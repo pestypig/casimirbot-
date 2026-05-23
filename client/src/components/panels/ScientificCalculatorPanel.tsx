@@ -14,6 +14,7 @@ import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
+import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
@@ -78,10 +79,15 @@ function resolveSolveTrace(lastSolve: { trace?: ScientificSolveTrace; input_late
   };
 }
 
-function setupVariableText(variable: { symbol: string; value: string; unit?: string | null; meaning?: string | null }): string {
+function setupVariableText(variable: { symbol: string; value: string; unit?: string | null; meaning?: string | null; dimension_signature?: string | null }): string {
   const unit = variable.unit ? ` ${variable.unit}` : "";
   const meaning = variable.meaning ? ` (${variable.meaning})` : "";
-  return `${variable.symbol} = ${variable.value}${unit}${meaning}`;
+  const dimension = variable.dimension_signature ? ` [${variable.dimension_signature}]` : "";
+  return `${variable.symbol} = ${variable.value}${unit}${meaning}${dimension}`;
+}
+
+function setupUnitOptionText(option: { symbol: string; quantity: string; si_factor: number }): string {
+  return option.si_factor === 1 ? option.symbol : `${option.symbol} -> SI x ${option.si_factor}`;
 }
 
 export default function ScientificCalculatorPanel() {
@@ -248,14 +254,71 @@ export default function ScientificCalculatorPanel() {
             {lastSetup.equation ? <div className="mt-1 font-mono text-slate-300">{lastSetup.equation}</div> : null}
             {lastSetup.variables?.length ? (
               <div className="mt-2 flex flex-wrap gap-2">
-                {lastSetup.variables.map((variable) => (
+                {lastSetup.variables.map((variable: HelixCalculatorSetupVariable) => (
                   <Badge key={`${variable.symbol}:${variable.value}`} variant="outline" className="border-slate-600 text-slate-200">
                     {setupVariableText(variable)}
                   </Badge>
                 ))}
               </div>
             ) : null}
-            {lastSetup.result_unit ? <div className="mt-2 text-slate-400">Result unit: {lastSetup.result_unit}</div> : null}
+            <div className="mt-3 rounded border border-slate-800 bg-slate-900/50 p-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Units & Dimensions</div>
+              <div className="flex flex-wrap gap-2">
+                {lastSetup.unit_system ? (
+                  <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                    system: {lastSetup.unit_system}
+                  </Badge>
+                ) : null}
+                {lastSetup.result_quantity ? (
+                  <Badge variant="outline" className="border-slate-600 text-slate-200">
+                    quantity: {lastSetup.result_quantity}
+                  </Badge>
+                ) : null}
+                {lastSetup.result_unit ? (
+                  <Badge variant="outline" className="border-slate-600 text-slate-200">
+                    result: {lastSetup.result_unit}
+                  </Badge>
+                ) : null}
+                {lastSetup.result_dimension_signature ? (
+                  <Badge variant="outline" className="border-slate-600 text-slate-200">
+                    dimension: {lastSetup.result_dimension_signature}
+                  </Badge>
+                ) : null}
+              </div>
+              {lastSetup.input_units && Object.keys(lastSetup.input_units).length > 0 ? (
+                <div className="mt-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Input Units</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(lastSetup.input_units as Record<string, string>).map(([symbol, unit]: [string, string]) => (
+                      <Badge key={`${symbol}:${unit}`} variant="outline" className="border-slate-700 text-slate-300">
+                        {symbol}: {unit}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {lastSetup.unit_options?.length ? (
+                <div className="mt-2">
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Compatible Units</div>
+                  <div className="flex flex-wrap gap-2">
+                    {lastSetup.unit_options.slice(0, 8).map((option: { symbol: string; quantity: string; si_factor: number }) => (
+                      <Badge key={option.symbol} variant="outline" className="border-slate-700 text-slate-300">
+                        {setupUnitOptionText(option)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {lastSetup.assumptions?.length ? (
+                <div className="mt-2 space-y-1">
+                  {lastSetup.assumptions.map((assumption: string, index: number) => (
+                    <div key={`${assumption}:${index}`} className="text-[11px] text-slate-400">
+                      {assumption}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
         <div className="flex flex-wrap gap-2">

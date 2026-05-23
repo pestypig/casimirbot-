@@ -173,6 +173,67 @@ describe("helix ask E50 terminal consistency", () => {
     expect(answerText(response.body)).not.toMatch(/calculator panel|x\+9|attached image/i);
   }, 60000);
 
+  it("fails visual screen prompts cleanly when capture permission is denied", async () => {
+    const app = createApp();
+    const sessionId = `e50-visual-permission-denied-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is visible on my screen right now?",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          docContextPath: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          hasDocContext: true,
+          docContextValid: true,
+          hasNoteContext: false,
+          hasClipboardContext: false,
+          lastWorkspaceAction: null,
+          lastUpdatedAtMs: Date.now(),
+          visual_context_capability: {
+            schema: "helix.visual_context_capability.v1",
+            source_id: "src:visual-denied",
+            label: "Visual screen capture",
+            status: "error",
+            error: "Permission denied",
+            evidence_available: false,
+            latest_evidence_ref: null,
+            requires_agent_step_selection: true,
+            promotion_policy: "available_tool_not_forced_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      })
+      .expect(200);
+
+    const visualCapability = response.body?.available_capabilities?.capabilities?.find(
+      (capability: any) => capability?.capability_key === "situation-room.describe_visual_capture",
+    );
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("visual_capture_describe");
+    expect(response.body?.source_target_intent?.target_source).toBe("visual_capture");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.terminal_error_code).toBe("visual_capture_permission_denied");
+    expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("not_satisfied");
+    expect(response.body?.goal_satisfaction_evaluation?.next_decision).toBe("fail_closed");
+    expect(artifactKinds(response.body)).toEqual(expect.arrayContaining(["visual_context_capability", "typed_failure", "goal_satisfaction_evaluation"]));
+    expect(visualCapability).toEqual(
+      expect.objectContaining({
+        capability_key: "situation-room.describe_visual_capture",
+        availability: "permission_denied",
+        tool_context_ref: "src:visual-denied",
+      }),
+    );
+    expect(answerText(response.body)).toMatch(/visual capture permission is denied/i);
+    expect(answerText(response.body)).not.toMatch(/^Active doc:|\/docs\//i);
+    expect(response.body?.terminal_error_code).not.toBe("poison_clean_but_authority_failed");
+    expect(response.body?.terminal_error_code).not.toBe("solver_path_incomplete_before_terminal");
+  }, 60000);
+
   it("honors explicit no-workspace constraints before workstation source targeting", async () => {
     const app = createApp();
     const activePath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";

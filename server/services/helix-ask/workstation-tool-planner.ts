@@ -10,6 +10,13 @@ import {
   type HelixCalculatorSetupContext,
   type HelixCalculatorSetupVariable,
 } from "../../../shared/helix-calculator-setup-context";
+import {
+  findHelixUnitDefinition,
+  formatHelixDimensionSignature,
+  helixUnitsForQuantity,
+  inferHelixDimensionForUnit,
+  inferHelixQuantityForUnit,
+} from "../../../shared/helix-physical-units";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -111,6 +118,25 @@ function stripCalculatorInstructionTail(value: string): string {
     .trim();
 }
 
+function stripCalculatorUnitTail(value: string): string {
+  return value
+    .replace(/\s+(?:joules?|j|hz|hertz|electronvolts?|ev|kg|m\/s|meters?|metres?|seconds?|sec|s|newtons?|n)\b[\s.,;:!?)]*$/i, "")
+    .trim();
+}
+
+function normalizeCalculatorExpressionCandidate(value: string): string {
+  return stripCalculatorUnitTail(stripCalculatorInstructionTail(stripOuterPunctuation(value)));
+}
+
+function numericArithmeticRhsFromAssignment(value: string): string | null {
+  const match = value.match(/^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*(.+)$/);
+  if (!match) return null;
+  const rhs = stripCalculatorUnitTail(stripExpressionPunctuation(match[1])).replace(/\s+/g, "");
+  if (!rhs || !/\d/.test(rhs) || !/[+\-*/^]/.test(rhs)) return null;
+  if (!parensBalanced(rhs)) return null;
+  return /^[()+\-*/^\d.eE]+$/.test(rhs) ? rhs : null;
+}
+
 function stripCalculatorInstructionHead(value: string): string {
   return value
     .replace(
@@ -135,11 +161,11 @@ function extractQuoted(prompt: string): string | null {
 
 function extractInlineMathExpression(value: string): string | null {
   const coefficientEquation = value.match(/(?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*\*\s*)?[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)+\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/i)?.[0];
-  if (coefficientEquation) return stripOuterPunctuation(coefficientEquation);
+  if (coefficientEquation) return normalizeCalculatorExpressionCandidate(coefficientEquation);
   const assignment = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\([^)]*\))?\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
-  if (assignment) return stripOuterPunctuation(assignment);
+  if (assignment) return numericArithmeticRhsFromAssignment(assignment) ?? normalizeCalculatorExpressionCandidate(assignment);
   const equation = value.match(/\b[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)+\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/)?.[0];
-  if (equation) return stripOuterPunctuation(equation);
+  if (equation) return normalizeCalculatorExpressionCandidate(equation);
   return extractArithmeticCandidate(value);
 }
 
@@ -163,6 +189,22 @@ function extractFrequencyValue(value: string): string | null {
   );
 }
 
+function extractKineticEnergyExpression(value: string): string | null {
+  if (!/\bkinetic\s+energy\b|\bke\b|\b1\/2\s*m\s*v/i.test(value)) return null;
+  const number = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
+  const mass =
+    value.match(new RegExp(`\\bm(?:ass)?\\s*(?:=|is|of)?\\s*(${number})\\s*(?:kg|kilograms?)\\b`, "i"))?.[1] ??
+    value.match(new RegExp(`\\b(${number})\\s*(?:kg|kilograms?)\\b`, "i"))?.[1] ??
+    null;
+  const speed =
+    value.match(new RegExp(`\\bv(?:elocity|speed)?\\s*(?:=|is|of)?\\s*(${number})\\s*(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)\\b`, "i"))?.[1] ??
+    value.match(new RegExp(`\\b(?:moving|travell?ing|going)\\s+(?:at\\s+)?(${number})\\s*(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)\\b`, "i"))?.[1] ??
+    value.match(new RegExp(`\\b(${number})\\s*(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)\\b`, "i"))?.[1] ??
+    null;
+  if (!mass || !speed) return null;
+  return `0.5*${mass}*${speed}^2`;
+}
+
 function parseKineticEnergyVariables(expression: string): HelixCalculatorSetupVariable[] {
   const normalized = expression.replace(/\s+/g, "");
   const match = normalized.match(/^0\.5\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\^2$/i);
@@ -173,12 +215,65 @@ function parseKineticEnergyVariables(expression: string): HelixCalculatorSetupVa
   ];
 }
 
+function defaultAssumptionsForCalculatorSetup(setup: HelixCalculatorSetupContext): string[] {
+  if (setup.assumptions?.length) return setup.assumptions;
+  if (setup.domain === "photon_energy") {
+    return ["SI quantity calculus; constants and wavelength/frequency values are interpreted in SI-compatible units."];
+  }
+  if (setup.domain === "wavelength") {
+    return ["Vacuum light-speed approximation is used when c appears as 3e8 m/s."];
+  }
+  if (setup.domain === "kinetic_energy") {
+    return ["Non-relativistic kinetic energy model KE = 1/2 m v^2."];
+  }
+  return [];
+}
+
+function enrichCalculatorSetupUnits(setup: HelixCalculatorSetupContext): HelixCalculatorSetupContext {
+  const variables = (setup.variables ?? []).map((variable) => {
+    const unitDefinition = findHelixUnitDefinition(variable.unit);
+    const dimension = variable.dimension ?? unitDefinition?.dimension ?? null;
+    return {
+      ...variable,
+      quantity: variable.quantity ?? unitDefinition?.quantity ?? null,
+      dimension,
+      dimension_signature: variable.dimension_signature ?? formatHelixDimensionSignature(dimension),
+    };
+  });
+  const inputUnits = Object.fromEntries(
+    variables
+      .filter((variable) => variable.unit)
+      .map((variable) => [variable.symbol, variable.unit as string]),
+  );
+  const resultQuantity =
+    setup.result_quantity ??
+    inferHelixQuantityForUnit(setup.result_unit) ??
+    (setup.domain === "photon_energy" || setup.domain === "kinetic_energy"
+      ? "energy"
+      : setup.domain === "wavelength"
+        ? "length"
+        : null);
+  const resultDimension = setup.result_dimension ?? inferHelixDimensionForUnit(setup.result_unit);
+  return {
+    ...setup,
+    variables,
+    quantity: setup.quantity ?? resultQuantity,
+    unit_system: setup.unit_system ?? (setup.result_unit || variables.some((variable) => variable.unit) ? "SI" : null),
+    input_units: setup.input_units ?? (Object.keys(inputUnits).length ? inputUnits : undefined),
+    result_quantity: resultQuantity,
+    result_dimension: resultDimension,
+    result_dimension_signature: setup.result_dimension_signature ?? formatHelixDimensionSignature(resultDimension),
+    assumptions: defaultAssumptionsForCalculatorSetup(setup),
+    unit_options: setup.unit_options ?? helixUnitsForQuantity(resultQuantity),
+  };
+}
+
 function buildCalculatorSetupContext(prompt: string, expression: string | null): HelixCalculatorSetupContext | null {
   if (!expression) return null;
   const normalized = normalizePrompt(prompt);
   const frequency = extractFrequencyValue(normalized);
   if (/\bphoton\b|\be\s*=\s*h\s*f\b|planck/i.test(normalized) && frequency) {
-    return {
+    return enrichCalculatorSetupUnits({
       schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
       expression,
       display_latex: expression,
@@ -191,11 +286,27 @@ function buildCalculatorSetupContext(prompt: string, expression: string | null):
       ],
       result_unit: "J",
       interpretation_prompt: "Use the calculator result as the energy of one photon at the supplied frequency.",
-    };
+    });
+  }
+  if (/\bphoton\b[\s\S]{0,80}\benergy\b|\benergy\b[\s\S]{0,80}\bphoton\b|planck/i.test(normalized)) {
+    return enrichCalculatorSetupUnits({
+      schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+      expression,
+      display_latex: expression,
+      domain: "photon_energy",
+      subgoal: "Compute photon energy from the supplied expression.",
+      equation: "E = h c / lambda",
+      variables: [
+        ...(expression.includes("6.626") ? [{ symbol: "h", value: "6.626e-34", unit: "J*s", meaning: "Planck constant" }] : []),
+        ...(expression.includes("3.0e8") || expression.includes("3e8") ? [{ symbol: "c", value: "3.0e8", unit: "m/s", meaning: "speed of light" }] : []),
+      ],
+      result_unit: "J",
+      interpretation_prompt: "Use the calculator result as the energy of one photon for the supplied expression.",
+    });
   }
   if (/\bwavelength\b|\blambda\b|\\lambda|c\s*\/\s*f/i.test(normalized)) {
     const divisor = expression.replace(/\s+/g, "").match(/^\(?3e8\)?\/\(?([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\)?$/i)?.[1];
-    return {
+    return enrichCalculatorSetupUnits({
       schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
       expression,
       display_latex: expression,
@@ -208,10 +319,10 @@ function buildCalculatorSetupContext(prompt: string, expression: string | null):
       ],
       result_unit: "m",
       interpretation_prompt: "Use the calculator result as the wavelength for the supplied light frequency.",
-    };
+    });
   }
   if (/\bkinetic\s+energy\b|\bke\s*=|\b1\/2\s*m\s*v/i.test(normalized)) {
-    return {
+    return enrichCalculatorSetupUnits({
       schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
       expression,
       display_latex: expression,
@@ -221,9 +332,9 @@ function buildCalculatorSetupContext(prompt: string, expression: string | null):
       variables: parseKineticEnergyVariables(expression),
       result_unit: "J",
       interpretation_prompt: "Use the calculator result as the non-relativistic kinetic energy for the supplied values.",
-    };
+    });
   }
-  return {
+  return enrichCalculatorSetupUnits({
     schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
     expression,
     display_latex: expression,
@@ -233,7 +344,7 @@ function buildCalculatorSetupContext(prompt: string, expression: string | null):
     variables: [],
     result_unit: null,
     interpretation_prompt: null,
-  };
+  });
 }
 
 function calculatorArgs(latex: string | null, setup: HelixCalculatorSetupContext | null): Record<string, unknown> {
@@ -249,6 +360,8 @@ export function extractCalculatorExpression(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
   const photonEnergyExpression = extractPhotonEnergyExpression(normalized);
   if (photonEnergyExpression) return photonEnergyExpression;
+  const kineticEnergyExpression = extractKineticEnergyExpression(normalized);
+  if (kineticEnergyExpression) return kineticEnergyExpression;
 
   const colonTail = normalized.match(/(?:equation|expression|claim|calculator|solve|evaluate|compute|check|verify)[^:]{0,120}:\s*(.+)$/i)?.[1];
   if (colonTail) {
@@ -261,7 +374,7 @@ export function extractCalculatorExpression(prompt: string): string | null {
     if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
     const arithmetic = extractArithmeticCandidate(candidate);
     if (arithmetic) return arithmetic;
-    if (/[=+\-*/^]|\\frac|\\sqrt|\d/.test(candidate)) return stripOuterPunctuation(candidate);
+    if (/[=+\-*/^]|\\frac|\\sqrt/.test(candidate)) return stripOuterPunctuation(candidate);
   }
 
   const quoted = extractQuoted(normalized);
@@ -274,7 +387,7 @@ export function extractCalculatorExpression(prompt: string): string | null {
     if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
     const arithmetic = extractArithmeticCandidate(cleaned);
     if (arithmetic) return arithmetic;
-    if (/[=+\-*/^]|\\frac|\\sqrt|\d/.test(cleaned)) {
+    if (/[=+\-*/^]|\\frac|\\sqrt/.test(cleaned)) {
       return stripOuterPunctuation(cleaned);
     }
   }
@@ -283,7 +396,7 @@ export function extractCalculatorExpression(prompt: string): string | null {
   if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
 
   const calculatorTail = normalized.match(/\b(?:calculator|calc)\b\s*(.+)$/i)?.[1];
-  if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt|\d/.test(calculatorTail)) {
+  if (calculatorTail && /[=+\-*/^]|\\frac|\\sqrt/.test(calculatorTail)) {
     const cleaned = stripCalculatorInstructionTail(calculatorTail);
     return extractInlineMathExpression(cleaned) ?? extractArithmeticCandidate(cleaned) ?? stripOuterPunctuation(cleaned);
   }

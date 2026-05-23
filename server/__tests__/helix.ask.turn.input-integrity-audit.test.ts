@@ -94,4 +94,29 @@ describe("helix ask turn input integrity audit", () => {
       }),
     );
   });
+
+  it("allows live visual tool requests to reach the agent loop without committed image input", () => {
+    const requestBody = {
+      question: "What is visible on my screen right now?",
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:live-visual-tool",
+    });
+
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        text_input_count: 1,
+        image_input_count: 0,
+        evidence_ref_count: 0,
+      }),
+    );
+  });
 });

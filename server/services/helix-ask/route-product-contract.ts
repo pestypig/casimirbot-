@@ -211,7 +211,7 @@ export function buildRouteProductContract(input: {
         : explicitBindingDiagnosis
           ? ["situation_context_pack", "live_environment_binding_diagnosis"]
           : ["situation_context_pack"],
-      allowedExtra: ["live_visual_answer", "live_source_typed_failure", "visual_frame_evidence", "source_binding_status", "source_binding_repair_candidate"],
+      allowedExtra: ["live_visual_answer", "live_source_typed_failure", "typed_failure", "visual_frame_evidence", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: ["active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location", "client_projection", "no_tool_direct", "model_only_concept", "panel_generated_answer", "process_graph_overview"],
       precedenceReason: "visual_source_target_allows_current_situation_terminal_products",
     });

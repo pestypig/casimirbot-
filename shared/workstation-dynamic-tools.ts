@@ -1053,6 +1053,19 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
   if (arg === "calculator_setup") {
+    const physicalDimensionSchema = {
+      type: "object",
+      properties: {
+        length: { type: "number" },
+        mass: { type: "number" },
+        time: { type: "number" },
+        electric_current: { type: "number" },
+        thermodynamic_temperature: { type: "number" },
+        amount_of_substance: { type: "number" },
+        luminous_intensity: { type: "number" },
+      },
+      additionalProperties: false,
+    };
     return {
       type: "object",
       additionalProperties: true,
@@ -1063,7 +1076,50 @@ function argSchema(arg: string): Record<string, unknown> {
         subgoal: { type: "string" },
         domain: { enum: ["photon_energy", "kinetic_energy", "wavelength", "generic"] },
         equation: { type: "string" },
+        variables: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+            properties: {
+              symbol: { type: "string" },
+              value: { type: "string" },
+              unit: { type: "string" },
+              meaning: { type: "string" },
+              quantity: { type: "string" },
+              dimension: physicalDimensionSchema,
+              dimension_signature: { type: "string" },
+            },
+            required: ["symbol", "value"],
+          },
+        },
+        quantity: { type: "string" },
+        unit_system: { enum: ["SI", "custom"] },
+        input_units: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
         result_unit: { type: "string" },
+        result_quantity: { type: "string" },
+        result_dimension: physicalDimensionSchema,
+        result_dimension_signature: { type: "string" },
+        assumptions: { type: "array", items: { type: "string" } },
+        unit_options: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: true,
+            properties: {
+              symbol: { type: "string" },
+              label: { type: "string" },
+              quantity: { type: "string" },
+              dimension: physicalDimensionSchema,
+              si_factor: { type: "number" },
+              aliases: { type: "array", items: { type: "string" } },
+            },
+            required: ["symbol", "label", "quantity", "dimension", "si_factor"],
+          },
+        },
       },
       required: ["schema", "expression", "display_latex", "subgoal", "domain"],
     };

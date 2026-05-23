@@ -111,6 +111,27 @@ function normalizeCalculatorActionLatex(value: string): string {
   return candidate;
 }
 
+function isCalculatorActionExpression(value: string | null | undefined): value is string {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/\b(?:einstein\s+tensor|qi\s+guardrail|natario|warp\.?metric|adm|stress[-\s]?energy)\b/i.test(trimmed)) {
+    return true;
+  }
+  if (/\\(?:frac|sqrt|lambda|sum|int)\b/i.test(trimmed)) return true;
+  if (/[=+\-*/^]/.test(trimmed) && /[A-Za-z0-9]/.test(trimmed)) return true;
+  return false;
+}
+
+function resolveCalculatorActionLatex(rawLatex: string | null, calculatorSetup: HelixCalculatorSetupContext | null): string | null {
+  const setupExpression = calculatorSetup?.display_latex ?? calculatorSetup?.expression ?? null;
+  const normalizedSetup = setupExpression ? normalizeCalculatorActionLatex(setupExpression) : null;
+  const normalizedRaw = rawLatex ? normalizeCalculatorActionLatex(rawLatex) : null;
+  if (isCalculatorActionExpression(normalizedSetup)) return normalizedSetup;
+  if (isCalculatorActionExpression(normalizedRaw)) return normalizedRaw;
+  return null;
+}
+
 function asCalculatorSetupContext(value: unknown): HelixCalculatorSetupContext | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -2691,7 +2712,7 @@ export function executeHelixPanelAction(
 
     if (actionId === "ingest_latex") {
       const rawLatex = asNonEmptyString(args.latex ?? args.expression ?? args.text);
-      let latex = rawLatex ? normalizeCalculatorActionLatex(rawLatex) : rawLatex;
+      let latex = rawLatex === "$clipboard" ? rawLatex : resolveCalculatorActionLatex(rawLatex, calculatorSetup);
       if (rawLatex === "$clipboard" && typeof navigator !== "undefined" && navigator.clipboard?.readText) {
         // Non-blocking clipboard fallback for deterministic action calls.
         void navigator.clipboard.readText().then((clipboardText) => {
@@ -2717,7 +2738,7 @@ export function executeHelixPanelAction(
           message:
             rawLatex === "$clipboard"
               ? "Attempting clipboard ingest for scientific-calculator."
-              : "scientific-calculator.ingest_latex requires latex.",
+              : "scientific-calculator.ingest_latex requires a calculator expression, not prose.",
         };
       }
       const sourcePath = asNonEmptyString(args.source_path ?? args.path ?? args.source);
@@ -2758,7 +2779,15 @@ export function executeHelixPanelAction(
 
     if (actionId === "solve_expression" || actionId === "solve_with_steps") {
       const rawLatexArg = asNonEmptyString(args.latex ?? args.expression ?? args.text);
-      const latexArg = rawLatexArg ? normalizeCalculatorActionLatex(rawLatexArg) : rawLatexArg;
+      const latexArg = resolveCalculatorActionLatex(rawLatexArg, calculatorSetup);
+      if (rawLatexArg && !latexArg) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "scientific-calculator.solve_expression requires a calculator expression, not prose.",
+        };
+      }
       const latex = latexArg ?? scientificState.currentLatex;
       if (!latex.trim()) {
         return {
@@ -2796,6 +2825,14 @@ export function executeHelixPanelAction(
           result_text: solveResult.result_text,
           result_latex: solveResult.result_latex ?? "",
           calculator_setup: calculatorSetup,
+          result_unit: calculatorSetup?.result_unit ?? null,
+          result_quantity: calculatorSetup?.result_quantity ?? calculatorSetup?.quantity ?? null,
+          result_dimension: calculatorSetup?.result_dimension ?? null,
+          result_dimension_signature: calculatorSetup?.result_dimension_signature ?? null,
+          unit_system: calculatorSetup?.unit_system ?? null,
+          input_units: calculatorSetup?.input_units ?? null,
+          unit_options: calculatorSetup?.unit_options ?? [],
+          assumptions: calculatorSetup?.assumptions ?? [],
           variable: solveResult.variable,
           steps_count: solveResult.steps.length,
           steps: solveResult.steps,
@@ -2965,6 +3002,14 @@ export function executeHelixPanelAction(
           live_solve_steps: latestLiveSource.liveSolveSteps,
           active_live_step_id: latestLiveSource.activeLiveStepId,
           calculator_setup: latestLiveSource.calculatorSetup ?? calculatorSetup ?? null,
+          result_unit: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.result_unit ?? null,
+          result_quantity: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.result_quantity ?? (latestLiveSource.calculatorSetup ?? calculatorSetup)?.quantity ?? null,
+          result_dimension: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.result_dimension ?? null,
+          result_dimension_signature: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.result_dimension_signature ?? null,
+          unit_system: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.unit_system ?? null,
+          input_units: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.input_units ?? null,
+          unit_options: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.unit_options ?? [],
+          assumptions: (latestLiveSource.calculatorSetup ?? calculatorSetup)?.assumptions ?? [],
           evidence_refs: latestLiveSource.latestTick
             ? [`calculator:live:${latestLiveSource.latestTick.trace.calculator_trace_id}`]
             : requestedEquation

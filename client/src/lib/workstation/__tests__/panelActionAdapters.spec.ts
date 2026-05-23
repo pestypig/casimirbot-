@@ -557,6 +557,10 @@ describe("panelActionAdapters", () => {
             display_latex: "1.602e-19*5",
             subgoal: "Evaluate the supplied calculator expression.",
             domain: "generic",
+            result_unit: "J",
+            result_quantity: "energy",
+            result_dimension_signature: "L^2 M T^-2",
+            unit_system: "SI",
             variables: [],
           },
         },
@@ -572,7 +576,69 @@ describe("panelActionAdapters", () => {
     expect(solve.ok).toBe(true);
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("1.602e-19*5");
     expect(solve.artifact?.result_text).toBe("8.01e-19");
+    expect(solve.artifact?.result_unit).toBe("J");
+    expect(solve.artifact?.result_quantity).toBe("energy");
+    expect(solve.artifact?.result_dimension_signature).toBe("L^2 M T^-2");
+    expect(solve.artifact?.unit_system).toBe("SI");
     expect(String(solve.artifact?.normalized_expression)).not.toContain("with the scientific calculator");
+  });
+
+  it("uses calculator setup expression instead of prompt prose for workstation solves", () => {
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: "what is kinetic energy of 2 kg moving at 15 meters per second",
+          calculator_setup: {
+            schema: "helix.calculator_setup_context.v1",
+            expression: "0.5*2*15^2",
+            display_latex: "0.5*2*15^2",
+            subgoal: "Compute kinetic energy from KE = 1/2 m v^2.",
+            equation: "KE = 1/2 m v^2",
+            domain: "kinetic_energy",
+            result_unit: "J",
+            result_quantity: "energy",
+            result_dimension_signature: "L^2 M T^-2",
+            unit_system: "SI",
+            variables: [],
+          },
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(true);
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("0.5*2*15^2");
+    expect(solve.artifact?.result_text).toBe("225");
+  });
+
+  it("rejects prose-only calculator action args without mutating calculator input", () => {
+    useScientificCalculatorStore.getState().clear();
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: "what is kinetic energy of 2 kg moving at 15 meters per second",
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(false);
+    expect(solve.message).toContain("not prose");
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
   });
 
   it("delegates Situation Room source and pipeline actions", () => {

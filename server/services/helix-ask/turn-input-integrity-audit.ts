@@ -25,6 +25,9 @@ const VISUAL_PROMPT_PATTERN =
 const ATTACHED_VISUAL_PATTERN =
   /\battached\b[\s\S]{0,60}\b(?:image|screenshot|picture|photo|frame)\b|\b(?:image|screenshot|picture|photo|frame)\b[\s\S]{0,60}\battached\b/i;
 
+const COMMITTED_VISUAL_REFERENCE_PATTERN =
+  /\b(?:this|that|the)\s+(?:image|screenshot|picture|photo|frame)\b/i;
+
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -33,6 +36,9 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 export const helixTurnInputLooksVisual = (text: string): boolean =>
   VISUAL_PROMPT_PATTERN.test(text) || ATTACHED_VISUAL_PATTERN.test(text);
+
+export const helixTurnInputRequiresCommittedVisual = (text: string): boolean =>
+  ATTACHED_VISUAL_PATTERN.test(text) || COMMITTED_VISUAL_REFERENCE_PATTERN.test(text);
 
 export function auditHelixTurnInputIntegrity(input: {
   userText: string;
@@ -54,11 +60,20 @@ export function auditHelixTurnInputIntegrity(input: {
     }
     return false;
   });
+  const workspaceSnapshot = asRecord(input.request.workspace_context_snapshot);
+  const visualContextCapability = asRecord(workspaceSnapshot?.visual_context_capability);
+  const hasVisualToolCapability =
+    Boolean(visualContextCapability) &&
+    (
+      visualContextCapability?.requires_agent_step_selection === true ||
+      Boolean(readString(visualContextCapability?.status)) ||
+      Boolean(readString(visualContextCapability?.source_id))
+    );
 
-  if (helixTurnInputLooksVisual(input.userText) && !hasValidVisualInput) {
+  if (helixTurnInputRequiresCommittedVisual(input.userText) && !hasValidVisualInput && !hasVisualToolCapability) {
     violations.push({
       kind: "visual_prompt_without_visual_input",
-      summary: "The prompt asks about visual input, but the committed turn has no valid image or visual evidence item.",
+      summary: "The prompt refers to a committed visual input, but the turn has no valid image or visual evidence item.",
     });
   }
 

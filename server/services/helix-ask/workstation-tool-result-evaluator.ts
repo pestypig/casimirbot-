@@ -111,10 +111,16 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
 
   const supportValue = input.supports_goal ?? (receiptIds.length > 0 || lastActionStep ? true : "unknown");
   const calculatorSetup = calculatorSetupFromPlan(input.plan);
+  const calculatorUnitSummary =
+    calculatorSetup?.result_unit || calculatorSetup?.result_dimension_signature
+      ? ` Result unit: ${calculatorSetup.result_unit ?? "unspecified"}${
+          calculatorSetup.result_dimension_signature ? ` (${calculatorSetup.result_dimension_signature})` : ""
+        }.`
+      : "";
   const summary =
     input.summary?.trim() ||
     (calculatorSetup
-      ? `${lastActionStep?.panel_id ?? "workstation"}.${lastActionStep?.action_id ?? "action"} produced ${calculatorSetup.domain} evidence for ${input.plan.intent}: ${calculatorSetup.subgoal}`
+      ? `${lastActionStep?.panel_id ?? "workstation"}.${lastActionStep?.action_id ?? "action"} produced ${calculatorSetup.domain} evidence for ${input.plan.intent}: ${calculatorSetup.subgoal}${calculatorUnitSummary}`
       : "") ||
     `${lastActionStep?.panel_id ?? "workstation"}.${lastActionStep?.action_id ?? "action"} produced evidence for ${input.plan.intent}.`;
   const mapped = mapIntentToCategorization(input.plan.intent);

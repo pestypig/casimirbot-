@@ -61,9 +61,16 @@ describe("Helix Ask workstation tool planner", () => {
           domain: "wavelength",
           expression: "(3e8)/(5e14)",
           result_unit: "m",
+          result_quantity: "length",
+          result_dimension_signature: "L",
+          unit_system: "SI",
+          input_units: expect.objectContaining({
+            c: "m/s",
+            f: "Hz",
+          }),
           variables: expect.arrayContaining([
-            expect.objectContaining({ symbol: "c", value: "3e8", unit: "m/s" }),
-            expect.objectContaining({ symbol: "f", value: "5e14", unit: "Hz" }),
+            expect.objectContaining({ symbol: "c", value: "3e8", unit: "m/s", dimension_signature: "L T^-1" }),
+            expect.objectContaining({ symbol: "f", value: "5e14", unit: "Hz", dimension_signature: "T^-1" }),
           ]),
         }),
       }),
@@ -85,9 +92,71 @@ describe("Helix Ask workstation tool planner", () => {
           domain: "photon_energy",
           equation: "E = h f",
           result_unit: "J",
+          result_quantity: "energy",
+          result_dimension_signature: "L^2 M T^-2",
+          unit_system: "SI",
+          unit_options: expect.arrayContaining([
+            expect.objectContaining({ symbol: "J", quantity: "energy" }),
+            expect.objectContaining({ symbol: "eV", quantity: "energy" }),
+          ]),
         }),
       }),
     });
+  });
+
+  it("strips assignment labels and units from direct photon energy calculator expressions", () => {
+    const prompt = "Use the scientific calculator to compute photon energy E=(6.626e-34*3.0e8)/(500e-9) joules, then explain the result.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBe("(6.626e-34*3.0e8)/(500e-9)");
+    expect(plan.intent).toBe("calculator_solve");
+    expect(plan.action).toEqual({
+      panel_id: "scientific-calculator",
+      action_id: "solve_expression",
+      args: expect.objectContaining({
+        latex: "(6.626e-34*3.0e8)/(500e-9)",
+        calculator_setup: expect.objectContaining({
+          domain: "photon_energy",
+          expression: "(6.626e-34*3.0e8)/(500e-9)",
+          result_unit: "J",
+          result_quantity: "energy",
+          result_dimension_signature: "L^2 M T^-2",
+          unit_system: "SI",
+          input_units: expect.objectContaining({
+            h: "J*s",
+            c: "m/s",
+          }),
+        }),
+      }),
+    });
+  });
+
+  it("synthesizes kinetic-energy expressions from natural-language values", () => {
+    const prompt = "Use calculator what is kinetic energy of 2 kg moving at 15 meters per second";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBe("0.5*2*15^2");
+    expect(plan.intent).toBe("calculator_solve");
+    expect(plan.action).toEqual({
+      panel_id: "scientific-calculator",
+      action_id: "solve_expression",
+      args: expect.objectContaining({
+        latex: "0.5*2*15^2",
+        calculator_setup: expect.objectContaining({
+          domain: "kinetic_energy",
+          expression: "0.5*2*15^2",
+          result_unit: "J",
+          variables: expect.arrayContaining([
+            expect.objectContaining({ symbol: "m", value: "2", unit: "kg", dimension_signature: "M" }),
+            expect.objectContaining({ symbol: "v", value: "15", unit: "m/s", dimension_signature: "L T^-1" }),
+          ]),
+        }),
+      }),
+    });
+  });
+
+  it("does not treat prose with numbers as a calculator expression", () => {
+    expect(extractCalculatorExpression("Use calculator what is the mass of 2 kg in this example")).toBeNull();
   });
 
   it("routes explicit calculator live-source prompts to equation stream startup", () => {
