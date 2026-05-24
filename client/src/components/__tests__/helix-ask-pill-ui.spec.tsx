@@ -343,6 +343,19 @@ describe("HelixAskPill mic-first surface contract", () => {
     });
   });
 
+  it("exposes UI/debug parity hooks without making clipboard copy part of prompt submission", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
+    expect(source).toContain("data-testid={latestFinalAnswerTestId}");
+    expect(source).toContain("data-final-answer-text={finalAnswerRawText}");
+    expect(source).toContain("data-visible-terminal-source={transcriptTerminal.source}");
+    expect(source).toContain("data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? \"\"}");
+    expect(source).toContain("ui_debug_parity_harness");
+    expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY__");
+    expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__");
+    expect(source).toContain("clipboard_debug_copy_required_for_prompt_submission: false");
+  });
+
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("buildHelixTurnTranscriptRows");

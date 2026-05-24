@@ -10413,6 +10413,54 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit;
   const runtimeContinuationHints =
     payload.runtime_continuation_hints ?? debug?.runtime_continuation_hints ?? agentLoop?.runtime_continuation_hints;
+  const findLedgerPayloadByKind = (kind: string): Record<string, unknown> | null =>
+    readAgentLoopAuditRecord(
+      ledger
+        .map((artifact) => readAgentLoopAuditRecord(artifact))
+        .reverse()
+        .find((artifact) => artifact?.kind === kind)?.payload,
+    );
+  const collectCoveragePayloads = (): Record<string, unknown>[] =>
+    ledger
+      .map((artifact) => readAgentLoopAuditRecord(artifact))
+      .filter((artifact) => {
+        const kind = coerceText(artifact?.kind).trim();
+        return kind === "calculator_plan_coverage" || /_coverage$/.test(kind);
+      })
+      .map((artifact) => readAgentLoopAuditRecord(artifact?.payload) ?? artifact)
+      .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+  const terminalPresentationForDebug = readAgentLoopAuditRecord(
+    payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation,
+  );
+  const calculatorPlannerResultForDebug =
+    readAgentLoopAuditRecord(
+      payload.calculator_planner_result ?? debug?.calculator_planner_result ?? agentLoop?.calculator_planner_result,
+    ) ?? findLedgerPayloadByKind("calculator_planner_result");
+  const calculatorPlannerRepairResultForDebug =
+    readAgentLoopAuditRecord(
+      payload.calculator_planner_repair_result ??
+        debug?.calculator_planner_repair_result ??
+        agentLoop?.calculator_planner_repair_result,
+    ) ?? findLedgerPayloadByKind("calculator_planner_repair_result");
+  const calculatorPlanCoverageForDebug =
+    readAgentLoopAuditRecord(
+      payload.calculator_plan_coverage ?? debug?.calculator_plan_coverage ?? agentLoop?.calculator_plan_coverage,
+    ) ?? findLedgerPayloadByKind("calculator_plan_coverage");
+  const promptRequirementCoverageForDebug =
+    readAgentLoopAuditRecord(
+      payload.prompt_requirement_coverage ?? debug?.prompt_requirement_coverage ?? agentLoop?.prompt_requirement_coverage,
+    ) ?? findLedgerPayloadByKind("prompt_requirement_coverage");
+  const finalAnswerRepairRequestForDebug =
+    readAgentLoopAuditRecord(
+      payload.final_answer_repair_request ?? debug?.final_answer_repair_request ?? agentLoop?.final_answer_repair_request,
+    ) ?? findLedgerPayloadByKind("final_answer_repair_request");
+  const finalAnswerDraftForDebug =
+    readAgentLoopAuditRecord(payload.final_answer_draft ?? debug?.final_answer_draft ?? agentLoop?.final_answer_draft) ??
+    findLedgerPayloadByKind("final_answer_draft");
+  const coverageArtifactsForDebug = collectCoveragePayloads();
+  const calculatorPanelStateForDebug = readAgentLoopAuditRecord(
+    payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state,
+  );
   const activeTurnId =
     coerceText(agentLoop?.terminal_artifact_owner_turn_id).trim() ||
     coerceText(debug?.turn_id).trim() ||
@@ -10476,6 +10524,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       : Array.isArray(agentLoop?.turn_transcript_events)
         ? agentLoop.turn_transcript_events
         : [],
+    terminal_answer_authority: terminalAuthorityForDebug,
+    terminal_presentation: terminalPresentationForDebug,
+    calculator_planner_result: calculatorPlannerResultForDebug,
+    calculator_planner_repair_result: calculatorPlannerRepairResultForDebug,
+    calculator_plan_coverage: calculatorPlanCoverageForDebug,
+    prompt_requirement_coverage: promptRequirementCoverageForDebug,
+    final_answer_repair_request: finalAnswerRepairRequestForDebug,
+    final_answer_draft: finalAnswerDraftForDebug,
+    coverage_artifacts: coverageArtifactsForDebug,
+    calculator_panel_state: calculatorPanelStateForDebug,
     route_history_debug: payload.route_history_debug,
     visible_projection_invariant: payload.visible_projection_invariant,
     workspace_action_debug: workspaceActionSource
@@ -10547,7 +10605,6 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       debug?.live_interpretation_epoch_delta ??
       agentLoop?.live_interpretation_epoch_delta,
     pending_server_request: agentLoop?.pending_request ?? payload.pending_server_request ?? payload.pending_request ?? null,
-    terminal_answer_authority: terminalAuthorityForDebug,
     poison_audit: payload.poison_audit ?? debug?.poison_audit ?? agentLoop?.poison_audit,
     prompt_poison_audit: payload.prompt_poison_audit ?? debug?.prompt_poison_audit ?? agentLoop?.prompt_poison_audit,
     selected_evidence_pack: payload.selected_evidence_pack ?? debug?.selected_evidence_pack ?? agentLoop?.selected_evidence_pack,
@@ -10582,8 +10639,44 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       ],
     },
   };
+  const visibleFinalAnswerForParity = coerceText(reply.content).trim() || selectedFinalAnswer || "";
+  const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
+  const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
+  const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)
+    ? calculatorPanelStateForDebug.visible_compound_run_ids
+        .map((value) => coerceText(value).trim())
+        .filter(Boolean)
+    : [];
+  const uiDebugParityHarness = {
+    schema: "helix.ui_debug_parity_harness.v1",
+    visible_final_answer: visibleFinalAnswerForParity,
+    selected_final_answer: selectedFinalAnswerForParity,
+    terminal_authority_text: terminalAuthorityText,
+    ui_answer_equals_selected_final_answer:
+      Boolean(visibleFinalAnswerForParity && selectedFinalAnswerForParity) &&
+      visibleFinalAnswerForParity === selectedFinalAnswerForParity,
+    ui_answer_equals_terminal_authority_text:
+      Boolean(visibleFinalAnswerForParity && terminalAuthorityText) && visibleFinalAnswerForParity === terminalAuthorityText,
+    has_terminal_authority: Boolean(terminalAuthorityForDebug),
+    has_goal_satisfaction: Boolean(goalSatisfactionEvaluation),
+    has_agent_runtime_loop: Boolean(agentRuntimeLoop),
+    has_coverage_artifact: coverageArtifactsForDebug.length > 0,
+    has_planner_artifact: Boolean(calculatorPlannerResultForDebug),
+    has_repair_artifact: Boolean(calculatorPlannerRepairResultForDebug),
+    has_receipt_artifact: ledger.some((artifact) => readAgentLoopAuditRecord(artifact)?.kind === "workspace_action_receipt"),
+    has_composer_artifact: Boolean(finalAnswerDraftForDebug),
+    calculator_panel_state: calculatorPanelStateForDebug,
+    calculator_panel_current_compound_run_id: currentCompoundRunIdForParity || null,
+    calculator_panel_visible_compound_run_ids: visibleCompoundRunIdsForParity,
+    calculator_panel_stale_compound_run_visible: Boolean(
+      currentCompoundRunIdForParity &&
+        visibleCompoundRunIdsForParity.some((runId) => runId !== currentCompoundRunIdForParity),
+    ),
+    clipboard_debug_copy_required_for_prompt_submission: false,
+  };
   return safeJsonStringify({
     ...envelopeWithoutHash,
+    ui_debug_parity_harness: uiDebugParityHarness,
     payload_hash: stableHelixProjectionHash(safeJsonStringify(envelopeWithoutHash)),
   });
 }
@@ -29104,6 +29197,9 @@ export function HelixAskPill({
                   <div
                     className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50"
                     data-testid={latestFinalAnswerTestId}
+                    data-final-answer-text={finalAnswerRawText}
+                    data-visible-terminal-source={transcriptTerminal.source}
+                    data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? ""}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Final answer</p>

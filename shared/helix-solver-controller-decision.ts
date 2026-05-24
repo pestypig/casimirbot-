@@ -18,7 +18,8 @@ export type HelixSolverControllerBlockingReason =
   | "terminal_kind_not_required"
   | "terminal_equivalence_missing"
   | "terminal_equivalence_failed"
-  | "subgoals_observed_not_satisfied";
+  | "subgoals_observed_not_satisfied"
+  | "prompt_requirement_coverage_incomplete";
 
 export type HelixSolverControllerDecision = {
   schema: typeof HELIX_SOLVER_CONTROLLER_DECISION_SCHEMA;

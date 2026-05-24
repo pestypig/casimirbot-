@@ -50,6 +50,86 @@ const readString = (value: unknown): string | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const collectLedgerPayloads = (
+  ledger: unknown[],
+  predicate: (artifact: Record<string, unknown>) => boolean,
+): Record<string, unknown>[] =>
+  ledger
+    .map(asRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact && predicate(artifact)))
+    .map((artifact) => asRecord(artifact.payload) ?? artifact);
+
+const collectCoverageArtifacts = (ledger: unknown[]): Record<string, unknown>[] =>
+  collectLedgerPayloads(ledger, (artifact) => {
+    const kind = readString(artifact.kind) ?? "";
+    return kind === "calculator_plan_coverage" || /_coverage$/.test(kind);
+  });
+
+const findLedgerPayload = (ledger: unknown[], kind: string): Record<string, unknown> | null =>
+  [...ledger]
+    .reverse()
+    .map(asRecord)
+    .find((artifact) => artifact?.kind === kind)
+    ? asRecord(
+        [...ledger]
+          .reverse()
+          .map(asRecord)
+          .find((artifact) => artifact?.kind === kind)?.payload,
+      )
+    : null;
+
+export function buildHelixUiDebugParityHarnessSnapshot(args: {
+  visibleFinalAnswer: string | null | undefined;
+  debugExport: Record<string, unknown>;
+  calculatorPanelState?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const visibleFinalAnswer = readString(args.visibleFinalAnswer) ?? "";
+  const terminalAuthority = asRecord(args.debugExport.terminal_answer_authority);
+  const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview) ?? "";
+  const selectedFinalAnswer = readString(args.debugExport.selected_final_answer) ?? "";
+  const coverageArtifacts = Array.isArray(args.debugExport.coverage_artifacts)
+    ? args.debugExport.coverage_artifacts
+    : collectCoverageArtifacts(
+        Array.isArray(args.debugExport.current_turn_artifact_ledger)
+          ? args.debugExport.current_turn_artifact_ledger
+          : [],
+      );
+  const calculatorPanelState = asRecord(args.calculatorPanelState ?? args.debugExport.calculator_panel_state);
+  const currentCompoundRunId = readString(calculatorPanelState?.current_compound_run_id);
+  const visibleCompoundRunIds = Array.isArray(calculatorPanelState?.visible_compound_run_ids)
+    ? calculatorPanelState.visible_compound_run_ids
+        .map((value) => readString(value))
+        .filter((value): value is string => Boolean(value))
+    : [];
+  const staleCalculatorRunVisible = Boolean(
+    currentCompoundRunId &&
+      visibleCompoundRunIds.some((runId) => runId !== currentCompoundRunId),
+  );
+  return {
+    schema: "helix.ui_debug_parity_harness.v1",
+    visible_final_answer: visibleFinalAnswer,
+    selected_final_answer: selectedFinalAnswer,
+    terminal_authority_text: terminalAuthorityText,
+    ui_answer_equals_selected_final_answer: Boolean(visibleFinalAnswer && selectedFinalAnswer && visibleFinalAnswer === selectedFinalAnswer),
+    ui_answer_equals_terminal_authority_text: Boolean(visibleFinalAnswer && terminalAuthorityText && visibleFinalAnswer === terminalAuthorityText),
+    has_terminal_authority: Boolean(terminalAuthority),
+    has_goal_satisfaction: Boolean(asRecord(args.debugExport.goal_satisfaction_evaluation)),
+    has_agent_runtime_loop: Boolean(asRecord(args.debugExport.agent_runtime_loop)),
+    has_coverage_artifact: coverageArtifacts.length > 0,
+    has_planner_artifact: Boolean(asRecord(args.debugExport.calculator_planner_result)),
+    has_repair_artifact: Boolean(asRecord(args.debugExport.calculator_planner_repair_result)),
+    has_receipt_artifact: Array.isArray(args.debugExport.current_turn_artifact_ledger)
+      ? args.debugExport.current_turn_artifact_ledger.some((artifact) => asRecord(artifact)?.kind === "workspace_action_receipt")
+      : false,
+    has_composer_artifact: Boolean(asRecord(args.debugExport.final_answer_draft)),
+    calculator_panel_state: calculatorPanelState,
+    calculator_panel_current_compound_run_id: currentCompoundRunId,
+    calculator_panel_visible_compound_run_ids: visibleCompoundRunIds,
+    calculator_panel_stale_compound_run_visible: staleCalculatorRunVisible,
+    clipboard_debug_copy_required_for_prompt_submission: false,
+  };
+}
+
 const buildSolverControllerSummary = (payload: Record<string, unknown>) => {
   const debug = asRecord(payload.debug);
   const agentLoop = asRecord(payload.agentLoop);
@@ -103,30 +183,18 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : Array.isArray(debug?.current_turn_artifact_ledger)
       ? debug.current_turn_artifact_ledger
       : [];
-  const findLedgerPayload = (kind: string): Record<string, unknown> | null =>
-    [...ledger]
-      .reverse()
-      .map(asRecord)
-      .find((artifact) => artifact?.kind === kind)
-      ? asRecord(
-          [...ledger]
-            .reverse()
-            .map(asRecord)
-            .find((artifact) => artifact?.kind === kind)?.payload,
-        )
-      : null;
   const availableCapabilities =
     asRecord(payload.available_capabilities ?? debug?.available_capabilities ?? agentLoop?.available_capabilities) ??
-    findLedgerPayload("available_capabilities");
+    findLedgerPayload(ledger, "available_capabilities");
   const agentStepDecision =
     asRecord(payload.agent_step_decision ?? debug?.agent_step_decision ?? agentLoop?.agent_step_decision) ??
-    findLedgerPayload("agent_step_decision");
+    findLedgerPayload(ledger, "agent_step_decision");
   const observationReview =
     asRecord(payload.observation_review ?? debug?.observation_review ?? agentLoop?.observation_review) ??
-    findLedgerPayload("observation_review");
+    findLedgerPayload(ledger, "observation_review");
   const goalSatisfactionEvaluation =
     asRecord(payload.goal_satisfaction_evaluation ?? debug?.goal_satisfaction_evaluation ?? agentLoop?.goal_satisfaction_evaluation) ??
-    findLedgerPayload("goal_satisfaction_evaluation");
+    findLedgerPayload(ledger, "goal_satisfaction_evaluation");
   const initialAvailableCapabilities =
     asRecord(
       payload.initial_available_capabilities ??
@@ -138,19 +206,19 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     agentStepDecision;
   const agentStepAuthorityCheck =
     asRecord(payload.agent_step_authority_check ?? debug?.agent_step_authority_check ?? agentLoop?.agent_step_authority_check) ??
-    findLedgerPayload("agent_step_authority_check");
+    findLedgerPayload(ledger, "agent_step_authority_check");
   const agentStepLoop =
     asRecord(payload.agent_step_loop ?? debug?.agent_step_loop ?? agentLoop?.agent_step_loop) ??
-    findLedgerPayload("agent_step_loop");
+    findLedgerPayload(ledger, "agent_step_loop");
   const agentRuntimeLoop =
     asRecord(payload.agent_runtime_loop ?? debug?.agent_runtime_loop ?? agentLoop?.agent_runtime_loop) ??
-    findLedgerPayload("agent_runtime_loop");
+    findLedgerPayload(ledger, "agent_runtime_loop");
   const agentRuntimeLoopAdmission =
     asRecord(payload.agent_runtime_loop_admission ?? debug?.agent_runtime_loop_admission ?? agentLoop?.agent_runtime_loop_admission) ??
-    findLedgerPayload("agent_runtime_loop_admission");
+    findLedgerPayload(ledger, "agent_runtime_loop_admission");
   const runtimeAuthorityAudit =
     asRecord(payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit) ??
-    findLedgerPayload("runtime_authority_audit");
+    findLedgerPayload(ledger, "runtime_authority_audit");
   const runtimeContinuationHints =
     Array.isArray(payload.runtime_continuation_hints)
       ? payload.runtime_continuation_hints
@@ -183,6 +251,26 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     : [];
   const terminalPresentation = asRecord(payload.terminal_presentation ?? debug?.terminal_presentation ?? agentLoop?.terminal_presentation);
   const terminalAuthority = asRecord(payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? agentLoop?.terminal_answer_authority);
+  const calculatorPlannerResult =
+    asRecord(payload.calculator_planner_result ?? debug?.calculator_planner_result ?? agentLoop?.calculator_planner_result) ??
+    findLedgerPayload(ledger, "calculator_planner_result");
+  const calculatorPlannerRepairResult =
+    asRecord(payload.calculator_planner_repair_result ?? debug?.calculator_planner_repair_result ?? agentLoop?.calculator_planner_repair_result) ??
+    findLedgerPayload(ledger, "calculator_planner_repair_result");
+  const calculatorPlanCoverage =
+    asRecord(payload.calculator_plan_coverage ?? debug?.calculator_plan_coverage ?? agentLoop?.calculator_plan_coverage) ??
+    findLedgerPayload(ledger, "calculator_plan_coverage");
+  const promptRequirementCoverage =
+    asRecord(payload.prompt_requirement_coverage ?? debug?.prompt_requirement_coverage ?? agentLoop?.prompt_requirement_coverage) ??
+    findLedgerPayload(ledger, "prompt_requirement_coverage");
+  const finalAnswerRepairRequest =
+    asRecord(payload.final_answer_repair_request ?? debug?.final_answer_repair_request ?? agentLoop?.final_answer_repair_request) ??
+    findLedgerPayload(ledger, "final_answer_repair_request");
+  const finalAnswerDraft =
+    asRecord(payload.final_answer_draft ?? debug?.final_answer_draft ?? agentLoop?.final_answer_draft) ??
+    findLedgerPayload(ledger, "final_answer_draft");
+  const coverageArtifacts = collectCoverageArtifacts(ledger);
+  const calculatorPanelState = asRecord(payload.calculator_panel_state ?? debug?.calculator_panel_state ?? agentLoop?.calculator_panel_state);
   const terminalArtifactKind =
     readString(agentLoop?.terminal_artifact_kind) ??
     readString(debug?.terminal_artifact_kind) ??
@@ -261,6 +349,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     runtime_continuation_hints: runtimeContinuationHints,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
+    terminal_answer_authority: terminalAuthority,
+    terminal_presentation: terminalPresentation,
+    calculator_planner_result: calculatorPlannerResult,
+    calculator_planner_repair_result: calculatorPlannerRepairResult,
+    calculator_plan_coverage: calculatorPlanCoverage,
+    prompt_requirement_coverage: promptRequirementCoverage,
+    final_answer_repair_request: finalAnswerRepairRequest,
+    final_answer_draft: finalAnswerDraft,
+    coverage_artifacts: coverageArtifacts,
+    calculator_panel_state: calculatorPanelState,
     workspace_action_debug: receipt
       ? {
           workspace_action_registry_audit: receipt.workspace_action_registry_audit,
@@ -342,8 +440,14 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       ],
     },
   };
+  const uiDebugParityHarness = buildHelixUiDebugParityHarnessSnapshot({
+    visibleFinalAnswer: readString(reply.content) ?? selectedFinalAnswer,
+    debugExport: envelopeWithoutHash,
+    calculatorPanelState,
+  });
   return JSON.stringify({
     ...envelopeWithoutHash,
+    ui_debug_parity_harness: uiDebugParityHarness,
     payload_hash: hashDebugExportText(stableStringify(envelopeWithoutHash)),
   });
 }

@@ -385,6 +385,56 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).toEqual([]);
   });
 
+  it("blocks satisfied tool terminals when prompt requirement coverage is incomplete", () => {
+    const turnId = "ask:prompt-coverage";
+    const payload = {
+      active_prompt: "Calculate kinetic energy and momentum, then explain the units.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_reason_code: "calculator_solve",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "calculator_solve",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      ...capabilityLifecycleOk(turnId, "workstation_tool_evaluation"),
+      goal_satisfaction_evaluation: satisfiedGoal("calculator_solve", "workstation_tool_evaluation"),
+      prompt_requirement_coverage: {
+        schema: "helix.prompt_requirement_coverage.v1",
+        turn_id: turnId,
+        coverage: "partial",
+        missing_requirement_ids: ["momentum", "units"],
+        next_decision: "repair_compose",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "calculator_solve",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({ turnId, finalRoute: "calculator_solve", payload }),
+    });
+
+    expect(decision.decision).toBe("typed_failure");
+    expect(decision.blocking_reasons).toContain("prompt_requirement_coverage_incomplete");
+    expect(decision.typed_failure_code).toBe("prompt_requirement_coverage_incomplete");
+  });
+
   it("blocks workstation action receipts when the capability lifecycle is incomplete", () => {
     const payload = {
       active_prompt: "Open the docs panel.",

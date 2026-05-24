@@ -146,6 +146,12 @@ const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKi
   });
 };
 
+const hasIncompletePromptRequirementCoverage = (payload: RecordLike): boolean => {
+  const coverage = readRecord(payload.prompt_requirement_coverage);
+  const coverageState = readString(coverage?.coverage);
+  return Boolean(coverageState && coverageState !== "complete");
+};
+
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
@@ -360,6 +366,7 @@ export function buildSolverControllerDecision(input: {
     "turn_id_integrity_audit",
     "final_route_reconciliation",
     "goal_satisfaction_evaluation",
+    "prompt_requirement_coverage",
     "terminal_equivalence_harness_result",
     "capability_plan",
     "capability_result",
@@ -390,6 +397,9 @@ export function buildSolverControllerDecision(input: {
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
       pushUnique(blockingReasons, "capability_lifecycle_incomplete");
+    }
+    if (hasIncompletePromptRequirementCoverage(payload)) {
+      pushUnique(blockingReasons, "prompt_requirement_coverage_incomplete");
     }
   }
 
@@ -452,7 +462,7 @@ export function buildSolverControllerDecision(input: {
     terminalArtifactKind === "live_answer_environment_receipt" ||
     (terminalArtifactKind === "workspace_action_receipt" &&
       /\b(?:set_rate|live-source\.set_rate|interval|cadence|rate)\b/i.test(promptText));
-  if (!nonAnswerTerminal && !liveMaintenanceTerminal && visualContentPrompt && terminalContractGoalKind !== "live_interval_set" && controlReceiptTerminal) {
+  if (!nonAnswerTerminal && visualContentPrompt && terminalContractGoalKind !== "live_interval_set" && controlReceiptTerminal) {
     pushUnique(blockingReasons, "terminal_kind_not_required");
     pushUnique(blockingReasons, "visual_evidence_missing");
   }
@@ -537,7 +547,8 @@ export function buildSolverControllerDecision(input: {
       reason === "terminal_equivalence_missing" ||
       reason === "terminal_equivalence_failed" ||
       reason === "capability_lifecycle_incomplete" ||
-      reason === "subgoals_observed_not_satisfied"
+      reason === "subgoals_observed_not_satisfied" ||
+      reason === "prompt_requirement_coverage_incomplete"
     )
   ) {
     pushUnique(blockingReasons, "solver_path_incomplete");
@@ -549,7 +560,8 @@ export function buildSolverControllerDecision(input: {
     reason === "goal_not_satisfied" ||
     reason === "required_artifact_contract_missing" ||
     reason === "terminal_kind_not_required" ||
-    reason === "subgoals_observed_not_satisfied"
+    reason === "subgoals_observed_not_satisfied" ||
+    reason === "prompt_requirement_coverage_incomplete"
   );
   const requestedGoalDecision =
     goalNextDecision === "continue" ||

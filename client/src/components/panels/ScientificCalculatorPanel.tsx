@@ -15,6 +15,7 @@ import { useScientificCalculatorStore } from "@/store/useScientificCalculatorSto
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
+import type { ScientificCalculatorDebugEvent } from "@/store/useScientificCalculatorStore";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
@@ -88,6 +89,32 @@ function setupVariableText(variable: { symbol: string; value: string; unit?: str
 
 function setupUnitOptionText(option: { symbol: string; quantity: string; si_factor: number }): string {
   return option.si_factor === 1 ? option.symbol : `${option.symbol} -> SI x ${option.si_factor}`;
+}
+
+export function resolveScientificCalculatorVisibleDebugEvents(
+  debugEvents: ScientificCalculatorDebugEvent[],
+  limit = 8,
+): {
+  currentCompoundRunId: string | null;
+  visibleEvents: ScientificCalculatorDebugEvent[];
+  visibleCompoundRunIds: string[];
+  staleCompoundRunVisible: boolean;
+} {
+  const currentCompoundRunId = debugEvents.find((entry) => Boolean(entry.compound_run_id))?.compound_run_id ?? null;
+  const visibleEvents = currentCompoundRunId
+    ? debugEvents.filter((entry) => entry.compound_run_id === currentCompoundRunId).slice(0, limit)
+    : debugEvents.slice(0, limit);
+  const visibleCompoundRunIds = [
+    ...new Set(visibleEvents.map((entry) => entry.compound_run_id).filter((value): value is string => Boolean(value))),
+  ];
+  return {
+    currentCompoundRunId,
+    visibleEvents,
+    visibleCompoundRunIds,
+    staleCompoundRunVisible: Boolean(
+      currentCompoundRunId && visibleCompoundRunIds.some((runId) => runId !== currentCompoundRunId),
+    ),
+  };
 }
 
 export default function ScientificCalculatorPanel() {
@@ -263,6 +290,10 @@ export default function ScientificCalculatorPanel() {
       }
       return latestChain.reverse();
     },
+    [debugEvents],
+  );
+  const visibleDebugState = useMemo(
+    () => resolveScientificCalculatorVisibleDebugEvents(debugEvents),
     [debugEvents],
   );
 
@@ -534,12 +565,20 @@ export default function ScientificCalculatorPanel() {
 
       <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/30 p-3">
         <div className="text-[10px] uppercase tracking-wide text-slate-500">Calculator Event Log</div>
-        <div className="mt-2 space-y-1" data-testid="scientific-calculator-debug-log">
-          {debugEvents.slice(0, 8).map((entry) => (
+        <div
+          className="mt-2 space-y-1"
+          data-testid="scientific-calculator-debug-log"
+          data-current-compound-run-id={visibleDebugState.currentCompoundRunId ?? ""}
+          data-visible-compound-run-ids={visibleDebugState.visibleCompoundRunIds.join(",")}
+          data-stale-compound-run-visible={visibleDebugState.staleCompoundRunVisible ? "true" : "false"}
+        >
+          {visibleDebugState.visibleEvents.map((entry) => (
             <div
               key={entry.id}
               className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1 text-[11px] text-slate-300"
               data-testid="scientific-calculator-debug-event"
+              data-compound-run-id={entry.compound_run_id ?? ""}
+              data-compound-subgoal-id={entry.compound_subgoal_id ?? ""}
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-slate-200">{entry.action_id}</span>

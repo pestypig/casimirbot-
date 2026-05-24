@@ -159,4 +159,110 @@ describe("helix ask pill E68 debug export envelope", () => {
       }),
     );
   });
+
+  it("exports the UI/debug parity harness fields for tool-backed turns", () => {
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:phase7",
+        question: "Use calculator solve x^2-9=0.",
+        content: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+        mode: "read",
+        debug: {},
+      } as any,
+      {
+        selectedDebugFinalAnswer: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+        debug: {
+          turn_id: "ask:phase7",
+          selected_final_answer: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+          terminal_artifact_kind: "workstation_tool_evaluation",
+          canonical_goal_frame: { turn_id: "ask:phase7", goal_kind: "calculator_solve" },
+        },
+        calculator_panel_state: {
+          current_compound_run_id: "compound:phase7",
+          visible_compound_run_ids: ["compound:phase7"],
+          stale_compound_run_visible: false,
+        },
+        agentLoop: {
+          selected_final_answer: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+          final_answer_source: "final_answer_draft",
+          terminal_artifact_kind: "workstation_tool_evaluation",
+          terminal_answer_authority: {
+            turn_id: "ask:phase7",
+            terminal_text_preview: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+            terminal_artifact_kind: "workstation_tool_evaluation",
+            final_answer_source: "final_answer_draft",
+          },
+          agent_runtime_loop: {
+            schema: "helix.agent_runtime_loop.v1",
+            iterations: [{ action_key: "scientific-calculator.solve_expression" }],
+          },
+          goal_satisfaction_evaluation: {
+            schema: "helix.goal_satisfaction_evaluation.v1",
+            satisfaction: "satisfied",
+          },
+          current_turn_artifact_ledger: [
+            {
+              artifact_id: "ask:phase7:planner",
+              kind: "calculator_planner_result",
+              payload: { schema: "helix.calculator_planner_result.v1", status: "valid" },
+            },
+            {
+              artifact_id: "ask:phase7:repair",
+              kind: "calculator_planner_repair_result",
+              payload: { schema: "helix.calculator_planner_repair_result.v1", repair_attempted: true },
+            },
+            {
+              artifact_id: "ask:phase7:coverage",
+              kind: "calculator_plan_coverage",
+              payload: { schema: "helix.calculator_plan_coverage.v1", missing_requirement_ids: [] },
+            },
+            {
+              artifact_id: "ask:phase7:receipt",
+              kind: "workspace_action_receipt",
+              payload: {
+                action_key: "scientific-calculator.solve_expression",
+                target_id: "scientific-calculator",
+                action_id: "solve_expression",
+                status: "completed",
+              },
+            },
+            {
+              artifact_id: "ask:phase7:draft",
+              kind: "final_answer_draft",
+              payload: { schema: "helix.final_answer_draft.v1", text: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3." },
+            },
+          ],
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.terminal_answer_authority.terminal_text_preview).toBe(
+      "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3.",
+    );
+    expect(parsed.goal_satisfaction_evaluation.satisfaction).toBe("satisfied");
+    expect(parsed.agent_runtime_loop.iterations).toHaveLength(1);
+    expect(parsed.calculator_planner_result.status).toBe("valid");
+    expect(parsed.calculator_planner_repair_result.repair_attempted).toBe(true);
+    expect(parsed.calculator_plan_coverage.missing_requirement_ids).toEqual([]);
+    expect(parsed.final_answer_draft.schema).toBe("helix.final_answer_draft.v1");
+    expect(parsed.coverage_artifacts.map((artifact: any) => artifact.schema)).toContain("helix.calculator_plan_coverage.v1");
+    expect(parsed.ui_debug_parity_harness).toMatchObject({
+      schema: "helix.ui_debug_parity_harness.v1",
+      ui_answer_equals_selected_final_answer: true,
+      ui_answer_equals_terminal_authority_text: true,
+      has_terminal_authority: true,
+      has_goal_satisfaction: true,
+      has_agent_runtime_loop: true,
+      has_coverage_artifact: true,
+      has_planner_artifact: true,
+      has_repair_artifact: true,
+      has_receipt_artifact: true,
+      has_composer_artifact: true,
+      calculator_panel_current_compound_run_id: "compound:phase7",
+      calculator_panel_visible_compound_run_ids: ["compound:phase7"],
+      calculator_panel_stale_compound_run_visible: false,
+      clipboard_debug_copy_required_for_prompt_submission: false,
+    });
+  });
 });
