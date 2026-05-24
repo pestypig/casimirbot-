@@ -148,6 +148,20 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     );
     expect(response.body?.doc_location_result?.doc_path).toBe(activePath);
     expect(response.body?.doc_location_result?.locate_query).toBe("lapse shift");
+    expect(response.body?.doc_location_coverage).toMatchObject({
+      schema: "helix.doc_location_coverage.v1",
+      goal_kind: "doc_evidence_location",
+      coverage: "complete",
+      next_decision: "allow_terminal",
+    });
+    expect(response.body?.doc_location_coverage?.required_items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "line_backed_locations_or_typed_no_match",
+          satisfied: true,
+        }),
+      ]),
+    );
     expect(response.body?.doc_location_result?.assistant_answer).toBe(false);
     expect(response.body?.doc_location_result?.raw_content_included).toBe(false);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/^(Locations:|No locations found)/i);

@@ -65,6 +65,17 @@ function addMismatchViolation(input: {
 function terminalArtifactForbiddenByContract(payload: Record<string, unknown>): boolean {
   const terminalArtifactKind = readString(payload.terminal_artifact_kind);
   if (terminalArtifactKind === "typed_failure" || terminalArtifactKind === "request_user_input") return false;
+  const canonicalGoal = asRecord(payload.canonical_goal_frame);
+  const canonicalGoalKind = readString(canonicalGoal?.goal_kind);
+  const routeReason = readString(payload.route_reason_code) ?? readString(payload.route);
+  const routeBase = routeReason?.split("/")[0]?.trim() ?? null;
+  const liveMaintenanceTerminal =
+    ["live_pipeline_receipt", "live_environment_binding_diagnosis"].includes(terminalArtifactKind ?? "") &&
+    (
+      Boolean(canonicalGoalKind && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(canonicalGoalKind)) ||
+      Boolean(routeBase && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(routeBase))
+    );
+  if (liveMaintenanceTerminal) return false;
   const contract = asRecord(payload.route_product_contract);
   const selectionGuard = asRecord(payload.terminal_artifact_selection_guard);
   const productGuard = asRecord(payload.product_authority_guard);

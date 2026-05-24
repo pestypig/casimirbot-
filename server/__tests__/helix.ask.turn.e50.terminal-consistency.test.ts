@@ -218,6 +218,12 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.source_target_intent?.target_source).toBe("visual_capture");
     expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
     expect(response.body?.terminal_error_code).toBe("visual_capture_permission_denied");
+    expect(response.body?.visual_capture_coverage).toMatchObject({
+      schema: "helix.visual_capture_coverage.v1",
+      goal_kind: "visual_capture_describe",
+      coverage: "complete",
+      next_decision: "allow_terminal",
+    });
     expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("not_satisfied");
     expect(response.body?.goal_satisfaction_evaluation?.next_decision).toBe("fail_closed");
     expect(artifactKinds(response.body)).toEqual(expect.arrayContaining(["visual_context_capability", "typed_failure", "goal_satisfaction_evaluation"]));

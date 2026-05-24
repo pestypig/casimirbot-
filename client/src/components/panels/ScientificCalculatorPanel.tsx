@@ -212,6 +212,59 @@ export default function ScientificCalculatorPanel() {
   );
   const inputPreviewHtml = useMemo(() => renderMathHtml(input, true), [input]);
   const solveTrace = useMemo(() => resolveSolveTrace(lastSolve), [lastSolve]);
+  const compoundSolveEvents = useMemo(
+    () => {
+      const latestChain: typeof debugEvents = [];
+      const seenSubgoals = new Set<string>();
+      let newestSolveAtMs: number | null = null;
+      let newestCompoundRunId: string | null = null;
+      for (const entry of debugEvents) {
+        if (
+          entry.action_id !== "solve_expression" &&
+          entry.action_id !== "solve_with_steps"
+        ) {
+          continue;
+        }
+        if (
+          entry.source !== "workstation_action" ||
+          !entry.input_latex ||
+          !entry.result_text ||
+          !entry.calculator_setup
+        ) {
+          continue;
+        }
+        if (newestCompoundRunId === null && entry.compound_run_id) {
+          newestCompoundRunId = entry.compound_run_id;
+        }
+        if (
+          newestCompoundRunId &&
+          entry.compound_run_id &&
+          entry.compound_run_id !== newestCompoundRunId
+        ) {
+          break;
+        }
+        const entryAtMs = Date.parse(entry.ts);
+        if (Number.isFinite(entryAtMs)) {
+          if (newestSolveAtMs === null) {
+            newestSolveAtMs = entryAtMs;
+          } else if (newestSolveAtMs - entryAtMs > 30_000) {
+            break;
+          }
+        }
+        const subgoalKey = [
+          entry.calculator_setup.domain ?? "unknown",
+          entry.calculator_setup.subgoal ?? entry.input_latex,
+          entry.calculator_setup.result_unit ?? "",
+        ].join("|");
+        if (seenSubgoals.has(subgoalKey)) break;
+        seenSubgoals.add(subgoalKey);
+        latestChain.push(entry);
+        if (latestChain.length >= 6) break;
+      }
+      return latestChain.reverse();
+    },
+    [debugEvents],
+  );
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
@@ -348,6 +401,44 @@ export default function ScientificCalculatorPanel() {
       </div>
 
       <ScientificCalculatorLiveSourceControls currentEquation={input} />
+
+      {compoundSolveEvents.length >= 2 ? (
+        <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
+          <div className="mb-2 text-[10px] uppercase tracking-wide text-cyan-300">Compound Solve Trace</div>
+          <div className="space-y-2">
+            {compoundSolveEvents.map((entry, index) => (
+              <div key={entry.id} className="rounded border border-cyan-900/40 bg-slate-950/60 p-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                    {index + 1}
+                  </Badge>
+                  <span className="text-slate-200">{entry.calculator_setup?.subgoal ?? "Calculator subgoal"}</span>
+                </div>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Expression</div>
+                    <div className="break-all rounded border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-slate-200">
+                      {entry.input_latex}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Result</div>
+                    <div className="break-all rounded border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-slate-100">
+                      {entry.result_text}
+                      {entry.calculator_setup?.result_unit ? ` ${entry.calculator_setup.result_unit}` : ""}
+                    </div>
+                  </div>
+                </div>
+                {entry.calculator_setup?.result_dimension_signature ? (
+                  <div className="mt-2 text-[11px] text-slate-400">
+                    dimension: {entry.calculator_setup.result_dimension_signature}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-3 space-y-3 rounded-md border border-slate-800 bg-slate-900/40 p-3">
         {lastSolve ? (

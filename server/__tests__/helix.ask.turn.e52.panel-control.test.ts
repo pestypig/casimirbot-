@@ -333,6 +333,16 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
     expect(findAction(response.body, "docs-viewer", "open")).toBeTruthy();
     expect(response.body?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(response.body?.doc_open_coverage).toMatchObject({
+      schema: "helix.doc_open_coverage.v1",
+      goal_kind: "docs_panel_open",
+      coverage: "complete",
+      next_decision: "allow_terminal",
+    });
+    expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+      artifact.kind === "doc_open_coverage" &&
+      artifact.payload?.coverage === "complete"
+    )).toBe(true);
     expect(readGoalSatisfaction(response.body)?.terminal_contract).toEqual(
       expect.objectContaining({
         goal_kind: "docs_panel_open",
@@ -474,8 +484,11 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.available_capabilities?.model_visible_capability_keys).toEqual(
       expect.arrayContaining([
         "scientific-calculator.solve_expression",
+        "scientific-calculator.open",
         "docs-viewer.search_docs",
+        "workstation-notes.create",
         "workstation-notes.create_note",
+        "live-source.status",
       ]),
     );
     expect(response.body?.available_capabilities?.recommended_capability_key).toBe("scientific-calculator.solve_expression");
@@ -492,6 +505,77 @@ describe("helix ask E52 panel control terminal contract", () => {
     );
     expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+  }, 60000);
+
+  it("exposes every workstation panel tool in the model-visible capability manifest", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Solve x^2-4=0 in the scientific calculator.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-capability-manifest-complete-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          visual_context_capability: {
+            schema: "helix.visual_context_capability.v1",
+            source_id: "src:visual-denied",
+            status: "error",
+            error: "Permission denied",
+            evidence_available: false,
+            latest_evidence_ref: null,
+            requires_agent_step_selection: true,
+            promotion_policy: "available_tool_not_forced_context",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      })
+      .expect(200);
+
+    const manifest = response.body?.available_capabilities;
+    const keys = manifest?.model_visible_capability_keys ?? [];
+    const capabilities = manifest?.capabilities ?? [];
+    const byKey = new Map(capabilities.map((capability: any) => [capability?.capability_key, capability]));
+    const requiredKeys = [
+      "docs-viewer.open",
+      "docs-viewer.search_docs",
+      "docs-viewer.open_doc_by_path",
+      "docs-viewer.locate_in_doc",
+      "scientific-calculator.open",
+      "scientific-calculator.solve_expression",
+      "scientific-calculator.start_equation_live_source",
+      "workstation-notes.open",
+      "workstation-notes.create",
+      "workstation-notes.append",
+      "situation-room.describe_visual_capture",
+      "live-source.status",
+      "live-source.set_rate",
+    ];
+
+    expect(manifest?.schema).toBe("helix.available_capabilities.v1");
+    expect(manifest?.manifest_role).toBe("model_visible_tool_menu");
+    expect(keys).toEqual(expect.arrayContaining(requiredKeys));
+    for (const key of requiredKeys) {
+      const capability = byKey.get(key) as any;
+      expect(capability, key).toBeTruthy();
+      expect(String(capability?.model_visible_description ?? ""), key).toContain(capability?.label);
+      expect(capability?.model_visible_input_schema, key).toEqual(expect.objectContaining({ type: "object" }));
+      expect(String(capability?.reason ?? ""), key).not.toHaveLength(0);
+    }
+    expect(byKey.get("situation-room.describe_visual_capture")).toEqual(
+      expect.objectContaining({
+        goal_fit: "possible",
+      }),
+    );
+    expect(byKey.get("live-source.set_rate")).toEqual(
+      expect.objectContaining({
+        goal_fit: "forbidden",
+      }),
+    );
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
   }, 60000);
 
   it("can promote the initial agent-step decision through the model-visible capability manifest", async () => {
@@ -607,6 +691,128 @@ describe("helix ask E52 panel control terminal contract", () => {
     }
   }, 60000);
 
+  it("records the generic agent runtime loop for document acquisition turns", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Search Docs for the requested NHM2 white paper first.",
+        args: { query: "NHM2 white paper", limit: 5 },
+        expected_artifacts: ["doc_search_results", "doc_candidate_validation"],
+        commentary: {
+          turn_purpose: "Find the requested NHM2 document before opening it.",
+          why_this_capability: "The document path is not yet selected.",
+          expected_artifacts: "doc_search_results",
+          what_would_make_this_done: "A validated path can be opened.",
+          observation_summary: "No observations yet.",
+          next_step_reason: "Search first.",
+        },
+        confidence: 0.94,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.open_doc_by_path",
+        reason: "The search observation is enough to open the known NHM2 whitepaper path.",
+        args: { path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        expected_artifacts: ["doc_open_receipt"],
+        commentary: {
+          turn_purpose: "Open the validated NHM2 document.",
+          why_this_capability: "The path is now known from the document search observation.",
+          expected_artifacts: "doc_open_receipt",
+          what_would_make_this_done: "A completed document-open receipt.",
+          observation_summary: "Search results are present.",
+          next_step_reason: "Open the selected path.",
+        },
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The document-open receipt satisfies the goal.",
+        args: {},
+        expected_artifacts: ["doc_open_receipt"],
+        commentary: {
+          turn_purpose: "Finish after opening the requested document.",
+          why_this_capability: "No further tool call is needed.",
+          expected_artifacts: "doc_open_receipt",
+          what_would_make_this_done: "The receipt is already present.",
+          observation_summary: "The document was opened.",
+          next_step_reason: "Answer now.",
+        },
+        confidence: 0.97,
+      },
+    ]);
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Open the NHM2 white paper from docs.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-agent-runtime-loop-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.initial_agent_step_decision?.sampling).toMatchObject({
+        mode: "llm",
+        llm_used: true,
+      });
+      expect(response.body?.agent_runtime_loop).toMatchObject({
+        schema: "helix.agent_runtime_loop.v1",
+        runtime_role: "generic_next_action_observe_loop",
+      });
+      expect(response.body?.agent_loop_budget).toMatchObject({
+        schema: "helix.agent_loop_budget.v1",
+        profile: "doc_search_open",
+        max_tool_calls: 3,
+        exhausted: false,
+      });
+      expect(response.body?.agent_loop_budget?.consumed_tool_calls).toBeGreaterThanOrEqual(0);
+      expect(response.body?.agent_runtime_loop_admission).toMatchObject({
+        schema: "helix.agent_runtime_loop_admission.v1",
+        admitted: true,
+      });
+      expect(response.body?.agent_runtime_loop?.iterations?.length).toBeGreaterThanOrEqual(1);
+      expect(response.body?.agent_runtime_loop?.iterations?.every((iteration: any) =>
+        iteration.decision_source === "llm" || iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
+      expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) => iteration.decision_source === "llm")).toBe(true);
+      expect(["terminal_satisfied", "answered"]).toContain(response.body?.agent_runtime_loop?.stop_reason);
+      expect(response.body?.runtime_authority_audit).toMatchObject({
+        schema: "helix.runtime_authority_audit.v1",
+        runtime_loop_present: true,
+        ok: true,
+        all_subgoals_observed_terminal_authority: false,
+      });
+      expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+      expect(response.body?.doc_open_coverage).toMatchObject({
+        schema: "helix.doc_open_coverage.v1",
+        goal_kind: "doc_open_best",
+        coverage: "complete",
+      });
+      expect(response.body?.doc_open_coverage?.required_items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "validated_doc_path", satisfied: true }),
+          expect.objectContaining({ id: "doc_open_receipt", satisfied: true }),
+        ]),
+      );
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+    }
+  }, 60000);
+
   it("uses calculator output as a subgoal before answering compound photon prompts", async () => {
     const app = createApp();
     const response = await request(app)
@@ -671,6 +877,56 @@ describe("helix ask E52 panel control terminal contract", () => {
       "photon_energy_ev",
     ]);
     expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(response.body?.agent_calculator_subgoal_plan).toMatchObject({
+      schema: "helix.agent_calculator_subgoal_plan.v1",
+      authority: "agent_step_decision",
+      seed_plan_role: "hint_only_non_authoritative",
+      rejected_deterministic_authority: true,
+    });
+    expect(response.body?.agent_calculator_subgoal_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
+      "wavelength",
+      "photon_energy_j",
+      "photon_energy_ev",
+    ]);
+    expect(response.body?.calculator_loop_integrity).toMatchObject({
+      schema: "helix.calculator_loop_integrity.v1",
+      ok: true,
+      violations: [],
+    });
+    expect(response.body?.calculator_loop_integrity?.receipt_decision_links?.map((link: any) => link.subgoal_id)).toEqual([
+      "wavelength",
+      "photon_energy_j",
+      "photon_energy_ev",
+    ]);
+    expect(response.body?.calculator_loop_integrity?.receipt_decision_links?.every((link: any) => Boolean(link.decision_ref))).toBe(true);
+    expect(response.body?.runtime_continuation_hints?.length).toBeGreaterThanOrEqual(3);
+    expect(response.body?.runtime_continuation_hints?.every((hint: any) =>
+      hint.schema === "helix.runtime_continuation_hint.v1" &&
+      hint.source === "calculator_compound_chain" &&
+      hint.authority === "hint_only_agent_must_decide" &&
+      hint.migrated_to_agent_runtime_loop === true
+    )).toBe(true);
+    expect(response.body?.agent_runtime_loop_admission).toMatchObject({
+      schema: "helix.agent_runtime_loop_admission.v1",
+      admitted: true,
+      reason: "runtime_continuation_hints_require_agent_step_decision",
+    });
+    expect(["record_only", "execute_or_record"]).toContain(response.body?.agent_runtime_loop_admission?.mode);
+    expect(response.body?.agent_runtime_loop).toMatchObject({
+      schema: "helix.agent_runtime_loop.v1",
+      stop_reason: "terminal_satisfied",
+    });
+    expect(response.body?.agent_runtime_loop?.iterations?.every((iteration: any) =>
+      iteration.decision_source === "llm" || iteration.decision_source === "deterministic_policy_fallback"
+    )).toBe(true);
+    expect(response.body?.runtime_authority_audit).toMatchObject({
+      schema: "helix.runtime_authority_audit.v1",
+      runtime_loop_present: true,
+      all_subgoals_observed_terminal_authority: false,
+      ok: true,
+    });
+    expect(response.body?.runtime_authority_audit?.legacy_hint_count).toBeGreaterThanOrEqual(3);
+    expect(response.body?.runtime_authority_audit?.migrated_hint_count).toBe(response.body?.runtime_authority_audit?.legacy_hint_count);
     expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
     expect(response.body?.available_capabilities?.manifest_role).toBe("model_visible_tool_menu");
     expect(response.body?.available_capabilities?.model_visible_capability_keys).toEqual(
@@ -695,6 +951,18 @@ describe("helix ask E52 panel control terminal contract", () => {
       next_step: "answer",
     });
     expect(response.body?.agent_step_decision?.current_observations?.length).toBeGreaterThan(0);
+    expect(response.body?.calculator_agent_subgoal_decisions?.length).toBeGreaterThanOrEqual(2);
+    expect(response.body?.agent_step_loop?.final_state).toBe("answered");
+    expect(response.body?.agent_step_loop?.steps?.map((step: any) => step.step_id)).toEqual([
+      "subgoal_wavelength",
+      "subgoal_photon_energy_j",
+      "subgoal_photon_energy_ev",
+      "post_observation",
+    ]);
+    expect(response.body?.agent_step_loop?.steps?.slice(0, 3).every((step: any) =>
+      step.next_step === "next_action" &&
+      step.chosen_capability === "scientific-calculator.solve_expression"
+    )).toBe(true);
     expect(response.body?.observation_review).toMatchObject({
       schema: "helix.observation_review.v1",
       does_it_satisfy_goal: true,
@@ -702,6 +970,649 @@ describe("helix ask E52 panel control terminal contract", () => {
     });
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Wavelength:");
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Photon energy:");
+  }, 60000);
+
+  it("uses the generic calculator planner for broader force prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "A 1200 kg car accelerates at 3 m/s^2. Use the scientific calculator to compute the force.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-generic-force-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.calculator_candidate_hints).toMatchObject({
+      schema: "helix.calculator_candidate_hints.v1",
+      authority: "hint_only",
+    });
+    expect(response.body?.calculator_planner_result?.authority).toBe("deterministic_generic_fallback");
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual(["force"]);
+    expect(response.body?.calculator_compound_plan?.subgoals?.[0]).toMatchObject({
+      expression: "1200*3",
+      expected_quantity: "force",
+      expected_unit: "N",
+    });
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("3600 N");
+  }, 60000);
+
+  it("uses the generic calculator planner for pendulum period prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "A pendulum is 2 m long. Use the scientific calculator to estimate its small-angle period.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-generic-pendulum-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.calculator_planner_result?.authority).toBe("deterministic_generic_fallback");
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual(["pendulum_period"]);
+    expect(response.body?.calculator_compound_plan?.subgoals?.[0]).toMatchObject({
+      expected_quantity: "time",
+      expected_unit: "s",
+    });
+    expect(String(response.body?.calculator_compound_plan?.subgoals?.[0]?.expression ?? "")).toContain("sqrt(2/9.80665)");
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("2.837");
+  }, 60000);
+
+  it("keeps calculator planner result in debug artifacts and carries de Broglie momentum units", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "A particle has de Broglie wavelength 0.25 nm. Use the scientific calculator to compute its momentum.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-debroglie-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.calculator_planner_result).toMatchObject({
+      schema: "helix.calculator_planner_result.v1",
+    });
+    expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+      artifact.kind === "calculator_planner_result" &&
+      artifact.payload?.schema === "helix.calculator_planner_result.v1"
+    )).toBe(true);
+    expect(response.body?.calculator_compound_plan?.subgoals?.[0]).toMatchObject({
+      id: "de_broglie_momentum",
+      expected_quantity: "momentum",
+      expected_unit: "kg*m/s",
+    });
+    expect(response.body?.calculator_subgoal_receipts?.[0]).toMatchObject({
+      result_unit: "kg*m/s",
+      result_quantity: "momentum",
+    });
+    expect(response.body?.calculator_subgoal_receipts?.[0]?.calculator_setup).toMatchObject({
+      result_dimension_signature: "L M T^-1",
+    });
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("kg*m/s");
+  }, 60000);
+
+  it("accepts model-authored calculator planner subgoals as the calculator authority", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousCalculatorResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "gravitational_potential_energy",
+          label: "Compute gravitational potential energy",
+          expression: "5*9.80665*10",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "U = m g h",
+          assumptions: ["Use standard gravity."],
+          variables: [
+            { symbol: "m", value: "5", unit: "kg", meaning: "mass" },
+            { symbol: "g", value: "9.80665", unit: null, meaning: "standard gravity numeric value" },
+            { symbol: "h", value: "10", unit: "m", meaning: "height" },
+          ],
+        },
+      ],
+    });
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "The model-authored calculator plan has one required numeric subgoal.",
+        args: { latex: "5*9.80665*10", compound_subgoal_id: "gravitational_potential_energy" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        commentary: {
+          turn_purpose: "Compute the requested gravitational potential energy.",
+          why_this_capability: "The calculator can evaluate the numeric expression.",
+          expected_artifacts: "calculator receipt",
+          what_would_make_this_done: "A validated numeric energy result.",
+          observation_summary: "No calculator observation yet.",
+          next_step_reason: "Run the calculator subgoal.",
+        },
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The calculator receipt satisfies the requested numeric result.",
+        args: {},
+        expected_artifacts: ["workstation_tool_evaluation"],
+        commentary: {
+          turn_purpose: "Answer from the calculator receipt.",
+          why_this_capability: "No more tool call is needed.",
+          expected_artifacts: "workstation evaluation",
+          what_would_make_this_done: "The receipt-backed result is present.",
+          observation_summary: "The calculator result is available.",
+          next_step_reason: "Answer now.",
+        },
+        confidence: 0.96,
+      },
+    ]);
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "A 5 kg mass is lifted 10 m. Use the scientific calculator to compute gravitational potential energy.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-model-planner-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.calculator_planner_result?.authority).toBe("model_authored_calculator_planner");
+      expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+        artifact.kind === "calculator_planner_result" &&
+        artifact.payload?.authority === "model_authored_calculator_planner"
+      )).toBe(true);
+      expect(response.body?.calculator_compound_plan?.subgoals?.[0]).toMatchObject({
+        id: "gravitational_potential_energy",
+        expression: "5*9.80665*10",
+        expected_quantity: "energy",
+        expected_unit: "J",
+      });
+      expect(response.body?.agent_calculator_subgoal_plan?.model_authored).toBe(true);
+      expect(response.body?.calculator_loop_integrity?.violations).toEqual([]);
+      expect(response.body?.calculator_loop_integrity?.violations).toEqual([]);
+      expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("490.3325 J");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+      if (previousCalculatorResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousCalculatorResponse;
+    }
+  }, 60000);
+
+  it("does not mark long calculator prompts satisfied when planner fallback under-covers requirements", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousCalculatorResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    const previousRepairResponse = process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Execute the repaired calculator subgoal.",
+        args: { latex: "0.5*0.5*12^2", compound_subgoal_id: "initial_kinetic_energy" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "Stop after the observed repaired subgoal; coverage will decide whether this is sufficient.",
+        args: {},
+        expected_artifacts: ["workstation_tool_evaluation"],
+        confidence: 0.9,
+      },
+    ]);
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = "not valid json";
+    process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "initial_kinetic_energy",
+          label: "Compute initial kinetic energy only",
+          expression: "0.5*0.5*12^2",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "KE = 1/2 m v^2",
+        },
+      ],
+    });
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Use the scientific calculator as a workstation tool and answer every part. A 0.50 kg cart rolls at 12 m/s on a level track, then climbs a ramp. First compute its initial kinetic energy. Second compute the maximum height it could reach if all kinetic energy became gravitational potential energy using g = 9.80665 m/s^2. Third compute the speed it would have after reaching a height of 3.0 m, assuming no drag and no rolling losses. Fourth compare the initial kinetic energy to the remaining kinetic energy at 3.0 m. In the final answer, show the formulas, the calculator expressions, the numeric results with units, and a short interpretation of what the energy conversion means.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-long-undercovered-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.calculator_planner_result?.authority).toBe("model_repaired_calculator_planner");
+      expect(response.body?.calculator_planner_repair_result).toMatchObject({
+        schema: "helix.calculator_planner_repair_result.v1",
+        attempted: true,
+        repaired: true,
+      });
+      expect(response.body?.calculator_plan_coverage?.coverage).not.toBe("complete");
+      expect(response.body?.calculator_plan_coverage?.missing_requirement_ids).toEqual(
+        expect.arrayContaining(["maximum_height", "speed_after_height", "energy_comparison"]),
+      );
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("not_satisfied");
+      expect(response.body?.final_status).toBe("final_failure");
+      expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+        artifact.kind === "typed_failure" &&
+        artifact.payload?.error_code === "calculator_requirement_coverage_incomplete"
+      )).toBe(true);
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+      if (previousCalculatorResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousCalculatorResponse;
+      if (previousRepairResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE = previousRepairResponse;
+    }
+  }, 60000);
+
+  it("uses receipt coverage and a post-observation composer for long calculator prompts", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousCalculatorResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    const previousRepairResponse = process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE;
+    const previousFinalAnswer = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = "not valid json";
+    process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "initial_kinetic_energy",
+          label: "Compute initial kinetic energy",
+          expression: "0.5*0.5*12^2",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "KE = 1/2 m v^2",
+        },
+        {
+          id: "maximum_height",
+          label: "Compute maximum height from initial kinetic energy",
+          expression: "36/(0.5*9.80665)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "h = KE / (m g)",
+        },
+        {
+          id: "remaining_kinetic_energy",
+          label: "Compute remaining kinetic energy at 3 m",
+          expression: "36-(0.5*9.80665*3)",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "KE_remaining = KE_initial - m g h",
+        },
+        {
+          id: "speed_after_height",
+          label: "Compute speed at 3 m from remaining kinetic energy",
+          expression: "sqrt(2*21.290025/0.5)",
+          expected_quantity: "speed",
+          expected_unit: "m/s",
+          equation: "v = sqrt(2 KE_remaining / m)",
+        },
+        {
+          id: "energy_comparison",
+          label: "Compare remaining kinetic energy to initial kinetic energy",
+          expression: "21.290025/36",
+          expected_quantity: "dimensionless",
+          expected_unit: null,
+          equation: "ratio = KE_remaining / KE_initial",
+        },
+      ],
+  });
+
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the first requested numeric subgoal.",
+        args: { latex: "0.5*0.5*12^2", compound_subgoal_id: "initial_kinetic_energy" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The final decision should answer after coverage is complete.",
+        args: {},
+        expected_artifacts: ["workstation_tool_evaluation"],
+        confidence: 0.96,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the next requested numeric subgoal.",
+        args: { latex: "36/(0.5*9.80665)", compound_subgoal_id: "maximum_height" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the remaining kinetic energy subgoal.",
+        args: { latex: "36-(0.5*9.80665*3)", compound_subgoal_id: "remaining_kinetic_energy" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the speed subgoal.",
+        args: { latex: "sqrt(2*21.290025/0.5)", compound_subgoal_id: "speed_after_height" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the comparison subgoal.",
+        args: { latex: "21.290025/36", compound_subgoal_id: "energy_comparison" },
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        confidence: 0.95,
+      },
+    ]);
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = [
+      "Initial kinetic energy: Formula KE = 1/2 m v^2. Calculator expression 0.5*0.5*12^2. Result: 36 J.",
+      "Maximum height: Formula h = KE / (m g). Calculator expression 36/(0.5*9.80665). Result: 7.34195673344 m.",
+      "Remaining kinetic energy at 3.0 m: Formula KE_remaining = KE_initial - m g h. Calculator expression 36-(0.5*9.80665*3). Result: 21.290025 J.",
+      "Speed at 3.0 m: Formula v = sqrt(2 KE_remaining / m). Calculator expression sqrt(2*21.290025/0.5). Result: 9.22822301421 m/s.",
+      "Energy comparison: Calculator expression 21.290025/36. Result: 0.591389583333, so about 59.1% of the initial kinetic energy remains.",
+      "Interpretation: the cart trades kinetic energy for gravitational potential energy as it climbs; at 3.0 m it has less kinetic energy and therefore a lower speed.",
+    ].join("\n");
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Use the scientific calculator as a workstation tool and answer every part. A 0.50 kg cart rolls at 12 m/s on a level track, then climbs a ramp. First compute its initial kinetic energy. Second compute the maximum height it could reach if all kinetic energy became gravitational potential energy using g = 9.80665 m/s^2. Third compute the speed it would have after reaching a height of 3.0 m, assuming no drag and no rolling losses. Fourth compare the initial kinetic energy to the remaining kinetic energy at 3.0 m. In the final answer, show the formulas, the calculator expressions, the numeric results with units, and a short interpretation of what the energy conversion means.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-long-covered-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.calculator_planner_result?.authority).toBe("model_repaired_calculator_planner");
+      expect(response.body?.calculator_planner_repair_result).toMatchObject({
+        schema: "helix.calculator_planner_repair_result.v1",
+        attempted: true,
+        repaired: true,
+        proposed_subgoal_count: 5,
+      });
+      expect(response.body?.calculator_problem_requirements?.requirements?.map((requirement: any) => requirement.id)).toEqual(
+        expect.arrayContaining(["initial_kinetic_energy", "maximum_height", "speed_after_height", "energy_comparison"]),
+      );
+      expect(response.body?.calculator_plan_coverage).toMatchObject({
+        schema: "helix.calculator_plan_coverage.v1",
+        coverage: "complete",
+        missing_requirement_ids: [],
+      });
+      expect(response.body?.agent_loop_budget).toMatchObject({
+        schema: "helix.agent_loop_budget.v1",
+        profile: "calculator_compound",
+        max_tool_calls: 8,
+        exhausted: false,
+      });
+      expect(response.body?.agent_loop_budget?.consumed_tool_calls).toBeGreaterThanOrEqual(1);
+      expect(response.body?.final_answer_draft).toMatchObject({
+        schema: "helix.final_answer_draft.v1",
+        authority: "llm_post_observation_composer",
+        composer_scope: "source_tool_backed",
+        unsupported_claim_guard: {
+          source_targeted: true,
+          policy: "selected_artifacts_only",
+        },
+      });
+      expect(response.body?.calculator_final_answer_draft).toMatchObject({
+        schema: "helix.calculator_final_answer_draft.v1",
+        authority: "llm_post_observation_composer",
+        composer_schema: "helix.final_answer_draft.v1",
+      });
+      expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      expect(response.body?.final_status).toBe("final_answer");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("Initial kinetic energy");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("Maximum height");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("9.22822301421 m/s");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("Interpretation");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+      if (previousCalculatorResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousCalculatorResponse;
+      if (previousRepairResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_REPAIR_TEST_RESPONSE = previousRepairResponse;
+      if (previousFinalAnswer === undefined) delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousFinalAnswer;
+    }
+  }, 60000);
+
+  it("does not treat input speed as a requested speed-after-height output", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    const previousFinalAnswer = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "compute_initial_kinetic_energy",
+          label: "Compute initial kinetic energy",
+          expression: "0.5*2*15^2",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "KE = 0.5*m*v^2",
+          variables: [
+            { symbol: "m", value: "2", unit: "kg", meaning: "mass" },
+            { symbol: "v", value: "15", unit: "m/s", meaning: "speed" },
+          ],
+        },
+        {
+          id: "compute_maximum_height",
+          label: "Compute maximum height",
+          expression: "0.5*2*15^2/(2*9.80665)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "h = KE/(m*g)",
+          depends_on: ["compute_initial_kinetic_energy"],
+          variables: [
+            { symbol: "m", value: "2", unit: "kg", meaning: "mass" },
+            { symbol: "g", value: "9.80665", unit: "m/s^2", meaning: "gravity" },
+          ],
+        },
+      ],
+    });
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = [
+      "Initial kinetic energy: 225 J.",
+      "Maximum height: 11.471807396001692729 m.",
+    ].join("\n");
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute kinetic energy.",
+        args: { latex: "0.5*2*15^2", compound_subgoal_id: "compute_initial_kinetic_energy" },
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute maximum height from the energy conversion.",
+        args: { latex: "0.5*2*15^2/(2*9.80665)", compound_subgoal_id: "compute_maximum_height" },
+      },
+      {
+        next_step: "answer",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Both requested calculator results are receipt-backed.",
+      },
+    ]);
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Use the scientific calculator to compute kinetic energy for mass 2 kg and speed 15 m per s then compute maximum height with g 9.80665.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-input-speed-${Date.now()}`,
+        })
+        .expect(200);
+
+      const requirementIds = response.body?.calculator_problem_requirements?.requirements?.map((requirement: any) => requirement.id) ?? [];
+      expect(requirementIds).toEqual(expect.arrayContaining(["initial_kinetic_energy", "maximum_height"]));
+      expect(requirementIds).not.toContain("speed_after_height");
+      expect(response.body?.calculator_plan_coverage).toMatchObject({
+        coverage: "complete",
+        missing_requirement_ids: [],
+      });
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+      if (previousFinalAnswer === undefined) delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousFinalAnswer;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+    }
+  }, 60000);
+
+  it("allows rounded calculator final answers when numbers are receipt-backed", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    const previousFinalAnswer = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "compute_kinetic_energy",
+          label: "Compute kinetic energy",
+          expression: "0.5*0.2*18^2",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "KE = 0.5*m*v^2",
+          variables: [
+            { symbol: "m", value: "0.2", unit: "kg", meaning: "mass" },
+            { symbol: "v", value: "18", unit: "m/s", meaning: "speed" },
+          ],
+        },
+        {
+          id: "compute_max_height",
+          label: "Compute max height",
+          expression: "0.5*0.2*18^2/(0.2*9.80665)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "h = KE/(m*g)",
+          depends_on: ["compute_kinetic_energy"],
+          variables: [
+            { symbol: "m", value: "0.2", unit: "kg", meaning: "mass" },
+            { symbol: "g", value: "9.80665", unit: "m/s^2", meaning: "gravity" },
+          ],
+        },
+      ],
+    });
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = [
+      "Formula: KE = 0.5*m*v^2. Calculator expression: 0.5*0.2*18^2. Kinetic energy result: 32.4 J.",
+      "Formula: h = KE/(m*g). Calculator expression: 0.5*0.2*18^2/(0.2*9.80665). Maximum height result: 16.52 m.",
+      "Units: J for kinetic energy and m for height.",
+    ].join("\n");
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the kinetic-energy subgoal with the calculator.",
+        args: { latex: "0.5*0.2*18^2", compound_subgoal_id: "compute_kinetic_energy" },
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the maximum-height subgoal with the calculator.",
+        args: { latex: "0.5*0.2*18^2/(0.2*9.80665)", compound_subgoal_id: "compute_max_height" },
+      },
+      {
+        next_step: "answer",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "All calculator receipts are observed and the final answer can be composed.",
+      },
+    ]);
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Use scientific calculator. A 0.20 kg ball moves at 18 m/s. Compute kinetic energy and max height if all kinetic energy becomes mgh. Show formulas expressions results units.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-rounded-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.calculator_loop_integrity?.violations).toEqual([]);
+      expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+      expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
+      expect(response.body?.selected_final_answer ?? response.body?.answer).toContain("16.52 m");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+      if (previousFinalAnswer === undefined) delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousFinalAnswer;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+    }
   }, 60000);
 
   it("routes calculator live-source prompts through the workstation tool loop", async () => {
@@ -754,6 +1665,14 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.final_answer_source).not.toBe("typed_failure");
     expect(response.body?.terminal_error_code ?? null).toBeNull();
     expect(response.body?.terminal_artifact_kind).toBe("note_update_receipt");
+    expect(response.body?.notes_mutation_coverage).toMatchObject({
+      schema: "helix.notes_mutation_coverage.v1",
+      goal_kind: "note_mutation",
+      coverage: "complete",
+      next_decision: "allow_terminal",
+    });
+    expect(response.body?.poison_audit?.ok).toBe(true);
+    expect(response.body?.poison_audit?.violations ?? []).toEqual([]);
   }, 60000);
 
   it("does not steal real document acquisition prompts", async () => {

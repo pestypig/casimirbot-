@@ -162,6 +162,10 @@ const isVisualContentRequestPrompt = (promptText: string): boolean =>
   /\b(?:current|latest|right\s+now)\s+(?:screen|capture|frame|image|picture|window|visual)\b/i.test(promptText) ||
   /\blive\s+(?:capture|screen|visual)\b/i.test(promptText);
 
+const isNoteMutationPrompt = (promptText: string): boolean =>
+  /\b(?:create|append|add|write|save|store|copy)\b[\s\S]{0,120}\b(?:note|workstation\s+notes?)\b/i.test(promptText) ||
+  /\b(?:note|workstation\s+notes?)\b[\s\S]{0,120}\b(?:create|append|add|write|save|store|copy)\b/i.test(promptText);
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -343,6 +347,46 @@ export function buildRouteProductContract(input: {
     });
   }
 
+  if (sourceTarget === "workstation_panel" || sourceTarget === "workspace_action" || sourceTarget === "workstation_state") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: [],
+      allowedExtra: [
+        "workspace_action_receipt",
+        "workstation_tool_evaluation",
+        "tool_evaluation",
+        "note_update_receipt",
+        "note_context_pack",
+        "source_binding_status",
+        "source_binding_repair_candidate",
+      ],
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "no_tool_direct", "model_only_concept"],
+      precedenceReason: "workstation_panel_source_target_allows_workspace_and_note_action_receipts",
+    });
+  }
+
+  if (isNoteMutationPrompt(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: sourceTarget === "unknown" ? "workstation_panel" : sourceTarget,
+      allowedCore: [],
+      allowedExtra: [
+        "workspace_action_receipt",
+        "workstation_tool_evaluation",
+        "tool_evaluation",
+        "note_update_receipt",
+        "note_context_pack",
+        "source_binding_status",
+        "source_binding_repair_candidate",
+      ],
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "no_tool_direct", "model_only_concept"],
+      precedenceReason: "note_mutation_prompt_allows_note_action_receipts",
+    });
+  }
+
   if (sourceTarget === "audio_transcript" || sourceTarget === "workstation_state") {
     return makeContract({
       turnId: input.turnId,
@@ -361,7 +405,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget: "active_note",
       allowedCore: [],
-      allowedExtra: ["note_context_pack", "note_location_result", "source_binding_status", "source_binding_repair_candidate"],
+      allowedExtra: ["note_context_pack", "note_location_result", "note_update_receipt", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: ["situation_context_pack", "visual_frame_evidence", "doc_location_result", "process_graph_overview", "no_tool_direct", "model_only_concept"],
       precedenceReason: "notes_source_target_allows_note_terminal_products",
     });

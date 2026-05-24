@@ -29,10 +29,47 @@ import {
 const H = 6.62607015e-34;
 const C = 3e8;
 const EV_J = 1.602176634e-19;
+const G0 = 9.80665;
 
 export type CalculatorCompoundChainArtifact = {
   kind: string;
   payload: Record<string, unknown>;
+};
+
+export type CalculatorCandidateHints = {
+  schema: "helix.calculator_candidate_hints.v1";
+  turn_id: string;
+  prompt: string;
+  authority: "hint_only";
+  constants: Array<{
+    symbol: string;
+    value: string;
+    unit: string | null;
+    meaning: string;
+  }>;
+  formula_hints: Array<{
+    id: string;
+    expression_template: string;
+    quantity: string;
+    result_unit: string | null;
+    when_useful: string;
+  }>;
+  expression_rules: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type CalculatorModelAuthoredSubgoal = {
+  id?: string | null;
+  label?: string | null;
+  expression: string;
+  expected_quantity?: string | null;
+  expected_unit?: string | null;
+  equation?: string | null;
+  depends_on?: string[] | null;
+  assumptions?: string[] | null;
+  variables?: HelixCalculatorSetupContext["variables"] | null;
+  interpretation?: string | null;
 };
 
 export type CalculatorCompoundChainResult = {
@@ -74,6 +111,16 @@ const formatNumber = (value: number): string => {
     return value.toExponential(6).replace(/\.?0+e/, "e");
   }
   return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
+};
+
+const sanitizeId = (value: string, fallback: string): string => {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  return sanitized || fallback;
 };
 
 const newId = (prefix: string, turnId: string, suffix: string): string =>
@@ -125,6 +172,13 @@ const unitSetup = (input: {
 
 const numberPattern = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
 
+const extractNumberNear = (prompt: string, units: string[]): number | null => {
+  const unitPattern = units.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const match = prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:${unitPattern})\\b`, "i"));
+  const value = Number(match?.[1]);
+  return Number.isFinite(value) ? value : null;
+};
+
 const extractFrequency = (prompt: string): number | null => {
   const match =
     prompt.match(new RegExp(`\\bf(?:requency)?\\s*(?:=|is|of)?\\s*(${numberPattern})\\s*(?:hz|hertz)?\\b`, "i")) ??
@@ -171,6 +225,7 @@ const colorRangeForWavelength = (meters: number): string => {
 
 const validateReceipt = (
   turnId: string,
+  prompt: string,
   subgoal: HelixCalculatorCompoundSubgoal,
   receipt: HelixCalculatorSubgoalReceipt,
 ): HelixCalculatorResultValidation => {
@@ -179,7 +234,8 @@ const validateReceipt = (
   const actualQuantity = receipt.result_quantity ?? null;
   const unitOk = !subgoal.expected_unit || actualUnit === subgoal.expected_unit;
   const quantityOk = !subgoal.expected_quantity || actualQuantity === subgoal.expected_quantity;
-  const satisfied = resultNumeric && unitOk && quantityOk && receipt.status === "completed";
+  const semanticCheck = validateCalculatorReceiptSemanticConsistency(prompt, subgoal, receipt);
+  const satisfied = resultNumeric && unitOk && quantityOk && receipt.status === "completed" && semanticCheck.ok;
   const failureReason = satisfied
     ? null
     : !resultNumeric
@@ -188,7 +244,9 @@ const validateReceipt = (
         ? "unit_mismatch"
         : !quantityOk
           ? "quantity_mismatch"
-          : "receipt_failed";
+          : !semanticCheck.ok
+            ? semanticCheck.reason
+            : "receipt_failed";
   return {
     schema: HELIX_CALCULATOR_RESULT_VALIDATION_SCHEMA,
     validation_id: newId("calculator_result_validation", turnId, subgoal.id),
@@ -205,6 +263,49 @@ const validateReceipt = (
     assistant_answer: false,
     raw_content_included: false,
   };
+};
+
+const valuesClose = (actual: number, expected: number): boolean => {
+  const tolerance = Math.max(1e-9, Math.abs(expected) * 1e-6);
+  return Math.abs(actual - expected) <= tolerance;
+};
+
+const validateCalculatorReceiptSemanticConsistency = (
+  prompt: string,
+  subgoal: HelixCalculatorCompoundSubgoal,
+  receipt: HelixCalculatorSubgoalReceipt,
+): { ok: true; reason: null } | { ok: false; reason: string } => {
+  if (typeof receipt.result_value !== "number" || !Number.isFinite(receipt.result_value)) {
+    return { ok: true, reason: null };
+  }
+  const normalizedPrompt = normalizePrompt(prompt).toLowerCase();
+  const subgoalText = normalizePrompt([
+    subgoal.id,
+    subgoal.label,
+    subgoal.expression,
+    subgoal.setup?.subgoal,
+    subgoal.setup?.equation,
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  if (
+    /\b(?:maximum|max)\s+height\b|\bheight\b/.test(normalizedPrompt) &&
+    /\b(?:kinetic\s+energy|energy\s+convert|converts?\s+to\s+gravitational|potential\s+energy)\b/.test(normalizedPrompt) &&
+    /\bheight\b/.test(subgoalText) &&
+    receipt.result_unit === "m"
+  ) {
+    const massSpeed = extractMassSpeed(normalizedPrompt);
+    if (massSpeed) {
+      const expectedHeight = (0.5 * massSpeed.mass * massSpeed.speed ** 2) / (massSpeed.mass * G0);
+      if (!valuesClose(receipt.result_value, expectedHeight)) {
+        return {
+          ok: false,
+          reason: `formula_expression_inconsistent_with_prompt:expected_${formatNumber(expectedHeight)}_m`,
+        };
+      }
+    }
+  }
+
+  return { ok: true, reason: null };
 };
 
 const makeReceipt = (
@@ -230,6 +331,20 @@ const makeReceipt = (
   assistant_answer: false,
   raw_content_included: false,
 });
+
+const evaluateNumericExpression = (expression: string): number | null => {
+  const normalized = normalizePrompt(expression)
+    .replace(/\^/g, "**")
+    .replace(/\bsqrt\s*\(/gi, "Math.sqrt(")
+    .replace(/\bpi\b/gi, "Math.PI");
+  if (!/^[0-9eE+\-*/().,\s*MathsqrtPI]+$/.test(normalized)) return null;
+  try {
+    const value = Function(`"use strict"; return (${normalized});`)() as unknown;
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
 
 const buildPlan = (turnId: string, prompt: string, subgoals: DraftSubgoal[]): HelixCalculatorCompoundPlan => ({
   schema: HELIX_CALCULATOR_COMPOUND_PLAN_SCHEMA,
@@ -301,11 +416,11 @@ const buildWorkstationPlan = (
   created_at: new Date().toISOString(),
 });
 
-const buildPhotonFrequencyDraft = (prompt: string, frequency: number): DraftSubgoal[] => {
+const buildPhotonFrequencyDraft = (prompt: string, frequency: number, includeEv: boolean): DraftSubgoal[] => {
   const wavelength = C / frequency;
   const energyJ = H * frequency;
   const energyEv = energyJ / EV_J;
-  return [
+  const subgoals: DraftSubgoal[] = [
     {
       id: "wavelength",
       label: "Compute wavelength from frequency",
@@ -350,7 +465,9 @@ const buildPhotonFrequencyDraft = (prompt: string, frequency: number): DraftSubg
         assumptions: ["Planck relation E = hf."],
       }),
     },
-    {
+  ];
+  if (includeEv) {
+    subgoals.push({
       id: "photon_energy_ev",
       label: "Convert photon energy from joules to electronvolts",
       expression: `${formatNumber(energyJ)}/1.602176634e-19`,
@@ -371,8 +488,9 @@ const buildPhotonFrequencyDraft = (prompt: string, frequency: number): DraftSubg
         ],
         assumptions: ["1 eV = 1.602176634e-19 J."],
       }),
-    },
-  ];
+    });
+  }
+  return subgoals;
 };
 
 const buildPhotonWavelengthDraft = (wavelength: { meters: number; label: string }): DraftSubgoal[] => {
@@ -552,9 +670,13 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
   const normalized = normalizePrompt(prompt);
   const normalizedExpressionText = normalizeCalculatorExpressionPhrases(normalized);
   if (!/\b(?:calculator|calculate|compute|solve|evaluate)\b/i.test(normalized)) return null;
-  if (/\bfrequency\b|\bhz\b/i.test(normalized) && /\bwavelength\b/i.test(normalized) && /\bev\b/i.test(normalized)) {
+  if (
+    (/\bfrequency\b|\bhz\b/i.test(normalized)) &&
+    /\bwavelength\b/i.test(normalized) &&
+    /\b(?:energy|photon\s+energy|joules?|j\b|ev\b)\b/i.test(normalized)
+  ) {
     const frequency = extractFrequency(normalized);
-    if (frequency) return { subgoals: buildPhotonFrequencyDraft(normalized, frequency), answerKind: "photon_frequency_chain" };
+    if (frequency) return { subgoals: buildPhotonFrequencyDraft(normalized, frequency, /\bev\b/i.test(normalized)), answerKind: "photon_frequency_chain" };
   }
   if (/\bphoton\b/i.test(normalized) && /\bev\b/i.test(normalized) && /\b(?:nm|nanometer|nanometre)\b/i.test(normalized)) {
     const wavelength = extractWavelengthMeters(normalized);
@@ -573,13 +695,18 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
 const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCalculatorSubgoalReceipt[]): string => {
   const byId = new Map(receipts.map((receipt) => [receipt.subgoal_id, receipt]));
   if (answerKind === "photon_frequency_chain") {
-    return [
+    const lines = [
       "Calculator compound plan completed.",
       `Wavelength: ${byId.get("wavelength")?.result_text} m.`,
       `Photon energy: ${byId.get("photon_energy_j")?.result_text} J.`,
-      `Photon energy: ${byId.get("photon_energy_ev")?.result_text} eV.`,
-      "Interpretation: the chain used frequency to compute wavelength, then used Planck's relation to compute photon energy and converted the validated joule result to electronvolts.",
-    ].join("\n");
+    ];
+    if (byId.has("photon_energy_ev")) {
+      lines.push(`Photon energy: ${byId.get("photon_energy_ev")?.result_text} eV.`);
+      lines.push("Interpretation: the chain used frequency to compute wavelength, then used Planck's relation to compute photon energy and converted the validated joule result to electronvolts.");
+    } else {
+      lines.push("Interpretation: the chain used frequency to compute wavelength, then used Planck's relation to compute photon energy. No electronvolt conversion was required because the prompt did not ask for eV.");
+    }
+    return lines.join("\n");
   }
   if (answerKind.startsWith("photon_wavelength_chain:")) {
     const color = answerKind.split(":").slice(1).join(":");
@@ -609,8 +736,176 @@ const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCal
       "Interpretation: both roots produce the same value because squaring removes the sign.",
     ].join("\n");
   }
+  if (answerKind === "model_authored_generic_calculator_chain") {
+    const lines = ["Calculator planning loop completed."];
+    for (const receipt of receipts) {
+      const unit = receipt.result_unit ? ` ${receipt.result_unit}` : "";
+      const setup = receipt.calculator_setup;
+      const subgoal = setup?.subgoal ?? receipt.subgoal_id;
+      lines.push(`${subgoal}: ${receipt.result_text}${unit}.`);
+    }
+    lines.push("Interpretation: each numeric claim above is backed by a scientific-calculator subgoal receipt.");
+    return lines.join("\n");
+  }
   return `Calculator compound plan completed for: ${prompt}`;
 };
+
+export function buildCalculatorCandidateHints(input: {
+  prompt: string;
+  turnId: string;
+}): CalculatorCandidateHints {
+  return {
+    schema: "helix.calculator_candidate_hints.v1",
+    turn_id: input.turnId,
+    prompt: input.prompt,
+    authority: "hint_only",
+    constants: [
+      { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light approximation" },
+      { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
+      { symbol: "e", value: "1.602176634e-19", unit: "J/eV", meaning: "joules per electronvolt" },
+      { symbol: "g", value: "9.80665", unit: "m/s^2", meaning: "standard gravity" },
+      { symbol: "G", value: "6.67430e-11", unit: "N*m^2/kg^2", meaning: "Newtonian gravitational constant" },
+    ],
+    formula_hints: [
+      { id: "force", expression_template: "m*a", quantity: "force", result_unit: "N", when_useful: "mass and acceleration are given" },
+      { id: "kinetic_energy", expression_template: "0.5*m*v^2", quantity: "energy", result_unit: "J", when_useful: "mass and speed are given" },
+      { id: "potential_energy", expression_template: "m*g*h", quantity: "energy", result_unit: "J", when_useful: "mass and height near Earth are given" },
+      { id: "pendulum_period", expression_template: "2*pi*sqrt(L/g)", quantity: "time", result_unit: "s", when_useful: "small-angle pendulum length is given" },
+      { id: "de_broglie_momentum", expression_template: "h/lambda", quantity: "momentum", result_unit: "kg*m/s", when_useful: "wavelength is given and momentum is requested" },
+      { id: "photon_energy", expression_template: "h*f", quantity: "energy", result_unit: "J", when_useful: "photon frequency is given" },
+      { id: "wavelength_from_frequency", expression_template: "c/f", quantity: "length", result_unit: "m", when_useful: "wave or photon frequency is given and wavelength is requested" },
+    ],
+    expression_rules: [
+      "Return calculator-ready numeric expressions only; no prose or units inside expression.",
+      "Use *, /, ^, parentheses, sqrt(), pi, and scientific notation.",
+      "Convert input units to SI before writing the expression.",
+      "Create one subgoal per meaningful numeric result.",
+      "Use depends_on only when a later expression uses an earlier result.",
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSubgoal[] => {
+  const normalized = normalizePrompt(prompt);
+  const subgoals: CalculatorModelAuthoredSubgoal[] = [];
+  const mass = extractNumberNear(normalized, ["kg", "kilogram", "kilograms"]);
+  const acceleration =
+    extractNumberNear(normalized, ["m/s^2", "m/s2", "meters per second squared", "metres per second squared"]) ??
+    (/\baccelerat/i.test(normalized)
+      ? Number(normalized.match(new RegExp(`\\b(${numberPattern})\\b(?=[^\\d]*(?:m/s\\^?2|meters?\\s+per\\s+second\\s+squared|metres?\\s+per\\s+second\\s+squared|acceleration))`, "i"))?.[1])
+      : null);
+  if (/\bforce\b/i.test(normalized) && mass && acceleration && Number.isFinite(acceleration)) {
+    subgoals.push({
+      id: "force",
+      label: "Compute force from F = m a",
+      expression: `${formatNumber(mass)}*${formatNumber(acceleration)}`,
+      expected_quantity: "force",
+      expected_unit: "N",
+      equation: "F = m a",
+      assumptions: ["Mass is in kilograms and acceleration is in metres per second squared."],
+      variables: [
+        { symbol: "m", value: formatNumber(mass), unit: "kg", meaning: "mass" },
+        { symbol: "a", value: formatNumber(acceleration), unit: null, meaning: "acceleration numeric value in m/s^2" },
+      ],
+    });
+  }
+  const lengthOrHeight = extractNumberNear(normalized, ["m", "meter", "meters", "metre", "metres"]);
+  if (/\b(?:potential\s+energy|gravitational\s+energy|mgh)\b/i.test(normalized) && mass && lengthOrHeight) {
+    subgoals.push({
+      id: "gravitational_potential_energy",
+      label: "Compute gravitational potential energy",
+      expression: `${formatNumber(mass)}*${formatNumber(G0)}*${formatNumber(lengthOrHeight)}`,
+      expected_quantity: "energy",
+      expected_unit: "J",
+      equation: "U = m g h",
+      assumptions: ["Uses standard gravity g = 9.80665 m/s^2."],
+      variables: [
+        { symbol: "m", value: formatNumber(mass), unit: "kg", meaning: "mass" },
+        { symbol: "g", value: formatNumber(G0), unit: null, meaning: "standard gravity numeric value in m/s^2" },
+        { symbol: "h", value: formatNumber(lengthOrHeight), unit: "m", meaning: "height" },
+      ],
+    });
+  }
+  const pendulumLength = /\bpendulum\b/i.test(normalized) ? lengthOrHeight : null;
+  if (pendulumLength && /\b(?:period|pendulum)\b/i.test(normalized)) {
+    subgoals.push({
+      id: "pendulum_period",
+      label: "Estimate small-angle pendulum period",
+      expression: `2*pi*sqrt(${formatNumber(pendulumLength)}/${formatNumber(G0)})`,
+      expected_quantity: "time",
+      expected_unit: "s",
+      equation: "T = 2 pi sqrt(L / g)",
+      assumptions: ["Small-angle pendulum approximation.", "Uses standard gravity g = 9.80665 m/s^2."],
+      variables: [
+        { symbol: "L", value: formatNumber(pendulumLength), unit: "m", meaning: "pendulum length" },
+        { symbol: "g", value: formatNumber(G0), unit: null, meaning: "standard gravity numeric value in m/s^2" },
+      ],
+    });
+  }
+  const wavelength = /\bde\s*broglie|\bmomentum\b/i.test(normalized) ? extractWavelengthMeters(normalized) : null;
+  if (wavelength && /\b(?:de\s*broglie|momentum)\b/i.test(normalized)) {
+    subgoals.push({
+      id: "de_broglie_momentum",
+      label: "Compute de Broglie momentum from wavelength",
+      expression: `${formatNumber(H)}/${formatNumber(wavelength.meters)}`,
+      expected_quantity: "momentum",
+      expected_unit: "kg*m/s",
+      equation: "p = h / lambda",
+      assumptions: ["Wavelength is converted to metres before evaluation."],
+      variables: [
+        { symbol: "h", value: formatNumber(H), unit: "J*s", meaning: "Planck constant" },
+        { symbol: "lambda", value: wavelength.label, unit: "m", meaning: "wavelength converted to SI" },
+      ],
+    });
+  }
+  return subgoals.slice(0, 5);
+};
+
+const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[]): DraftSubgoal[] => {
+  return subgoals.slice(0, 5).flatMap((subgoal, index) => {
+    const expression = normalizePrompt(String(subgoal.expression ?? ""));
+    if (!expression) return [];
+    const value = evaluateNumericExpression(expression);
+    if (value === null) return [];
+    const expectedUnit = subgoal.expected_unit
+      ? String(subgoal.expected_unit).trim()
+      : subgoal.expected_quantity === "momentum"
+        ? "kg*m/s"
+        : null;
+    const unitQuantity = expectedUnit ? findHelixUnitDefinition(expectedUnit)?.quantity ?? null : null;
+    const expectedQuantity = subgoal.expected_quantity ? String(subgoal.expected_quantity).trim() : unitQuantity ?? "dimensionless";
+    const id = sanitizeId(String(subgoal.id ?? subgoal.label ?? expectedQuantity), `calculator_subgoal_${index + 1}`);
+    const label = normalizePrompt(String(subgoal.label ?? subgoal.equation ?? `Compute ${expectedQuantity}`));
+    return [{
+      id,
+      label,
+      expression,
+      expected_quantity: expectedQuantity as HelixCalculatorCompoundQuantity,
+      expected_unit: expectedUnit,
+      depends_on: Array.isArray(subgoal.depends_on)
+        ? subgoal.depends_on.map((entry) => sanitizeId(String(entry ?? ""), "")).filter(Boolean)
+        : [],
+      value,
+      result_text: formatNumber(value),
+      setup: unitSetup({
+        expression,
+        domain: "generic",
+        subgoal: label,
+        equation: subgoal.equation ?? null,
+        resultUnit: expectedUnit,
+        variables: subgoal.variables ?? [],
+        assumptions: subgoal.assumptions?.map((entry) => String(entry)).filter(Boolean).slice(0, 6) ?? [],
+        interpretation: subgoal.interpretation ?? null,
+      }),
+    }];
+  });
+};
+
+export function draftGenericCalculatorSubgoalsForPrompt(prompt: string): CalculatorModelAuthoredSubgoal[] {
+  return buildFallbackGenericSubgoals(prompt);
+}
 
 export function runCalculatorCompoundChain(input: {
   prompt: string;
@@ -627,7 +922,7 @@ export function runCalculatorCompoundChain(input: {
   const validations = receipts.map((receipt) => {
     const subgoal = plan.subgoals.find((entry) => entry.id === receipt.subgoal_id);
     if (!subgoal) throw new Error(`missing_compound_subgoal:${receipt.subgoal_id}`);
-    return validateReceipt(input.turnId, subgoal, receipt);
+    return validateReceipt(input.turnId, input.prompt, subgoal, receipt);
   });
   const allSatisfied = validations.every((validation) => validation.satisfied);
   if (!allSatisfied) return null;
@@ -659,6 +954,8 @@ export function runCalculatorCompoundChain(input: {
     args: {
       latex: subgoal.expression,
       calculator_setup: subgoal.setup ?? null,
+      compound_run_id: input.turnId,
+      compound_subgoal_id: subgoal.id,
     },
   }));
   const artifacts: CalculatorCompoundChainArtifact[] = [
@@ -708,6 +1005,136 @@ export function runCalculatorCompoundChain(input: {
         turn_id: input.turnId,
         input_refs: evidenceRefs,
         consumed_observation_kind: "calculator_compound_results",
+        final_answer_kind: "calculator_compound_grounded_explanation",
+        text: answerText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    {
+      kind: "turn_final_text",
+      payload: {
+        kind: "turn_final_text",
+        text: answerText,
+        answer_text: answerText,
+      },
+    },
+  ];
+  return {
+    plan,
+    workstation_tool_plan: workstationPlan,
+    receipts,
+    validations,
+    evaluation,
+    answer_text: answerText,
+    artifacts,
+    action_steps: actionSteps,
+  };
+}
+
+export function runCalculatorModelAuthoredChain(input: {
+  prompt: string;
+  turnId: string;
+  threadId: string;
+  subgoals: CalculatorModelAuthoredSubgoal[];
+}): CalculatorCompoundChainResult | null {
+  const requestedExpressionCount = input.subgoals
+    .slice(0, 5)
+    .filter((subgoal) => normalizePrompt(String(subgoal.expression ?? ""))).length;
+  const draftSubgoals = coerceModelSubgoalsToDrafts(input.subgoals);
+  if (draftSubgoals.length !== requestedExpressionCount) return null;
+  if (draftSubgoals.length < 1 || draftSubgoals.length > 5) return null;
+  const plan = buildPlan(input.turnId, input.prompt, draftSubgoals);
+  const receipts = plan.subgoals.map((subgoal) => {
+    const source = draftSubgoals.find((entry) => entry.id === subgoal.id);
+    return makeReceipt(input.turnId, subgoal, source?.value ?? null, source?.result_text ?? null);
+  });
+  const validations = receipts.map((receipt) => {
+    const subgoal = plan.subgoals.find((entry) => entry.id === receipt.subgoal_id);
+    if (!subgoal) throw new Error(`missing_compound_subgoal:${receipt.subgoal_id}`);
+    return validateReceipt(input.turnId, input.prompt, subgoal, receipt);
+  });
+  const allSatisfied = validations.every((validation) => validation.satisfied);
+  if (!allSatisfied) return null;
+  const workstationPlan = buildWorkstationPlan(input, plan);
+  const answerText = synthesizeAnswer(input.prompt, "model_authored_generic_calculator_chain", receipts);
+  const evidenceRefs = receipts.map((receipt) => receipt.receipt_id);
+  const evaluation: CalculatorCompoundChainResult["evaluation"] = {
+    schema: HELIX_WORKSTATION_TOOL_EVALUATION_SCHEMA,
+    evaluation_id: newId("workstation-tool-eval:calculator_compound", input.turnId, "chain"),
+    plan_id: workstationPlan.plan_id,
+    thread_id: input.threadId,
+    turn_id: input.turnId,
+    goal: input.prompt,
+    subgoal: "Run a model-authored calculator plan and validate every required numeric subgoal.",
+    tool_receipt_ids: evidenceRefs,
+    supports_goal: true,
+    summary: `model_authored_calculator_chain satisfied ${validations.length} calculator subgoals with validated results.`,
+    evidence_refs: evidenceRefs,
+    calculator_setup: plan.subgoals[plan.subgoals.length - 1]?.setup ?? null,
+    calculator_compound_plan: plan,
+    calculator_result_validations: validations,
+    deterministic: false,
+    model_invoked: true,
+    created_at: new Date().toISOString(),
+  };
+  const actionSteps = plan.subgoals.map((subgoal) => ({
+    panel_id: "scientific-calculator",
+    action_id: "solve_expression",
+    args: {
+      latex: subgoal.expression,
+      calculator_setup: subgoal.setup ?? null,
+      compound_run_id: input.turnId,
+      compound_subgoal_id: subgoal.id,
+    },
+  }));
+  const artifacts: CalculatorCompoundChainArtifact[] = [
+    { kind: "calculator_compound_plan", payload: plan as unknown as Record<string, unknown> },
+    ...receipts.map((receipt) => ({ kind: "calculator_receipt", payload: { ...receipt, kind: "calculator_receipt" } as unknown as Record<string, unknown> })),
+    ...receipts.map((receipt) => ({ kind: "calculator_subgoal_receipt", payload: receipt as unknown as Record<string, unknown> })),
+    {
+      kind: "calculator_subgoal_receipts",
+      payload: {
+        schema: "helix.calculator_subgoal_receipts.v1",
+        turn_id: input.turnId,
+        receipts,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    ...validations.map((validation) => ({ kind: "calculator_result_validation", payload: validation as unknown as Record<string, unknown> })),
+    {
+      kind: "calculator_result_validations",
+      payload: {
+        schema: "helix.calculator_result_validations.v1",
+        turn_id: input.turnId,
+        validations,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    { kind: "workstation_tool_evaluation", payload: evaluation as unknown as Record<string, unknown> },
+    {
+      kind: "tool_observation_continuation",
+      payload: {
+        schema: "helix.tool_observation_continuation.v1",
+        turn_id: input.turnId,
+        source_tool: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_model_authored_results",
+        evidence_refs: evidenceRefs,
+        continuation_required: true,
+        continuation_reason: "The calculator subgoals produced intermediate observations that must be synthesized into the final answer.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    },
+    {
+      kind: "reasoning_continuation_result",
+      payload: {
+        schema: "helix.reasoning_continuation_result.v1",
+        turn_id: input.turnId,
+        input_refs: evidenceRefs,
+        consumed_observation_kind: "calculator_model_authored_results",
         final_answer_kind: "calculator_compound_grounded_explanation",
         text: answerText,
         assistant_answer: false,

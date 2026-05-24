@@ -2709,6 +2709,8 @@ export function executeHelixPanelAction(
     const args = asRecord(request.args) ?? {};
     const scientificState = useScientificCalculatorStore.getState();
     const calculatorSetup = asCalculatorSetupContext(args.calculator_setup ?? args.setup_context ?? args.setup);
+    const compoundRunId = asNonEmptyString(args.compound_run_id ?? args.run_id ?? args.turn_id);
+    const compoundSubgoalId = asNonEmptyString(args.compound_subgoal_id ?? args.subgoal_id);
 
     if (actionId === "ingest_latex") {
       const rawLatex = asNonEmptyString(args.latex ?? args.expression ?? args.text);
@@ -2748,6 +2750,8 @@ export function executeHelixPanelAction(
         anchor,
         source: "workstation_action",
         calculatorSetup,
+        compoundRunId,
+        compoundSubgoalId,
       });
       dispatchScientificCalculatorMathPicked({
         latex: entry.latex,
@@ -2803,6 +2807,8 @@ export function executeHelixPanelAction(
           anchor: asNonEmptyString(args.anchor),
           source: "workstation_action",
           calculatorSetup,
+          compoundRunId,
+          compoundSubgoalId,
         });
       }
       const solveResult = runScientificSolve(latex, actionId === "solve_with_steps");
@@ -2810,6 +2816,8 @@ export function executeHelixPanelAction(
         actionId: actionId === "solve_with_steps" ? "solve_with_steps" : "solve_expression",
         source: "workstation_action",
         calculatorSetup,
+        compoundRunId,
+        compoundSubgoalId,
       });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);

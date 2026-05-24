@@ -266,6 +266,12 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.status).toBe("permission_required");
+    expect(response.body?.live_source_coverage).toMatchObject({
+      schema: "helix.live_source_coverage.v1",
+      goal_kind: "live_interval_set",
+      coverage: "complete",
+      next_decision: "allow_terminal",
+    });
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
   }, 20_000);
 
@@ -486,6 +492,11 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.visual_producer_cadence_receipt?.action_id).toBe("situation-room.live-source.set_rate");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.capture_mode).toBe("interval");
     expect(response.body?.visual_producer_cadence_receipt?.cadence?.cadence_ms).toBe(10_000);
+    expect(response.body?.live_source_coverage).toMatchObject({
+      schema: "helix.live_source_coverage.v1",
+      goal_kind: "live_interval_set",
+      coverage: "complete",
+    });
     expect(response.body?.client_action_request?.schema).toBe("helix.client_capability_action.v1");
     expect(response.body?.client_action_request?.capability).toBe("visual_capture");
     expect(response.body?.client_action_request?.action).toBe("request_permission");

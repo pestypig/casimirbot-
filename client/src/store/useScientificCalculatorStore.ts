@@ -41,6 +41,8 @@ export type ScientificCalculatorDebugEvent = {
   engine?: string | null;
   message?: string;
   calculator_setup?: HelixCalculatorSetupContext | null;
+  compound_run_id?: string | null;
+  compound_subgoal_id?: string | null;
 };
 
 type ScientificCalculatorState = {
@@ -57,6 +59,8 @@ type ScientificCalculatorState = {
       anchor?: string | null;
       source?: ScientificCalculatorDebugEvent["source"];
       calculatorSetup?: HelixCalculatorSetupContext | null;
+      compoundRunId?: string | null;
+      compoundSubgoalId?: string | null;
     },
   ) => ScientificCalculatorHistoryEntry;
   setSolveResult: (
@@ -65,6 +69,8 @@ type ScientificCalculatorState = {
       actionId?: Extract<ScientificCalculatorDebugAction, "solve_expression" | "solve_with_steps">;
       source?: ScientificCalculatorDebugEvent["source"];
       calculatorSetup?: HelixCalculatorSetupContext | null;
+      compoundRunId?: string | null;
+      compoundSubgoalId?: string | null;
     },
   ) => void;
   recordDebugEvent: (
@@ -124,6 +130,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           source_path: entry.sourcePath,
           anchor: entry.anchor,
           calculator_setup: entry.calculatorSetup,
+          compound_run_id: meta?.compoundRunId ?? null,
+          compound_subgoal_id: meta?.compoundSubgoalId ?? null,
           message: trimmed ? "latex_ingested" : "empty_latex",
         });
         set((state) => ({
@@ -146,6 +154,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           route: result.trace.route,
           engine: result.trace.engine,
           calculator_setup: meta?.calculatorSetup ?? null,
+          compound_run_id: meta?.compoundRunId ?? null,
+          compound_subgoal_id: meta?.compoundSubgoalId ?? null,
           message: result.ok ? "solve_completed" : result.error ?? "solve_failed",
         });
         set((state) => ({

@@ -122,8 +122,33 @@ const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArti
   });
 };
 
+const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (terminalArtifactKind !== "live_pipeline_receipt") return false;
+  const liveTurnReceipt = readRecord(payload.live_pipeline_turn_receipt);
+  const pipelineReceiptId = readString(payload.pipeline_receipt_id);
+  const pipelineId = readString(payload.pipeline_id);
+  if (liveTurnReceipt || pipelineReceiptId || pipelineId) return true;
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (!artifact) return false;
+    const artifactKind = readString(artifact.kind);
+    const artifactPayload = readRecord(artifact.payload);
+    return (
+      artifactKind === "live_pipeline_receipt" ||
+      (
+        artifactKind === "tool_observation" &&
+        (
+          readString(artifactPayload?.schema) === "helix.live_pipeline_turn_receipt.v1" ||
+          Boolean(readString(artifactPayload?.pipeline_receipt_id) || readString(artifactPayload?.pipeline_id))
+        )
+      )
+    );
+  });
+};
+
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);
@@ -299,15 +324,20 @@ export function buildSolverControllerDecision(input: {
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
+  const canonicalGoalKind = readString(canonicalGoal?.goal_kind);
+  const liveMaintenanceTerminal = Boolean(
+    (canonicalGoalKind && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(canonicalGoalKind)) ||
+      (finalRouteBase && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(finalRouteBase)),
+  ) && ["live_pipeline_receipt", "live_environment_binding_diagnosis"].includes(terminalArtifactKind ?? "");
   const noteMutationTerminal =
-    readString(canonicalGoal?.goal_kind) === "note_mutation" &&
+    canonicalGoalKind === "note_mutation" &&
     goalSatisfactionState === "satisfied" &&
     goalNextDecision === "allow_terminal" &&
     terminalArtifactKind === "note_update_receipt" &&
     readBoolean(readRecord(payload.terminal_consistency_check)?.consistent) === true;
   const canonicalTerminal =
     noteMutationTerminal ||
-    Boolean(readString(canonicalGoal?.goal_kind) && requiredTerminalKind && finalRouteBase === readString(canonicalGoal?.goal_kind) && terminalArtifactKind === requiredTerminalKind);
+    Boolean(canonicalGoalKind && requiredTerminalKind && finalRouteBase === canonicalGoalKind && terminalArtifactKind === requiredTerminalKind);
   const turnIdIntegrityAudit = input.turnIdIntegrityAudit ?? buildTurnIdIntegrityAudit({ turnId: input.turnId, payload });
   const finalRouteReconciliation = input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
   const disciplineGuardRequired = isSourceTargetedOrCapabilityTurn(payload);
@@ -376,14 +406,15 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
-  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal) {
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal) {
     pushUnique(blockingReasons, "route_authority_failed");
   }
   if (
     readBoolean(routeAuthority?.route_authority_ok) === false &&
     !noteMutationTerminal &&
+    !liveMaintenanceTerminal &&
     (
       (poisonFailed && !staleRouteOnlyPoisonFailure) ||
       readString(routeAuthority?.primary_violation_code) === "terminal_artifact_forbidden_by_route_contract" ||
@@ -421,12 +452,13 @@ export function buildSolverControllerDecision(input: {
     terminalArtifactKind === "live_answer_environment_receipt" ||
     (terminalArtifactKind === "workspace_action_receipt" &&
       /\b(?:set_rate|live-source\.set_rate|interval|cadence|rate)\b/i.test(promptText));
-  if (!nonAnswerTerminal && visualContentPrompt && terminalContractGoalKind !== "live_interval_set" && controlReceiptTerminal) {
+  if (!nonAnswerTerminal && !liveMaintenanceTerminal && visualContentPrompt && terminalContractGoalKind !== "live_interval_set" && controlReceiptTerminal) {
     pushUnique(blockingReasons, "terminal_kind_not_required");
     pushUnique(blockingReasons, "visual_evidence_missing");
   }
   if (
     !nonAnswerTerminal &&
+    !liveMaintenanceTerminal &&
     (sourceTargetName === "live_pipeline" || sourceTargetName === "visual_capture") &&
     (
       terminalArtifactKind === "direct_answer_text" ||
@@ -476,6 +508,7 @@ export function buildSolverControllerDecision(input: {
     );
   if (
     visualSourceRequired &&
+    !liveMaintenanceTerminal &&
     terminalArtifactKind !== "typed_failure" &&
     (
       liveSourceIdentityHardFailure ||

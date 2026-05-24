@@ -139,6 +139,30 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const agentStepAuthorityCheck =
     asRecord(payload.agent_step_authority_check ?? debug?.agent_step_authority_check ?? agentLoop?.agent_step_authority_check) ??
     findLedgerPayload("agent_step_authority_check");
+  const agentStepLoop =
+    asRecord(payload.agent_step_loop ?? debug?.agent_step_loop ?? agentLoop?.agent_step_loop) ??
+    findLedgerPayload("agent_step_loop");
+  const agentRuntimeLoop =
+    asRecord(payload.agent_runtime_loop ?? debug?.agent_runtime_loop ?? agentLoop?.agent_runtime_loop) ??
+    findLedgerPayload("agent_runtime_loop");
+  const agentRuntimeLoopAdmission =
+    asRecord(payload.agent_runtime_loop_admission ?? debug?.agent_runtime_loop_admission ?? agentLoop?.agent_runtime_loop_admission) ??
+    findLedgerPayload("agent_runtime_loop_admission");
+  const runtimeAuthorityAudit =
+    asRecord(payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit) ??
+    findLedgerPayload("runtime_authority_audit");
+  const runtimeContinuationHints =
+    Array.isArray(payload.runtime_continuation_hints)
+      ? payload.runtime_continuation_hints
+      : Array.isArray(debug?.runtime_continuation_hints)
+        ? debug.runtime_continuation_hints
+        : Array.isArray(agentLoop?.runtime_continuation_hints)
+          ? agentLoop.runtime_continuation_hints
+          : ledger
+              .map(asRecord)
+              .filter((artifact) => artifact?.kind === "runtime_continuation_hint")
+              .map((artifact) => asRecord(artifact?.payload) ?? artifact)
+              .filter(Boolean);
   const receiptArtifact =
     [...ledger]
       .reverse()
@@ -230,6 +254,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     initial_available_capabilities: initialAvailableCapabilities,
     initial_agent_step_decision: initialAgentStepDecision,
     agent_step_authority_check: agentStepAuthorityCheck,
+    agent_step_loop: agentStepLoop,
+    agent_runtime_loop: agentRuntimeLoop,
+    agent_runtime_loop_admission: agentRuntimeLoopAdmission,
+    runtime_authority_audit: runtimeAuthorityAudit,
+    runtime_continuation_hints: runtimeContinuationHints,
     current_turn_artifact_ledger: ledger,
     current_turn_events: Array.isArray(agentLoop?.turn_events) ? agentLoop.turn_events : [],
     workspace_action_debug: receipt

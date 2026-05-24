@@ -65,6 +65,7 @@ const FREQUENCY = helixDimension({ time: -1 });
 const ENERGY = helixDimension({ mass: 1, length: 2, time: -2 });
 const ACTION = helixDimension({ mass: 1, length: 2, time: -1 });
 const FORCE = helixDimension({ mass: 1, length: 1, time: -2 });
+const MOMENTUM = helixDimension({ mass: 1, length: 1, time: -1 });
 const POWER = helixDimension({ mass: 1, length: 2, time: -3 });
 const CHARGE = helixDimension({ electric_current: 1, time: 1 });
 const VOLTAGE = helixDimension({ mass: 1, length: 2, time: -3, electric_current: -1 });
@@ -85,6 +86,7 @@ export const HELIX_PHYSICAL_UNITS: HelixPhysicalUnitDefinition[] = [
   { symbol: "eV", label: "electronvolt", quantity: "energy", dimension: ENERGY, si_factor: 1.602176634e-19, aliases: ["ev", "electronvolt", "electronvolts"] },
   { symbol: "J*s", label: "joule second", quantity: "action", dimension: ACTION, si_factor: 1, aliases: ["J s", "joule second", "joule seconds"] },
   { symbol: "N", label: "newton", quantity: "force", dimension: FORCE, si_factor: 1, aliases: ["n", "newton", "newtons"] },
+  { symbol: "kg*m/s", label: "kilogram metre per second", quantity: "momentum", dimension: MOMENTUM, si_factor: 1, aliases: ["kg m/s", "kg*m*s^-1", "kg m s^-1", "kilogram meter per second", "kilogram metre per second"] },
   { symbol: "W", label: "watt", quantity: "power", dimension: POWER, si_factor: 1, aliases: ["w", "watt", "watts"] },
   { symbol: "C", label: "coulomb", quantity: "electric_charge", dimension: CHARGE, si_factor: 1, aliases: ["coulomb", "coulombs"] },
   { symbol: "V", label: "volt", quantity: "electric_potential", dimension: VOLTAGE, si_factor: 1, aliases: ["v", "volt", "volts"] },
