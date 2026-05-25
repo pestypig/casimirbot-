@@ -7,6 +7,7 @@ export type HelixCalculatorCompoundQuantity =
   | "energy"
   | "length"
   | "speed"
+  | "acceleration"
   | "time"
   | "mass"
   | "force"

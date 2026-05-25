@@ -231,6 +231,14 @@ describe("helix ask pill E68 debug export envelope", () => {
               kind: "final_answer_draft",
               payload: { schema: "helix.final_answer_draft.v1", text: "The equation x^2 - 9 = 0 has solutions x = -3 and x = 3." },
             },
+            {
+              artifact_id: "ask:phase7:runtime_intent_packet",
+              kind: "runtime_intent_packet",
+              payload: {
+                schema: "helix.runtime_intent_packet.v1",
+                completion_authority: "agent_runtime_loop_and_goal_satisfaction",
+              },
+            },
           ],
         },
       },
@@ -246,6 +254,7 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.calculator_planner_repair_result.repair_attempted).toBe(true);
     expect(parsed.calculator_plan_coverage.missing_requirement_ids).toEqual([]);
     expect(parsed.final_answer_draft.schema).toBe("helix.final_answer_draft.v1");
+    expect(parsed.runtime_intent_packet.schema).toBe("helix.runtime_intent_packet.v1");
     expect(parsed.coverage_artifacts.map((artifact: any) => artifact.schema)).toContain("helix.calculator_plan_coverage.v1");
     expect(parsed.ui_debug_parity_harness).toMatchObject({
       schema: "helix.ui_debug_parity_harness.v1",

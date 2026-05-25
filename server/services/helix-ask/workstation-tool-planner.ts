@@ -425,9 +425,36 @@ function extractNoteBody(prompt: string): string | null {
   return null;
 }
 
+function hasConcreteCalculatorExpression(prompt: string): boolean {
+  const expression = extractCalculatorExpression(prompt);
+  if (!expression) return false;
+  return /\d/.test(expression) || /[+\-*/^=]/.test(expression);
+}
+
+function isConceptualNoCalculatorPrompt(prompt: string): boolean {
+  const normalized = normalizePrompt(prompt);
+  if (!normalized) return false;
+  const negatesCalculation =
+    /\b(?:do\s+not|don't|without|no\s+need\s+to)\s+(?:calculate|compute|solve|evaluate)\b/i.test(normalized) ||
+    /\b(?:do\s+not|don't)\s+calculate\s+(?:a\s+)?(?:specific\s+)?numeric\s+case\b/i.test(normalized);
+  const conceptual =
+    /\b(?:explain|why|conceptual|intuition|relationship|depends?\s+on|connected\s+to|what\s+changes)\b/i.test(normalized);
+  if (negatesCalculation && conceptual) return true;
+  if (negatesCalculation && !hasConcreteCalculatorExpression(normalized)) return true;
+  if (
+    /\b(?:did\s+not|didn't|do\s+not|don't)\s+(?:give|provide|invent)\b[\s\S]{0,80}\b(?:exact|specific|numeric|speed|value|number)\b/i.test(normalized) &&
+    /\b(?:underspecified|need|needs|required|before\s+producing\s+a\s+numeric\s+result|do\s+not\s+invent)\b/i.test(normalized)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function isCalculatorPrompt(prompt: string): boolean {
+  if (isConceptualNoCalculatorPrompt(prompt)) return false;
+  const hasConcreteExpression = hasConcreteCalculatorExpression(prompt);
   return /\b(?:calculator|solve|evaluate|compute|calculate|verify|check)\b/i.test(prompt) &&
-    (/\b(?:equation|expression|math|numeric|calculation|with\s+steps|show\s+work)\b/i.test(prompt) || Boolean(extractCalculatorExpression(prompt)));
+    (/\b(?:equation|expression|math|numeric|calculation|with\s+steps|show\s+work)\b/i.test(prompt) || hasConcreteExpression);
 }
 
 function isNoteCreatePrompt(prompt: string): boolean {

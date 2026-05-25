@@ -106,6 +106,60 @@ describe("helix ask E50 terminal consistency", () => {
     expect(answerText(response.body)).not.toMatch(/Completed reasoning turn|active doc|\/docs\//i);
   }, 60000);
 
+  it("keeps conceptual no-numeric physics prompts out of the calculator route", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Explain why kinetic energy depends on velocity squared instead of velocity directly. I want a conceptual explanation connected to work, force over distance, and what changes when speed doubles. Do not calculate a specific numeric case unless it helps the explanation.",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-conceptual-ke-no-calculator-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          hasDocContext: false,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.route_reason_code).not.toMatch(/calculator_solve/);
+    if (response.body?.terminal_artifact_kind === "typed_failure") {
+      expect(response.body?.terminal_error_code).toBe("model_only_answer_unavailable");
+    } else {
+      expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+      expect(response.body?.final_answer_source).toBe("no_tool_direct");
+      expect(response.body?.terminal_error_code ?? null).toBeNull();
+    }
+    expect(response.body?.selected_final_answer).not.toMatch(/ask_turn_invariant_violation|Completed reasoning turn/i);
+    expect(response.body?.workstation_tool_plan?.intent).not.toBe("calculator_solve");
+  }, 60000);
+
+  it("keeps abstract underspecified calculator-judgment prompts out of visual situation routing", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "I am trying to estimate the kinetic energy of a 1500 kg car at highway speed for a safety comparison. I did not give you an exact speed. Decide whether the calculator is useful here, but do not invent a speed silently. If the problem is underspecified, say what value you need before producing a numeric result.",
+        mode: "read",
+        debug: true,
+        sessionId: `e50-underspecified-ke-no-visual-${Date.now()}`,
+        workspace_context_snapshot: {
+          activePanel: "scientific-calculator",
+          hasDocContext: false,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(response.body?.route_reason_code).not.toMatch(/situation_context_question|calculator_solve/);
+    expect(response.body?.terminal_error_code).not.toBe("prompt_requirement_coverage_incomplete");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/SituationRun|current screen|ask_turn_invariant_violation/i);
+    expect(response.body?.workstation_tool_plan?.intent).not.toBe("calculator_solve");
+  }, 60000);
+
   it("keeps ambient visual context available as a tool without forcing it into model-only answers", async () => {
     const app = createApp();
     const response = await request(app)

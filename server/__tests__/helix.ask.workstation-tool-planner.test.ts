@@ -159,6 +159,30 @@ describe("Helix Ask workstation tool planner", () => {
     expect(extractCalculatorExpression("Use calculator what is the mass of 2 kg in this example")).toBeNull();
   });
 
+  it("does not force calculator for conceptual no-numeric physics explanations", () => {
+    const prompt =
+      "Explain why kinetic energy depends on velocity squared instead of velocity directly. I want a conceptual explanation connected to work, force over distance, and what changes when speed doubles. Do not calculate a specific numeric case unless it helps the explanation.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBeNull();
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+  });
+
+  it("does not create a missing-latex calculator action when the user says the numeric input is absent", () => {
+    const prompt =
+      "I am trying to estimate the kinetic energy of a 1500 kg car at highway speed for a safety comparison. I did not give you an exact speed. Decide whether the calculator is useful here, but do not invent a speed silently. If the problem is underspecified, say what value you need before producing a numeric result.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBeNull();
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+  });
+
   it("routes explicit calculator live-source prompts to equation stream startup", () => {
     const prompt = "Start the calculator as a live source for 3*x+9=0 and explain the first tick.";
     const plan = planWorkstationToolUse(prompt);

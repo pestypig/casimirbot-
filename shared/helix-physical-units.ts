@@ -61,6 +61,7 @@ const TEMPERATURE = helixDimension({ thermodynamic_temperature: 1 });
 const AMOUNT = helixDimension({ amount_of_substance: 1 });
 const LUMINOUS = helixDimension({ luminous_intensity: 1 });
 const SPEED = helixDimension({ length: 1, time: -1 });
+const ACCELERATION = helixDimension({ length: 1, time: -2 });
 const FREQUENCY = helixDimension({ time: -1 });
 const ENERGY = helixDimension({ mass: 1, length: 2, time: -2 });
 const ACTION = helixDimension({ mass: 1, length: 2, time: -1 });
@@ -81,6 +82,7 @@ export const HELIX_PHYSICAL_UNITS: HelixPhysicalUnitDefinition[] = [
   { symbol: "s", label: "second", quantity: "time", dimension: TIME, si_factor: 1, aliases: ["sec", "second", "seconds"] },
   { symbol: "ms", label: "millisecond", quantity: "time", dimension: TIME, si_factor: 1e-3, aliases: ["millisecond", "milliseconds"] },
   { symbol: "m/s", label: "metre per second", quantity: "speed", dimension: SPEED, si_factor: 1, aliases: ["meter per second", "metre per second", "meters per second", "metres per second"] },
+  { symbol: "m/s^2", label: "metre per second squared", quantity: "acceleration", dimension: ACCELERATION, si_factor: 1, aliases: ["m/s2", "meter per second squared", "metre per second squared", "meters per second squared", "metres per second squared"] },
   { symbol: "Hz", label: "hertz", quantity: "frequency", dimension: FREQUENCY, si_factor: 1, aliases: ["hz", "hertz"] },
   { symbol: "J", label: "joule", quantity: "energy", dimension: ENERGY, si_factor: 1, aliases: ["j", "joule", "joules"] },
   { symbol: "eV", label: "electronvolt", quantity: "energy", dimension: ENERGY, si_factor: 1.602176634e-19, aliases: ["ev", "electronvolt", "electronvolts"] },

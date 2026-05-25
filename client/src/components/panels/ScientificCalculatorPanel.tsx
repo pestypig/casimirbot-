@@ -15,7 +15,7 @@ import { useScientificCalculatorStore } from "@/store/useScientificCalculatorSto
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
-import type { ScientificCalculatorDebugEvent } from "@/store/useScientificCalculatorStore";
+import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry } from "@/store/useScientificCalculatorStore";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
@@ -115,6 +115,15 @@ export function resolveScientificCalculatorVisibleDebugEvents(
       currentCompoundRunId && visibleCompoundRunIds.some((runId) => runId !== currentCompoundRunId),
     ),
   };
+}
+
+export function resolveScientificCalculatorVisibleHistory(
+  history: ScientificCalculatorHistoryEntry[],
+  currentCompoundRunId: string | null,
+  limit = 6,
+): ScientificCalculatorHistoryEntry[] {
+  if (!currentCompoundRunId) return history.slice(0, limit);
+  return history.filter((entry) => entry.compound_run_id === currentCompoundRunId).slice(0, limit);
 }
 
 export default function ScientificCalculatorPanel() {
@@ -295,6 +304,10 @@ export default function ScientificCalculatorPanel() {
   const visibleDebugState = useMemo(
     () => resolveScientificCalculatorVisibleDebugEvents(debugEvents),
     [debugEvents],
+  );
+  const visibleHistory = useMemo(
+    () => resolveScientificCalculatorVisibleHistory(history, visibleDebugState.currentCompoundRunId),
+    [history, visibleDebugState.currentCompoundRunId],
   );
 
   return (
@@ -554,8 +567,13 @@ export default function ScientificCalculatorPanel() {
       <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/30 p-3">
         <div className="text-[10px] uppercase tracking-wide text-slate-500">Recent Ingest</div>
         <div className="mt-2 space-y-1">
-          {history.slice(0, 6).map((entry) => (
-            <div key={entry.id} className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1 text-[11px] text-slate-300">
+          {visibleHistory.map((entry) => (
+            <div
+              key={entry.id}
+              className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1 text-[11px] text-slate-300"
+              data-compound-run-id={entry.compound_run_id ?? ""}
+              data-compound-subgoal-id={entry.compound_subgoal_id ?? ""}
+            >
               <div className="font-mono text-slate-200">{entry.latex}</div>
               <div className="text-slate-500">{entry.sourcePath ?? "unknown"}{entry.anchor ? ` #${entry.anchor}` : ""}</div>
             </div>

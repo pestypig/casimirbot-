@@ -10,6 +10,7 @@ import {
 import {
   HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
   type HelixCalculatorSetupContext,
+  type HelixCalculatorSetupVariable,
 } from "../../../shared/helix-calculator-setup-context";
 import {
   HELIX_WORKSTATION_TOOL_EVALUATION_SCHEMA,
@@ -139,7 +140,7 @@ const unitSetup = (input: {
   const resultUnit = input.resultUnit ?? null;
   const resultQuantity = resultUnit ? findHelixUnitDefinition(resultUnit)?.quantity ?? null : null;
   const resultDimension = resultUnit ? inferHelixDimensionForUnit(resultUnit) : null;
-  const variables = (input.variables ?? []).map((variable) => {
+  const variables: HelixCalculatorSetupVariable[] = (input.variables ?? []).map((variable: HelixCalculatorSetupVariable) => {
     const unit = variable.unit ? findHelixUnitDefinition(variable.unit) : null;
     const dimension = variable.dimension ?? unit?.dimension ?? null;
     return {
@@ -163,7 +164,11 @@ const unitSetup = (input: {
     result_dimension_signature: formatHelixDimensionSignature(resultDimension),
     quantity: resultQuantity,
     unit_system: resultUnit ? "SI" : null,
-    input_units: Object.fromEntries(variables.filter((variable) => variable.unit).map((variable) => [variable.symbol, variable.unit as string])),
+    input_units: Object.fromEntries(
+      variables
+        .filter((variable: HelixCalculatorSetupVariable) => variable.unit)
+        .map((variable: HelixCalculatorSetupVariable) => [variable.symbol, variable.unit as string]),
+    ),
     assumptions: input.assumptions ?? [],
     unit_options: helixUnitsForQuantity(resultQuantity),
     interpretation_prompt: input.interpretation ?? null,
@@ -173,7 +178,7 @@ const unitSetup = (input: {
 const numberPattern = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
 
 const extractNumberNear = (prompt: string, units: string[]): number | null => {
-  const unitPattern = units.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const unitPattern = units.map((unit: string) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   const match = prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:${unitPattern})\\b`, "i"));
   const value = Number(match?.[1]);
   return Number.isFinite(value) ? value : null;
@@ -204,11 +209,43 @@ const extractWavelengthMeters = (prompt: string): { meters: number; label: strin
 const extractMassSpeed = (prompt: string): { mass: number; speed: number } | null => {
   const massMatch = prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:kg|kilograms?)\\b`, "i"));
   const speedMatch =
-    prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)\\b`, "i")) ??
+    prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)\\b(?!\\s*(?:\\^?2|squared))`, "i")) ??
     prompt.match(new RegExp(`\\b(?:speed|velocity|moving|travell?ing)\\s*(?:at|is|of)?\\s*(${numberPattern})\\b`, "i"));
   const mass = Number(massMatch?.[1]);
   const speed = Number(speedMatch?.[1]);
   return Number.isFinite(mass) && mass > 0 && Number.isFinite(speed) && speed > 0 ? { mass, speed } : null;
+};
+
+const extractDurationSeconds = (prompt: string): number | null =>
+  extractNumberNear(prompt, ["s", "sec", "secs", "second", "seconds"]);
+
+const extractExplicitAcceleration = (prompt: string): number | null => {
+  const unitBacked = extractNumberNear(prompt, ["m/s^2", "m/s2", "meters per second squared", "metres per second squared"]);
+  if (unitBacked !== null) return unitBacked;
+  const named =
+    prompt.match(new RegExp(`\\b(?:acceleration|accelerates?\\s+at|a)\\s*(?:=|is|of|at)?\\s*(${numberPattern})\\b`, "i")) ??
+    prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?=(?:is\\s+)?(?:the\\s+)?acceleration\\b)`, "i"));
+  const value = Number(named?.[1]);
+  return Number.isFinite(value) ? value : null;
+};
+
+const extractRestToSpeedKinematics = (
+  prompt: string,
+): { mass: number | null; finalSpeed: number; durationSeconds: number; acceleration: number } | null => {
+  const mass = extractNumberNear(prompt, ["kg", "kilogram", "kilograms"]);
+  const massSpeed = extractMassSpeed(prompt);
+  const durationSeconds = extractDurationSeconds(prompt);
+  const startsFromRest =
+    /\bstarts?\s+from\s+rest\b|\binitial(?:ly)?\s+(?:at\s+)?(?:rest|0\s*(?:m\/s|meters?\s+per\s+second|metres?\s+per\s+second)?)\b|\bfrom\s+0\s*(?:m\/s|meters?\s+per\s+second|metres?\s+per\s+second)\b/i.test(prompt);
+  if (!massSpeed || !durationSeconds || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || !startsFromRest) {
+    return null;
+  }
+  return {
+    mass,
+    finalSpeed: massSpeed.speed,
+    durationSeconds,
+    acceleration: massSpeed.speed / durationSeconds,
+  };
 };
 
 const colorRangeForWavelength = (meters: number): string => {
@@ -287,6 +324,33 @@ const validateCalculatorReceiptSemanticConsistency = (
     subgoal.setup?.equation,
   ].filter(Boolean).join(" ")).toLowerCase();
 
+  const mass = extractNumberNear(normalizedPrompt, ["kg", "kilogram", "kilograms"]);
+  const restKinematics = extractRestToSpeedKinematics(normalizedPrompt);
+  const acceleration = extractExplicitAcceleration(normalizedPrompt) ?? restKinematics?.acceleration ?? null;
+  const durationSeconds = extractDurationSeconds(normalizedPrompt);
+  const finalSpeed = restKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalizedPrompt)?.speed : null);
+  if (mass && acceleration && Number.isFinite(acceleration) && durationSeconds && Number.isFinite(durationSeconds)) {
+    const expectedFinalSpeed = finalSpeed ?? acceleration * durationSeconds;
+    const expectedForce = mass * acceleration;
+    const expectedImpulse = expectedForce * durationSeconds;
+    const expectedFinalKineticEnergy = 0.5 * mass * expectedFinalSpeed ** 2;
+    const expectedAveragePower = expectedFinalKineticEnergy / durationSeconds;
+    const formulaChecks: Array<{ pattern: RegExp; expected: number; unitLabel: string }> = [
+      { pattern: /\bfinal_speed\b|\bfinal\s+(?:speed|velocity)\b|\bv\s*=/, expected: expectedFinalSpeed, unitLabel: "m/s" },
+      { pattern: /\bforce\b|\bf\s*=\s*m\s*a\b/, expected: expectedForce, unitLabel: "N" },
+      { pattern: /\bimpulse\b|\bj\s*=|\bf\s*t\b|\bm\s*a\s*t\b/, expected: expectedImpulse, unitLabel: "N*s" },
+      { pattern: /\bfinal_kinetic_energy\b|\bfinal\s+kinetic\s+energy\b|\bke\s*=/, expected: expectedFinalKineticEnergy, unitLabel: "J" },
+      { pattern: /\baverage_power\b|\baverage\s+power\b|\bp(?:_avg)?\s*=/, expected: expectedAveragePower, unitLabel: "W" },
+    ];
+    const matchingCheck = formulaChecks.find((check: { pattern: RegExp; expected: number; unitLabel: string }) => check.pattern.test(subgoalText));
+    if (matchingCheck && !valuesClose(receipt.result_value, matchingCheck.expected)) {
+      return {
+        ok: false,
+        reason: `formula_expression_inconsistent_with_prompt:expected_${formatNumber(matchingCheck.expected)}_${matchingCheck.unitLabel}`,
+      };
+    }
+  }
+
   if (
     /\b(?:maximum|max)\s+height\b|\bheight\b/.test(normalizedPrompt) &&
     /\b(?:kinetic\s+energy|energy\s+convert|converts?\s+to\s+gravitational|potential\s+energy)\b/.test(normalizedPrompt) &&
@@ -350,7 +414,7 @@ const buildPlan = (turnId: string, prompt: string, subgoals: DraftSubgoal[]): He
   schema: HELIX_CALCULATOR_COMPOUND_PLAN_SCHEMA,
   turn_id: turnId,
   user_goal: prompt,
-  subgoals: subgoals.map((subgoal) => ({
+  subgoals: subgoals.map((subgoal: DraftSubgoal) => ({
     id: subgoal.id,
     label: subgoal.label,
     expression: subgoal.expression,
@@ -391,7 +455,7 @@ const buildWorkstationPlan = (
       required: true,
       expected_receipt_kind: "workspace_action_receipt",
     },
-    ...plan.subgoals.map((subgoal) => ({
+    ...plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => ({
       step_id: `solve_${subgoal.id}`,
       kind: "run_panel_action" as const,
       panel_id: "scientific-calculator",
@@ -400,7 +464,7 @@ const buildWorkstationPlan = (
         latex: subgoal.expression,
         calculator_setup: subgoal.setup ?? null,
       },
-      depends_on: subgoal.depends_on.map((id) => `solve_${id}`),
+      depends_on: subgoal.depends_on.map((id: string) => `solve_${id}`),
       required: true,
       expected_receipt_kind: "calculator_receipt",
     })),
@@ -409,7 +473,7 @@ const buildWorkstationPlan = (
       kind: "evaluate_result",
       required: true,
       expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
-      depends_on: plan.subgoals.map((subgoal) => `solve_${subgoal.id}`),
+      depends_on: plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => `solve_${subgoal.id}`),
     },
   ],
   missing_requirements: [],
@@ -693,7 +757,7 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
 };
 
 const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCalculatorSubgoalReceipt[]): string => {
-  const byId = new Map(receipts.map((receipt) => [receipt.subgoal_id, receipt]));
+  const byId = new Map(receipts.map((receipt: HelixCalculatorSubgoalReceipt) => [receipt.subgoal_id, receipt]));
   if (answerKind === "photon_frequency_chain") {
     const lines = [
       "Calculator compound plan completed.",
@@ -791,11 +855,33 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
   const normalized = normalizePrompt(prompt);
   const subgoals: CalculatorModelAuthoredSubgoal[] = [];
   const mass = extractNumberNear(normalized, ["kg", "kilogram", "kilograms"]);
-  const acceleration =
-    extractNumberNear(normalized, ["m/s^2", "m/s2", "meters per second squared", "metres per second squared"]) ??
-    (/\baccelerat/i.test(normalized)
-      ? Number(normalized.match(new RegExp(`\\b(${numberPattern})\\b(?=[^\\d]*(?:m/s\\^?2|meters?\\s+per\\s+second\\s+squared|metres?\\s+per\\s+second\\s+squared|acceleration))`, "i"))?.[1])
-      : null);
+  const restKinematics = extractRestToSpeedKinematics(normalized);
+  const acceleration = extractExplicitAcceleration(normalized) ?? restKinematics?.acceleration ?? null;
+  const durationSeconds = extractDurationSeconds(normalized);
+  const finalSpeedFromPrompt = restKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalized)?.speed : null);
+  if (/\bacceleration\b/i.test(normalized) && acceleration && Number.isFinite(acceleration)) {
+    const expression =
+      restKinematics && durationSeconds
+        ? `${formatNumber(restKinematics.finalSpeed)}/${formatNumber(durationSeconds)}`
+        : formatNumber(acceleration);
+    subgoals.push({
+      id: "acceleration",
+      label: restKinematics ? "Compute acceleration from a = Delta v / t" : "Compute acceleration",
+      expression,
+      expected_quantity: "acceleration",
+      expected_unit: "m/s^2",
+      equation: restKinematics ? "a = Delta v / t" : "a",
+      assumptions: restKinematics
+        ? ["Initial speed is zero and the stated final speed is reached over the stated duration."]
+        : ["Acceleration is supplied directly by the prompt."],
+      variables: restKinematics
+        ? [
+            { symbol: "Delta v", value: formatNumber(restKinematics.finalSpeed), unit: "m/s", meaning: "change in speed from rest" },
+            { symbol: "t", value: formatNumber(durationSeconds ?? restKinematics.durationSeconds), unit: "s", meaning: "duration" },
+          ]
+        : [{ symbol: "a", value: formatNumber(acceleration), unit: "m/s^2", meaning: "acceleration" }],
+    });
+  }
   if (/\bforce\b/i.test(normalized) && mass && acceleration && Number.isFinite(acceleration)) {
     subgoals.push({
       id: "force",
@@ -804,12 +890,86 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
       expected_quantity: "force",
       expected_unit: "N",
       equation: "F = m a",
+      depends_on: subgoals.some((subgoal: CalculatorModelAuthoredSubgoal) => subgoal.id === "acceleration") ? ["acceleration"] : [],
       assumptions: ["Mass is in kilograms and acceleration is in metres per second squared."],
       variables: [
         { symbol: "m", value: formatNumber(mass), unit: "kg", meaning: "mass" },
-        { symbol: "a", value: formatNumber(acceleration), unit: null, meaning: "acceleration numeric value in m/s^2" },
+        { symbol: "a", value: formatNumber(acceleration), unit: "m/s^2", meaning: "acceleration" },
       ],
     });
+  }
+  if (mass && acceleration && Number.isFinite(acceleration) && durationSeconds && Number.isFinite(durationSeconds)) {
+    const finalSpeed = finalSpeedFromPrompt ?? acceleration * durationSeconds;
+    const impulse = mass * acceleration * durationSeconds;
+    const finalKineticEnergy = 0.5 * mass * finalSpeed ** 2;
+    const averagePower = finalKineticEnergy / durationSeconds;
+    const baseVariables = [
+      { symbol: "m", value: formatNumber(mass), unit: "kg", meaning: "mass" },
+      { symbol: "a", value: formatNumber(acceleration), unit: "m/s^2", meaning: "acceleration" },
+      { symbol: "t", value: formatNumber(durationSeconds), unit: "s", meaning: "duration" },
+    ];
+    if (/\bfinal\s+(?:speed|velocity)\b|\bspeed\b/i.test(normalized)) {
+      subgoals.push({
+        id: "final_speed",
+        label: "Compute final speed from v = a t",
+        expression: `${formatNumber(acceleration)}*${formatNumber(durationSeconds)}`,
+        expected_quantity: "speed",
+        expected_unit: "m/s",
+        equation: "v = a t",
+        assumptions: ["Initial speed is zero and acceleration is treated as constant over the stated duration."],
+        variables: baseVariables,
+      });
+    }
+    if (/\bimpulse\b/i.test(normalized)) {
+      subgoals.push({
+        id: "impulse",
+        label: "Compute impulse from J = F t = m a t",
+        expression: `${formatNumber(mass)}*${formatNumber(acceleration)}*${formatNumber(durationSeconds)}`,
+        expected_quantity: "momentum",
+        expected_unit: "N*s",
+        equation: "J = F t = m a t",
+        depends_on: subgoals.some((subgoal: CalculatorModelAuthoredSubgoal) => subgoal.id === "force") ? ["force"] : [],
+        assumptions: ["Average acceleration and average force are treated as constant over the interval."],
+        variables: baseVariables,
+        interpretation: `Equivalent to a momentum change of ${formatNumber(impulse)} N*s under the idealized assumptions.`,
+      });
+    }
+    if (/\b(?:final\s+)?kinetic\s+energy\b|\bke\b/i.test(normalized)) {
+      subgoals.push({
+        id: "final_kinetic_energy",
+        label: "Compute final kinetic energy from KE = 1/2 m v^2",
+        expression: finalSpeedFromPrompt
+          ? `0.5*${formatNumber(mass)}*${formatNumber(finalSpeed)}^2`
+          : `0.5*${formatNumber(mass)}*(${formatNumber(acceleration)}*${formatNumber(durationSeconds)})^2`,
+        expected_quantity: "energy",
+        expected_unit: "J",
+        equation: finalSpeedFromPrompt ? "KE = 1/2 m v^2" : "KE = 1/2 m (a t)^2",
+        depends_on: subgoals.some((subgoal: CalculatorModelAuthoredSubgoal) => subgoal.id === "final_speed") ? ["final_speed"] : [],
+        assumptions: ["Non-relativistic kinetic energy.", "Initial speed is zero and acceleration is constant."],
+        variables: [
+          ...baseVariables,
+          { symbol: "v", value: formatNumber(finalSpeed), unit: "m/s", meaning: finalSpeedFromPrompt ? "stated final speed" : "final speed from a t" },
+        ],
+        interpretation: `Uses the final speed ${formatNumber(finalSpeed)} m/s.`,
+      });
+    }
+    if (/\baverage\s+power\b|\bpower\b/i.test(normalized)) {
+      subgoals.push({
+        id: "average_power",
+        label: "Compute average power from final kinetic energy over time",
+        expression: `0.5*${formatNumber(mass)}*(${formatNumber(acceleration)}*${formatNumber(durationSeconds)})^2/${formatNumber(durationSeconds)}`,
+        expected_quantity: "dimensionless",
+        expected_unit: "W",
+        equation: "P_avg = KE / t",
+        depends_on: subgoals.some((subgoal: CalculatorModelAuthoredSubgoal) => subgoal.id === "final_kinetic_energy") ? ["final_kinetic_energy"] : [],
+        assumptions: ["Average power is computed from the change in kinetic energy divided by elapsed time."],
+        variables: [
+          ...baseVariables,
+          { symbol: "KE", value: formatNumber(finalKineticEnergy), unit: "J", meaning: "final kinetic energy" },
+        ],
+        interpretation: `Equivalent to ${formatNumber(averagePower)} W for the idealized sled energy gain.`,
+      });
+    }
   }
   const lengthOrHeight = extractNumberNear(normalized, ["m", "meter", "meters", "metre", "metres"]);
   if (/\b(?:potential\s+energy|gravitational\s+energy|mgh)\b/i.test(normalized) && mass && lengthOrHeight) {
@@ -864,7 +1024,7 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
 };
 
 const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[]): DraftSubgoal[] => {
-  return subgoals.slice(0, 5).flatMap((subgoal, index) => {
+  return subgoals.slice(0, 5).flatMap((subgoal: CalculatorModelAuthoredSubgoal, index: number) => {
     const expression = normalizePrompt(String(subgoal.expression ?? ""));
     if (!expression) return [];
     const value = evaluateNumericExpression(expression);
@@ -885,7 +1045,7 @@ const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[])
       expected_quantity: expectedQuantity as HelixCalculatorCompoundQuantity,
       expected_unit: expectedUnit,
       depends_on: Array.isArray(subgoal.depends_on)
-        ? subgoal.depends_on.map((entry) => sanitizeId(String(entry ?? ""), "")).filter(Boolean)
+        ? subgoal.depends_on.map((entry: string) => sanitizeId(String(entry ?? ""), "")).filter(Boolean)
         : [],
       value,
       result_text: formatNumber(value),
@@ -896,7 +1056,7 @@ const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[])
         equation: subgoal.equation ?? null,
         resultUnit: expectedUnit,
         variables: subgoal.variables ?? [],
-        assumptions: subgoal.assumptions?.map((entry) => String(entry)).filter(Boolean).slice(0, 6) ?? [],
+        assumptions: subgoal.assumptions?.map((entry: string) => String(entry)).filter(Boolean).slice(0, 6) ?? [],
         interpretation: subgoal.interpretation ?? null,
       }),
     }];
@@ -915,20 +1075,20 @@ export function runCalculatorCompoundChain(input: {
   const draft = draftSubgoalsForPrompt(input.prompt);
   if (!draft || draft.subgoals.length < 2 || draft.subgoals.length > 5) return null;
   const plan = buildPlan(input.turnId, input.prompt, draft.subgoals);
-  const receipts = plan.subgoals.map((subgoal) => {
-    const source = draft.subgoals.find((entry) => entry.id === subgoal.id);
+  const receipts = plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => {
+    const source = draft.subgoals.find((entry: DraftSubgoal) => entry.id === subgoal.id);
     return makeReceipt(input.turnId, subgoal, source?.value ?? null, source?.result_text ?? null);
   });
-  const validations = receipts.map((receipt) => {
-    const subgoal = plan.subgoals.find((entry) => entry.id === receipt.subgoal_id);
+  const validations = receipts.map((receipt: HelixCalculatorSubgoalReceipt) => {
+    const subgoal = plan.subgoals.find((entry: HelixCalculatorCompoundSubgoal) => entry.id === receipt.subgoal_id);
     if (!subgoal) throw new Error(`missing_compound_subgoal:${receipt.subgoal_id}`);
     return validateReceipt(input.turnId, input.prompt, subgoal, receipt);
   });
-  const allSatisfied = validations.every((validation) => validation.satisfied);
+  const allSatisfied = validations.every((validation: HelixCalculatorResultValidation) => validation.satisfied);
   if (!allSatisfied) return null;
   const workstationPlan = buildWorkstationPlan(input, plan);
   const answerText = synthesizeAnswer(input.prompt, draft.answerKind, receipts);
-  const evidenceRefs = receipts.map((receipt) => receipt.receipt_id);
+  const evidenceRefs = receipts.map((receipt: HelixCalculatorSubgoalReceipt) => receipt.receipt_id);
   const evaluation: CalculatorCompoundChainResult["evaluation"] = {
     schema: HELIX_WORKSTATION_TOOL_EVALUATION_SCHEMA,
     evaluation_id: newId("workstation-tool-eval:calculator_compound", input.turnId, "chain"),
@@ -948,7 +1108,7 @@ export function runCalculatorCompoundChain(input: {
     model_invoked: false,
     created_at: new Date().toISOString(),
   };
-  const actionSteps = plan.subgoals.map((subgoal) => ({
+  const actionSteps = plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => ({
     panel_id: "scientific-calculator",
     action_id: "solve_expression",
     args: {
@@ -960,8 +1120,8 @@ export function runCalculatorCompoundChain(input: {
   }));
   const artifacts: CalculatorCompoundChainArtifact[] = [
     { kind: "calculator_compound_plan", payload: plan as unknown as Record<string, unknown> },
-    ...receipts.map((receipt) => ({ kind: "calculator_receipt", payload: { ...receipt, kind: "calculator_receipt" } as unknown as Record<string, unknown> })),
-    ...receipts.map((receipt) => ({ kind: "calculator_subgoal_receipt", payload: receipt as unknown as Record<string, unknown> })),
+    ...receipts.map((receipt: HelixCalculatorSubgoalReceipt) => ({ kind: "calculator_receipt", payload: { ...receipt, kind: "calculator_receipt" } as unknown as Record<string, unknown> })),
+    ...receipts.map((receipt: HelixCalculatorSubgoalReceipt) => ({ kind: "calculator_subgoal_receipt", payload: receipt as unknown as Record<string, unknown> })),
     {
       kind: "calculator_subgoal_receipts",
       payload: {
@@ -972,7 +1132,7 @@ export function runCalculatorCompoundChain(input: {
         raw_content_included: false,
       },
     },
-    ...validations.map((validation) => ({ kind: "calculator_result_validation", payload: validation as unknown as Record<string, unknown> })),
+    ...validations.map((validation: HelixCalculatorResultValidation) => ({ kind: "calculator_result_validation", payload: validation as unknown as Record<string, unknown> })),
     {
       kind: "calculator_result_validations",
       payload: {
@@ -1040,25 +1200,25 @@ export function runCalculatorModelAuthoredChain(input: {
 }): CalculatorCompoundChainResult | null {
   const requestedExpressionCount = input.subgoals
     .slice(0, 5)
-    .filter((subgoal) => normalizePrompt(String(subgoal.expression ?? ""))).length;
+    .filter((subgoal: CalculatorModelAuthoredSubgoal) => normalizePrompt(String(subgoal.expression ?? ""))).length;
   const draftSubgoals = coerceModelSubgoalsToDrafts(input.subgoals);
   if (draftSubgoals.length !== requestedExpressionCount) return null;
   if (draftSubgoals.length < 1 || draftSubgoals.length > 5) return null;
   const plan = buildPlan(input.turnId, input.prompt, draftSubgoals);
-  const receipts = plan.subgoals.map((subgoal) => {
-    const source = draftSubgoals.find((entry) => entry.id === subgoal.id);
+  const receipts = plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => {
+    const source = draftSubgoals.find((entry: DraftSubgoal) => entry.id === subgoal.id);
     return makeReceipt(input.turnId, subgoal, source?.value ?? null, source?.result_text ?? null);
   });
-  const validations = receipts.map((receipt) => {
-    const subgoal = plan.subgoals.find((entry) => entry.id === receipt.subgoal_id);
+  const validations = receipts.map((receipt: HelixCalculatorSubgoalReceipt) => {
+    const subgoal = plan.subgoals.find((entry: HelixCalculatorCompoundSubgoal) => entry.id === receipt.subgoal_id);
     if (!subgoal) throw new Error(`missing_compound_subgoal:${receipt.subgoal_id}`);
     return validateReceipt(input.turnId, input.prompt, subgoal, receipt);
   });
-  const allSatisfied = validations.every((validation) => validation.satisfied);
+  const allSatisfied = validations.every((validation: HelixCalculatorResultValidation) => validation.satisfied);
   if (!allSatisfied) return null;
   const workstationPlan = buildWorkstationPlan(input, plan);
   const answerText = synthesizeAnswer(input.prompt, "model_authored_generic_calculator_chain", receipts);
-  const evidenceRefs = receipts.map((receipt) => receipt.receipt_id);
+  const evidenceRefs = receipts.map((receipt: HelixCalculatorSubgoalReceipt) => receipt.receipt_id);
   const evaluation: CalculatorCompoundChainResult["evaluation"] = {
     schema: HELIX_WORKSTATION_TOOL_EVALUATION_SCHEMA,
     evaluation_id: newId("workstation-tool-eval:calculator_compound", input.turnId, "chain"),
@@ -1078,7 +1238,7 @@ export function runCalculatorModelAuthoredChain(input: {
     model_invoked: true,
     created_at: new Date().toISOString(),
   };
-  const actionSteps = plan.subgoals.map((subgoal) => ({
+  const actionSteps = plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => ({
     panel_id: "scientific-calculator",
     action_id: "solve_expression",
     args: {
@@ -1090,8 +1250,8 @@ export function runCalculatorModelAuthoredChain(input: {
   }));
   const artifacts: CalculatorCompoundChainArtifact[] = [
     { kind: "calculator_compound_plan", payload: plan as unknown as Record<string, unknown> },
-    ...receipts.map((receipt) => ({ kind: "calculator_receipt", payload: { ...receipt, kind: "calculator_receipt" } as unknown as Record<string, unknown> })),
-    ...receipts.map((receipt) => ({ kind: "calculator_subgoal_receipt", payload: receipt as unknown as Record<string, unknown> })),
+    ...receipts.map((receipt: HelixCalculatorSubgoalReceipt) => ({ kind: "calculator_receipt", payload: { ...receipt, kind: "calculator_receipt" } as unknown as Record<string, unknown> })),
+    ...receipts.map((receipt: HelixCalculatorSubgoalReceipt) => ({ kind: "calculator_subgoal_receipt", payload: receipt as unknown as Record<string, unknown> })),
     {
       kind: "calculator_subgoal_receipts",
       payload: {
@@ -1102,7 +1262,7 @@ export function runCalculatorModelAuthoredChain(input: {
         raw_content_included: false,
       },
     },
-    ...validations.map((validation) => ({ kind: "calculator_result_validation", payload: validation as unknown as Record<string, unknown> })),
+    ...validations.map((validation: HelixCalculatorResultValidation) => ({ kind: "calculator_result_validation", payload: validation as unknown as Record<string, unknown> })),
     {
       kind: "calculator_result_validations",
       payload: {

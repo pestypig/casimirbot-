@@ -11,6 +11,8 @@ export type ScientificCalculatorHistoryEntry = {
   sourcePath: string | null;
   anchor: string | null;
   calculatorSetup?: HelixCalculatorSetupContext | null;
+  compound_run_id?: string | null;
+  compound_subgoal_id?: string | null;
   ts: string;
 };
 
@@ -120,6 +122,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           sourcePath: meta?.sourcePath ?? null,
           anchor: meta?.anchor ?? null,
           calculatorSetup: meta?.calculatorSetup ?? null,
+          compound_run_id: meta?.compoundRunId ?? null,
+          compound_subgoal_id: meta?.compoundSubgoalId ?? null,
           ts: new Date().toISOString(),
         };
         const debugEvent = makeDebugEvent({

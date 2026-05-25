@@ -786,10 +786,30 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(["terminal_satisfied", "answered"]).toContain(response.body?.agent_runtime_loop?.stop_reason);
       expect(response.body?.runtime_authority_audit).toMatchObject({
         schema: "helix.runtime_authority_audit.v1",
+        runtime_intent_packet_ref: expect.stringContaining(":runtime_intent_packet"),
+        capability_turn: true,
         runtime_loop_present: true,
         ok: true,
         all_subgoals_observed_terminal_authority: false,
       });
+      expect(response.body?.runtime_intent_packet).toMatchObject({
+        schema: "helix.runtime_intent_packet.v1",
+        completion_authority: "agent_runtime_loop_and_goal_satisfaction",
+        terminal_contract: expect.objectContaining({
+          goal_kind: "doc_open_best",
+          required_terminal_kinds: ["doc_open_receipt"],
+        }),
+        hints: expect.arrayContaining([
+          expect.objectContaining({ authority: "hint_only" }),
+        ]),
+      });
+      expect(response.body?.observation_review).toMatchObject({
+        schema: "helix.observation_review.v1",
+        supports_goal: true,
+        runtime_next_action: "final",
+        next_action: "final",
+      });
+      expect(response.body?.observation_review?.observation_refs?.length).toBeGreaterThan(0);
       expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
       expect(response.body?.doc_open_coverage).toMatchObject({
         schema: "helix.doc_open_coverage.v1",
@@ -916,14 +936,41 @@ describe("helix ask E52 panel control terminal contract", () => {
       schema: "helix.agent_runtime_loop.v1",
       stop_reason: "terminal_satisfied",
     });
+    expect(response.body?.agent_runtime_loop?.iterations?.filter((iteration: any) =>
+      iteration.observation_role === "preobserved_tool_result" &&
+      iteration.chosen_capability === "scientific-calculator.solve_expression"
+    )).toHaveLength(3);
+    expect(response.body?.agent_runtime_loop?.iterations?.filter((iteration: any) =>
+      iteration.observation_role === "preobserved_tool_result"
+    )?.every((iteration: any) =>
+      Array.isArray(iteration.observed_artifact_refs) &&
+      iteration.observed_artifact_refs.length > 0 &&
+      iteration.produced_artifacts.includes("calculator_receipt")
+    )).toBe(true);
     expect(response.body?.agent_runtime_loop?.iterations?.every((iteration: any) =>
       iteration.decision_source === "llm" || iteration.decision_source === "deterministic_policy_fallback"
     )).toBe(true);
     expect(response.body?.runtime_authority_audit).toMatchObject({
       schema: "helix.runtime_authority_audit.v1",
+      runtime_intent_packet_ref: expect.stringContaining(":runtime_intent_packet"),
+      capability_turn: true,
       runtime_loop_present: true,
       all_subgoals_observed_terminal_authority: false,
       ok: true,
+    });
+    expect(response.body?.runtime_intent_packet).toMatchObject({
+      schema: "helix.runtime_intent_packet.v1",
+      completion_authority: "agent_runtime_loop_and_goal_satisfaction",
+      terminal_contract: expect.objectContaining({
+        goal_kind: "calculator_solve",
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      }),
+    });
+    expect(response.body?.runtime_intent_packet?.hints?.every((hint: any) => hint.authority === "hint_only")).toBe(true);
+    expect(response.body?.observation_review).toMatchObject({
+      schema: "helix.observation_review.v1",
+      supports_goal: true,
+      runtime_next_action: "final",
     });
     expect(response.body?.runtime_authority_audit?.legacy_hint_count).toBeGreaterThanOrEqual(3);
     expect(response.body?.runtime_authority_audit?.migrated_hint_count).toBe(response.body?.runtime_authority_audit?.legacy_hint_count);
@@ -999,6 +1046,61 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
     expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
     expect(String(response.body?.selected_final_answer ?? "")).toContain("3600 N");
+  }, 60000);
+
+  it("derives acceleration from rest-to-final-speed prompts before force and kinetic energy", async () => {
+    const app = createApp();
+    const previousComposerResponse = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE =
+      "The calculations give acceleration = 3 m/s^2, force = 9 N, and final kinetic energy = 216 J. The results show that the requested values follow directly from the given mass, final speed, and time, without inventing extra measurements.";
+    let response: any;
+    try {
+      response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "A 3 kg cart starts from rest and reaches 12 m/s in 4 seconds. Use the scientific calculator as a tool to compute acceleration, force, and final kinetic energy. Then explain how the calculator results support the answer without inventing extra measurements.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-rest-kinematics-${Date.now()}`,
+        })
+        .expect(200);
+    } finally {
+      if (previousComposerResponse === undefined) {
+        delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      } else {
+        process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousComposerResponse;
+      }
+    }
+
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(response.body?.calculator_plan_coverage).toMatchObject({
+      schema: "helix.calculator_plan_coverage.v1",
+      coverage: "complete",
+      missing_requirement_ids: [],
+    });
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
+      "acceleration",
+      "force",
+      "final_kinetic_energy",
+    ]);
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.expression)).toEqual([
+      "12/4",
+      "3*3",
+      "0.5*3*12^2",
+    ]);
+    expect(response.body?.calculator_subgoal_receipts?.map((receipt: any) => receipt.result_text)).toEqual([
+      "3",
+      "9",
+      "216",
+    ]);
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(response.body?.calculator_loop_integrity?.ok).toBe(true);
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("3 m/s^2");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("9 N");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("216 J");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/interpretation of these results is missing/i);
   }, 60000);
 
   it("uses the generic calculator planner for pendulum period prompts", async () => {

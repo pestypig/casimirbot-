@@ -10409,6 +10409,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     payload.agent_runtime_loop ?? debug?.agent_runtime_loop ?? agentLoop?.agent_runtime_loop;
   const agentRuntimeLoopAdmission =
     payload.agent_runtime_loop_admission ?? debug?.agent_runtime_loop_admission ?? agentLoop?.agent_runtime_loop_admission;
+  const runtimeIntentPacket =
+    payload.runtime_intent_packet ?? debug?.runtime_intent_packet ?? agentLoop?.runtime_intent_packet;
   const runtimeAuthorityAudit =
     payload.runtime_authority_audit ?? debug?.runtime_authority_audit ?? agentLoop?.runtime_authority_audit;
   const runtimeContinuationHints =
@@ -10516,6 +10518,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     agent_step_loop: agentStepLoop,
     agent_runtime_loop: agentRuntimeLoop,
     agent_runtime_loop_admission: agentRuntimeLoopAdmission,
+    runtime_intent_packet: runtimeIntentPacket ?? findLedgerPayloadByKind("runtime_intent_packet"),
     runtime_authority_audit: runtimeAuthorityAudit,
     runtime_continuation_hints: runtimeContinuationHints,
     current_turn_artifact_ledger: ledger,
