@@ -11440,24 +11440,57 @@ function deriveReasoningTheaterState(input: {
   };
 }
 
-function buildReasoningTheaterParticles(
-  seed: number,
-  count: number,
+function buildReasoningTheaterParticlesFromMirekArtifact(
+  artifact: MirekReasoningArtifactV1,
 ): ReasoningTheaterParticle[] {
-  const rng = mulberry32(seed);
-  const particles: ReasoningTheaterParticle[] = [];
-  for (let i = 0; i < count; i += 1) {
-    particles.push({
-      id: `particle-${i}`,
-      leftPct: Math.round(rng() * 1000) / 10,
-      topPct: Math.round(rng() * 1000) / 10,
-      sizePx: 1.8 + rng() * 3.6,
-      opacity: 0.15 + rng() * 0.55,
-      delayS: rng() * 1.2,
-      durationS: 1.2 + rng() * 1.8,
-    });
+  const width = Math.max(1, artifact.grid.width);
+  const height = Math.max(1, artifact.grid.height);
+  return artifact.grid.cells.map((cell, index) => {
+    const roleSize =
+      cell.kind === "objective" || cell.kind === "proof" || cell.kind === "blocked"
+        ? 4.4
+        : cell.kind === "evidence"
+          ? 3.8
+          : cell.kind === "support"
+            ? 2.8
+            : 2.2;
+    const jitter = (hash32(`${artifact.finalFrameHash}:${cell.id}:${index}`) % 9) / 10;
+    return {
+      id: cell.id,
+      leftPct: Math.round(((cell.x + 0.5) / width) * 1000) / 10,
+      topPct: Math.round(((cell.y + 0.5) / height) * 1000) / 10,
+      sizePx: roleSize + jitter,
+      opacity: clamp01(cell.opacity),
+      delayS: ((hash32(`${cell.id}:delay`) % 900) / 1000),
+      durationS: 1.2 + ((hash32(`${cell.id}:duration`) % 1800) / 1000),
+      kind: cell.kind,
+    };
+  });
+}
+
+function mirekCellParticleClassName(kind: MirekCellKind): string {
+  switch (kind) {
+    case "objective":
+      return "bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.5)]";
+    case "evidence":
+      return "bg-emerald-200/85 shadow-[0_0_10px_rgba(110,231,183,0.45)]";
+    case "support":
+      return "bg-cyan-200/80 shadow-[0_0_8px_rgba(103,232,249,0.4)]";
+    case "gap":
+      return "bg-amber-200/85 shadow-[0_0_10px_rgba(252,211,77,0.45)]";
+    case "conflict":
+      return "bg-orange-300/85 shadow-[0_0_10px_rgba(253,186,116,0.45)]";
+    case "proof":
+      return "bg-violet-200/90 shadow-[0_0_12px_rgba(221,214,254,0.55)]";
+    case "blocked":
+      return "bg-rose-300/90 shadow-[0_0_12px_rgba(253,164,175,0.55)]";
+    case "afterglow":
+      return "bg-slate-300/45";
+    case "context":
+    case "empty":
+    default:
+      return "bg-sky-200/65 shadow-[0_0_8px_rgba(186,230,253,0.28)]";
   }
-  return particles;
 }
 
 function buildReasoningTheaterFrontierParticles(
