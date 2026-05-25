@@ -191,6 +191,17 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan).toBeNull();
   });
 
+  it("does not route tool diagnostic prose through the calculator", () => {
+    const prompt = "Calculator panel showed stale/failed expression state even though backend receipts succeeded.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBeNull();
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+  });
+
   it("does not create a missing-latex calculator action when the user says the numeric input is absent", () => {
     const prompt =
       "I am trying to estimate the kinetic energy of a 1500 kg car at highway speed for a safety comparison. I did not give you an exact speed. Decide whether the calculator is useful here, but do not invent a speed silently. If the problem is underspecified, say what value you need before producing a numeric result.";

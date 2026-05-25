@@ -359,6 +359,7 @@ function calculatorArgs(latex: string | null, setup: HelixCalculatorSetupContext
 
 export function extractCalculatorExpression(prompt: string): string | null {
   const normalized = normalizePrompt(prompt);
+  if (isWorkstationToolDiagnosticPrompt(normalized)) return null;
   const photonEnergyExpression = extractPhotonEnergyExpression(normalized);
   if (photonEnergyExpression) return photonEnergyExpression;
   const kineticEnergyExpression = extractKineticEnergyExpression(normalized);
@@ -451,7 +452,22 @@ function isConceptualNoCalculatorPrompt(prompt: string): boolean {
   return false;
 }
 
+export function isWorkstationToolDiagnosticPrompt(prompt: string): boolean {
+  const normalized = normalizePrompt(prompt);
+  if (!normalized) return false;
+  const mentionsWorkstationTool =
+    /\b(?:calculator|scientific\s+calculator|docs?\s+(?:panel|viewer)|workstation\s+notes?|visual\s+capture|live\s+source|tool\s+call|capabilit(?:y|ies)|panel|receipt|artifact)\b/i.test(
+      normalized,
+    );
+  const diagnosticCue =
+    /\b(?:backend|debug|trace|terminal_error_code|goal_satisfaction|satisfaction|runtime|agent\s+loop|route|router|classifier|deterministic|stale|failed|failure|took\s+over|over[-\s]?eager|poison(?:ing)?|parity|codex|why\s+did|what\s+went\s+wrong|error|bug|patch|code)\b/i.test(
+      normalized,
+    );
+  return mentionsWorkstationTool && diagnosticCue;
+}
+
 function isCalculatorPrompt(prompt: string): boolean {
+  if (isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (isConceptualNoCalculatorPrompt(prompt)) return false;
   const hasConcreteExpression = hasConcreteCalculatorExpression(prompt);
   return /\b(?:calculator|solve|evaluate|compute|calculate|verify|check)\b/i.test(prompt) &&

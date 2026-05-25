@@ -666,6 +666,22 @@ const edges: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Shared units are only a hint relation.",
   },
   {
+    id: "energy_density_requires_qei_sampling",
+    from: "nhm2.source.energy_density_proxy",
+    to: "nhm2.qei.sampling_window",
+    relation: "requires",
+    label: "QEI sampling compares energy-density-like scalar quantities.",
+    claimBoundaryNote: "Executable dependency only feeds diagnostic playback.",
+  },
+  {
+    id: "energy_density_shares_units_with_qei_sampling",
+    from: "nhm2.source.energy_density_proxy",
+    to: "nhm2.qei.sampling_window",
+    relation: "shares_units",
+    label: "The source proxy and QEI sampling margin share energy-density units.",
+    claimBoundaryNote: "Shared units are excluded from executable playback.",
+  },
+  {
     id: "energy_density_requires_source_residual",
     from: "nhm2.source.energy_density_proxy",
     to: "nhm2.closure.source_residual",

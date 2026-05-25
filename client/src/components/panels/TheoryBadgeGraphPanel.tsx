@@ -1,17 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Calculator, ExternalLink, Search } from "lucide-react";
+import { Calculator, Copy, ExternalLink, Play, Search, Trash2 } from "lucide-react";
 import type {
   TheoryBadgeCalculatorPayloadV1,
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
+import type { TheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -29,6 +32,27 @@ function labelize(value: string) {
 
 function uniqueSorted(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+}
+
+async function copyText(value: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard) {
+    await navigator.clipboard.writeText(value);
+  }
+}
+
+function statusClass(status: string) {
+  switch (status) {
+    case "running":
+      return "border-cyan-500 bg-cyan-950/40 text-cyan-100";
+    case "solved":
+      return "border-emerald-500 bg-emerald-950/40 text-emerald-100";
+    case "failed":
+      return "border-rose-500 bg-rose-950/40 text-rose-100";
+    case "skipped":
+      return "border-slate-700 bg-slate-900/70 text-slate-300";
+    default:
+      return "border-slate-800 bg-slate-950/70 text-slate-500";
+  }
 }
 
 function SelectFilter({
@@ -156,10 +180,18 @@ function Inspector({
   badge,
   graph,
   onSelect,
+  playback,
+  onRunPlayback,
+  onClearPlayback,
+  playbackStatus,
 }: {
   badge: TheoryBadgeV1 | null;
   graph: TheoryBadgeGraphV1 | undefined;
   onSelect: (id: string) => void;
+  playback: TheoryBadgePlaybackArtifactV1 | null;
+  onRunPlayback: () => void;
+  onClearPlayback: () => void;
+  playbackStatus: "idle" | "running" | "complete" | "failed";
 }) {
   const byId = useMemo(() => new Map((graph?.badges ?? []).map((item) => [item.id, item])), [graph?.badges]);
   const relatedEdges = useMemo(
@@ -183,11 +215,23 @@ function Inspector({
             <CardTitle className="text-lg text-slate-50">{badge.title}</CardTitle>
             <div className="mt-1 text-xs text-slate-400">{badge.id}</div>
           </div>
-          <div className="flex flex-wrap gap-1">
-            <Badge className="bg-cyan-900/80 text-cyan-50">{labelize(badge.level)}</Badge>
-            <Badge variant="outline" className="border-slate-700 text-slate-300">
-              {labelize(badge.status)}
-            </Badge>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-1">
+              <Badge className="bg-cyan-900/80 text-cyan-50">{labelize(badge.level)}</Badge>
+              <Badge variant="outline" className="border-slate-700 text-slate-300">
+                {labelize(badge.status)}
+              </Badge>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onRunPlayback}
+              disabled={playbackStatus === "running"}
+              className="gap-2 bg-cyan-700 text-white hover:bg-cyan-600"
+            >
+              <Play className="h-4 w-4" />
+              Run Path to Badge
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -299,6 +343,88 @@ function Inspector({
             )}
           </div>
         </section>
+
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Path Playback</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!playback}
+                onClick={() => playback && copyText(JSON.stringify(playback, null, 2))}
+                className="gap-2 border-slate-700"
+              >
+                <Copy className="h-4 w-4" />
+                Copy Playback JSON
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!playback}
+                onClick={() => playback && copyText(formatTheoryBadgePlaybackMarkdown(playback))}
+                className="gap-2 border-slate-700"
+              >
+                <Copy className="h-4 w-4" />
+                Copy Playback Markdown
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={!playback}
+                onClick={onClearPlayback}
+                className="gap-2 text-slate-300"
+              >
+                <Trash2 className="h-4 w-4" />
+                Clear Playback
+              </Button>
+            </div>
+          </div>
+          {playback ? (
+            <div className="mt-3 space-y-2">
+              <div className="grid gap-2 text-xs text-slate-400 sm:grid-cols-5">
+                <div>Badges: {playback.summary.badgeCount}</div>
+                <div>Payloads: {playback.summary.payloadCount}</div>
+                <div>Solved: {playback.summary.solvedCount}</div>
+                <div>Skipped: {playback.summary.skippedCount}</div>
+                <div>Failed: {playback.summary.failedCount}</div>
+              </div>
+              {playback.steps.map((step) => (
+                <div key={step.id} className={`rounded-md border p-3 text-sm ${statusClass(step.status)}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-semibold">
+                      {step.index}. {step.badgeTitle}
+                    </div>
+                    <Badge variant="outline" className="border-current text-[10px]">
+                      {step.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 font-mono text-xs opacity-80">
+                    {step.payloadId ?? `skipped: ${step.skipReason ?? "unknown"}`}
+                  </div>
+                  {step.expression ? <div className="mt-2 font-mono text-xs opacity-90">{step.expression}</div> : null}
+                  <div className="mt-2 grid gap-1 text-xs opacity-90 sm:grid-cols-4">
+                    <div>kind: {step.resultKind ?? "-"}</div>
+                    <div>confidence: {step.confidence ?? "-"}</div>
+                    <div>fallback: {step.fallbackReason ?? "-"}</div>
+                    <div>artifact: {step.calculatorArtifactV1 ? "yes" : "no"}</div>
+                  </div>
+                  {step.resultText ? <div className="mt-2 text-xs opacity-95">result: {step.resultText}</div> : null}
+                  {step.warnings.length > 0 ? (
+                    <div className="mt-2 text-xs opacity-90">warnings: {step.warnings.join("; ")}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 rounded-md border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-500">
+              No playback run yet.
+            </div>
+          )}
+        </section>
       </CardContent>
     </Card>
   );
@@ -310,6 +436,7 @@ export default function TheoryBadgeGraphPanel() {
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const playbackStore = useTheoryBadgePlaybackStore();
 
   const { data: graph, isLoading, error } = useQuery<TheoryBadgeGraphV1>({
     queryKey: ["/api/helix/theory/graph"],
@@ -440,7 +567,24 @@ export default function TheoryBadgeGraphPanel() {
             </div>
           </div>
           <div className="min-h-0 overflow-y-auto">
-            <Inspector badge={selectedBadge} graph={graph} onSelect={setSelectedId} />
+            <Inspector
+              badge={selectedBadge}
+              graph={graph}
+              onSelect={setSelectedId}
+              playback={
+                playbackStore.activeTargetBadgeId === selectedBadge?.id ? playbackStore.activeRun : null
+              }
+              playbackStatus={playbackStore.status}
+              onRunPlayback={() => {
+                if (graph && selectedBadge) {
+                  void playbackStore.runPlayback({
+                    graph,
+                    targetBadgeId: selectedBadge.id,
+                  });
+                }
+              }}
+              onClearPlayback={playbackStore.clearPlayback}
+            />
           </div>
         </div>
       )}

@@ -507,6 +507,33 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
   }, 60000);
 
+  it("does not let calculator diagnostic prose become a calculator tool call", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Calculator panel showed stale/failed expression state even though backend receipts succeeded.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-diagnostic-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("debug_diagnosis");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("debug_evidence_diagnosis");
+    expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
+    expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe(
+      "scientific-calculator.solve_expression",
+    );
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("debug.inspect_current_turn");
+    const runtimeCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
+    expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
+    expect(response.body?.terminal_artifact_kind).not.toBe("workstation_tool_evaluation");
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.terminal_error_code).toBe("debug_evidence_missing");
+    expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
+  }, 60000);
+
   it("exposes every workstation panel tool in the model-visible capability manifest", async () => {
     const app = createApp();
     const response = await request(app)
