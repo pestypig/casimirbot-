@@ -16,6 +16,7 @@ export default defineConfig({
       "tests/**/*.spec.ts",
       "tests/nhm2/**/*.test.ts",
       "server/**/__tests__/**/*.{spec,test}.ts",
+      "shared/**/__tests__/**/*.{spec,test}.ts",
       "tools/**/__tests__/**/*.spec.ts",
       "client/src/**/*.{spec,test}.ts?(x)",
     ],

@@ -81,6 +81,7 @@ const API = {
   grAgentLoop: "GET /api/helix/gr-agent-loop",
   grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
   mathGraph: "GET /api/helix/math/graph",
+  theoryGraph: "GET /api/helix/theory/graph",
   auditTree: "GET /api/helix/audit/tree",
   warpCalculator: "POST /api/physics/warp/calculator",
   tokamakState: "GET /api/physics/tokamak/sim",
@@ -119,6 +120,14 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "stage ladder",
     "unit coverage",
     "repo audit"
+  ],
+  "theory-badge-graph": [
+    "theory badge",
+    "badge graph",
+    "nhm2 theory",
+    "calculator loadout",
+    "unit signatures",
+    "claim boundary"
   ],
   "universal-audit-tree": [
     "audit tree",
@@ -388,6 +397,17 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     mobileReady: true,
     endpoints: [API.mathGraph],
     keywords: PANEL_KEYWORDS["math-maturity-tree"]
+  },
+  {
+    id: "theory-badge-graph",
+    title: "Theory Badge Graph",
+    icon: ScrollText,
+    loader: lazyPanel(() => import("@/components/panels/TheoryBadgeGraphPanel")),
+    defaultSize: { w: 1040, h: 720 },
+    defaultPosition: { x: 300, y: 190 },
+    mobileReady: true,
+    endpoints: [API.theoryGraph],
+    keywords: PANEL_KEYWORDS["theory-badge-graph"]
   },
   {
     id: "universal-audit-tree",

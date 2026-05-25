@@ -165,6 +165,13 @@ import {
   type ContextCapsuleConvergence,
   type ContextCapsuleSummary,
 } from "@shared/helix-context-capsule";
+import {
+  buildMirekReasoningArtifact,
+  type MirekAnchorInput,
+  type MirekCellKind,
+  type MirekReasoningArtifactV1,
+  type MirekReasoningCanonicalStateV1,
+} from "@shared/helix-reasoning-mirek";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
@@ -8687,6 +8694,7 @@ type ReasoningTheaterParticle = {
   opacity: number;
   delayS: number;
   durationS: number;
+  kind: MirekCellKind;
 };
 
 type ReasoningTheaterFrontierParticleNode = {

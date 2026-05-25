@@ -87,6 +87,35 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(payload.selected_final_answer).not.toBe("You're viewing a developer environment.");
   });
 
+  it("treats typed failure source as failure even when artifact kind is stale", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:typed-failure-stale-artifact",
+      thread_id: "thread:test",
+      selected_final_answer: "Created workstation note \"Open document summary\".",
+      answer: "Created workstation note \"Open document summary\".",
+      text: "Created workstation note \"Open document summary\".",
+      terminal_artifact_kind: "note_mutation_result",
+      final_answer_source: "typed_failure",
+      terminal_failure_text: "I could not complete this turn because the note tool call was missing required arguments.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "Created workstation note \"Open document summary\".",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(envelope).toMatchObject({
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      authority_origin: "typed_failure",
+      terminal_text: "I could not complete this turn because the note tool call was missing required arguments.",
+    });
+    allTerminalSurfacesEqual(payload);
+    expect(payload.selected_final_answer).not.toMatch(/Created workstation note/i);
+  });
+
   it("flags stale typed failure presentation text as non-authoritative", () => {
     const failureText =
       "I could not complete this Ask turn because solver authority failed (terminal_authority_before_solver_completion).";

@@ -360,4 +360,44 @@ describe("Helix Ask Codex-shaped debug parity", () => {
     expect(debug.resolved_turn_summary?.terminal_artifact_kind).toBe("active_doc_identity");
     expect(String(debug.finalAnswer ?? debug.selected_final_answer ?? "")).toContain(NHM2_DOC_PATH);
   }, 60000);
+
+  it("uses repaired note action args when model-selected note capability args are empty", async () => {
+    const { debug } = await askAndDebug({
+      question: "Create a workstation note titled Runtime Args Test with body Preserve repaired args inside the loop.",
+      env: {
+        HELIX_AGENT_STEP_DECISION_LLM: "1",
+        HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX: "0",
+        HELIX_AGENT_STEP_DECISION_TEST_RESPONSE: JSON.stringify([
+          {
+            next_step: "next_action",
+            chosen_capability: "workstation-notes.create_note",
+            reason: "The user asked to create a workstation note.",
+            args: {},
+            expected_artifacts: ["note_update_receipt"],
+            confidence: 0.97,
+          },
+          {
+            next_step: "answer",
+            chosen_capability: null,
+            reason: "The note creation receipt satisfies the mutation goal.",
+            args: {},
+            expected_artifacts: ["note_update_receipt"],
+            confidence: 0.98,
+          },
+        ]),
+      },
+    });
+
+    assertCodexShapedDebug(debug, {
+      requireToolExecution: true,
+      expectedCapability: "workstation-notes.create_note",
+      expectedCoverageKind: "notes_mutation_coverage",
+    });
+    const invalidArgSummaries = artifactPayloads(debug, "runtime_tool_observation")
+      .map((entry) => String(entry.summary ?? ""))
+      .filter((entry) => /missing_required_arg:title/i.test(entry));
+    expect(invalidArgSummaries).toEqual([]);
+    expect(debug.final_answer_source).not.toBe("typed_failure");
+    expect(String(debug.finalAnswer ?? debug.selected_final_answer ?? "")).toMatch(/Runtime Args Test|note/i);
+  }, 60000);
 });

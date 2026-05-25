@@ -92,7 +92,8 @@ export function resolveTerminalAnswerEnvelope(
   let terminalText: string | null = null;
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
 
-  if (terminalArtifactKind === "typed_failure") {
+  if (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") {
+    terminalArtifactKind = "typed_failure";
     terminalText = typedFailureText(payload);
     finalAnswerSource = "typed_failure";
     authorityOrigin = "typed_failure";
