@@ -24,7 +24,7 @@ describe("theory_badge_graph/v1", () => {
     };
 
     expect(
-      validateTheoryBadgeGraphV1(graph).some((issue) =>
+      validateTheoryBadgeGraphV1(graph).some((issue: string) =>
         issue.includes("forbidden validation claim phrase matched"),
       ),
     ).toBe(true);

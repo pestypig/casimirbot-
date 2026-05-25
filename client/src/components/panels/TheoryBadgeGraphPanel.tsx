@@ -4,10 +4,17 @@ import { Calculator, Copy, ExternalLink, Play, Search, Trash2 } from "lucide-rea
 import type {
   TheoryBadgeCalculatorPayloadV1,
   TheoryBadgeEdgeV1,
+  TheoryBadgeEquationV1,
   TheoryBadgeGraphV1,
+  TheoryBadgeLevel,
+  TheoryBadgeSourceRefV1,
+  TheoryBadgeUnitV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
-import type { TheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
+import type {
+  TheoryBadgePlaybackArtifactV1,
+  TheoryBadgePlaybackStepV1,
+} from "@shared/contracts/theory-badge-playback.v1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,14 +31,14 @@ const LEVEL_ORDER = [
   "simulation_specific",
   "diagnostic_gate",
   "claim_boundary",
-];
+] as const satisfies readonly TheoryBadgeLevel[];
 
 function labelize(value: string) {
   return value.replace(/_/g, " ");
 }
 
-function uniqueSorted(values: string[]) {
-  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+function uniqueSorted(values: string[]): string[] {
+  return Array.from(new Set(values)).sort((a: string, b: string) => a.localeCompare(b));
 }
 
 async function copyText(value: string) {
@@ -71,11 +78,11 @@ function SelectFilter({
       {label}
       <select
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event: React.ChangeEvent<HTMLSelectElement>) => onChange(event.target.value)}
         className="h-9 rounded-md border border-slate-800 bg-slate-950 px-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-cyan-500"
       >
         <option value="all">All</option>
-        {options.map((option) => (
+        {options.map((option: string) => (
           <option key={option} value={option}>
             {labelize(option)}
           </option>
@@ -193,9 +200,18 @@ function Inspector({
   onClearPlayback: () => void;
   playbackStatus: "idle" | "running" | "complete" | "failed";
 }) {
-  const byId = useMemo(() => new Map((graph?.badges ?? []).map((item) => [item.id, item])), [graph?.badges]);
+  const byId = useMemo(
+    () =>
+      new Map<string, TheoryBadgeV1>(
+        (graph?.badges ?? []).map((item: TheoryBadgeV1) => [item.id, item]),
+      ),
+    [graph?.badges],
+  );
   const relatedEdges = useMemo(
-    () => (graph?.edges ?? []).filter((edge) => edge.from === badge?.id || edge.to === badge?.id),
+    () =>
+      (graph?.edges ?? []).filter(
+        (edge: TheoryBadgeEdgeV1) => edge.from === badge?.id || edge.to === badge?.id,
+      ),
     [badge?.id, graph?.edges],
   );
 
@@ -245,7 +261,7 @@ function Inspector({
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Equations</h3>
           <div className="mt-2 space-y-2">
-            {badge.equations.map((equation) => (
+            {badge.equations.map((equation: TheoryBadgeEquationV1) => (
               <div key={equation.id} className="rounded-md border border-slate-800 bg-slate-900/50 p-3">
                 <div className="font-mono text-sm text-cyan-100">{equation.displayLatex}</div>
                 {equation.computableExpression ? (
@@ -270,7 +286,7 @@ function Inspector({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Units</h3>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {badge.units.length > 0 ? (
-              badge.units.map((unit) => (
+              badge.units.map((unit: TheoryBadgeUnitV1) => (
                 <div key={`${unit.symbol}-${unit.dimensionSignature ?? unit.unit ?? "unit"}`} className="rounded-md border border-slate-800 bg-slate-900/50 p-2 text-xs">
                   <div className="font-mono text-slate-100">{unit.symbol}</div>
                   <div className="mt-1 text-slate-400">
@@ -287,7 +303,7 @@ function Inspector({
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assumptions</h3>
           <ul className="mt-2 space-y-1 text-sm text-slate-300">
-            {badge.assumptions.map((assumption) => (
+            {badge.assumptions.map((assumption: string) => (
               <li key={assumption}>- {assumption}</li>
             ))}
           </ul>
@@ -297,7 +313,7 @@ function Inspector({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Calculator Payloads</h3>
           <div className="mt-2 space-y-2">
             {badge.calculatorPayloads.length > 0 ? (
-              badge.calculatorPayloads.map((payload) => (
+              badge.calculatorPayloads.map((payload: TheoryBadgeCalculatorPayloadV1) => (
                 <div key={payload.id} className="rounded-md border border-slate-800 bg-slate-900/50 p-3">
                   <div className="font-mono text-sm text-cyan-100">{payload.displayLatex}</div>
                   <div className="mt-1 font-mono text-xs text-slate-400">{payload.expression}</div>
@@ -318,7 +334,7 @@ function Inspector({
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Source Refs</h3>
           <div className="mt-2 space-y-2">
-            {badge.sourceRefs.map((source, index) => (
+            {badge.sourceRefs.map((source: TheoryBadgeSourceRefV1, index: number) => (
               <div key={`${source.kind}-${source.path ?? source.id ?? index}`} className="rounded-md border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300">
                 <div className="flex items-center gap-2">
                   <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
@@ -335,7 +351,7 @@ function Inspector({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Related Badges</h3>
           <div className="mt-2 space-y-2">
             {relatedEdges.length > 0 ? (
-              relatedEdges.map((edge) => (
+              relatedEdges.map((edge: TheoryBadgeEdgeV1) => (
                 <RelatedBadgeRow key={edge.id} edge={edge} selectedId={badge.id} byId={byId} onSelect={onSelect} />
               ))
             ) : (
@@ -392,7 +408,7 @@ function Inspector({
                 <div>Skipped: {playback.summary.skippedCount}</div>
                 <div>Failed: {playback.summary.failedCount}</div>
               </div>
-              {playback.steps.map((step) => (
+              {playback.steps.map((step: TheoryBadgePlaybackStepV1) => (
                 <div key={step.id} className={`rounded-md border p-3 text-sm ${statusClass(step.status)}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="font-semibold">
@@ -442,13 +458,22 @@ export default function TheoryBadgeGraphPanel() {
     queryKey: ["/api/helix/theory/graph"],
   });
 
-  const subjects = useMemo(() => uniqueSorted((graph?.badges ?? []).flatMap((badge) => badge.subjects)), [graph?.badges]);
-  const levels = useMemo(() => uniqueSorted((graph?.badges ?? []).map((badge) => badge.level)), [graph?.badges]);
-  const statuses = useMemo(() => uniqueSorted((graph?.badges ?? []).map((badge) => badge.status)), [graph?.badges]);
+  const subjects = useMemo(
+    () => uniqueSorted((graph?.badges ?? []).flatMap((badge: TheoryBadgeV1) => badge.subjects)),
+    [graph?.badges],
+  );
+  const levels = useMemo(
+    () => uniqueSorted((graph?.badges ?? []).map((badge: TheoryBadgeV1) => badge.level)),
+    [graph?.badges],
+  );
+  const statuses = useMemo(
+    () => uniqueSorted((graph?.badges ?? []).map((badge: TheoryBadgeV1) => badge.status)),
+    [graph?.badges],
+  );
 
   const filteredBadges = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (graph?.badges ?? []).filter((badge) => {
+    return (graph?.badges ?? []).filter((badge: TheoryBadgeV1) => {
       const haystack = [
         badge.id,
         badge.title,
@@ -470,10 +495,10 @@ export default function TheoryBadgeGraphPanel() {
   }, [graph?.badges, level, query, status, subject]);
 
   const groupedBadges = useMemo(() => {
-    return LEVEL_ORDER.map((levelName) => ({
+    return LEVEL_ORDER.map((levelName: TheoryBadgeLevel) => ({
       level: levelName,
-      badges: filteredBadges.filter((badge) => badge.level === levelName),
-    })).filter((group) => group.badges.length > 0);
+      badges: filteredBadges.filter((badge: TheoryBadgeV1) => badge.level === levelName),
+    })).filter((group: { level: TheoryBadgeLevel; badges: TheoryBadgeV1[] }) => group.badges.length > 0);
   }, [filteredBadges]);
 
   useEffect(() => {
@@ -481,13 +506,13 @@ export default function TheoryBadgeGraphPanel() {
       setSelectedId(null);
       return;
     }
-    if (!selectedId || !filteredBadges.some((badge) => badge.id === selectedId)) {
+    if (!selectedId || !filteredBadges.some((badge: TheoryBadgeV1) => badge.id === selectedId)) {
       setSelectedId(filteredBadges[0].id);
     }
   }, [filteredBadges, selectedId]);
 
   const selectedBadge = useMemo(
-    () => (graph?.badges ?? []).find((badge) => badge.id === selectedId) ?? null,
+    () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
   );
 
@@ -522,7 +547,7 @@ export default function TheoryBadgeGraphPanel() {
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
               <Input
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
                 placeholder="Badge, symbol, subject"
                 className="h-9 border-slate-800 bg-slate-950 pl-8 text-slate-100 placeholder:text-slate-600"
               />
@@ -542,13 +567,13 @@ export default function TheoryBadgeGraphPanel() {
         <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
           <div className="min-h-0 overflow-y-auto pr-1">
             <div className="space-y-4">
-              {groupedBadges.map((group) => (
+              {groupedBadges.map((group: { level: TheoryBadgeLevel; badges: TheoryBadgeV1[] }) => (
                 <section key={group.level}>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {labelize(group.level)}
                   </div>
                   <div className="space-y-2">
-                    {group.badges.map((badge) => (
+                    {group.badges.map((badge: TheoryBadgeV1) => (
                       <BadgeButton
                         key={badge.id}
                         badge={badge}

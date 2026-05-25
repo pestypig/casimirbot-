@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { create, type StateCreator } from "zustand";
 import {
   buildTheoryBadgePlaybackArtifactV1,
   type TheoryBadgePlaybackArtifactV1,
@@ -22,8 +22,8 @@ type TheoryBadgePlaybackState = {
   clearPlayback: () => void;
 };
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number): Promise<void> {
+  return new Promise<void>((resolve: () => void) => setTimeout(resolve, ms));
 }
 
 function buildPartialRun(
@@ -42,14 +42,22 @@ function buildPartialRun(
   });
 }
 
-export const useTheoryBadgePlaybackStore = create<TheoryBadgePlaybackState>()((set) => ({
+const createTheoryBadgePlaybackStore: StateCreator<TheoryBadgePlaybackState> = (set) => ({
   activeRun: null,
   activeTargetBadgeId: null,
   status: "idle",
   currentStepIndex: null,
   error: null,
 
-  runPlayback: async ({ graph, targetBadgeId, delayMs = 80 }) => {
+  runPlayback: async ({
+    graph,
+    targetBadgeId,
+    delayMs = 80,
+  }: {
+    graph: TheoryBadgeGraphV1;
+    targetBadgeId: string;
+    delayMs?: number;
+  }) => {
     set({
       activeRun: null,
       activeTargetBadgeId: targetBadgeId,
@@ -102,4 +110,8 @@ export const useTheoryBadgePlaybackStore = create<TheoryBadgePlaybackState>()((s
       currentStepIndex: null,
       error: null,
     }),
-}));
+});
+
+export const useTheoryBadgePlaybackStore = create<TheoryBadgePlaybackState>()(
+  createTheoryBadgePlaybackStore,
+);

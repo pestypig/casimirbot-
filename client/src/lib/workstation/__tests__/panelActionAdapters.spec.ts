@@ -11,6 +11,7 @@ import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardSto
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
+import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -37,6 +38,15 @@ vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
 }));
 
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+
+function actionContext() {
+  return {
+    openPanel: () => undefined,
+    focusPanel: () => undefined,
+    closePanel: () => undefined,
+    openSettings: () => undefined,
+  };
+}
 
 describe("panelActionAdapters", () => {
   beforeEach(() => {
@@ -1033,5 +1043,74 @@ describe("panelActionAdapters", () => {
         delegatedTo: "/api/physics/warp/calculator",
       }),
     );
+  });
+
+  it("looks up theory badges for Helix workstation context", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "theory-badge-graph",
+        action_id: "lookup_badges",
+        args: { query: "solve the QEI sampling margin", limit: 3 },
+      },
+      actionContext(),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact?.kind).toBe("theory_badge_lookup");
+    const matches = result.artifact?.matches as Array<{ badgeId: string; claimBoundaryWarnings: string[] }>;
+    expect(matches[0]?.badgeId).toBe("nhm2.qei.sampling_window");
+    expect(matches[0]?.claimBoundaryWarnings).toContain("diagnostic-only badge");
+  });
+
+  it("returns theory badge context and connection traces", () => {
+    const contextResult = executeHelixPanelAction(
+      {
+        panel_id: "theory-badge-graph",
+        action_id: "get_badge_context",
+        args: { badge_id: "nhm2.qei.sampling_window" },
+      },
+      actionContext(),
+    );
+
+    expect(contextResult.ok).toBe(true);
+    expect(contextResult.artifact?.kind).toBe("theory_badge_context");
+    expect(contextResult.artifact?.calculator_payloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "qei_margin_difference_payload" }),
+      ]),
+    );
+
+    const traceResult = executeHelixPanelAction(
+      {
+        panel_id: "theory-badge-graph",
+        action_id: "trace_badges",
+        args: { badge_ids: ["nhm2.qei.sampling_window", "nhm2.closure.source_residual"] },
+      },
+      actionContext(),
+    );
+
+    expect(traceResult.ok).toBe(true);
+    expect(traceResult.artifact?.kind).toBe("theory_badge_connection_trace");
+    expect(traceResult.artifact?.shared_ancestor_ids).toEqual(
+      expect.arrayContaining(["nhm2.source.energy_density_proxy"]),
+    );
+    expect(traceResult.artifact?.shared_unit_signatures).toContain("M L^-1 T^-2");
+  });
+
+  it("runs a theory badge path through calculator playback", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "theory-badge-graph",
+        action_id: "run_badge_path",
+        args: { target_badge_id: "nhm2.qei.sampling_window" },
+      },
+      actionContext(),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact?.kind).toBe("theory_badge_playback");
+    expect(result.artifact?.target_badge_id).toBe("nhm2.qei.sampling_window");
+    expect(result.artifact?.solved_count).toBeGreaterThanOrEqual(1);
+    expect(isTheoryBadgePlaybackArtifactV1(result.artifact?.artifact_v1)).toBe(true);
   });
 });

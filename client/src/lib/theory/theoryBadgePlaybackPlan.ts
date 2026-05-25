@@ -1,6 +1,8 @@
 import type {
+  TheoryBadgeEdgeV1,
   TheoryBadgeEdgeRelation,
   TheoryBadgeGraphV1,
+  TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
 
 export const THEORY_PLAYBACK_EXECUTABLE_RELATIONS = new Set<TheoryBadgeEdgeRelation>([
@@ -33,8 +35,10 @@ export function resolveTheoryBadgePlaybackPlan(args: {
 }): TheoryBadgePlaybackPlan {
   const { graph, targetBadgeId } = args;
   const warnings: string[] = [];
-  const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
-  const incomingByTarget = new Map<string, typeof graph.edges>();
+  const badgesById = new Map<string, TheoryBadgeV1>(
+    graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+  );
+  const incomingByTarget = new Map<string, TheoryBadgeEdgeV1[]>();
   const executableRelationTypes = new Set<string>();
   const skippedRelationTypes = new Set<string>();
   const included = new Set<string>();

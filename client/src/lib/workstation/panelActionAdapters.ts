@@ -10,6 +10,7 @@ import {
   formatScientificCalculatorDebugLog,
 } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
+import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
@@ -43,6 +44,12 @@ import type {
   TranslationPairNodeConfig,
 } from "@shared/helix-situation-graph";
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
+import type { TheoryBadgeV1 } from "@shared/contracts/theory-badge-graph.v1";
+import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import {
+  locateTheoryBadges,
+  traceTheoryBadgeConnections,
+} from "@shared/theory/theory-badge-overlap-locator";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -177,6 +184,21 @@ function asStringArray(value: unknown): string[] {
   }
   const single = asNonEmptyString(value);
   return single ? [single] : [];
+}
+
+function claimBoundaryNotesForBadges(
+  badges: Array<{ id: string; claimBoundary?: { diagnosticOnly?: boolean; validationClaimAllowed?: boolean; physicalMechanismClaimAllowed?: boolean; promotionAllowed?: boolean } }>,
+): string[] {
+  const notes = new Set<string>();
+  for (const badge of badges) {
+    if (badge.claimBoundary?.diagnosticOnly) notes.add(`${badge.id}: diagnostic-only badge`);
+    if (badge.claimBoundary?.validationClaimAllowed === false) notes.add(`${badge.id}: validation claim not allowed`);
+    if (badge.claimBoundary?.physicalMechanismClaimAllowed === false) {
+      notes.add(`${badge.id}: physical mechanism claim not allowed`);
+    }
+    if (badge.claimBoundary?.promotionAllowed === false) notes.add(`${badge.id}: promotion not allowed`);
+  }
+  return Array.from(notes);
 }
 
 function postSituationThreadBinding(body: Record<string, unknown>): void {
@@ -2700,6 +2722,177 @@ export function executeHelixPanelAction(
           appended_text: text,
           source: selectionText ? "selection" : "clipboard_receipt",
           body_length: useWorkstationNotesStore.getState().notes[noteId]?.body.length ?? nextBody.length,
+        },
+      };
+    }
+  }
+
+  if (panelId === "theory-badge-graph") {
+    const args = asRecord(request.args) ?? {};
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
+    const incomingByTarget = new Map<string, typeof graph.edges>();
+    const outgoingBySource = new Map<string, typeof graph.edges>();
+    for (const edge of graph.edges) {
+      incomingByTarget.set(edge.to, [...(incomingByTarget.get(edge.to) ?? []), edge]);
+      outgoingBySource.set(edge.from, [...(outgoingBySource.get(edge.from) ?? []), edge]);
+    }
+
+    if (actionId === "open") {
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_graph_panel_receipt",
+          graph_id: graph.graphId,
+          badge_count: graph.badges.length,
+          edge_count: graph.edges.length,
+        },
+      };
+    }
+
+    if (actionId === "lookup_badges") {
+      const matches = locateTheoryBadges({
+        graph,
+        input: {
+          query: asNonEmptyString(args.query ?? args.text ?? args.prompt) ?? undefined,
+          subjects: asStringArray(args.subjects),
+          symbols: asStringArray(args.symbols),
+          unitSignatures: asStringArray(args.unit_signatures ?? args.unitSignatures),
+          repoPaths: asStringArray(args.repo_paths ?? args.repoPaths),
+          equationFamilies: asStringArray(args.equation_families ?? args.equationFamilies),
+          simulationOwners: asStringArray(args.simulation_owners ?? args.simulationOwners),
+          limit: asNumber(args.limit) ?? undefined,
+        },
+      });
+      const matchedBadges = matches
+        .map((match) => badgesById.get(match.badgeId))
+        .filter((entry): entry is TheoryBadgeV1 => Boolean(entry));
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_lookup",
+          graph_id: graph.graphId,
+          matches,
+          claim_boundary_notes: claimBoundaryNotesForBadges(matchedBadges),
+        },
+      };
+    }
+
+    if (actionId === "get_badge_context") {
+      const badgeId = asNonEmptyString(args.badge_id ?? args.badgeId ?? args.id);
+      const badge = badgeId ? badgesById.get(badgeId) : null;
+      if (!badgeId || !badge) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.get_badge_context requires a valid badge_id.",
+        };
+      }
+      const includeNeighbors = asBoolean(args.include_neighbors ?? args.includeNeighbors) ?? true;
+      const includePayloads = asBoolean(args.include_payloads ?? args.includePayloads) ?? true;
+      const upstreamBadges = includeNeighbors
+        ? (incomingByTarget.get(badge.id) ?? [])
+            .map((edge) => badgesById.get(edge.from))
+            .filter((entry): entry is TheoryBadgeV1 => Boolean(entry))
+        : [];
+      const downstreamBadges = includeNeighbors
+        ? (outgoingBySource.get(badge.id) ?? [])
+            .map((edge) => badgesById.get(edge.to))
+            .filter((entry): entry is TheoryBadgeV1 => Boolean(entry))
+        : [];
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_context",
+          graph_id: graph.graphId,
+          badge,
+          upstream_badges: upstreamBadges,
+          downstream_badges: downstreamBadges,
+          calculator_payloads: includePayloads ? badge.calculatorPayloads : [],
+          units: badge.units,
+          assumptions: badge.assumptions,
+          source_refs: badge.sourceRefs,
+          claim_boundary: badge.claimBoundary,
+          claim_boundary_notes: claimBoundaryNotesForBadges([badge, ...upstreamBadges, ...downstreamBadges]),
+        },
+      };
+    }
+
+    if (actionId === "trace_badges") {
+      const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
+      if (badgeIds.length === 0) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.trace_badges requires badge_ids.",
+        };
+      }
+      const trace = traceTheoryBadgeConnections({ graph, badgeIds });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: trace.selectedBadgeIds.length > 0,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_connection_trace",
+          graph_id: graph.graphId,
+          selected_badge_ids: trace.selectedBadgeIds,
+          connecting_badge_ids: trace.connectingBadgeIds,
+          shared_ancestor_ids: trace.sharedAncestorIds,
+          shared_subjects: trace.sharedSubjects,
+          shared_symbols: trace.sharedSymbols,
+          shared_unit_signatures: trace.sharedUnitSignatures,
+          path_segments: trace.pathSegments,
+          claim_boundary_notes: trace.claimBoundaryNotes,
+          warnings: trace.warnings,
+        },
+      };
+    }
+
+    if (actionId === "run_badge_path") {
+      const targetBadgeId = asNonEmptyString(args.target_badge_id ?? args.targetBadgeId ?? args.badge_id ?? args.badgeId);
+      if (!targetBadgeId || !badgesById.has(targetBadgeId)) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.run_badge_path requires a valid target_badge_id.",
+        };
+      }
+      const playback = runTheoryBadgePlaybackNow({
+        graph,
+        targetBadgeId,
+        source: "workstation_action",
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: playback.summary.ok,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_playback",
+          graph_id: graph.graphId,
+          target_badge_id: targetBadgeId,
+          artifact_v1: playback,
+          solved_count: playback.summary.solvedCount,
+          skipped_count: playback.summary.skippedCount,
+          failed_count: playback.summary.failedCount,
         },
       };
     }

@@ -228,13 +228,13 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
 const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === "string");
+  Array.isArray(value) && value.every((item: unknown) => typeof item === "string");
 
 const includes = <T extends readonly string[]>(items: T, value: unknown): value is T[number] =>
   typeof value === "string" && items.includes(value);
 
-function countBy(values: string[]) {
-  return values.reduce<Record<string, number>>((acc, value) => {
+function countBy(values: string[]): Record<string, number> {
+  return values.reduce<Record<string, number>>((acc: Record<string, number>, value: string) => {
     acc[value] = (acc[value] ?? 0) + 1;
     return acc;
   }, {});
@@ -244,10 +244,10 @@ export function buildTheoryBadgeGraphV1(input: BuildTheoryBadgeGraphV1Input): Th
   const summary = {
     badgeCount: input.badges.length,
     edgeCount: input.edges.length,
-    subjects: countBy(input.badges.flatMap((badge) => badge.subjects)),
-    levels: countBy(input.badges.map((badge) => badge.level)),
-    statuses: countBy(input.badges.map((badge) => badge.status)),
-    calculatorLoadableCount: input.badges.filter((badge) => badge.calculatorPayloads.length > 0).length,
+    subjects: countBy(input.badges.flatMap((badge: TheoryBadgeV1) => badge.subjects)),
+    levels: countBy(input.badges.map((badge: TheoryBadgeV1) => badge.level)),
+    statuses: countBy(input.badges.map((badge: TheoryBadgeV1) => badge.status)),
+    calculatorLoadableCount: input.badges.filter((badge: TheoryBadgeV1) => badge.calculatorPayloads.length > 0).length,
     ...input.summary,
   };
 
@@ -283,8 +283,8 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
   if (!Array.isArray(value.badges) || value.badges.length === 0) issues.push("badges must be a non-empty array");
   if (!Array.isArray(value.edges)) issues.push("edges must be an array");
 
-  const badges = Array.isArray(value.badges) ? value.badges : [];
-  const edges = Array.isArray(value.edges) ? value.edges : [];
+  const badges: unknown[] = Array.isArray(value.badges) ? value.badges : [];
+  const edges: unknown[] = Array.isArray(value.edges) ? value.edges : [];
   const badgeIds = new Set<string>();
   const edgeIds = new Set<string>();
 
@@ -406,7 +406,8 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
       const owners = isStringArray(rawBadge.simulationOwners) ? rawBadge.simulationOwners : [];
       const isNhm2Badge =
         typeof badgeId === "string" &&
-        (badgeId.startsWith("nhm2.") || owners.some((owner) => /\bNHM2\b|needle-hull-mark2/i.test(owner)));
+        (badgeId.startsWith("nhm2.") ||
+          owners.some((owner: string) => /\bNHM2\b|needle-hull-mark2/i.test(owner)));
       if (isNhm2Badge && boundary.diagnosticOnly !== true) {
         issues.push(`${prefix}.claimBoundary.diagnosticOnly must be true for NHM2 badges`);
       }

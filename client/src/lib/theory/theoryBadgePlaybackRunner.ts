@@ -161,7 +161,9 @@ export function runTheoryBadgePlaybackNow(args: {
 }): TheoryBadgePlaybackArtifactV1 {
   const { graph, targetBadgeId, onStep } = args;
   const source = args.source ?? "panel";
-  const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
+  const badgesById = new Map<string, TheoryBadgeV1>(
+    graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]),
+  );
   const targetBadge = badgesById.get(targetBadgeId);
   if (!targetBadge) {
     throw new Error(`Theory badge not found: ${targetBadgeId}`);
