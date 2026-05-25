@@ -1,6 +1,7 @@
 import type { HelixFinalRouteReconciliation } from "@shared/helix-final-route-reconciliation";
 import type { HelixSolverControllerBlockingReason, HelixSolverControllerDecision } from "@shared/helix-solver-controller-decision";
 import type { HelixTurnIdIntegrityAudit, HelixTurnIdIntegrityViolationCode } from "@shared/helix-turn-id-integrity-audit";
+import { evaluateTerminalBoundaryEligibility } from "./runtime-authority-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -357,6 +358,7 @@ export function buildSolverControllerDecision(input: {
         readRecord(payload.capability_result) ||
         readRecord(payload.capability_lifecycle_ledger),
     );
+  const runtimeBoundary = evaluateTerminalBoundaryEligibility(payload);
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const consumedRefs: string[] = [
@@ -399,6 +401,20 @@ export function buildSolverControllerDecision(input: {
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
       pushUnique(blockingReasons, "capability_lifecycle_incomplete");
+    }
+    if (disciplineGuardRequired) {
+      if (runtimeBoundary.blocking_reasons.includes("agent_runtime_loop_missing")) {
+        pushUnique(blockingReasons, "agent_runtime_loop_missing");
+      }
+      if (runtimeBoundary.blocking_reasons.includes("agent_step_decision_missing")) {
+        pushUnique(blockingReasons, "agent_step_decision_missing");
+      }
+      if (runtimeBoundary.blocking_reasons.includes("selected_capability_observation_missing")) {
+        pushUnique(blockingReasons, "selected_capability_observation_missing");
+      }
+      if (runtimeBoundary.blocking_reasons.includes("post_observation_model_decision_missing")) {
+        pushUnique(blockingReasons, "post_observation_model_decision_missing");
+      }
     }
     if (hasIncompletePromptRequirementCoverage(payload)) {
       pushUnique(blockingReasons, "prompt_requirement_coverage_incomplete");
@@ -549,6 +565,10 @@ export function buildSolverControllerDecision(input: {
       reason === "terminal_equivalence_missing" ||
       reason === "terminal_equivalence_failed" ||
       reason === "capability_lifecycle_incomplete" ||
+      reason === "agent_runtime_loop_missing" ||
+      reason === "agent_step_decision_missing" ||
+      reason === "selected_capability_observation_missing" ||
+      reason === "post_observation_model_decision_missing" ||
       reason === "subgoals_observed_not_satisfied" ||
       reason === "prompt_requirement_coverage_incomplete"
     )

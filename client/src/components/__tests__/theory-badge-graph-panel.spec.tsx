@@ -33,7 +33,7 @@ describe("TheoryBadgeGraphPanel", () => {
     renderPanel();
 
     expect(await screen.findByText("Theory Badge Graph")).toBeTruthy();
-    fireEvent.click(await screen.findByText("Energy density proxy"));
+    fireEvent.click(await screen.findByRole("button", { name: "Energy density proxy" }));
 
     expect(await screen.findByText("Assumptions")).toBeTruthy();
     expect(screen.getByText("Units")).toBeTruthy();

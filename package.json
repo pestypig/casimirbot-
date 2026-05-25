@@ -338,7 +338,9 @@
     "hull:mis:prepare": "npm run hull:mis:clone && npm run hull:mis:install-bridge",
     "hull:mis:rollout": "tsx scripts/hull-mis-rollout.ts",
     "hull:export:smoke": "tsx scripts/hull-export-dataset-smoke.ts",
-    "warp:full-solve:nhm2-shift-lapse:selected-transport-only": "tsx scripts/research/run-nhm2-lapse-alpha-sweep.ts"
+    "warp:full-solve:nhm2-shift-lapse:selected-transport-only": "tsx scripts/research/run-nhm2-lapse-alpha-sweep.ts",
+    "helix:ask:runtime-authority-audit": "tsx scripts/helix-ask-runtime-authority-audit.ts",
+    "helix:ask:runtime-authority-audit:strict": "tsx scripts/helix-ask-runtime-authority-audit.ts --strict"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.674.0",

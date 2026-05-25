@@ -18,6 +18,10 @@ export type HelixSolverControllerBlockingReason =
   | "terminal_kind_not_required"
   | "terminal_equivalence_missing"
   | "terminal_equivalence_failed"
+  | "agent_runtime_loop_missing"
+  | "agent_step_decision_missing"
+  | "selected_capability_observation_missing"
+  | "post_observation_model_decision_missing"
   | "subgoals_observed_not_satisfied"
   | "prompt_requirement_coverage_incomplete";
 

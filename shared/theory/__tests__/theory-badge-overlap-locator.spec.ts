@@ -3,6 +3,7 @@ import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
 import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
+  type TheoryBadgeLookupMatch,
 } from "../theory-badge-overlap-locator";
 
 describe("theory badge overlap locator", () => {
@@ -31,7 +32,7 @@ describe("theory badge overlap locator", () => {
       },
     });
 
-    expect(matches.map((match) => match.badgeId)).toEqual(
+    expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toEqual(
       expect.arrayContaining([
         "nhm2.source.energy_density_proxy",
         "nhm2.qei.sampling_window",
@@ -56,6 +57,6 @@ describe("theory badge overlap locator", () => {
       expect.arrayContaining(["nhm2.qei.sampling_window", "nhm2.closure.source_residual"]),
     );
     expect(trace.sharedUnitSignatures).toContain("M L^-1 T^-2");
-    expect(trace.claimBoundaryNotes.some((note) => note.includes("diagnostic-only"))).toBe(true);
+    expect(trace.claimBoundaryNotes.some((note: string) => note.includes("diagnostic-only"))).toBe(true);
   });
 });

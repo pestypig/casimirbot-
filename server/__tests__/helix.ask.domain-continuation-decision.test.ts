@@ -9,6 +9,9 @@ const buildDecision = (prompt: string, payload: Record<string, unknown>) =>
     payload,
   });
 
+const suggestedAction = (decision: ReturnType<typeof buildDecision>) =>
+  decision.recommended_capability_hint?.suggested_action;
+
 describe("helix ask domain continuation decision", () => {
   it("continues docs-panel goals when the observed artifact is only active document identity", () => {
     const decision = buildDecision("Okay, can you open up the Docs panel?", {
@@ -25,7 +28,9 @@ describe("helix ask domain continuation decision", () => {
 
     expect(decision.decision).toBe("continue");
     expect(decision.reason).toBe("docs_panel_open_requires_docs_viewer_open_action");
-    expect(decision.next_action).toEqual(
+    expect(decision.schema).toBe("helix.domain_continuation_hint.v1");
+    expect(decision.recommended_capability_hint?.authority).toBe("hint_only_agent_must_decide");
+    expect(suggestedAction(decision)).toEqual(
       expect.objectContaining({ panel_id: "docs-viewer", action_id: "open" }),
     );
   });
@@ -48,10 +53,10 @@ describe("helix ask domain continuation decision", () => {
 
     expect(decision.decision).toBe("continue");
     expect(decision.reason).toBe("doc_search_candidates_require_validation");
-    expect(decision.next_action).toEqual(
+    expect(suggestedAction(decision)).toEqual(
       expect.objectContaining({ panel_id: "docs-viewer", action_id: "validate_doc_candidates" }),
     );
-    expect(decision.next_action?.args).toEqual(
+    expect(suggestedAction(decision)?.args).toEqual(
       expect.objectContaining({ query: "NHM-2 whitepaper", transcript: "Open the NHM-2 white paper from the docs." }),
     );
   });
@@ -75,7 +80,7 @@ describe("helix ask domain continuation decision", () => {
 
     expect(decision.decision).toBe("continue");
     expect(decision.reason).toBe("validated_doc_candidate_requires_open");
-    expect(decision.next_action).toEqual(
+    expect(suggestedAction(decision)).toEqual(
       expect.objectContaining({
         panel_id: "docs-viewer",
         action_id: "open_doc_by_path",
@@ -110,7 +115,7 @@ describe("helix ask domain continuation decision", () => {
 
     expect(decision.decision).toBe("retry");
     expect(decision.reason).toBe("doc_open_path_mismatch_retry_selected_path");
-    expect(decision.next_action?.args).toEqual(
+    expect(suggestedAction(decision)?.args).toEqual(
       expect.objectContaining({
         path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
         previous_opened_path: "/docs/research/nhm2-current-status-whitepaper-2026-04-03.md",
@@ -130,7 +135,7 @@ describe("helix ask domain continuation decision", () => {
 
     expect(decision.decision).toBe("continue");
     expect(decision.reason).toBe("active_doc_context_requires_locate_in_doc");
-    expect(decision.next_action).toEqual(
+    expect(suggestedAction(decision)).toEqual(
       expect.objectContaining({
         panel_id: "docs-viewer",
         action_id: "locate_in_doc",
@@ -180,7 +185,7 @@ describe("helix ask domain continuation decision", () => {
     expect(decision.goal_kind).toBe("visual_capture_describe");
     expect(decision.decision).toBe("continue");
     expect(decision.reason).toBe("visual_source_requires_field_evaluations");
-    expect(decision.next_action).toBeUndefined();
+    expect(decision.recommended_capability_hint).toBeUndefined();
   });
 
   it("does not continue visual content goals after observation and field evaluation evidence are present", () => {

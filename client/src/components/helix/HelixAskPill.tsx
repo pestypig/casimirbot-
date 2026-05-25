@@ -6241,6 +6241,163 @@ function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | nul
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+type HelixActionEnvelopeRuntimeAuthority = {
+  schema: "helix.ui.action_envelope_runtime_authority.v1";
+  allowed: boolean;
+  reason: string;
+  selected_capabilities: string[];
+  envelope_action_keys: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+function normalizeHelixRuntimeActionKey(value: unknown): string {
+  return coerceText(value).trim().toLowerCase().replace(/[/:]+/g, ".").replace(/\s+/g, "_");
+}
+
+function readHelixDecisionCapabilityKeys(value: unknown): string[] {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return [];
+  const directKeys = [
+    record.chosen_capability,
+    record.selected_capability,
+    record.capability_key,
+    record.executed_action_key,
+    record.action_key,
+    record.tool_key,
+    record.tool_name,
+  ]
+    .map(normalizeHelixRuntimeActionKey)
+    .filter(Boolean);
+  const nestedKeys = [
+    record.agent_step_decision,
+    record.initial_agent_step_decision,
+    record.tool_call,
+    record.next_action,
+    record.selected_action,
+    record.action,
+  ].flatMap(readHelixDecisionCapabilityKeys);
+  return [...directKeys, ...nestedKeys];
+}
+
+function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] {
+  const selected = new Set<string>();
+  const add = (value: unknown): void => {
+    readHelixDecisionCapabilityKeys(value).forEach((key) => selected.add(key));
+  };
+  sources.forEach((source) => {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) return;
+    const debug = readAgentLoopAuditRecord(record.debug);
+    [
+      record.agent_step_decision,
+      record.initial_agent_step_decision,
+      record.observation_review,
+      record.runtime_authority_audit,
+      debug?.agent_step_decision,
+      debug?.initial_agent_step_decision,
+      debug?.observation_review,
+      debug?.runtime_authority_audit,
+    ].forEach(add);
+    [record.agent_runtime_loop, debug?.agent_runtime_loop, record.agent_step_loop, debug?.agent_step_loop].forEach((loop) => {
+      const loopRecord = readAgentLoopAuditRecord(loop);
+      const iterations = Array.isArray(loopRecord?.iterations)
+        ? loopRecord?.iterations
+        : Array.isArray(loopRecord?.steps)
+          ? loopRecord?.steps
+          : [];
+      iterations.forEach(add);
+    });
+  });
+  return [...selected].filter(Boolean);
+}
+
+function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | Record<string, unknown>): string[] {
+  const record = readAgentLoopAuditRecord(action);
+  if (!record) return [];
+  const panelId = normalizeHelixRuntimeActionKey(record.panel_id);
+  const actionId = normalizeHelixRuntimeActionKey(record.action_id);
+  const actionName = normalizeHelixRuntimeActionKey(record.action);
+  const keys = new Set<string>();
+  if (panelId && actionId) {
+    keys.add(`${panelId}.${actionId}`);
+    keys.add(`${panelId}/${actionId}`);
+  }
+  if (panelId && actionName === "open_panel") keys.add(`${panelId}.open`);
+  if (panelId && actionName) keys.add(`${panelId}.${actionName}`);
+  if (actionId) keys.add(actionId);
+  if (actionName) keys.add(actionName);
+  return [...keys].map(normalizeHelixRuntimeActionKey).filter(Boolean);
+}
+
+function buildHelixActionEnvelopeRuntimeAuthority(
+  envelope: HelixActionEnvelope | undefined,
+  ...authoritySources: unknown[]
+): { executableEnvelope: HelixActionEnvelope | undefined; audit: HelixActionEnvelopeRuntimeAuthority } {
+  const dispatch = envelope?.governance?.dispatch ?? "allow";
+  if (!envelope || envelope.schema !== "helix.ask.action_envelope.v1") {
+    return {
+      executableEnvelope: undefined,
+      audit: {
+        schema: "helix.ui.action_envelope_runtime_authority.v1",
+        allowed: false,
+        reason: "missing_action_envelope",
+        selected_capabilities: [],
+        envelope_action_keys: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  const actions = coerceHelixWorkstationActions(envelope.workstation_actions ?? []);
+  const envelopeActionKeys: string[] = Array.from(
+    new Set<string>(
+      actions
+        .flatMap(readHelixWorkstationActionRuntimeKeys)
+        .map(normalizeHelixRuntimeActionKey)
+        .filter((key): key is string => Boolean(key)),
+    ),
+  );
+  const selectedCapabilities = collectHelixAgentSelectedCapabilities(...authoritySources);
+  const hasExecutablePayload = envelopeActionKeys.length > 0 || Boolean(envelope.viewer_launch);
+  const selectedActionMatched =
+    envelopeActionKeys.length === 0
+      ? !hasExecutablePayload
+      : envelopeActionKeys.some((key) => selectedCapabilities.includes(key));
+  const allowed = dispatch === "suppress" || selectedActionMatched;
+  return {
+    executableEnvelope: allowed ? envelope : undefined,
+    audit: {
+      schema: "helix.ui.action_envelope_runtime_authority.v1",
+      allowed,
+      reason:
+        dispatch === "suppress"
+          ? "server_suppressed_dispatch"
+          : selectedActionMatched
+            ? "agent_step_decision_backed"
+            : "agent_step_decision_missing_for_action_envelope",
+      selected_capabilities: selectedCapabilities,
+      envelope_action_keys: envelopeActionKeys,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+}
+
+function attachHelixActionEnvelopeRuntimeAuthorityDebug<T extends Record<string, unknown> | undefined>(
+  debug: T,
+  envelope: HelixActionEnvelope | undefined,
+  authority: HelixActionEnvelopeRuntimeAuthority,
+): T {
+  if (!debug) return debug;
+  return {
+    ...debug,
+    action_envelope_runtime_authority: authority,
+    action_envelope: authority.allowed /* runtime_authority */ ? envelope ?? null : null,
+    suppressed_action_envelope: authority.allowed ? null : envelope ?? null,
+  } as T;
+}
+
 function readHelixPendingInputRecord(value: unknown): Record<string, unknown> | null {
   const record = readAgentLoopAuditRecord(value);
   if (!record) return null;
@@ -6599,6 +6756,9 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const terminalAuthorityRecord =
     readAgentLoopAuditRecord(replyRecord?.terminal_answer_authority) ??
     readAgentLoopAuditRecord(debugRecord?.terminal_answer_authority);
+  const terminalAuthorityTrusted =
+    terminalAuthorityRecord?.schema === "helix.turn_terminal_authority.v1" &&
+    terminalAuthorityRecord.server_authoritative === true;
   const summary = readHelixResolvedTurnSummary(reply);
   const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
   const pendingPresent = Boolean(pendingRequest);
@@ -6616,7 +6776,20 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     coerceText(replyRecord?.terminal_error_code).trim() ||
     coerceText(debugRecord?.terminal_error_code).trim() ||
     coerceText(summary?.terminal_error_code).trim() ||
-    null;
+    (
+      !pendingPresent &&
+      reply.ok !== false &&
+      !terminalAuthorityTrusted &&
+      (
+        coerceText(replyRecord?.selected_final_answer).trim() ||
+        coerceText(debugRecord?.selected_final_answer).trim() ||
+        coerceText(reply.assistant_answer).trim() ||
+        coerceText(reply.text).trim() ||
+        coerceText(reply.content).trim()
+      )
+        ? "terminal_authority_missing"
+        : null
+    );
   const finalAnswerSource =
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim() ||
@@ -6628,11 +6801,9 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const selectedFinalAnswerCandidate =
     isTypedFailure
       ? terminalAuthorityText || liveFinalAnswer || renderTypedFailureFallback(terminalErrorCode)
-      : coerceText(replyRecord?.selected_final_answer).trim() ||
-        coerceText(debugRecord?.selected_final_answer).trim() ||
-        coerceText(reply.assistant_answer).trim() ||
-        coerceText(reply.text).trim() ||
-        coerceText(reply.content).trim();
+      : terminalAuthorityTrusted && terminalAuthorityText
+        ? terminalAuthorityText
+        : "";
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
   const terminalArtifactKind =
     coerceText(summary?.terminal_artifact_kind).trim() ||
@@ -6677,11 +6848,13 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
 export function chooseVisibleFinalText(reply: HelixAskReply): string {
   const visible = buildVisibleResolvedTurn(reply);
   const replyRecord = readAgentLoopAuditRecord(reply);
-  const debugRecord = readAgentLoopAuditRecord(reply.debug);
   if (visible.primary_source_label.replace(/\s+/g, "_") === "typed_failure" || visible.terminal_error_code) {
-    return visible.selected_final_answer || coerceText(replyRecord?.assistant_answer).trim() || renderTypedFailureFallback(visible.terminal_error_code);
+    return visible.selected_final_answer || renderTypedFailureFallback(visible.terminal_error_code);
   }
-  return visible.selected_final_answer || coerceText(replyRecord?.text).trim() || coerceText(debugRecord?.text).trim() || "";
+  if (!visible.selected_final_answer && replyRecord?.ok === false) {
+    return renderTypedFailureFallback("terminal_authority_missing");
+  }
+  return visible.selected_final_answer || "";
 }
 
 const renderTypedFailureFallback = (code?: string | null): string => {
@@ -18429,6 +18602,27 @@ export function HelixAskPill({
 
   const handleVisualSituationSourceCapture = useCallback(() => {
     if (visualSituationSourceStatus === "requesting") return;
+    if (visualSituationSourceStatus === "active" || visualSituationSourceStatus === "error") {
+      setVisualSituationSourceStatus("idle");
+      setVisualSituationSourceError(null);
+      setVisualSituationSourceLabel(null);
+      setVisualSituationEvidenceForTurn(null);
+      visualSituationSourceIdRef.current = null;
+      appendSyntheticLiveEvent({
+        id: `situation:visual:disabled:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        tool: "situation_room",
+        ts: new Date().toISOString(),
+        text: "Visual screen capture detached from Helix Ask context.",
+        meta: {
+          room_id: situationRoomId,
+          source: "visual_screen_capture",
+          event_type: "visual_source_detached",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      });
+      return;
+    }
     onOpenPanel?.("live-answer-environment");
     setDisplayAudioError(null);
     setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
@@ -25191,7 +25385,17 @@ export function HelixAskPill({
           responseDebug = localResponse.debug;
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
-          responseActionEnvelope = localResponse.action_envelope;
+          const actionEnvelopeRuntimeAuthority = buildHelixActionEnvelopeRuntimeAuthority(
+            localResponse.action_envelope,
+            localResponse,
+            localResponse.debug,
+          );
+          responseActionEnvelope = actionEnvelopeRuntimeAuthority.executableEnvelope;
+          responseDebug = attachHelixActionEnvelopeRuntimeAuthorityDebug(
+            responseDebug,
+            localResponse.action_envelope,
+            actionEnvelopeRuntimeAuthority.audit,
+          );
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
@@ -25200,14 +25404,16 @@ export function HelixAskPill({
           const aborted =
             controller.signal.aborted || (error instanceof Error && error.name === "AbortError");
           if (aborted && askTurnWatchdogFired) {
-            responseText = `Turn timed out after ${HELIX_ASK_TURN_CLIENT_WATCHDOG_MS}ms before a terminal result was returned.`;
+            skipReply = true;
+            responseText = "";
             responseMode = "observe";
             setAskStatus("Turn timed out.");
+            setAskError(`Turn timed out after ${HELIX_ASK_TURN_CLIENT_WATCHDOG_MS}ms before a terminal result was returned.`);
             addHelixTimelineEntry({
               type: "suppressed",
               source: "manual",
               status: "failed",
-              text: responseText,
+              text: `Turn timed out after ${HELIX_ASK_TURN_CLIENT_WATCHDOG_MS}ms before a terminal result was returned.`,
               detail: "turn_timeout",
               mode: inferredMode,
               traceId,
@@ -25233,7 +25439,25 @@ export function HelixAskPill({
           } else {
             const message = error instanceof Error ? error.message : String(error);
             const streamedFallback = askLiveDraftRef.current.trim();
-            responseText = streamedFallback || message || "Request failed.";
+            skipReply = true;
+            responseText = "";
+            setAskError(message || "Request failed.");
+            setAskStatus(null);
+            addHelixTimelineEntry({
+              type: "suppressed",
+              source: "manual",
+              status: "failed",
+              text: clipText(
+                streamedFallback
+                  ? `Transport failed before authoritative terminal. Partial stream was discarded: ${message || "reasoning_failed"}`
+                  : `Transport failed before authoritative terminal: ${message || "reasoning_failed"}`,
+                280,
+              ),
+              detail: "transport failure suppressed before terminal projection",
+              mode: inferredMode,
+              traceId,
+              attemptId: manualAttempt?.id,
+            });
           }
         }
         if (!skipReply) {
@@ -25260,7 +25484,7 @@ export function HelixAskPill({
             suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
           });
           if (!actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
-            applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+            applyWorkstationActionsFromPayload(responseDebug);
           }
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);
@@ -25327,6 +25551,7 @@ export function HelixAskPill({
       }
     },
     [
+      addHelixTimelineEntry,
       addMessage,
       applyGovernedActionEnvelope,
       applyWorkstationActionsFromPayload,
@@ -26229,7 +26454,12 @@ export function HelixAskPill({
           );
           responsePromptIngested = localResponse.prompt_ingested;
           responseViewerLaunch = localResponse.viewer_launch;
-          responseActionEnvelope = localResponse.action_envelope;
+          const actionEnvelopeRuntimeAuthority = buildHelixActionEnvelopeRuntimeAuthority(
+            localResponse.action_envelope,
+            localResponse,
+            localResponse.debug,
+          );
+          responseActionEnvelope = actionEnvelopeRuntimeAuthority.executableEnvelope;
           responseMode = localResponse.mode;
           responseProof = localResponse.proof;
           responseContextCapsule = localResponse.context_capsule;
@@ -26238,7 +26468,17 @@ export function HelixAskPill({
             ? responseActionEnvelope.workstation_actions[0]
             : undefined;
           const localResponseRecord = localResponse as unknown as Record<string, unknown>;
+          responseDebug = attachHelixActionEnvelopeRuntimeAuthorityDebug(
+            responseDebug,
+            localResponse.action_envelope,
+            actionEnvelopeRuntimeAuthority.audit,
+          );
           if (responseDebugWithClientMode || HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
+            responseDebugWithClientMode = attachHelixActionEnvelopeRuntimeAuthorityDebug(
+              responseDebugWithClientMode,
+              localResponse.action_envelope,
+              actionEnvelopeRuntimeAuthority.audit,
+            );
             responseDebugWithClientMode = {
               ...responseDebugWithClientMode,
               ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
@@ -26291,7 +26531,9 @@ export function HelixAskPill({
               pending_transition_reason: localResponse.pending_transition_reason ?? null,
               pending_transition_trace: localResponse.pending_transition_trace ?? [],
               workspace_context_snapshot: localResponse.workspace_context_snapshot ?? null,
-              action_envelope: localResponse.action_envelope ?? null,
+              action_envelope: actionEnvelopeRuntimeAuthority.audit.allowed /* runtime_authority */ ? responseActionEnvelope ?? null : null,
+              suppressed_action_envelope: actionEnvelopeRuntimeAuthority.audit.allowed ? null : localResponse.action_envelope ?? null,
+              action_envelope_runtime_authority: actionEnvelopeRuntimeAuthority.audit,
               turn_contract: localResponse.turn_contract ?? null,
               invariant_violations: localResponse.invariant_violations ?? [],
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
@@ -26412,7 +26654,10 @@ export function HelixAskPill({
           } else {
             const message = error instanceof Error ? error.message : String(error);
             const streamedFallback = askLiveDraftRef.current.trim();
-            responseText = streamedFallback || message || "Request failed.";
+            skipReply = true;
+            responseText = "";
+            setAskError(message || "Request failed.");
+            setAskStatus(null);
             if (manualAttempt) {
               updateReasoningAttempt(manualAttempt.id, (current) => ({
                 ...current,
@@ -26430,8 +26675,13 @@ export function HelixAskPill({
                 type: "suppressed",
                 source: "manual",
                 status: "suppressed",
-                text: clipText(message || "reasoning_failed", 280),
-                detail: "manual reasoning failed",
+                text: clipText(
+                  streamedFallback
+                    ? `Transport failed before authoritative terminal. Partial stream was discarded: ${message || "reasoning_failed"}`
+                    : `Transport failed before authoritative terminal: ${message || "reasoning_failed"}`,
+                  280,
+                ),
+                detail: "transport failure suppressed before terminal projection",
                 mode: inferredMode,
                 traceId,
                 attemptId: manualAttempt.id,
@@ -26474,7 +26724,7 @@ export function HelixAskPill({
             suppressSecondaryDocsActions: suppressPayloadActionsAfterDocOpen,
           });
           if (!suppressWorkstationPayloadActions && !actionEnvelopeHandled && !suppressPayloadActionsAfterDocOpen) {
-            applyWorkstationActionsFromPayload(responseDebug, responseEnvelope);
+            applyWorkstationActionsFromPayload(responseDebug);
           }
           if (responseContextCapsule) {
             upsertContextCapsuleSessionLedger(responseContextCapsule);

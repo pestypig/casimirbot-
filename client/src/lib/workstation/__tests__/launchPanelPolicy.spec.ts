@@ -25,6 +25,10 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
   });
 
+  it("includes the theory badge graph in launch panels", () => {
+    expect(isUserLaunchPanel("theory-badge-graph")).toBe(true);
+  });
+
   it("keeps Essence Console as a legacy/debug panel outside default launch", () => {
     expect(isUserLaunchPanel("agi-essence-console")).toBe(false);
     expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);

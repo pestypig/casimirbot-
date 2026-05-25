@@ -139,6 +139,15 @@ function textIncludesAny(haystack: string, needles: string[]) {
   return needles.filter((needle) => normalizedHaystack.includes(normalize(needle)));
 }
 
+function symbolMatchesQuery(queryTokens: string[], symbols: string[]) {
+  const tokenKeys = new Set(queryTokens.map(normalizeKey));
+  return symbols.filter((symbol) => {
+    const key = normalizeKey(symbol);
+    if (key.length <= 2) return tokenKeys.has(key);
+    return queryTokens.some((token) => normalize(token).includes(normalize(symbol)));
+  });
+}
+
 export function locateTheoryBadges(args: {
   graph: TheoryBadgeGraphV1;
   input: TheoryBadgeLookupInput;
@@ -193,7 +202,7 @@ export function locateTheoryBadges(args: {
 
       const matchedSymbols = unique([
         ...intersectNormalized(requestedSymbols, symbols),
-        ...textIncludesAny(query, symbols),
+        ...symbolMatchesQuery(queryTokens, symbols),
       ]);
       if (matchedSymbols.length > 0) addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
 

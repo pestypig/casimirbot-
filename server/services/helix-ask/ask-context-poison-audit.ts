@@ -7,7 +7,7 @@ import {
   type HelixTerminalAuthority,
 } from "@shared/helix-turn-poison-guard";
 import { quarantineHelixArtifact, quarantineHelixArtifacts } from "./deterministic-artifact-quarantine";
-import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "./turn-terminal-authority";
+import { hashHelixTerminalText } from "./turn-terminal-authority";
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -43,6 +43,13 @@ function readVisibleAnswerText(payload: Record<string, unknown>): string | null 
     readString(payload.finalAnswer) ??
     readString(payload.content)
   );
+}
+
+function readExistingTerminalAuthority(value: unknown): HelixTerminalAuthority | null {
+  const record = asRecord(value);
+  return record?.schema === "helix.turn_terminal_authority.v1"
+    ? (record as unknown as HelixTerminalAuthority)
+    : null;
 }
 
 function addMismatchViolation(input: {
@@ -185,28 +192,13 @@ export function auditHelixAskContextForPoison(input: {
   const canonicalTerminalText = payloadPresentationText ?? payloadSelectedText ?? "";
   const terminalAuthority =
     input.terminal_authority ??
-    (payload
-      ? buildHelixTurnTerminalAuthority({
-          thread_id: input.thread_id,
-          turn_id: input.turn_id ?? readString(payload.turn_id),
-          final_answer_source: readString(payload.final_answer_source),
-          terminal_artifact_kind: readString(payload.terminal_artifact_kind),
-          terminal_text: canonicalTerminalText,
-          route: readString(payload.route_reason_code) ?? readString(payload.route),
-          authority_origin: payloadPresentationText
-            ? "terminal_presentation"
-            : payloadSelectedText
-              ? "selected_final_answer"
-              : undefined,
-          created_at: input.created_at,
-        })
-      : null);
+    (payload ? readExistingTerminalAuthority(payload.terminal_answer_authority) : null);
 
-  if (!terminalAuthority && payload) {
+  if (!terminalAuthority && payload && canonicalTerminalText) {
     violations.push({
       kind: "missing_terminal_authority",
       item_id: readString(payload.turn_id),
-      summary: "Ask payload has no terminal authority record.",
+      summary: "Ask payload has terminal-visible text but no terminal authority record.",
     });
   }
 

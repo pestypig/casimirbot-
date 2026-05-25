@@ -1,4 +1,5 @@
 import { hashHelixTerminalText } from "./turn-terminal-authority";
+import { evaluateTerminalBoundaryEligibility } from "./runtime-authority-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -7,6 +8,10 @@ export type HelixTerminalEquivalenceFailureCode =
   | "controller_decision_not_terminal"
   | "controller_goal_terminal_mismatch"
   | "debug_terminal_differs_from_turn_terminal"
+  | "agent_runtime_loop_missing"
+  | "agent_step_decision_missing"
+  | "selected_capability_observation_missing"
+  | "post_observation_model_decision_missing"
   | "goal_satisfaction_missing"
   | "goal_satisfaction_not_terminal"
   | "poison_hashes_hidden_terminal_while_ui_stale"
@@ -38,6 +43,8 @@ export type HelixTerminalEquivalenceHarnessResult = {
     controller_decision: string | null;
     controller_blocking_reasons: string[];
     discipline_guard_required: boolean;
+    runtime_boundary_eligible: boolean | null;
+    runtime_boundary_blocking_reasons: string[];
   };
   assistant_answer: false;
   raw_content_included: false;
@@ -180,6 +187,10 @@ export function buildTerminalEquivalenceHarnessResult(input: {
     Boolean(input.requireControllerParity) ||
     (!input.suppressDisciplineAutoRequire &&
       (isSourceTargetedOrCapabilityTurn(nonStream) || isSourceTargetedOrCapabilityTurn(debug)));
+  const runtimeBoundary = evaluateTerminalBoundaryEligibility({
+    ...debug,
+    ...nonStream,
+  });
 
   const failures: HelixTerminalEquivalenceFailureCode[] = [];
   pushIf(failures, Boolean(terminalText && terminalHash && hashHelixTerminalText(terminalText) !== terminalHash), "terminal_authority_hash_mismatch");
@@ -207,6 +218,18 @@ export function buildTerminalEquivalenceHarnessResult(input: {
     pushIf(failures, !goalSatisfaction, "goal_satisfaction_missing");
     pushIf(failures, !controller, "controller_decision_missing");
     pushIf(failures, !hasRequiredArtifactContract(goalSatisfaction), "required_artifact_contract_missing");
+    pushIf(failures, runtimeBoundary.blocking_reasons.includes("agent_runtime_loop_missing"), "agent_runtime_loop_missing");
+    pushIf(failures, runtimeBoundary.blocking_reasons.includes("agent_step_decision_missing"), "agent_step_decision_missing");
+    pushIf(
+      failures,
+      runtimeBoundary.blocking_reasons.includes("selected_capability_observation_missing"),
+      "selected_capability_observation_missing",
+    );
+    pushIf(
+      failures,
+      runtimeBoundary.blocking_reasons.includes("post_observation_model_decision_missing"),
+      "post_observation_model_decision_missing",
+    );
   }
   if (goalSatisfaction && normalFinalTerminal) {
     pushIf(
@@ -245,6 +268,8 @@ export function buildTerminalEquivalenceHarnessResult(input: {
       controller_decision: firstText(controller?.decision),
       controller_blocking_reasons: controllerBlockingReasons,
       discipline_guard_required: disciplineGuardRequired,
+      runtime_boundary_eligible: disciplineGuardRequired ? runtimeBoundary.eligible : null,
+      runtime_boundary_blocking_reasons: disciplineGuardRequired ? runtimeBoundary.blocking_reasons : [],
     },
     assistant_answer: false,
     raw_content_included: false,

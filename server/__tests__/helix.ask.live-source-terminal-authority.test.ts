@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHelixTurnTerminalAuthority } from "../services/helix-ask/turn-terminal-authority";
-import { composeLiveSourceTerminalAnswer } from "../services/helix-ask/live-source-terminal-answer-composer";
+import { buildLiveSourceObservationCandidate } from "../services/helix-ask/live-source-terminal-answer-composer";
 import { assertNoLiveSourceSecondLoop } from "../services/helix-ask/live-source-second-loop-guard";
 
 describe("live-source terminal authority", () => {
@@ -30,8 +29,8 @@ describe("live-source terminal authority", () => {
     })).toThrow(/live_source_second_loop_forbidden:live_pipeline_receipt/);
   });
 
-  it("composes a live visual answer with nested live-source authority", () => {
-    const composed = composeLiveSourceTerminalAnswer({
+  it("builds a live visual observation candidate without terminal authority", () => {
+    const composed = buildLiveSourceObservationCandidate({
       threadId: "thread:visual",
       turnId: "turn:visual",
       sourceIdentity: {
@@ -143,27 +142,23 @@ describe("live-source terminal authority", () => {
       createdAt: "2026-05-19T00:00:02.000Z",
     });
 
-    expect(composed.terminal_artifact_kind).toBe("live_visual_answer");
-    expect(composed.assistant_answer).toBe(true);
-    expect(composed.live_source_terminal_authority).toMatchObject({
-      schema: "helix.live_source_terminal_authority.v1",
+    expect(composed).toMatchObject({
+      schema: "helix.live_source_observation_candidate.v1",
+      suggested_terminal_artifact_kind: "live_visual_answer",
       source_binding_id: "source_binding:screen",
       source_epoch: 2,
       selected_evidence_refs: expect.arrayContaining(["observation:latest", "live_field_eval:scene"]),
       assistant_answer: false,
-      server_authoritative: true,
+      raw_content_included: false,
     });
-
-    const terminalAuthority = buildHelixTurnTerminalAuthority({
-      thread_id: "thread:visual",
-      turn_id: "turn:visual",
-      final_answer_source: "terminal_presenter_from_selected_live_evidence",
-      terminal_artifact_kind: composed.terminal_artifact_kind,
-      terminal_text: composed.selected_final_answer,
-      terminal_item_id: composed.live_source_terminal_authority.terminal_item_id,
-      live_source_authority: composed.live_source_terminal_authority,
-    });
-    expect(terminalAuthority.live_source_authority?.source_binding_id).toBe("source_binding:screen");
-    expect(terminalAuthority.server_authoritative).toBe(true);
+    expect(composed.candidate_summary).toContain("Live visual evidence candidate.");
+    expect(composed.observed).toEqual(expect.arrayContaining([
+      "Task Manager is visible on the Performance tab.",
+      "scene: Windows Task Manager performance metrics are visible.",
+    ]));
+    expect(composed).not.toHaveProperty("selected_final_answer");
+    expect(composed).not.toHaveProperty("live_source_terminal_authority");
+    expect(composed).not.toHaveProperty("terminal_answer_authority");
+    expect(composed).not.toHaveProperty("terminal_artifact_kind");
   });
 });

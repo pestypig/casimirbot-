@@ -96,6 +96,46 @@ const capabilityLifecycleOk = (turnId: string, terminalKind: string) => {
   };
 };
 
+const runtimeLoopOk = (turnId: string, capability: string, artifactKind: string) => ({
+  agent_step_decision: {
+    schema: "helix.agent_step_decision.v1",
+    decision_id: `${turnId}:decision:1`,
+    chosen_capability: capability,
+    decision_authority: "llm",
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  agent_runtime_loop: {
+    schema: "helix.agent_runtime_loop.v1",
+    iterations: [
+      {
+        decision_id: `${turnId}:decision:1`,
+        chosen_capability: capability,
+        decision_authority: "llm",
+        decision_timing: "pre_action",
+        tool_observation: { kind: artifactKind },
+        artifact_refs: [`${turnId}:${artifactKind}`],
+      },
+      {
+        decision_id: `${turnId}:decision:2`,
+        chosen_capability: "answer",
+        decision_authority: "llm",
+        decision_timing: "post_observation",
+      },
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  },
+  current_turn_artifact_ledger: [
+    {
+      artifact_id: `${turnId}:${artifactKind}`,
+      turn_id: turnId,
+      kind: artifactKind,
+      payload: { kind: artifactKind },
+    },
+  ],
+});
+
 describe("helix ask solver controller decision", () => {
   it("blocks stale terminal authority routes before normal terminal answers", () => {
     const payload = {
@@ -354,6 +394,7 @@ describe("helix ask solver controller decision", () => {
       poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
       route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
       ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: "ask:live-interval", completed_solver_path: true },
+      ...runtimeLoopOk("ask:live-interval", "live-source.set_rate", "live_pipeline_receipt"),
       ...capabilityLifecycleOk("ask:live-interval", "live_pipeline_receipt"),
       goal_satisfaction_evaluation: {
         ...satisfiedGoal("live_interval_set", "live_pipeline_receipt"),
@@ -408,6 +449,7 @@ describe("helix ask solver controller decision", () => {
       poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
       route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
       ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      ...runtimeLoopOk(turnId, "scientific-calculator.solve_expression", "workstation_tool_evaluation"),
       ...capabilityLifecycleOk(turnId, "workstation_tool_evaluation"),
       goal_satisfaction_evaluation: satisfiedGoal("calculator_solve", "workstation_tool_evaluation"),
       prompt_requirement_coverage: {
@@ -499,6 +541,7 @@ describe("helix ask solver controller decision", () => {
       poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
       route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
       ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: "ask:capability-complete", completed_solver_path: true },
+      ...runtimeLoopOk("ask:capability-complete", "docs-viewer.open", "workspace_action_receipt"),
       ...capabilityLifecycleOk("ask:capability-complete", "workspace_action_receipt"),
       goal_satisfaction_evaluation: satisfiedGoal("docs_panel_open", "workspace_action_receipt"),
       terminal_equivalence_harness_result: terminalEquivalenceOk,

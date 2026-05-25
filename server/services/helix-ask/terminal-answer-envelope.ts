@@ -1,6 +1,7 @@
 import { auditHelixAskContextForPoison } from "./ask-context-poison-audit";
 import { auditTerminalPresentationCoverage } from "./terminal-presentation-coverage-audit";
 import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "./turn-terminal-authority";
+import { evaluateTerminalBoundaryEligibility } from "./runtime-authority-contract";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -178,6 +179,7 @@ export function applyTerminalAnswerEnvelope(
   payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
   payload.final_answer_source = envelope.final_answer_source;
   payload.terminal_answer_envelope = envelope;
+  payload.terminal_boundary_eligibility = evaluateTerminalBoundaryEligibility(payload);
 
   const presentation = readRecord(payload.terminal_presentation);
   payload.terminal_presentation = {
@@ -245,6 +247,7 @@ export function applyTerminalAnswerEnvelope(
     debug.terminal_presentation = payload.terminal_presentation;
     debug.terminal_answer_authority = payload.terminal_answer_authority;
     debug.terminal_answer_envelope = envelope;
+    debug.terminal_boundary_eligibility = payload.terminal_boundary_eligibility;
     debug.current_turn_events = payload.current_turn_events;
     debug.turn_events = payload.turn_events;
     debug.poison_audit = payload.poison_audit;

@@ -19,8 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
+import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
 
 const LEVEL_ORDER = [
@@ -447,11 +451,18 @@ function Inspector({
 }
 
 export default function TheoryBadgeGraphPanel() {
+  const [viewMode, setViewMode] = useState<"map" | "list">("map");
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("all");
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeId);
+  const selectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeIds);
+  const viewport = useTheoryBadgeGraphPanelStore((state) => state.viewport);
+  const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
+  const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
+  const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
+  const rememberViewport = useTheoryBadgeGraphPanelStore((state) => state.rememberViewport);
   const playbackStore = useTheoryBadgePlaybackStore();
 
   const { data: graph, isLoading, error } = useQuery<TheoryBadgeGraphV1>({
@@ -502,19 +513,180 @@ export default function TheoryBadgeGraphPanel() {
   }, [filteredBadges]);
 
   useEffect(() => {
+    if (!graph) return;
     if (filteredBadges.length === 0) {
-      setSelectedId(null);
+      setSelectedBadgeId(null);
       return;
     }
     if (!selectedId || !filteredBadges.some((badge: TheoryBadgeV1) => badge.id === selectedId)) {
-      setSelectedId(filteredBadges[0].id);
+      setSelectedBadgeId(filteredBadges[0].id);
     }
-  }, [filteredBadges, selectedId]);
+  }, [filteredBadges, graph, selectedId, setSelectedBadgeId]);
 
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
   );
+
+  const singlePlaybackPlan = useMemo(() => {
+    if (!graph || !selectedId || selectedBadgeIds.length > 1) return null;
+    return resolveTheoryBadgePlaybackPlan({ graph, targetBadgeId: selectedId });
+  }, [graph, selectedBadgeIds.length, selectedId]);
+
+  const multiTrace = useMemo(() => {
+    if (!graph || selectedBadgeIds.length < 2) return null;
+    return resolveTheoryBadgeConnectionTrace({ graph, badgeIds: selectedBadgeIds });
+  }, [graph, selectedBadgeIds]);
+
+  const highlightedBadgeIds = multiTrace?.connectingBadgeIds ?? singlePlaybackPlan?.orderedBadgeIds ?? [];
+  const highlightedEdgeIds = useMemo(() => {
+    if (!graph) return [];
+    if (multiTrace) return multiTrace.connectingEdgeIds;
+    const highlighted = new Set(highlightedBadgeIds);
+    return graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+  }, [graph, highlightedBadgeIds, multiTrace]);
+
+  const activePlayback =
+    playbackStore.activeTargetBadgeId === selectedBadge?.id || playbackStore.activeTargetBadgeId
+      ? playbackStore.activeRun
+      : null;
+  const playbackBadgeIds = activePlayback?.steps.map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
+  const solvedBadgeIds =
+    activePlayback?.steps
+      .filter((step: TheoryBadgePlaybackStepV1) => step.status === "solved")
+      .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
+  const failedBadgeIds =
+    activePlayback?.steps
+      .filter((step: TheoryBadgePlaybackStepV1) => step.status === "failed")
+      .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
+
+  const selectBadge = (badgeId: string) => {
+    setSelectedBadgeId(badgeId);
+    setSelectedBadgeIds([]);
+  };
+
+  const toggleBadgeSelection = (badgeId: string) => {
+    toggleSelectedBadgeId(badgeId);
+  };
+
+  const loadCalculatorPayload = (badgeId: string, payloadId: string) => {
+    const badge = graph?.badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId);
+    const payload = badge?.calculatorPayloads.find(
+      (candidate: TheoryBadgeCalculatorPayloadV1) => candidate.id === payloadId,
+    );
+    if (!badge || !payload) return;
+    dispatchScientificCalculatorMathPicked({
+      latex: payload.displayLatex || payload.expression,
+      sourcePath: `theory://${graph?.graphId ?? "nhm2-theory-badge-graph"}/${badge.id}/${payload.id}`,
+      anchor: payload.id,
+    });
+  };
+
+  const runPathToBadge = (badgeId: string) => {
+    if (!graph) return;
+    void playbackStore.runPlayback({
+      graph,
+      targetBadgeId: badgeId,
+    });
+  };
+
+  if (viewMode === "map") {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-300 p-1 text-zinc-950">
+        <div className="flex h-full min-h-0 flex-col border-2 border-zinc-950 bg-zinc-300 shadow-inner">
+          <div className="flex h-7 shrink-0 items-center justify-between border-b-2 border-zinc-950 px-2 font-mono text-sm">
+            <span>Achievements</span>
+            {graph ? (
+              <span className="text-xs">
+                {graph.summary.badgeCount} badges / {graph.summary.edgeCount} branches /{" "}
+                {graph.summary.calculatorLoadableCount} loadouts
+              </span>
+            ) : null}
+          </div>
+
+          <div className="relative min-h-0 flex-1 overflow-hidden border-b-2 border-zinc-950 bg-zinc-900">
+            {isLoading ? (
+              <div className="p-4 text-sm text-zinc-200">Loading theory badge graph...</div>
+            ) : error ? (
+              <div className="p-4 text-sm text-red-200">Theory badge graph failed to load.</div>
+            ) : graph ? (
+              <>
+                <TheoryAchievementMap
+                  graph={graph}
+                  selectedBadgeId={selectedId}
+                  selectedBadgeIds={selectedBadgeIds}
+                  highlightedBadgeIds={highlightedBadgeIds}
+                  highlightedEdgeIds={highlightedEdgeIds}
+                  playbackBadgeIds={playbackBadgeIds}
+                  solvedBadgeIds={solvedBadgeIds}
+                  failedBadgeIds={failedBadgeIds}
+                  onSelectBadge={selectBadge}
+                  onToggleBadgeSelection={toggleBadgeSelection}
+                  onRunPath={runPathToBadge}
+                  onLoadCalculatorPayload={loadCalculatorPayload}
+                  viewport={viewport}
+                  onViewportChange={rememberViewport}
+                />
+                {multiTrace ? (
+                  <div className="absolute bottom-3 left-3 right-3 border-2 border-zinc-950 bg-zinc-200 p-3 text-sm shadow-2xl">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-bold">Trace Selected Badges</div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            const target = selectedBadgeIds[selectedBadgeIds.length - 1];
+                            if (target) runPathToBadge(target);
+                          }}
+                        >
+                          Run Selected Trace
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setSelectedBadgeIds([])}>
+                          Clear Selection
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid gap-2 text-xs md:grid-cols-3">
+                      <div>Shared ancestors: {multiTrace.sharedAncestorIds.slice(0, 4).join(", ") || "-"}</div>
+                      <div>Shared symbols: {multiTrace.sharedSymbols.join(", ") || "-"}</div>
+                      <div>Shared units: {multiTrace.sharedUnitSignatures.join(", ") || "-"}</div>
+                    </div>
+                    {multiTrace.claimBoundaryNotes.length > 0 ? (
+                      <div className="mt-2 text-xs text-amber-800">
+                        {multiTrace.claimBoundaryNotes.slice(0, 3).join("; ")}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 p-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Button type="button" size="sm" variant="secondary" className="h-8 min-w-32" disabled>
+                Achievement Map
+              </Button>
+              {selectedBadge ? <span>Selected: {selectedBadge.title}</span> : <span>Select a badge to inspect it.</span>}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 min-w-28 border-zinc-700"
+              onClick={() => setSelectedBadgeIds([])}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-[520px] flex-col bg-slate-950 text-slate-100">
@@ -526,19 +698,41 @@ export default function TheoryBadgeGraphPanel() {
               Physics theory badges, unit signatures, assumptions, and calculator loadouts.
             </p>
           </div>
-          {graph ? (
-            <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-              <Badge variant="outline" className="border-slate-700">
-                {graph.summary.badgeCount} badges
-              </Badge>
-              <Badge variant="outline" className="border-slate-700">
-                {graph.summary.edgeCount} edges
-              </Badge>
-              <Badge variant="outline" className="border-slate-700">
-                {graph.summary.calculatorLoadableCount} calculator loadouts
-              </Badge>
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            {graph ? (
+              <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                <Badge variant="outline" className="border-slate-700">
+                  {graph.summary.badgeCount} badges
+                </Badge>
+                <Badge variant="outline" className="border-slate-700">
+                  {graph.summary.edgeCount} edges
+                </Badge>
+                <Badge variant="outline" className="border-slate-700">
+                  {graph.summary.calculatorLoadableCount} calculator loadouts
+                </Badge>
+              </div>
+            ) : null}
+            <div className="flex rounded-md border border-slate-800 bg-slate-950 p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setViewMode("map")}
+                className="h-8"
+              >
+                Achievement Map
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                onClick={() => setViewMode("list")}
+                className="h-8"
+              >
+                Inspector List
+              </Button>
             </div>
-          ) : null}
+          </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_180px_180px]">
           <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -578,7 +772,7 @@ export default function TheoryBadgeGraphPanel() {
                         key={badge.id}
                         badge={badge}
                         selected={badge.id === selectedId}
-                        onSelect={() => setSelectedId(badge.id)}
+                        onSelect={() => selectBadge(badge.id)}
                       />
                     ))}
                   </div>
@@ -595,19 +789,10 @@ export default function TheoryBadgeGraphPanel() {
             <Inspector
               badge={selectedBadge}
               graph={graph}
-              onSelect={setSelectedId}
-              playback={
-                playbackStore.activeTargetBadgeId === selectedBadge?.id ? playbackStore.activeRun : null
-              }
+              onSelect={selectBadge}
+              playback={playbackStore.activeTargetBadgeId === selectedBadge?.id ? playbackStore.activeRun : null}
               playbackStatus={playbackStore.status}
-              onRunPlayback={() => {
-                if (graph && selectedBadge) {
-                  void playbackStore.runPlayback({
-                    graph,
-                    targetBadgeId: selectedBadge.id,
-                  });
-                }
-              }}
+              onRunPlayback={() => selectedBadge && runPathToBadge(selectedBadge.id)}
               onClearPlayback={playbackStore.clearPlayback}
             />
           </div>

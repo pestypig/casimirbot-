@@ -6,6 +6,10 @@ import {
   type TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
 import { HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA } from "../helix-calculator-setup-context";
+import {
+  FIRST_PRINCIPLES_THEORY_BADGES,
+  FIRST_PRINCIPLES_THEORY_EDGES,
+} from "./first-principles-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -729,7 +733,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     title: "NHM2 Theory Badge Graph",
     description:
       "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, and claim boundaries for NHM2.",
-    badges,
-    edges,
+    badges: [...FIRST_PRINCIPLES_THEORY_BADGES, ...badges],
+    edges: [...FIRST_PRINCIPLES_THEORY_EDGES, ...edges],
   });
 }

@@ -24,6 +24,69 @@ const allTerminalSurfacesEqual = (body: Record<string, any>): void => {
 };
 
 describe("Helix Ask terminal authority contracts", () => {
+  it("does not let poison audit mint missing terminal authority from visible text", () => {
+    const audit = auditHelixAskContextForPoison({
+      thread_id: "thread:test",
+      turn_id: "ask:test:missing-authority",
+      payload: {
+        turn_id: "ask:test:missing-authority",
+        thread_id: "thread:test",
+        selected_final_answer: "A terminal-looking answer.",
+        answer: "A terminal-looking answer.",
+        text: "A terminal-looking answer.",
+        finalAnswer: "A terminal-looking answer.",
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "situation_context_pack",
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          concise_text: "A terminal-looking answer.",
+        },
+      },
+      client_visible_text: "A terminal-looking answer.",
+    });
+
+    expect(audit.ok).toBe(false);
+    expect(audit.terminal_authority).toBeNull();
+    expect(audit.violations.map((violation) => violation.kind)).toContain("missing_terminal_authority");
+  });
+
+  it("uses existing payload terminal authority without rebuilding it", () => {
+    const terminalAuthority = buildHelixTurnTerminalAuthority({
+      thread_id: "thread:test",
+      turn_id: "ask:test:existing-authority",
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "situation_context_pack",
+      terminal_text: "A terminal answer.",
+      authority_origin: "terminal_presentation",
+    });
+    const audit = auditHelixAskContextForPoison({
+      thread_id: "thread:test",
+      turn_id: "ask:test:existing-authority",
+      payload: {
+        turn_id: "ask:test:existing-authority",
+        thread_id: "thread:test",
+        selected_final_answer: "A terminal answer.",
+        answer: "A terminal answer.",
+        text: "A terminal answer.",
+        finalAnswer: "A terminal answer.",
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "situation_context_pack",
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          concise_text: "A terminal answer.",
+        },
+        terminal_answer_authority: terminalAuthority,
+        current_turn_events: {
+          terminal_answer: { type: "terminal_answer", text: "A terminal answer." },
+        },
+      },
+      client_visible_text: "A terminal answer.",
+    });
+
+    expect(audit.ok).toBe(true);
+    expect(audit.terminal_authority?.server_terminal_text_hash).toBe(terminalAuthority.terminal_text_hash);
+  });
+
   it("lets selected terminal presentation beat fallback visible text", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:fallback",

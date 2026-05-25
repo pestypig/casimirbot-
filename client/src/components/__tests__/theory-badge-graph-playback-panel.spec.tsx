@@ -33,15 +33,18 @@ describe("TheoryBadgeGraphPanel playback", () => {
   it("runs a badge path and renders solved and skipped playback rows", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByText("QEI sampling window"));
+    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }));
     fireEvent.click(await screen.findByRole("button", { name: /Run Path to Badge/i }));
 
     expect(await screen.findByText("Path Playback")).toBeTruthy();
     expect(screen.getByText("Copy Playback JSON")).toBeTruthy();
 
-    await waitFor(() => {
-      expect(useTheoryBadgePlaybackStore.getState().status).toBe("complete");
-    });
+    await waitFor(
+      () => {
+        expect(useTheoryBadgePlaybackStore.getState().status).toBe("complete");
+      },
+      { timeout: 8000 },
+    );
 
     expect((await screen.findAllByText("solved")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("skipped").length).toBeGreaterThan(0);

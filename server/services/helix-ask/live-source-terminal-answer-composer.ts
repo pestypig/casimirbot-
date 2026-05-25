@@ -5,7 +5,6 @@ import type { HelixLiveProbeResult } from "@shared/helix-live-probe-result";
 import type { HelixLiveProcedureEpoch } from "@shared/helix-live-procedure-epoch";
 import type { HelixLiveSituationRun } from "@shared/helix-live-situation-run";
 import type { HelixLiveSourceIdentity } from "@shared/helix-live-source-identity";
-import type { HelixLiveSourceTerminalAuthority } from "@shared/helix-turn-poison-guard";
 import type { HelixObservationJournalEntry } from "@shared/helix-observation-journal";
 
 const compact = (value: unknown): string =>
@@ -14,7 +13,10 @@ const compact = (value: unknown): string =>
 const bulletLines = (values: string[]): string =>
   values.length > 0 ? values.map((entry: string) => `- ${entry}`).join("\n") : "- none";
 
-export function composeLiveSourceTerminalAnswer(input: {
+// This builder is intentionally not a terminal composer. It can summarize live
+// visual evidence for the runtime loop, but the guarded final boundary owns
+// terminal text and authority creation.
+export function buildLiveSourceObservationCandidate(input: {
   threadId: string;
   turnId: string;
   sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null;
@@ -43,48 +45,55 @@ export function composeLiveSourceTerminalAnswer(input: {
     evaluations.length === 0 ? "field evaluation for scene/activity" : null,
   ].filter((entry: string | null): entry is string => Boolean(entry));
 
-  const terminalArtifactKind = missing.length > 0 ? "request_user_input" : "live_visual_answer";
-  const terminalItemId = `live_source_terminal:${input.turnId}`;
+  const suggestedTerminalArtifactKind = missing.length > 0 ? "request_user_input" : "live_visual_answer";
   const selectedEvidenceRefs = Array.from(new Set([
     ...(run?.selected_evidence_refs ?? []),
     ...(latestObservation ? [latestObservation.observation_id, ...latestObservation.evidence_refs] : []),
     ...evaluations.flatMap((entry: HelixLiveFieldEvaluation) => [entry.evaluation_id, ...entry.evidence_refs]),
   ])).slice(-32);
 
-  const authority: HelixLiveSourceTerminalAuthority = {
-    schema: "helix.live_source_terminal_authority.v1",
+  const sourceBindingId =
+    run?.source_binding_id ?? identity?.source_binding_id ?? "missing_source_binding";
+  const sourceIdentityRef =
+    run?.primary_source_identity_ref ??
+    (identity ? `live_source_identity:${identity.thread_id}:${identity.source_id}:epoch:${identity.latest_epoch}` : "missing_source_identity");
+  const sourceEpoch = run?.current_epoch ?? identity?.latest_epoch ?? 0;
+
+  const baseCandidate = {
+    schema: "helix.live_source_observation_candidate.v1",
+    candidate_id: `live_source_observation_candidate:${input.turnId}`,
     thread_id: input.threadId,
     turn_id: input.turnId,
     situation_run_id: run?.situation_run_id ?? "missing_situation_run",
-    source_binding_id: run?.source_binding_id ?? identity?.source_binding_id ?? "missing_source_binding",
-    source_identity_ref: run?.primary_source_identity_ref ?? (identity ? `live_source_identity:${identity.thread_id}:${identity.source_id}:epoch:${identity.latest_epoch}` : "missing_source_identity"),
-    source_epoch: run?.current_epoch ?? identity?.latest_epoch ?? 0,
-    terminal_item_id: terminalItemId,
-    terminal_artifact_kind: terminalArtifactKind,
+    source_binding_id: sourceBindingId,
+    source_identity_ref: sourceIdentityRef,
+    source_epoch: sourceEpoch,
+    suggested_terminal_artifact_kind: suggestedTerminalArtifactKind,
     selected_evidence_refs: selectedEvidenceRefs,
     selected_field_evaluation_refs: evaluations.map((entry: HelixLiveFieldEvaluation) => entry.evaluation_id),
     selected_interpretation_refs: interpretations.map((entry: HelixLiveInterpretationHypothesis) => entry.hypothesis_id),
     selected_probe_result_refs: probeResults.map((entry: HelixLiveProbeResult) => entry.probe_result_id),
     arbitration_candidate_ref: input.arbitrationCandidate?.candidate_id ?? null,
-    authority_path: "terminal_presenter_from_selected_live_evidence",
-    server_authoritative: true,
+    candidate_path: "live_visual_observation_candidate_from_selected_evidence",
+    missing_requirements: missing,
     assistant_answer: false,
+    raw_content_included: false,
     created_at: createdAt,
   };
 
   if (missing.length > 0) {
     return {
-      terminal_artifact_kind: terminalArtifactKind,
-      selected_final_answer: [
-        "I have a bound visual source, but the latest SituationRun does not have enough fresh evidence to answer that yet.",
+      ...baseCandidate,
+      candidate_summary: [
+        "Live visual evidence is incomplete.",
         "",
         "Needed:",
         bulletLines(missing),
       ].join("\n"),
-      selected_evidence_refs: selectedEvidenceRefs,
-      source_binding_id: authority.source_binding_id,
-      live_source_terminal_authority: authority,
-      assistant_answer: true as const,
+      observed: [],
+      confidence: 0,
+      limits: missing,
+      next_checks: missing,
     };
   }
 
@@ -101,8 +110,10 @@ export function composeLiveSourceTerminalAnswer(input: {
     .filter((entry: string): entry is string => Boolean(entry));
 
   return {
-    terminal_artifact_kind: terminalArtifactKind,
-    selected_final_answer: [
+    ...baseCandidate,
+    candidate_summary: [
+      "Live visual evidence candidate.",
+      "",
       "Observed:",
       bulletLines(observed),
       "",
@@ -118,9 +129,9 @@ export function composeLiveSourceTerminalAnswer(input: {
       "Next check:",
       bulletLines(nextChecks.slice(0, 2)),
     ].join("\n"),
-    selected_evidence_refs: selectedEvidenceRefs,
-    source_binding_id: authority.source_binding_id,
-    live_source_terminal_authority: authority,
-    assistant_answer: true as const,
+    observed,
+    confidence,
+    limits,
+    next_checks: nextChecks.slice(0, 2),
   };
 }

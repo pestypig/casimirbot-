@@ -6,13 +6,22 @@ export type HelixDomainContinuationAction = {
   args: Record<string, unknown>;
 };
 
+export type HelixDomainContinuationCapabilityHint = {
+  schema: "helix.domain_continuation_capability_hint.v1";
+  authority: "hint_only_agent_must_decide";
+  capability_key: string;
+  suggested_action: HelixDomainContinuationAction;
+  suggested_args: Record<string, unknown>;
+  reason: string;
+};
+
 export type HelixDomainContinuationDecision = {
-  schema: "helix.domain_continuation_decision.v1";
+  schema: "helix.domain_continuation_hint.v1";
   turn_id: string;
   goal_kind: string;
   decision: "none" | "continue" | "retry" | "typed_failure" | "request_user_input";
   reason: string;
-  next_action?: HelixDomainContinuationAction;
+  recommended_capability_hint?: HelixDomainContinuationCapabilityHint;
   expected_artifacts?: string[];
   typed_failure_code?: string;
   repair_candidate?: Record<string, unknown>;
@@ -50,6 +59,18 @@ const action = (panelId: string, actionId: string, args: Record<string, unknown>
   args,
 });
 
+const capabilityHint = (
+  suggestedAction: HelixDomainContinuationAction,
+  reason: string,
+): HelixDomainContinuationCapabilityHint => ({
+  schema: "helix.domain_continuation_capability_hint.v1",
+  authority: "hint_only_agent_must_decide",
+  capability_key: `${suggestedAction.panel_id}.${suggestedAction.action_id}`,
+  suggested_action: suggestedAction,
+  suggested_args: suggestedAction.args,
+  reason,
+});
+
 const continuation = (
   input: DomainContinuationInput,
   goalKind: string,
@@ -57,7 +78,7 @@ const continuation = (
   reason: string,
   extra: Omit<Partial<HelixDomainContinuationDecision>, "schema" | "turn_id" | "goal_kind" | "decision" | "reason" | "assistant_answer" | "raw_content_included"> = {},
 ): HelixDomainContinuationDecision => ({
-  schema: "helix.domain_continuation_decision.v1",
+  schema: "helix.domain_continuation_hint.v1",
   turn_id: input.turnId,
   goal_kind: goalKind,
   decision,
@@ -230,7 +251,10 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
   if (goalKind === "docs_panel_open") {
     if (!hasAction(input.payload, "docs-viewer", "open")) {
       return continuation(input, goalKind, "continue", "docs_panel_open_requires_docs_viewer_open_action", {
-        next_action: action("docs-viewer", "open"),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "open"),
+          "docs_panel_open_requires_docs_viewer_open_action",
+        ),
         expected_artifacts: ["workspace_action_receipt"],
       });
     }
@@ -248,29 +272,38 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
 
     if (hasDocSearchCandidates(input.payload) && !validation) {
       return continuation(input, goalKind, "continue", "doc_search_candidates_require_validation", {
-        next_action: action("docs-viewer", "validate_doc_candidates", { query, transcript: input.prompt, limit: 8 }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "validate_doc_candidates", { query, transcript: input.prompt, limit: 8 }),
+          "doc_search_candidates_require_validation",
+        ),
         expected_artifacts: ["doc_candidate_validation"],
       });
     }
     if (selectedStatus === "strong" && selectedPath && !openReceipt) {
       return continuation(input, goalKind, "continue", "validated_doc_candidate_requires_open", {
-        next_action: action("docs-viewer", "open_doc_by_path", {
-          path: selectedPath,
-          query,
-          selection_reason: "validated_topic_candidate",
-          candidate_validation_status: selectedStatus,
-        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "open_doc_by_path", {
+            path: selectedPath,
+            query,
+            selection_reason: "validated_topic_candidate",
+            candidate_validation_status: selectedStatus,
+          }),
+          "validated_doc_candidate_requires_open",
+        ),
         expected_artifacts: ["active_doc_path", "doc_open_receipt"],
       });
     }
     if (selectedPath && openedPath && selectedPath !== openedPath) {
       return continuation(input, goalKind, "retry", "doc_open_path_mismatch_retry_selected_path", {
-        next_action: action("docs-viewer", "open_doc_by_path", {
-          path: selectedPath,
-          query,
-          selection_reason: "validated_topic_candidate_retry",
-          previous_opened_path: openedPath,
-        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "open_doc_by_path", {
+            path: selectedPath,
+            query,
+            selection_reason: "validated_topic_candidate_retry",
+            previous_opened_path: openedPath,
+          }),
+          "doc_open_path_mismatch_retry_selected_path",
+        ),
         expected_artifacts: ["active_doc_path", "doc_open_receipt"],
       });
     }
@@ -282,7 +315,10 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
     const query = locateQuery(input.payload, input.prompt);
     if (path && query && !hasLocationResult(input.payload)) {
       return continuation(input, goalKind, "continue", "active_doc_context_requires_locate_in_doc", {
-        next_action: action("docs-viewer", "locate_in_doc", { path, query, locate_strategy: "variant" }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "locate_in_doc", { path, query, locate_strategy: "variant" }),
+          "active_doc_context_requires_locate_in_doc",
+        ),
         expected_artifacts: ["doc_location_matches"],
       });
     }
