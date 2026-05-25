@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ScientificSolveResult } from "@/lib/scientific-calculator/solver";
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
+import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 
 const SCIENTIFIC_CALCULATOR_STORAGE_KEY = "scientific-calculator:v1";
 
@@ -23,6 +24,7 @@ export type ScientificCalculatorDebugAction =
   | "solve_expression"
   | "solve_with_steps"
   | "copy_result"
+  | "copy_steps_markdown"
   | "copy_debug_log"
   | "clear_workspace";
 
@@ -51,6 +53,7 @@ type ScientificCalculatorState = {
   currentLatex: string;
   history: ScientificCalculatorHistoryEntry[];
   lastSolve: ScientificSolveResult | null;
+  lastArtifactV1: ScientificCalculatorStepTraceArtifactV1 | null;
   lastSetup: HelixCalculatorSetupContext | null;
   steps: ScientificSolveResult["steps"];
   debugEvents: ScientificCalculatorDebugEvent[];
@@ -111,6 +114,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
       currentLatex: "",
       history: [],
       lastSolve: null,
+      lastArtifactV1: null,
       lastSetup: null,
       steps: [],
       debugEvents: [],
@@ -164,6 +168,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         });
         set((state) => ({
           lastSolve: result,
+          lastArtifactV1: result.artifact_v1 ?? null,
           lastSetup: meta && "calculatorSetup" in meta ? (meta.calculatorSetup ?? null) : state.lastSetup,
           steps: result.steps,
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
@@ -200,6 +205,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         set((state) => ({
           currentLatex: "",
           lastSolve: null,
+          lastArtifactV1: null,
           lastSetup: null,
           steps: [],
           debugEvents: [
@@ -219,6 +225,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         currentLatex: state.currentLatex,
         history: state.history,
         lastSolve: state.lastSolve,
+        lastArtifactV1: state.lastArtifactV1,
         lastSetup: state.lastSetup,
         steps: state.steps,
         debugEvents: state.debugEvents,

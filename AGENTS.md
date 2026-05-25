@@ -1,5 +1,17 @@
 # AGENTS
 
+## Canonical working root
+
+The authoritative CasimirBot checkout is this Desktop repository:
+
+`C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot`
+
+Do not infer the working root from matching filenames, a clean git status, or a
+`Documents\Codex\...` chat folder. If multiple CasimirBot checkouts are found,
+patch this Desktop checkout unless the user explicitly names another path. If
+the current shell is outside this root, either run commands with an explicit
+`-C`/`--prefix` target or ask the user before editing.
+
 This repo uses `WARP_AGENTS.md` for warp-physics constraints and required tests.
 Always read and follow those requirements when working on warp/GR features.
 For deterministic G4 debugging workflow, also follow `AGENT_PLAYBOOK.md`.

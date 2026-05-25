@@ -16,6 +16,7 @@ import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionM
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
 import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry } from "@/store/useScientificCalculatorStore";
+import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
@@ -91,6 +92,27 @@ function setupUnitOptionText(option: { symbol: string; quantity: string; si_fact
   return option.si_factor === 1 ? option.symbol : `${option.symbol} -> SI x ${option.si_factor}`;
 }
 
+function formatArtifactStepsMarkdown(artifact: ScientificCalculatorStepTraceArtifactV1): string {
+  const lines = [
+    "# Scientific Calculator Steps",
+    "",
+    `Input: ${artifact.request.inputLatex}`,
+    `Mode: ${artifact.request.mode}`,
+    `Result: ${artifact.result.text}`,
+    "",
+  ];
+  for (const step of artifact.steps) {
+    lines.push(`${step.index}. ${step.title}`);
+    lines.push(`   Stage: ${step.stage}`);
+    lines.push(`   Text: ${step.text}`);
+    if (step.latex) lines.push(`   LaTeX: ${step.latex}`);
+    if (step.operation) lines.push(`   Operation: ${step.operation.kind} (${step.operation.rule})`);
+    if (step.warnings.length > 0) lines.push(`   Warnings: ${step.warnings.join(", ")}`);
+    lines.push("");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 export function resolveScientificCalculatorVisibleDebugEvents(
   debugEvents: ScientificCalculatorDebugEvent[],
   limit = 8,
@@ -127,7 +149,7 @@ export function resolveScientificCalculatorVisibleHistory(
 }
 
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
+  const { currentLatex, history, lastSolve, lastArtifactV1, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
@@ -241,7 +263,36 @@ export default function ScientificCalculatorPanel() {
     });
   };
 
+  const handleCopyStepsMarkdown = () => {
+    if (!lastArtifactV1) {
+      recordDebugEvent({
+        action_id: "copy_steps_markdown",
+        source: "panel",
+        ok: false,
+        message: "No schema step artifact available to copy.",
+      });
+      return;
+    }
+    const payload = formatArtifactStepsMarkdown(lastArtifactV1);
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(payload);
+    }
+    recordDebugEvent({
+      action_id: "copy_steps_markdown",
+      source: "panel",
+      ok: true,
+      input_latex: lastArtifactV1.request.inputLatex,
+      result_text: lastArtifactV1.result.text,
+      normalized_expression: lastArtifactV1.normalization.canonicalText,
+      trace_id: lastSolve?.trace.traceId ?? null,
+      route: lastSolve?.trace.route ?? null,
+      engine: lastArtifactV1.quality.engine,
+      message: "steps_markdown_copied",
+    });
+  };
+
   const stepItems = useMemo(() => steps ?? [], [steps]);
+  const schemaStepItems = useMemo(() => lastArtifactV1?.steps ?? [], [lastArtifactV1?.steps]);
   const resultMathHtml = useMemo(
     () => renderMathHtml(lastSolve?.result_latex ?? "", true),
     [lastSolve?.result_latex],
@@ -541,7 +592,63 @@ export default function ScientificCalculatorPanel() {
                 </div>
               ) : null}
             </div>
-            {stepItems.length > 0 ? (
+            {lastArtifactV1 ? (
+              <div className="space-y-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase tracking-wide text-cyan-300">Schema Trace</div>
+                  <Button size="sm" variant="outline" onClick={handleCopyStepsMarkdown}>
+                    Copy Steps Markdown
+                  </Button>
+                </div>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Method</div>
+                    <div className="text-slate-200">{schemaStepItems.find((step) => step.stage === "method")?.text ?? "n/a"}</div>
+                  </div>
+                  <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Assumptions</div>
+                    <div className="font-mono text-slate-200">
+                      domain={lastArtifactV1.request.assumptions.domain}; angle={lastArtifactV1.request.assumptions.angleMode}
+                    </div>
+                  </div>
+                  <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Verification</div>
+                    <div className="text-slate-200">
+                      {lastArtifactV1.result.verification?.status ?? "not_run"}: {lastArtifactV1.result.verification?.text ?? "n/a"}
+                    </div>
+                  </div>
+                  <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Confidence / Fallback</div>
+                    <div className="font-mono text-slate-200">
+                      {lastArtifactV1.quality.confidence.toFixed(2)} / {lastArtifactV1.quality.fallbackReason ?? "none"}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">Schema Steps</div>
+                  {schemaStepItems.map((step) => (
+                    <div key={step.id} className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
+                      <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-slate-500">
+                        <span>{step.index}. {step.title}</span>
+                        <span>{step.stage}</span>
+                      </div>
+                      {step.latex ? (
+                        <div
+                          className="mt-1 overflow-x-auto rounded border border-slate-800 bg-slate-900/70 px-2 py-2 text-slate-100"
+                          dangerouslySetInnerHTML={{ __html: renderMathHtml(step.latex, true) }}
+                        />
+                      ) : null}
+                      <div className="mt-1 font-mono text-slate-100">{step.text}</div>
+                      {step.operation ? (
+                        <div className="mt-1 font-mono text-[11px] text-slate-400">
+                          {step.operation.kind}: {step.operation.rule}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : stepItems.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] uppercase tracking-wide text-slate-500">Steps</div>
                 {stepItems.map((step, index) => (

@@ -795,7 +795,7 @@ export function executeHelixPanelAction(
 
     if (actionId === "filter_view") {
       const filter = asNonEmptyString(args.filter ?? args.query);
-      graphStore.filterView(filter);
+      graphStore.filterView(filter ?? undefined);
       return {
         ok: true,
         panel_id: panelId,
@@ -2844,6 +2844,10 @@ export function executeHelixPanelAction(
           variable: solveResult.variable,
           steps_count: solveResult.steps.length,
           steps: solveResult.steps,
+          artifact_v1: solveResult.artifact_v1 ?? null,
+          result_kind: solveResult.artifact_v1?.result.kind ?? null,
+          confidence: solveResult.artifact_v1?.quality.confidence ?? null,
+          fallback_reason: solveResult.artifact_v1?.quality.fallbackReason ?? null,
           trace: solveResult.trace,
           route: solveResult.trace.route,
           engine: solveResult.trace.engine,

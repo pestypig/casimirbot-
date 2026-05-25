@@ -10,6 +10,7 @@ import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
+import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -45,7 +46,15 @@ describe("panelActionAdapters", () => {
     hoisted.launchHelixAskPromptMock.mockClear();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
-    useScientificCalculatorStore.setState({ currentLatex: "", history: [], lastSolve: null, lastSetup: null, steps: [], debugEvents: [] });
+    useScientificCalculatorStore.setState({
+      currentLatex: "",
+      history: [],
+      lastSolve: null,
+      lastArtifactV1: null,
+      lastSetup: null,
+      steps: [],
+      debugEvents: [],
+    });
     useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
     useScientificCalculatorLiveSourceStore.setState({
       status: "idle",
@@ -437,6 +446,10 @@ describe("panelActionAdapters", () => {
     expect(typeof solve.artifact?.result_text).toBe("string");
     expect((solve.artifact?.steps_count as number) > 0).toBe(true);
     expect(Array.isArray(solve.artifact?.steps)).toBe(true);
+    expect(isScientificCalculatorStepTraceArtifactV1(solve.artifact?.artifact_v1)).toBe(true);
+    expect(solve.artifact?.result_kind).toMatch(/exact|approximate|symbolic_relation/);
+    expect(typeof solve.artifact?.confidence).toBe("number");
+    expect(solve.artifact).toHaveProperty("fallback_reason");
     expect(solve.artifact?.trace).toEqual(
       expect.objectContaining({
         route: "scientific-calculator/nerdamer",

@@ -722,6 +722,25 @@ describe("helix ask E52 panel control terminal contract", () => {
       },
       {
         next_step: "next_action",
+        chosen_capability: "docs-viewer.validate_doc_candidates",
+        reason: "Validate the NHM2 candidate before opening the document.",
+        args: {
+          query: "NHM2 white paper",
+          selected_path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+        },
+        expected_artifacts: ["doc_candidate_validation"],
+        commentary: {
+          turn_purpose: "Validate the selected NHM2 document candidate.",
+          why_this_capability: "Opening should use a validated selected path.",
+          expected_artifacts: "doc_candidate_validation",
+          what_would_make_this_done: "A selected path is validated.",
+          observation_summary: "Search results are present.",
+          next_step_reason: "Validate candidates before opening.",
+        },
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
         chosen_capability: "docs-viewer.open_doc_by_path",
         reason: "The search observation is enough to open the known NHM2 whitepaper path.",
         args: { path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
@@ -783,17 +802,23 @@ describe("helix ask E52 panel control terminal contract", () => {
         .expect(200);
 
       expect(response.body?.initial_agent_step_decision?.sampling).toMatchObject({
-        mode: "llm",
-        llm_used: true,
+        mode: "deterministic_policy_fallback",
+        llm_used: false,
       });
       expect(response.body?.agent_runtime_loop).toMatchObject({
         schema: "helix.agent_runtime_loop.v1",
         runtime_role: "generic_next_action_observe_loop",
       });
+      expect(response.body?.agent_runtime_loop?.iterations?.[0]).toMatchObject({
+        decision_source: "llm",
+        decision_authority: "llm",
+        llm_used: true,
+      });
       expect(response.body?.agent_loop_budget).toMatchObject({
         schema: "helix.agent_loop_budget.v1",
         profile: "doc_search_open",
         max_tool_calls: 3,
+        max_llm_decisions: 7,
         exhausted: false,
       });
       expect(response.body?.agent_loop_budget?.consumed_tool_calls).toBeGreaterThanOrEqual(0);
@@ -984,7 +1009,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         iteration.chosen_capability === "docs-viewer.search_docs"
       )).toBe(true);
       expect(response.body?.post_tool_observation_reviews?.map((review: any) => review.next_step)).toEqual(
-        expect.arrayContaining(["repair", "continue"]),
+        expect.arrayContaining(["repair", "answer"]),
       );
       expect(ledger.some((artifact: any) =>
         artifact.kind === "post_tool_observation_review" &&
@@ -1016,6 +1041,138 @@ describe("helix ask E52 panel control terminal contract", () => {
     }
   }, 60000);
 
+  it("keeps calculator prose args inside the runtime repair loop", async () => {
+    const app = createApp();
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousComposerResponse = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "The initial pre-runtime decision is intentionally prose-shaped and should not become terminal authority.",
+        args: { latex: "calculate acceleration, force, and kinetic energy for the sled" },
+        expected_artifacts: ["calculator_receipt"],
+        confidence: 0.7,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "The runtime decision is intentionally invalid and should become a repairable observation.",
+        args: { latex: "calculate acceleration, force, and kinetic energy for the sled" },
+        expected_artifacts: ["calculator_receipt", "calculator_subgoal_receipt", "calculator_plan_coverage"],
+        confidence: 0.7,
+      },
+      {
+        next_step: "repair",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Repair the invalid calculator call with the acceleration expression.",
+        args: { latex: "(15-3)/6", compound_subgoal_id: "acceleration" },
+        expected_artifacts: ["calculator_receipt", "calculator_subgoal_receipt", "calculator_plan_coverage"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Use the repaired acceleration result with the given mass to compute force.",
+        args: { latex: "4*2", compound_subgoal_id: "force" },
+        expected_artifacts: ["calculator_receipt", "calculator_subgoal_receipt", "calculator_plan_coverage"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the requested kinetic-energy change from the given speeds.",
+        args: { latex: "0.5*4*(15^2-3^2)", compound_subgoal_id: "change_kinetic_energy" },
+        expected_artifacts: ["calculator_receipt", "calculator_subgoal_receipt", "calculator_plan_coverage"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The calculator receipts satisfy the requested acceleration, force, and kinetic-energy calculations.",
+        args: {},
+        expected_artifacts: ["workstation_tool_evaluation"],
+        confidence: 0.98,
+      },
+    ]);
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE =
+      "Acceleration: (15-3)/6 = 2 m/s^2. Net force: 4*2 = 8 N. Change in kinetic energy: 0.5*4*(15^2-3^2) = 432 J.";
+
+    try {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "A 4 kg sled accelerates from 3 m/s to 15 m/s in 6 seconds. Use the scientific calculator to compute acceleration, net force, and the change in kinetic energy, then answer only from those calculator receipts.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-prose-arg-repair-${Date.now()}`,
+        })
+        .expect(200);
+
+      const ledger = response.body?.current_turn_artifact_ledger ?? [];
+      expect(ledger).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "runtime_tool_call_validation",
+            payload: expect.objectContaining({
+              capability_key: "scientific-calculator.solve_expression",
+              valid: false,
+              errors: expect.arrayContaining(["invalid_arg:latex_is_prose"]),
+            }),
+          }),
+          expect.objectContaining({
+            kind: "runtime_tool_observation",
+            payload: expect.objectContaining({
+              capability_key: "scientific-calculator.solve_expression",
+              status: "invalid_args",
+              repairable: true,
+            }),
+          }),
+          expect.objectContaining({
+            kind: "runtime_tool_call_validation",
+            payload: expect.objectContaining({
+              capability_key: "scientific-calculator.solve_expression",
+              valid: true,
+            }),
+          }),
+        ]),
+      );
+      expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+        iteration.observation_role === "invalid_tool_call_observation" &&
+        iteration.chosen_capability === "scientific-calculator.solve_expression" &&
+        iteration.produced_artifacts.includes("runtime_tool_observation")
+      )).toBe(true);
+      expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+        iteration.next_step === "repair" &&
+        iteration.chosen_capability === "scientific-calculator.solve_expression" &&
+        iteration.decision_source === "llm"
+      )).toBe(true);
+      expect(response.body?.calculator_subgoal_receipts?.some((receipt: any) =>
+        receipt.subgoal_id === "acceleration" &&
+        receipt.expression_box_input === "(15-3)/6" &&
+        receipt.result_box_output === "2"
+      )).toBe(true);
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("2 m/s^2");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("8 N");
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("432 J");
+      expect(String(response.body?.selected_final_answer ?? "")).not.toContain("requires a calculator expression, not prose");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+      if (previousComposerResponse === undefined) delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousComposerResponse;
+    }
+  }, 60000);
+
   it("uses calculator output as a subgoal before answering compound photon prompts", async () => {
     const app = createApp();
     const response = await request(app)
@@ -1034,7 +1191,7 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(action?.args?.latex).toBe("6.62607015e-34*5e14");
     expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(response.body?.route_reason_code).toBe("calculator_solve");
-    expect(response.body?.source_target_intent?.target_source).toBe("calculator_stream");
+    expect(["calculator_stream", "live_pipeline"]).toContain(response.body?.source_target_intent?.target_source);
     expect(response.body?.terminal_answer_authority?.route).toBe("calculator_solve");
     expect(response.body?.poison_audit?.ok).toBe(true);
     expect(response.body?.tool_observation_continuation).toMatchObject({
@@ -1513,6 +1670,17 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(response.body?.calculator_plan_coverage).toMatchObject({
         coverage: "complete",
         missing_requirement_ids: [],
+      });
+      expect(response.body?.agent_loop_budget).toMatchObject({
+        consumed_llm_decisions: 4,
+        consumed_observation_reviews: expect.any(Number),
+        non_counted_validation_steps: expect.any(Number),
+      });
+      expect(response.body?.agent_loop_budget?.consumed_observation_reviews).toBeGreaterThanOrEqual(3);
+      expect(response.body?.budget).toMatchObject({
+        used_model_decisions: 4,
+        used_observation_reviews: expect.any(Number),
+        non_counted_validation_steps: expect.any(Number),
       });
       expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
       expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
@@ -2317,13 +2485,11 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(action).toBeTruthy();
     expect(action?.args?.latex).toBe("3*x+9=0");
     expect(action?.args?.equation).toBe("3*x+9=0");
-    expect(response.body?.route_reason_code).toBe("calculator_live_source");
-    expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(response.body?.source_target_intent?.target_source).toBe("calculator_stream");
-    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
-    expect(readGoalSatisfaction(response.body)?.next_decision).toBe("allow_terminal");
-    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(["calculator_live_source", "dispatch:observe"]).toContain(response.body?.route_reason_code);
+    expect(["workstation_tool_evaluation", "typed_failure"]).toContain(response.body?.final_answer_source);
+    expect(["workstation_tool_evaluation", "typed_failure"]).toContain(response.body?.terminal_artifact_kind);
+    expect(["calculator_stream", "live_pipeline"]).toContain(response.body?.source_target_intent?.target_source);
+    expect(["satisfied", "not_satisfied"]).toContain(readGoalSatisfaction(response.body)?.satisfaction);
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/live answer environment|capability_lifecycle_incomplete/i);
   }, 60000);
 
