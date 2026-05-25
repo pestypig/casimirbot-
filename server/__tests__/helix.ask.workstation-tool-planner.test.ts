@@ -155,6 +155,26 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("extracts calculator-ready kinetic-energy expressions instead of prose prompt tails", () => {
+    const prompt =
+      "Use the scientific calculator to compute the kinetic energy of a 2.5 kg object moving at 8 m/s. Show the expression, result, and units.";
+    const plan = planWorkstationToolUse(prompt);
+
+    expect(extractCalculatorExpression(prompt)).toBe("0.5*2.5*8^2");
+    expect(plan.intent).toBe("calculator_solve");
+    expect(plan.action?.args).toEqual(expect.objectContaining({
+      latex: "0.5*2.5*8^2",
+      calculator_setup: expect.objectContaining({
+        domain: "kinetic_energy",
+        result_unit: "J",
+        variables: expect.arrayContaining([
+          expect.objectContaining({ symbol: "m", value: "2.5", unit: "kg" }),
+          expect.objectContaining({ symbol: "v", value: "8", unit: "m/s" }),
+        ]),
+      }),
+    }));
+  });
+
   it("does not treat prose with numbers as a calculator expression", () => {
     expect(extractCalculatorExpression("Use calculator what is the mass of 2 kg in this example")).toBeNull();
   });

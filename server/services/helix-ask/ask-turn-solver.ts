@@ -303,6 +303,12 @@ const forbiddenTerminalProducts = (payload: RecordLike): string[] =>
 const isHardSourceTarget = (payload: RecordLike, trace: HelixAskTurnSolverTrace | null): boolean => {
   const sourceTarget = readRecord(payload.source_target_intent);
   const traceSource = trace?.primary_intent?.source_target ?? "";
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const modelOnlySourceTarget =
+    readString(sourceTarget?.target_source) === "model_only" ||
+    readString(sourceTarget?.target_kind) === "general_background" ||
+    readString(canonicalGoalFrame?.goal_kind) === "model_only_concept";
+  if (modelOnlySourceTarget) return false;
   return (
     readString(sourceTarget?.strength) === "hard" ||
     sourceTarget?.must_enter_backend_ask === true ||

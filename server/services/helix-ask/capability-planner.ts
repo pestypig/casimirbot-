@@ -140,11 +140,11 @@ const admissionFor = (input: {
 }): { status: HelixCapabilityAdmissionStatus; rejectionReason?: string } => {
   const instructionFrame = readRecord(input.instructionFrame);
   const negativeConstraints = readStringArray(instructionFrame?.negative_user_constraints);
-  const capabilityRules = readStringArray(instructionFrame?.capability_permission_rules);
+  const activeRules = readStringArray(instructionFrame?.active_rules);
   const negativeExecutionBlocked =
     input.mutating &&
     (
-      capabilityRules.includes("negative_user_constraints_block_mutating_capabilities") ||
+      activeRules.includes("negative_user_constraint_blocks_mutating_capability") ||
       negativeConstraints.some((constraint: string) =>
         /\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute)\s+nothing\b/i.test(constraint) ||
         /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:run|open|click|start|stop|set|change|update|repair|refresh|execute|call)\b/i.test(constraint),

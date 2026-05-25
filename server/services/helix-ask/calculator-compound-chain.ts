@@ -223,7 +223,8 @@ const extractExplicitAcceleration = (prompt: string): number | null => {
   const unitBacked = extractNumberNear(prompt, ["m/s^2", "m/s2", "meters per second squared", "metres per second squared"]);
   if (unitBacked !== null) return unitBacked;
   const named =
-    prompt.match(new RegExp(`\\b(?:acceleration|accelerates?\\s+at|a)\\s*(?:=|is|of|at)?\\s*(${numberPattern})\\b`, "i")) ??
+    prompt.match(new RegExp(`\\b(?:acceleration|accelerates?\\s+at)\\s*(?:=|is|of|at)?\\s*(${numberPattern})\\b`, "i")) ??
+    prompt.match(new RegExp(`\\ba\\s*=\\s*(${numberPattern})\\b`, "i")) ??
     prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?=(?:is\\s+)?(?:the\\s+)?acceleration\\b)`, "i"));
   const value = Number(named?.[1]);
   return Number.isFinite(value) ? value : null;
@@ -245,6 +246,34 @@ const extractRestToSpeedKinematics = (
     finalSpeed: massSpeed.speed,
     durationSeconds,
     acceleration: massSpeed.speed / durationSeconds,
+  };
+};
+
+const speedUnitPattern = "(?:m\\s*/\\s*s|meters?\\s+per\\s+second|metres?\\s+per\\s+second)";
+
+const extractSpeedChangeKinematics = (
+  prompt: string,
+): { initialSpeed: number; finalSpeed: number; durationSeconds: number; acceleration: number } | null => {
+  const match =
+    prompt.match(new RegExp(`\\bfrom\\s+(${numberPattern})\\s*${speedUnitPattern}\\s+(?:to|up\\s+to)\\s+(${numberPattern})\\s*${speedUnitPattern}[\\s\\S]{0,80}\\b(?:in|over|during|for)\\s+(${numberPattern})\\s*(?:s|sec|secs|seconds?)\\b`, "i")) ??
+    prompt.match(new RegExp(`\\b(?:accelerates?|accelerating|accelerated)\\s+from\\s+(${numberPattern})\\s*${speedUnitPattern}\\s+(?:to|up\\s+to)\\s+(${numberPattern})\\s*${speedUnitPattern}[\\s\\S]{0,80}\\b(?:in|over|during|for)\\s+(${numberPattern})\\s*(?:s|sec|secs|seconds?)\\b`, "i"));
+  if (!match) return null;
+  const initialSpeed = Number(match[1]);
+  const finalSpeed = Number(match[2]);
+  const durationSeconds = Number(match[3]);
+  if (
+    !Number.isFinite(initialSpeed) ||
+    !Number.isFinite(finalSpeed) ||
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds <= 0
+  ) {
+    return null;
+  }
+  return {
+    initialSpeed,
+    finalSpeed,
+    durationSeconds,
+    acceleration: (finalSpeed - initialSpeed) / durationSeconds,
   };
 };
 
@@ -326,20 +355,26 @@ const validateCalculatorReceiptSemanticConsistency = (
 
   const mass = extractNumberNear(normalizedPrompt, ["kg", "kilogram", "kilograms"]);
   const restKinematics = extractRestToSpeedKinematics(normalizedPrompt);
-  const acceleration = extractExplicitAcceleration(normalizedPrompt) ?? restKinematics?.acceleration ?? null;
-  const durationSeconds = extractDurationSeconds(normalizedPrompt);
-  const finalSpeed = restKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalizedPrompt)?.speed : null);
+  const speedChangeKinematics = extractSpeedChangeKinematics(normalizedPrompt);
+  const acceleration = restKinematics?.acceleration ?? speedChangeKinematics?.acceleration ?? extractExplicitAcceleration(normalizedPrompt) ?? null;
+  const durationSeconds = speedChangeKinematics?.durationSeconds ?? extractDurationSeconds(normalizedPrompt);
+  const finalSpeed = restKinematics?.finalSpeed ?? speedChangeKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalizedPrompt)?.speed : null);
+  const initialSpeed = restKinematics ? 0 : speedChangeKinematics?.initialSpeed ?? null;
   if (mass && acceleration && Number.isFinite(acceleration) && durationSeconds && Number.isFinite(durationSeconds)) {
     const expectedFinalSpeed = finalSpeed ?? acceleration * durationSeconds;
     const expectedForce = mass * acceleration;
     const expectedImpulse = expectedForce * durationSeconds;
     const expectedFinalKineticEnergy = 0.5 * mass * expectedFinalSpeed ** 2;
+    const expectedChangeKineticEnergy = initialSpeed === null
+      ? expectedFinalKineticEnergy
+      : 0.5 * mass * (expectedFinalSpeed ** 2 - initialSpeed ** 2);
     const expectedAveragePower = expectedFinalKineticEnergy / durationSeconds;
     const formulaChecks: Array<{ pattern: RegExp; expected: number; unitLabel: string }> = [
       { pattern: /\bfinal_speed\b|\bfinal\s+(?:speed|velocity)\b|\bv\s*=/, expected: expectedFinalSpeed, unitLabel: "m/s" },
       { pattern: /\bforce\b|\bf\s*=\s*m\s*a\b/, expected: expectedForce, unitLabel: "N" },
       { pattern: /\bimpulse\b|\bj\s*=|\bf\s*t\b|\bm\s*a\s*t\b/, expected: expectedImpulse, unitLabel: "N*s" },
-      { pattern: /\bfinal_kinetic_energy\b|\bfinal\s+kinetic\s+energy\b|\bke\s*=/, expected: expectedFinalKineticEnergy, unitLabel: "J" },
+      { pattern: /\bchange_kinetic_energy\b|\bchange\s+in\s+kinetic\s+energy\b|\bdelta\s+ke\b|\bΔke\b/, expected: expectedChangeKineticEnergy, unitLabel: "J" },
+      { pattern: /\bfinal_kinetic_energy\b|\bfinal\s+kinetic\s+energy\b|(?<!delta\s)\bke\s*=/, expected: expectedFinalKineticEnergy, unitLabel: "J" },
       { pattern: /\baverage_power\b|\baverage\s+power\b|\bp(?:_avg)?\s*=/, expected: expectedAveragePower, unitLabel: "W" },
     ];
     const matchingCheck = formulaChecks.find((check: { pattern: RegExp; expected: number; unitLabel: string }) => check.pattern.test(subgoalText));
@@ -856,25 +891,38 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
   const subgoals: CalculatorModelAuthoredSubgoal[] = [];
   const mass = extractNumberNear(normalized, ["kg", "kilogram", "kilograms"]);
   const restKinematics = extractRestToSpeedKinematics(normalized);
-  const acceleration = extractExplicitAcceleration(normalized) ?? restKinematics?.acceleration ?? null;
-  const durationSeconds = extractDurationSeconds(normalized);
-  const finalSpeedFromPrompt = restKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalized)?.speed : null);
+  const speedChangeKinematics = extractSpeedChangeKinematics(normalized);
+  const acceleration = restKinematics?.acceleration ?? speedChangeKinematics?.acceleration ?? extractExplicitAcceleration(normalized) ?? null;
+  const durationSeconds = speedChangeKinematics?.durationSeconds ?? extractDurationSeconds(normalized);
+  const finalSpeedFromPrompt = restKinematics?.finalSpeed ?? speedChangeKinematics?.finalSpeed ?? (mass ? extractMassSpeed(normalized)?.speed : null);
+  const initialSpeedFromPrompt = restKinematics ? 0 : speedChangeKinematics?.initialSpeed ?? null;
+  const finalSpeedForEnergy = speedChangeKinematics?.finalSpeed ?? finalSpeedFromPrompt;
   if (/\bacceleration\b/i.test(normalized) && acceleration && Number.isFinite(acceleration)) {
     const expression =
-      restKinematics && durationSeconds
+      speedChangeKinematics
+        ? `(${formatNumber(speedChangeKinematics.finalSpeed)}-${formatNumber(speedChangeKinematics.initialSpeed)})/${formatNumber(speedChangeKinematics.durationSeconds)}`
+        : restKinematics && durationSeconds
         ? `${formatNumber(restKinematics.finalSpeed)}/${formatNumber(durationSeconds)}`
         : formatNumber(acceleration);
     subgoals.push({
       id: "acceleration",
-      label: restKinematics ? "Compute acceleration from a = Delta v / t" : "Compute acceleration",
+      label: restKinematics || speedChangeKinematics ? "Compute acceleration from a = Delta v / t" : "Compute acceleration",
       expression,
       expected_quantity: "acceleration",
       expected_unit: "m/s^2",
-      equation: restKinematics ? "a = Delta v / t" : "a",
-      assumptions: restKinematics
+      equation: restKinematics || speedChangeKinematics ? "a = Delta v / t" : "a",
+      assumptions: speedChangeKinematics
+        ? ["Acceleration is computed from the stated initial speed, final speed, and duration."]
+        : restKinematics
         ? ["Initial speed is zero and the stated final speed is reached over the stated duration."]
         : ["Acceleration is supplied directly by the prompt."],
-      variables: restKinematics
+      variables: speedChangeKinematics
+        ? [
+            { symbol: "v_i", value: formatNumber(speedChangeKinematics.initialSpeed), unit: "m/s", meaning: "initial speed" },
+            { symbol: "v_f", value: formatNumber(speedChangeKinematics.finalSpeed), unit: "m/s", meaning: "final speed" },
+            { symbol: "t", value: formatNumber(speedChangeKinematics.durationSeconds), unit: "s", meaning: "duration" },
+          ]
+        : restKinematics
         ? [
             { symbol: "Delta v", value: formatNumber(restKinematics.finalSpeed), unit: "m/s", meaning: "change in speed from rest" },
             { symbol: "t", value: formatNumber(durationSeconds ?? restKinematics.durationSeconds), unit: "s", meaning: "duration" },
@@ -900,8 +948,10 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
   }
   if (mass && acceleration && Number.isFinite(acceleration) && durationSeconds && Number.isFinite(durationSeconds)) {
     const finalSpeed = finalSpeedFromPrompt ?? acceleration * durationSeconds;
+    const initialSpeed = initialSpeedFromPrompt ?? 0;
     const impulse = mass * acceleration * durationSeconds;
     const finalKineticEnergy = 0.5 * mass * finalSpeed ** 2;
+    const changeKineticEnergy = 0.5 * mass * (finalSpeed ** 2 - initialSpeed ** 2);
     const averagePower = finalKineticEnergy / durationSeconds;
     const baseVariables = [
       { symbol: "m", value: formatNumber(mass), unit: "kg", meaning: "mass" },
@@ -934,7 +984,10 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
         interpretation: `Equivalent to a momentum change of ${formatNumber(impulse)} N*s under the idealized assumptions.`,
       });
     }
-    if (/\b(?:final\s+)?kinetic\s+energy\b|\bke\b/i.test(normalized)) {
+    if (
+      /\b(?:final\s+)?kinetic\s+energy\b|\bke\b/i.test(normalized) &&
+      !/\bchange\s+in\s+kinetic\s+energy\b|\bkinetic\s+energy\s+change\b|\bdelta\s+ke\b|\bΔke\b/i.test(normalized)
+    ) {
       subgoals.push({
         id: "final_kinetic_energy",
         label: "Compute final kinetic energy from KE = 1/2 m v^2",
@@ -951,6 +1004,26 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
           { symbol: "v", value: formatNumber(finalSpeed), unit: "m/s", meaning: finalSpeedFromPrompt ? "stated final speed" : "final speed from a t" },
         ],
         interpretation: `Uses the final speed ${formatNumber(finalSpeed)} m/s.`,
+      });
+    }
+    if (/\bchange\s+in\s+kinetic\s+energy\b|\bkinetic\s+energy\s+change\b|\bdelta\s+ke\b|\bΔke\b/i.test(normalized)) {
+      subgoals.push({
+        id: "change_kinetic_energy",
+        label: "Compute change in kinetic energy from Delta KE = 1/2 m (vf^2 - vi^2)",
+        expression: finalSpeedForEnergy
+          ? `0.5*${formatNumber(mass)}*(${formatNumber(finalSpeedForEnergy)}^2-${formatNumber(initialSpeed)}^2)`
+          : `0.5*${formatNumber(mass)}*((${formatNumber(acceleration)}*${formatNumber(durationSeconds)})^2-${formatNumber(initialSpeed)}^2)`,
+        expected_quantity: "energy",
+        expected_unit: "J",
+        equation: "Delta KE = 1/2 m (vf^2 - vi^2)",
+        depends_on: subgoals.some((subgoal: CalculatorModelAuthoredSubgoal) => subgoal.id === "acceleration") ? ["acceleration"] : [],
+        assumptions: ["Non-relativistic kinetic energy.", "The prompt's initial and final speeds define the kinetic-energy change."],
+        variables: [
+          ...baseVariables,
+          { symbol: "v_i", value: formatNumber(initialSpeed), unit: "m/s", meaning: "initial speed" },
+          { symbol: "v_f", value: formatNumber(finalSpeedForEnergy ?? finalSpeed), unit: "m/s", meaning: "final speed" },
+        ],
+        interpretation: `The kinetic-energy increase is ${formatNumber(changeKineticEnergy)} J under the stated speeds.`,
       });
     }
     if (/\baverage\s+power\b|\bpower\b/i.test(normalized)) {

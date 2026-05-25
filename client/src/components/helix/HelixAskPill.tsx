@@ -29072,7 +29072,7 @@ export function HelixAskPill({
                 canceledPendingTurn ||
                 String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
             );
-            const isLatestReply = replyIndex === 0;
+            const isLatestReply = reply.id === latestAskReplyId;
             const shouldRenderLiveSituationProjection =
               Boolean(liveSituationArtifact) ||
               (isLatestReply &&

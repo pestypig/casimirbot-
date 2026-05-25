@@ -33,8 +33,10 @@ const isNonAnswerTerminal = (payload: RecordLike): boolean => {
   return (
     terminalArtifactKind === "typed_failure" ||
     terminalArtifactKind === "request_user_input" ||
+    terminalArtifactKind === "pending_server_request" ||
     finalAnswerSource === "typed_failure" ||
     finalAnswerSource === "request_user_input" ||
+    finalAnswerSource === "pending_server_request" ||
     responseType === "final_failure" ||
     responseType === "pending_input" ||
     finalStatus === "final_failure" ||

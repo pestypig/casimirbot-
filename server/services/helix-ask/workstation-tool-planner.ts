@@ -191,6 +191,7 @@ function extractFrequencyValue(value: string): string | null {
 
 function extractKineticEnergyExpression(value: string): string | null {
   if (!/\bkinetic\s+energy\b|\bke\b|\b1\/2\s*m\s*v/i.test(value)) return null;
+  if (/\bchange\s+in\s+kinetic\s+energy\b|\bkinetic\s+energy\s+change\b|\bdelta\s+ke\b|\bΔke\b/i.test(value)) return null;
   const number = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
   const mass =
     value.match(new RegExp(`\\bm(?:ass)?\\s*(?:=|is|of)?\\s*(${number})\\s*(?:kg|kilograms?)\\b`, "i"))?.[1] ??
@@ -523,6 +524,21 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
   };
 }
 
+function isCompoundCalculatorPlanningPrompt(prompt: string): boolean {
+  if (!/\b(?:calculator|calculate|compute|solve|evaluate|estimate)\b/i.test(prompt)) return false;
+  const requestedQuantities = [
+    /\bacceleration\b/i,
+    /\b(?:net\s+)?force\b/i,
+    /\bchange\s+in\s+kinetic\s+energy\b|\bkinetic\s+energy\s+change\b|\bdelta\s+ke\b|\bΔke\b/i,
+    /\b(?:final\s+)?kinetic\s+energy\b/i,
+    /\bpotential\s+energy\b/i,
+    /\bmomentum\b/i,
+    /\baverage\s+power\b|\bpower\b/i,
+    /\bmaximum\s+height\b|\bmax\s+height\b/i,
+  ].filter((pattern) => pattern.test(prompt)).length;
+  return requestedQuantities >= 2;
+}
+
 export function planWorkstationToolUse(
   prompt: string,
   options: PlanWorkstationToolUseOptions = {},
@@ -709,6 +725,17 @@ export function planWorkstationToolUse(
 
   if (isCalculatorPrompt(normalized)) {
     const latex = extractCalculatorExpression(normalized);
+    if (!latex && isCompoundCalculatorPlanningPrompt(normalized)) {
+      return {
+        intent: "direct_answer",
+        action: null,
+        tool_plan: null,
+        scores,
+        should_use_tool: false,
+        reason: "Narrative multi-result calculator prompt should be handled by the compound calculator runtime planner.",
+        missing_required_args: [],
+      };
+    }
     const calculatorSetup = buildCalculatorSetupContext(normalized, latex);
     const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
     const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";

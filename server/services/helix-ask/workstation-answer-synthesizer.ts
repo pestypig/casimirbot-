@@ -103,11 +103,12 @@ function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculato
 function calculatorResultText(prompt: string, plan: HelixWorkstationToolPlan): string {
   const observation = buildCalculatorObservation(prompt, plan);
   const expression = observation.expression;
+  const unit = observation.setup?.result_unit ? ` ${observation.setup.result_unit}` : "";
   if (observation.result) {
     return [
       "Calculator verification plan completed.",
       `Expression: ${expression}`,
-      `Result: ${observation.result}`,
+      `Result: ${observation.result}${unit}`,
       `Trace source: ${observation.traceSource}.`,
     ].join("\n");
   }

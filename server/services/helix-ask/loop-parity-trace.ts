@@ -316,18 +316,22 @@ export function buildLoopParityTrace(input: {
     (routeAuthorityOk && terminalAuthorityOk && onlyStaleContractPoison);
   const terminalSelectionRan = Boolean(readRecord(payload.terminal_artifact_selection_guard) || readRecord(payload.product_authority_guard) || routeAuthorityAudit);
   const postObservationFinalizerRan = Boolean(readRecord(payload.terminal_presentation) || terminalSelectionRan);
+  const modelOnlySourceTarget =
+    sourceTargetIntent?.target_source === "model_only" ||
+    sourceTargetIntent?.target_kind === "general_background" ||
+    readString(readRecord(payload.canonical_goal_frame)?.goal_kind) === "model_only_concept";
   const routeContractMissing =
-    Boolean(sourceTargetIntent && sourceTargetIntent.strength === "hard") &&
+    Boolean(sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget) &&
     !readRecord(payload.route_product_contract);
   const violationCodes = readStringArray(routeAuthorityAudit?.violation_codes);
   const shortCircuitRiskFlags = unique([
-    sourceTargetIntent && sourceTargetIntent.strength === "hard" && evidence.selected.length === 0 && !/typed_failure|receipt|tool_evaluation|workstation_tool_evaluation/i.test(terminalArtifactKind)
+    sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget && evidence.selected.length === 0 && !/typed_failure|receipt|tool_evaluation|workstation_tool_evaluation/i.test(terminalArtifactKind)
       ? "classifier_selected_terminal_without_evidence"
       : "",
     violationCodes.includes("receipt_used_as_content_answer") ? "receipt_promoted_to_answer" : "",
     /client_projection|panel_generated_answer|live_card_projection/i.test(`${terminalArtifactKind} ${finalAnswerSource}`) ? "projection_promoted_to_answer" : "",
     unexpectedToolCalls.length > 0 ? "tool_called_without_admission" : "",
-    sourceTargetIntent && sourceTargetIntent.strength === "hard" && (sourceTargetIntent.allow_no_tool_direct || terminalArtifactKind === "no_tool_direct")
+    sourceTargetIntent && sourceTargetIntent.strength === "hard" && !modelOnlySourceTarget && (sourceTargetIntent.allow_no_tool_direct || terminalArtifactKind === "no_tool_direct")
       ? "hard_source_target_allowed_no_tool_direct"
       : "",
     routeContractMissing ? "route_contract_missing" : "",

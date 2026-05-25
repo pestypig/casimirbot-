@@ -136,6 +136,38 @@ npm run helix:ask:api-parity
 Report disabled/frontier scenarios separately. Do not present a disabled
 scenario as proof of the current contract.
 
+## Model Commentary Owns Step Choice
+
+For source-targeted and capability turns, Helix Ask must not let classifiers,
+routes, planners, receipts, coverage gates, or terminal artifacts decide the next
+step.
+
+They may provide hints, constraints, observations, and validation.
+
+The next-step authority is:
+
+```txt
+agent_step_decision produced from model-visible state.
+```
+
+Required loop:
+
+1. Build runtime intent packet.
+2. Show available capabilities.
+3. Ask model for next step.
+4. Execute selected capability, if any.
+5. Record observation.
+6. Run goal satisfaction.
+7. Ask model again.
+8. Repeat until answer, ask_user, fail_closed, or budget exhaustion.
+
+A normal final answer requires:
+
+- model selected `answer`
+- `goal_satisfaction = satisfied`
+- terminal artifact matches goal contract
+- runtime authority audit passes
+
 ## Codex-Owned Responsibilities
 
 Do not recreate these in Helix Ask unless Codex cannot expose the capability:

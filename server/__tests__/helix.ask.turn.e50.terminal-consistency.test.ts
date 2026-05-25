@@ -158,6 +158,13 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.terminal_error_code).not.toBe("prompt_requirement_coverage_incomplete");
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/SituationRun|current screen|ask_turn_invariant_violation/i);
     expect(response.body?.workstation_tool_plan?.intent).not.toBe("calculator_solve");
+    if (response.body?.terminal_artifact_kind === "pending_server_request") {
+      expect(String(response.body?.selected_final_answer ?? "")).toMatch(/speed/i);
+      expect(response.body?.final_status).toBe("pending_input");
+    } else {
+      expect(String(response.body?.selected_final_answer ?? "")).toMatch(/speed|value|underspecified|need/i);
+      expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    }
   }, 60000);
 
   it("keeps ambient visual context available as a tool without forcing it into model-only answers", async () => {

@@ -67,6 +67,9 @@ const sourceTargeted = new Set([
 const uniqueViolationCodes = (codes: HelixRouteAuthorityViolationCode[]): HelixRouteAuthorityViolationCode[] =>
   Array.from(new Set(codes));
 
+const isModelOnlySourceTarget = (sourceTarget: string, targetKind: string): boolean =>
+  sourceTarget === "model_only" || targetKind === "general_background";
+
 const isVisualContentPrompt = (promptText: string): boolean =>
   /\b(?:review|explain|describe|summari[sz]e|compare|what(?:'s|\s+is)?|what\s+changed|look\s+at|see|seeing)\b[\s\S]{0,120}\b(?:screen|screenshot|capture|visual|frame|window|tab)\b/i.test(promptText) ||
   /\b(?:screen|screenshot|capture|visual|frame|window|tab)\b[\s\S]{0,120}\b(?:show|shows|showing|seeing|visible|happening|changed)\b/i.test(promptText);
@@ -151,10 +154,14 @@ export function auditRouteAuthority(input: {
   const productGuard = input.productAuthorityGuard as Record<string, unknown> | null | undefined;
   const sourceTarget = readString(sourceTargetRecord?.target_source) || readString(contract?.source_target) || "unknown";
   const targetKind = readString(sourceTargetRecord?.target_kind) || sourceTarget;
+  const modelOnlySourceTarget = isModelOnlySourceTarget(sourceTarget, targetKind);
   const hardSourceTarget =
-    readString(sourceTargetRecord?.strength) === "hard" ||
-    sourceTargetRecord?.must_enter_backend_ask === true ||
-    (sourceTargeted.has(sourceTarget) && sourceTarget !== "unknown");
+    !modelOnlySourceTarget &&
+    (
+      readString(sourceTargetRecord?.strength) === "hard" ||
+      sourceTargetRecord?.must_enter_backend_ask === true ||
+      (sourceTargeted.has(sourceTarget) && sourceTarget !== "unknown")
+    );
   const routeProductContractMissing = !contract || readString(contract.schema) !== "helix.route_product_contract.v1";
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
