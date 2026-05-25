@@ -11468,6 +11468,104 @@ function buildReasoningTheaterParticlesFromMirekArtifact(
   });
 }
 
+const MIREK_EVIDENCE_PATH_KEYS = [
+  "path",
+  "source_path",
+  "sourcePath",
+  "file",
+  "filePath",
+  "href",
+  "uri",
+  "ref",
+];
+
+const MIREK_EVIDENCE_ARRAY_KEYS = [
+  "context_files",
+  "prompt_context_files",
+  "evidence_refs",
+  "selected_validation_refs",
+  "contextFiles",
+  "evidenceRefs",
+  "sources",
+  "citations",
+  "retrieval_paths",
+  "retrievalPaths",
+];
+
+function isMirekEvidencePath(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 260) return false;
+  return (
+    /[\\/]/.test(trimmed) ||
+    /\.(?:md|mdx|txt|json|jsonl|ts|tsx|js|jsx|py|html|css|ya?ml|pdf|csv)$/i.test(trimmed) ||
+    /^(?:client|server|shared|docs|tests|scripts|configs|public)\b/i.test(trimmed)
+  );
+}
+
+function collectMirekEvidencePathsFromValue(value: unknown, depth = 0): string[] {
+  if (depth > 3 || value == null) return [];
+  if (typeof value === "string") {
+    return isMirekEvidencePath(value) ? [value.trim()] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectMirekEvidencePathsFromValue(entry, depth + 1));
+  }
+  const record = asObjectRecord(value);
+  if (!record) return [];
+  const paths: string[] = [];
+  for (const key of MIREK_EVIDENCE_PATH_KEYS) {
+    paths.push(...collectMirekEvidencePathsFromValue(record[key], depth + 1));
+  }
+  for (const key of MIREK_EVIDENCE_ARRAY_KEYS) {
+    paths.push(...collectMirekEvidencePathsFromValue(record[key], depth + 1));
+  }
+  return paths;
+}
+
+function collectMirekEvidencePathsFromLiveEvents(events: AskLiveEventEntry[]): string[] {
+  return dedupeStrings(
+    events.flatMap((event) => [
+      ...collectMirekEvidencePathsFromValue(event.meta),
+      ...collectMirekEvidencePathsFromValue(event.text),
+    ]),
+  );
+}
+
+function buildMirekEvidenceAnchors(paths: string[]): MirekAnchorInput[] {
+  return dedupeStrings(paths)
+    .slice(0, 12)
+    .map((path, index) => ({
+      id: `evidence:${hash32(path).toString(16)}:${index}`,
+      role: "evidence",
+      path,
+      weight: clamp01(1 - index * 0.045),
+      exact: true,
+    }));
+}
+
+function calculateMirekSharedExactPathRatio(
+  anchors: MirekAnchorInput[],
+  previousArtifact: MirekReasoningArtifactV1 | null,
+): number {
+  const currentPaths = new Set(
+    anchors
+      .filter((anchor) => anchor.role === "evidence" && anchor.exact && anchor.path)
+      .map((anchor) => anchor.path!.toLowerCase()),
+  );
+  if (currentPaths.size === 0 || !previousArtifact) return 0;
+  const previousPaths = new Set(
+    previousArtifact.anchors
+      .filter((anchor) => anchor.role === "evidence" && anchor.exact && anchor.path)
+      .map((anchor) => anchor.path!.toLowerCase()),
+  );
+  if (previousPaths.size === 0) return 0;
+  let shared = 0;
+  for (const path of currentPaths) {
+    if (previousPaths.has(path)) shared += 1;
+  }
+  return clamp01(shared / Math.max(1, currentPaths.size));
+}
+
 function mirekCellParticleClassName(kind: MirekCellKind): string {
   switch (kind) {
     case "objective":
@@ -13094,13 +13192,16 @@ export function HelixAskPill({
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
-  const latestAskReplyId = askReplies[askReplies.length - 1]?.id ?? null;
+  const latestAskReply = askReplies[askReplies.length - 1] ?? null;
+  const latestAskReplyId = latestAskReply?.id ?? null;
   const debugCopyInFlightRef = useRef(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
+  const mirekReasoningArtifactRef = useRef<MirekReasoningArtifactV1 | null>(null);
+  const mirekObjectiveFingerprintRef = useRef<string | null>(null);
   const situationRoomId = useMemo(() => contextId?.trim() || "helix-room", [contextId]);
   const [situationRoomState, setSituationRoomState] = useState<SituationRoomState>(() =>
     createSituationRoomState(situationRoomId),
@@ -14062,13 +14163,75 @@ export function HelixAskPill({
       reasoningTheaterCanonicalState,
     ],
   );
-  const reasoningTheaterParticles = useMemo(() => {
-    if (!reasoningTheater) return [];
-    return buildReasoningTheaterParticles(
-      reasoningTheater.seed,
-      reasoningTheater.particleCount,
+  const mirekEvidenceAnchors = useMemo(() => {
+    const latestReplyDebug = latestAskReply?.debug;
+    return buildMirekEvidenceAnchors(
+      dedupeStrings([
+        ...collectMirekEvidencePathsFromLiveEvents(askLiveEvents),
+        ...collectMirekEvidencePathsFromValue(latestReplyDebug),
+      ]),
     );
-  }, [reasoningTheater]);
+  }, [askLiveEvents, latestAskReply]);
+  const mirekObjectiveFingerprint = useMemo(() => {
+    const objective = askActiveQuestion?.trim() || latestAskReply?.question?.trim() || contextId || "helix";
+    return hash32(objective.toLowerCase()).toString(16);
+  }, [askActiveQuestion, contextId, latestAskReply]);
+  const mirekReasoningArtifact = useMemo(() => {
+    if (!reasoningTheater) return null;
+    const previousArtifact = mirekReasoningArtifactRef.current;
+    return buildMirekReasoningArtifact({
+      canonicalState: reasoningTheaterCanonicalState
+        ? (reasoningTheaterCanonicalState as unknown as MirekReasoningCanonicalStateV1)
+        : null,
+      fallbackState: reasoningTheaterCanonicalState
+        ? null
+        : {
+            traceId: askLiveTraceId ?? latestAskReply?.id ?? "helix-live",
+            phase: reasoningTheater.phase,
+            stance: reasoningTheater.stance,
+            archetype: reasoningTheater.archetype,
+            certaintyClass: reasoningTheater.certaintyClass,
+            suppressionReason: reasoningTheater.suppressionReason,
+            momentum: reasoningTheater.momentum,
+            ambiguityPressure: reasoningTheater.ambiguityPressure,
+            battleIndex: reasoningTheater.battleIndex,
+            seed: reasoningTheater.seed,
+            proofVerdict: null,
+            certificateIntegrityOk: null,
+          },
+      traceEvents: askLiveEvents,
+      anchors: mirekEvidenceAnchors,
+      previousArtifact,
+      objectiveFingerprint: mirekObjectiveFingerprint,
+      previousObjectiveFingerprint: mirekObjectiveFingerprintRef.current,
+      sharedExactPathRatio: calculateMirekSharedExactPathRatio(mirekEvidenceAnchors, previousArtifact),
+      capsuleContinuityScore: contextCapsuleDetectedId ? 0.7 : 0,
+      width: 36,
+      height: 9,
+      ticks: 3,
+      turnId: latestAskReply?.id ?? null,
+      sessionId: askLiveSessionId ?? helixAskSessionRef.current,
+    });
+  }, [
+    askLiveEvents,
+    askLiveSessionId,
+    askLiveTraceId,
+    contextCapsuleDetectedId,
+    latestAskReply,
+    mirekEvidenceAnchors,
+    mirekObjectiveFingerprint,
+    reasoningTheater,
+    reasoningTheaterCanonicalState,
+  ]);
+  useEffect(() => {
+    if (!mirekReasoningArtifact) return;
+    mirekReasoningArtifactRef.current = mirekReasoningArtifact;
+    mirekObjectiveFingerprintRef.current = mirekObjectiveFingerprint;
+  }, [mirekReasoningArtifact, mirekObjectiveFingerprint]);
+  const reasoningTheaterParticles = useMemo(() => {
+    if (!mirekReasoningArtifact) return [];
+    return buildReasoningTheaterParticlesFromMirekArtifact(mirekReasoningArtifact);
+  }, [mirekReasoningArtifact]);
   const reasoningTheaterFrontierParticles = useMemo(() => {
     if (!reasoningTheater) return [];
     return buildReasoningTheaterFrontierParticles(
@@ -25368,11 +25531,11 @@ export function HelixAskPill({
           deterministicManualAction.action_id !== "open"
           ? deterministicManualAction
           : null;
-      if (clientOwnedCalculatorAction) {
+      if (clientOwnedCalculatorAction && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
         parsedWorkstationCommand = clientOwnedCalculatorAction;
       }
       const unifiedAskTurnOwnsManualDispatch =
-        HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch && !clientOwnedCalculatorAction;
+        HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch;
       if (!bypassWorkstationDispatch && !unifiedAskTurnOwnsManualDispatch) {
         const pendingResolution = resolveWorkstationActionFromPendingInput(trimmed, "run_ask", runAskTurnId);
         if (pendingResolution.handled) {
@@ -28621,7 +28784,7 @@ export function HelixAskPill({
                         {reasoningTheaterParticles.map((particle) => (
                           <span
                             key={particle.id}
-                            className="absolute rounded-full bg-cyan-200/80 animate-pulse"
+                            className={`absolute rounded-full animate-pulse ${mirekCellParticleClassName(particle.kind)}`}
                             style={{
                               left: `${particle.leftPct}%`,
                               top: `${particle.topPct}%`,

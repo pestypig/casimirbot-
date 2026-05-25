@@ -356,6 +356,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("clipboard_debug_copy_required_for_prompt_submission: false");
   });
 
+  it("does not let calculator Ask prompts bypass the unified backend turn owner", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("clientOwnedCalculatorAction && !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG");
+    expect(source).toContain("HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch");
+    expect(source).not.toContain("HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG && !bypassWorkstationDispatch && !clientOwnedCalculatorAction");
+  });
+
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("buildHelixTurnTranscriptRows");
