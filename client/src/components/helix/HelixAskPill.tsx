@@ -6846,10 +6846,18 @@ function readProceduralStatusClass(status: string): string {
 }
 
 function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
+  const replyRecord = readAgentLoopAuditRecord(reply);
   const truthTable = readAgentLoopAuditRecord(reply.debug?.turn_truth_table);
   const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
   const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
   const agentLoopAudit = readAgentLoopAuditRecord(reply.debug?.agent_loop_audit);
+  const uiDebugParityHarness = readAgentLoopAuditRecord(
+    replyRecord?.ui_debug_parity_harness ?? reply.debug?.ui_debug_parity_harness,
+  );
+  const agentRuntimeLoop = readAgentLoopAuditRecord(
+    replyRecord?.agent_runtime_loop ?? reply.debug?.agent_runtime_loop,
+  );
+  const runtimeIterations = readAgentLoopAuditArray(agentRuntimeLoop?.iterations);
   const planItems = readAgentLoopAuditArray(truthTable?.plan_items ?? plannerContract?.plan_items);
   const observations = readAgentLoopAuditArray(truthTable?.runtime_observations ?? runtimeSummary?.observations);
   const appendedSteps = readAgentLoopAuditArray(runtimeSummary?.appended_steps);
@@ -6859,7 +6867,15 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   const route = visibleResolvedTurn.primary_route_label;
   const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
   const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
-  const truthMatchesVisible = Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
+  const parityMatchesVisible =
+    typeof uiDebugParityHarness?.ui_answer_equals_terminal_authority_text === "boolean"
+      ? uiDebugParityHarness.ui_answer_equals_terminal_authority_text
+      : typeof uiDebugParityHarness?.ui_answer_equals_selected_final_answer === "boolean"
+        ? uiDebugParityHarness.ui_answer_equals_selected_final_answer
+        : null;
+  const truthMatchesVisible =
+    parityMatchesVisible ??
+    Boolean(terminalText && visibleAnswer && terminalText.trim() === visibleAnswer.trim());
   const pendingInput =
     visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present
       ? readHelixTopLevelPendingServerRequest(reply)
@@ -6871,7 +6887,7 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
     extraSources: [truthTable, runtimeSummary, agentLoopAudit],
   });
 
-  if (!truthTable && planItems.length === 0 && observations.length === 0 && !terminal) {
+  if (!truthTable && runtimeIterations.length === 0 && planItems.length === 0 && observations.length === 0 && !terminal) {
     return null;
   }
 
@@ -6882,17 +6898,44 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
     status: string;
   }> = [];
 
-  planItems.slice(0, 8).forEach((item, index) => {
+  const runtimeActionLabels: string[] = [];
+
+  runtimeIterations.slice(0, 12).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
-    const actionLabel = readProceduralActionLabel(record?.action);
-    const lane = String(record?.lane ?? "step");
+    const chosenCapability = typeof record?.chosen_capability === "string" ? record.chosen_capability.trim() : "";
+    const executedAction = typeof record?.executed_action_key === "string" ? record.executed_action_key.trim() : "";
+    const actionLabel = executedAction || chosenCapability || String(record?.next_step ?? "model step");
+    const authority = String(record?.decision_authority ?? record?.decision_source ?? "unknown");
+    const producedArtifacts = Array.isArray(record?.produced_artifacts)
+      ? (record.produced_artifacts as unknown[]).map((entry) => String(entry)).filter(Boolean).join(", ")
+      : "";
+    if (executedAction || chosenCapability) runtimeActionLabels.push(executedAction || chosenCapability);
     rows.push({
-      key: `plan-${index}`,
-      label: `Plan ${index + 1}: ${lane}`,
-      detail: actionLabel !== "model step" ? actionLabel : clipText(String(record?.title ?? record?.id ?? "planned step"), 140),
-      status: String(record?.status ?? "planned"),
+      key: `runtime-${index}`,
+      label: `Runtime ${String(record?.iteration ?? index + 1)}: ${String(record?.next_step ?? "step")}`,
+      detail: `${authority}: ${actionLabel}${producedArtifacts ? ` -> ${producedArtifacts}` : ""}`,
+      status:
+        record?.observation_role === "tool_error" || record?.status === "failed"
+          ? "failed"
+          : record?.next_step === "ask_user"
+            ? "pending_input"
+            : "completed",
     });
   });
+
+  if (runtimeIterations.length === 0) {
+    planItems.slice(0, 8).forEach((item, index) => {
+      const record = readAgentLoopAuditRecord(item);
+      const actionLabel = readProceduralActionLabel(record?.action);
+      const lane = String(record?.lane ?? "step");
+      rows.push({
+        key: `plan-${index}`,
+        label: `Plan ${index + 1}: ${lane}`,
+        detail: actionLabel !== "model step" ? actionLabel : clipText(String(record?.title ?? record?.id ?? "planned step"), 140),
+        status: String(record?.status ?? "planned"),
+      });
+    });
+  }
 
   appendedSteps.slice(0, 6).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
@@ -6963,7 +7006,12 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
       </div>
       <p className="mt-1 text-[11px] text-cyan-100/80">
         Route: {route}
-        {selectedTool ? ` | Tool: ${readProceduralActionLabel(selectedTool)}` : ""}
+        {runtimeActionLabels.length > 0
+          ? ` | Tool: ${runtimeActionLabels[0]}`
+          : selectedTool
+            ? ` | Tool: ${readProceduralActionLabel(selectedTool)}`
+            : ""}
+        {typeof agentRuntimeLoop?.stop_reason === "string" ? ` | Runtime: ${agentRuntimeLoop.stop_reason}` : ""}
       </p>
       <div className="mt-2 space-y-1.5">
         {rows.slice(0, 18).map((row, index) => (

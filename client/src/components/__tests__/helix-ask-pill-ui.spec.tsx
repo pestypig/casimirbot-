@@ -376,6 +376,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("function renderProceduralTurnTimeline");
     expect(source).toContain("reply.debug?.turn_truth_table");
+    expect(source).toContain("ui_answer_equals_terminal_authority_text");
+    expect(source).toContain("replyRecord?.agent_runtime_loop");
+    expect(source).toContain("executed_action_key");
     expect(source).toContain("Procedural workspace timeline");
     expect(source).toContain("backend terminal == visible answer");
     expect(source).toContain("Appended step:");
