@@ -199,7 +199,6 @@ export function locateTheoryBadges(args: {
   );
   const atlasPrimaryBadgeIds = new Set(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.primaryBadgeIds));
   const atlasSubjectPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.subjects));
-  const atlasSymbolPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.symbols));
   const atlasUnitSignaturePriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.unitSignatures));
   const atlasEquationFamilyPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.equationFamilies));
   const atlasSimulationOwnerPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.simulationOwners));
