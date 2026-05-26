@@ -9352,6 +9352,9 @@ function classifyAskLiveAgenticEventRow(event: AskLiveEventEntry): Pick<
 
 function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
   const { stage, detail, body } = resolveAskLiveEventStageParts(event);
+  const combined = `${body} ${stage} ${detail} ${event.text ?? ""}`;
+  const progressNotice = normalizeAskLiveProgressNotice(combined);
+  if (progressNotice !== combined) return progressNotice;
   const detailLower = detail.toLowerCase();
   if (body && !/^start$|^done$|^error$/i.test(detail)) {
     return clipText(body, 180);
@@ -9553,6 +9556,22 @@ const ASK_LIVE_FALLBACK_SIGNAL_RULES: Array<{
   { id: "deterministic_fallback", pattern: /deterministic[_\s-]?fallback/i },
 ];
 
+function isAskLiveMissingArtifactProgressText(value: string): boolean {
+  return /\b(?:missing_artifacts|missing_required_artifacts|blocked_missing_artifacts|required artifacts were satisfied|required artifacts are satisfied)\b/i.test(
+    value,
+  );
+}
+
+function isAskLiveTerminalFailureText(value: string): boolean {
+  return /\b(?:final_failure|typed_failure|fail_closed|terminal_error|terminal failure|Cause:)\b/i.test(value);
+}
+
+function normalizeAskLiveProgressNotice(value: string): string {
+  return isAskLiveMissingArtifactProgressText(value) && !isAskLiveTerminalFailureText(value)
+    ? "Waiting for required tool receipt..."
+    : value;
+}
+
 function formatAskLiveFallbackSignal(signal: string): string {
   switch (signal) {
     case "objective_loop_primary_suppressed":
@@ -9583,6 +9602,9 @@ function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
     haystackParts.push(safeJsonStringify(metaRecord));
   }
   const haystack = haystackParts.join(" ");
+  if (isAskLiveMissingArtifactProgressText(haystack) && !isAskLiveTerminalFailureText(haystack)) {
+    return false;
+  }
   return /\b(error|fail|failed|blocked|fallback|suppressed|unknown_terminal|no_context|unresolved)\b/i.test(
     haystack,
   );
@@ -9598,6 +9620,9 @@ function collectAskLiveFallbackSignals(events: AskLiveEventEntry[]): string[] {
       haystackParts.push(safeJsonStringify(metaRecord));
     }
     const haystack = haystackParts.join(" ");
+    if (isAskLiveMissingArtifactProgressText(haystack) && !isAskLiveTerminalFailureText(haystack)) {
+      return;
+    }
     ASK_LIVE_FALLBACK_SIGNAL_RULES.forEach((rule) => {
       if (rule.pattern.test(haystack)) {
         matched.push(rule.id);
