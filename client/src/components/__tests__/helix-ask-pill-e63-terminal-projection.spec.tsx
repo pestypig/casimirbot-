@@ -100,6 +100,51 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(text).not.toMatch(/^Search results:/);
   });
 
+  it("prefers terminal envelope text over stale selected_final_answer", () => {
+    const reply = {
+      id: "turn-e63-envelope",
+      turn_id: "turn-e63-envelope",
+      content: "stale content",
+      selected_final_answer: "stale selected answer",
+      final_answer_source: "artifact_synthesis",
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: "authoritative envelope answer",
+        terminal_kind: "direct_answer_text",
+        final_answer_source: "artifact_synthesis",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: "authoritative envelope answer",
+      },
+    };
+
+    expect(chooseVisibleFinalText(reply as never)).toBe("authoritative envelope answer");
+  });
+
+  it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {
+    const reply = {
+      id: "turn-e63-source-no-authority",
+      turn_id: "turn-e63-source-no-authority",
+      content: "stale content",
+      selected_final_answer: "legacy ghost answer",
+      final_answer_source: "artifact_synthesis",
+      canonical_goal_frame: {
+        goal_kind: "doc_open_best",
+      },
+      source_target_intent: {
+        target_source: "active_doc",
+        strength: "hard",
+      },
+    };
+
+    const text = chooseVisibleFinalText(reply as never);
+
+    expect(text).toContain("terminal_authority_missing");
+    expect(text).not.toContain("legacy ghost answer");
+  });
+
   it("uses authoritative final live event text over stale typed failure projection", () => {
     const reply = {
       id: "turn-e63-live-final",

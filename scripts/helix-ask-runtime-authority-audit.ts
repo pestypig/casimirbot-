@@ -3,9 +3,15 @@ import * as path from "node:path";
 import * as process from "node:process";
 
 type Severity = "P0" | "P1" | "P2";
+type P2Bucket =
+  | "P2_REAL_PROJECTION_RISK"
+  | "P2_ACTION_EXECUTION_RISK"
+  | "P2_LEGACY_COMPATIBILITY"
+  | "P2_AUDIT_SELF_REFERENCE";
 
 type Finding = {
   severity: Severity;
+  p2_bucket?: P2Bucket;
   code: string;
   file: string;
   line: number;
@@ -95,6 +101,18 @@ function isClientProjectionFile(file: string): boolean {
   return file.startsWith("client/");
 }
 
+function isAuditSelfReference(file: string): boolean {
+  return approvedAuditFiles.has(file);
+}
+
+function isClientProjectionCompatibilityLine(file: string, trimmed: string): boolean {
+  if (!isClientProjectionFile(file)) return false;
+  if (/resolveHelixVisibleTerminal|terminalResolution|visibleTerminal|visibleResolvedTurn|debug|parity|snapshot|export|invariant/i.test(trimmed)) {
+    return true;
+  }
+  return /^\w[\w$]*:\s*/.test(trimmed);
+}
+
 function isReadOnlyDiagnosticFile(file: string): boolean {
   return readOnlyDiagnosticFilePattern.test(file);
 }
@@ -120,6 +138,9 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
     if (isClientProjectionFile(file)) {
       return {
         severity: "P2",
+        p2_bucket: isClientProjectionCompatibilityLine(file, trimmed)
+          ? "P2_LEGACY_COMPATIBILITY"
+          : "P2_REAL_PROJECTION_RISK",
         code: "client_terminal_projection_legacy_field",
         file,
         line: lineNumber,
@@ -165,6 +186,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
   if (shortcutPattern.test(trimmed) && !/candidate|forbidden|test|contract|type|interface/i.test(trimmed)) {
     return {
       severity: "P2",
+      p2_bucket: isAuditSelfReference(file) ? "P2_AUDIT_SELF_REFERENCE" : "P2_LEGACY_COMPATIBILITY",
       code: "legacy_shortcut_marker",
       file,
       line: lineNumber,
@@ -204,11 +226,20 @@ for (const file of files) {
 const p0 = findings.filter((finding) => finding.severity === "P0");
 const p1 = findings.filter((finding) => finding.severity === "P1");
 const p2 = findings.filter((finding) => finding.severity === "P2");
+const p2Buckets: Record<P2Bucket, number> = {
+  P2_REAL_PROJECTION_RISK: 0,
+  P2_ACTION_EXECUTION_RISK: 0,
+  P2_LEGACY_COMPATIBILITY: 0,
+  P2_AUDIT_SELF_REFERENCE: 0,
+};
+for (const finding of findings) {
+  if (finding.p2_bucket) p2Buckets[finding.p2_bucket] += 1;
+}
 
 if (json) {
-  console.log(JSON.stringify({ schema: "helix.ask.runtime_authority_audit.v1", finding_count: findings.length, counts: { P0: p0.length, P1: p1.length, P2: p2.length }, findings }, null, 2));
+  console.log(JSON.stringify({ schema: "helix.ask.runtime_authority_audit.v1", finding_count: findings.length, counts: { P0: p0.length, P1: p1.length, P2: p2.length, ...p2Buckets }, findings }, null, 2));
 } else {
-  console.log(`Helix Ask runtime authority audit: ${findings.length} findings (P0=${p0.length}, P1=${p1.length}, P2=${p2.length})`);
+  console.log(`Helix Ask runtime authority audit: ${findings.length} findings (P0=${p0.length}, P1=${p1.length}, P2=${p2.length}, P2_REAL_PROJECTION_RISK=${p2Buckets.P2_REAL_PROJECTION_RISK}, P2_ACTION_EXECUTION_RISK=${p2Buckets.P2_ACTION_EXECUTION_RISK})`);
   for (const finding of findings.slice(0, 120)) {
     console.log(`${finding.severity} ${finding.code} ${finding.file}:${finding.line}`);
     console.log(`  ${finding.text.slice(0, 220)}`);

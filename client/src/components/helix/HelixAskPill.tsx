@@ -61,6 +61,7 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
+import { resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore } from "@/lib/helix/resolveHelixVisibleTerminal";
 import {
   adoptServerVisualProducerPolicies,
   getActiveVisualFrameStream,
@@ -6797,6 +6798,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     (terminalErrorCode ? "typed_failure" : "unknown");
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
+  const terminalResolution = resolveHelixVisibleTerminalCore(reply);
   const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
   const selectedFinalAnswerCandidate =
     isTypedFailure
@@ -6820,7 +6822,14 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         )
       : "";
   const selectedFinalAnswerRaw =
-    situationContextAnswer
+    terminalResolution.text &&
+    terminalResolution.source !== "legacy_shadow" &&
+    terminalResolution.source !== "empty" &&
+    terminalResolution.source !== "typed_failure"
+      ? terminalResolution.text
+      : terminalResolution.source === "typed_failure" && !liveFinalAnswer
+      ? terminalResolution.text
+      : situationContextAnswer
       ? situationContextAnswer
       : liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
       ? liveFinalAnswer
@@ -6895,108 +6904,11 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
 }
 
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
-  const record = readAgentLoopAuditRecord(value);
-  const replyRecord = record as HelixAskReply | null;
-  if (replyRecord?.id && replyRecord.content !== undefined) {
-    const visible = buildVisibleResolvedTurn(replyRecord);
-    const selected = chooseVisibleFinalText(replyRecord);
-    if (selected) {
-      return {
-        text: selected,
-        source: visible.primary_source_label.replace(/\s+/g, "_"),
-        backendTerminalText: visible.selected_final_answer || selected,
-      };
-    }
-  }
-  const debugRecord = readAgentLoopAuditRecord(record?.debug);
-  const envelopeRecord = readAgentLoopAuditRecord(record?.envelope);
-  const agentLoopAudit = readAgentLoopAuditRecord(record?.agent_loop_audit ?? debugRecord?.agent_loop_audit);
-  const turnTruthTable = readAgentLoopAuditRecord(record?.turn_truth_table ?? debugRecord?.turn_truth_table);
-  const truthTerminal = readAgentLoopAuditRecord(turnTruthTable?.terminal);
-  const runtimeSummary = readAgentLoopAuditRecord(record?.turn_runtime ?? debugRecord?.turn_runtime ?? agentLoopAudit?.runtime_summary);
-  const runtimeTerminal = readAgentLoopAuditRecord(runtimeSummary?.terminal);
-  const terminalArtifact = readAgentLoopAuditRecord(
-    record?.terminal_artifact ??
-      debugRecord?.terminal_artifact ??
-      record?.latest_result_artifact ??
-      debugRecord?.latest_result_artifact ??
-      agentLoopAudit?.latest_result_artifact,
-  );
-  const turnContract = readAgentLoopAuditRecord(record?.turn_contract ?? debugRecord?.turn_contract ?? agentLoopAudit?.terminal_contract);
-  const candidates: Array<{ source: string; text: string | null }> = [
-    {
-      source: "selected_final_answer",
-      text: typeof record?.selected_final_answer === "string" ? record.selected_final_answer.trim() : null,
-    },
-    {
-      source: "debug.selected_final_answer",
-      text: typeof debugRecord?.selected_final_answer === "string" ? debugRecord.selected_final_answer.trim() : null,
-    },
-    {
-      source: "terminal_artifact",
-      text: readHelixAskTerminalText(terminalArtifact),
-    },
-    {
-      source: "turn_contract.terminal_text",
-      text: typeof turnContract?.terminal_text === "string" ? turnContract.terminal_text.trim() : null,
-    },
-    {
-      source: "runtime_terminal",
-      text: readHelixAskTerminalText(runtimeTerminal),
-    },
-    {
-      source: "turn_truth_table.terminal",
-      text: readHelixAskTerminalText(truthTerminal),
-    },
-    {
-      source: "assistant_answer",
-      text: typeof record?.assistant_answer === "string" ? record.assistant_answer.trim() : null,
-    },
-    {
-      source: "envelope.assistant_answer",
-      text: typeof envelopeRecord?.assistant_answer === "string" ? envelopeRecord.assistant_answer.trim() : null,
-    },
-    {
-      source: "envelope.answer",
-      text: typeof envelopeRecord?.answer === "string" ? envelopeRecord.answer.trim() : null,
-    },
-    {
-      source: "text",
-      text: typeof record?.text === "string" ? record.text.trim() : null,
-    },
-    {
-      source: "answer",
-      text: typeof record?.answer === "string" ? record.answer.trim() : null,
-    },
-    {
-      source: "content",
-      text: typeof record?.content === "string" ? record.content.trim() : null,
-    },
-    {
-      source: "fallback_content",
-      text: typeof fallbackContent === "string" ? fallbackContent.trim() : null,
-    },
-  ];
-  const selected = candidates.find((candidate: { source: string; text: string | null }) =>
-    Boolean(candidate.text && !isInvalidTerminalAnswerText(candidate.text)),
-  );
-  const backendTerminalText =
-    (typeof record?.selected_final_answer === "string" && record.selected_final_answer.trim()
-      ? record.selected_final_answer.trim()
-      : null) ??
-    (typeof debugRecord?.selected_final_answer === "string" && debugRecord.selected_final_answer.trim()
-      ? debugRecord.selected_final_answer.trim()
-      : null) ??
-    readHelixAskTerminalText(terminalArtifact) ??
-    (typeof turnContract?.terminal_text === "string" && turnContract.terminal_text.trim()
-      ? turnContract.terminal_text.trim()
-      : null) ??
-    readHelixAskTerminalText(runtimeTerminal) ??
-    readHelixAskTerminalText(truthTerminal);
+  const terminal = resolveHelixVisibleTerminalCore(value, fallbackContent);
   return {
-    text: selected?.text ?? "",
-    source: selected?.source ?? "empty",
-    backendTerminalText,
+    text: terminal.text,
+    source: terminal.source,
+    backendTerminalText: terminal.backendTerminalText,
   };
 }
 
@@ -9114,6 +9026,116 @@ function buildAskLiveEventLogExport(events: AskLiveEventEntry[]): string {
   return events.map((event) => formatAskLiveEventLogLine(event)).join("\n");
 }
 
+function humanizeAskLiveEventToken(value: string): string {
+  const cleaned = value
+    .replace(/^Helix Ask:\s*/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  return cleaned.replace(/\b(?:llm|api|id|url|ui)\b/gi, (token) => token.toUpperCase());
+}
+
+function resolveAskLiveEventStageParts(event: AskLiveEventEntry): {
+  stage: string;
+  detail: string;
+  body: string;
+} {
+  const meta = asObjectRecord(event.meta);
+  const rawText = (event.text ?? "").trim();
+  const [rawHeader = "", ...bodyLines] = rawText.split(/\n+/);
+  const header = rawHeader.replace(/^Helix Ask:\s*/i, "").trim();
+  const [headerStage = "", ...headerDetailParts] = header.split(/\s+-\s+/);
+  const stage =
+    humanizeAskLiveEventToken(
+      typeof meta?.stage === "string" && meta.stage.trim() ? meta.stage : headerStage,
+    ) || "Agent step";
+  const detail =
+    humanizeAskLiveEventToken(
+      typeof meta?.detail === "string" && meta.detail.trim()
+        ? meta.detail
+        : headerDetailParts.join(" - "),
+    );
+  const body = summarizeVoiceDebugText(bodyLines.join(" "), 180);
+  return { stage, detail, body };
+}
+
+function classifyAskLiveAgenticEventRow(event: AskLiveEventEntry): Pick<
+  AskLiveAgenticEventRow,
+  "label" | "tone"
+> {
+  const meta = asObjectRecord(event.meta);
+  const { stage, detail } = resolveAskLiveEventStageParts(event);
+  const haystack = `${event.tool ?? ""} ${stage} ${detail} ${event.text ?? ""} ${safeJsonStringify(meta ?? {})}`;
+  if (isAskLiveEventWarning(event)) return { label: "Notice", tone: "warning" };
+  if (/\b(final|terminal|complete|completed|answer)\b/i.test(haystack)) {
+    return { label: "Final", tone: "final" };
+  }
+  if (/\b(decision|choose|chosen|selected|route|dispatch|handoff)\b/i.test(haystack)) {
+    return { label: "Decision", tone: "decision" };
+  }
+  if (/\b(done|observed|observation|result|receipt|retrieved|evidence)\b/i.test(haystack)) {
+    return { label: "Observation", tone: "observation" };
+  }
+  if (/\b(llm|model|draft|synthes|reason|think|commentary)\b/i.test(haystack)) {
+    return { label: "Thinking", tone: "thinking" };
+  }
+  return { label: "Working", tone: "default" };
+}
+
+function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
+  const { stage, detail, body } = resolveAskLiveEventStageParts(event);
+  const detailLower = detail.toLowerCase();
+  if (body && !/^start$|^done$|^error$/i.test(detail)) {
+    return clipText(body, 180);
+  }
+  if (detailLower === "start") return `${stage} started.`;
+  if (detailLower === "done") return `${stage} finished.`;
+  if (detailLower === "error") return `${stage} hit a problem.`;
+  if (detail) return `${stage}: ${detail}.`;
+  return `${stage}.`;
+}
+
+function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgenticEventRow[] {
+  return events
+    .filter((event) => !isAskLiveEventSuperseded(event))
+    .slice(-18)
+    .map((event, index) => {
+      const tsMs = resolveAskLiveEventTimestampMs(event);
+      const timestamp =
+        tsMs === null
+          ? ""
+          : new Date(tsMs).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            });
+      const duration =
+        typeof event.durationMs === "number" && Number.isFinite(event.durationMs)
+          ? `${Math.max(0, Math.round(event.durationMs))}ms`
+          : "";
+      const classified = classifyAskLiveAgenticEventRow(event);
+      return {
+        key: `${event.id}:agentic:${index}`,
+        ...classified,
+        text: buildAskLiveAgenticEventText(event),
+        meta: [timestamp, duration].filter(Boolean).join(" / "),
+      };
+    });
+}
+
+function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
+  const base = latest
+    ? "border-slate-500/40 bg-slate-950/35 text-slate-100"
+    : "border-slate-700/35 bg-black/10 text-slate-300/90";
+  if (row.tone === "warning") return `${base} text-amber-100 border-amber-300/30 bg-amber-950/15`;
+  if (row.tone === "thinking") return `${base} text-cyan-100/95`;
+  if (row.tone === "observation") return `${base} text-emerald-100/90`;
+  if (row.tone === "decision") return `${base} text-indigo-100/95`;
+  if (row.tone === "final") return `${base} text-violet-100/95`;
+  return base;
+}
+
 function resolveObjectiveReasoningTrace(
   debug: HelixAskReply["debug"] | undefined,
 ): HelixAskObjectiveReasoningTrace[] {
@@ -9264,6 +9286,27 @@ const ASK_LIVE_FALLBACK_SIGNAL_RULES: Array<{
   { id: "deterministic_fallback", pattern: /deterministic[_\s-]?fallback/i },
 ];
 
+function formatAskLiveFallbackSignal(signal: string): string {
+  switch (signal) {
+    case "objective_loop_primary_suppressed":
+      return "Primary objective loop deferred";
+    case "objective_unresolved":
+      return "Objective still unresolved";
+    case "unknown_terminal":
+      return "Terminal answer not established";
+    case "retrieval_no_context":
+      return "Retrieval lacked usable context";
+    case "assembly_fail_closed":
+      return "Assembly closed on an evidence gap";
+    case "stage0_empty_candidates":
+      return "No initial candidates found";
+    case "deterministic_fallback":
+      return "Policy fallback used";
+    default:
+      return humanizeAskLiveEventToken(signal);
+  }
+}
+
 function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
   const metaRecord = asObjectRecord(event.meta);
   const metaOk = typeof metaRecord?.ok === "boolean" ? metaRecord.ok : null;
@@ -9321,6 +9364,14 @@ type UnifiedDebugEventRow = {
   stage: string | null;
   detail: string | null;
   text: string;
+};
+
+type AskLiveAgenticEventRow = {
+  key: string;
+  label: "Thinking" | "Working" | "Observation" | "Decision" | "Final" | "Notice";
+  text: string;
+  meta: string;
+  tone: "default" | "thinking" | "observation" | "decision" | "warning" | "final";
 };
 
 type ObserverCommentaryOptions = {
@@ -14405,6 +14456,12 @@ export function HelixAskPill({
     if (!mirekReasoningArtifact) return [];
     return buildReasoningTheaterParticlesFromMirekArtifact(mirekReasoningArtifact);
   }, [mirekReasoningArtifact]);
+  const mirekReasoningFieldStrength =
+    mirekReasoningArtifact?.source.provenanceMode === "strict_exact"
+      ? 1
+      : mirekReasoningArtifact?.source.provenanceMode === "derived"
+        ? 0.72
+        : 0.48;
   const reasoningTheaterFrontierParticles = useMemo(() => {
     if (!reasoningTheater) return [];
     return buildReasoningTheaterFrontierParticles(
@@ -25073,16 +25130,21 @@ export function HelixAskPill({
     };
   }, [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, contextId, updateReasoningAttempt]);
 
+  const askLiveAgenticEventRows = useMemo(
+    () => buildAskLiveAgenticEventRows(askLiveEvents),
+    [askLiveEvents],
+  );
+  const askLiveLatestAgenticEvent = askLiveAgenticEventRows[askLiveAgenticEventRows.length - 1] ?? null;
+  const askLivePriorAgenticEvents = askLiveAgenticEventRows.slice(0, -1).slice(-8);
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";
     if (!askBusy) {
       return statusTrimmed || null;
     }
-    const statusIsGenerating = !statusTrimmed || /^generating/i.test(statusTrimmed);
-    const lastEventText = askLiveEvents[askLiveEvents.length - 1]?.text?.trim();
-    if (lastEventText) {
-      return lastEventText;
+    if (askLiveLatestAgenticEvent?.text) {
+      return askLiveLatestAgenticEvent.text;
     }
+    const statusIsGenerating = !statusTrimmed || /^generating/i.test(statusTrimmed);
     const draftTail = askLiveDraft.trim();
     if (draftTail && statusIsGenerating) {
       const normalized = draftTail.replace(/\s+/g, " ").trim();
@@ -25094,7 +25156,7 @@ export function HelixAskPill({
       }
     }
     return statusTrimmed || null;
-  }, [askBusy, askLiveDraft, askLiveEvents, askStatus]);
+  }, [askBusy, askLiveDraft, askLiveLatestAgenticEvent, askStatus]);
 
   const askLiveFallbackSignals = useMemo(
     () => collectAskLiveFallbackSignals(askLiveEvents),
@@ -29040,7 +29102,10 @@ export function HelixAskPill({
                               top: `${particle.topPct}%`,
                               width: `${particle.sizePx}px`,
                               height: `${particle.sizePx}px`,
-                              opacity: particle.opacity * (0.35 + reasoningTheater.fogOpacity * 0.35),
+                              opacity:
+                                particle.opacity *
+                                (0.35 + reasoningTheater.fogOpacity * 0.35) *
+                                mirekReasoningFieldStrength,
                               animationDelay: `${particle.delayS}s`,
                               animationDuration: `${particle.durationS}s`,
                             }}
@@ -29064,15 +29129,7 @@ export function HelixAskPill({
                         <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
                           {REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]}
                         </span>
-                        {reasoningTheater.suppressionReason ? (
-                          <span className="text-[10px] uppercase tracking-[0.16em] text-rose-200/95">
-                            {REASONING_THEATER_SUPPRESSION_LABEL[reasoningTheater.suppressionReason]}
-                          </span>
-                        ) : null}
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-200/90">
-                        {reasoningTheater.symbolicLine}
-                      </p>
                       {reasoningTheaterMedalQueue.length > 0 ? (
                         <div className="pointer-events-none mt-1 space-y-1 text-cyan-100/95">
                           <div className="flex items-end gap-1.5">
@@ -29224,38 +29281,46 @@ export function HelixAskPill({
                 {askLiveFallbackSignals.length > 0 ? (
                   <p className="mt-2 whitespace-pre-wrap text-[10px] leading-5 text-amber-200/90">
                     <span className="text-[9px] uppercase tracking-[0.2em] text-amber-300">
-                      Fallback Signals
+                      Notices
                     </span>
                     {"\n"}
-                    {askLiveFallbackSignals.join(" | ")}
+                    {askLiveFallbackSignals.map(formatAskLiveFallbackSignal).join(" | ")}
                   </p>
                 ) : null}
-                {askBusy && askLiveEvents.length > 0 ? (
-                  <div className="mt-2 max-h-44 overflow-y-auto rounded border border-slate-700/70 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-                    {askLiveEvents.map((entry) => {
-                      const warning = isAskLiveEventWarning(entry);
-                      const superseded = isAskLiveEventSuperseded(entry);
-                      return (
-                        <details
-                          key={entry.id}
-                          className={`mb-1 rounded border px-1.5 py-1 last:mb-0 ${
-                            superseded
-                              ? "border-slate-700/60 bg-slate-900/30 opacity-70"
-                              : warning
-                              ? "border-amber-400/40 bg-amber-950/15"
-                              : "border-slate-700/70 bg-black/20"
-                          }`}
+                {askBusy && askLiveAgenticEventRows.length > 0 ? (
+                  <div className="mt-2 border-t border-slate-700/40 pt-2 text-[10px] leading-5">
+                    <div className="max-h-24 overflow-y-auto pr-1">
+                      {askLivePriorAgenticEvents.map((row) => (
+                        <div
+                          key={row.key}
+                          className={`mb-1 grid grid-cols-[72px_minmax(0,1fr)] gap-2 border-l px-2 py-1 last:mb-0 ${askLiveAgenticEventClassName(row)}`}
                         >
-                          <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
-                            {formatAskLiveEventLogLine(entry)}
-                          </summary>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{entry.text}</p>
-                          <pre className="mt-1 whitespace-pre-wrap break-words text-slate-400">
-                            {buildAskLiveEventLogDetailPayload(entry)}
-                          </pre>
-                        </details>
-                      );
-                    })}
+                          <span className="uppercase tracking-[0.16em] text-slate-500">{row.label}</span>
+                          <span className="min-w-0 truncate text-slate-300/90">{row.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {askLiveLatestAgenticEvent ? (
+                      <div
+                        data-testid="helix-ask-live-latest-event"
+                        className={`mt-1 grid grid-cols-[72px_minmax(0,1fr)] gap-2 border-l px-2 py-1.5 ${askLiveAgenticEventClassName(
+                          askLiveLatestAgenticEvent,
+                          true,
+                        )}`}
+                      >
+                        <span className="uppercase tracking-[0.16em] text-slate-400">
+                          {askLiveLatestAgenticEvent.label}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate">{askLiveLatestAgenticEvent.text}</span>
+                          {askLiveLatestAgenticEvent.meta ? (
+                            <span className="block truncate text-[9px] uppercase tracking-[0.14em] text-slate-500">
+                              {askLiveLatestAgenticEvent.meta}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="mt-1 text-[11px] text-slate-500">
