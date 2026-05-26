@@ -157,6 +157,56 @@ describe("panelActionAdapters", () => {
     expect(secondCall?.question).toContain('Selected text: "Key excerpt"');
   });
 
+  it("returns same-turn docs observations for runtime-owned summarize and locate actions", () => {
+    const summarizeResult = executeHelixPanelAction(
+      {
+        panel_id: "docs-viewer",
+        action_id: "summarize_doc",
+        args: {
+          path: "/docs/papers.md",
+          selected_text: "This paper introduces the useful caveats.",
+          agent_step_decision_ref: "agent-step-doc-summary",
+        },
+      },
+      actionContext(),
+    );
+
+    expect(summarizeResult.ok).toBe(true);
+    expect(summarizeResult.artifact).toMatchObject({
+      kind: "doc_summary",
+      path: "/docs/papers.md",
+      decision_ref: "agent-step-doc-summary",
+      launched_prompt: false,
+      manual_ui_launch_only: false,
+    });
+    expect(hoisted.launchHelixAskPromptMock).not.toHaveBeenCalled();
+
+    const locateResult = executeHelixPanelAction(
+      {
+        panel_id: "docs-viewer",
+        action_id: "locate_in_doc",
+        args: {
+          path: "/docs/papers.md",
+          query: "caveats",
+          selected_text: "Useful caveats appear in this selected section.",
+          agent_step_decision_ref: "agent-step-doc-location",
+        },
+      },
+      actionContext(),
+    );
+
+    expect(locateResult.ok).toBe(true);
+    expect(locateResult.artifact).toMatchObject({
+      kind: "doc_location_matches",
+      path: "/docs/papers.md",
+      query: "caveats",
+      decision_ref: "agent-step-doc-location",
+      launched_prompt: false,
+    });
+    expect((locateResult.artifact?.matches as unknown[] | undefined)?.length).toBe(1);
+    expect(hoisted.launchHelixAskPromptMock).not.toHaveBeenCalled();
+  });
+
   it("creates and appends notes with deterministic artifacts", () => {
     const create = executeHelixPanelAction(
       {

@@ -19,7 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import StellarEvolutionLens from "@/components/panels/StellarEvolutionLens";
 import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
+import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/TheoryAtlasRail";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
 import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
@@ -29,6 +31,11 @@ import { useScientificCalculatorStore } from "@/store/useScientificCalculatorSto
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
+import {
+  STARSIM_STELLAR_EVOLUTION_STAGES,
+  type StarSimStellarEvolutionStage,
+  type StarSimStellarEvolutionStageId,
+} from "@shared/theory/starsim-stellar-evolution-map";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -459,15 +466,20 @@ export default function TheoryBadgeGraphPanel() {
   const [subject, setSubject] = useState("all");
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
+  const [selectedEvolutionStageId, setSelectedEvolutionStageId] =
+    useState<StarSimStellarEvolutionStageId | null>(null);
   const selectedId = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeId);
   const selectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeIds);
   const viewport = useTheoryBadgeGraphPanelStore((state) => state.viewport);
+  const activeLensId = useTheoryBadgeGraphPanelStore((state) => state.activeAtlasLensId);
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
   const rememberViewport = useTheoryBadgeGraphPanelStore((state) => state.rememberViewport);
+  const setActiveAtlasLensId = useTheoryBadgeGraphPanelStore((state) => state.setActiveAtlasLensId);
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
+  const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
   const playbackStore = useTheoryBadgePlaybackStore();
   const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
   const calculatorArtifact = useScientificCalculatorStore((state) => state.lastArtifactV1);
@@ -611,6 +623,28 @@ export default function TheoryBadgeGraphPanel() {
     });
   };
 
+  const selectEvolutionStage = (stage: StarSimStellarEvolutionStage) => {
+    if (!graph) return;
+    setSelectedEvolutionStageId(stage.id);
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    const stageBadgeIds = stage.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(stageBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: stageBadgeIds,
+      highlightedBadgeIds: stageBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: stage.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Stage 1 reduced-order prior only.`,
+      ),
+    });
+  };
+
   const runPathToBadge = (badgeId: string) => {
     if (!graph) return;
     void playbackStore.runPlayback({
@@ -619,10 +653,24 @@ export default function TheoryBadgeGraphPanel() {
     });
   };
 
+  const toggleAtlasLens = (lensId: TheoryAtlasLensId) => {
+    setActiveAtlasLensId(activeLensId === lensId ? null : lensId);
+  };
+
   if (viewMode === "map") {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-900 text-zinc-950">
-        <div className="flex h-full min-h-0 flex-col bg-zinc-900">
+      <div className="flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
+        <TheoryAtlasRail activeLensId={activeLensId} onSelectLens={toggleAtlasLens} />
+        {activeLensId === "starsim-stellar-evolution" && graph ? (
+          <StellarEvolutionLens
+            graph={graph}
+            stages={STARSIM_STELLAR_EVOLUTION_STAGES}
+            selectedStageId={selectedEvolutionStageId}
+            onSelectStage={selectEvolutionStage}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
+        <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
           <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
             {isLoading ? (
               <div className="p-4 text-sm text-zinc-200">Loading theory badge graph...</div>

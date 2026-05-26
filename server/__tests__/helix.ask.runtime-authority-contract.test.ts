@@ -126,6 +126,17 @@ describe("helix ask runtime authority contract", () => {
           },
         ],
       },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "receipt-1",
+          kind: "workspace_action_receipt",
+          payload: {
+            kind: "workspace_action_receipt",
+            panel_id: "docs-viewer",
+            action_id: "open",
+          },
+        },
+      ],
     };
 
     expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
@@ -180,6 +191,47 @@ describe("helix ask runtime authority contract", () => {
     const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.eligible).toBe(true);
     expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
+  it("does not let an unrelated current-turn artifact satisfy the selected capability observation", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "calculator_solve", required_terminal_kind: "calculator_receipt" },
+      terminal_artifact_kind: "calculator_receipt",
+      final_answer_source: "artifact_synthesis",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "calculator_solve",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-calculator",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "scientific-calculator.solve_expression",
+            observed_artifact_refs: ["doc-summary-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc-summary-1",
+          kind: "doc_summary",
+          payload: {
+            kind: "doc_summary",
+            path: "/docs/research/example.md",
+            text: "This is not a calculator receipt.",
+          },
+        },
+      ],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
   });
 
   it("allows clean typed failures for source/capability turns without minting a successful terminal", () => {

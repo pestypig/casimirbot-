@@ -684,6 +684,81 @@ function buildDocAnswerContract(mode: "summarize_doc" | "summarize_section" | "e
   };
 }
 
+function buildRuntimeDocsObservationArtifact(args: {
+  actionId: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc";
+  path: string;
+  anchor: string | null;
+  selectedText: string | null;
+  query: string | null;
+  decisionRef: string;
+}): Record<string, unknown> {
+  const route = normalizeDocRoute(args.path);
+  const entry = findDocEntry(route);
+  if (args.actionId === "locate_in_doc") {
+    const hasSelectedMatch =
+      Boolean(args.selectedText) &&
+      Boolean(args.query) &&
+      args.selectedText!.toLowerCase().includes(args.query!.toLowerCase());
+    return {
+      schema: "helix.doc_location_matches.v1",
+      kind: "doc_location_matches",
+      source: "docs_viewer_runtime_adapter",
+      decision_ref: args.decisionRef,
+      path: route,
+      title: entry?.title ?? null,
+      anchor: args.anchor,
+      query: args.query,
+      matches: hasSelectedMatch
+        ? [
+            {
+              path: route,
+              anchor: args.anchor,
+              snippet: args.selectedText,
+              source: "selected_text",
+            },
+          ]
+        : [],
+      adapter_note: hasSelectedMatch
+        ? "Matched against selected text in the current Docs Viewer context."
+        : "Runtime-owned client adapter returned a same-turn location observation without launching a nested Ask turn.",
+      launched_prompt: false,
+      manual_ui_launch_only: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  const selectedTextSummary = args.selectedText
+    ? args.selectedText.length > 360
+      ? `${args.selectedText.slice(0, 357)}...`
+      : args.selectedText
+    : null;
+  const modeLabel =
+    args.actionId === "summarize_section"
+      ? "section summary"
+      : args.actionId === "explain_paper"
+        ? "paper explanation"
+        : "document summary";
+  return {
+    schema: "helix.doc_summary.v1",
+    kind: "doc_summary",
+    source: "docs_viewer_runtime_adapter",
+    decision_ref: args.decisionRef,
+    mode: args.actionId,
+    path: route,
+    title: entry?.title ?? null,
+    anchor: args.anchor,
+    selected_text: selectedTextSummary,
+    summary_text: selectedTextSummary
+      ? `${modeLabel}: ${selectedTextSummary}`
+      : `${modeLabel}: ${entry?.title ?? route}`,
+    adapter_note: "Runtime-owned client adapter returned a same-turn doc summary observation without launching a nested Ask turn.",
+    launched_prompt: false,
+    manual_ui_launch_only: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
 export function executeHelixPanelAction(
   request: HelixPanelActionRequest,
   context: HelixPanelActionExecutionContext,
@@ -1019,6 +1094,7 @@ export function executeHelixPanelAction(
     const anchor = asNonEmptyString(args.anchor) ?? asNonEmptyString(store.anchor);
     const selectedText = asNonEmptyString(args.selected_text ?? args.selection_text ?? args.selection);
     const query = asNonEmptyString(args.query ?? args.topic ?? args.find);
+    const decisionRef = asNonEmptyString(args.agent_step_decision_ref ?? args.decision_ref ?? args.runtime_decision_ref);
     if (!path) {
       return {
         ok: false,
@@ -1033,6 +1109,25 @@ export function executeHelixPanelAction(
         panel_id: panelId,
         action_id: actionId,
         message: "docs-viewer.locate_in_doc requires query.",
+      };
+    }
+    if (decisionRef) {
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: buildRuntimeDocsObservationArtifact({
+          actionId,
+          path,
+          anchor,
+          selectedText,
+          query,
+          decisionRef,
+        }),
+        message:
+          actionId === "locate_in_doc"
+            ? "Returned same-turn document location observation."
+            : "Returned same-turn document summary observation.",
       };
     }
     const prompt = buildDocReasoningPrompt({
@@ -1061,6 +1156,7 @@ export function executeHelixPanelAction(
         query: query ?? null,
         selected_text: selectedText ?? null,
         launched_prompt: true,
+        manual_ui_launch_only: true,
       },
       message:
         actionId === "summarize_section"

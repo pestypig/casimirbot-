@@ -73,6 +73,67 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     );
   });
 
+  it("uses the StarSim stellar evolution lens to light mapped badges and load scalar formulas", async () => {
+    renderPanel();
+
+    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    expect(starSimLensButton).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Select Main Sequence" }));
+
+    await waitFor(() => {
+      expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toEqual(
+        expect.arrayContaining([
+          "starsim.observable.surface_temperature_proxy",
+          "starsim.fusion.pp_chain_prior",
+          "starsim.runtime.evaluate_fusion_microphysics",
+          "starsim.claim_boundary.stage1_reduced_order_prior",
+        ]),
+      );
+    });
+
+    fireEvent.click(screen.getByText("T_eff = T_sun*(L/(R^2))^(1/4)"));
+
+    await waitFor(() => {
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "T_{eff}=T_{sun}\\left(\\frac{L}{R^2}\\right)^{1/4}",
+      );
+    });
+  });
+
+  it("collapses the StarSim lens when its atlas block is clicked again", async () => {
+    renderPanel();
+
+    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
+
+    fireEvent.click(starSimLensButton);
+
+    expect(screen.queryByText("Stellar Evolution")).toBeNull();
+    expect(screen.getByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+
+    fireEvent.click(starSimLensButton);
+
+    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
+  });
+
+  it("remembers whether the StarSim lens is collapsed across remounts", async () => {
+    const firstRender = renderPanel();
+
+    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
+
+    fireEvent.click(starSimLensButton);
+
+    expect(screen.queryByText("Stellar Evolution")).toBeNull();
+    expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBeNull();
+
+    firstRender.unmount();
+    renderPanel();
+
+    expect(await screen.findByRole("button", { name: "StarSim stellar evolution lens" })).toBeTruthy();
+    expect(screen.queryByText("Stellar Evolution")).toBeNull();
+  });
+
   it("remembers selected badges and viewport position across remounts", async () => {
     const firstRender = renderPanel();
 

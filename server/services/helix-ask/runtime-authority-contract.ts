@@ -61,10 +61,52 @@ const readString = (value: unknown): string | null =>
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
+const readStringArray = (value: unknown): string[] =>
+  readArray(value).filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
+
 const payloadGoalKind = (payload: Record<string, unknown>): string | null =>
   readString(readRecord(payload.canonical_goal_frame)?.goal_kind) ??
   readString(readRecord(payload.goal_satisfaction_evaluation)?.canonical_goal_kind) ??
   readString(readRecord(payload.terminal_contract)?.goal_kind);
+
+const artifactKindMatchesCapability = (
+  capability: string,
+  artifact: Record<string, unknown> | null,
+): boolean => {
+  const kind = readString(artifact?.kind);
+  const payload = readRecord(artifact?.payload);
+  const payloadKind = readString(payload?.kind);
+  const schema = readString(payload?.schema);
+  const actionId = readString(payload?.action_id) ?? readString(readRecord(payload?.action)?.action_id);
+  const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
+  const joined = [kind, payloadKind, schema, actionId, panelId].filter(Boolean).join(" ");
+
+  if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
+  if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
+  if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);
+  if (capability === "docs-viewer.validate_doc_candidates") return /doc_candidate_validation|doc_search_results/i.test(joined);
+  if (capability === "docs-viewer.open_doc_by_path") return /doc_open_receipt|active_doc_path|workspace_action_receipt|doc_summary/i.test(joined);
+  if (capability === "docs-viewer.summarize_doc") return /doc_summary/i.test(joined);
+  if (capability === "docs-viewer.locate_in_doc") return /doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined);
+  if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
+  if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
+  if (capability.startsWith("live-source.") || capability.startsWith("situation-room.")) return /live_pipeline_receipt|live_source|visual_context_pack|situation_context_pack|permission_denied|workspace_action_receipt/i.test(joined);
+  if (capability.startsWith("process-graph.")) return /process_graph_overview|workspace_action_receipt/i.test(joined);
+  if (capability.includes(".")) return /tool_observation|workspace_action_receipt/i.test(joined);
+  return false;
+};
+
+const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): string[] => {
+  const toolObservation = readRecord(iteration.tool_observation);
+  return Array.from(new Set([
+    ...readStringArray(iteration.observed_artifact_refs),
+    ...readStringArray(iteration.artifact_refs),
+    ...readStringArray(iteration.created_artifact_refs),
+    ...readStringArray(toolObservation?.artifact_refs),
+    ...readStringArray(toolObservation?.observed_artifact_refs),
+    ...(readString(toolObservation?.artifact_id) ? [readString(toolObservation?.artifact_id) as string] : []),
+  ]));
+};
 
 export function isSourceCapabilityDiagnosticTurn(payload: Record<string, unknown>): boolean {
   const goalKind = payloadGoalKind(payload);
@@ -113,24 +155,24 @@ export function hasAgentRuntimeLoopDecisionChain(payload: Record<string, unknown
 export function hasSelectedCapabilityObservation(payload: Record<string, unknown>): boolean {
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations);
-  if (iterations.some((iteration) => {
-    const record = readRecord(iteration);
-    return Boolean(
-      readString(record?.chosen_capability) &&
-        (
-          readRecord(record?.tool_observation) ||
-          readArray(record?.artifact_refs).length > 0 ||
-          readArray(record?.created_artifact_refs).length > 0
-        ),
-    );
-  })) {
-    return true;
-  }
   const artifacts = readArray(payload.current_turn_artifact_ledger);
-  return artifacts.some((artifact) => {
+  const artifactById = new Map<string, Record<string, unknown>>();
+  for (const artifact of artifacts) {
     const record = readRecord(artifact);
-    const kind = readString(record?.kind);
-    return Boolean(kind && /tool_observation|workspace_action_receipt|calculator_receipt|doc_open_receipt|doc_search_results|doc_location_result|doc_summary|note_update_receipt|situation_context_pack|live_pipeline_receipt/i.test(kind));
+    const artifactId = readString(record?.artifact_id);
+    if (record && artifactId) artifactById.set(artifactId, record);
+  }
+
+  return iterations.some((iteration) => {
+    const record = readRecord(iteration);
+    const capability = readString(record?.chosen_capability);
+    if (!record || !capability || capability === "model.direct_answer") return false;
+    const refs = observedArtifactRefsForIteration(record);
+    if (refs.some((ref) => artifactKindMatchesCapability(capability, artifactById.get(ref) ?? null))) return true;
+    const toolObservation = readRecord(record.tool_observation);
+    if (!toolObservation) return false;
+    const status = readString(toolObservation.status);
+    return /completed|observed|ok|success/i.test(status ?? "") && refs.length > 0;
   });
 }
 

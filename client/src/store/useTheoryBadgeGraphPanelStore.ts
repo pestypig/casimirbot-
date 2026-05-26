@@ -8,14 +8,18 @@ type TheoryBadgeGraphViewport = {
   scrollTop: number;
 };
 
+export type TheoryBadgeGraphAtlasLensId = "starsim-stellar-evolution";
+
 type TheoryBadgeGraphPanelState = {
   selectedBadgeId: string | null;
   selectedBadgeIds: string[];
   viewport: TheoryBadgeGraphViewport;
+  activeAtlasLensId: TheoryBadgeGraphAtlasLensId | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
   rememberViewport: (viewport: TheoryBadgeGraphViewport) => void;
+  setActiveAtlasLensId: (lensId: TheoryBadgeGraphAtlasLensId | null) => void;
   resetPanelMemory: () => void;
 };
 
@@ -54,6 +58,7 @@ const initialState = {
     scrollLeft: 0,
     scrollTop: 0,
   },
+  activeAtlasLensId: "starsim-stellar-evolution" as TheoryBadgeGraphAtlasLensId | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -82,6 +87,7 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
             scrollTop: normalizeScroll(viewport.scrollTop),
           },
         }),
+      setActiveAtlasLensId: (lensId) => set({ activeAtlasLensId: lensId }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -91,6 +97,7 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedBadgeId: state.selectedBadgeId,
         selectedBadgeIds: state.selectedBadgeIds,
         viewport: state.viewport,
+        activeAtlasLensId: state.activeAtlasLensId,
       }),
     },
   ),
