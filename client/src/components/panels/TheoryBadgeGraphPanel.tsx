@@ -26,6 +26,7 @@ import SolarSpectrumLens from "@/components/panels/SolarSpectrumLens";
 import StellarEvolutionLens from "@/components/panels/StellarEvolutionLens";
 import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
 import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/TheoryAtlasRail";
+import WarpGrNhm2Lens from "@/components/panels/WarpGrNhm2Lens";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
 import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
@@ -36,6 +37,7 @@ import { buildHelixPhysicsAtlasV1 } from "@shared/theory/physics-atlas-blocks";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildCasimirCavityObjectBindings } from "@shared/theory/casimir-cavity-object-bindings";
 import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
+import { buildNhm2DiagnosticObjectBindings } from "@shared/theory/nhm2-diagnostic-object-bindings";
 import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
@@ -58,6 +60,10 @@ import {
   CASIMIR_CAVITY_GROUPS,
   type CasimirCavityGroup,
 } from "@shared/theory/casimir-cavity-map";
+import {
+  WARP_GR_NHM2_GROUPS,
+  type WarpGrNhm2Group,
+} from "@shared/theory/warp-gr-nhm2-map";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -506,6 +512,10 @@ export default function TheoryBadgeGraphPanel() {
   const selectedCasimirObjectBindingId = useTheoryBadgeGraphPanelStore(
     (state) => state.selectedCasimirCavityObjectBindingId,
   );
+  const selectedWarpGroupId = useTheoryBadgeGraphPanelStore((state) => state.selectedWarpGrNhm2GroupId);
+  const selectedWarpObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.selectedWarpGrNhm2ObjectBindingId,
+  );
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
@@ -534,6 +544,13 @@ export default function TheoryBadgeGraphPanel() {
   );
   const clearCasimirCavityObjectBinding = useTheoryBadgeGraphPanelStore(
     (state) => state.clearCasimirCavityObjectBinding,
+  );
+  const setSelectedWarpGroupId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedWarpGrNhm2GroupId);
+  const setSelectedWarpObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedWarpGrNhm2ObjectBindingId,
+  );
+  const clearWarpGrNhm2ObjectBinding = useTheoryBadgeGraphPanelStore(
+    (state) => state.clearWarpGrNhm2ObjectBinding,
   );
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
@@ -753,6 +770,40 @@ export default function TheoryBadgeGraphPanel() {
     setSelectionOverlay,
   ]);
 
+  useEffect(() => {
+    if (!graph || activeLensId !== "warp_gr_nhm2" || !selectedWarpGroupId) return;
+    const group = WARP_GR_NHM2_GROUPS.find((candidate) => candidate.id === selectedWarpGroupId);
+    if (!group) return;
+    if (
+      selectedWarpObjectBindingId &&
+      !group.objectBindings.some((binding) => binding.id === selectedWarpObjectBindingId)
+    ) {
+      clearWarpGrNhm2ObjectBinding();
+    }
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: NHM2 diagnostic-only boundary.`,
+      ),
+    });
+  }, [
+    clearWarpGrNhm2ObjectBinding,
+    activeLensId,
+    graph,
+    selectedWarpGroupId,
+    selectedWarpObjectBindingId,
+    setSelectionOverlay,
+  ]);
+
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
@@ -818,10 +869,12 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
@@ -864,10 +917,12 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     setSelectedObjectBindingId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -897,9 +952,11 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     const payloadIdsByBadgeId = stage.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
       acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
       return acc;
@@ -950,9 +1007,11 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedEvolutionStageId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     clearStarSimObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1017,9 +1076,11 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedEvolutionStageId(null);
     setSelectedCosmicRungId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1084,9 +1145,11 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedEvolutionStageId(null);
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
+    setSelectedWarpGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1143,6 +1206,75 @@ export default function TheoryBadgeGraphPanel() {
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
+  const selectWarpGrNhm2Group = (group: WarpGrNhm2Group) => {
+    if (!graph) return;
+    setActiveAtlasLensId("warp_gr_nhm2");
+    setSelectedWarpGroupId(group.id);
+    setSelectedWarpObjectBindingId(null);
+    setSelectedEvolutionStageId(null);
+    setSelectedCosmicRungId(null);
+    setSelectedSolarGroupId(null);
+    setSelectedCasimirGroupId(null);
+    clearStarSimObjectBinding();
+    clearCosmicDistanceObjectBinding();
+    clearSolarSpectrumObjectBinding();
+    clearCasimirCavityObjectBinding();
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: NHM2 diagnostic-only boundary.`,
+      ),
+    });
+  };
+
+  const selectWarpObjectBinding = (group: WarpGrNhm2Group, bindingId: string) => {
+    if (!graph) return;
+    const binding = group.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectWarpGrNhm2Group(group);
+    setSelectedWarpObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = group.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildNhm2DiagnosticObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: group.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstWarpScalar =
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId.startsWith("nhm2.")) ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstWarpScalar) scientificState.loadTheoryLoadoutItem(firstWarpScalar.index);
+  };
+
+  const clearWarpBindingSelection = () => {
+    clearWarpGrNhm2ObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+  };
+
   const runPathToBadge = (badgeId: string) => {
     if (!graph) return;
     void playbackStore.runPlayback({
@@ -1164,10 +1296,12 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
     if (!graph) return;
     const lens = resolvePhysicsAtlasLens({
       graph,
@@ -1237,11 +1371,24 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
+        {activeLensId === "warp_gr_nhm2" && graph ? (
+          <WarpGrNhm2Lens
+            graph={graph}
+            groups={WARP_GR_NHM2_GROUPS}
+            selectedGroupId={selectedWarpGroupId}
+            selectedObjectBindingId={selectedWarpObjectBindingId}
+            onSelectGroup={selectWarpGrNhm2Group}
+            onSelectObjectBinding={selectWarpObjectBinding}
+            onClearObjectBinding={clearWarpBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
         {activeLensId &&
         activeLensId !== "stellar_evolution" &&
         activeLensId !== "cosmic_distance_ladder" &&
         activeLensId !== "solar_surface_spectrum" &&
         activeLensId !== "casimir_cavity_modes" &&
+        activeLensId !== "warp_gr_nhm2" &&
         graph &&
         atlasLens &&
         activeAtlasBlock ? (

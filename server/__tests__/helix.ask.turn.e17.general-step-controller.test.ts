@@ -147,7 +147,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.route_reason_code).toBe("dispatch:act");
     expect(response.body?.planner_contract?.plan_items?.some((step: any) => step?.action?.action_id === "identify_current_doc")).toBe(true);
     expect(
-      response.body?.job_ready_links?.some((link: any) => link?.label === "Open active doc" && link?.args?.path === activePath),
+      response.body?.job_ready_links?.some((link: any) => link?.label === "Open current doc" && link?.args?.path === activePath),
     ).toBe(true);
     expect(response.body?.final_answer_contract_family).toBe("identity");
     expect(response.body?.final_answer_contract_pass).toBe(true);

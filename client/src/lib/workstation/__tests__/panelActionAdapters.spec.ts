@@ -41,6 +41,10 @@ vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
 }));
 
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
+import {
+  clearDottieVoiceDebugClips,
+  getDottieVoiceDebugClipsSnapshot,
+} from "@/lib/helix/dottie-voice-debug-clips";
 
 function actionContext() {
   return {
@@ -57,6 +61,7 @@ describe("panelActionAdapters", () => {
     hoisted.callOrder.length = 0;
     hoisted.openDocPanelMock.mockClear();
     hoisted.launchHelixAskPromptMock.mockClear();
+    clearDottieVoiceDebugClips();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
     useScientificCalculatorStore.setState({
@@ -1135,6 +1140,16 @@ describe("panelActionAdapters", () => {
     expect(String(result.artifact?.spoken_text).length).toBeLessThanOrEqual(64);
     expect(result.artifact?.spoken_text_hash).toMatch(/^fnv1a64:/);
     expect(result.artifact?.source_text_hash).toMatch(/^fnv1a64:/);
+    expect(getDottieVoiceDebugClipsSnapshot()).toEqual([
+      expect.objectContaining({
+        status: "proposed",
+        observerId: "observer:dottie:test",
+        sourceEventId: "agent_commentary:orientation",
+        spokenText: result.artifact?.spoken_text,
+        spoken: false,
+        authority: "witness_only",
+      }),
+    ]);
   });
 
   it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {
@@ -1681,6 +1696,39 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().currentLatex).toBe(
         "E_area = -(3.141592653589793^2*3.16152677e-26)/(720*1e-9^3)",
       );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("loads object-aware Warp / GR / NHM2 diagnostic loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "nhm2.geometry.lapse_shift_profile",
+              "nhm2.closure.source_residual",
+            ],
+            object_context: {
+              kind: "nhm2_diagnostic_object",
+              observables: {
+                t_shift: 1,
+                delta_t_lapse: 0.1,
+                source_required: 1,
+                source_available: 0.8,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "nhm2_diagnostic_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("t_proper = 1 + 0.1");
       expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
     });
 

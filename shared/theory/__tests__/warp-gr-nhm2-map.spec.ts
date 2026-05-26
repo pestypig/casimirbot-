@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { WARP_GR_NHM2_GROUPS } from "../warp-gr-nhm2-map";
+
+describe("Warp / GR / NHM2 map", () => {
+  it("provides grouped diagnostic paths for the atlas lens", () => {
+    expect(WARP_GR_NHM2_GROUPS.map((group) => group.id)).toEqual([
+      "warp.gr.reference_roots",
+      "warp.nhm2.geometry_sample",
+      "warp.nhm2.source_closure",
+      "warp.nhm2.diagnostic_path",
+      "warp.nhm2.claim_boundary",
+    ]);
+
+    const path = WARP_GR_NHM2_GROUPS.find((group) => group.id === "warp.nhm2.diagnostic_path");
+    expect(path?.calculatorPayloadRefs.map((ref) => ref.payloadId)).toEqual([
+      "proper_time_scalar_offset_payload",
+      "rho_equals_E_over_V_payload",
+      "average_power_from_cycle_energy_payload",
+      "source_residual_difference_payload",
+      "qei_margin_difference_payload",
+    ]);
+    expect(path?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
+  });
+});

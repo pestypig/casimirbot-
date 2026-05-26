@@ -6942,6 +6942,141 @@ function readAgentLoopAuditArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function readHelixRuntimeArtifactRefs(record: Record<string, unknown>): string[] {
+  const refs = [
+    record.observed_artifact_refs,
+    record.artifact_refs,
+    record.produced_artifacts,
+    record.actual_artifacts,
+    record.consumed_artifact_refs,
+  ].flatMap((value) => (Array.isArray(value) ? value : []));
+  return Array.from(new Set(refs.map((entry) => coerceText(entry).trim()).filter(Boolean)));
+}
+
+function summarizeHelixRuntimeArtifactRefs(refs: string[]): string {
+  if (refs.length === 0) return "";
+  const labels = refs.map((ref) => {
+    const match = ref.match(
+      /\b(?:doc_search_results|doc_summary|doc_open_receipt|doc_location_matches|calculator_receipt|workspace_action_receipt|note_update_receipt|runtime_tool_observation|tool_observation|final_answer_draft|direct_answer_text)\b/i,
+    );
+    if (match?.[0]) return match[0];
+    const parts = ref.split(/[/:#]/).map((part) => part.trim()).filter(Boolean);
+    const label = parts[parts.length - 1] ?? ref;
+    return /^[a-f0-9]{12,}$/i.test(label) || /^\d+$/.test(label) ? "" : label;
+  });
+  const unique = Array.from(new Set(labels.filter(Boolean)));
+  const visible = unique.slice(0, 5).join(", ");
+  return unique.length > 5 ? `${visible}, +${unique.length - 5} more` : visible;
+}
+
+function buildHelixRuntimeTranscriptEvents(reply: HelixAskReply): Record<string, unknown>[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const agentRuntimeLoop = readAgentLoopAuditRecord(
+    replyRecord?.agent_runtime_loop ?? debugRecord?.agent_runtime_loop,
+  );
+  const iterations = readAgentLoopAuditArray(agentRuntimeLoop?.iterations);
+  if (iterations.length === 0) return [];
+
+  const turnId = coerceText(replyRecord?.turn_id ?? debugRecord?.turn_id ?? reply.id).trim();
+  const events: Record<string, unknown>[] = [];
+  iterations.slice(0, 24).forEach((item, index) => {
+    const record = readAgentLoopAuditRecord(item);
+    if (!record) return;
+    const nextStep = coerceText(record.next_step ?? record.decision ?? "step").trim() || "step";
+    const chosenCapability =
+      coerceText(record.executed_action_key).trim() ||
+      coerceText(record.chosen_capability).trim() ||
+      coerceText(record.capability_key).trim() ||
+      coerceText(record.tool_key).trim();
+    const authority =
+      coerceText(record.decision_authority).trim() ||
+      coerceText(record.decision_source).trim() ||
+      coerceText(record.sampling_mode).trim() ||
+      "runtime";
+    const decisionId = coerceText(record.decision_id ?? record.decision_ref).trim();
+    const stepId = `runtime_${index + 1}`;
+    const status =
+      record.observation_role === "tool_error" || record.status === "failed"
+        ? "failed"
+        : nextStep === "ask_user"
+          ? "request_input"
+          : "completed";
+    const refs = readHelixRuntimeArtifactRefs(record);
+    const artifactSummary = summarizeHelixRuntimeArtifactRefs(refs);
+    const decisionText =
+      nextStep === "answer" || chosenCapability === "model.direct_answer"
+        ? "Composed final answer from current observations."
+        : chosenCapability
+          ? `Selected ${chosenCapability}.`
+          : `Selected ${nextStep}.`;
+    events.push({
+      id: `${reply.id}-runtime-${index}-decision`,
+      role: "agent",
+      type: "decision",
+      status,
+      text: decisionText,
+      detail: chosenCapability || nextStep,
+      lane: authority,
+      step_id: stepId,
+      turn_id: turnId,
+      decision_id: decisionId,
+      event_source: "agent_runtime_loop",
+    });
+    if (nextStep === "answer" || chosenCapability === "model.direct_answer") {
+      events.push({
+        id: `${reply.id}-runtime-${index}-final`,
+        role: "agent",
+        type: "observation",
+        status,
+        text: artifactSummary
+          ? `Drafted final answer artifact: ${artifactSummary}.`
+          : "Drafted final answer artifact.",
+        detail: chosenCapability || "model.direct_answer",
+        lane: authority,
+        step_id: stepId,
+        turn_id: turnId,
+        decision_id: decisionId,
+        event_source: "agent_runtime_loop",
+      });
+      return;
+    }
+    events.push({
+      id: `${reply.id}-runtime-${index}-observation`,
+      role: "tool",
+      type: "tool_result",
+      status,
+      text: artifactSummary ? `Observed ${artifactSummary}.` : "Observed selected capability result.",
+      detail: chosenCapability || nextStep,
+      lane: chosenCapability || "tool",
+      step_id: stepId,
+      turn_id: turnId,
+      decision_id: decisionId,
+      event_source: "agent_runtime_loop",
+    });
+  });
+  return events;
+}
+
+function buildHelixRuntimeAskLiveEvents(reply: HelixAskReply): AskLiveEventEntry[] {
+  return buildHelixRuntimeTranscriptEvents(reply).map((event, index) => ({
+    id: coerceText(event.id).trim() || `${reply.id}-runtime-event-${index}`,
+    text: coerceText(event.text).trim() || "Helix Ask runtime update",
+    tool: coerceText(event.role).trim() || "agent",
+    seq: index,
+    meta: {
+      stage: coerceText(event.type).trim() || "runtime",
+      detail: coerceText(event.detail).trim() || null,
+      status: coerceText(event.status).trim() || "completed",
+      traceId: coerceText(event.trace_id).trim() || null,
+      turnKey: coerceText(event.turn_id).trim() || null,
+      stepId: coerceText(event.step_id).trim() || null,
+      lane: coerceText(event.lane).trim() || null,
+      event_source: "agent_runtime_loop",
+    },
+  }));
+}
+
 function readProceduralActionLabel(value: unknown): string {
   const action = readAgentLoopAuditRecord(value);
   if (!action) return "model step";
@@ -7184,6 +7319,10 @@ function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, 
       : records;
     return dedupeHelixVisibleTranscriptEvents(visible);
   };
+  const runtimeEvents = buildHelixRuntimeTranscriptEvents(reply);
+  if (runtimeEvents.length > 0) {
+    return normalizeEvents(runtimeEvents);
+  }
   const directEvents = Array.isArray(reply.debug?.turn_transcript_events)
     ? reply.debug.turn_transcript_events
     : [];
@@ -7195,7 +7334,7 @@ function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, 
   return normalizeEvents(auditEvents);
 }
 
-function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
+export function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
   key: string;
   role: string;
   label: string;
@@ -25485,6 +25624,10 @@ export function HelixAskPill({
         /\b(?:missing_artifacts|missing_required_artifacts|Need user input|Request input|final_failure)\b/i.test(combined)
       );
     };
+    const runtimeEvents = buildHelixRuntimeAskLiveEvents(reply);
+    if (runtimeEvents.length > 0) {
+      return runtimeEvents.filter((event) => !isStaleWorkstationEvent(event));
+    }
     const transcriptEvents = Array.isArray(reply.debug?.turn_transcript_events)
       ? reply.debug.turn_transcript_events
       : [];

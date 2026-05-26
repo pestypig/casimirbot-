@@ -58,6 +58,12 @@ describe("Helix Ask docs summary output coverage", () => {
     expect(response.body?.doc_retrieval_coverage?.requested_scope).toBe("full_doc");
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_min_5_bullets" && entry?.satisfied === true)).toBe(true);
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_path_included" && entry?.satisfied === true)).toBe(true);
+    expect(
+      response.body?.job_ready_links?.some((link: any) => link?.label === "Open cited doc" && link?.args?.path === docPath),
+    ).toBe(true);
+    expect(
+      response.body?.job_ready_links?.some((link: any) => link?.label === "Open current doc" && link?.args?.path === docPath),
+    ).toBe(false);
     expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
     expect(response.body?.debug?.doc_summary_observation_candidate?.terminal_authority).toBe(false);
   }, 60000);
@@ -112,6 +118,10 @@ describe("Helix Ask docs summary output coverage", () => {
         (entry: any) => entry?.id === "doc_search_results_observed" && entry?.satisfied === true,
       ),
     ).toBe(true);
+    const docLinks = (response.body?.job_ready_links ?? []).filter((link: any) => link?.panel_id === "docs-viewer");
+    const docLinkPaths = docLinks.map((link: any) => String(link?.args?.path ?? link?.path ?? ""));
+    expect(docLinks.some((link: any) => link?.label === "Open cited doc")).toBe(true);
+    expect(new Set(docLinkPaths).size).toBe(docLinkPaths.length);
     expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
     if (response.body?.debug?.doc_summary_observation_candidate) {
       expect(response.body.debug.doc_summary_observation_candidate.terminal_authority).toBe(false);

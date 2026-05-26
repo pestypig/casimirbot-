@@ -11,6 +11,7 @@ export type StartSettings = {
   voiceNoisyEnvironmentMode: boolean;
   showHelixAskDebug: boolean;
   showHelixAskObserverLane: boolean;
+  showDottieVoiceDebugClips: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
   showPowerShellDebug: boolean;
   showAlcubierreRenderDebugLog: boolean;
@@ -22,7 +23,7 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 10,
+  settingsVersion: 11,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
   showHelixAskObserverLane: true,
+  showDottieVoiceDebugClips: false,
   showHelixVoiceCaptureDiagnostics: false,
   showPowerShellDebug: false,
   showAlcubierreRenderDebugLog: false,
@@ -64,6 +66,10 @@ export function useHelixStartSettings() {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
         merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
         merged.showHelixVoiceCaptureDiagnostics = DEFAULT_SETTINGS.showHelixVoiceCaptureDiagnostics;
+        merged.showDottieVoiceDebugClips =
+          typeof parsed.showDottieVoiceDebugClips === "boolean"
+            ? parsed.showDottieVoiceDebugClips
+            : DEFAULT_SETTINGS.showDottieVoiceDebugClips;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
         merged.showWorkstationDebug =
           typeof parsed.showWorkstationDebug === "boolean"

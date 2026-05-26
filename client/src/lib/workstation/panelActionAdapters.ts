@@ -51,6 +51,7 @@ import type { TheoryBadgeV1 } from "@shared/contracts/theory-badge-graph.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
 import { buildCasimirCavityObjectBindings } from "@shared/theory/casimir-cavity-object-bindings";
 import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
+import { buildNhm2DiagnosticObjectBindings } from "@shared/theory/nhm2-diagnostic-object-bindings";
 import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import {
@@ -79,6 +80,7 @@ import {
   HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
   type HelixDottieObserverSubscriptionV1,
 } from "@shared/helix-agent-commentary";
+import { recordDottieVoiceDebugClip } from "@/lib/helix/dottie-voice-debug-clips";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -323,6 +325,28 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       n: asNumber(observables.n ?? observables.mode_n) ?? undefined,
       h: asNumber(observables.h ?? observables.planck_h) ?? undefined,
       f_n: asNumber(observables.f_n ?? observables.mode_frequency_Hz) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "nhm2_diagnostic_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildNhm2DiagnosticObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      t_shift: asNumber(observables.t_shift ?? observables.tShift) ?? undefined,
+      delta_t_lapse: asNumber(observables.delta_t_lapse ?? observables.deltaTLapse) ?? undefined,
+      E: asNumber(observables.E ?? observables.energy_J) ?? undefined,
+      V: asNumber(observables.V ?? observables.volume_m3) ?? undefined,
+      rho: asNumber(observables.rho ?? observables.energy_density_J_m3) ?? undefined,
+      E_cycle: asNumber(observables.E_cycle ?? observables.cycle_energy_J) ?? undefined,
+      T_cycle: asNumber(observables.T_cycle ?? observables.cycle_period_s) ?? undefined,
+      P_avg: asNumber(observables.P_avg ?? observables.average_power_W) ?? undefined,
+      source_required: asNumber(observables.source_required ?? observables.sourceRequired) ?? undefined,
+      source_available: asNumber(observables.source_available ?? observables.sourceAvailable) ?? undefined,
+      R_source: asNumber(observables.R_source ?? observables.source_residual) ?? undefined,
+      qei_bound: asNumber(observables.qei_bound ?? observables.qeiBound) ?? undefined,
+      qei_sample: asNumber(observables.qei_sample ?? observables.qeiSample) ?? undefined,
+      qei_margin: asNumber(observables.qei_margin ?? observables.qeiMargin) ?? undefined,
       source: "helix_ask",
     });
   }
@@ -2585,23 +2609,30 @@ export function executeHelixPanelAction(
       const sourceText = asNonEmptyString(args.source_text ?? args.sourceText);
       const observerId = asNonEmptyString(args.observer_id ?? args.observerId) ?? "observer:dottie:unassigned";
       if (!sourceText) {
+        const suppressedReceipt = {
+          kind: "dottie_voice_receipt",
+          schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
+          observer_id: observerId,
+          source_event_id: sourceEventId,
+          source_event_schema: asNonEmptyString(args.source_event_schema ?? args.sourceEventSchema) ?? HELIX_AGENT_COMMENTARY_SCHEMA,
+          spoken: false,
+          assistant_answer: false,
+          authority: "witness_only",
+          suppression_reason: "missing_source_text",
+          deterministic_content_role: "observation_not_assistant_answer",
+          raw_reasoning_included: false,
+        };
+        recordDottieVoiceDebugClip({
+          receipt: suppressedReceipt,
+          voiceMode: asNonEmptyString(args.voice_mode ?? args.voiceMode),
+          status: "suppressed",
+          suppressionReason: "missing_source_text",
+        });
         return {
           ok: true,
           panel_id: panelId,
           action_id: actionId,
-          artifact: {
-            kind: "dottie_voice_receipt",
-            schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
-            observer_id: observerId,
-            source_event_id: sourceEventId,
-            source_event_schema: asNonEmptyString(args.source_event_schema ?? args.sourceEventSchema) ?? HELIX_AGENT_COMMENTARY_SCHEMA,
-            spoken: false,
-            assistant_answer: false,
-            authority: "witness_only",
-            suppression_reason: "missing_source_text",
-            deterministic_content_role: "observation_not_assistant_answer",
-            raw_reasoning_included: false,
-          },
+          artifact: suppressedReceipt,
           message: "Dottie voice proposal suppressed because no public source text was provided.",
         };
       }
@@ -2614,6 +2645,11 @@ export function executeHelixPanelAction(
         source_text: sourceText,
         max_chars: boundedDottieMaxChars(args.max_chars ?? args.maxChars),
         spoken: false,
+      });
+      recordDottieVoiceDebugClip({
+        receipt,
+        voiceMode: asNonEmptyString(args.voice_mode ?? args.voiceMode),
+        status: "proposed",
       });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);

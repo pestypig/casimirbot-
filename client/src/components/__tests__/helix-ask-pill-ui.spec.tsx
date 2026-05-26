@@ -80,6 +80,7 @@ let evaluateEvidenceFinalizationGate: typeof import("@/components/helix/HelixAsk
 let buildNeedsRetrievalPlanEvent: typeof import("@/components/helix/HelixAskPill").buildNeedsRetrievalPlanEvent;
 let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/HelixAskPill").syncDocViewerStateFromWorkstationAction;
 let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
+let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -161,6 +162,7 @@ beforeAll(async () => {
     buildNeedsRetrievalPlanEvent,
     syncDocViewerStateFromWorkstationAction,
     copyDebugPayloadToClipboard,
+    buildHelixTurnTranscriptRows,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -377,6 +379,53 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("stream_fallback_reason");
     expect(source).toContain("async_executor_used");
     expect(source).toContain("async_step_durations");
+  });
+
+  it("prefers runtime loop events over stale procedural transcript events", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-runtime-docs",
+      question: "summarize docs about nhm2 current status",
+      content: "Five bullet summary",
+      debug: {
+        turn_transcript_events: [
+          {
+            type: "model_decision",
+            role: "agent",
+            status: "completed",
+            text: "No tool step selected; prepare direct response.",
+          },
+        ],
+        agent_runtime_loop: {
+          schema: "helix.agent_runtime_loop.v1",
+          iterations: [
+            {
+              next_step: "next_action",
+              chosen_capability: "docs-viewer.search_docs",
+              decision_authority: "llm",
+              observed_artifact_refs: ["doc_search_results:nhm2-current-status"],
+            },
+            {
+              next_step: "next_action",
+              chosen_capability: "docs-viewer.summarize_doc",
+              decision_authority: "llm",
+              observed_artifact_refs: ["doc_summary:nhm2-current-status"],
+            },
+            {
+              next_step: "answer",
+              chosen_capability: "model.direct_answer",
+              decision_authority: "llm",
+              artifact_refs: ["final_answer_draft:docs-summary"],
+            },
+          ],
+        },
+      },
+    } as never);
+    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
+    expect(combined).toContain("docs-viewer.search_docs");
+    expect(combined).toContain("docs-viewer.summarize_doc");
+    expect(combined).toContain("Composed final answer");
+    expect(combined).not.toContain("No tool step selected");
+    expect(rows.some((row) => row.label === "Final" && /final_answer_draft/i.test(row.text))).toBe(false);
   });
 
   it("renders a procedural workspace timeline from the turn truth table", () => {

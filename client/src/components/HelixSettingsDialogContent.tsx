@@ -36,6 +36,13 @@ import {
   type WorkstationDebugEvent,
   type WorkstationDebugSnapshot,
 } from "@/lib/helix/workstation-debug";
+import {
+  buildDottieVoiceDebugClipExport,
+  clearDottieVoiceDebugClips,
+  getDottieVoiceDebugClipsSnapshot,
+  subscribeDottieVoiceDebugClips,
+  type DottieVoiceDebugClip,
+} from "@/lib/helix/dottie-voice-debug-clips";
 
 type Props = {
   settingsTab: SettingsTab;
@@ -160,6 +167,14 @@ export function HelixSettingsDialogContent({
               checked={userSettings.showHelixAskObserverLane}
               onChange={(value) => updateSettings({ showHelixAskObserverLane: value })}
             />
+            <PreferenceToggleRow
+              id="dottie-voice-debug-clips"
+              label="Dottie voice debug clips"
+              description="Show receipt-backed text previews that would be sent to Auntie Dottie before any audio is spoken."
+              checked={userSettings.showDottieVoiceDebugClips}
+              onChange={(value) => updateSettings({ showDottieVoiceDebugClips: value })}
+            />
+            {userSettings.showDottieVoiceDebugClips ? <DottieVoiceDebugClipsPanel /> : null}
             {helixAskUnifiedDebugEnabled ? (
               <>
                 <HelixAskDebugContextPanel snapshot={voiceDiagnostics} />
@@ -302,6 +317,107 @@ function PreferenceToggleRow({
         checked={checked}
         onCheckedChange={(value) => onChange(value === true)}
       />
+    </div>
+  );
+}
+
+function DottieVoiceDebugClipsPanel() {
+  const [clips, setClips] = React.useState<DottieVoiceDebugClip[]>(() => getDottieVoiceDebugClipsSnapshot());
+  const [copied, setCopied] = React.useState(false);
+  const exportPayload = React.useMemo(() => buildDottieVoiceDebugClipExport(clips), [clips]);
+
+  React.useEffect(() => {
+    setClips(getDottieVoiceDebugClipsSnapshot());
+    return subscribeDottieVoiceDebugClips((nextClips) => {
+      setClips(nextClips);
+    });
+  }, []);
+
+  const handleCopy = async () => {
+    if (!exportPayload || !navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(exportPayload);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const handleClear = () => {
+    clearDottieVoiceDebugClips();
+  };
+
+  return (
+    <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/80 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-300">Dottie voice debug clips</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={clips.length === 0}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              clips.length > 0
+                ? "border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            clear
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!exportPayload}
+            className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
+              exportPayload
+                ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
+                : "border-slate-600 text-slate-500"
+            }`}
+          >
+            {copied ? "copied" : "copy clips"}
+          </button>
+        </div>
+      </div>
+      <div className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] leading-5 text-slate-200">
+        <p>clips: {clips.length} | source: dottie voice proposal receipts | audio: not played</p>
+      </div>
+      {clips.length === 0 ? (
+        <p className="text-xs text-slate-300">
+          No Dottie voice proposals captured yet. Run a prompt that prepares a Dottie voice proposal from a public trace event.
+        </p>
+      ) : (
+        <div className="max-h-[36vh] space-y-2 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
+          {[...clips]
+            .sort((a, b) => a.atMs - b.atMs)
+            .slice(-80)
+            .map((clip) => (
+              <div key={clip.id} className="rounded border border-white/10 bg-white/5 p-1.5">
+                <p className="whitespace-pre-wrap break-words text-slate-100">
+                  {new Date(clip.atMs).toISOString()} | {clip.status} | mode={clip.voiceMode ?? "n/a"} | spoken=
+                  {clip.spoken ? "yes" : "no"}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-cyan-100">
+                  {clip.spokenText ? clipDiagnosticsText(clip.spokenText, 360) : "No spoken text available."}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-slate-400">
+                  source={clip.sourceEventId} | observer={clip.observerId} | turn={clip.targetTurnId ?? "n/a"}
+                  {clip.suppressionReason ? ` | suppressed=${clip.suppressionReason}` : ""}
+                </p>
+                <p className="whitespace-pre-wrap break-words text-slate-500">
+                  spoken_hash={clip.spokenTextHash ?? "n/a"} | source_hash={clip.sourceTextHash ?? "n/a"} | max=
+                  {clip.maxChars ?? "n/a"}
+                </p>
+                <details className="mt-1 rounded border border-slate-700/80 bg-slate-900/70 px-2 py-1 text-slate-300">
+                  <summary className="cursor-pointer select-none uppercase tracking-[0.14em] text-slate-400">
+                    raw receipt
+                  </summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-words">{JSON.stringify(clip.receipt, null, 2)}</pre>
+                </details>
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   );
 }

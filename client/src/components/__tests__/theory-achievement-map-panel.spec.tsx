@@ -234,12 +234,37 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+  it("uses the Warp / GR / NHM2 lens to load object-bound diagnostic rows", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Warp / GR / NHM2 atlas lens" }));
 
-    expect(await screen.findByText("Warp / GR / NHM2")).toBeTruthy();
+    expect(await screen.findByText("NHM2 Diagnostics")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Geometry Sample" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Diagnostic Path" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample diagnostic path object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("warp_gr_nhm2");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedWarpGrNhm2GroupId).toBe("warp.nhm2.diagnostic_path");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedWarpGrNhm2ObjectBindingId).toBe(
+        "sample-diagnostic-path",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "nhm2_diagnostic_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("t_proper = 1 + 0.1");
+    });
+  });
+
+  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "QEI / Stress-Energy atlas lens" }));
+
+    expect(await screen.findByText("QEI / Stress-Energy")).toBeTruthy();
     expect(screen.getByText("Mapped Badges")).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("");

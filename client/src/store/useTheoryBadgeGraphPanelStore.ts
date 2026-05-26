@@ -4,6 +4,7 @@ import type { StarSimStellarEvolutionStageId } from "@shared/theory/starsim-stel
 import type { CosmicDistanceLadderRungId } from "@shared/theory/cosmic-distance-ladder-map";
 import type { SolarSpectrumObservationGroupId } from "@shared/theory/solar-spectrum-observation-map";
 import type { CasimirCavityGroupId } from "@shared/theory/casimir-cavity-map";
+import type { WarpGrNhm2GroupId } from "@shared/theory/warp-gr-nhm2-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
@@ -28,6 +29,8 @@ type TheoryBadgeGraphPanelState = {
   selectedSolarSpectrumObjectBindingId: string | null;
   selectedCasimirCavityGroupId: CasimirCavityGroupId | null;
   selectedCasimirCavityObjectBindingId: string | null;
+  selectedWarpGrNhm2GroupId: WarpGrNhm2GroupId | null;
+  selectedWarpGrNhm2ObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -45,6 +48,9 @@ type TheoryBadgeGraphPanelState = {
   setSelectedCasimirCavityGroupId: (groupId: CasimirCavityGroupId | null) => void;
   setSelectedCasimirCavityObjectBindingId: (bindingId: string | null) => void;
   clearCasimirCavityObjectBinding: () => void;
+  setSelectedWarpGrNhm2GroupId: (groupId: WarpGrNhm2GroupId | null) => void;
+  setSelectedWarpGrNhm2ObjectBindingId: (bindingId: string | null) => void;
+  clearWarpGrNhm2ObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -92,6 +98,8 @@ const initialState = {
   selectedSolarSpectrumObjectBindingId: null as string | null,
   selectedCasimirCavityGroupId: null as CasimirCavityGroupId | null,
   selectedCasimirCavityObjectBindingId: null as string | null,
+  selectedWarpGrNhm2GroupId: null as WarpGrNhm2GroupId | null,
+  selectedWarpGrNhm2ObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -148,6 +156,13 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedCasimirCavityObjectBindingId: null,
         }),
+      setSelectedWarpGrNhm2GroupId: (groupId) => set({ selectedWarpGrNhm2GroupId: groupId }),
+      setSelectedWarpGrNhm2ObjectBindingId: (bindingId) =>
+        set({ selectedWarpGrNhm2ObjectBindingId: bindingId }),
+      clearWarpGrNhm2ObjectBinding: () =>
+        set({
+          selectedWarpGrNhm2ObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -166,6 +181,8 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedSolarSpectrumObjectBindingId: state.selectedSolarSpectrumObjectBindingId,
         selectedCasimirCavityGroupId: state.selectedCasimirCavityGroupId,
         selectedCasimirCavityObjectBindingId: state.selectedCasimirCavityObjectBindingId,
+        selectedWarpGrNhm2GroupId: state.selectedWarpGrNhm2GroupId,
+        selectedWarpGrNhm2ObjectBindingId: state.selectedWarpGrNhm2ObjectBindingId,
       }),
     },
   ),
