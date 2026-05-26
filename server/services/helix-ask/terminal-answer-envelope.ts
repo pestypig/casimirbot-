@@ -69,6 +69,31 @@ const typedFailureText = (payload: Record<string, unknown>): string =>
   readString(readRecord(payload.typed_failure)?.message) ??
   "I could not produce a terminal answer for this turn.";
 
+const readDocConceptExplanationTerminal = (
+  payload: Record<string, unknown>,
+): { text: string; artifactId: string | null } | null => {
+  if (readString(payload.terminal_error_code) !== "concept_explanation_unavailable") return null;
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  for (const entry of ledger) {
+    const artifact = readRecord(entry);
+    if (!artifact || readString(artifact.kind) !== "doc_concept_explanation") continue;
+    const artifactPayload = readRecord(artifact.payload);
+    const text =
+      readString(artifactPayload?.answer_text) ??
+      readString(artifactPayload?.text) ??
+      readString(artifactPayload?.plain_language_summary);
+    if (!text) continue;
+    const path = readString(artifactPayload?.source_path) ?? readString(artifactPayload?.path);
+    return {
+      text: path && !text.includes(path) ? `${text}\n\nPath: ${path}` : text,
+      artifactId: readString(artifact.artifact_id),
+    };
+  }
+  return null;
+};
+
 function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAuthority["terminal_kind"] {
   if (terminalArtifactKind === "request_user_input") return "request_user_input";
   if (terminalArtifactKind === "typed_failure") return "failure";
@@ -92,8 +117,27 @@ export function resolveTerminalAnswerEnvelope(
   let finalAnswerSource = readFinalAnswerSource(payload);
   let terminalText: string | null = null;
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
+  const docConceptTerminal = readDocConceptExplanationTerminal(payload);
 
-  if (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") {
+  if (docConceptTerminal) {
+    terminalArtifactKind = "doc_concept_explanation";
+    finalAnswerSource = "artifact_synthesis";
+    terminalText = docConceptTerminal.text;
+    authorityOrigin = "selected_final_answer";
+    payload.ok = true;
+    payload.response_type = "final_answer";
+    payload.final_status = "final_answer";
+    payload.terminal_artifact_kind = terminalArtifactKind;
+    payload.final_answer_source = finalAnswerSource;
+    payload.selected_final_answer = terminalText;
+    payload.answer = terminalText;
+    payload.text = terminalText;
+    payload.finalAnswer = terminalText;
+    if (docConceptTerminal.artifactId) payload.terminal_artifact_id = docConceptTerminal.artifactId;
+    delete payload.terminal_error_code;
+    delete payload.scientific_extraction_failed;
+    delete payload.scientific_extraction_fail_reason;
+  } else if (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") {
     terminalArtifactKind = "typed_failure";
     terminalText = typedFailureText(payload);
     finalAnswerSource = "typed_failure";
