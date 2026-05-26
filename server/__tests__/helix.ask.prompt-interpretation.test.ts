@@ -154,4 +154,29 @@ describe("Helix Ask prompt interpretation", () => {
       ]),
     );
   });
+
+  it("builds a compound prompt contract without splitting the root prompt into separate turns", () => {
+    const interpretation = interpretHelixAskPrompt(`
+      Explain why large prompts are being split.
+      Compare against Codex compaction.
+      Identify exact code changes.
+      Include tests.
+    `);
+
+    expect(interpretation.compound_contract).toMatchObject({
+      schema: "helix.compound_prompt_contract.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      output_contract: expect.objectContaining({
+        allow_partial_answer: false,
+      }),
+    });
+    expect(interpretation.compound_contract?.requirements.map((entry) => entry.text)).toEqual([
+      "Explain why large prompts are being split.",
+      "Compare against Codex compaction.",
+      "Identify exact code changes.",
+      "Include tests.",
+    ]);
+    expect(interpretation.compound_contract?.requirements.every((entry) => entry.status === "pending")).toBe(true);
+  });
 });

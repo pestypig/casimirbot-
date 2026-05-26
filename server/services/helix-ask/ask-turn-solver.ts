@@ -11,6 +11,7 @@ import type { HelixSolverSubgoalLedger } from "@shared/helix-solver-subgoal";
 import type { HelixSolverRetryPolicy } from "@shared/helix-solver-retry-policy";
 import {
   interpretHelixAskPrompt,
+  type HelixCompoundPromptContract,
   type HelixPromptInterpretation,
 } from "./prompt-interpretation";
 import {
@@ -87,6 +88,17 @@ export type HelixAskTurnSolverTrace = {
   prompt_hash: string;
 
   prompt_interpretation: HelixPromptInterpretation;
+  compound_prompt_contract?: HelixCompoundPromptContract;
+  compound_prompt_coverage?: {
+    schema: "helix.compound_prompt_coverage.v1";
+    required_requirement_ids: string[];
+    answered_requirement_ids: string[];
+    missing_requirement_ids: string[];
+    coverage: "complete" | "partial" | "none" | "not_compound";
+    final_answer_must_cover_all: boolean;
+    assistant_answer: false;
+    raw_content_included: false;
+  };
   intent_hypotheses: HelixIntentHypothesis[];
   intent_arbitration: HelixIntentArbitration;
   selected_primary_intent: HelixAskTurnIntentKind | null;
@@ -195,6 +207,44 @@ const readStringArray = (value: unknown): string[] =>
     : [];
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
+
+const buildCompoundPromptCoverage = (
+  contract: HelixCompoundPromptContract,
+  finalAnswerText: string,
+): NonNullable<HelixAskTurnSolverTrace["compound_prompt_coverage"]> => {
+  const required = contract.requirements.filter((requirement) => requirement.required);
+  const normalizedAnswer = finalAnswerText.toLowerCase();
+  const answered = required.filter((requirement) => {
+    const keywords = requirement.text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length >= 5)
+      .slice(0, 5);
+    return keywords.length > 0 && keywords.some((word) => normalizedAnswer.includes(word));
+  });
+  const answeredIds = answered.map((requirement) => requirement.id);
+  const missingIds = required
+    .filter((requirement) => !answeredIds.includes(requirement.id))
+    .map((requirement) => requirement.id);
+  return {
+    schema: "helix.compound_prompt_coverage.v1",
+    required_requirement_ids: required.map((requirement) => requirement.id),
+    answered_requirement_ids: answeredIds,
+    missing_requirement_ids: missingIds,
+    coverage:
+      required.length === 0
+        ? "not_compound"
+        : missingIds.length === 0
+          ? "complete"
+          : answeredIds.length > 0
+            ? "partial"
+            : "none",
+    final_answer_must_cover_all: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const readTerminalGoalFrame = (payload: RecordLike): { goalKind: string; requiredTerminalKind: string } => {
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
@@ -712,6 +762,14 @@ export function buildAskTurnSolverTrace(input: {
   const loopTrace = (input.loopParityTrace ?? readRecord(input.payload.loop_parity_trace)) as HelixLoopParityTrace | RecordLike | null;
   const sourceTargetInfo = sourceTargetFromPayload(input.payload);
   const promptInterpretation = interpretHelixAskPrompt(promptText);
+  const compoundContract = promptInterpretation.compound_contract;
+  const finalAnswerText =
+    readString(input.payload.selected_final_answer) ||
+    readString(input.payload.answer) ||
+    readString(input.payload.text);
+  const compoundCoverage = compoundContract
+    ? buildCompoundPromptCoverage(compoundContract, finalAnswerText)
+    : null;
   const routeCandidatesForIntent = collectRouteCandidatesForIntent(input.payload, input.selectedRoute);
   const terminalProductsAllowed = allowedTerminalProducts(input.payload);
   const terminalProductsForbidden = forbiddenTerminalProducts(input.payload);
@@ -831,6 +889,8 @@ export function buildAskTurnSolverTrace(input: {
     turn_id: input.turnId,
     prompt_hash: hashShort(promptText),
     prompt_interpretation: promptInterpretation,
+    ...(compoundContract ? { compound_prompt_contract: compoundContract } : {}),
+    ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
     intent_hypotheses: intentHypotheses,
     intent_arbitration: intentArbitration,
     selected_primary_intent: primary,

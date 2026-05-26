@@ -57,10 +57,20 @@ export function normalizeHelixTurnInputItems(input: {
   threadId: string;
 }): HelixMultimodalTurnContext {
   const request = input.request;
+  const rawPrompt = readString(request.raw_user_prompt);
+  const prompt = readString(request.prompt);
+  const question = readString(request.question);
+  const transcript = readString(request.transcript);
   const userText =
-    readString(request.question) ??
-    readString(request.prompt) ??
-    readString(request.transcript) ??
+    rawPrompt ??
+    (
+      prompt && question && prompt.length > question.length
+        ? prompt
+        : null
+    ) ??
+    prompt ??
+    question ??
+    transcript ??
     "";
   const items: HelixTurnInputItem[] = [];
   if (userText) items.push({ type: "text", text: userText, source: "user" });

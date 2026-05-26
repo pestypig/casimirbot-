@@ -34,6 +34,41 @@ export type HelixPromptInterpretation = {
   debug_or_history_question_detected: boolean;
   implementation_question_detected: boolean;
   ambiguity_notes: string[];
+  compound_contract?: HelixCompoundPromptContract;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixCompoundPromptContract = {
+  schema: "helix.compound_prompt_contract.v1";
+  root_prompt_id: string;
+  raw_prompt_hash: string;
+  raw_prompt_chars: number;
+  root_objective: string;
+  requirements: Array<{
+    id: string;
+    text: string;
+    span?: { start: number; end: number };
+    kind:
+      | "question"
+      | "instruction"
+      | "constraint"
+      | "comparison"
+      | "implementation_request"
+      | "diagnostic_request"
+      | "output_format";
+    required: boolean;
+    depends_on: string[];
+    status: "pending" | "answered" | "blocked" | "not_applicable";
+  }>;
+  global_constraints: string[];
+  negative_constraints: string[];
+  evidence_requirements: string[];
+  output_contract: {
+    requested_format?: string;
+    must_include_coverage_ledger: boolean;
+    allow_partial_answer: boolean;
+  };
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -235,6 +270,86 @@ const requestedOutput = (input: {
   return "reasoned answer";
 };
 
+const classifyCompoundRequirementKind = (text: string): HelixCompoundPromptContract["requirements"][number]["kind"] => {
+  if (/\b(?:compare|contrast|versus|vs\.?)\b/i.test(text)) return "comparison";
+  if (/\b(?:implementation|code|patch|repo|function|module|file)\b/i.test(text)) return "implementation_request";
+  if (/\b(?:debug|trace|error|failure|why|diagnos|root cause)\b/i.test(text)) return "diagnostic_request";
+  if (/\b(?:format|include|bullet|table|checklist|final answer|output)\b/i.test(text)) return "output_format";
+  if (/\b(?:do not|don't|without|must|should|need to|required|constraint)\b/i.test(text)) return "constraint";
+  if (/[?？]\s*$/.test(text) || /^(?:what|why|how|when|where|can|could|should|does|do|is|are)\b/i.test(text)) return "question";
+  return "instruction";
+};
+
+const extractCompoundRequirementTexts = (prompt: string): string[] => {
+  const lines = prompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const lineRequirements = lines
+    .map((line) => {
+      const labeled = line.match(/^(?:question|task|goal|requirement|acceptance|instruction|context)\s*:\s*(.+)$/i)?.[1]?.trim();
+      const listed = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/)?.[1]?.trim();
+      return labeled ?? listed ?? (
+        /[?？]\s*$/.test(line) || /\b(?:explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse)\b/i.test(line)
+          ? line
+          : ""
+      );
+    })
+    .filter(Boolean);
+  if (lineRequirements.length > 1) return uniqueBy(lineRequirements, (entry) => entry.toLowerCase());
+  const sentenceRequirements = prompt
+    .split(/(?<=[.?])\s+(?=(?:Explain|Compare|Identify|Include|Propose|Write|Implement|Test|Diagnose|Analyze|Analyse|What|Why|How|Can|Should)\b)/i)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && /\b(?:explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse|what|why|how|can|should)\b/i.test(entry));
+  return uniqueBy(sentenceRequirements, (entry) => entry.toLowerCase());
+};
+
+export const buildHelixCompoundPromptContract = (
+  promptText: string,
+  negativeConstraints: string[] = [],
+): HelixCompoundPromptContract | null => {
+  const prompt = promptText.trim();
+  if (!prompt) return null;
+  const requirementTexts = extractCompoundRequirementTexts(prompt);
+  if (requirementTexts.length < 2) return null;
+  const rawPromptHash = hashShort(prompt);
+  const requirements = requirementTexts.map((text, index) => {
+    const start = prompt.indexOf(text);
+    return {
+      id: `R${index + 1}`,
+      text,
+      ...(start >= 0 ? { span: { start, end: start + text.length } } : {}),
+      kind: classifyCompoundRequirementKind(text),
+      required: !/\b(?:optional|if useful|if needed|if relevant)\b/i.test(text),
+      depends_on: index > 0 && /\b(?:then|after|based on|from that|therefore)\b/i.test(text) ? [`R${index}`] : [],
+      status: "pending" as const,
+    };
+  });
+  const globalConstraints = requirementTexts.filter((text) =>
+    /\b(?:must|should|do not|don't|without|never|include|avoid|make sure|ensure|final answer|format)\b/i.test(text),
+  );
+  return {
+    schema: "helix.compound_prompt_contract.v1",
+    root_prompt_id: `compound_prompt:${rawPromptHash}`,
+    raw_prompt_hash: rawPromptHash,
+    raw_prompt_chars: prompt.length,
+    root_objective: requirementTexts[0],
+    requirements,
+    global_constraints: uniqueBy(globalConstraints, (entry) => entry.toLowerCase()),
+    negative_constraints: negativeConstraints,
+    evidence_requirements: requirementTexts.filter((text) =>
+      /\b(?:evidence|source|debug|trace|receipt|artifact|line|cite|verify|test)\b/i.test(text),
+    ),
+    output_contract: {
+      requested_format: /\btable\b/i.test(prompt) ? "table" : /\b(?:bullet|list)\b/i.test(prompt) ? "list" : undefined,
+      must_include_coverage_ledger: /\b(?:coverage|checklist|ledger|all requirements|each requirement)\b/i.test(prompt),
+      allow_partial_answer: /\b(?:partial|best effort|if possible)\b/i.test(prompt),
+    },
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpretation {
   const prompt = promptText.trim();
   const contextualMentions = uniqueBy(
@@ -281,6 +396,7 @@ export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpre
     contextualMentions.length > 0 && executableCommands.length > 0 ? "contextual_and_executable_control_language_present" : "",
     negativeConstraints.length > 0 ? "negative_constraints_present" : "",
   ].filter(Boolean);
+  const compoundContract = buildHelixCompoundPromptContract(prompt, negativeConstraints);
 
   return {
     schema: "helix.prompt_interpretation.v1",
@@ -309,6 +425,7 @@ export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpre
     debug_or_history_question_detected: debugDetected,
     implementation_question_detected: implementationDetected,
     ambiguity_notes: ambiguityNotes,
+    ...(compoundContract ? { compound_contract: compoundContract } : {}),
     assistant_answer: false,
     raw_content_included: false,
   };

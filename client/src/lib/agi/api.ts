@@ -2347,6 +2347,7 @@ export async function askLocal(
       : "";
   if (trimmedPrompt) {
     body.prompt = prompt;
+    body.raw_user_prompt = trimmedPrompt;
   }
   if (typeof options?.maxTokens === "number") body.max_tokens = options.maxTokens;
   if (typeof options?.temperature === "number") body.temperature = options.temperature;
@@ -2355,9 +2356,16 @@ export async function askLocal(
   if (options?.sessionId) body.sessionId = options.sessionId;
   if (options?.traceId) body.traceId = options.traceId;
   if (options?.personaId) body.personaId = options.personaId;
-  if (options?.question) body.question = options.question;
-  else if (promptQuestionMatch) body.question = promptQuestionMatch;
-  else if (trimmedPrompt) body.question = trimmedPrompt;
+  if (typeof options?.question === "string" && options.question.trim()) {
+    body.question = options.question.trim();
+    body.question_source = "explicit_option";
+  } else if (trimmedPrompt) {
+    body.question = trimmedPrompt;
+    body.question_source = "raw_prompt";
+  }
+  if (promptQuestionMatch) {
+    body.extracted_question_label = promptQuestionMatch;
+  }
   if (typeof options?.sourceQuestion === "string" && options.sourceQuestion.trim()) {
     body.sourceQuestion = options.sourceQuestion.trim();
   }

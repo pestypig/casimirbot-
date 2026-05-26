@@ -95,6 +95,31 @@ describe("helix ask turn input integrity audit", () => {
     );
   });
 
+  it("normalizer prefers full raw prompt over extracted question labels", () => {
+    const fullPrompt = [
+      "Question: diagnose Helix Ask large prompt behavior",
+      "",
+      "Full compound context:",
+      "1. preserve global context",
+      "2. compare with Codex compaction",
+      "3. propose code changes",
+    ].join("\n");
+    const context = normalizeHelixTurnInputItems({
+      request: {
+        question: "diagnose Helix Ask large prompt behavior",
+        prompt: fullPrompt,
+        raw_user_prompt: fullPrompt,
+      },
+      threadId: "test:turn-input-integrity:compound-prompt",
+    });
+
+    expect(context.turn_input_items[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("Full compound context"),
+      source: "user",
+    });
+  });
+
   it("allows live visual tool requests to reach the agent loop without committed image input", () => {
     const requestBody = {
       question: "What is visible on my screen right now?",

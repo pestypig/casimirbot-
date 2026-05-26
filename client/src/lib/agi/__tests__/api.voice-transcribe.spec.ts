@@ -243,6 +243,55 @@ describe("askLocal capsule ids", () => {
     expect(payload.capsuleIds).toEqual(capsuleIds.slice(0, 12));
   });
 
+  it("preserves full prompts when they contain a Question header", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-compound-question-header",
+            status: "pending",
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jobId: "job-compound-question-header",
+            status: "completed",
+            result: { text: "ok" },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const prompt = [
+      "Question: diagnose Helix Ask large prompt behavior",
+      "",
+      "Context:",
+      "1. preserve global context",
+      "2. compare with Codex compaction",
+      "3. propose code changes",
+    ].join("\n");
+    await askLocal(prompt);
+
+    const createRequest = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const payload = JSON.parse(String(createRequest.body)) as Record<string, unknown>;
+    expect(payload.prompt).toBe(prompt);
+    expect(payload.raw_user_prompt).toBe(prompt);
+    expect(payload.question).toBe(prompt);
+    expect(payload.question_source).toBe("raw_prompt");
+    expect(payload.extracted_question_label).toBe("diagnose Helix Ask large prompt behavior");
+  });
+
   it("recovers from job-missing interrupted fallback by retrying direct ask", async () => {
     const fetchMock = vi
       .fn()
