@@ -193,6 +193,71 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
   });
 
+  it("accepts agent step loop capability observations recorded after the selected action step", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "doc_evidence_location", required_terminal_kind: "doc_location_result" },
+      terminal_artifact_kind: "doc_location_matches",
+      final_answer_source: "model_direct_answer",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "doc_evidence_location",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-answer",
+            decision_authority: "llm",
+            decision_timing: "terminal_review",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "terminal_decision",
+          },
+        ],
+      },
+      final_answer_draft: {
+        text: "Locations:\n- /docs/research/example.md:12 - Assumptions are listed here.",
+      },
+      agent_step_loop: {
+        steps: [
+          {
+            step_id: "initial",
+            decision_ref: "agent-step-locate",
+            next_step: "next_action",
+            chosen_capability: "docs-viewer.locate_in_doc",
+            observation_refs: [],
+            sampling_mode: "llm",
+          },
+          {
+            step_id: "post_observation",
+            decision_ref: "agent-step-answer",
+            next_step: "answer",
+            chosen_capability: null,
+            observation_refs: ["doc-location-1"],
+            sampling_mode: "llm",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc-location-1",
+          kind: "doc_location_matches",
+          payload: {
+            kind: "doc_location_matches",
+            path: "/docs/research/example.md",
+            matches: [{ path: "/docs/research/example.md", line_start: 12, line_end: 12, text: "Assumptions are listed here." }],
+          },
+        },
+      ],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
   it("does not let an unrelated current-turn artifact satisfy the selected capability observation", () => {
     const payload = {
       canonical_goal_frame: { goal_kind: "calculator_solve", required_terminal_kind: "calculator_receipt" },

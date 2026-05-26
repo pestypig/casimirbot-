@@ -100,6 +100,7 @@ const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): s
   const toolObservation = readRecord(iteration.tool_observation);
   return Array.from(new Set([
     ...readStringArray(iteration.observed_artifact_refs),
+    ...readStringArray(iteration.observation_refs),
     ...readStringArray(iteration.artifact_refs),
     ...readStringArray(iteration.created_artifact_refs),
     ...readStringArray(toolObservation?.artifact_refs),
@@ -178,6 +179,8 @@ export function hasAgentRuntimeLoopDecisionChain(payload: Record<string, unknown
 export function hasSelectedCapabilityObservation(payload: Record<string, unknown>): boolean {
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations);
+  const agentStepLoop = readRecord(payload.agent_step_loop);
+  const agentStepLoopSteps = readArray(agentStepLoop?.steps);
   const artifacts = readArray(payload.current_turn_artifact_ledger);
   const artifactById = new Map<string, Record<string, unknown>>();
   for (const artifact of artifacts) {
@@ -186,7 +189,7 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     if (record && artifactId) artifactById.set(artifactId, record);
   }
 
-  return iterations.some((iteration) => {
+  const runtimeLoopHasObservation = iterations.some((iteration) => {
     const record = readRecord(iteration);
     const capability = readString(record?.chosen_capability);
     if (!record || !capability || capability === "model.direct_answer") return false;
@@ -199,6 +202,21 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     if (!toolObservation) return false;
     const status = readString(toolObservation.status);
     return /completed|observed|ok|success/i.test(status ?? "") && artifactKindMatchesCapability(capability, toolObservation);
+  });
+  if (runtimeLoopHasObservation) return true;
+
+  return agentStepLoopSteps.some((step, index) => {
+    const record = readRecord(step);
+    const capability = readString(record?.chosen_capability);
+    if (!record || !capability || capability === "model.direct_answer") return false;
+    const candidateSteps = agentStepLoopSteps.slice(index)
+      .map((entry) => readRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    const refs = Array.from(new Set(candidateSteps.flatMap((entry) => observedArtifactRefsForIteration(entry))));
+    return refs.some((ref) => {
+      const artifact = artifactById.get(ref) ?? null;
+      return Boolean(artifact) && artifactKindMatchesCapability(capability, artifact);
+    });
   });
 }
 
