@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import type {
+  TheoryBadgeEquationV1,
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
@@ -49,13 +50,13 @@ function badgeGlyph(badge: TheoryBadgeV1): string {
 function toPath(points: Array<{ x: number; y: number }>): string {
   if (points.length === 0) return "";
   const [first, ...rest] = points;
-  return [`M ${first.x} ${first.y}`, ...rest.map((point) => `L ${point.x} ${point.y}`)].join(" ");
+  return [`M ${first.x} ${first.y}`, ...rest.map((point: { x: number; y: number }) => `L ${point.x} ${point.y}`)].join(" ");
 }
 
 function primaryExpression(badge: TheoryBadgeV1): string | null {
   return (
     badge.calculatorPayloads[0]?.displayLatex ??
-    badge.equations.find((equation) => Boolean(equation.displayLatex))?.displayLatex ??
+    badge.equations.find((equation: TheoryBadgeEquationV1) => Boolean(equation.displayLatex))?.displayLatex ??
     null
   );
 }

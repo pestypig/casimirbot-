@@ -1,5 +1,5 @@
 import React from "react";
-import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
+import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "@shared/contracts/physics-atlas.v1";
 import { PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 
 export type TheoryAtlasLensId = PhysicsAtlasBlockId;
@@ -28,7 +28,7 @@ export default function TheoryAtlasRail({
       aria-label="Theory atlas lenses"
       className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
     >
-      {PHYSICS_ATLAS_BLOCKS.map((block) => {
+      {PHYSICS_ATLAS_BLOCKS.map((block: PhysicsAtlasBlockV1) => {
         const active = activeLensId === block.id;
         const planned = block.status === "planned";
         return (

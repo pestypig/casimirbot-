@@ -172,7 +172,7 @@ export function layoutTheoryAchievementMap(graph: TheoryBadgeGraphV1): TheoryAch
         points: edgePoints(from, to),
       };
     })
-    .filter((edge): edge is TheoryAchievementLayoutEdge => Boolean(edge));
+    .filter((edge: TheoryAchievementLayoutEdge | null): edge is TheoryAchievementLayoutEdge => Boolean(edge));
 
   const maxX = Math.max(...nodes.map((node: TheoryAchievementLayoutNode) => node.x), X_OFFSET);
   const maxY = Math.max(...nodes.map((node: TheoryAchievementLayoutNode) => node.y), Y_OFFSET);

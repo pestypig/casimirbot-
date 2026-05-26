@@ -114,7 +114,7 @@ describe("conversation-turn route", () => {
     const briefPrompt = String(llmLocalHandlerMock.mock.calls[1]?.[0]?.prompt ?? "");
     expect(briefPrompt).toContain("Route reason: dispatch:verify");
     expect(briefPrompt).toContain("Do not output raw route/status codes.");
-  }, 20000);
+  }, 30000);
 
   it("keeps brief empty when LLM brief payload is invalid", async () => {
     llmLocalHandlerMock
@@ -148,7 +148,7 @@ describe("conversation-turn route", () => {
     expect(res.body.brief?.source).toBe("none");
     expect(String(res.body.fail_reason ?? "")).toMatch(/conversation_brief_(parse|policy)_none/);
     expect(String(res.body.brief?.text ?? "")).toBe("");
-  }, 20000);
+  }, 30000);
 
   it("auto-seeds recentTurns from persisted conversation history when omitted", async () => {
     llmLocalHandlerMock

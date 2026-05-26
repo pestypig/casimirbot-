@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateTheoryBadgeGraphV1 } from "../../contracts/theory-badge-graph.v1";
+import type { TheoryBadgeV1 } from "../../contracts/theory-badge-graph.v1";
+import type { TheoryBadgeLookupMatch } from "../theory-badge-overlap-locator";
+import type { TheoryCalculatorLoadoutItemV1 } from "../../contracts/theory-calculator-loadout.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
 import { locateTheoryBadges } from "../theory-badge-overlap-locator";
 import { buildTheoryCalculatorLoadout } from "../theory-calculator-loadout";
@@ -7,7 +10,7 @@ import { buildTheoryCalculatorLoadout } from "../theory-calculator-loadout";
 describe("solar spectrum theory badges", () => {
   it("merges a validating solar spectrum branch into the theory graph", () => {
     const graph = buildNhm2TheoryBadgeGraphV1();
-    const badgeIds = graph.badges.map((badge) => badge.id);
+    const badgeIds = graph.badges.map((badge: TheoryBadgeV1) => badge.id);
 
     expect(validateTheoryBadgeGraphV1(graph)).toEqual([]);
     expect(badgeIds).toContain("solar.spectrum.photon_energy_wavelength");
@@ -26,8 +29,8 @@ describe("solar spectrum theory badges", () => {
         simulationOwners: ["solar_spectrum"],
       },
     });
-    expect(spectrumMatches.map((match) => match.badgeId)).toContain("solar.spectrum.photon_energy_wavelength");
-    expect(spectrumMatches.map((match) => match.badgeId)).toContain("solar.spectrum.doppler_velocity");
+    expect(spectrumMatches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("solar.spectrum.photon_energy_wavelength");
+    expect(spectrumMatches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("solar.spectrum.doppler_velocity");
 
     const flareMatches = locateTheoryBadges({
       graph,
@@ -36,7 +39,7 @@ describe("solar spectrum theory badges", () => {
         simulationOwners: ["solar_flare"],
       },
     });
-    expect(flareMatches.map((match) => match.badgeId)).toContain("solar.flare.radiant_energy_proxy");
+    expect(flareMatches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("solar.flare.radiant_energy_proxy");
   });
 
   it("builds a solar scalar loadout from selected badges", () => {
@@ -48,7 +51,7 @@ describe("solar spectrum theory badges", () => {
       includeContextItems: false,
     });
 
-    expect(loadout.items.map((item) => item.expression)).toEqual(
+    expect(loadout.items.map((item: TheoryCalculatorLoadoutItemV1) => item.expression)).toEqual(
       expect.arrayContaining(["E = h*c/lambda", "v = c*(lambda_obs - lambda0)/lambda0"]),
     );
   });

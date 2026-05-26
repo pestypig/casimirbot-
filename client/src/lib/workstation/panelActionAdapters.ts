@@ -63,7 +63,11 @@ import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
 } from "@shared/theory/theory-badge-overlap-locator";
-import { PHYSICS_ATLAS_BLOCK_IDS, type PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
+import {
+  PHYSICS_ATLAS_BLOCK_IDS,
+  type PhysicsAtlasBlockId,
+  type PhysicsAtlasBlockV1,
+} from "@shared/contracts/physics-atlas.v1";
 import { buildPhysicsAtlasBlocksV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 
@@ -284,10 +288,12 @@ function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: 
   const targetBadgeId = asNonEmptyString(args.target_badge_id ?? args.targetBadgeId ?? args.badge_id ?? args.badgeId);
   const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
   const atlasBlockId = asPhysicsAtlasBlockId(args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId);
-  const atlasBlock = atlasBlockId ? PHYSICS_ATLAS_BLOCKS.find((block) => block.id === atlasBlockId) : null;
+  const atlasBlock = atlasBlockId
+    ? PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) => block.id === atlasBlockId)
+    : null;
   const atlasBadgeIds = atlasBlock
-    ? [...atlasBlock.primaryBadgeIds, ...atlasBlock.claimBoundaryBadgeIds].filter((badgeId) =>
-        graph.badges.some((badge) => badge.id === badgeId),
+    ? [...atlasBlock.primaryBadgeIds, ...atlasBlock.claimBoundaryBadgeIds].filter((badgeId: string) =>
+        graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
       )
     : [];
   const selectedBadgeIds = badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : atlasBadgeIds;
@@ -2914,7 +2920,7 @@ export function executeHelixPanelAction(
           schemaVersion: atlas.schemaVersion,
           artifact_v1: atlas,
           graph_id: graph.graphId,
-          blocks: atlas.blocks.map((block) => ({
+          blocks: atlas.blocks.map((block: PhysicsAtlasBlockV1) => ({
             id: block.id,
             title: block.title,
             glyph: block.glyph,
@@ -2939,7 +2945,7 @@ export function executeHelixPanelAction(
         };
       }
       const atlas = buildPhysicsAtlasBlocksV1(graph.graphId);
-      const block = atlas.blocks.find((candidate) => candidate.id === blockId);
+      const block = atlas.blocks.find((candidate: PhysicsAtlasBlockV1) => candidate.id === blockId);
       const lens = resolvePhysicsAtlasLens({ graph, blockId });
       if (!block || !lens) {
         return {

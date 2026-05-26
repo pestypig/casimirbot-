@@ -21,7 +21,7 @@ const normalize = (value: string) => value.trim().toLowerCase();
 
 const matchesAny = (values: string[], requested: string[]) => {
   const requestedKeys = requested.map((value: string) => normalize(value));
-  return values.some((value) => {
+  return values.some((value: string) => {
     const key = normalize(value);
     return requestedKeys.some((requestedKey: string) => key === requestedKey || key.includes(requestedKey));
   });

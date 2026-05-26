@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { PhysicsAtlasBlockV1 } from "../../contracts/physics-atlas.v1";
 import { buildPhysicsAtlasBlocksV1 } from "../physics-atlas-blocks";
 
 describe("physics atlas blocks", () => {
   it("includes the finite rail domains and source references", () => {
     const atlas = buildPhysicsAtlasBlocksV1();
-    const byId = new Map(atlas.blocks.map((block) => [block.id, block]));
+    const byId = new Map(atlas.blocks.map((block: PhysicsAtlasBlockV1) => [block.id, block]));
 
     expect(byId.get("stellar_evolution")?.status).toBe("active");
     expect(byId.get("cosmic_distance_ladder")?.status).toBe("active");

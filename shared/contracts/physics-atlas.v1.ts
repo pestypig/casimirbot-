@@ -155,12 +155,13 @@ export function validatePhysicsAtlasV1(value: unknown): string[] {
       issues.push(`${prefix} must be an object`);
       continue;
     }
-    if (!PHYSICS_ATLAS_BLOCK_IDS.includes(rawBlock.id as PhysicsAtlasBlockId)) {
+    const rawBlockId = typeof rawBlock.id === "string" ? rawBlock.id : "";
+    if (!PHYSICS_ATLAS_BLOCK_IDS.includes(rawBlockId as PhysicsAtlasBlockId)) {
       issues.push(`${prefix}.id is invalid`);
-    } else if (blockIds.has(rawBlock.id)) {
-      issues.push(`duplicate block id: ${rawBlock.id}`);
+    } else if (blockIds.has(rawBlockId)) {
+      issues.push(`duplicate block id: ${rawBlockId}`);
     } else {
-      blockIds.add(rawBlock.id);
+      blockIds.add(rawBlockId);
     }
     for (const field of ["title", "shortTitle", "glyph", "description", "status"] as const) {
       if (!isNonEmptyString(rawBlock[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
