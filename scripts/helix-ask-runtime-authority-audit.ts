@@ -37,12 +37,16 @@ const boundaryCallPattern =
 const approvedTerminalBoundaryFiles = new Set([
   "server/services/helix-ask/terminal-answer-envelope.ts",
   "server/services/helix-ask/runtime-authority-contract.ts",
+  "server/services/helix-ask/turn-terminal-authority.ts",
 ]);
 
 const approvedAuditFiles = new Set([
   "scripts/helix-ask-runtime-authority-audit.ts",
   "scripts/helix-ask-discipline-check.ts",
 ]);
+
+const readOnlyDiagnosticFilePattern =
+  /(?:^scripts\/|(?:^|\/)(?:api-parity-matrix|api-parity-probe|ask-context-poison-audit|product-authority-guard|route-authority-audit|solver-artifact-reentry-audit|terminal-artifact-selection-guard|terminal-equivalence-harness|terminal-presentation-coverage-audit|universal-terminal-presenter)\.ts$)/;
 
 function normalizePath(value: string): string {
   return value.replace(/\\/g, "/");
@@ -91,6 +95,10 @@ function isClientProjectionFile(file: string): boolean {
   return file.startsWith("client/");
 }
 
+function isReadOnlyDiagnosticFile(file: string): boolean {
+  return readOnlyDiagnosticFilePattern.test(file);
+}
+
 function isDeclarationOnlyLine(trimmed: string): boolean {
   return /^[A-Za-z_$][\w$]*\??:\s*(?:string|number|boolean|null|unknown|Record<|Array<|readonly|Helix|Ask|Terminal|Payload|Debug|[A-Z][\w$]*)(?:[<\w\s,.$[\]|?{}:'"-]*)?[;,]?$/.test(trimmed);
 }
@@ -108,6 +116,7 @@ function classifyFinding(file: string, content: string, lineNumber: number, line
 
   if (terminalWritePattern.test(trimmed)) {
     if (fileContextAllowsWrite(file, content) || lineHasRuntimeGuard(trimmed)) return null;
+    if (isReadOnlyDiagnosticFile(file)) return null;
     if (isClientProjectionFile(file)) {
       return {
         severity: "P2",

@@ -1,7 +1,7 @@
 import { auditHelixAskContextForPoison } from "./ask-context-poison-audit";
 import { auditTerminalPresentationCoverage } from "./terminal-presentation-coverage-audit";
 import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "./turn-terminal-authority";
-import { evaluateTerminalBoundaryEligibility } from "./runtime-authority-contract";
+import { evaluateTerminalBoundaryEligibility, type HelixRuntimeAuthorityBoundaryReport } from "./runtime-authority-contract";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -165,10 +165,56 @@ function upsertCurrentTurnEvents(value: unknown, envelope: HelixTerminalAnswerEn
   };
 }
 
+function buildTerminalBoundaryFailureEnvelope(
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+  boundary: HelixRuntimeAuthorityBoundaryReport,
+): HelixTerminalAnswerEnvelope {
+  const blockingReasons = boundary.blocking_reasons.length > 0
+    ? boundary.blocking_reasons
+    : ["terminal_boundary_ineligible"];
+  const terminalText = [
+    "I could not complete this turn because the terminal boundary blocked a source/capability answer before the agent runtime loop proved it.",
+    `Missing runtime authority: ${blockingReasons.join(", ")}.`,
+  ].join(" ");
+  payload.terminal_error_code = readString(payload.terminal_error_code) ?? "terminal_boundary_ineligible";
+  payload.typed_failure = {
+    ...(readRecord(payload.typed_failure) ?? {}),
+    kind: "typed_failure",
+    error_code: payload.terminal_error_code,
+    text: terminalText,
+    answer_text: terminalText,
+    terminal_boundary_eligibility: boundary,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    ...envelope,
+    terminal_artifact_kind: "typed_failure",
+    final_answer_source: "typed_failure",
+    terminal_text: terminalText,
+    terminal_text_hash: hashHelixTerminalText(terminalText),
+    terminal_kind: "failure",
+    authority_origin: "typed_failure",
+  };
+}
+
 export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): HelixTerminalAnswerEnvelope {
+  const previewPayload = {
+    ...payload,
+    selected_final_answer: envelope.terminal_text,
+    terminal_artifact_kind: envelope.terminal_artifact_kind,
+    final_answer_source: envelope.final_answer_source,
+    terminal_answer_envelope: envelope,
+  };
+  const initialBoundary = evaluateTerminalBoundaryEligibility(previewPayload);
+  if (!initialBoundary.eligible) {
+    envelope = buildTerminalBoundaryFailureEnvelope(payload, envelope, initialBoundary);
+  }
+
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
   payload.selected_final_answer = envelope.terminal_text;

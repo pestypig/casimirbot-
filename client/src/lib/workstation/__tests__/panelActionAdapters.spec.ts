@@ -10,6 +10,7 @@ import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
+import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 
@@ -66,6 +67,7 @@ describe("panelActionAdapters", () => {
       debugEvents: [],
     });
     useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
+    useTheoryMapOverlayStore.getState().clearOverlay();
     useScientificCalculatorLiveSourceStore.setState({
       status: "idle",
       sourceId: "source:calculator-prime-stream",
@@ -1045,10 +1047,10 @@ describe("panelActionAdapters", () => {
     );
   });
 
-  it("looks up theory badges for Helix workstation context", () => {
-    const result = executeHelixPanelAction(
-      {
-        panel_id: "theory-badge-graph",
+    it("looks up theory badges for Helix workstation context", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
         action_id: "lookup_badges",
         args: { query: "solve the QEI sampling margin", limit: 3 },
       },
@@ -1059,10 +1061,78 @@ describe("panelActionAdapters", () => {
     expect(result.artifact?.kind).toBe("theory_badge_lookup");
     const matches = result.artifact?.matches as Array<{ badgeId: string; claimBoundaryWarnings: string[] }>;
     expect(matches[0]?.badgeId).toBe("nhm2.qei.sampling_window");
-    expect(matches[0]?.claimBoundaryWarnings).toContain("diagnostic-only badge");
-  });
+      expect(matches[0]?.claimBoundaryWarnings).toContain("diagnostic-only badge");
+    });
 
-  it("returns theory badge context and connection traces", () => {
+    it("locates theory context and updates the map overlay without solving", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "locate_context",
+          args: {
+            query: "solve the QEI margin",
+            symbols: ["qei_margin"],
+            overlay: true,
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_badge_locator");
+      expect(result.artifact?.schemaVersion).toBe("theory_badge_locator/v1");
+      expect(result.artifact?.matches).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ badgeId: "nhm2.qei.sampling_window" }),
+        ]),
+      );
+      expect(useTheoryMapOverlayStore.getState().rippleBadgeIds).toContain("nhm2.qei.sampling_window");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("loads theory badge payloads to the calculator without solving", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_payloads_to_calculator",
+          args: {
+            badge_id: "nhm2.qei.sampling_window",
+            load_mode: "primary",
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_badge_calculator_loadout");
+      expect(useScientificCalculatorStore.getState().currentLatex).toContain("qei");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("clears theory map overlays", () => {
+      executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "locate_context",
+          args: { query: "rest energy", overlay: true },
+        },
+        actionContext(),
+      );
+      expect(useTheoryMapOverlayStore.getState().rippleBadgeIds.length).toBeGreaterThan(0);
+
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "clear_overlay",
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(useTheoryMapOverlayStore.getState().rippleBadgeIds).toEqual([]);
+    });
+
+    it("returns theory badge context and connection traces", () => {
     const contextResult = executeHelixPanelAction(
       {
         panel_id: "theory-badge-graph",

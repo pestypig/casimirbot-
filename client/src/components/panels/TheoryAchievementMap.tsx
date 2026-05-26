@@ -18,6 +18,8 @@ type TheoryAchievementMapProps = {
   playbackBadgeIds: string[];
   solvedBadgeIds: string[];
   failedBadgeIds: string[];
+  rippleBadgeIds: string[];
+  heatByBadgeId: Record<string, number>;
   onSelectBadge: (badgeId: string) => void;
   onToggleBadgeSelection: (badgeId: string) => void;
   onRunPath: (badgeId: string) => void;
@@ -101,6 +103,8 @@ export default function TheoryAchievementMap({
   playbackBadgeIds,
   solvedBadgeIds,
   failedBadgeIds,
+  rippleBadgeIds,
+  heatByBadgeId,
   onSelectBadge,
   onToggleBadgeSelection,
   onRunPath,
@@ -121,6 +125,7 @@ export default function TheoryAchievementMap({
   const playbackSet = new Set(playbackBadgeIds);
   const solvedSet = new Set(solvedBadgeIds);
   const failedSet = new Set(failedBadgeIds);
+  const rippleSet = new Set(rippleBadgeIds);
   const hasFocus = highlightedSet.size > 0 || selectedSet.size > 1;
 
   useEffect(() => {
@@ -188,6 +193,8 @@ export default function TheoryAchievementMap({
           if (!badge) return null;
           const expression = primaryExpression(badge);
           const title = expression ? `${badge.title}\n${expression}` : badge.title;
+          const heat = heatByBadgeId[node.badgeId] ?? 0;
+          const ripple = rippleSet.has(node.badgeId);
           return (
             <button
               key={node.badgeId}
@@ -202,7 +209,14 @@ export default function TheoryAchievementMap({
                 hasFocus,
                 loadable: badge.calculatorPayloads.length > 0,
               })}
-              style={{ left: node.x, top: node.y }}
+              style={{
+                left: node.x,
+                top: node.y,
+                boxShadow:
+                  heat > 0
+                    ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
+                    : undefined,
+              }}
               title={title}
               aria-label={badge.title}
               onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
@@ -221,6 +235,9 @@ export default function TheoryAchievementMap({
               </span>
               {badge.calculatorPayloads.length > 0 ? (
                 <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
+              ) : null}
+              {ripple ? (
+                <span className="pointer-events-none absolute -inset-2 border border-cyan-200/80" />
               ) : null}
             </button>
           );

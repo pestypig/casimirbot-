@@ -24,8 +24,11 @@ import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calcula
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
 import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
+import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
+import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -463,7 +466,11 @@ export default function TheoryBadgeGraphPanel() {
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
   const rememberViewport = useTheoryBadgeGraphPanelStore((state) => state.rememberViewport);
+  const mapOverlay = useTheoryMapOverlayStore();
+  const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const playbackStore = useTheoryBadgePlaybackStore();
+  const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
+  const calculatorArtifact = useScientificCalculatorStore((state) => state.lastArtifactV1);
 
   const { data: graph, isLoading, error } = useQuery<TheoryBadgeGraphV1>({
     queryKey: ["/api/helix/theory/graph"],
@@ -518,10 +525,26 @@ export default function TheoryBadgeGraphPanel() {
       setSelectedBadgeId(null);
       return;
     }
-    if (!selectedId || !filteredBadges.some((badge: TheoryBadgeV1) => badge.id === selectedId)) {
-      setSelectedBadgeId(filteredBadges[0].id);
+    if (selectedId && !filteredBadges.some((badge: TheoryBadgeV1) => badge.id === selectedId)) {
+      setSelectedBadgeId(null);
     }
   }, [filteredBadges, graph, selectedId, setSelectedBadgeId]);
+
+  useEffect(() => {
+    if (!graph) return;
+    const expression = calculatorArtifact?.request.inputLatex || calculatorLatex;
+    if (!expression.trim()) return;
+    const locator = buildTheoryBadgeLocatorArtifact({
+      graph,
+      input: {
+        expression,
+        query: expression,
+        source: "scientific_calculator",
+        limit: 8,
+      },
+    });
+    if (locator.matches.length > 0) setLocatorOverlay(locator);
+  }, [calculatorArtifact, calculatorLatex, graph, setLocatorOverlay]);
 
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
@@ -538,15 +561,19 @@ export default function TheoryBadgeGraphPanel() {
     return resolveTheoryBadgeConnectionTrace({ graph, badgeIds: selectedBadgeIds });
   }, [graph, selectedBadgeIds]);
 
-  const highlightedBadgeIds = multiTrace?.connectingBadgeIds ?? singlePlaybackPlan?.orderedBadgeIds ?? [];
+  const highlightedBadgeIds =
+    multiTrace?.connectingBadgeIds ??
+    singlePlaybackPlan?.orderedBadgeIds ??
+    mapOverlay.highlightedBadgeIds;
   const highlightedEdgeIds = useMemo(() => {
     if (!graph) return [];
     if (multiTrace) return multiTrace.connectingEdgeIds;
+    if (!singlePlaybackPlan && mapOverlay.highlightedEdgeIds.length > 0) return mapOverlay.highlightedEdgeIds;
     const highlighted = new Set(highlightedBadgeIds);
     return graph.edges
       .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
       .map((edge: TheoryBadgeEdgeV1) => edge.id);
-  }, [graph, highlightedBadgeIds, multiTrace]);
+  }, [graph, highlightedBadgeIds, mapOverlay.highlightedEdgeIds, multiTrace, singlePlaybackPlan]);
 
   const activePlayback =
     playbackStore.activeTargetBadgeId === selectedBadge?.id || playbackStore.activeTargetBadgeId
@@ -622,6 +649,8 @@ export default function TheoryBadgeGraphPanel() {
                   playbackBadgeIds={playbackBadgeIds}
                   solvedBadgeIds={solvedBadgeIds}
                   failedBadgeIds={failedBadgeIds}
+                  rippleBadgeIds={mapOverlay.rippleBadgeIds}
+                  heatByBadgeId={mapOverlay.heatByBadgeId}
                   onSelectBadge={selectBadge}
                   onToggleBadgeSelection={toggleBadgeSelection}
                   onRunPath={runPathToBadge}

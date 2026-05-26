@@ -11,10 +11,12 @@ import {
 } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
+import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import {
   useSituationRoomStore,
   selectSituationRoomEvents,
@@ -2754,6 +2756,50 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "locate_context") {
+      const source =
+        asNonEmptyString(args.source) === "scientific_calculator" ||
+        asNonEmptyString(args.source) === "helix_ask" ||
+        asNonEmptyString(args.source) === "playback"
+          ? (asNonEmptyString(args.source) as "scientific_calculator" | "helix_ask" | "playback")
+          : "manual";
+      const locator = buildTheoryBadgeLocatorArtifact({
+        graph,
+        input: {
+          query: asNonEmptyString(args.query ?? args.text ?? args.prompt) ?? undefined,
+          expression: asNonEmptyString(args.expression) ?? undefined,
+          subjects: asStringArray(args.subjects),
+          symbols: asStringArray(args.symbols),
+          unitSignatures: asStringArray(args.unit_signatures ?? args.unitSignatures),
+          repoPaths: asStringArray(args.repo_paths ?? args.repoPaths),
+          equationFamilies: asStringArray(args.equation_families ?? args.equationFamilies),
+          simulationOwners: asStringArray(args.simulation_owners ?? args.simulationOwners),
+          source,
+          limit: asNumber(args.limit) ?? undefined,
+        },
+      });
+      if (asBoolean(args.overlay) ?? true) {
+        useTheoryMapOverlayStore.getState().setLocatorOverlay(locator);
+        context.openPanel(panelId, undefined);
+        context.focusPanel(panelId, undefined);
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_locator",
+          schemaVersion: locator.schemaVersion,
+          artifact_v1: locator,
+          graph_id: graph.graphId,
+          matches: locator.matches,
+          overlay: locator.overlay,
+          recommended_actions: locator.recommendedActions,
+          claim_boundary_notes: locator.claimBoundaryNotes,
+        },
+      };
+    }
+
     if (actionId === "lookup_badges") {
       const matches = locateTheoryBadges({
         graph,
@@ -2831,6 +2877,60 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "load_payloads_to_calculator") {
+      const badgeId = asNonEmptyString(args.badge_id ?? args.badgeId);
+      const badge = badgeId ? badgesById.get(badgeId) : null;
+      if (!badgeId || !badge) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.load_payloads_to_calculator requires a valid badge_id.",
+        };
+      }
+      const requestedPayloadIds = asStringArray(args.payload_ids ?? args.payloadIds);
+      const loadMode = asNonEmptyString(args.load_mode ?? args.loadMode) === "all" ? "all" : "primary";
+      const selectedPayloads =
+        requestedPayloadIds.length > 0
+          ? badge.calculatorPayloads.filter((payload) => requestedPayloadIds.includes(payload.id))
+          : loadMode === "all"
+            ? badge.calculatorPayloads
+            : badge.calculatorPayloads.slice(0, 1);
+      const compoundRunId = asNonEmptyString(args.compound_run_id ?? args.compoundRunId);
+      const scientificState = useScientificCalculatorStore.getState();
+      const loadedPayloads = selectedPayloads.map((payload) => {
+        scientificState.ingestLatex(payload.displayLatex || payload.expression, {
+          sourcePath: `theory://${graph.graphId}/${badge.id}/${payload.id}`,
+          anchor: payload.id,
+          source: "workstation_action",
+          calculatorSetup: payload.setupContext ?? null,
+          compoundRunId,
+          compoundSubgoalId: `${badge.id}:${payload.id}`,
+        });
+        return {
+          badge_id: badge.id,
+          payload_id: payload.id,
+          expression: payload.expression,
+          display_latex: payload.displayLatex,
+        };
+      });
+      context.openPanel("scientific-calculator", undefined);
+      context.focusPanel("scientific-calculator", undefined);
+      return {
+        ok: loadedPayloads.length > 0,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_calculator_loadout",
+          graph_id: graph.graphId,
+          badge_id: badge.id,
+          loaded_payloads: loadedPayloads,
+          calculator_focused: true,
+        },
+        message: loadedPayloads.length > 0 ? undefined : "No calculator payloads matched the request.",
+      };
+    }
+
     if (actionId === "trace_badges") {
       const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
       if (badgeIds.length === 0) {
@@ -2842,6 +2942,14 @@ export function executeHelixPanelAction(
         };
       }
       const trace = traceTheoryBadgeConnections({ graph, badgeIds });
+      if (asBoolean(args.overlay) ?? true) {
+        useTheoryMapOverlayStore.getState().setSelectionOverlay({
+          selectedBadgeIds: trace.selectedBadgeIds,
+          highlightedBadgeIds: trace.connectingBadgeIds,
+          highlightedEdgeIds: trace.pathSegments.flatMap((segment) => segment.edgeIds),
+          claimBoundaryNotes: trace.claimBoundaryNotes,
+        });
+      }
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       return {
@@ -2853,6 +2961,7 @@ export function executeHelixPanelAction(
           graph_id: graph.graphId,
           selected_badge_ids: trace.selectedBadgeIds,
           connecting_badge_ids: trace.connectingBadgeIds,
+          connecting_edge_ids: trace.pathSegments.flatMap((segment) => segment.edgeIds),
           shared_ancestor_ids: trace.sharedAncestorIds,
           shared_subjects: trace.sharedSubjects,
           shared_symbols: trace.sharedSymbols,
@@ -2860,6 +2969,19 @@ export function executeHelixPanelAction(
           path_segments: trace.pathSegments,
           claim_boundary_notes: trace.claimBoundaryNotes,
           warnings: trace.warnings,
+        },
+      };
+    }
+
+    if (actionId === "clear_overlay") {
+      useTheoryMapOverlayStore.getState().clearOverlay();
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_badge_overlay_cleared",
+          graph_id: graph.graphId,
         },
       };
     }

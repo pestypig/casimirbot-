@@ -7,6 +7,7 @@ import TheoryBadgeGraphPanel from "../panels/TheoryBadgeGraphPanel";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
+import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
 
 function renderPanel() {
@@ -29,6 +30,7 @@ function renderPanel() {
 afterEach(() => {
   useTheoryBadgePlaybackStore.getState().clearPlayback();
   useTheoryBadgeGraphPanelStore.getState().resetPanelMemory();
+  useTheoryMapOverlayStore.getState().clearOverlay();
   useScientificCalculatorStore.setState({ currentLatex: "" });
   cleanup();
 });
