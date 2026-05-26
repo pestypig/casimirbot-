@@ -482,9 +482,18 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       {
         id: "solve_calculator_loadout",
         title: "Solve Calculator Loadout",
-        description: "Solve all scalar rows in a theory calculator loadout and keep runtime/reference rows as context.",
+        description: "Solve scalar rows in a theory calculator loadout and optionally run StarSim runtime receipt rows.",
         risk: "low",
-        optional_args: ["badge_ids", "target_badge_id", "mode", "object_context", "include_context_items", "loadout"],
+        optional_args: ["badge_ids", "target_badge_id", "mode", "object_context", "include_context_items", "loadout", "solve_scope"],
+        returns_artifact: true,
+      },
+      {
+        id: "run_runtime_badge",
+        title: "Run Runtime Badge",
+        description: "Run a StarSim runtime badge against an object context and return a typed runtime receipt.",
+        risk: "low",
+        required_args: ["badge_id", "object_context"],
+        optional_args: ["include_raw_evaluation"],
         returns_artifact: true,
       },
       {

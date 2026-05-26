@@ -1,8 +1,6 @@
 import { openDocPanel } from "@/lib/docs/openDocPanel";
 import { DOC_MANIFEST, findDocEntry } from "@/lib/docs/docManifest";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
-import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
-import type { HelixAskAnswerContract } from "@/lib/helix/ask-prompt-launch";
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import {
@@ -13,6 +11,7 @@ import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
+import { runStarSimRuntimeBadge } from "@shared/theory/starsim-runtime-adapter";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
@@ -219,6 +218,9 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       radialVelocity_kms: asNumber(observables.radialVelocity_kms ?? observables.radial_velocity_kms),
       r90_Rstar: asNumber(observables.r90_Rstar ?? observables.r90_rstar),
       distance_pc: asNumber(observables.distance_pc),
+      gravitationalConstantNormalized: asNumber(observables.gravitationalConstantNormalized ?? observables.gravitational_constant_normalized),
+      channelTemperature_K: asNumber(observables.channelTemperature_K ?? observables.channel_temperature_K),
+      channelDensity_g_cm3: asNumber(observables.channelDensity_g_cm3 ?? observables.channel_density_g_cm3),
       magneticField_T: asNumber(observables.magneticField_T ?? observables.magnetic_field_T),
       spectralLineNm: asNumber(observables.spectralLineNm ?? observables.spectral_line_nm),
       source: "helix_ask",
@@ -231,16 +233,16 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
         .map(([key, rawValue]) => [key, typeof rawValue === "number" || typeof rawValue === "string" ? rawValue : null])
         .filter((entry): entry is [string, string | number] => entry[1] !== null),
     );
-    return {
-      kind,
-      objectId: asNonEmptyString(record.objectId ?? record.object_id),
-      label: asNonEmptyString(record.label),
-      observables: {},
-      variableBindings: normalizedBindings,
-      units: asRecord(record.units) as Record<string, string> ?? {},
-      source: "helix_ask",
-      assumptions: asStringArray(record.assumptions),
-      claimBoundaryNotes: asStringArray(record.claim_boundary_notes ?? record.claimBoundaryNotes),
+      return {
+        kind,
+        objectId: asNonEmptyString(record.objectId ?? record.object_id),
+        label: asNonEmptyString(record.label),
+        observables: {},
+        variableBindings: normalizedBindings,
+        units: (asRecord(record.units) as Record<string, string> | null) ?? {},
+        source: "helix_ask",
+        assumptions: asStringArray(record.assumptions),
+        claimBoundaryNotes: asStringArray(record.claim_boundary_notes ?? record.claimBoundaryNotes),
     };
   }
   return null;
@@ -673,90 +675,16 @@ function requireConfirmation(
   };
 }
 
-function buildDocReasoningPrompt(args: {
-  mode: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc";
-  path: string;
-  anchor?: string;
-  selectedText?: string;
-  query?: string;
-}): string {
-  const pathLine = `Document path: ${args.path}`;
-  const anchorLine = args.anchor ? `Section anchor: #${args.anchor}` : null;
-  const selectionLine = args.selectedText ? `Selected text: "${args.selectedText}"` : null;
-  const queryLine = args.query ? `Locate query: "${args.query}"` : null;
-  const contextLines = [pathLine, anchorLine, selectionLine, queryLine].filter(Boolean).join("\n");
-
-  if (args.mode === "summarize_section") {
-    return `Summarize this section from the current docs viewer selection. Start with one sentence on what this section is for, then key points.\n${contextLines}`;
-  }
-  if (args.mode === "explain_paper") {
-    return `Explain this paper from the current docs viewer context in plain language.\n${contextLines}`;
-  }
-  if (args.mode === "locate_in_doc") {
-    return `Find where this topic is addressed in the current docs viewer context. Return a short "Locations:" list with anchors/sections and one-line evidence snippets.\n${contextLines}`;
-  }
-  return `Summarize this document from the current docs viewer context. Start with one sentence on what this document is for, then key findings and caveats.\n${contextLines}`;
-}
-
-function buildDocAnswerContract(mode: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc"): HelixAskAnswerContract {
-  const sharedSections = [
-    { id: "purpose", heading: "Purpose", required: true, synonyms: ["What this document is for"] },
-  ];
-  if (mode === "summarize_section") {
-    return {
-      schema: "helix.ask.answer_contract.v1",
-      source: "docs_viewer",
-      mode,
-      strict_sections: true,
-      min_tokens: 900,
-      sections: [
-        ...sharedSections,
-        { id: "key_points", heading: "Key Points", required: true, synonyms: ["Findings"] },
-        { id: "caveats", heading: "Caveats", required: true, synonyms: ["Limits", "Limitations"] },
-        { id: "next_checks", heading: "Next Checks", required: false, synonyms: ["Follow-ups"] },
-      ],
-    };
-  }
-  if (mode === "explain_paper") {
-    return {
-      schema: "helix.ask.answer_contract.v1",
-      source: "docs_viewer",
-      mode,
-      strict_sections: true,
-      min_tokens: 1000,
-      sections: [
-        ...sharedSections,
-        { id: "core_mechanism", heading: "Core Mechanism", required: true, synonyms: ["How it works"] },
-        { id: "evidence", heading: "Evidence", required: true, synonyms: ["Findings"] },
-        { id: "caveats", heading: "Caveats", required: true, synonyms: ["Limits", "Limitations"] },
-      ],
-    };
-  }
-  if (mode === "locate_in_doc") {
-    return {
-      schema: "helix.ask.answer_contract.v1",
-      source: "docs_viewer",
-      mode,
-      strict_sections: true,
-      min_tokens: 500,
-      sections: [
-        ...sharedSections,
-        { id: "locations", heading: "Locations", required: true, synonyms: ["Matches", "Where It Appears"] },
-      ],
-    };
-  }
+function buildWorkspaceActionReceipt(panelId: string, actionId: string): Record<string, unknown> {
   return {
-    schema: "helix.ask.answer_contract.v1",
-    source: "docs_viewer",
-    mode,
-    strict_sections: true,
-    min_tokens: 1100,
-    sections: [
-      ...sharedSections,
-      { id: "findings", heading: "Findings", required: true, synonyms: ["Key Findings", "Key Points"] },
-      { id: "caveats", heading: "Caveats", required: true, synonyms: ["Limits", "Limitations"] },
-      { id: "next_checks", heading: "Next Checks", required: false, synonyms: ["Follow-ups"] },
-    ],
+    kind: "workspace_action_receipt",
+    schema: "helix.workspace_action_receipt.v1",
+    panel_id: panelId,
+    action_id: actionId,
+    status: "completed",
+    state_observed: true,
+    assistant_answer: false,
+    raw_content_included: false,
   };
 }
 
@@ -766,10 +694,11 @@ function buildRuntimeDocsObservationArtifact(args: {
   anchor: string | null;
   selectedText: string | null;
   query: string | null;
-  decisionRef: string;
+  decisionRef: string | null;
 }): Record<string, unknown> {
   const route = normalizeDocRoute(args.path);
   const entry = findDocEntry(route);
+  const observationScope = args.decisionRef ? "runtime_selected_capability" : "manual_panel_action";
   if (args.actionId === "locate_in_doc") {
     const hasSelectedMatch =
       Boolean(args.selectedText) &&
@@ -780,6 +709,8 @@ function buildRuntimeDocsObservationArtifact(args: {
       kind: "doc_location_matches",
       source: "docs_viewer_runtime_adapter",
       decision_ref: args.decisionRef,
+      observation_scope: observationScope,
+      runtime_owned: Boolean(args.decisionRef),
       path: route,
       title: entry?.title ?? null,
       anchor: args.anchor,
@@ -796,7 +727,9 @@ function buildRuntimeDocsObservationArtifact(args: {
         : [],
       adapter_note: hasSelectedMatch
         ? "Matched against selected text in the current Docs Viewer context."
-        : "Runtime-owned client adapter returned a same-turn location observation without launching a nested Ask turn.",
+        : "Docs Viewer adapter returned a same-turn location observation without launching a nested Ask turn.",
+      same_turn_observation: true,
+      nested_ask_launch: false,
       launched_prompt: false,
       manual_ui_launch_only: false,
       assistant_answer: false,
@@ -819,6 +752,8 @@ function buildRuntimeDocsObservationArtifact(args: {
     kind: "doc_summary",
     source: "docs_viewer_runtime_adapter",
     decision_ref: args.decisionRef,
+    observation_scope: observationScope,
+    runtime_owned: Boolean(args.decisionRef),
     mode: args.actionId,
     path: route,
     title: entry?.title ?? null,
@@ -827,7 +762,9 @@ function buildRuntimeDocsObservationArtifact(args: {
     summary_text: selectedTextSummary
       ? `${modeLabel}: ${selectedTextSummary}`
       : `${modeLabel}: ${entry?.title ?? route}`,
-    adapter_note: "Runtime-owned client adapter returned a same-turn doc summary observation without launching a nested Ask turn.",
+    adapter_note: "Docs Viewer adapter returned a same-turn doc summary observation without launching a nested Ask turn.",
+    same_turn_observation: true,
+    nested_ask_launch: false,
     launched_prompt: false,
     manual_ui_launch_only: false,
     assistant_answer: false,
@@ -853,17 +790,32 @@ export function executeHelixPanelAction(
   if (actionId === "open") {
     context.openPanel(panelId, undefined);
     context.focusPanel(panelId, undefined);
-    return { ok: true, panel_id: panelId, action_id: actionId };
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: buildWorkspaceActionReceipt(panelId, actionId),
+    };
   }
 
   if (actionId === "focus") {
     context.focusPanel(panelId, undefined);
-    return { ok: true, panel_id: panelId, action_id: actionId };
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: buildWorkspaceActionReceipt(panelId, actionId),
+    };
   }
 
   if (actionId === "close") {
     context.closePanel(panelId, undefined);
-    return { ok: true, panel_id: panelId, action_id: actionId };
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: buildWorkspaceActionReceipt(panelId, actionId),
+    };
   }
 
   if (panelId === "workstation-process-graph") {
@@ -1187,61 +1139,26 @@ export function executeHelixPanelAction(
         message: "docs-viewer.locate_in_doc requires query.",
       };
     }
-    if (decisionRef) {
-      return {
-        ok: true,
-        panel_id: panelId,
-        action_id: actionId,
-        artifact: buildRuntimeDocsObservationArtifact({
-          actionId,
-          path,
-          anchor,
-          selectedText,
-          query,
-          decisionRef,
-        }),
-        message:
-          actionId === "locate_in_doc"
-            ? "Returned same-turn document location observation."
-            : "Returned same-turn document summary observation.",
-      };
-    }
-    const prompt = buildDocReasoningPrompt({
-      mode: actionId,
-      path,
-      anchor: anchor ?? undefined,
-      selectedText: selectedText ?? undefined,
-      query: query ?? undefined,
-    });
-    launchHelixAskPrompt({
-      question: prompt,
-      autoSubmit: true,
-      panelId: "docs-viewer",
-      bypassWorkstationDispatch: true,
-      forceReasoningDispatch: true,
-      suppressWorkstationPayloadActions: true,
-      answerContract: buildDocAnswerContract(actionId),
-    });
     return {
       ok: true,
       panel_id: panelId,
       action_id: actionId,
-      artifact: {
+      artifact: buildRuntimeDocsObservationArtifact({
+        actionId,
         path,
-        anchor: anchor ?? null,
-        query: query ?? null,
-        selected_text: selectedText ?? null,
-        launched_prompt: true,
-        manual_ui_launch_only: true,
-      },
+        anchor,
+        selectedText,
+        query,
+        decisionRef: decisionRef ?? null,
+      }),
       message:
         actionId === "summarize_section"
-          ? "Summarizing current section in Helix Ask."
+          ? "Returned same-turn document section summary observation."
           : actionId === "explain_paper"
-            ? "Explaining current paper in Helix Ask."
+            ? "Returned same-turn paper explanation observation."
             : actionId === "locate_in_doc"
-              ? "Locating topic in current document in Helix Ask."
-            : "Summarizing current document in Helix Ask.",
+              ? "Returned same-turn document location observation."
+              : "Returned same-turn document summary observation.",
     };
   }
 
@@ -1306,10 +1223,29 @@ export function executeHelixPanelAction(
       let noteId = resolveNoteId(args, { allowActiveFallback: true });
       let created = false;
       if (!noteId) {
+        const createIfMissing = asBoolean(args.create_if_missing ?? args.createIfMissing) === true;
+        const fallbackTitle = asNonEmptyString(args.title ?? args.name);
+        if (!createIfMissing) {
+          return {
+            ok: false,
+            panel_id: panelId,
+            action_id: actionId,
+            message: "Note target unresolved. Provide note_id/title, select an active note, or explicitly set create_if_missing=true.",
+            artifact: {
+              kind: "note_mutation_failure",
+              schema: "helix.note_mutation_failure.v1",
+              error_code: "note_target_unresolved",
+              requires_user_input: ["note_id", "title"],
+              mutation_applied: false,
+              requested_action: "append_to_note",
+              requested_text: text,
+            },
+          };
+        }
         const fallback = notesState.upsertWorkflowNote({
-          id: buildDeterministicNoteId("Untitled note", Object.keys(notesState.notes)),
-          title: "Untitled note",
-          topic: "general",
+          id: buildDeterministicNoteId(fallbackTitle ?? "Untitled note", Object.keys(notesState.notes)),
+          title: fallbackTitle ?? "Untitled note",
+          topic: asNonEmptyString(args.topic) ?? "general",
           body: "",
           citations: [],
           snippets: [],
@@ -3192,9 +3128,15 @@ export function executeHelixPanelAction(
       scientificState.setTheoryLoadout(loadout);
       const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
       if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
+      const solveScope = asNonEmptyString(args.solve_scope ?? args.solveScope) === "all_scalar_and_runtime"
+        ? "all_scalar_and_runtime"
+        : "all_scalar";
       const finalLoadout =
         actionId === "solve_calculator_loadout"
-          ? solveTheoryCalculatorLoadoutNow(loadout)
+          ? solveTheoryCalculatorLoadoutNow(loadout, {
+              solveScope,
+              runRuntime: solveScope === "all_scalar_and_runtime",
+            })
           : useScientificCalculatorStore.getState().lastTheoryLoadout ?? loadout;
       context.openPanel("scientific-calculator", undefined);
       context.focusPanel("scientific-calculator", undefined);
@@ -3209,9 +3151,43 @@ export function executeHelixPanelAction(
           loaded_scalar_count: finalLoadout.summary.scalarCount,
           context_count: finalLoadout.summary.contextCount,
           solved_count: finalLoadout.summary.solvedCount,
+          runtime_receipt_count: finalLoadout.summary.runtimeReceiptCount,
           failed_count: finalLoadout.summary.failedCount,
           claim_boundary_notes: finalLoadout.claimBoundaryNotes,
           calculator_focused: true,
+        },
+      };
+    }
+
+    if (actionId === "run_runtime_badge") {
+      const badgeId = asNonEmptyString(args.badge_id ?? args.badgeId);
+      const objectContext = asTheoryCalculatorObjectContext(args.object_context ?? args.objectContext);
+      if (!badgeId || !badgesById.has(badgeId) || !objectContext) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.run_runtime_badge requires a valid badge_id and object_context.",
+        };
+      }
+      const receipt = runStarSimRuntimeBadge({
+        badgeId,
+        objectContext,
+        includeRawEvaluation: asBoolean(args.include_raw_evaluation ?? args.includeRawEvaluation) ?? false,
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "starsim_runtime_receipt",
+          artifact_v1: receipt,
+          badge_id: badgeId,
+          dominant_fusion_channel: receipt.outputSummary.dominantFusionChannel,
+          fusion_zone_mode: receipt.outputSummary.fusionZoneMode,
+          claim_boundary_notes: receipt.claimBoundaryNotes,
         },
       };
     }

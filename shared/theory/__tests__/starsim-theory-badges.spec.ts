@@ -10,6 +10,8 @@ describe("StarSim theory badges", () => {
     const badgeIds = branch.badges.map((badge) => badge.id);
 
     expect(badgeIds).toContain("starsim.observable.surface_temperature_proxy");
+    expect(badgeIds).toContain("starsim.classifier.cno_temperature_margin");
+    expect(badgeIds).toContain("starsim.classifier.brown_dwarf_mass_margin");
     expect(badgeIds).toContain("starsim.claim_boundary.stage1_reduced_order_prior");
     expect(branch.badges.filter((badge) => badge.calculatorPayloads.length > 0).length).toBeGreaterThanOrEqual(6);
     expect(branch.edges.length).toBeGreaterThanOrEqual(8);

@@ -1,5 +1,6 @@
 import type { HelixCalculatorSetupContext } from "../helix-calculator-setup-context";
 import type { ScientificCalculatorStepTraceArtifactV1 } from "./scientific-calculator-step-schema.v1";
+import type { StarSimRuntimeReceiptV1 } from "./starsim-runtime-receipt.v1";
 
 export const THEORY_CALCULATOR_LOADOUT_ARTIFACT_ID = "theory_calculator_loadout" as const;
 export const THEORY_CALCULATOR_LOADOUT_SCHEMA_VERSION = "theory_calculator_loadout/v1" as const;
@@ -54,6 +55,7 @@ export type TheoryCalculatorLoadoutItemV1 = {
   confidence: number | null;
   fallbackReason: string | null;
   calculatorArtifactV1: ScientificCalculatorStepTraceArtifactV1 | null;
+  runtimeReceiptV1?: StarSimRuntimeReceiptV1 | null;
   warnings: string[];
 };
 
@@ -76,6 +78,7 @@ export type TheoryCalculatorLoadoutV1 = {
     solvedCount: number;
     failedCount: number;
     skippedCount: number;
+    runtimeReceiptCount: number;
     bindingWarningCount: number;
     claimBoundaryNoteCount: number;
   };
@@ -107,6 +110,7 @@ function countItems(items: TheoryCalculatorLoadoutItemV1[]) {
     solvedCount: items.filter((item) => item.calculatorArtifactV1).length,
     failedCount: items.filter((item) => item.warnings.some((warning) => /failed|error/i.test(warning))).length,
     skippedCount: items.filter((item) => item.kind !== "calculator_payload").length,
+    runtimeReceiptCount: items.filter((item) => item.runtimeReceiptV1).length,
     bindingWarningCount: items.reduce((sum, item) => sum + item.bindingWarnings.length, 0),
   };
 }
@@ -124,6 +128,7 @@ export function buildTheoryCalculatorLoadoutV1(
     solvedCount: itemCounts.solvedCount,
     failedCount: itemCounts.failedCount,
     skippedCount: itemCounts.skippedCount,
+    runtimeReceiptCount: itemCounts.runtimeReceiptCount,
     bindingWarningCount: itemCounts.bindingWarningCount,
     claimBoundaryNoteCount: claimBoundaryNotes.length,
     ...input.summary,

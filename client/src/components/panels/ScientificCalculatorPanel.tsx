@@ -241,6 +241,19 @@ export default function ScientificCalculatorPanel() {
     }
   };
 
+  const handleSolveTheoryLoadoutWithRuntime = () => {
+    if (!lastTheoryLoadout) return;
+    const solved = solveTheoryCalculatorLoadoutNow(lastTheoryLoadout, {
+      solveScope: "all_scalar_and_runtime",
+      runRuntime: true,
+    });
+    const firstSolved = solved.items.find((item) => item.kind === "calculator_payload" && item.solveExpression);
+    if (firstSolved?.solveExpression) {
+      setInput(firstSolved.solveExpression);
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, firstSolved.solveExpression);
+    }
+  };
+
   const handleCopyResult = () => {
     const text = lastSolve?.result_text;
     if (!text) {
@@ -525,9 +538,14 @@ export default function ScientificCalculatorPanel() {
                 {lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode} / {lastTheoryLoadout.summary.scalarCount} scalar rows / {lastTheoryLoadout.summary.contextCount} context rows
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadout}>
-              Solve All Scalar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadout}>
+                Solve All Scalar
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
+                Solve + Runtime
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             {lastTheoryLoadout.items.map((item) => (
@@ -554,6 +572,11 @@ export default function ScientificCalculatorPanel() {
                       solved
                     </Badge>
                   ) : null}
+                  {item.runtimeReceiptV1 ? (
+                    <Badge variant="outline" className="border-violet-700/70 text-violet-100">
+                      runtime completed
+                    </Badge>
+                  ) : null}
                 </div>
                 {item.solveExpression ? (
                   <div className="mt-2 break-all font-mono text-cyan-100">{item.solveExpression}</div>
@@ -570,6 +593,16 @@ export default function ScientificCalculatorPanel() {
                   </div>
                 ) : null}
                 {item.resultText ? <div className="mt-2 font-mono text-slate-200">result: {item.resultText}</div> : null}
+                {item.runtimeReceiptV1 ? (
+                  <div className="mt-2 grid gap-1 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100 md:grid-cols-2">
+                    <div>channel: {item.runtimeReceiptV1.outputSummary.dominantFusionChannel ?? "-"}</div>
+                    <div>fusion zone: {item.runtimeReceiptV1.outputSummary.fusionZoneMode ?? "-"}</div>
+                    <div>active: {String(item.runtimeReceiptV1.outputSummary.fusionActive ?? "-")}</div>
+                    <div>tunneling: {String(item.runtimeReceiptV1.outputSummary.tunnelingRequired ?? "-")}</div>
+                    <div>qst: {item.runtimeReceiptV1.outputSummary.qstRole ?? "-"}</div>
+                    <div>boundary: {item.runtimeReceiptV1.outputSummary.spacetimeCL ?? "proxy_only"}</div>
+                  </div>
+                ) : null}
                 {item.warnings.length > 0 ? (
                   <div className="mt-2 text-[11px] text-amber-200">{item.warnings.join("; ")}</div>
                 ) : null}

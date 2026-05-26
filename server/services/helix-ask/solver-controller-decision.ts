@@ -336,6 +336,10 @@ export function buildSolverControllerDecision(input: {
       : requiredTerminalKind
         ? [requiredTerminalKind]
         : [];
+  const allowedTerminalKinds = Array.from(new Set([
+    ...requiredTerminalKinds,
+    ...readStringArray(terminalContract?.acceptable_fallbacks),
+  ]));
   const forbiddenTerminalKinds = readStringArray(terminalContract?.forbidden_terminal_kinds);
   const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
   const goalNextDecision = readString(goalSatisfaction?.next_decision);
@@ -409,7 +413,7 @@ export function buildSolverControllerDecision(input: {
     if (disciplineGuardRequired && !hasRequiredArtifactContract(terminalContract)) {
       pushUnique(blockingReasons, "required_artifact_contract_missing");
     }
-    if (terminalArtifactKind && requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalArtifactKind)) {
+    if (terminalArtifactKind && allowedTerminalKinds.length > 0 && !allowedTerminalKinds.includes(terminalArtifactKind)) {
       pushUnique(blockingReasons, "terminal_kind_not_required");
     }
     if (terminalArtifactKind && forbiddenTerminalKinds.includes(terminalArtifactKind)) {

@@ -47,6 +47,13 @@ const COMMON_STRUCTURE_BADGES = [
   "starsim.structure.core_density_proxy",
 ];
 
+const COMMON_CLASSIFIER_MARGIN_BADGES = [
+  "starsim.classifier.compactness_scale",
+  "starsim.classifier.brown_dwarf_mass_margin",
+  "starsim.classifier.cno_mass_margin",
+  "starsim.classifier.cno_temperature_margin",
+];
+
 const COMMON_CALCULATOR_PAYLOADS = [
   {
     badgeId: "starsim.observable.surface_temperature_proxy",
@@ -123,6 +130,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...COMMON_OBSERVABLE_BADGES,
       "starsim.structure.hydrostatic_balance",
       "starsim.structure.core_temperature_proxy",
+      "starsim.classifier.compactness_scale",
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [
@@ -163,6 +171,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
     theoryBadgeIds: [
       ...COMMON_OBSERVABLE_BADGES,
       ...COMMON_STRUCTURE_BADGES,
+      ...COMMON_CLASSIFIER_MARGIN_BADGES,
       "starsim.fusion.pp_chain_prior",
       "starsim.fusion.cno_cycle_prior",
       "starsim.fusion_zone.active_volume_fraction",
@@ -235,6 +244,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
     theoryBadgeIds: [
       ...COMMON_OBSERVABLE_BADGES,
       ...COMMON_STRUCTURE_BADGES,
+      ...COMMON_CLASSIFIER_MARGIN_BADGES,
       "starsim.fusion.pp_chain_prior",
       "starsim.fusion_zone.active_volume_fraction",
       "starsim.runtime.evaluate_fusion_microphysics",
@@ -285,6 +295,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
     theoryBadgeIds: [
       ...COMMON_OBSERVABLE_BADGES,
       ...COMMON_STRUCTURE_BADGES,
+      ...COMMON_CLASSIFIER_MARGIN_BADGES,
       "starsim.fusion.cno_cycle_prior",
       "starsim.fusion_zone.active_volume_fraction",
       "starsim.runtime.evaluate_fusion_microphysics",

@@ -99,38 +99,14 @@ describe("helix ask E42 universal final composer", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_evidence_location");
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_evidence_location");
-    console.error(
-      "DOC_LOCATION_RUNTIME",
-      JSON.stringify({
-        initial: {
-          chosen: response.body?.initial_agent_step_decision?.chosen_capability,
-          action: response.body?.initial_agent_step_decision?.action,
-        },
-        terminal_artifact_kind: response.body?.terminal_artifact_kind,
-        final_answer_source: response.body?.final_answer_source,
-        terminal_error_code: response.body?.terminal_error_code,
-        selected_final_answer: response.body?.selected_final_answer,
-        runtime_boundary: response.body?.runtime_boundary_eligibility,
-        solver_controller_decision: response.body?.solver_controller_decision,
-        goal: response.body?.goal_satisfaction_evaluation,
-        runtime: response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => ({
-          i: iteration?.iteration,
-          chosen: iteration?.chosen_capability,
-          role: iteration?.observation_role,
-          refs: iteration?.observed_artifact_refs,
-          produced: iteration?.produced_artifacts,
-          missing: iteration?.missing_requirement_ids,
-        })),
-        artifactKinds: response.body?.current_turn_artifact_ledger?.map((artifact: any) => `${artifact?.kind}:${artifact?.producer_item_id}`),
-      }),
-    );
     expect(JSON.stringify(response.body)).toContain("docs-viewer.locate_in_doc");
     expect(JSON.stringify(response.body)).not.toContain("docs_viewer_summary_precedence");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
     expect(
       response.body?.agent_runtime_loop?.iterations?.some(
         (iteration: any) =>
           iteration?.chosen_capability === "docs-viewer.locate_in_doc" &&
-          iteration?.observation_role === "preobserved_tool_result" &&
+          ["executed_tool_result", "preobserved_tool_result"].includes(iteration?.observation_role) &&
           Array.isArray(iteration?.observed_artifact_refs) &&
           iteration.observed_artifact_refs.length > 0,
       ),

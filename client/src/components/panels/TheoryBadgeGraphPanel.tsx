@@ -716,10 +716,15 @@ export default function TheoryBadgeGraphPanel() {
       ...binding.input,
       source: "manual",
     });
+    const targetBadgeIds = stage.theoryBadgeIds.includes("starsim.runtime.evaluate_fusion_microphysics")
+      ? ["starsim.runtime.evaluate_fusion_microphysics"]
+      : stage.theoryBadgeIds;
     const loadout = buildTheoryCalculatorLoadout({
       graph,
-      badgeIds: stage.theoryBadgeIds,
-      mode: "selected_badges",
+      badgeIds: targetBadgeIds,
+      mode: stage.theoryBadgeIds.includes("starsim.runtime.evaluate_fusion_microphysics")
+        ? "dependency_path"
+        : "selected_badges",
       source: "achievement_map",
       objectContext,
       includeContextItems: true,
@@ -727,8 +732,17 @@ export default function TheoryBadgeGraphPanel() {
     });
     const scientificState = useScientificCalculatorStore.getState();
     scientificState.setTheoryLoadout(loadout);
-    const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
-    if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
+    const firstObjectScalar =
+      loadout.items.find(
+        (item) =>
+          item.kind === "calculator_payload" &&
+          item.badgeId === "starsim.observable.surface_temperature_proxy",
+      ) ??
+      loadout.items.find(
+        (item) => item.kind === "calculator_payload" && item.badgeId.startsWith("starsim."),
+      ) ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstObjectScalar) scientificState.loadTheoryLoadoutItem(firstObjectScalar.index);
   };
 
   const clearStarSimBindingSelection = () => {

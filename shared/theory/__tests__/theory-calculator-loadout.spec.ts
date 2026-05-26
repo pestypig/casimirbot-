@@ -26,6 +26,8 @@ describe("theory calculator loadout builder", () => {
 
     expect(isTheoryCalculatorLoadoutV1(loadout)).toBe(true);
     expect(loadout.items.some((item) => item.solveExpression?.includes("5772*(65/(12^2))"))).toBe(true);
+    expect(loadout.items.some((item) => item.badgeId === "starsim.classifier.cno_mass_margin")).toBe(true);
+    expect(loadout.items.some((item) => item.badgeId === "starsim.classifier.brown_dwarf_mass_margin")).toBe(true);
     expect(loadout.items.some((item) => item.kind === "runtime_context")).toBe(true);
     expect(loadout.claimBoundaryNotes.some((note) => note.includes("diagnostic-only"))).toBe(true);
   });

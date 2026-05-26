@@ -108,6 +108,29 @@ const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): s
   ]));
 };
 
+const artifactLinkedToIteration = (
+  artifact: Record<string, unknown> | null,
+  iteration: Record<string, unknown>,
+): boolean => {
+  if (!artifact) return false;
+  const decisionId = readString(iteration.decision_id) ?? readString(iteration.decision_ref);
+  const payload = readRecord(artifact.payload);
+  const explicitDecisionRefs = [
+    readString(artifact.decision_ref),
+    readString(artifact.agent_step_decision_ref),
+    readString(artifact.runtime_decision_ref),
+    readString(artifact.prior_agent_step_decision_ref),
+    readString(payload?.decision_ref),
+    readString(payload?.agent_step_decision_ref),
+    readString(payload?.runtime_decision_ref),
+    readString(payload?.prior_agent_step_decision_ref),
+  ].filter((entry): entry is string => Boolean(entry));
+  if (explicitDecisionRefs.length > 0) return Boolean(decisionId && explicitDecisionRefs.includes(decisionId));
+  const artifactId = readString(artifact.artifact_id);
+  if (!artifactId) return false;
+  return observedArtifactRefsForIteration(iteration).includes(artifactId);
+};
+
 export function isSourceCapabilityDiagnosticTurn(payload: Record<string, unknown>): boolean {
   const goalKind = payloadGoalKind(payload);
   if (goalKind && MODEL_DIRECT_ANSWER_GOAL_KINDS.has(goalKind)) return false;
@@ -168,11 +191,14 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     const capability = readString(record?.chosen_capability);
     if (!record || !capability || capability === "model.direct_answer") return false;
     const refs = observedArtifactRefsForIteration(record);
-    if (refs.some((ref) => artifactKindMatchesCapability(capability, artifactById.get(ref) ?? null))) return true;
+    if (refs.some((ref) => {
+      const artifact = artifactById.get(ref) ?? null;
+      return artifactLinkedToIteration(artifact, record) && artifactKindMatchesCapability(capability, artifact);
+    })) return true;
     const toolObservation = readRecord(record.tool_observation);
     if (!toolObservation) return false;
     const status = readString(toolObservation.status);
-    return /completed|observed|ok|success/i.test(status ?? "") && refs.length > 0;
+    return /completed|observed|ok|success/i.test(status ?? "") && artifactKindMatchesCapability(capability, toolObservation);
   });
 }
 

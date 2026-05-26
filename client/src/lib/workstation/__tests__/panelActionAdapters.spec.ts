@@ -90,6 +90,44 @@ describe("panelActionAdapters", () => {
     useWorkstationProcessGraphStore.getState().reset();
   });
 
+  it("returns receipt-shaped observations for panel open/focus/close actions", () => {
+    const opened = executeHelixPanelAction(
+      { panel_id: "docs-viewer", action_id: "open" },
+      actionContext(),
+    );
+    expect(opened.ok).toBe(true);
+    expect(opened.artifact).toMatchObject({
+      kind: "workspace_action_receipt",
+      schema: "helix.workspace_action_receipt.v1",
+      panel_id: "docs-viewer",
+      action_id: "open",
+      status: "completed",
+      state_observed: true,
+    });
+
+    const focused = executeHelixPanelAction(
+      { panel_id: "docs-viewer", action_id: "focus" },
+      actionContext(),
+    );
+    expect(focused.artifact).toMatchObject({
+      kind: "workspace_action_receipt",
+      panel_id: "docs-viewer",
+      action_id: "focus",
+      state_observed: true,
+    });
+
+    const closed = executeHelixPanelAction(
+      { panel_id: "docs-viewer", action_id: "close" },
+      actionContext(),
+    );
+    expect(closed.artifact).toMatchObject({
+      kind: "workspace_action_receipt",
+      panel_id: "docs-viewer",
+      action_id: "close",
+      state_observed: true,
+    });
+  });
+
   it("opens/focuses docs panel before applying read intent", () => {
     const result = executeHelixPanelAction(
       {
@@ -114,7 +152,7 @@ describe("panelActionAdapters", () => {
     expect(hoisted.callOrder).toEqual(["openPanel", "focusPanel", "openDocPanel"]);
   });
 
-  it("launches Helix Ask for summarize/explain docs actions", () => {
+  it("returns same-turn docs observations for manual summarize/explain docs actions", () => {
     const summarizeResult = executeHelixPanelAction(
       {
         panel_id: "docs-viewer",
@@ -130,16 +168,16 @@ describe("panelActionAdapters", () => {
     );
     expect(summarizeResult.ok).toBe(true);
     expect(summarizeResult.action_id).toBe("summarize_doc");
-    expect(hoisted.launchHelixAskPromptMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        autoSubmit: true,
-        panelId: "docs-viewer",
-        bypassWorkstationDispatch: true,
-      }),
-    );
-    const firstCall = hoisted.launchHelixAskPromptMock.mock.calls[0]?.[0] as { question?: string } | undefined;
-    expect(firstCall?.question).toContain("Summarize this document");
-    expect(firstCall?.question).toContain("/docs/papers.md");
+    expect(summarizeResult.artifact).toMatchObject({
+      kind: "doc_summary",
+      path: "/docs/papers.md",
+      observation_scope: "manual_panel_action",
+      runtime_owned: false,
+      same_turn_observation: true,
+      nested_ask_launch: false,
+      launched_prompt: false,
+    });
+    expect(hoisted.launchHelixAskPromptMock).not.toHaveBeenCalled();
 
     const explainResult = executeHelixPanelAction(
       {
@@ -155,9 +193,18 @@ describe("panelActionAdapters", () => {
       },
     );
     expect(explainResult.ok).toBe(true);
-    const secondCall = hoisted.launchHelixAskPromptMock.mock.calls[1]?.[0] as { question?: string } | undefined;
-    expect(secondCall?.question).toContain("Explain this paper");
-    expect(secondCall?.question).toContain('Selected text: "Key excerpt"');
+    expect(explainResult.artifact).toMatchObject({
+      kind: "doc_summary",
+      mode: "explain_paper",
+      path: "/docs/papers.md",
+      selected_text: "Key excerpt",
+      observation_scope: "manual_panel_action",
+      runtime_owned: false,
+      same_turn_observation: true,
+      nested_ask_launch: false,
+      launched_prompt: false,
+    });
+    expect(hoisted.launchHelixAskPromptMock).not.toHaveBeenCalled();
   });
 
   it("returns same-turn docs observations for runtime-owned summarize and locate actions", () => {
@@ -179,6 +226,10 @@ describe("panelActionAdapters", () => {
       kind: "doc_summary",
       path: "/docs/papers.md",
       decision_ref: "agent-step-doc-summary",
+      observation_scope: "runtime_selected_capability",
+      runtime_owned: true,
+      same_turn_observation: true,
+      nested_ask_launch: false,
       launched_prompt: false,
       manual_ui_launch_only: false,
     });
@@ -204,6 +255,10 @@ describe("panelActionAdapters", () => {
       path: "/docs/papers.md",
       query: "caveats",
       decision_ref: "agent-step-doc-location",
+      observation_scope: "runtime_selected_capability",
+      runtime_owned: true,
+      same_turn_observation: true,
+      nested_ask_launch: false,
       launched_prompt: false,
     });
     expect((locateResult.artifact?.matches as unknown[] | undefined)?.length).toBe(1);
@@ -244,6 +299,48 @@ describe("panelActionAdapters", () => {
     expect(append.artifact?.note_id).toBe("note:mission-notes");
     const note = useWorkstationNotesStore.getState().notes["note:mission-notes"];
     expect(note?.body).toContain("new evidence line");
+  });
+
+  it("does not create an untitled note when append target resolution fails", () => {
+    const append = executeHelixPanelAction(
+      {
+        panel_id: "workstation-notes",
+        action_id: "append_to_note",
+        args: { text: "orphaned line" },
+      },
+      actionContext(),
+    );
+
+    expect(append.ok).toBe(false);
+    expect(append.artifact).toMatchObject({
+      kind: "note_mutation_failure",
+      error_code: "note_target_unresolved",
+      mutation_applied: false,
+      requested_action: "append_to_note",
+    });
+    expect(Object.keys(useWorkstationNotesStore.getState().notes)).toEqual([]);
+
+    const explicitCreate = executeHelixPanelAction(
+      {
+        panel_id: "workstation-notes",
+        action_id: "append_to_note",
+        args: {
+          title: "New Target Note",
+          text: "created only because the model explicitly requested it",
+          create_if_missing: true,
+        },
+      },
+      actionContext(),
+    );
+
+    expect(explicitCreate.ok).toBe(true);
+    expect(explicitCreate.artifact).toMatchObject({
+      note_id: "note:new-target-note",
+      created_note: true,
+    });
+    expect(useWorkstationNotesStore.getState().notes["note:new-target-note"]?.body).toContain(
+      "created only because the model explicitly requested it",
+    );
   });
 
   it("requires confirmation for destructive note and clipboard actions", () => {
@@ -1233,6 +1330,60 @@ describe("panelActionAdapters", () => {
       expect(isTheoryCalculatorLoadoutV1(loadout)).toBe(true);
       expect(result.artifact?.solved_count).toBeGreaterThanOrEqual(1);
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.items[0]?.calculatorArtifactV1).toBeTruthy();
+    });
+
+    it("runs StarSim runtime receipts through theory badge actions", () => {
+      const runtimeResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "run_runtime_badge",
+          args: {
+            badge_id: "starsim.runtime.evaluate_fusion_microphysics",
+            object_context: {
+              kind: "starsim_star",
+              observables: {
+                objectClass: "red_giant",
+                spectralType: "K1III",
+                luminosity_Lsun: 65,
+                radius_Rsun: 12,
+                mass_Msun: 1.1,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(runtimeResult.ok).toBe(true);
+      expect(runtimeResult.artifact?.kind).toBe("starsim_runtime_receipt");
+      expect(runtimeResult.artifact?.fusion_zone_mode).toBe("shell_fusion");
+
+      const solveResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "solve_calculator_loadout",
+          args: {
+            badge_ids: ["starsim.runtime.evaluate_fusion_microphysics"],
+            mode: "dependency_path",
+            solve_scope: "all_scalar_and_runtime",
+            object_context: {
+              kind: "starsim_star",
+              observables: {
+                objectClass: "red_giant",
+                spectralType: "K1III",
+                luminosity_Lsun: 65,
+                radius_Rsun: 12,
+                mass_Msun: 1.1,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(solveResult.ok).toBe(true);
+      expect(solveResult.artifact?.runtime_receipt_count).toBeGreaterThanOrEqual(1);
+      expect(JSON.stringify(solveResult.artifact)).toContain("starsim_runtime_receipt");
     });
 
     it("clears theory map overlays", () => {
