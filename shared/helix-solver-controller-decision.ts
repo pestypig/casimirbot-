@@ -25,6 +25,7 @@ export type HelixSolverControllerBlockingReason =
   | "direct_answer_text_missing"
   | "subgoals_observed_not_satisfied"
   | "prompt_requirement_coverage_incomplete"
+  | "doc_retrieval_coverage_incomplete"
   | "compound_prompt_coverage_incomplete";
 
 export type HelixSolverControllerDecision = {

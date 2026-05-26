@@ -54,6 +54,8 @@ describe("Helix Ask docs summary output coverage", () => {
       ),
     ).toBe(true);
     expect(coverage?.coverage).toBe("complete");
+    expect(response.body?.doc_retrieval_coverage?.coverage).toBe("complete");
+    expect(response.body?.doc_retrieval_coverage?.requested_scope).toBe("full_doc");
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_min_5_bullets" && entry?.satisfied === true)).toBe(true);
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_path_included" && entry?.satisfied === true)).toBe(true);
   }, 60000);
@@ -92,5 +94,12 @@ describe("Helix Ask docs summary output coverage", () => {
     expect(answerText).toMatch(/\/docs\//);
     expect(visibleBulletCount(answerText)).toBeGreaterThanOrEqual(4);
     expect(response.body?.prompt_requirement_coverage?.coverage).toBe("complete");
+    expect(response.body?.doc_retrieval_coverage?.coverage).toBe("complete");
+    expect(response.body?.doc_retrieval_coverage?.requested_scope).toBe("broad_topic");
+    expect(
+      response.body?.doc_retrieval_coverage?.requirements?.some(
+        (entry: any) => entry?.id === "doc_search_results_observed" && entry?.satisfied === true,
+      ),
+    ).toBe(true);
   }, 60000);
 });

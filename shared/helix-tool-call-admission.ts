@@ -8,6 +8,7 @@ export type HelixToolCallAdmissionFamily =
   | "docs_viewer"
   | "repo_code"
   | "runtime_evidence"
+  | "live_environment"
   | "live_pipeline"
   | "process_graph"
   | "world_event"

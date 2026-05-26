@@ -4,6 +4,7 @@ export type HelixCapabilityFamily =
   | "docs"
   | "workstation_action"
   | "live_source"
+  | "live_environment"
   | "visual_capture"
   | "procedure_memory"
   | "repo_evidence"

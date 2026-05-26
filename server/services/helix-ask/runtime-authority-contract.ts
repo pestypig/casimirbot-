@@ -35,6 +35,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "docs_panel_open",
   "latest_doc_navigation",
   "live_interval_set",
+  "live_environment_review",
   "live_pipeline_control",
   "live_pipeline_repair",
   "note_mutation",
@@ -90,6 +91,7 @@ const artifactKindMatchesCapability = (
   if (capability === "docs-viewer.locate_in_doc") return /doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined);
   if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
   if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
+  if (capability.startsWith("live_env.")) return /live_environment_tool_observation|live_environment_agent_loop|interpreted_log|minecraft_navigation_state|source_capability|runtime_tool_observation|tool_observation/i.test(joined);
   if (capability.startsWith("live-source.") || capability.startsWith("situation-room.")) return /live_pipeline_receipt|live_source|visual_context_pack|situation_context_pack|permission_denied|workspace_action_receipt/i.test(joined);
   if (capability.startsWith("process-graph.")) return /process_graph_overview|workspace_action_receipt/i.test(joined);
   if (capability.includes(".")) return /tool_observation|workspace_action_receipt/i.test(joined);

@@ -477,6 +477,58 @@ describe("helix ask solver controller decision", () => {
     expect(decision.typed_failure_code).toBe("prompt_requirement_coverage_incomplete");
   });
 
+  it("blocks docs terminals when docs retrieval coverage is incomplete", () => {
+    const turnId = "ask:doc-retrieval-coverage";
+    const payload = {
+      active_prompt: "Summarize docs about NHM2 current status in 4 bullets. Include the path.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "doc_summary",
+        required_terminal_kind: "doc_summary",
+      },
+      route_reason_code: "doc_summary",
+      terminal_artifact_kind: "doc_summary",
+      final_answer_source: "artifact_synthesis",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "doc_summary",
+        terminal_artifact_kind: "doc_summary",
+        final_answer_source: "artifact_synthesis",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      ...runtimeLoopOk(turnId, "docs-viewer.summarize_doc", "doc_summary"),
+      ...capabilityLifecycleOk(turnId, "doc_summary"),
+      goal_satisfaction_evaluation: satisfiedGoal("doc_summary", "doc_summary"),
+      doc_retrieval_coverage: {
+        schema: "helix.doc_retrieval_coverage.v1",
+        turn_id: turnId,
+        coverage: "partial",
+        requested_scope: "broad_topic",
+        missing_requirement_ids: ["doc_search_results_observed"],
+        next_decision: "repair_compose",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "doc_summary",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({ turnId, finalRoute: "doc_summary", payload }),
+    });
+
+    expect(decision.decision).toBe("typed_failure");
+    expect(decision.blocking_reasons).toContain("doc_retrieval_coverage_incomplete");
+    expect(decision.typed_failure_code).toBe("doc_retrieval_coverage_incomplete");
+  });
+
   it("blocks satisfied terminals when compound prompt coverage gate fails", () => {
     const turnId = "ask:compound-coverage";
     const payload = {

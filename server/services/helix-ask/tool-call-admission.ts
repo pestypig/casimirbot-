@@ -19,6 +19,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "active_doc",
   "process_graph",
   "live_pipeline",
+  "live_environment",
   "world_event",
   "active_note",
   "workspace_panel",
@@ -120,6 +121,11 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "doc_summary", "active_doc_identity", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept"];
     reason = "live_pipeline_requires_receipt_presentation_path";
+  } else if (sourceTarget === "live_environment") {
+    admittedToolFamilies = ["live_environment"];
+    extraForbiddenTerminalKinds = ["direct_answer_text", "situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"];
+    extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept", "no_tool_direct", "panel_generated_answer"];
+    reason = "live_environment_requires_tool_evidence_path";
   } else if (sourceTarget === "world_event") {
     admittedToolFamilies = ["world_event"];
     extraForbiddenTerminalKinds = ["active_doc_identity", "doc_location_matches", "no_tool_direct", "model_only_concept"];

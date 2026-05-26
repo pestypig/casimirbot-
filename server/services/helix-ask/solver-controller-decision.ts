@@ -155,6 +155,13 @@ const hasIncompletePromptRequirementCoverage = (payload: RecordLike): boolean =>
   return Boolean(coverageState && coverageState !== "complete");
 };
 
+const hasIncompleteDocRetrievalCoverage = (payload: RecordLike): boolean => {
+  const coverage = readRecord(payload.doc_retrieval_coverage);
+  const schema = readString(coverage?.schema);
+  const coverageState = readString(coverage?.coverage);
+  return schema === "helix.doc_retrieval_coverage.v1" && Boolean(coverageState && coverageState !== "complete");
+};
+
 const hasIncompleteCompoundPromptCoverageGate = (payload: RecordLike): boolean => {
   const gate = readRecord(payload.compound_prompt_coverage_gate);
   return (
@@ -456,6 +463,9 @@ export function buildSolverControllerDecision(input: {
     if (hasIncompletePromptRequirementCoverage(payload)) {
       pushUnique(blockingReasons, "prompt_requirement_coverage_incomplete");
     }
+    if (hasIncompleteDocRetrievalCoverage(payload)) {
+      pushUnique(blockingReasons, "doc_retrieval_coverage_incomplete");
+    }
     if (hasIncompleteCompoundPromptCoverageGate(payload)) {
       pushUnique(blockingReasons, "compound_prompt_coverage_incomplete");
     }
@@ -613,6 +623,7 @@ export function buildSolverControllerDecision(input: {
       reason === "direct_answer_text_missing" ||
       reason === "subgoals_observed_not_satisfied" ||
       reason === "prompt_requirement_coverage_incomplete" ||
+      reason === "doc_retrieval_coverage_incomplete" ||
       reason === "compound_prompt_coverage_incomplete"
     )
   ) {
@@ -628,6 +639,7 @@ export function buildSolverControllerDecision(input: {
     reason === "direct_answer_text_missing" ||
     reason === "subgoals_observed_not_satisfied" ||
     reason === "prompt_requirement_coverage_incomplete" ||
+    reason === "doc_retrieval_coverage_incomplete" ||
     reason === "compound_prompt_coverage_incomplete"
   );
   const requestedGoalDecision =

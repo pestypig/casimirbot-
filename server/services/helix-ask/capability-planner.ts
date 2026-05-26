@@ -67,6 +67,7 @@ const classifySourceFamily = (input: {
   }
   if (input.sourceTarget === "repo_code" || input.admittedFamilies.includes("repo_code")) return "repo_evidence";
   if (input.sourceTarget === "process_graph" || input.admittedFamilies.includes("process_graph")) return "process_graph";
+  if (input.sourceTarget === "live_environment" || input.admittedFamilies.includes("live_environment")) return "live_environment";
   if (input.sourceTarget === "live_pipeline" || input.admittedFamilies.includes("live_pipeline")) return "live_source";
   if (/^(?:please\s+)?(?:click|press|tap|close|start|stop|select|choose|submit)\b/i.test(input.promptText.trim())) {
     return "workstation_action";
@@ -89,6 +90,7 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
     if (/\b(?:set|change|interval|rate|cadence|start|stop)\b/.test(prompt)) return "control_live_source";
     return "inspect_live_source";
   }
+  if (family === "live_environment") return "query_live_environment";
   if (family === "visual_capture") return "review_current_visual_state";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
   if (family === "repo_evidence") return "retrieve_repo_evidence";
@@ -125,6 +127,7 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "repo_evidence") return admittedFamilies.includes("repo_code");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
+  if (family === "live_environment") return admittedFamilies.includes("live_environment");
   if (family === "live_source") return admittedFamilies.includes("live_pipeline");
   return true;
 };
@@ -163,6 +166,7 @@ const admissionFor = (input: {
     input.family === "visual_capture" ||
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
+    input.family === "live_environment" ||
     input.family === "repo_evidence" ||
     input.sourceTarget === "runtime_evidence"
   ) {
