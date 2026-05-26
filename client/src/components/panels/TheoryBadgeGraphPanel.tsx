@@ -29,6 +29,7 @@ import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlayback
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
+import { buildHelixPhysicsAtlasV1 } from "@shared/theory/physics-atlas-blocks";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
@@ -665,18 +666,22 @@ export default function TheoryBadgeGraphPanel() {
 
   const atlasLens = useMemo(() => {
     if (!graph || !activeLensId) return null;
-    return resolvePhysicsAtlasLens({ graph, blockId: activeLensId });
+    return resolvePhysicsAtlasLens({
+      graph,
+      atlas: buildHelixPhysicsAtlasV1({ graph }),
+      blockId: activeLensId,
+    });
   }, [activeLensId, graph]);
 
   const highlightedBadgeIds =
     multiTrace?.connectingBadgeIds ??
     singlePlaybackPlan?.orderedBadgeIds ??
-    (mapOverlay.highlightedBadgeIds.length > 0 ? mapOverlay.highlightedBadgeIds : atlasLens?.badgeIds ?? []);
+    (mapOverlay.highlightedBadgeIds.length > 0 ? mapOverlay.highlightedBadgeIds : atlasLens?.highlightedBadgeIds ?? []);
   const highlightedEdgeIds = useMemo(() => {
     if (!graph) return [];
     if (multiTrace) return multiTrace.connectingEdgeIds;
     if (!singlePlaybackPlan && mapOverlay.highlightedEdgeIds.length > 0) return mapOverlay.highlightedEdgeIds;
-    if (!singlePlaybackPlan && atlasLens) return atlasLens.edgeIds;
+    if (!singlePlaybackPlan && atlasLens) return atlasLens.highlightedEdgeIds;
     const highlighted = new Set(highlightedBadgeIds);
     return graph.edges
       .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))

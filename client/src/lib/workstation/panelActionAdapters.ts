@@ -68,7 +68,7 @@ import {
   type PhysicsAtlasBlockId,
   type PhysicsAtlasBlockV1,
 } from "@shared/contracts/physics-atlas.v1";
-import { buildPhysicsAtlasBlocksV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
+import { buildHelixPhysicsAtlasV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 
 export type HelixPanelActionRequest = {
@@ -2908,7 +2908,7 @@ export function executeHelixPanelAction(
     }
 
     if (actionId === "list_physics_atlas") {
-      const atlas = buildPhysicsAtlasBlocksV1(graph.graphId);
+      const atlas = buildHelixPhysicsAtlasV1({ graph });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       return {
@@ -2944,10 +2944,9 @@ export function executeHelixPanelAction(
           message: "theory-badge-graph.select_atlas_block requires a valid block_id.",
         };
       }
-      const atlas = buildPhysicsAtlasBlocksV1(graph.graphId);
+      const atlas = buildHelixPhysicsAtlasV1({ graph });
       const block = atlas.blocks.find((candidate: PhysicsAtlasBlockV1) => candidate.id === blockId);
-      const lens = resolvePhysicsAtlasLens({ graph, blockId });
-      if (!block || !lens) {
+      if (!block) {
         return {
           ok: false,
           panel_id: panelId,
@@ -2955,12 +2954,13 @@ export function executeHelixPanelAction(
           message: "No atlas block lens matched the request.",
         };
       }
+      const lens = resolvePhysicsAtlasLens({ graph, atlas, blockId });
       if (asBoolean(args.overlay) ?? true) {
         useTheoryBadgeGraphPanelStore.getState().setActiveAtlasLensId(blockId);
         useTheoryMapOverlayStore.getState().setSelectionOverlay({
-          selectedBadgeIds: lens.rootBadgeIds,
-          highlightedBadgeIds: lens.badgeIds,
-          highlightedEdgeIds: lens.edgeIds,
+          selectedBadgeIds: lens.centerBadgeIds,
+          highlightedBadgeIds: lens.highlightedBadgeIds,
+          highlightedEdgeIds: lens.highlightedEdgeIds,
           claimBoundaryNotes: lens.claimBoundaryNotes,
         });
         context.openPanel(panelId, undefined);
@@ -2975,9 +2975,9 @@ export function executeHelixPanelAction(
           graph_id: graph.graphId,
           block,
           lens,
-          badge_count: lens.badgeIds.length,
-          edge_count: lens.edgeIds.length,
-          calculator_payload_count: lens.calculatorPayloadIds.length,
+          badge_count: lens.highlightedBadgeIds.length,
+          edge_count: lens.highlightedEdgeIds.length,
+          calculator_example_count: lens.calculatorExamples.length,
           claim_boundary_notes: lens.claimBoundaryNotes,
         },
       };

@@ -3,6 +3,7 @@ import {
   type PhysicsAtlasBlockV1,
   type PhysicsAtlasV1,
 } from "../contracts/physics-atlas.v1";
+import type { TheoryBadgeGraphV1 } from "../contracts/theory-badge-graph.v1";
 
 const sourceRef = (
   kind: PhysicsAtlasBlockV1["sourceRefs"][number]["kind"],
@@ -21,7 +22,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "stellar_evolution",
     title: "Stellar Evolution",
     shortTitle: "Stellar",
-    glyph: "*",
+    glyph: "★",
     description: "StarSim stellar stages, object bindings, scalar observables, runtime classification, and Stage 1 boundaries.",
     status: "active",
     subjects: ["starsim", "stellar", "stellar_structure", "fusion", "main_sequence", "red_giant", "compact_object"],
@@ -29,7 +30,11 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     unitSignatures: ["Theta", "M", "L", "M L^-3"],
     equationFamilies: ["stellar_observable_proxy", "stellar_structure_proxy", "fusion_classifier_margin"],
     simulationOwners: ["starsim"],
-    repoPathHints: ["shared/starsim-fusion-microphysics.ts", "shared/theory/starsim-theory-badges.ts"],
+    repoPathHints: [
+      "shared/theory/starsim-theory-badges.ts",
+      "shared/theory/starsim-stellar-evolution-map.ts",
+      "shared/starsim-fusion-microphysics.ts",
+    ],
     primaryBadgeIds: [
       "starsim.observable.surface_temperature_proxy",
       "starsim.observable.surface_gravity",
@@ -109,7 +114,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "solar_surface_spectrum",
     title: "Solar Surface & Spectrum",
     shortTitle: "Solar",
-    glyph: "S",
+    glyph: "☀",
     description: "Solar spectrum, photon energy, Doppler shifts, blackbody proxies, and flare-energy observation rows.",
     status: "active",
     subjects: ["solar", "spectrum", "wavelength", "radiation", "blackbody", "flare", "doppler"],
@@ -170,7 +175,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "casimir_cavity_modes",
     title: "Casimir Cavities",
     shortTitle: "Casimir",
-    glyph: "C",
+    glyph: "▣",
     description: "Static and dynamic Casimir, cavity modes, Q factors, gaps, and cavity telemetry.",
     status: "planned",
     subjects: ["casimir", "cavity", "negative_energy", "q_factor", "mode_frequency"],
@@ -280,7 +285,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "tokamak_plasma",
     title: "Tokamak Plasma",
     shortTitle: "Tokamak",
-    glyph: "T",
+    glyph: "⊙",
     description: "Tokamak energy fields, stability proxies, precursor detection, and synthetic diagnostics.",
     status: "planned",
     subjects: ["tokamak", "plasma", "stability", "diagnostics", "energy_field"],
@@ -311,7 +316,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "galactic_dynamics",
     title: "Galactic Dynamics",
     shortTitle: "Galactic",
-    glyph: "D",
+    glyph: "◎",
     description: "StarMap distances, relative velocities, galactic rotation controls, and Accordion null-model context.",
     status: "planned",
     subjects: ["galactic", "star_map", "distance", "relative_velocity", "accordion"],
@@ -342,7 +347,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     id: "curvature_collapse",
     title: "Curvature / Collapse",
     shortTitle: "Collapse",
-    glyph: "K",
+    glyph: "κ",
     description: "Curvature leverage, DP/collapse diagnostics, uncertainty propagation, and benchmark receipts.",
     status: "planned",
     subjects: ["curvature", "collapse", "dp", "benchmark", "uncertainty"],
@@ -371,6 +376,31 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     claimBoundaryNotes: ["Curvature/collapse rows should remain benchmark diagnostics unless backed by explicit receipts."],
   },
 ];
+
+export function buildPhysicsAtlasBlocks(_args: { graph: TheoryBadgeGraphV1 }): PhysicsAtlasBlockV1[] {
+  return PHYSICS_ATLAS_BLOCKS.map((block: PhysicsAtlasBlockV1) => ({ ...block }));
+}
+
+export function buildHelixPhysicsAtlasV1(args: { graph: TheoryBadgeGraphV1 }): PhysicsAtlasV1 {
+  return buildPhysicsAtlasV1({
+    graphId: args.graph.graphId,
+    alwaysOnFoundationSubjects: ["units", "dimensions", "constants", "energy", "relativity", "stress_energy"],
+    alwaysOnFoundationBadgeIds: [
+      "physics.units.dimension_consistency",
+      "physics.constants.speed_of_light",
+      "physics.quantum.energy_frequency",
+      "physics.energy.energy_density",
+      "physics.energy.power_rate",
+      "physics.fields.stress_energy_tensor",
+    ],
+    alwaysOnClaimBoundaryBadgeIds: [
+      "nhm2.claim_boundary.diagnostic_only",
+      "starsim.claim_boundary.stage1_reduced_order_prior",
+      "solar.claim_boundary.observation_proxy",
+    ],
+    blocks: buildPhysicsAtlasBlocks(args),
+  });
+}
 
 export function buildPhysicsAtlasBlocksV1(graphId = "nhm2-theory-badge-graph"): PhysicsAtlasV1 {
   return buildPhysicsAtlasV1({

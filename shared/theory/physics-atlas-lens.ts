@@ -1,19 +1,29 @@
-import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "../contracts/physics-atlas.v1";
 import type {
-  TheoryBadgeCalculatorPayloadV1,
+  PhysicsAtlasBlockId,
+  PhysicsAtlasBlockV1,
+  PhysicsAtlasV1,
+} from "../contracts/physics-atlas.v1";
+import type {
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
-import { buildPhysicsAtlasBlocksV1 } from "./physics-atlas-blocks";
 
 export type PhysicsAtlasLensResult = {
   blockId: PhysicsAtlasBlockId;
-  badgeIds: string[];
-  edgeIds: string[];
-  rootBadgeIds: string[];
+  title: string;
+  centerBadgeIds: string[];
+  highlightedBadgeIds: string[];
+  highlightedEdgeIds: string[];
+  foundationBadgeIds: string[];
   claimBoundaryBadgeIds: string[];
-  calculatorPayloadIds: string[];
+  dimmedBadgeIds: string[];
+  suggestedViewport: {
+    centerBadgeId: string | null;
+    zoom: number;
+  };
+  calculatorExamples: PhysicsAtlasBlockV1["calculatorExamples"];
+  runtimeActions: PhysicsAtlasBlockV1["runtimeActions"];
   claimBoundaryNotes: string[];
 };
 
@@ -41,52 +51,69 @@ function badgeMatchesBlock(badge: TheoryBadgeV1, block: PhysicsAtlasBlockV1): bo
   );
 }
 
-function neighborBadgeIds(graph: TheoryBadgeGraphV1, seedIds: Set<string>): Set<string> {
-  const result = new Set(seedIds);
-  for (const edge of graph.edges) {
-    if (seedIds.has(edge.from) || seedIds.has(edge.to)) {
-      result.add(edge.from);
-      result.add(edge.to);
-    }
-  }
-  return result;
+function existingBadgeIds(graph: TheoryBadgeGraphV1, ids: string[]): string[] {
+  const badgeIds = new Set(graph.badges.map((badge: TheoryBadgeV1) => badge.id));
+  return ids.filter((id: string) => badgeIds.has(id));
 }
 
 export function resolvePhysicsAtlasLens(args: {
   graph: TheoryBadgeGraphV1;
+  atlas: PhysicsAtlasV1;
   blockId: PhysicsAtlasBlockId;
-}): PhysicsAtlasLensResult | null {
-  const atlas = buildPhysicsAtlasBlocksV1(args.graph.graphId);
-  const block = atlas.blocks.find((candidate: PhysicsAtlasBlockV1) => candidate.id === args.blockId);
-  if (!block) return null;
+}): PhysicsAtlasLensResult {
+  const block = args.atlas.blocks.find((candidate: PhysicsAtlasBlockV1) => candidate.id === args.blockId);
+  if (!block) {
+    throw new Error(`Unknown physics atlas block: ${args.blockId}`);
+  }
 
-  const directBadgeIds = new Set(
+  const matchedBadgeIds = new Set(
     args.graph.badges
       .filter((badge: TheoryBadgeV1) => badgeMatchesBlock(badge, block))
       .map((badge: TheoryBadgeV1) => badge.id),
   );
-  for (const id of [...block.primaryBadgeIds, ...block.rootBadgeIds, ...block.claimBoundaryBadgeIds]) {
-    if (args.graph.badges.some((badge: TheoryBadgeV1) => badge.id === id)) directBadgeIds.add(id);
+  for (const id of existingBadgeIds(args.graph, block.primaryBadgeIds)) {
+    matchedBadgeIds.add(id);
   }
 
-  const badgeIds = Array.from(neighborBadgeIds(args.graph, directBadgeIds));
-  const badgeIdSet = new Set(badgeIds);
-  const edgeIds = args.graph.edges
-    .filter((edge: TheoryBadgeEdgeV1) => badgeIdSet.has(edge.from) && badgeIdSet.has(edge.to))
+  const foundationBadgeIds = existingBadgeIds(args.graph, [
+    ...args.atlas.alwaysOnFoundationBadgeIds,
+    ...block.rootBadgeIds,
+  ]);
+  const claimBoundaryBadgeIds = existingBadgeIds(args.graph, [
+    ...args.atlas.alwaysOnClaimBoundaryBadgeIds,
+    ...block.claimBoundaryBadgeIds,
+  ]);
+
+  const highlightedBadgeIds = Array.from(new Set([
+    ...foundationBadgeIds,
+    ...Array.from(matchedBadgeIds),
+    ...claimBoundaryBadgeIds,
+  ]));
+  const highlightedBadgeSet = new Set(highlightedBadgeIds);
+  const highlightedEdgeIds = args.graph.edges
+    .filter((edge: TheoryBadgeEdgeV1) => highlightedBadgeSet.has(edge.from) && highlightedBadgeSet.has(edge.to))
     .map((edge: TheoryBadgeEdgeV1) => edge.id);
-  const calculatorPayloadIds = args.graph.badges
-    .filter((badge: TheoryBadgeV1) => badgeIdSet.has(badge.id))
-    .flatMap((badge: TheoryBadgeV1) =>
-      badge.calculatorPayloads.map((payload: TheoryBadgeCalculatorPayloadV1) => `${badge.id}:${payload.id}`),
-    );
+  const centerBadgeIds = existingBadgeIds(args.graph, block.primaryBadgeIds).filter((id: string) => matchedBadgeIds.has(id));
+  const dimmedBadgeIds = args.graph.badges
+    .map((badge: TheoryBadgeV1) => badge.id)
+    .filter((id: string) => !highlightedBadgeSet.has(id));
+  const centerBadgeId = centerBadgeIds[0] ?? Array.from(matchedBadgeIds)[0] ?? foundationBadgeIds[0] ?? null;
 
   return {
     blockId: block.id,
-    badgeIds,
-    edgeIds,
-    rootBadgeIds: block.rootBadgeIds.filter((id: string) => badgeIdSet.has(id)),
-    claimBoundaryBadgeIds: block.claimBoundaryBadgeIds.filter((id: string) => badgeIdSet.has(id)),
-    calculatorPayloadIds,
+    title: block.title,
+    centerBadgeIds,
+    highlightedBadgeIds,
+    highlightedEdgeIds,
+    foundationBadgeIds,
+    claimBoundaryBadgeIds,
+    dimmedBadgeIds,
+    suggestedViewport: {
+      centerBadgeId,
+      zoom: centerBadgeId ? 1.12 : 1,
+    },
+    calculatorExamples: block.calculatorExamples,
+    runtimeActions: block.runtimeActions,
     claimBoundaryNotes: block.claimBoundaryNotes,
   };
 }

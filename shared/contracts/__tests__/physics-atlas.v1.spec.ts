@@ -5,11 +5,12 @@ import {
   type PhysicsAtlasBlockV1,
   validatePhysicsAtlasV1,
 } from "../physics-atlas.v1";
-import { buildPhysicsAtlasBlocksV1 } from "../../theory/physics-atlas-blocks";
+import { buildNhm2TheoryBadgeGraphV1 } from "../../theory/nhm2-theory-badges";
+import { buildHelixPhysicsAtlasV1 } from "../../theory/physics-atlas-blocks";
 
 describe("physics_atlas/v1", () => {
   it("validates the compact physics atlas blocks", () => {
-    const atlas = buildPhysicsAtlasBlocksV1();
+    const atlas = buildHelixPhysicsAtlasV1({ graph: buildNhm2TheoryBadgeGraphV1() });
 
     expect(validatePhysicsAtlasV1(atlas)).toEqual([]);
     expect(isPhysicsAtlasV1(atlas)).toBe(true);
@@ -19,7 +20,7 @@ describe("physics_atlas/v1", () => {
   });
 
   it("rejects forbidden overclaiming language", () => {
-    const atlas = buildPhysicsAtlasBlocksV1();
+    const atlas = buildHelixPhysicsAtlasV1({ graph: buildNhm2TheoryBadgeGraphV1() });
     atlas.blocks[0] = {
       ...atlas.blocks[0],
       description: "StarSim proves an external claim.",

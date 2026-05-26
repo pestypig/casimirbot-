@@ -1,13 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { PhysicsAtlasBlockV1 } from "../../contracts/physics-atlas.v1";
-import { buildPhysicsAtlasBlocksV1 } from "../physics-atlas-blocks";
+import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
+import { buildHelixPhysicsAtlasV1, buildPhysicsAtlasBlocks } from "../physics-atlas-blocks";
 
 describe("physics atlas blocks", () => {
   it("includes the finite rail domains and source references", () => {
-    const atlas = buildPhysicsAtlasBlocksV1();
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const atlas = buildHelixPhysicsAtlasV1({ graph });
+    const blocks = buildPhysicsAtlasBlocks({ graph });
     const byId = new Map(atlas.blocks.map((block: PhysicsAtlasBlockV1) => [block.id, block]));
 
+    expect(blocks.map((block: PhysicsAtlasBlockV1) => block.glyph)).toEqual([
+      "★",
+      "z",
+      "☀",
+      "▣",
+      "G",
+      "Q",
+      "⊙",
+      "◎",
+      "κ",
+    ]);
     expect(byId.get("stellar_evolution")?.status).toBe("active");
+    expect(byId.get("stellar_evolution")?.repoPathHints).toContain("shared/theory/starsim-stellar-evolution-map.ts");
     expect(byId.get("cosmic_distance_ladder")?.status).toBe("active");
     expect(byId.get("solar_surface_spectrum")?.status).toBe("active");
     expect(byId.get("solar_surface_spectrum")?.primaryBadgeIds).toContain(
