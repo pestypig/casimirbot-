@@ -1268,7 +1268,7 @@ describe("panelActionAdapters", () => {
       expect(selectResult.artifact?.kind).toBe("physics_atlas_lens");
       expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("solar_surface_spectrum");
       expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toContain(
-        "solar.spectrum.photon_energy_wavelength",
+        "solar.spectrum.photon_energy",
       );
     });
 
@@ -1407,7 +1407,8 @@ describe("panelActionAdapters", () => {
       expect(result.ok).toBe(true);
       expect(result.artifact?.kind).toBe("theory_calculator_loadout");
       expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("E = h*c/lambda");
-      expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("v = c*(lambda_obs - lambda0)/lambda0");
+      expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("z = (lambda_obs - lambda0)/lambda0");
+      expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("v = c*z");
     });
 
     it("runs StarSim runtime receipts through theory badge actions", () => {

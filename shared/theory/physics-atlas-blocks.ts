@@ -129,16 +129,20 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
       "shared/solar-flare-observable-contract.v1.ts",
     ],
     primaryBadgeIds: [
-      "solar.spectrum.frequency_from_wavelength",
-      "solar.spectrum.photon_energy_wavelength",
-      "solar.spectrum.doppler_velocity",
-      "solar.radiation.wien_peak",
-      "solar.radiation.stefan_boltzmann_flux",
-      "solar.flare.radiant_energy_proxy",
-      "solar.claim_boundary.observation_proxy",
+      "solar.spectrum.photon_energy",
+      "solar.spectrum.wien_peak",
+      "solar.spectrum.stefan_boltzmann_luminosity",
+      "solar.spectrum.halpha_line_reference",
+      "solar.spectrum.doppler_shift",
+      "solar.spectrum.radial_velocity_proxy",
+      "solar.spectrum.blackbody_curve_reference",
+      "solar.magnetic.zeeman_split_proxy",
+      "solar.flare.energy_proxy",
+      "solar.runtime.spectrum_analysis",
+      "solar.claim_boundary.observational_proxy",
     ],
     rootBadgeIds: ["physics.constants.speed_of_light", "physics.quantum.energy_frequency", "physics.energy.power_rate"],
-    claimBoundaryBadgeIds: ["solar.claim_boundary.observation_proxy"],
+    claimBoundaryBadgeIds: ["solar.claim_boundary.observational_proxy"],
     calculatorExamples: [
       {
         label: "Photon energy from wavelength",
@@ -396,7 +400,7 @@ export function buildHelixPhysicsAtlasV1(args: { graph: TheoryBadgeGraphV1 }): P
     alwaysOnClaimBoundaryBadgeIds: [
       "nhm2.claim_boundary.diagnostic_only",
       "starsim.claim_boundary.stage1_reduced_order_prior",
-      "solar.claim_boundary.observation_proxy",
+      "solar.claim_boundary.observational_proxy",
     ],
     blocks: buildPhysicsAtlasBlocks(args),
   });
@@ -417,7 +421,7 @@ export function buildPhysicsAtlasBlocksV1(graphId = "nhm2-theory-badge-graph"): 
     alwaysOnClaimBoundaryBadgeIds: [
       "nhm2.claim_boundary.diagnostic_only",
       "starsim.claim_boundary.stage1_reduced_order_prior",
-      "solar.claim_boundary.observation_proxy",
+      "solar.claim_boundary.observational_proxy",
     ],
     blocks: PHYSICS_ATLAS_BLOCKS,
   });

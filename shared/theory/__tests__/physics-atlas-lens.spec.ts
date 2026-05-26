@@ -11,14 +11,14 @@ describe("physics atlas lens", () => {
 
     expect(lens.blockId).toBe("solar_surface_spectrum");
     expect(lens.title).toBe("Solar Surface & Spectrum");
-    expect(lens.highlightedBadgeIds).toContain("solar.spectrum.photon_energy_wavelength");
-    expect(lens.highlightedBadgeIds).toContain("solar.claim_boundary.observation_proxy");
+    expect(lens.highlightedBadgeIds).toContain("solar.spectrum.photon_energy");
+    expect(lens.highlightedBadgeIds).toContain("solar.claim_boundary.observational_proxy");
     expect(lens.foundationBadgeIds).toContain("physics.constants.speed_of_light");
-    expect(lens.claimBoundaryBadgeIds).toContain("solar.claim_boundary.observation_proxy");
+    expect(lens.claimBoundaryBadgeIds).toContain("solar.claim_boundary.observational_proxy");
     expect(lens.highlightedEdgeIds.length).toBeGreaterThan(0);
     expect(lens.dimmedBadgeIds.length).toBeGreaterThan(0);
     expect(lens.dimmedBadgeIds.every((badgeId: string) => !lens.highlightedBadgeIds.includes(badgeId))).toBe(true);
-    expect(lens.suggestedViewport.centerBadgeId).toBe("solar.spectrum.frequency_from_wavelength");
+    expect(lens.suggestedViewport.centerBadgeId).toBe("solar.spectrum.photon_energy");
     expect(lens.calculatorExamples.some((example) => example.expression === "E = h*c/lambda")).toBe(true);
   });
 });

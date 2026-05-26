@@ -1,8 +1,14 @@
 import type {
+  PhysicsAtlasBlockId,
+  PhysicsAtlasBlockV1,
+} from "../contracts/physics-atlas.v1";
+import type {
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
+import { buildHelixPhysicsAtlasV1 } from "./physics-atlas-blocks";
+import { resolvePhysicsAtlasLens } from "./physics-atlas-lens";
 
 export type TheoryBadgeLookupInput = {
   query?: string;
@@ -12,6 +18,7 @@ export type TheoryBadgeLookupInput = {
   repoPaths?: string[];
   equationFamilies?: string[];
   simulationOwners?: string[];
+  atlasBlockIds?: PhysicsAtlasBlockId[];
   limit?: number;
 };
 
@@ -83,6 +90,8 @@ const normalizeKey = (value: string) =>
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
 
+const isSpecificUnitSignature = (value: string) => normalize(value).length >= 3;
+
 const intersectNormalized = (left: string[], right: string[]) => {
   const rightByKey = new Map(right.map((value) => [normalizeKey(value), value]));
   return unique(
@@ -91,6 +100,9 @@ const intersectNormalized = (left: string[], right: string[]) => {
       .filter((value): value is string => Boolean(value)),
   );
 };
+
+const intersectUnitSignatures = (left: string[], right: string[]) =>
+  intersectNormalized(left.filter(isSpecificUnitSignature), right.filter(isSpecificUnitSignature));
 
 const tokenize = (value: string | undefined) =>
   unique(
@@ -143,7 +155,7 @@ function unitSignaturesInQuery(query: string, unitSignatures: string[]) {
   const normalizedQuery = normalize(query);
   return unitSignatures.filter((signature) => {
     const normalizedSignature = normalize(signature);
-    return normalizedSignature.length >= 3 && normalizedQuery.includes(normalizedSignature);
+    return isSpecificUnitSignature(signature) && normalizedQuery.includes(normalizedSignature);
   });
 }
 
@@ -171,6 +183,28 @@ export function locateTheoryBadges(args: {
   const requestedRepoPaths = input.repoPaths ?? [];
   const requestedEquationFamilies = input.equationFamilies ?? [];
   const requestedSimulationOwners = input.simulationOwners ?? [];
+  const atlas = buildHelixPhysicsAtlasV1({ graph });
+  const requestedAtlasBlockIds = unique(input.atlasBlockIds ?? []).filter((blockId: string): blockId is PhysicsAtlasBlockId =>
+    atlas.blocks.some((block: PhysicsAtlasBlockV1) => block.id === blockId),
+  );
+  const atlasBlocks = requestedAtlasBlockIds
+    .map((blockId: PhysicsAtlasBlockId) =>
+      atlas.blocks.find((block: PhysicsAtlasBlockV1) => block.id === blockId),
+    )
+    .filter((block): block is PhysicsAtlasBlockV1 => Boolean(block));
+  const atlasLensBadgeIds = new Set(
+    requestedAtlasBlockIds.flatMap((blockId: PhysicsAtlasBlockId) =>
+      resolvePhysicsAtlasLens({ graph, atlas, blockId }).highlightedBadgeIds,
+    ),
+  );
+  const atlasPrimaryBadgeIds = new Set(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.primaryBadgeIds));
+  const atlasSubjectPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.subjects));
+  const atlasSymbolPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.symbols));
+  const atlasUnitSignaturePriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.unitSignatures));
+  const atlasEquationFamilyPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.equationFamilies));
+  const atlasSimulationOwnerPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.simulationOwners));
+  const atlasRepoPathPriors = unique(atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.repoPathHints));
+  const atlasCalculatorExamples = atlasBlocks.flatMap((block: PhysicsAtlasBlockV1) => block.calculatorExamples);
   const limit = Math.max(1, Math.min(50, input.limit ?? 8));
 
   const matches = graph.badges
@@ -208,6 +242,9 @@ export function locateTheoryBadges(args: {
       if (queryKey && normalizeKey(badge.id) === queryKey) addScore(100, "direct badge id match");
       if (queryKey && normalizeKey(badge.title) === queryKey) addScore(60, "direct badge title match");
 
+      if (atlasPrimaryBadgeIds.has(badge.id)) addScore(40, "direct atlas primary badge");
+      if (atlasLensBadgeIds.has(badge.id)) addScore(10, "inside selected atlas lens");
+
       const matchedSymbols = unique([
         ...intersectNormalized(requestedSymbols, symbols),
         ...symbolMatchesQuery(queryTokens, symbols),
@@ -215,7 +252,7 @@ export function locateTheoryBadges(args: {
       if (matchedSymbols.length > 0) addScore(35 * matchedSymbols.length, `symbol match: ${matchedSymbols.join(", ")}`);
 
       const matchedUnitSignatures = unique([
-        ...intersectNormalized(requestedUnitSignatures, unitSignatures),
+        ...intersectUnitSignatures(requestedUnitSignatures, unitSignatures),
         ...unitSignaturesInQuery(query, unitSignatures),
       ]);
       if (matchedUnitSignatures.length > 0) {
@@ -254,6 +291,51 @@ export function locateTheoryBadges(args: {
 
       const matchedOwners = intersectNormalized(requestedSimulationOwners, simulationOwners);
       if (matchedOwners.length > 0) addScore(20 * matchedOwners.length, `simulation owner match: ${matchedOwners.join(", ")}`);
+
+      const atlasSubjectMatches = intersectNormalized(atlasSubjectPriors, subjects);
+      if (atlasSubjectMatches.length > 0) {
+        addScore(20 * atlasSubjectMatches.length, `subject match via atlas block: ${atlasSubjectMatches.join(", ")}`);
+      }
+
+      const atlasOwnerMatches = intersectNormalized(atlasSimulationOwnerPriors, simulationOwners);
+      if (atlasOwnerMatches.length > 0) {
+        addScore(20 * atlasOwnerMatches.length, `simulation owner match via atlas block: ${atlasOwnerMatches.join(", ")}`);
+      }
+
+      const atlasEquationFamilyMatches = intersectNormalized(atlasEquationFamilyPriors, equationFamilies);
+      if (atlasEquationFamilyMatches.length > 0) {
+        addScore(18 * atlasEquationFamilyMatches.length, `equation family via atlas block: ${atlasEquationFamilyMatches.join(", ")}`);
+      }
+
+      const atlasUnitMatches = intersectUnitSignatures(atlasUnitSignaturePriors, unitSignatures);
+      if (atlasUnitMatches.length > 0) {
+        addScore(18 * atlasUnitMatches.length, `unit signature via atlas block: ${atlasUnitMatches.join(", ")}`);
+      }
+
+      const atlasRepoMatches = unique([
+        ...intersectNormalized(atlasRepoPathPriors, repoPaths),
+        ...repoPaths.filter((path) => atlasRepoPathPriors.some((prior) => normalize(path).includes(normalize(prior)))),
+      ]);
+      if (atlasRepoMatches.length > 0) {
+        addScore(15 * atlasRepoMatches.length, `source path hint via atlas block: ${atlasRepoMatches.join(", ")}`);
+      }
+
+      const atlasCalculatorExampleHits = atlasCalculatorExamples.filter((example) => {
+        const exampleExpression = normalize(example.expression);
+        const exampleDisplay = normalize(example.displayLatex);
+        const normalizedPayloadText = normalize(payloadText);
+        return (
+          normalizedPayloadText.includes(exampleExpression) ||
+          normalizedPayloadText.includes(exampleDisplay) ||
+          intersectNormalized(example.symbols, symbols).length > 0
+        );
+      });
+      if (atlasCalculatorExampleHits.length > 0) {
+        addScore(
+          15 * atlasCalculatorExampleHits.length,
+          `calculator example expression/symbol match: ${atlasCalculatorExampleHits.map((example) => example.label).join(", ")}`,
+        );
+      }
 
       const textTokenHits = queryTokens.filter((token) => normalize(badgeText).includes(token));
       if (textTokenHits.length > 0) addScore(Math.min(30, 10 * textTokenHits.length), `text match: ${textTokenHits.join(", ")}`);

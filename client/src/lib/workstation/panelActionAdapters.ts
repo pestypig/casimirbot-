@@ -282,6 +282,18 @@ function asPhysicsAtlasBlockId(value: unknown): PhysicsAtlasBlockId | null {
   return PHYSICS_ATLAS_BLOCK_IDS.includes(text as PhysicsAtlasBlockId) ? (text as PhysicsAtlasBlockId) : null;
 }
 
+function asPhysicsAtlasBlockIds(...values: unknown[]): PhysicsAtlasBlockId[] {
+  return Array.from(
+    new Set(
+      values.flatMap((value) =>
+        asStringArray(value)
+          .map(asPhysicsAtlasBlockId)
+          .filter((blockId): blockId is PhysicsAtlasBlockId => Boolean(blockId)),
+      ),
+    ),
+  );
+}
+
 function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>): TheoryCalculatorLoadoutV1 {
   const existingLoadout = asRecord(args.loadout);
   if (existingLoadout && isTheoryCalculatorLoadoutV1(existingLoadout)) return existingLoadout;
@@ -3001,6 +3013,10 @@ export function executeHelixPanelAction(
           repoPaths: asStringArray(args.repo_paths ?? args.repoPaths),
           equationFamilies: asStringArray(args.equation_families ?? args.equationFamilies),
           simulationOwners: asStringArray(args.simulation_owners ?? args.simulationOwners),
+          atlasBlockIds: asPhysicsAtlasBlockIds(
+            args.atlas_block_ids ?? args.atlasBlockIds,
+            args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId,
+          ),
           source,
           limit: asNumber(args.limit) ?? undefined,
         },
@@ -3038,6 +3054,10 @@ export function executeHelixPanelAction(
           repoPaths: asStringArray(args.repo_paths ?? args.repoPaths),
           equationFamilies: asStringArray(args.equation_families ?? args.equationFamilies),
           simulationOwners: asStringArray(args.simulation_owners ?? args.simulationOwners),
+          atlasBlockIds: asPhysicsAtlasBlockIds(
+            args.atlas_block_ids ?? args.atlasBlockIds,
+            args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId,
+          ),
           limit: asNumber(args.limit) ?? undefined,
         },
       });

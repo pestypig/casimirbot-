@@ -41,6 +41,33 @@ describe("theory badge overlap locator", () => {
     );
   });
 
+  it("uses atlas blocks as scoring priors without matching single-letter unit signatures", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const solarMatches = locateTheoryBadges({
+      graph,
+      input: {
+        query: "line splitting wavelength",
+        atlasBlockIds: ["solar_surface_spectrum"],
+        limit: 8,
+      },
+    });
+
+    expect(solarMatches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain(
+      "solar.magnetic.zeeman_split_proxy",
+    );
+    expect(solarMatches[0]?.reasons.some((reason: string) => reason.includes("atlas block"))).toBe(true);
+
+    const massOnlyMatches = locateTheoryBadges({
+      graph,
+      input: {
+        unitSignatures: ["M"],
+        limit: 10,
+      },
+    });
+
+    expect(massOnlyMatches).toEqual([]);
+  });
+
   it("traces connections across selected badges", () => {
     const graph = buildNhm2TheoryBadgeGraphV1();
     const trace = traceTheoryBadgeConnections({

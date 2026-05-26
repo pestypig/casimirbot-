@@ -19,8 +19,7 @@ import {
   COSMIC_DISTANCE_LADDER_EDGES,
 } from "./cosmic-distance-ladder-badges";
 import {
-  SOLAR_SPECTRUM_THEORY_BADGES,
-  SOLAR_SPECTRUM_THEORY_EDGES,
+  buildSolarSpectrumTheoryBadgesV1,
 } from "./solar-spectrum-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
@@ -740,6 +739,8 @@ const edges: TheoryBadgeEdgeV1[] = [
 ];
 
 export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
+  const solar = buildSolarSpectrumTheoryBadgesV1();
+
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
@@ -750,14 +751,14 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...badges,
       ...STARSIM_THEORY_BADGES,
       ...COSMIC_DISTANCE_LADDER_BADGES,
-      ...SOLAR_SPECTRUM_THEORY_BADGES,
+      ...solar.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
       ...edges,
       ...STARSIM_THEORY_EDGES,
       ...COSMIC_DISTANCE_LADDER_EDGES,
-      ...SOLAR_SPECTRUM_THEORY_EDGES,
+      ...solar.edges,
     ],
   });
 }
