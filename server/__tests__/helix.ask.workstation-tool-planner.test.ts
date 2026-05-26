@@ -371,6 +371,35 @@ describe("Helix Ask workstation tool planner", () => {
     }));
   });
 
+  it("routes natural-language Auntie Dottie manifest requests to the manifest action", () => {
+    const plan = planWorkstationToolUse(
+      "Manifest Auntie Dottie as a witness-only observer preset for this room.",
+      { threadId: "thread:dottie-manifest", turnId: "turn:dottie-manifest" },
+    );
+
+    expect(plan.intent).toBe("dottie_observer");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.action).toEqual({
+      panel_id: "situation-room-pipelines",
+      action_id: "dottie.manifest",
+      args: expect.objectContaining({
+        thread_id: "thread:dottie-manifest",
+        observer_profile: "auntie_dottie",
+        objective: "Manifest Auntie Dottie as a witness-only Situation Room observer preset.",
+      }),
+    });
+    expect(plan.scores[0]).toMatchObject({
+      affordance_id: "situation-room-pipelines.dottie.manifest",
+      action_id: "dottie.manifest",
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "situation-room-pipelines.open",
+      "situation-room-pipelines.dottie.manifest",
+      "undefined.undefined",
+    ]);
+  });
+
   it("does not turn contextual Dottie debugging into observer actions", () => {
     const plan = planWorkstationToolUse(
       "What can you infer from this Dottie run and what should the next patches be?",

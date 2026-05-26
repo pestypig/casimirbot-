@@ -15,6 +15,10 @@ import {
   clearInterpretedEventLogForTest,
   listInterpretedEvents,
 } from "../services/situation-room/interpreted-event-log-store";
+import {
+  listLiveEnvironmentCommentary,
+  resetLiveEnvironmentCommentaryForTest,
+} from "../services/situation-room/live-environment-commentary-store";
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
@@ -22,6 +26,7 @@ import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-fi
 const resetAll = () => {
   resetLiveAnswerEnvironments();
   clearInterpretedEventLogForTest();
+  resetLiveEnvironmentCommentaryForTest();
   resetSituationSourceCapabilitiesForTest();
   resetLiveSituationRunsForTest();
   resetLiveFieldWorkersForTest();
@@ -167,16 +172,30 @@ describe("Helix Ask live environment agent loop", () => {
       roomId: environment.room_id,
       limit: 10,
     });
+    const commentary = listLiveEnvironmentCommentary({
+      threadId: environment.thread_id,
+      roomId: environment.room_id,
+      limit: 10,
+    });
 
     expect(observation.assistant_answer).toBe(false);
     expect(observation.raw_content_included).toBe(false);
     expect(observation.context_role).toBe("tool_evidence");
-    expect(observation.evidence_refs.some((ref) => ref.startsWith("interpreted:"))).toBe(true);
+    expect(observation.evidence_refs.some((ref) => ref.startsWith("live_commentary:"))).toBe(true);
+    expect(commentary.at(-1)).toMatchObject({
+      schema: "helix.live_environment_commentary.v1",
+      kind: "field_evaluation",
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_context_policy: "evidence_only",
+    });
     expect(events.at(-1)).toMatchObject({
-      kind: "agentic_review",
+      kind: "line_tool_evaluation",
       assistant_answer: false,
       raw_logs_included: false,
     });
+    expect(events.at(-1)?.evidence_refs).toContain(commentary.at(-1)?.commentary_id);
   });
 
   it("admits live environment review as evidence-only capability authority", () => {

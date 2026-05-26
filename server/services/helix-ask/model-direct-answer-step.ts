@@ -21,6 +21,108 @@ export const isModelDirectAnswerDecision = (
   return nextStep === "answer" || chosenCapability === "model.direct_answer";
 };
 
+const DIRECT_ANSWER_UNAVAILABLE_PATTERNS = [
+  /direct_answer_unavailable/i,
+  /model_only_answer_unavailable/i,
+  /could not produce a terminal answer/i,
+  /could not produce a final answer/i,
+  /could not produce a substantive direct answer/i,
+  /model did not return a usable answer/i,
+  /direct model-only answer timed out/i,
+  /i could not complete this turn/i,
+  /please retry once/i,
+];
+
+export function isUnavailableModelDirectAnswerText(value: unknown): boolean {
+  const text = readString(value);
+  if (!text) return true;
+  return DIRECT_ANSWER_UNAVAILABLE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function shouldRetryModelDirectAnswerStep(input: {
+  payload: RecordLike;
+  agentStepDecision?: RecordLike | null;
+  draftText?: unknown;
+  retryCount?: number | null;
+}): boolean {
+  const retryCount = typeof input.retryCount === "number" ? input.retryCount : 0;
+  if (retryCount > 0) return false;
+
+  const decision = input.agentStepDecision ?? readRecord(input.payload.agent_step_decision);
+  if (!isModelDirectAnswerDecision(decision)) return false;
+
+  const terminalErrorCode = readString(input.payload.terminal_error_code);
+  const terminalKind = readString(input.payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(input.payload.final_answer_source);
+  const directText =
+    input.draftText ??
+    readRecord(input.payload.direct_answer_text)?.text ??
+    readRecord(input.payload.final_answer_draft)?.text ??
+    input.payload.selected_final_answer ??
+    input.payload.answer ??
+    input.payload.text;
+
+  return (
+    terminalErrorCode === "direct_answer_unavailable" ||
+    terminalErrorCode === "model_only_answer_unavailable" ||
+    (
+      terminalKind === "typed_failure" &&
+      finalAnswerSource === "typed_failure" &&
+      isUnavailableModelDirectAnswerText(directText)
+    ) ||
+    isUnavailableModelDirectAnswerText(directText)
+  );
+}
+
+export function buildModelDirectAnswerRetryInstruction(input: {
+  promptText: string;
+  reason?: string | null;
+}): string {
+  return [
+    "The previous model.direct_answer step did not produce a usable direct_answer_text.",
+    "Retry once. Do not call workstation tools unless the prompt explicitly requires them.",
+    "Return a substantive answer to the user's goal as direct_answer_text.",
+    "Do not return a placeholder, route failure, or terminal-boundary explanation.",
+    input.reason ? `Previous failure: ${input.reason}` : null,
+    "",
+    "User goal:",
+    input.promptText,
+  ].filter(Boolean).join("\n");
+}
+
+export function markModelDirectAnswerRetryObservation(input: {
+  turnId: string;
+  payload: RecordLike;
+  reason: string;
+}): RecordLike {
+  const artifactId = `model_direct_answer_retry:${hashShort([input.turnId, input.reason])}`;
+  const observation = {
+    schema: "helix.model_direct_answer_retry_observation.v1",
+    kind: "model_direct_answer_retry_observation",
+    artifact_id: artifactId,
+    turn_id: input.turnId,
+    reason: input.reason,
+    retry_allowed: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    ...input.payload,
+    model_direct_answer_retry_count: 1,
+    current_turn_artifact_ledger: [
+      ...readArray(input.payload.current_turn_artifact_ledger),
+      {
+        artifact_id: artifactId,
+        turn_id: input.turnId,
+        kind: "model_direct_answer_retry_observation",
+        source_scope: "current_turn",
+        producer_item_id: "agent_runtime_loop",
+        payload: observation,
+      },
+    ],
+  };
+}
+
 export function applyModelDirectAnswerDraftStep(input: {
   turnId: string;
   promptText: string;

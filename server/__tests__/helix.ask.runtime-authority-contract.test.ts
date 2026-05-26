@@ -652,6 +652,78 @@ describe("helix ask runtime authority contract", () => {
     });
   });
 
+  it("exposes model-direct selection as a mismatch when docs observations exist", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "doc_summary", required_terminal_kind: "doc_summary" },
+      terminal_artifact_kind: "doc_summary",
+      final_answer_source: "doc_summary",
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-model-direct",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "model.direct_answer",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc-summary-1",
+          kind: "doc_summary",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.doc_summary.v1",
+            path: "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+          },
+        },
+      ],
+    };
+
+    const observation = buildCapabilityBindingMismatchObservation(payload);
+
+    expect(observation).toMatchObject({
+      schema: "helix.capability_binding_mismatch_observation.v1",
+      selected_capability: "model.direct_answer",
+      observed_artifact_refs: ["doc-summary-1"],
+      observed_artifact_kinds: ["doc_summary"],
+      suggested_capability: "docs-viewer.summarize_doc",
+      suggested_repair: "rebind_model_direct_answer_to_observed_tool_family",
+    });
+  });
+
+  it("does not flag a clean model-direct answer draft as a tool binding mismatch", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "model_only_concept", required_terminal_kind: "direct_answer_text" },
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-model-direct",
+            decision_authority: "llm",
+            decision_timing: "terminal_review",
+            chosen_capability: "model.direct_answer",
+            observed_artifact_refs: ["direct-answer-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "direct-answer-1",
+          kind: "direct_answer_text",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.direct_answer_text.v1",
+            text: "An electron is a negatively charged elementary particle.",
+          },
+        },
+      ],
+    };
+
+    expect(buildCapabilityBindingMismatchObservation(payload)).toBeNull();
+  });
+
   it("allows clean typed failures for source/capability turns without minting a successful terminal", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "debug_diagnosis" },

@@ -252,6 +252,37 @@ function buildTerminalBoundaryFailureEnvelope(
   };
 }
 
+function clearStaleFailureFieldsForSuccessfulTerminal(
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): void {
+  if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
+
+  delete payload.terminal_error_code;
+  delete payload.terminal_failure_text;
+
+  const typedFailure = readRecord(payload.typed_failure);
+  if (typedFailure) {
+    payload.rejected_typed_failure = {
+      ...typedFailure,
+      rejected_reason: "successful_terminal_authority_superseded_failure",
+      superseded_by_terminal_artifact_kind: envelope.terminal_artifact_kind,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete payload.typed_failure;
+  }
+
+  const satisfaction = readRecord(payload.satisfaction_report);
+  if (satisfaction?.missing_reason) {
+    payload.satisfaction_report = {
+      ...satisfaction,
+      missing_reason: null,
+      superseded_missing_reason: satisfaction.missing_reason,
+    };
+  }
+}
+
 export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
@@ -267,6 +298,8 @@ export function applyTerminalAnswerEnvelope(
   if (!initialBoundary.eligible) {
     envelope = buildTerminalBoundaryFailureEnvelope(payload, envelope, initialBoundary);
   }
+
+  clearStaleFailureFieldsForSuccessfulTerminal(payload, envelope);
 
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
@@ -346,6 +379,11 @@ export function applyTerminalAnswerEnvelope(
     debug.terminal_presentation = payload.terminal_presentation;
     debug.terminal_answer_authority = payload.terminal_answer_authority;
     debug.terminal_answer_envelope = envelope;
+    if (envelope.terminal_kind !== "failure" && envelope.final_answer_source !== "typed_failure") {
+      delete debug.terminal_error_code;
+      delete debug.terminal_failure_text;
+      delete debug.typed_failure;
+    }
     debug.terminal_boundary_eligibility = payload.terminal_boundary_eligibility;
     debug.current_turn_events = payload.current_turn_events;
     debug.turn_events = payload.turn_events;

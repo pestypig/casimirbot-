@@ -1,3 +1,5 @@
+import type { HelixLiveEnvironmentCommentary } from "./helix-live-environment-commentary";
+
 export const HELIX_INTERPRETED_EVENT_SCHEMA =
   "helix.interpreted_event.v1" as const;
 
@@ -54,6 +56,11 @@ export type HelixInterpretedLogRead = {
   thread_id: string;
   room_id?: string | null;
   events: HelixInterpretedEvent[];
+  interpreted_events?: HelixInterpretedEvent[];
+  typed_commentary?: HelixLiveEnvironmentCommentary[];
   raw_logs_included: false;
   deterministic_content_role: "evidence_not_assistant_answer";
+  context_role?: "tool_evidence";
+  ask_context_policy?: "evidence_only";
+  assistant_answer?: false;
 };

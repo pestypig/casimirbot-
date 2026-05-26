@@ -9,6 +9,20 @@ export type HelixVisibleTerminalResolution = {
   usedLegacyShadow: boolean;
 };
 
+export type HelixVisibleTerminalSourceLabelInput = {
+  terminalArtifactKind?: unknown;
+  finalAnswerSource?: unknown;
+  fallback?: unknown;
+};
+
+export type HelixRuntimeStopReasonVisibilityInput = {
+  stopReason?: unknown;
+  finalStatus?: unknown;
+  terminalErrorCode?: unknown;
+  solverDecision?: unknown;
+  terminalKind?: unknown;
+};
+
 type RecordLike = Record<string, unknown>;
 
 function readRecord(value: unknown): RecordLike | null {
@@ -17,6 +31,10 @@ function readRecord(value: unknown): RecordLike | null {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function normalizeTerminalText(value: unknown): string {
@@ -28,6 +46,10 @@ function isInvalidTerminalText(value: unknown): boolean {
   if (!normalized) return true;
   return (
     /^no final answer returned\.?$/i.test(normalized) ||
+    /^I could not produce a terminal answer for this turn\.?$/i.test(normalized) ||
+    /^I could not produce a final answer for this turn\.?$/i.test(normalized) ||
+    /^direct_answer_unavailable$/i.test(normalized) ||
+    /^model_only_answer_unavailable$/i.test(normalized) ||
     /^I could not produce a substantive direct answer for this background-only turn\.?$/i.test(normalized) ||
     /^I couldn't produce a final answer for that turn\. Please retry once\.?$/i.test(normalized)
   );
@@ -60,6 +82,71 @@ function renderTypedFailureFallback(code?: string | null): string {
   return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
 }
 
+export function formatHelixVisibleTerminalSourceLabel(
+  input: HelixVisibleTerminalSourceLabelInput,
+): string {
+  const terminalKind = readString(input.terminalArtifactKind);
+  const finalAnswerSource = readString(input.finalAnswerSource);
+  const fallback = readString(input.fallback);
+
+  const kindLabelByTerminalKind: Record<string, string> = {
+    direct_answer_text: "model direct answer",
+    doc_summary: "doc summary",
+    doc_open_receipt: "doc open receipt",
+    doc_location_matches: "docs location",
+    doc_location_result: "docs location",
+    doc_evidence_location: "docs location",
+    doc_search_results: "docs search",
+    workstation_tool_evaluation: "workstation tool evaluation",
+    workspace_action_receipt: "workspace action receipt",
+    note_update_receipt: "note update receipt",
+    calculator_receipt: "calculator receipt",
+    tool_evaluation: "tool evaluation",
+    live_pipeline_receipt: "live pipeline receipt",
+    live_environment_binding_diagnosis: "live environment diagnosis",
+    situation_context_pack: "situation context",
+    typed_failure: "typed failure",
+  };
+
+  if (terminalKind && kindLabelByTerminalKind[terminalKind]) {
+    return kindLabelByTerminalKind[terminalKind];
+  }
+
+  if (terminalKind && terminalKind !== "unknown") {
+    return terminalKind.replace(/_/g, " ");
+  }
+
+  if (finalAnswerSource) {
+    return finalAnswerSource.replace(/_/g, " ");
+  }
+
+  return fallback ? fallback.replace(/_/g, " ") : "unknown";
+}
+
+export function shouldShowHelixRuntimeStopReason(
+  input: HelixRuntimeStopReasonVisibilityInput,
+): boolean {
+  const stopReason = readString(input.stopReason);
+  if (!stopReason) return false;
+
+  const finalStatus = readString(input.finalStatus);
+  const terminalErrorCode = readString(input.terminalErrorCode);
+  const solverDecision = readString(input.solverDecision);
+  const terminalKind = readString(input.terminalKind);
+
+  if (
+    stopReason === "budget_exhausted" &&
+    !terminalErrorCode &&
+    terminalKind !== "typed_failure" &&
+    (finalStatus === "final_answer" || terminalKind === "final_answer") &&
+    solverDecision !== "fail_closed"
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 function isSourceOrCapabilityTurn(args: {
   record: RecordLike | null;
   debug: RecordLike | null;
@@ -90,6 +177,48 @@ function isSourceOrCapabilityTurn(args: {
   return false;
 }
 
+function hasSatisfiedDirectAnswerGoal(record: RecordLike | null, debug: RecordLike | null): boolean {
+  const goal = firstRecord(record?.goal_satisfaction_evaluation, debug?.goal_satisfaction_evaluation);
+  const satisfaction = readString(goal?.satisfaction);
+  const nextDecision = readString(goal?.next_decision);
+  if (satisfaction === "satisfied" && nextDecision === "allow_terminal") return true;
+
+  const runtime = firstRecord(record?.agent_runtime_loop, debug?.agent_runtime_loop);
+  const terminalState = readString(runtime?.terminal_state);
+  return terminalState === "answer_drafted" || terminalState === "terminal_satisfied";
+}
+
+function directAnswerTextFromArtifacts(...artifactContainers: unknown[]): string {
+  for (const container of artifactContainers) {
+    for (const artifact of readArray(container)) {
+      const artifactRecord = readRecord(artifact);
+      const artifactKind = readString(artifactRecord?.kind);
+      const payload = readRecord(artifactRecord?.payload);
+      const schema = readString(payload?.schema);
+      if (
+        artifactKind !== "direct_answer_text" &&
+        artifactKind !== "final_answer_draft" &&
+        schema !== "helix.direct_answer_text.v1" &&
+        schema !== "helix.final_answer_draft.v1"
+      ) {
+        continue;
+      }
+      const text = firstText(payload?.answer_text, payload?.text, artifactRecord?.text);
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
+function directAnswerTextFromRecord(record: RecordLike | null, debug: RecordLike | null): string {
+  const directAnswer = firstRecord(record?.direct_answer_text, debug?.direct_answer_text);
+  const finalDraft = firstRecord(record?.final_answer_draft, debug?.final_answer_draft);
+  return (
+    firstText(directAnswer?.answer_text, directAnswer?.text, finalDraft?.answer_text, finalDraft?.text) ||
+    directAnswerTextFromArtifacts(record?.current_turn_artifact_ledger, debug?.current_turn_artifact_ledger)
+  );
+}
+
 export function resolveHelixVisibleTerminal(
   value: unknown,
   fallbackContent?: string | null,
@@ -101,6 +230,8 @@ export function resolveHelixVisibleTerminal(
   const authority = firstRecord(record?.terminal_answer_authority, debug?.terminal_answer_authority, agentLoop?.terminal_answer_authority);
   const presentation = firstRecord(record?.terminal_presentation, debug?.terminal_presentation, agentLoop?.terminal_presentation);
   const summary = firstRecord(record?.resolved_turn_summary, debug?.resolved_turn_summary);
+  const recoveredModelDirectAnswer =
+    hasSatisfiedDirectAnswerGoal(record, debug) ? directAnswerTextFromRecord(record, debug) : "";
 
   const terminalErrorCode = firstText(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
   const terminalKind =
@@ -154,6 +285,19 @@ export function resolveHelixVisibleTerminal(
       finalAnswerSource,
       terminalErrorCode,
       authorityVerified: false,
+      usedLegacyShadow: false,
+    };
+  }
+
+  if (recoveredModelDirectAnswer) {
+    return {
+      text: recoveredModelDirectAnswer,
+      source: "model_direct_answer_artifact",
+      backendTerminalText: recoveredModelDirectAnswer,
+      terminalKind: terminalKind ?? "direct_answer_text",
+      finalAnswerSource: finalAnswerSource ?? "model_direct_answer",
+      terminalErrorCode,
+      authorityVerified: Boolean(authority?.server_authoritative === true),
       usedLegacyShadow: false,
     };
   }

@@ -117,6 +117,88 @@ describe("Helix Ask terminal authority contracts", () => {
     allTerminalSurfacesEqual(payload);
   });
 
+  it("clears stale failure metadata when a successful terminal becomes authoritative", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:stale-failure-success",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      terminal_error_code: "agent_loop_budget_exhausted",
+      terminal_failure_text: "The old loop budget failed.",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "agent_loop_budget_exhausted",
+        text: "The old loop budget failed.",
+      },
+      satisfaction_report: {
+        missing_reason: "agent_loop_budget_exhausted",
+      },
+      source_target_intent: {
+        target_source: "model_only",
+        target_kind: "general_background",
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+      },
+      agent_step_decision: {
+        decision_id: "decision:model-direct",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "decision:model-direct",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            decision_timing: "terminal_review",
+            decision_authority: "model",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["direct-answer-1", "final-draft-1"],
+          },
+        ],
+      },
+      direct_answer_text: {
+        schema: "helix.direct_answer_text.v1",
+        artifact_id: "direct-answer-1",
+        text: "An electron is a negatively charged elementary particle.",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "final-draft-1",
+        text: "An electron is a negatively charged elementary particle.",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "An electron is a negatively charged elementary particle.",
+      },
+      debug: {
+        terminal_error_code: "agent_loop_budget_exhausted",
+        typed_failure: { error_code: "agent_loop_budget_exhausted" },
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(payload.final_answer_source).toBe("model_direct_answer");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.terminal_failure_text).toBeUndefined();
+    expect(payload.typed_failure).toBeUndefined();
+    expect(payload.rejected_typed_failure).toMatchObject({
+      error_code: "agent_loop_budget_exhausted",
+      rejected_reason: "successful_terminal_authority_superseded_failure",
+    });
+    expect((payload.satisfaction_report as Record<string, unknown>).missing_reason).toBeNull();
+    expect((payload.debug as Record<string, unknown>).terminal_error_code).toBeUndefined();
+    expect((payload.debug as Record<string, unknown>).typed_failure).toBeUndefined();
+  });
+
   it("does not let stale presentation text override typed failure authority", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:typed-failure-stale-presentation",
@@ -352,5 +434,21 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(contract.source_target).toBe("docs_viewer");
     expect(contract.allowed_terminal_artifact_kinds).toContain("doc_summary");
     expect(contract.forbidden_terminal_artifact_kinds).not.toContain("doc_summary");
+  });
+
+  it("treats explicit Dottie manifest prompts as workstation panel product contracts", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:dottie-manifest",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: "Manifest Auntie Dottie as a witness-only observer preset for this room.",
+    });
+
+    expect(contract.source_target).toBe("workstation_panel");
+    expect(contract.allowed_terminal_artifact_kinds).toContain("workstation_tool_evaluation");
+    expect(contract.forbidden_terminal_artifact_kinds).not.toContain("workstation_tool_evaluation");
   });
 });

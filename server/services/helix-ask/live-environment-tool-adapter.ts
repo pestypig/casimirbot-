@@ -5,9 +5,18 @@ import {
   type HelixLiveEnvironmentToolObservation,
 } from "@shared/helix-live-agent-step";
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
+import type {
+  HelixLiveEnvironmentCommentaryKind,
+  HelixLiveEnvironmentCommentaryStatus,
+  HelixLiveEnvironmentCommentarySubject,
+} from "@shared/helix-live-environment-commentary";
 import { getActiveLiveAnswerEnvironmentForThread, getLiveAnswerEnvironment } from "../situation-room/live-answer-environment-store";
 import { queryEventWindow } from "../situation-room/event-window-query";
 import { appendInterpretedEvent, listInterpretedEvents } from "../situation-room/interpreted-event-log-store";
+import {
+  listLiveEnvironmentCommentary,
+  recordLiveEnvironmentCommentary,
+} from "../situation-room/live-environment-commentary-store";
 import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
@@ -108,6 +117,61 @@ const eventKind = (value: unknown): HelixInterpretedEventKind => {
   return "tool_trace";
 };
 
+const commentarySubject = (value: unknown): HelixLiveEnvironmentCommentarySubject => {
+  const raw = readString(value);
+  if (
+    raw === "dottie_observer" ||
+    raw === "minecraft_route" ||
+    raw === "source_health" ||
+    raw === "visual_source" ||
+    raw === "workstation_pipeline" ||
+    raw === "translation" ||
+    raw === "browser_audio" ||
+    raw === "terminal_authority"
+  ) {
+    return raw;
+  }
+  return "unknown";
+};
+
+const commentaryKind = (value: unknown): HelixLiveEnvironmentCommentaryKind => {
+  const raw = readString(value);
+  if (
+    raw === "observation" ||
+    raw === "prediction" ||
+    raw === "missing_evidence" ||
+    raw === "salience_candidate" ||
+    raw === "tool_trace" ||
+    raw === "field_evaluation" ||
+    raw === "terminal_ready" ||
+    raw === "terminal_blocked"
+  ) {
+    return raw;
+  }
+  const legacyKind = eventKind(value);
+  if (legacyKind === "clarification_need") return "missing_evidence";
+  if (legacyKind === "utility_hypothesis" || legacyKind === "pattern_candidate") return "salience_candidate";
+  if (legacyKind === "line_tool_evaluation" || legacyKind === "agentic_review") return "field_evaluation";
+  if (legacyKind === "final_answer_snapshot") return "terminal_ready";
+  return "observation";
+};
+
+const commentaryStatus = (value: unknown): HelixLiveEnvironmentCommentaryStatus => {
+  const raw = readString(value);
+  if (
+    raw === "candidate" ||
+    raw === "observed" ||
+    raw === "blocked" ||
+    raw === "satisfied" ||
+    raw === "needs_more_evidence" ||
+    raw === "policy_pending" ||
+    raw === "policy_approved"
+  ) {
+    return raw;
+  }
+  return "observed";
+};
+
 export function executeLiveEnvironmentTool(
   input: ExecuteLiveEnvironmentToolInput,
 ): HelixLiveEnvironmentToolObservation {
@@ -161,22 +225,41 @@ export function executeLiveEnvironmentTool(
       roomId,
       limit: readNumber(args.limit, 50),
     });
+    const typedCommentary = args.include_typed_commentary === true
+      ? listLiveEnvironmentCommentary({
+          threadId: input.thread_id,
+          roomId,
+          environmentId: input.environment_id,
+          subject: readString(args.commentary_subject),
+          kind: readString(args.commentary_kind),
+          limit: readNumber(args.limit, 50),
+        })
+      : [];
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
       ok: true,
-      summary: `Retrieved ${events.length} compact interpreted event(s).`,
+      summary: args.include_typed_commentary === true
+        ? `Retrieved ${events.length} compact interpreted event(s) and ${typedCommentary.length} typed commentary record(s).`
+        : `Retrieved ${events.length} compact interpreted event(s).`,
       observation: {
         schema: "helix.interpreted_log_read.v1",
         thread_id: input.thread_id,
         room_id: roomId,
         events,
+        interpreted_events: events,
+        typed_commentary: typedCommentary,
         raw_logs_included: false,
         deterministic_content_role: "evidence_not_assistant_answer",
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
         assistant_answer: false,
       },
-      evidenceRefs: events.flatMap((event) => [event.event_id, ...event.evidence_refs]),
+      evidenceRefs: [
+        ...events.flatMap((event) => [event.event_id, ...event.evidence_refs]),
+        ...typedCommentary.flatMap((commentary) => [commentary.commentary_id, ...commentary.evidence_refs]),
+      ],
     });
   }
 
@@ -241,13 +324,42 @@ export function executeLiveEnvironmentTool(
     });
   }
 
-  if (input.tool_name === "live_env.record_commentary" || input.tool_name === "live_env.request_probe") {
+  if (input.tool_name === "live_env.record_commentary") {
+    const commentary = recordLiveEnvironmentCommentary({
+      thread_id: input.thread_id,
+      room_id: roomId,
+      environment_id: input.environment_id,
+      subject: commentarySubject(args.subject),
+      kind: commentaryKind(args.kind),
+      status: commentaryStatus(args.status),
+      compact_summary: readString(args.summary) ?? readString(args.reason) ?? "Live environment evidence item recorded.",
+      evidence_refs: readStringArray(args.evidence_refs),
+      related_artifact_ids: readStringArray(args.related_artifact_ids),
+      related_worker_ids: readStringArray(args.related_worker_ids),
+      related_perturbation_ids: readStringArray(args.related_perturbation_ids),
+      missing_evidence: readStringArray(args.missing_evidence),
+      confidence: typeof args.confidence === "number" ? args.confidence : null,
+      model_invoked: args.model_invoked === true,
+      derived_by_deterministic_reducer: args.model_invoked !== true,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `${input.tool_name} recorded ${commentary.commentary_id}.`,
+      observation: commentary,
+      evidenceRefs: [commentary.commentary_id, ...commentary.evidence_refs],
+    });
+  }
+
+  if (input.tool_name === "live_env.request_probe") {
     const event = appendInterpretedEvent({
       thread_id: input.thread_id,
       room_id: roomId,
       source_family: "live_environment",
-      kind: input.tool_name === "live_env.record_commentary" ? eventKind(args.kind) : "tool_trace",
-      title: readString(args.title) ?? (input.tool_name === "live_env.request_probe" ? "Live probe requested" : "Live commentary"),
+      kind: "tool_trace",
+      title: readString(args.title) ?? "Live probe requested",
       summary: readString(args.summary) ?? readString(args.reason) ?? "Live environment evidence item recorded.",
       confidence: typeof args.confidence === "number" ? args.confidence : null,
       evidence_refs: readStringArray(args.evidence_refs),

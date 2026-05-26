@@ -343,15 +343,49 @@ export function buildCapabilityBindingMismatchObservation(
   }
   for (const iteration of iterations) {
     const selectedCapability = readString(iteration.chosen_capability);
-    if (!selectedCapability || selectedCapability === "model.direct_answer") continue;
-    const observedArtifacts = observedArtifactRefsForIteration(iteration)
+    if (!selectedCapability) continue;
+    const referencedArtifacts = observedArtifactRefsForIteration(iteration)
       .map((ref) => artifactById.get(ref) ?? null)
       .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+    const observedArtifacts =
+      selectedCapability === "model.direct_answer" && referencedArtifacts.length === 0
+        ? artifacts.filter((artifact) => {
+          const sourceScope = readString(artifact.source_scope);
+          if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;
+          const family = capabilityFamilyForArtifact(artifact);
+          return Boolean(
+            family &&
+              /^docs-viewer\.|^situation-room-pipelines\.(?:dottie|observer|voice_delivery)/i.test(family),
+          );
+        })
+        : referencedArtifacts;
     if (observedArtifacts.length === 0) continue;
+    const observedFamilies = Array.from(new Set(observedArtifacts.map(capabilityFamilyForArtifact).filter((entry): entry is string => Boolean(entry))));
+    if (
+      selectedCapability === "model.direct_answer" &&
+      observedFamilies.some((family) =>
+        /^docs-viewer\.|^situation-room-pipelines\.(?:dottie|observer|voice_delivery)/i.test(family),
+      )
+    ) {
+      const suggestedCapability = observedFamilies[0] ?? null;
+      const observedRefs = observedArtifacts.map((artifact) => readString(artifact.artifact_id)).filter((entry): entry is string => Boolean(entry));
+      const observedKinds = Array.from(new Set(observedArtifacts.map((artifact) => readString(artifact.kind)).filter((entry): entry is string => Boolean(entry))));
+      return {
+        schema: "helix.capability_binding_mismatch_observation.v1",
+        selected_capability: selectedCapability,
+        observed_artifact_refs: observedRefs,
+        observed_artifact_kinds: observedKinds,
+        observed_capability_families: observedFamilies,
+        suggested_capability: suggestedCapability,
+        suggested_repair: "rebind_model_direct_answer_to_observed_tool_family",
+        repair_reason: `Model-direct answer was selected, but current-turn observations belong to ${suggestedCapability}; expose this so the model can repair, retry, ask the user, or fail closed before terminal failure.`,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     if (observedArtifacts.some((artifact) => artifactLinkedToIteration(artifact, iteration) && artifactKindMatchesCapability(selectedCapability, artifact))) {
       continue;
     }
-    const observedFamilies = Array.from(new Set(observedArtifacts.map(capabilityFamilyForArtifact).filter((entry): entry is string => Boolean(entry))));
     if (observedFamilies.length === 0) continue;
     const suggestedCapability = observedFamilies.find((family) => family !== selectedCapability) ?? null;
     if (!suggestedCapability) continue;

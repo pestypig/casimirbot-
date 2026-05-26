@@ -173,6 +173,12 @@ const isNoteMutationPrompt = (promptText: string): boolean =>
   /\b(?:create|append|add|write|save|store|copy)\b[\s\S]{0,120}\b(?:note|workstation\s+notes?)\b/i.test(promptText) ||
   /\b(?:note|workstation\s+notes?)\b[\s\S]{0,120}\b(?:create|append|add|write|save|store|copy)\b/i.test(promptText);
 
+const isSituationRoomDottieActionPrompt = (promptText: string): boolean =>
+  /\b(?:manifest|materiali[sz]e|create|start|set\s+up|build|attach|query|watch|witness)\b[\s\S]{0,140}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(promptText) ||
+  /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,140}\b(?:manifest|materiali[sz]e|preset|attach|query|watch|witness|propose|speak)\b/i.test(promptText) ||
+  /\bsituation-room-pipelines\.(?:dottie|observer|voice_delivery)\./i.test(promptText) ||
+  /\b(?:dottie\.manifest|observer\.(?:attach|detach|query)|voice_delivery\.propose_from_trace)\b/i.test(promptText);
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -184,7 +190,9 @@ export function buildRouteProductContract(input: {
     ? "docs_viewer"
     : isActiveDocSummaryPrompt(promptText)
       ? "active_doc"
-      : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
+      : isSituationRoomDottieActionPrompt(promptText)
+        ? "workstation_panel"
+        : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
   const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
   const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
     ? sourceTargetRecord.requested_outputs

@@ -571,18 +571,18 @@ function extractDottieSourceText(prompt: string): string | null {
 function isDottieObserverToolPrompt(prompt: string): boolean {
   const mentionsDottie =
     /\b(?:auntie\s+dottie|dottie)\b/i.test(prompt) ||
-    /\bsituation-room-pipelines\.(?:observer|voice_delivery)\./i.test(prompt) ||
-    /\b(?:observer\.attach|observer\.detach|observer\.query|voice_delivery\.propose_from_trace)\b/i.test(prompt);
+    /\bsituation-room-pipelines\.(?:observer|voice_delivery|dottie)\./i.test(prompt) ||
+    /\b(?:dottie\.manifest|observer\.attach|observer\.detach|observer\.query|voice_delivery\.propose_from_trace)\b/i.test(prompt);
   if (!mentionsDottie) return false;
   const affirmativeCommand =
     /\boperator\s+command\b/i.test(prompt) ||
     /\brun\s+panel\s+action\b/i.test(prompt) ||
-    /\b(?:attach|detach|query|show|list|propose|prepare|create|add|set\s+up|start)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(prompt) ||
-    /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:attach|detach|query|show|list|propose|prepare|create|add|watch|witness)\b/i.test(prompt);
+    /\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|set\s+up|start|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(prompt) ||
+    /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|watch|witness|preset)\b/i.test(prompt);
   if (!affirmativeCommand) return false;
   const negatedCommand =
-    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to)\s+(?:attach|detach|query|show|list|propose|prepare|create|add|run)\b/i.test(prompt) ||
-    /\b(?:should|could|would)\s+(?:we|you)\b[\s\S]{0,80}\b(?:attach|propose|run)\b/i.test(prompt);
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to)\s+(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|run)\b/i.test(prompt) ||
+    /\b(?:should|could|would)\s+(?:we|you)\b[\s\S]{0,80}\b(?:manifest|attach|propose|run)\b/i.test(prompt);
   return !negatedCommand;
 }
 
@@ -651,14 +651,17 @@ export function planWorkstationToolUse(
     const observerProfile = extractDottieObserverProfile(normalized);
     const voiceMode = extractDottieVoiceMode(normalized);
     const maxChars = extractDottieMaxChars(normalized);
+    const wantsManifest =
+      /\b(?:dottie\.manifest|manifest|materiali[sz]e|create|start|set\s+up|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie)\b/i.test(normalized) ||
+      /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|preset)\b/i.test(normalized);
     const wantsAttach = /\b(?:observer\.attach|attach|watch|witness|set\s+up|start|add)\b/i.test(normalized);
     const wantsVoiceProposal = /\b(?:voice_delivery\.propose_from_trace|voice\s+delivery|propose|prepare|callout|speak)\b/i.test(normalized);
     const wantsQuery =
       /\b(?:observer\.query|query|show|list)\b/i.test(normalized) ||
       /\bthen\s+(?:query|show|list)\b/i.test(normalized);
     const missing = Array.from(new Set([
-      ...(wantsAttach && !targetRunId ? ["target_run_id"] : []),
-      ...(wantsVoiceProposal && !sourceEventId ? ["source_event_id"] : []),
+      ...(!wantsManifest && wantsAttach && !targetRunId ? ["target_run_id"] : []),
+      ...(!wantsManifest && wantsVoiceProposal && !sourceEventId ? ["source_event_id"] : []),
     ]));
     const observerArgs = {
       ...(targetRunId ? { target_run_id: targetRunId } : {}),
@@ -680,7 +683,31 @@ export function planWorkstationToolUse(
     };
     const steps: HelixWorkstationToolPlanStep[] = [makeOpenStep("situation-room-pipelines")];
     let primaryAction: WorkstationToolPlannerAction | null = null;
-    if (wantsAttach || !wantsVoiceProposal) {
+    if (wantsManifest) {
+      const manifestArgs = {
+        thread_id: options.threadId ?? "helix-ask:desktop",
+        observer_profile: observerProfile,
+        voice_mode: voiceMode,
+        ...(targetRunId ? { target_run_id: targetRunId } : {}),
+        ...(targetTurnId ? { target_turn_id: targetTurnId } : {}),
+        ...(maxChars ? { max_chars: maxChars } : {}),
+        objective: "Manifest Auntie Dottie as a witness-only Situation Room observer preset.",
+      };
+      const manifestStep: HelixWorkstationToolPlanStep = {
+        step_id: "manifest_dottie_observer",
+        kind: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "dottie.manifest",
+        args: manifestArgs,
+        depends_on: ["open_situation_room_pipelines"],
+        expected_receipt_kind: "dottie_manifest_preset_receipt",
+        expected_state_change: { store: "situation-room-runtime", proof_key: "preset_id" },
+        required: true,
+      };
+      steps.push(manifestStep);
+      primaryAction = { panel_id: manifestStep.panel_id ?? "", action_id: manifestStep.action_id ?? "", args: manifestArgs };
+    }
+    if (!wantsManifest && (wantsAttach || !wantsVoiceProposal)) {
       const attachStep: HelixWorkstationToolPlanStep = {
         step_id: "attach_dottie_observer",
         kind: "run_panel_action",
@@ -742,12 +769,16 @@ export function planWorkstationToolUse(
       required: true,
     });
     pushScore({
-      affordance_id: "situation-room-pipelines.observer.attach",
+      affordance_id: wantsManifest
+        ? "situation-room-pipelines.dottie.manifest"
+        : "situation-room-pipelines.observer.attach",
       panel_id: "situation-room-pipelines",
-      action_id: "observer.attach",
+      action_id: wantsManifest ? "dottie.manifest" : "observer.attach",
       score: missing.length === 0 ? 0.94 : 0.64,
       reason: missing.length === 0
-        ? "explicit Dottie observer command includes required public trace targets"
+        ? wantsManifest
+          ? "explicit Dottie manifest command can create the witness-only preset"
+          : "explicit Dottie observer command includes required public trace targets"
         : "explicit Dottie observer command is missing required target/source arguments",
       required_args_missing: missing,
     });

@@ -61,7 +61,11 @@ import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
-import { resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore } from "@/lib/helix/resolveHelixVisibleTerminal";
+import {
+  formatHelixVisibleTerminalSourceLabel,
+  resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
+  shouldShowHelixRuntimeStopReason,
+} from "@/lib/helix/resolveHelixVisibleTerminal";
 import {
   adoptServerVisualProducerPolicies,
   getActiveVisualFrameStream,
@@ -207,6 +211,7 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 
 const HELIX_ASK_TURN_EXPANSION_STORAGE_KEY = "helix.ask.turnExpansion.v1";
+const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
 
@@ -214,10 +219,10 @@ export function resolveInitialMicArmState(persisted: string | null | undefined):
   return persisted === "off" ? "off" : "on";
 }
 
-function readStoredHelixAskTurnExpansion(): Record<string, boolean> {
+function readStoredHelixAskExpansionState(storageKey: string): Record<string, boolean> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
@@ -227,6 +232,14 @@ function readStoredHelixAskTurnExpansion(): Record<string, boolean> {
   } catch {
     return {};
   }
+}
+
+function readStoredHelixAskTurnExpansion(): Record<string, boolean> {
+  return readStoredHelixAskExpansionState(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY);
+}
+
+function readStoredHelixAskAnswerExpansion(): Record<string, boolean> {
+  return readStoredHelixAskExpansionState(HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY);
 }
 
 export function transitionReadAloudState(
@@ -6902,7 +6915,10 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
     primary_route_label: routeLabel,
     primary_terminal_label: normalizedStatus,
-    primary_source_label: finalAnswerSource.replace(/_/g, " "),
+    primary_source_label: formatHelixVisibleTerminalSourceLabel({
+      terminalArtifactKind,
+      finalAnswerSource,
+    }),
     selected_final_answer: selectedFinalAnswer,
     terminal_error_code: terminalErrorCode,
     pending_server_request_present: pendingPresent,
@@ -6936,24 +6952,53 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
     if (!record) continue;
-    const direct =
+    const directSource =
       typeof record.final_answer_source === "string" && record.final_answer_source.trim()
         ? record.final_answer_source.trim()
         : null;
-    if (direct) return direct.replace(/_/g, " ");
+    const directTerminalKind =
+      typeof record.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
+        ? record.terminal_artifact_kind.trim()
+        : null;
+    if (directSource || directTerminalKind) {
+      return formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: directTerminalKind,
+        finalAnswerSource: directSource,
+      });
+    }
     const truthTable = readAgentLoopAuditRecord(record.turn_truth_table);
     const truthTerminal = readAgentLoopAuditRecord(truthTable?.terminal);
     const truthSource =
       typeof truthTerminal?.final_answer_source === "string" && truthTerminal.final_answer_source.trim()
         ? truthTerminal.final_answer_source.trim()
         : null;
-    if (truthSource) return truthSource.replace(/_/g, " ");
+    const truthTerminalKind =
+      typeof truthTerminal?.kind === "string" && truthTerminal.kind.trim()
+        ? truthTerminal.kind.trim()
+        : typeof truthTerminal?.terminal_artifact_kind === "string" && truthTerminal.terminal_artifact_kind.trim()
+          ? truthTerminal.terminal_artifact_kind.trim()
+          : null;
+    if (truthSource || truthTerminalKind) {
+      return formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: truthTerminalKind,
+        finalAnswerSource: truthSource,
+      });
+    }
     const audit = readAgentLoopAuditRecord(record.agent_loop_audit);
     const auditSource =
       typeof audit?.final_answer_source === "string" && audit.final_answer_source.trim()
         ? audit.final_answer_source.trim()
         : null;
-    if (auditSource) return auditSource.replace(/_/g, " ");
+    const auditTerminalKind =
+      typeof audit?.terminal_artifact_kind === "string" && audit.terminal_artifact_kind.trim()
+        ? audit.terminal_artifact_kind.trim()
+        : null;
+    if (auditSource || auditTerminalKind) {
+      return formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: auditTerminalKind,
+        finalAnswerSource: auditSource,
+      });
+    }
   }
   return null;
 }
@@ -7147,6 +7192,11 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
   const selectedTool = readAgentLoopAuditRecord(truthTable?.selected_tool ?? agentLoopAudit?.selected_action);
   const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
   const route = visibleResolvedTurn.primary_route_label;
+  const solverController = readAgentLoopAuditRecord(
+    replyRecord?.solver_controller_decision ?? reply.debug?.solver_controller_decision,
+  );
+  const runtimeStopReason =
+    typeof agentRuntimeLoop?.stop_reason === "string" ? agentRuntimeLoop.stop_reason.trim() : "";
   const visibleAnswer = typeof truthTable?.visible_answer_text === "string" ? truthTable.visible_answer_text : reply.content;
   const terminalText = typeof terminal?.text === "string" ? terminal.text : "";
   const parityMatchesVisible =
@@ -7167,6 +7217,13 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
     terminal,
     fallback: "final_answer",
     extraSources: [truthTable, runtimeSummary, agentLoopAudit],
+  });
+  const showRuntimeStopReason = shouldShowHelixRuntimeStopReason({
+    stopReason: runtimeStopReason,
+    finalStatus: replyRecord?.final_status ?? reply.debug?.final_status,
+    terminalErrorCode: visibleResolvedTurn.terminal_error_code,
+    solverDecision: solverController?.decision,
+    terminalKind: visibleTerminalKind,
   });
 
   if (!truthTable && runtimeIterations.length === 0 && planItems.length === 0 && observations.length === 0 && !terminal) {
@@ -7293,7 +7350,7 @@ function renderProceduralTurnTimeline(reply: HelixAskReply): React.ReactNode {
           : selectedTool
             ? ` | Tool: ${readProceduralActionLabel(selectedTool)}`
             : ""}
-        {typeof agentRuntimeLoop?.stop_reason === "string" ? ` | Runtime: ${agentRuntimeLoop.stop_reason}` : ""}
+        {showRuntimeStopReason ? ` | Runtime: ${runtimeStopReason}` : ""}
       </p>
       <div className="mt-2 space-y-1.5">
         {rows.slice(0, 18).map((row, index) => (
@@ -13948,19 +14005,12 @@ export function HelixAskPill({
     () => resolveVoiceNoiseHandlingProfile(voiceNoisyEnvironmentMode),
     [voiceNoisyEnvironmentMode],
   );
-  const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
+  const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>(
+    () => readStoredHelixAskAnswerExpansion(),
+  );
   const [askTurnExpandedByReply, setAskTurnExpandedByReply] = useState<Record<string, boolean>>(
     () => readStoredHelixAskTurnExpansion(),
   );
-
-  useEffect(() => {
-    if (!latestAskReplyId) return;
-    setAskExpandedByReply((prev) =>
-      Object.prototype.hasOwnProperty.call(prev, latestAskReplyId)
-        ? prev
-        : { ...prev, [latestAskReplyId]: true },
-    );
-  }, [latestAskReplyId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -13975,6 +14025,20 @@ export function HelixAskPill({
       // Ignore storage failures; expansion controls should still work for the session.
     }
   }, [askReplies, askTurnExpandedByReply]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (askReplies.length === 0) return;
+    try {
+      const liveIds = new Set(askReplies.map((reply) => reply.id));
+      const pruned = Object.fromEntries(
+        Object.entries(askExpandedByReply).filter(([replyId]) => liveIds.has(replyId)),
+      );
+      window.localStorage.setItem(HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY, JSON.stringify(pruned));
+    } catch {
+      // Ignore storage failures; expansion controls should still work for the session.
+    }
+  }, [askReplies, askExpandedByReply]);
 
   useEffect(() => {
     pendingWorkstationUserInputRef.current = pendingWorkstationUserInput;
@@ -15921,7 +15985,7 @@ export function HelixAskPill({
       const extensionCitations = normalizeCitations(extension?.citations);
       const extensionAvailable = Boolean(extension?.available && extensionBody);
       const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
-      const expanded = Boolean(askExpandedByReply[reply.id]);
+      const expanded = askExpandedByReply[reply.id] ?? reply.id === latestAskReplyId;
       const answerText = clipForDisplay(
         coerceText(envelopeAnswer || fallbackAnswer),
         HELIX_ASK_MAX_RENDER_CHARS,
@@ -16028,6 +16092,7 @@ export function HelixAskPill({
     [
       askExpandedByReply,
       askExtensionOpenByReply,
+      latestAskReplyId,
       openPanelById,
       renderEnvelopeSections,
       renderHelixAskFinalAnswerContent,
@@ -29805,30 +29870,46 @@ export function HelixAskPill({
             <div className="flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   setAskTurnExpandedByReply((prev) => {
                     const next = { ...prev };
                     askReplies.forEach((reply) => {
                       next[reply.id] = true;
                     });
                     return next;
-                  })
-                }
+                  });
+                  setAskExpandedByReply((prev) => {
+                    const next = { ...prev };
+                    askReplies.forEach((reply) => {
+                      next[reply.id] = true;
+                    });
+                    return next;
+                  });
+                }}
                 className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100 transition hover:bg-cyan-400/20"
               >
                 Expand all
               </button>
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   setAskTurnExpandedByReply((prev) => {
                     const next = { ...prev };
                     askReplies.forEach((reply) => {
+                      if (reply.id === latestAskReplyId) return;
                       next[reply.id] = false;
                     });
                     return next;
-                  })
-                }
+                  });
+                  setAskExpandedByReply((prev) => {
+                    const next = { ...prev };
+                    askReplies.forEach((reply) => {
+                      if (reply.id === latestAskReplyId) return;
+                      next[reply.id] = false;
+                    });
+                    return next;
+                  });
+                }}
                 className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
               >
                 Collapse previous
@@ -29954,7 +30035,8 @@ export function HelixAskPill({
               : [];
             const proceduralTurnTimeline = renderProceduralTurnTimeline(reply);
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
-            const expanded = Boolean(askExpandedByReply[reply.id]);
+            const isLatestReply = reply.id === latestAskReplyId;
+            const expanded = askExpandedByReply[reply.id] ?? isLatestReply;
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
             const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
               reply,
@@ -29995,7 +30077,6 @@ export function HelixAskPill({
                 canceledPendingTurn ||
                 String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
             );
-            const isLatestReply = reply.id === latestAskReplyId;
             const turnExpanded = Boolean(askTurnExpandedByReply[reply.id]);
             const shouldRenderLiveSituationProjection =
               Boolean(liveSituationArtifact) ||

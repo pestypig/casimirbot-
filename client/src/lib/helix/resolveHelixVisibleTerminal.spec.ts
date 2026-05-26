@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveHelixVisibleTerminal } from "./resolveHelixVisibleTerminal";
+import {
+  formatHelixVisibleTerminalSourceLabel,
+  resolveHelixVisibleTerminal,
+  shouldShowHelixRuntimeStopReason,
+} from "./resolveHelixVisibleTerminal";
 
 describe("resolveHelixVisibleTerminal", () => {
   it("prefers terminal envelope text over stale legacy fields", () => {
@@ -51,5 +55,85 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.text).toBe("plain model-only answer");
     expect(terminal.source).toBe("legacy_shadow");
     expect(terminal.usedLegacyShadow).toBe(true);
+  });
+
+  it("recovers a satisfied model-direct answer artifact from stale placeholder failure text", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "direct_answer_unavailable",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      direct_answer_text: {
+        schema: "helix.direct_answer_text.v1",
+        text: "An electron is a negatively charged elementary particle.",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        text: "An electron is a negatively charged elementary particle.",
+      },
+    });
+
+    expect(terminal.text).toBe("An electron is a negatively charged elementary particle.");
+    expect(terminal.source).toBe("model_direct_answer_artifact");
+    expect(terminal.usedLegacyShadow).toBe(false);
+  });
+});
+
+describe("formatHelixVisibleTerminalSourceLabel", () => {
+  it("labels source-backed doc summaries by terminal product instead of model source", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "doc_summary",
+        finalAnswerSource: "model_direct_answer",
+      }),
+    ).toBe("doc summary");
+  });
+
+  it("keeps true model-direct answers labeled as model direct", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "direct_answer_text",
+        finalAnswerSource: "model_direct_answer",
+      }),
+    ).toBe("model direct answer");
+  });
+});
+
+describe("shouldShowHelixRuntimeStopReason", () => {
+  it("hides exhausted budget labels when the terminal was successful", () => {
+    expect(
+      shouldShowHelixRuntimeStopReason({
+        stopReason: "budget_exhausted",
+        finalStatus: "final_answer",
+        solverDecision: "allow_terminal",
+        terminalKind: "doc_summary",
+      }),
+    ).toBe(false);
+  });
+
+  it("hides exhausted budget labels when final status is absent but terminal kind is final answer", () => {
+    expect(
+      shouldShowHelixRuntimeStopReason({
+        stopReason: "budget_exhausted",
+        solverDecision: "allow_terminal",
+        terminalKind: "final_answer",
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps exhausted budget labels when a terminal error remains", () => {
+    expect(
+      shouldShowHelixRuntimeStopReason({
+        stopReason: "budget_exhausted",
+        finalStatus: "final_answer",
+        terminalErrorCode: "selected_capability_observation_missing",
+        solverDecision: "fail_closed",
+        terminalKind: "typed_failure",
+      }),
+    ).toBe(true);
   });
 });
