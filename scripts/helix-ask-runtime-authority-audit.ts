@@ -46,7 +46,7 @@ const approvedAuditFiles = new Set([
 ]);
 
 const readOnlyDiagnosticFilePattern =
-  /(?:^scripts\/|(?:^|\/)(?:api-parity-matrix|api-parity-probe|ask-context-poison-audit|product-authority-guard|route-authority-audit|solver-artifact-reentry-audit|terminal-artifact-selection-guard|terminal-equivalence-harness|terminal-presentation-coverage-audit|universal-terminal-presenter)\.ts$)/;
+  /(?:^scripts\/|(?:^|\/)(?:api-parity-matrix|api-parity-probe|ask-context-poison-audit|ask-turn-solver|loop-parity-trace|objective-loop-debug|product-authority-guard|route-authority-audit|situation-context-turn-router|solver-artifact-reentry-audit|terminal-artifact-selection-guard|terminal-equivalence-harness|terminal-presentation-coverage-audit|universal-terminal-presenter)\.ts$)/;
 
 function normalizePath(value: string): string {
   return value.replace(/\\/g, "/");
