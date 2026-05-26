@@ -17,5 +17,8 @@ describe("layoutTheoryAchievementMap", () => {
     expect(node("physics.relativity.rest_energy")?.x).toBeLessThan(
       node("nhm2.qei.sampling_window")?.x ?? 0,
     );
+    expect(node("solar.spectrum.photon_energy")?.lane).toBeGreaterThanOrEqual(2);
+    expect(node("solar.spectrum.photon_energy")?.lane).toBeLessThan(10);
+    expect(node("solar.claim_boundary.observational_proxy")?.lane).toBeGreaterThanOrEqual(10);
   });
 });

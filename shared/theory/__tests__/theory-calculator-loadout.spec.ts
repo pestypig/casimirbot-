@@ -31,4 +31,36 @@ describe("theory calculator loadout builder", () => {
     expect(loadout.items.some((item) => item.kind === "runtime_context")).toBe(true);
     expect(loadout.claimBoundaryNotes.some((note) => note.includes("diagnostic-only"))).toBe(true);
   });
+
+  it("builds locator-matched solar atlas rows with explicit bindings", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: [],
+      mode: "locator_matches",
+      atlasBlockId: "solar_surface_spectrum",
+      query: "H-alpha photon energy Doppler shift",
+      variableBindings: {
+        h: "6.62607015e-34",
+        c: 299792458,
+        lambda: "656.28e-9",
+        lambda0: "656.28e-9",
+        lambda_obs: "656.35e-9",
+      },
+      includeContextItems: false,
+    });
+
+    expect(isTheoryCalculatorLoadoutV1(loadout)).toBe(true);
+    expect(loadout.mode).toBe("locator_matches");
+    expect(loadout.items.map((item) => item.badgeId)).toEqual(
+      expect.arrayContaining([
+        "solar.spectrum.photon_energy",
+        "solar.spectrum.doppler_shift",
+        "solar.spectrum.radial_velocity_proxy",
+      ]),
+    );
+    expect(loadout.items.some((item) => item.solveExpression === "E = 6.62607015e-34*299792458/656.28e-9")).toBe(true);
+    expect(loadout.items.some((item) => item.solveExpression === "z = (656.35e-9 - 656.28e-9)/656.28e-9")).toBe(true);
+    expect(loadout.summary.solvedCount).toBe(0);
+  });
 });

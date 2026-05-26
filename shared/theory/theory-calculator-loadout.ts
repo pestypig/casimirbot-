@@ -6,12 +6,15 @@ import {
   type TheoryCalculatorLoadoutV1,
   type TheoryCalculatorObjectContextV1,
 } from "../contracts/theory-calculator-loadout.v1";
+import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "../contracts/physics-atlas.v1";
 import type {
   TheoryBadgeCalculatorPayloadV1,
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
+import { buildHelixPhysicsAtlasV1 } from "./physics-atlas-blocks";
+import { locateTheoryBadges } from "./theory-badge-overlap-locator";
 
 const EXECUTABLE_RELATIONS = new Set([
   "derives",
@@ -102,6 +105,108 @@ function resolveDependencyOrder(graph: TheoryBadgeGraphV1, targetBadgeIds: strin
   return ordered;
 }
 
+const QUERY_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "from",
+  "in",
+  "of",
+  "the",
+  "to",
+  "with",
+]);
+
+function tokenizeQuery(value: string | undefined): string[] {
+  return unique(
+    (value ?? "")
+      .toLowerCase()
+      .split(/[^a-z0-9_./^-]+/i)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 && !QUERY_STOP_WORDS.has(token)),
+  );
+}
+
+function badgeSearchText(badge: TheoryBadgeV1): string {
+  return [
+    badge.id,
+    badge.title,
+    badge.plainMeaning,
+    badge.whyItMatters,
+    ...badge.subjects,
+    ...badge.tags,
+    ...badge.simulationOwners,
+    ...badge.equationFamilies,
+    ...badge.hintKeys.subjects,
+    ...badge.hintKeys.symbols,
+    ...badge.hintKeys.equationFamilies,
+    ...badge.hintKeys.simulationOwners,
+    ...badge.equations.flatMap((equation) => [
+      equation.id,
+      equation.displayLatex,
+      equation.computableExpression ?? "",
+      equation.operatorKind ?? "",
+      ...equation.inputSymbols,
+      ...equation.outputSymbols,
+    ]),
+    ...badge.calculatorPayloads.flatMap((payload) => [
+      payload.id,
+      payload.expression,
+      payload.displayLatex,
+      payload.targetVariable ?? "",
+    ]),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function matchesQueryTokens(badge: TheoryBadgeV1, queryTokens: string[]): boolean {
+  if (queryTokens.length === 0) return true;
+  const text = badgeSearchText(badge);
+  return queryTokens.some((token) => text.includes(token));
+}
+
+function resolveLocatorMatchedBadgeIds(args: {
+  graph: TheoryBadgeGraphV1;
+  query?: string;
+  atlasBlockId?: PhysicsAtlasBlockId;
+  seedBadgeIds: string[];
+}): string[] {
+  const badgesById = new Map(args.graph.badges.map((badge) => [badge.id, badge]));
+  const atlas = buildHelixPhysicsAtlasV1({ graph: args.graph });
+  const atlasBlock = args.atlasBlockId
+    ? atlas.blocks.find((block: PhysicsAtlasBlockV1) => block.id === args.atlasBlockId)
+    : null;
+  const queryTokens = tokenizeQuery(args.query);
+  const locatedBadgeIds = locateTheoryBadges({
+    graph: args.graph,
+    input: {
+      query: args.query,
+      atlasBlockIds: args.atlasBlockId ? [args.atlasBlockId] : undefined,
+      limit: 24,
+    },
+  }).map((match) => match.badgeId);
+  const seedBadgeIds = unique([
+    ...args.seedBadgeIds,
+    ...(atlasBlock?.primaryBadgeIds ?? []),
+    ...locatedBadgeIds,
+  ]).filter((badgeId) => badgesById.has(badgeId));
+  const atlasOrder = new Map((atlasBlock?.primaryBadgeIds ?? []).map((badgeId, index) => [badgeId, index]));
+
+  return seedBadgeIds
+    .filter((badgeId) => {
+      const badge = badgesById.get(badgeId);
+      return Boolean(badge?.calculatorPayloads.length) && (!badge || matchesQueryTokens(badge, queryTokens));
+    })
+    .sort((left, right) => {
+      const leftOrder = atlasOrder.get(left) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = atlasOrder.get(right) ?? Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return seedBadgeIds.indexOf(left) - seedBadgeIds.indexOf(right);
+    });
+}
+
 function contextKindForBadge(badge: TheoryBadgeV1): TheoryCalculatorLoadoutItemKind {
   if (badge.level === "claim_boundary") return "claim_boundary";
   if (badge.equations.some((equation) => equation.operatorKind === "gate_status")) return "runtime_context";
@@ -134,9 +239,12 @@ function withSetupBindings(
 export function buildTheoryCalculatorLoadout(args: {
   graph: TheoryBadgeGraphV1;
   badgeIds: string[];
-  mode?: "selected_badges" | "dependency_path";
+  mode?: "selected_badges" | "dependency_path" | "locator_matches";
   source?: TheoryCalculatorLoadoutSource;
   objectContext?: TheoryCalculatorObjectContextV1 | null;
+  variableBindings?: Record<string, string | number>;
+  query?: string;
+  atlasBlockId?: PhysicsAtlasBlockId;
   includeContextItems?: boolean;
   payloadIdsByBadgeId?: Record<string, string[]>;
 }): TheoryCalculatorLoadoutV1 {
@@ -146,11 +254,21 @@ export function buildTheoryCalculatorLoadout(args: {
   const orderedBadgeIds =
     mode === "dependency_path"
       ? resolveDependencyOrder(args.graph, args.badgeIds)
+      : mode === "locator_matches"
+        ? resolveLocatorMatchedBadgeIds({
+            graph: args.graph,
+            query: args.query,
+            atlasBlockId: args.atlasBlockId,
+            seedBadgeIds: args.badgeIds,
+          })
       : unique(args.badgeIds).filter((badgeId) => badgesById.has(badgeId));
   const items: TheoryCalculatorLoadoutItemV1[] = [];
   const claimBoundaryNotes: string[] = [];
   const objectContext = args.objectContext ?? null;
-  const bindings = objectContext?.variableBindings ?? {};
+  const bindings = {
+    ...(objectContext?.variableBindings ?? {}),
+    ...(args.variableBindings ?? {}),
+  };
   const loadoutId = `theory-loadout:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 7)}`;
 
   for (const badgeId of orderedBadgeIds) {
@@ -219,7 +337,7 @@ export function buildTheoryCalculatorLoadout(args: {
     graphId: args.graph.graphId,
     source,
     mode,
-    targetBadgeIds: args.badgeIds,
+    targetBadgeIds: mode === "locator_matches" ? orderedBadgeIds : args.badgeIds,
     objectContext,
     items: items.map((item, index) => ({ ...item, index: index + 1 })),
     claimBoundaryNotes: [

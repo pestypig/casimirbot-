@@ -4,6 +4,8 @@ import type {
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
+import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "@shared/contracts/physics-atlas.v1";
+import { PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import {
   layoutTheoryAchievementMap,
   type TheoryAchievementLayoutEdge,
@@ -21,6 +23,7 @@ type TheoryAchievementMapProps = {
   failedBadgeIds: string[];
   rippleBadgeIds: string[];
   heatByBadgeId: Record<string, number>;
+  activeAtlasLensId: PhysicsAtlasBlockId | null;
   onSelectBadge: (badgeId: string) => void;
   onToggleBadgeSelection: (badgeId: string) => void;
   onRunPath: (badgeId: string) => void;
@@ -32,7 +35,45 @@ type TheoryAchievementMapProps = {
   onViewportChange: (viewport: { scrollLeft: number; scrollTop: number }) => void;
 };
 
+const ATLAS_GLOW_COLORS: Record<PhysicsAtlasBlockId, string> = {
+  stellar_evolution: "rgba(192, 38, 211, 0.72)",
+  cosmic_distance_ladder: "rgba(217, 119, 6, 0.72)",
+  solar_surface_spectrum: "rgba(234, 179, 8, 0.76)",
+  casimir_cavity_modes: "rgba(6, 182, 212, 0.72)",
+  warp_gr_nhm2: "rgba(124, 58, 237, 0.72)",
+  qei_stress_energy: "rgba(148, 163, 184, 0.72)",
+  tokamak_plasma: "rgba(249, 115, 22, 0.72)",
+  galactic_dynamics: "rgba(14, 165, 233, 0.72)",
+  curvature_collapse: "rgba(16, 185, 129, 0.72)",
+};
+
+function badgeAtlasBlockId(badge: TheoryBadgeV1): PhysicsAtlasBlockId | null {
+  const direct = PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) =>
+    block.primaryBadgeIds.includes(badge.id) || block.claimBoundaryBadgeIds.includes(badge.id),
+  );
+  if (direct) return direct.id;
+  const badgeTokens = new Set([
+    ...badge.subjects,
+    ...badge.tags,
+    ...badge.simulationOwners,
+    ...badge.equationFamilies,
+    ...badge.hintKeys.subjects,
+    ...badge.hintKeys.simulationOwners,
+    ...badge.hintKeys.equationFamilies,
+  ]);
+  return (
+    PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) =>
+      [...block.subjects, ...block.simulationOwners, ...block.equationFamilies].some((token) => badgeTokens.has(token)),
+    )?.id ?? null
+  );
+}
+
 function badgeGlyph(badge: TheoryBadgeV1): string {
+  if (badge.id.includes("halpha") || badge.subjects.includes("halpha")) return "Hα";
+  if (badge.subjects.includes("zeeman") || badge.subjects.includes("magnetism") || badge.id.includes("zeeman")) return "B";
+  if (badge.subjects.includes("doppler") || badge.subjects.includes("redshift")) return "z";
+  if (badge.subjects.includes("spectrum") || badge.subjects.includes("wavelength") || badge.subjects.includes("radiation")) return "λ";
+  if (badge.subjects.includes("solar")) return "☀";
   if (badge.subjects.includes("quantum")) return "h";
   if (badge.subjects.includes("relativity")) return "c";
   if (badge.subjects.includes("energy")) return "E";
@@ -41,7 +82,6 @@ function badgeGlyph(badge: TheoryBadgeV1): string {
   if (badge.subjects.includes("qei")) return "Q";
   if (badge.subjects.includes("starsim")) return "*";
   if (badge.subjects.includes("cosmic_distance")) return "z";
-  if (badge.subjects.includes("solar")) return "S";
   if (badge.subjects.includes("nhm2")) return "N";
   if (badge.level === "claim_boundary") return "!";
   return "S";
@@ -81,6 +121,9 @@ function badgeClass(args: {
   failed: boolean;
   hasFocus: boolean;
   loadable: boolean;
+  foundation: boolean;
+  claimBoundary: boolean;
+  plannedDomain: boolean;
 }) {
   const classes = [
     "absolute flex h-11 w-11 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
@@ -94,6 +137,9 @@ function badgeClass(args: {
   else if (args.solved) classes.push("ring-4 ring-emerald-300/75 shadow-emerald-500/40");
   else if (args.playback) classes.push("ring-2 ring-cyan-500/70 shadow-cyan-900/40");
   if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
+  if (args.foundation) classes.push("shadow-[0_0_16px_rgba(148,163,184,0.28)]");
+  if (args.claimBoundary) classes.push("border-amber-300 bg-gradient-to-br from-amber-100 via-zinc-400 to-rose-900");
+  if (args.plannedDomain) classes.push("opacity-55 saturate-50");
   if (args.hasFocus && !args.highlighted && !args.multiSelected) classes.push("opacity-30 grayscale");
   return classes.join(" ");
 }
@@ -109,6 +155,7 @@ export default function TheoryAchievementMap({
   failedBadgeIds,
   rippleBadgeIds,
   heatByBadgeId,
+  activeAtlasLensId,
   onSelectBadge,
   onToggleBadgeSelection,
   onRunPath,
@@ -131,6 +178,10 @@ export default function TheoryAchievementMap({
   const failedSet = new Set(failedBadgeIds);
   const rippleSet = new Set(rippleBadgeIds);
   const hasFocus = highlightedSet.size > 0 || selectedSet.size > 1;
+  const activeAtlasBlock = activeAtlasLensId
+    ? PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) => block.id === activeAtlasLensId) ?? null
+    : null;
+  const activeAtlasGlow = activeAtlasLensId ? ATLAS_GLOW_COLORS[activeAtlasLensId] : null;
 
   useEffect(() => {
     const element = viewportRef.current;
@@ -199,6 +250,22 @@ export default function TheoryAchievementMap({
           const title = expression ? `${badge.title}\n${expression}` : badge.title;
           const heat = heatByBadgeId[node.badgeId] ?? 0;
           const ripple = rippleSet.has(node.badgeId);
+          const badgeBlockId = badgeAtlasBlockId(badge);
+          const foundation = badge.level === "first_principle" || badge.subjects.includes("constants");
+          const claimBoundary = badge.level === "claim_boundary";
+          const atlasHighlighted = highlightedSet.has(node.badgeId) && Boolean(activeAtlasGlow);
+          const plannedDomain = Boolean(
+            activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
+          );
+          const glowShadow = [
+            heat > 0
+              ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
+              : null,
+            atlasHighlighted && activeAtlasGlow ? `0 0 24px ${activeAtlasGlow}` : null,
+            foundation ? "0 0 14px rgba(226,232,240,0.22)" : null,
+          ]
+            .filter(Boolean)
+            .join(", ");
           return (
             <button
               key={node.badgeId}
@@ -212,14 +279,14 @@ export default function TheoryAchievementMap({
                 failed: failedSet.has(node.badgeId),
                 hasFocus,
                 loadable: badge.calculatorPayloads.length > 0,
+                foundation,
+                claimBoundary,
+                plannedDomain,
               })}
               style={{
                 left: node.x,
                 top: node.y,
-                boxShadow:
-                  heat > 0
-                    ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
-                    : undefined,
+                boxShadow: glowShadow || undefined,
               }}
               title={title}
               aria-label={badge.title}
@@ -242,6 +309,12 @@ export default function TheoryAchievementMap({
               ) : null}
               {ripple ? (
                 <span className="pointer-events-none absolute -inset-2 border border-cyan-200/80" />
+              ) : null}
+              {foundation ? (
+                <span className="pointer-events-none absolute -inset-1 border border-zinc-100/30" />
+              ) : null}
+              {claimBoundary ? (
+                <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
               ) : null}
             </button>
           );

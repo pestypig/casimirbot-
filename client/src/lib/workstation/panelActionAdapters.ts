@@ -276,6 +276,16 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
   return null;
 }
 
+function asVariableBindings(value: unknown): Record<string, string | number> {
+  const record = asRecord(value);
+  if (!record) return {};
+  return Object.fromEntries(
+    Object.entries(record)
+      .map(([key, rawValue]) => [key, typeof rawValue === "number" || typeof rawValue === "string" ? rawValue : null])
+      .filter((entry): entry is [string, string | number] => entry[1] !== null),
+  );
+}
+
 function asPhysicsAtlasBlockId(value: unknown): PhysicsAtlasBlockId | null {
   const text = asNonEmptyString(value);
   if (!text) return null;
@@ -309,14 +319,23 @@ function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: 
       )
     : [];
   const selectedBadgeIds = badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : atlasBadgeIds;
-  const mode = asNonEmptyString(args.mode) === "dependency_path" ? "dependency_path" : "selected_badges";
+  const requestedMode = asNonEmptyString(args.mode);
+  const mode =
+    requestedMode === "dependency_path"
+      ? "dependency_path"
+      : requestedMode === "locator_matches"
+        ? "locator_matches"
+        : "selected_badges";
   const objectContext = asTheoryCalculatorObjectContext(args.object_context ?? args.objectContext);
   return buildTheoryCalculatorLoadout({
     graph,
-    badgeIds: selectedBadgeIds,
+    badgeIds: mode === "locator_matches" ? (badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : []) : selectedBadgeIds,
     mode,
     source: "workstation_action",
     objectContext,
+    variableBindings: asVariableBindings(args.variable_bindings ?? args.variableBindings),
+    query: asNonEmptyString(args.query ?? args.text ?? args.prompt) ?? undefined,
+    atlasBlockId: atlasBlockId ?? undefined,
     includeContextItems: asBoolean(args.include_context_items ?? args.includeContextItems) ?? true,
   });
 }
@@ -2919,41 +2938,43 @@ export function executeHelixPanelAction(
       };
     }
 
-    if (actionId === "list_physics_atlas") {
+    if (actionId === "list_physics_atlas" || actionId === "list_atlas_blocks") {
       const atlas = buildHelixPhysicsAtlasV1({ graph });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
+      const compactBlocks = atlas.blocks.map((block: PhysicsAtlasBlockV1) => ({
+        id: block.id,
+        title: block.title,
+        glyph: block.glyph,
+        status: block.status,
+        subjects: block.subjects,
+        primary_badge_ids: block.primaryBadgeIds,
+        calculator_examples: block.calculatorExamples,
+        runtime_actions: block.runtimeActions,
+        claim_boundary_notes: block.claimBoundaryNotes,
+      }));
       return {
         ok: true,
         panel_id: panelId,
         action_id: actionId,
         artifact: {
-          kind: "physics_atlas",
+          kind: actionId === "list_atlas_blocks" ? "physics_atlas_blocks" : "physics_atlas",
           schemaVersion: atlas.schemaVersion,
           artifact_v1: atlas,
           graph_id: graph.graphId,
-          blocks: atlas.blocks.map((block: PhysicsAtlasBlockV1) => ({
-            id: block.id,
-            title: block.title,
-            glyph: block.glyph,
-            status: block.status,
-            subjects: block.subjects,
-            primary_badge_ids: block.primaryBadgeIds,
-            calculator_examples: block.calculatorExamples,
-            claim_boundary_notes: block.claimBoundaryNotes,
-          })),
+          blocks: compactBlocks,
         },
       };
     }
 
-    if (actionId === "select_atlas_block") {
+    if (actionId === "select_atlas_block" || actionId === "focus_atlas_block") {
       const blockId = asPhysicsAtlasBlockId(args.block_id ?? args.blockId ?? args.atlas_block_id ?? args.atlasBlockId);
       if (!blockId) {
         return {
           ok: false,
           panel_id: panelId,
           action_id: actionId,
-          message: "theory-badge-graph.select_atlas_block requires a valid block_id.",
+          message: `theory-badge-graph.${actionId} requires a valid atlas_block_id.`,
         };
       }
       const atlas = buildHelixPhysicsAtlasV1({ graph });
@@ -2985,8 +3006,12 @@ export function executeHelixPanelAction(
         artifact: {
           kind: "physics_atlas_lens",
           graph_id: graph.graphId,
+          block_id: blockId,
           block,
           lens,
+          highlighted_badge_ids: lens.highlightedBadgeIds,
+          highlighted_edge_ids: lens.highlightedEdgeIds,
+          calculator_examples: lens.calculatorExamples,
           badge_count: lens.highlightedBadgeIds.length,
           edge_count: lens.highlightedEdgeIds.length,
           calculator_example_count: lens.calculatorExamples.length,

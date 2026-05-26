@@ -178,7 +178,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
   {
     id: "casimir_cavity_modes",
     title: "Casimir Cavities",
-    shortTitle: "Casimir",
+    shortTitle: "Cavity",
     glyph: "▣",
     description: "Static and dynamic Casimir, cavity modes, Q factors, gaps, and cavity telemetry.",
     status: "planned",
@@ -210,7 +210,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
   {
     id: "warp_gr_nhm2",
     title: "Warp / GR / NHM2",
-    shortTitle: "Warp",
+    shortTitle: "Warp/GR",
     glyph: "G",
     description: "GR roots, 3+1 references, NHM2 geometry/source diagnostics, and full-solve context.",
     status: "planned",
@@ -288,7 +288,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
   {
     id: "tokamak_plasma",
     title: "Tokamak Plasma",
-    shortTitle: "Tokamak",
+    shortTitle: "Plasma",
     glyph: "⊙",
     description: "Tokamak energy fields, stability proxies, precursor detection, and synthetic diagnostics.",
     status: "planned",

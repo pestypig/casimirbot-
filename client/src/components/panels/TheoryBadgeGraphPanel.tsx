@@ -503,6 +503,7 @@ export default function TheoryBadgeGraphPanel() {
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
+  const clearMapOverlay = useTheoryMapOverlayStore((state) => state.clearOverlay);
   const playbackStore = useTheoryBadgePlaybackStore();
   const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
   const calculatorArtifact = useScientificCalculatorStore((state) => state.lastArtifactV1);
@@ -892,14 +893,64 @@ export default function TheoryBadgeGraphPanel() {
     });
   };
 
-  const toggleAtlasLens = (lensId: TheoryAtlasLensId) => {
-    setActiveAtlasLensId(activeLensId === lensId ? null : lensId);
+  const selectAtlasLens = (lensId: TheoryAtlasLensId) => {
+    if (activeLensId === lensId) {
+      setActiveAtlasLensId(null);
+      clearMapOverlay();
+      return;
+    }
+    setActiveAtlasLensId(lensId);
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    setSelectedEvolutionStageId(null);
+    setSelectedCosmicRungId(null);
+    clearStarSimObjectBinding();
+    clearCosmicDistanceObjectBinding();
+    if (!graph) return;
+    const lens = resolvePhysicsAtlasLens({
+      graph,
+      atlas: buildHelixPhysicsAtlasV1({ graph }),
+      blockId: lensId,
+    });
+    setSelectionOverlay({
+      selectedBadgeIds: lens.centerBadgeIds,
+      highlightedBadgeIds: lens.highlightedBadgeIds,
+      highlightedEdgeIds: lens.highlightedEdgeIds,
+      claimBoundaryNotes: lens.claimBoundaryNotes,
+    });
+  };
+
+  const loadAtlasExamples = (lensId: TheoryAtlasLensId) => {
+    if (!graph) return;
+    const atlas = buildHelixPhysicsAtlasV1({ graph });
+    const block = atlas.blocks.find((candidate) => candidate.id === lensId);
+    if (!block) return;
+    const queryText = block.calculatorExamples
+      .flatMap((example) => [example.label, example.expression, example.displayLatex, ...example.symbols])
+      .join(" ");
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: [],
+      mode: "locator_matches",
+      source: "achievement_map",
+      atlasBlockId: lensId,
+      query: queryText,
+      includeContextItems: false,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
   };
 
   if (viewMode === "map") {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
-        <TheoryAtlasRail activeLensId={activeLensId} onSelectLens={toggleAtlasLens} />
+        <TheoryAtlasRail
+          activeLensId={activeLensId}
+          onSelectLens={selectAtlasLens}
+          onLoadExamples={loadAtlasExamples}
+        />
         {activeLensId === "stellar_evolution" && graph ? (
           <StellarEvolutionLens
             graph={graph}
@@ -943,6 +994,7 @@ export default function TheoryBadgeGraphPanel() {
                   failedBadgeIds={failedBadgeIds}
                   rippleBadgeIds={mapOverlay.rippleBadgeIds}
                   heatByBadgeId={mapOverlay.heatByBadgeId}
+                  activeAtlasLensId={activeLensId}
                   onSelectBadge={selectBadge}
                   onToggleBadgeSelection={toggleBadgeSelection}
                   onRunPath={runPathToBadge}

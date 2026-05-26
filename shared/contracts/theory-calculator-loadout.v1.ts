@@ -66,7 +66,7 @@ export type TheoryCalculatorLoadoutV1 = {
   loadoutId: string;
   graphId: string;
   source: TheoryCalculatorLoadoutSource;
-  mode: "selected_badges" | "dependency_path";
+  mode: "selected_badges" | "dependency_path" | "locator_matches";
   targetBadgeIds: string[];
   objectContext: TheoryCalculatorObjectContextV1 | null;
   items: TheoryCalculatorLoadoutItemV1[];

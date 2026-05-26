@@ -44,27 +44,17 @@ const LEVEL_DEPTH: Record<TheoryBadgeLevel, number> = {
 };
 
 const LANE_RULES: Array<{ lane: number; matches: string[] }> = [
-  { lane: 0, matches: ["first_principles", "units", "dimensions"] },
-  { lane: 1, matches: ["constants", "quantum"] },
-  { lane: 2, matches: ["relativity", "frames", "momentum"] },
-  { lane: 3, matches: ["energy", "power", "density"] },
-  { lane: 4, matches: ["fields", "stress_energy"] },
-  { lane: 5, matches: ["general_relativity", "field_equations", "adm"] },
-  { lane: 6, matches: ["geometry", "time_dilation"] },
-  { lane: 7, matches: ["source", "closure"] },
-  { lane: 8, matches: ["qei", "diagnostic", "energy_conditions"] },
-  { lane: 9, matches: ["claim_boundary", "safety"] },
-  { lane: 10, matches: ["starsim", "stellar", "observable", "radiation"] },
-  { lane: 11, matches: ["stellar_structure", "hydrostatic", "fusion_zone"] },
-  { lane: 12, matches: ["fusion", "main_sequence", "compact_object"] },
-  { lane: 13, matches: ["star_map", "runtime"] },
-  { lane: 14, matches: ["cosmic_distance", "parallax", "astrometry"] },
-  { lane: 15, matches: ["spectrum", "redshift", "wavelength", "scale_factor"] },
-  { lane: 16, matches: ["cepheid", "standard_candle", "distance_modulus"] },
-  { lane: 17, matches: ["hubble_law", "cosmology", "accordion"] },
-  { lane: 18, matches: ["solar", "doppler", "flare"] },
-  { lane: 19, matches: ["blackbody", "wien_displacement", "stefan_boltzmann_law"] },
-  { lane: 20, matches: ["solar_flare", "solar_spectrum"] },
+  { lane: 0, matches: ["first_principles", "units", "dimensions", "foundation"] },
+  { lane: 1, matches: ["constants", "constant", "quantum", "radiation", "blackbody", "wien_displacement"] },
+  { lane: 2, matches: ["starsim", "stellar", "solar", "solar_spectrum", "solar_flare", "spectrum", "flare"] },
+  { lane: 3, matches: ["cosmic_distance", "redshift", "blueshift", "parallax", "cepheid", "hubble_law"] },
+  { lane: 4, matches: ["casimir", "cavity", "cavity_mode", "negative_energy", "q_factor"] },
+  { lane: 5, matches: ["qei", "stress_energy", "energy_conditions", "source", "closure"] },
+  { lane: 6, matches: ["general_relativity", "field_equations", "adm", "nhm2", "warp", "geometry"] },
+  { lane: 7, matches: ["tokamak", "plasma", "magnetohydrodynamics", "fusion_plasma"] },
+  { lane: 8, matches: ["galactic", "galactic_dynamics", "orbital", "dark_matter"] },
+  { lane: 9, matches: ["curvature", "collapse", "black_hole", "compact_object"] },
+  { lane: 10, matches: ["claim_boundary", "safety", "boundary"] },
 ];
 
 const LAYOUT_EDGE_RELATIONS = new Set([
@@ -80,12 +70,15 @@ const LAYOUT_EDGE_RELATIONS = new Set([
 ]);
 
 function preferredLane(badge: TheoryBadgeV1): number {
+  if (badge.level === "claim_boundary") return 10;
+  if (badge.level === "first_principle") return 0;
   const tokens = new Set([
     ...badge.subjects,
     ...badge.tags,
     ...badge.equationFamilies,
     ...badge.hintKeys.subjects,
   ]);
+  if (tokens.has("solar") || tokens.has("starsim") || tokens.has("stellar")) return 2;
   for (const rule of LANE_RULES) {
     if (rule.matches.some((token: string) => tokens.has(token))) return rule.lane;
   }

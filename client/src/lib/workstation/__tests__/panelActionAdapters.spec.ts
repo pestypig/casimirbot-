@@ -1272,6 +1272,77 @@ describe("panelActionAdapters", () => {
       );
     });
 
+    it("exposes Helix Ask atlas block listing and focus actions without calculator mutation", () => {
+      const listResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "list_atlas_blocks",
+        },
+        actionContext(),
+      );
+
+      expect(listResult.ok).toBe(true);
+      expect(listResult.artifact?.kind).toBe("physics_atlas_blocks");
+      expect(listResult.artifact?.blocks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "solar_surface_spectrum",
+            calculator_examples: expect.any(Array),
+            runtime_actions: expect.any(Array),
+            claim_boundary_notes: expect.any(Array),
+          }),
+        ]),
+      );
+
+      const focusResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "focus_atlas_block",
+          args: { atlas_block_id: "solar_surface_spectrum", overlay: true },
+        },
+        actionContext(),
+      );
+
+      expect(focusResult.ok).toBe(true);
+      expect(focusResult.artifact?.kind).toBe("physics_atlas_lens");
+      expect(focusResult.artifact?.block_id).toBe("solar_surface_spectrum");
+      expect(focusResult.artifact?.highlighted_badge_ids).toContain("solar.spectrum.photon_energy");
+      expect(focusResult.artifact?.calculator_examples).toEqual(expect.any(Array));
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("solar_surface_spectrum");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+    });
+
+    it("locates solar and distance badges with atlas block priors", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "locate_context",
+          args: {
+            query: "Estimate photon energy for 656.28 nm H-alpha and Doppler shift",
+            atlas_block_ids: ["solar_surface_spectrum", "cosmic_distance_ladder"],
+            symbols: ["lambda", "lambda0", "lambda_obs", "z", "E"],
+            overlay: true,
+            limit: 12,
+          },
+        },
+        actionContext(),
+      );
+
+      const matches = result.artifact?.matches as Array<{ badgeId: string }>;
+      expect(result.ok).toBe(true);
+      expect(matches.map((match) => match.badgeId)).toEqual(
+        expect.arrayContaining([
+          "solar.spectrum.photon_energy",
+          "solar.spectrum.halpha_line_reference",
+          "solar.spectrum.doppler_shift",
+          "solar.spectrum.radial_velocity_proxy",
+          "cosmic.spectral.redshift",
+        ]),
+      );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
     it("loads theory badge payloads to the calculator without solving", () => {
       const result = executeHelixPanelAction(
         {
@@ -1409,6 +1480,41 @@ describe("panelActionAdapters", () => {
       expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("E = h*c/lambda");
       expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("z = (lambda_obs - lambda0)/lambda0");
       expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("v = c*z");
+    });
+
+    it("builds locator-matched solar atlas loadouts without solving", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "build_calculator_loadout",
+          args: {
+            mode: "locator_matches",
+            atlas_block_id: "solar_surface_spectrum",
+            query: "H-alpha photon energy Doppler shift",
+            include_context_items: false,
+            variable_bindings: {
+              h: "6.62607015e-34",
+              c: 299792458,
+              lambda: "656.28e-9",
+              lambda0: "656.28e-9",
+              lambda_obs: "656.35e-9",
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      const loadout = result.artifact?.artifact_v1 as { items?: Array<{ badgeId: string; solveExpression: string }>; summary?: { solvedCount: number } };
+      expect(result.ok).toBe(true);
+      expect(loadout.items?.map((item) => item.badgeId)).toEqual(
+        expect.arrayContaining([
+          "solar.spectrum.photon_energy",
+          "solar.spectrum.doppler_shift",
+          "solar.spectrum.radial_velocity_proxy",
+        ]),
+      );
+      expect(loadout.items?.map((item) => item.solveExpression)).toContain("E = 6.62607015e-34*299792458/656.28e-9");
+      expect(loadout.summary?.solvedCount).toBe(0);
     });
 
     it("runs StarSim runtime receipts through theory badge actions", () => {
