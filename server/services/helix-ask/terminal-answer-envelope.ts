@@ -69,10 +69,19 @@ const typedFailureText = (payload: Record<string, unknown>): string =>
   readString(readRecord(payload.typed_failure)?.message) ??
   "I could not produce a terminal answer for this turn.";
 
-const readDocConceptExplanationTerminal = (
+export const applyDocConceptExplanationTerminalCandidate = (
   payload: Record<string, unknown>,
-): { text: string; artifactId: string | null } | null => {
-  if (readString(payload.terminal_error_code) !== "concept_explanation_unavailable") return null;
+): { applied: boolean; text: string | null; artifactId: string | null } => {
+  const terminalErrorCode = readString(payload.terminal_error_code);
+  const terminalArtifactKind = readTerminalArtifactKind(payload);
+  const finalAnswerSource = readFinalAnswerSource(payload);
+  if (
+    terminalErrorCode !== "concept_explanation_unavailable" &&
+    terminalArtifactKind !== "typed_failure" &&
+    finalAnswerSource !== "typed_failure"
+  ) {
+    return { applied: false, text: null, artifactId: null };
+  }
   const ledger = Array.isArray(payload.current_turn_artifact_ledger)
     ? payload.current_turn_artifact_ledger
     : [];
@@ -86,12 +95,25 @@ const readDocConceptExplanationTerminal = (
       readString(artifactPayload?.plain_language_summary);
     if (!text) continue;
     const path = readString(artifactPayload?.source_path) ?? readString(artifactPayload?.path);
-    return {
-      text: path && !text.includes(path) ? `${text}\n\nPath: ${path}` : text,
-      artifactId: readString(artifact.artifact_id),
-    };
+    const terminalText = path && !text.includes(path) ? `${text}\n\nPath: ${path}` : text;
+    payload.ok = true;
+    payload.response_type = "final_answer";
+    payload.final_status = "final_answer";
+    payload.terminal_artifact_kind = "doc_concept_explanation";
+    payload.final_answer_source = "artifact_synthesis";
+    payload.selected_final_answer = terminalText;
+    payload.answer = terminalText;
+    payload.text = terminalText;
+    payload.finalAnswer = terminalText;
+    payload.content = terminalText;
+    const artifactId = readString(artifact.artifact_id);
+    if (artifactId) payload.terminal_artifact_id = artifactId;
+    delete payload.terminal_error_code;
+    delete payload.scientific_extraction_failed;
+    delete payload.scientific_extraction_fail_reason;
+    return { applied: true, text: terminalText, artifactId };
   }
-  return null;
+  return { applied: false, text: null, artifactId: null };
 };
 
 function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAuthority["terminal_kind"] {
@@ -117,26 +139,13 @@ export function resolveTerminalAnswerEnvelope(
   let finalAnswerSource = readFinalAnswerSource(payload);
   let terminalText: string | null = null;
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
-  const docConceptTerminal = readDocConceptExplanationTerminal(payload);
+  const docConceptTerminal = applyDocConceptExplanationTerminalCandidate(payload);
 
-  if (docConceptTerminal) {
+  if (docConceptTerminal.applied && docConceptTerminal.text) {
     terminalArtifactKind = "doc_concept_explanation";
     finalAnswerSource = "artifact_synthesis";
     terminalText = docConceptTerminal.text;
     authorityOrigin = "selected_final_answer";
-    payload.ok = true;
-    payload.response_type = "final_answer";
-    payload.final_status = "final_answer";
-    payload.terminal_artifact_kind = terminalArtifactKind;
-    payload.final_answer_source = finalAnswerSource;
-    payload.selected_final_answer = terminalText;
-    payload.answer = terminalText;
-    payload.text = terminalText;
-    payload.finalAnswer = terminalText;
-    if (docConceptTerminal.artifactId) payload.terminal_artifact_id = docConceptTerminal.artifactId;
-    delete payload.terminal_error_code;
-    delete payload.scientific_extraction_failed;
-    delete payload.scientific_extraction_fail_reason;
   } else if (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") {
     terminalArtifactKind = "typed_failure";
     terminalText = typedFailureText(payload);
