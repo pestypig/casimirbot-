@@ -1332,6 +1332,33 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.items[0]?.calculatorArtifactV1).toBeTruthy();
     });
 
+    it("builds object-aware cosmic distance ladder loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: ["cosmic.spectral.redshift", "cosmic.low_z.hubble_distance"],
+            object_context: {
+              kind: "cosmic_distance_object",
+              observables: {
+                lambda_rest: 656.28,
+                lambda_obs: 721.91,
+                redshift: 0.1,
+                H0: 70,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe("cosmic_distance_object");
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("z = (721.91 - 656.28) / 656.28");
+    });
+
     it("runs StarSim runtime receipts through theory badge actions", () => {
       const runtimeResult = executeHelixPanelAction(
         {

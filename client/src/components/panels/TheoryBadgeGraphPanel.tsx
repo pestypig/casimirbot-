@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import CosmicDistanceLadderLens from "@/components/panels/CosmicDistanceLadderLens";
 import StellarEvolutionLens from "@/components/panels/StellarEvolutionLens";
 import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
 import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/TheoryAtlasRail";
@@ -28,6 +29,7 @@ import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlayback
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
+import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
@@ -37,6 +39,10 @@ import {
   STARSIM_STELLAR_EVOLUTION_STAGES,
   type StarSimStellarEvolutionStage,
 } from "@shared/theory/starsim-stellar-evolution-map";
+import {
+  COSMIC_DISTANCE_LADDER_RUNGS,
+  type CosmicDistanceLadderRung,
+} from "@shared/theory/cosmic-distance-ladder-map";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -473,6 +479,10 @@ export default function TheoryBadgeGraphPanel() {
   const activeLensId = useTheoryBadgeGraphPanelStore((state) => state.activeAtlasLensId);
   const selectedEvolutionStageId = useTheoryBadgeGraphPanelStore((state) => state.selectedStarSimStageId);
   const selectedObjectBindingId = useTheoryBadgeGraphPanelStore((state) => state.selectedStarSimObjectBindingId);
+  const selectedCosmicRungId = useTheoryBadgeGraphPanelStore((state) => state.selectedCosmicDistanceRungId);
+  const selectedCosmicObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.selectedCosmicDistanceObjectBindingId,
+  );
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
@@ -481,6 +491,13 @@ export default function TheoryBadgeGraphPanel() {
   const setSelectedEvolutionStageId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedStarSimStageId);
   const setSelectedObjectBindingId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedStarSimObjectBindingId);
   const clearStarSimObjectBinding = useTheoryBadgeGraphPanelStore((state) => state.clearStarSimObjectBinding);
+  const setSelectedCosmicRungId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedCosmicDistanceRungId);
+  const setSelectedCosmicObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedCosmicDistanceObjectBindingId,
+  );
+  const clearCosmicDistanceObjectBinding = useTheoryBadgeGraphPanelStore(
+    (state) => state.clearCosmicDistanceObjectBinding,
+  );
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
@@ -595,6 +612,39 @@ export default function TheoryBadgeGraphPanel() {
     setSelectionOverlay,
   ]);
 
+  useEffect(() => {
+    if (!graph || !selectedCosmicRungId) return;
+    const rung = COSMIC_DISTANCE_LADDER_RUNGS.find((candidate) => candidate.id === selectedCosmicRungId);
+    if (!rung) return;
+    if (
+      selectedCosmicObjectBindingId &&
+      !rung.objectBindings.some((binding) => binding.id === selectedCosmicObjectBindingId)
+    ) {
+      clearCosmicDistanceObjectBinding();
+    }
+    const rungBadgeIds = rung.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(rungBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: rungBadgeIds,
+      highlightedBadgeIds: rungBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: rung.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: distance-ladder estimate is calibration/model dependent.`,
+      ),
+    });
+  }, [
+    clearCosmicDistanceObjectBinding,
+    graph,
+    selectedCosmicObjectBindingId,
+    selectedCosmicRungId,
+    setSelectionOverlay,
+  ]);
+
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
@@ -642,7 +692,9 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedBadgeId(badgeId);
     setSelectedBadgeIds([]);
     setSelectedEvolutionStageId(null);
+    setSelectedCosmicRungId(null);
     clearStarSimObjectBinding();
+    clearCosmicDistanceObjectBinding();
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
@@ -681,7 +733,9 @@ export default function TheoryBadgeGraphPanel() {
   const selectEvolutionStage = (stage: StarSimStellarEvolutionStage) => {
     if (!graph) return;
     setSelectedEvolutionStageId(stage.id);
+    setSelectedCosmicRungId(null);
     setSelectedObjectBindingId(null);
+    clearCosmicDistanceObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -708,6 +762,8 @@ export default function TheoryBadgeGraphPanel() {
     if (!binding) return;
     selectEvolutionStage(stage);
     setSelectedObjectBindingId(binding.id);
+    setSelectedCosmicRungId(null);
+    clearCosmicDistanceObjectBinding();
     const payloadIdsByBadgeId = stage.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
       acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
       return acc;
@@ -750,6 +806,68 @@ export default function TheoryBadgeGraphPanel() {
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
+  const selectCosmicDistanceRung = (rung: CosmicDistanceLadderRung) => {
+    if (!graph) return;
+    setSelectedCosmicRungId(rung.id);
+    setSelectedCosmicObjectBindingId(null);
+    setSelectedEvolutionStageId(null);
+    clearStarSimObjectBinding();
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const rungBadgeIds = rung.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(rungBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: rungBadgeIds,
+      highlightedBadgeIds: rungBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: rung.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: distance-ladder estimate is calibration/model dependent.`,
+      ),
+    });
+  };
+
+  const selectCosmicObjectBinding = (rung: CosmicDistanceLadderRung, bindingId: string) => {
+    if (!graph) return;
+    const binding = rung.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectCosmicDistanceRung(rung);
+    setSelectedCosmicObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = rung.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildCosmicDistanceObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: rung.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstCosmicScalar =
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId.startsWith("cosmic.")) ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstCosmicScalar) scientificState.loadTheoryLoadoutItem(firstCosmicScalar.index);
+  };
+
+  const clearCosmicBindingSelection = () => {
+    clearCosmicDistanceObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+  };
+
   const runPathToBadge = (badgeId: string) => {
     if (!graph) return;
     void playbackStore.runPlayback({
@@ -775,6 +893,18 @@ export default function TheoryBadgeGraphPanel() {
             onSelectStage={selectEvolutionStage}
             onSelectObjectBinding={selectStarSimObjectBinding}
             onClearObjectBinding={clearStarSimBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
+        {activeLensId === "cosmic-distance-ladder" && graph ? (
+          <CosmicDistanceLadderLens
+            graph={graph}
+            rungs={COSMIC_DISTANCE_LADDER_RUNGS}
+            selectedRungId={selectedCosmicRungId}
+            selectedObjectBindingId={selectedCosmicObjectBindingId}
+            onSelectRung={selectCosmicDistanceRung}
+            onSelectObjectBinding={selectCosmicObjectBinding}
+            onClearObjectBinding={clearCosmicBindingSelection}
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}

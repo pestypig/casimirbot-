@@ -48,6 +48,7 @@ import type {
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 import type { TheoryBadgeV1 } from "@shared/contracts/theory-badge-graph.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import {
   buildTheoryCalculatorLoadout,
@@ -223,6 +224,25 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       channelDensity_g_cm3: asNumber(observables.channelDensity_g_cm3 ?? observables.channel_density_g_cm3),
       magneticField_T: asNumber(observables.magneticField_T ?? observables.magnetic_field_T),
       spectralLineNm: asNumber(observables.spectralLineNm ?? observables.spectral_line_nm),
+      source: "helix_ask",
+    });
+  }
+  if (kind === "cosmic_distance_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildCosmicDistanceObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id),
+      label: asNonEmptyString(record.label ?? observables.label),
+      lambda_rest: asNumber(observables.lambda_rest ?? observables.lambdaRest),
+      lambda_obs: asNumber(observables.lambda_obs ?? observables.lambdaObs),
+      parallax_mas: asNumber(observables.parallax_mas ?? observables.parallaxMas),
+      P_days: asNumber(observables.P_days ?? observables.period_days ?? observables.periodDays),
+      alpha: asNumber(observables.alpha),
+      beta: asNumber(observables.beta),
+      m_app: asNumber(observables.m_app ?? observables.apparent_magnitude ?? observables.apparentMagnitude),
+      M_abs: asNumber(observables.M_abs ?? observables.absolute_magnitude ?? observables.absoluteMagnitude),
+      z: asNumber(observables.z ?? observables.redshift),
+      H0_km_s_Mpc: asNumber(observables.H0_km_s_Mpc ?? observables.h0_km_s_mpc ?? observables.H0),
+      c_km_s: asNumber(observables.c_km_s ?? observables.c),
       source: "helix_ask",
     });
   }

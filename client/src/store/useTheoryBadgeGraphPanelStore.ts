@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { StarSimStellarEvolutionStageId } from "@shared/theory/starsim-stellar-evolution-map";
+import type { CosmicDistanceLadderRungId } from "@shared/theory/cosmic-distance-ladder-map";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
 
@@ -9,7 +10,7 @@ type TheoryBadgeGraphViewport = {
   scrollTop: number;
 };
 
-export type TheoryBadgeGraphAtlasLensId = "starsim-stellar-evolution";
+export type TheoryBadgeGraphAtlasLensId = "starsim-stellar-evolution" | "cosmic-distance-ladder";
 
 type TheoryBadgeGraphPanelState = {
   selectedBadgeId: string | null;
@@ -18,6 +19,8 @@ type TheoryBadgeGraphPanelState = {
   activeAtlasLensId: TheoryBadgeGraphAtlasLensId | null;
   selectedStarSimStageId: StarSimStellarEvolutionStageId | null;
   selectedStarSimObjectBindingId: string | null;
+  selectedCosmicDistanceRungId: CosmicDistanceLadderRungId | null;
+  selectedCosmicDistanceObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -26,6 +29,9 @@ type TheoryBadgeGraphPanelState = {
   setSelectedStarSimStageId: (stageId: StarSimStellarEvolutionStageId | null) => void;
   setSelectedStarSimObjectBindingId: (bindingId: string | null) => void;
   clearStarSimObjectBinding: () => void;
+  setSelectedCosmicDistanceRungId: (rungId: CosmicDistanceLadderRungId | null) => void;
+  setSelectedCosmicDistanceObjectBindingId: (bindingId: string | null) => void;
+  clearCosmicDistanceObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -67,6 +73,8 @@ const initialState = {
   activeAtlasLensId: "starsim-stellar-evolution" as TheoryBadgeGraphAtlasLensId | null,
   selectedStarSimStageId: null as StarSimStellarEvolutionStageId | null,
   selectedStarSimObjectBindingId: null as string | null,
+  selectedCosmicDistanceRungId: null as CosmicDistanceLadderRungId | null,
+  selectedCosmicDistanceObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -102,6 +110,13 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedStarSimObjectBindingId: null,
         }),
+      setSelectedCosmicDistanceRungId: (rungId) => set({ selectedCosmicDistanceRungId: rungId }),
+      setSelectedCosmicDistanceObjectBindingId: (bindingId) =>
+        set({ selectedCosmicDistanceObjectBindingId: bindingId }),
+      clearCosmicDistanceObjectBinding: () =>
+        set({
+          selectedCosmicDistanceObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -114,6 +129,8 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         activeAtlasLensId: state.activeAtlasLensId,
         selectedStarSimStageId: state.selectedStarSimStageId,
         selectedStarSimObjectBindingId: state.selectedStarSimObjectBindingId,
+        selectedCosmicDistanceRungId: state.selectedCosmicDistanceRungId,
+        selectedCosmicDistanceObjectBindingId: state.selectedCosmicDistanceObjectBindingId,
       }),
     },
   ),

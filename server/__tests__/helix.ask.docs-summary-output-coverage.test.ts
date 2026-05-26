@@ -57,4 +57,40 @@ describe("Helix Ask docs summary output coverage", () => {
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_min_5_bullets" && entry?.satisfied === true)).toBe(true);
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_path_included" && entry?.satisfied === true)).toBe(true);
   }, 60000);
+
+  it("searches docs before summarizing when no exact or active document is supplied", async () => {
+    const app = createApp();
+    const sessionId = `docs-summary-search-then-read-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Summarize docs about NHM2 current status in 4 bullets. Include the path.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: false,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
+    const iterations = response.body?.agent_runtime_loop?.iterations ?? [];
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(
+      iterations.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.summarize_doc" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.some((ref: unknown) => String(ref).includes(":doc_summary:")),
+      ),
+    ).toBe(true);
+    expect(answerText).toMatch(/\/docs\//);
+    expect(visibleBulletCount(answerText)).toBeGreaterThanOrEqual(4);
+    expect(response.body?.prompt_requirement_coverage?.coverage).toBe("complete");
+  }, 60000);
 });

@@ -160,6 +160,26 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(screen.queryByText("Stellar Evolution")).toBeNull();
   });
 
+  it("uses the cosmic distance ladder lens to load object-bound redshift rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Cosmic distance ladder lens" }));
+    expect(await screen.findByText("Distance Ladder")).toBeTruthy();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Select Spectral Shift" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use H-alpha z≈0.1 object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("cosmic-distance-ladder");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCosmicDistanceRungId).toBe("cosmic.ladder.spectral_shift");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCosmicDistanceObjectBindingId).toBe("h-alpha-redshift-0p1");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe("cosmic_distance_object");
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "z = (721.91 - 656.28) / 656.28",
+      );
+    });
+  });
+
   it("remembers selected badges and viewport position across remounts", async () => {
     const firstRender = renderPanel();
 

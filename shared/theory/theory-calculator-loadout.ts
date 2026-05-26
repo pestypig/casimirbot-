@@ -51,7 +51,9 @@ function bindExpression(
   usedBindings: Record<string, string | number>;
   bindingWarnings: string[];
 } {
-  let solveExpression = expression;
+  const equalsIndex = expression.indexOf("=");
+  const lhs = equalsIndex >= 0 ? expression.slice(0, equalsIndex + 1) : "";
+  let solveExpression = equalsIndex >= 0 ? expression.slice(equalsIndex + 1) : expression;
   const usedBindings: Record<string, string | number> = {};
   const symbols = Object.keys(bindings).sort((left, right) => right.length - left.length);
   for (const symbol of symbols) {
@@ -64,7 +66,7 @@ function bindExpression(
     if (used) usedBindings[symbol] = bindings[symbol];
   }
   return {
-    solveExpression,
+    solveExpression: `${lhs}${solveExpression}`,
     usedBindings,
     bindingWarnings: [],
   };

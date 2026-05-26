@@ -58,6 +58,10 @@ const LANE_RULES: Array<{ lane: number; matches: string[] }> = [
   { lane: 11, matches: ["stellar_structure", "hydrostatic", "fusion_zone"] },
   { lane: 12, matches: ["fusion", "main_sequence", "compact_object"] },
   { lane: 13, matches: ["star_map", "runtime"] },
+  { lane: 14, matches: ["cosmic_distance", "parallax", "astrometry"] },
+  { lane: 15, matches: ["spectrum", "redshift", "wavelength", "scale_factor"] },
+  { lane: 16, matches: ["cepheid", "standard_candle", "distance_modulus"] },
+  { lane: 17, matches: ["hubble_law", "cosmology", "accordion"] },
 ];
 
 const LAYOUT_EDGE_RELATIONS = new Set([

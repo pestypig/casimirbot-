@@ -14,6 +14,10 @@ import {
   STARSIM_THEORY_BADGES,
   STARSIM_THEORY_EDGES,
 } from "./starsim-theory-badges";
+import {
+  COSMIC_DISTANCE_LADDER_BADGES,
+  COSMIC_DISTANCE_LADDER_EDGES,
+} from "./cosmic-distance-ladder-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -736,8 +740,18 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2 and StarSim.",
-    badges: [...FIRST_PRINCIPLES_THEORY_BADGES, ...badges, ...STARSIM_THEORY_BADGES],
-    edges: [...FIRST_PRINCIPLES_THEORY_EDGES, ...edges, ...STARSIM_THEORY_EDGES],
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2, StarSim, and cosmic distance ladder contexts.",
+    badges: [
+      ...FIRST_PRINCIPLES_THEORY_BADGES,
+      ...badges,
+      ...STARSIM_THEORY_BADGES,
+      ...COSMIC_DISTANCE_LADDER_BADGES,
+    ],
+    edges: [
+      ...FIRST_PRINCIPLES_THEORY_EDGES,
+      ...edges,
+      ...STARSIM_THEORY_EDGES,
+      ...COSMIC_DISTANCE_LADDER_EDGES,
+    ],
   });
 }

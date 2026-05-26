@@ -1,9 +1,8 @@
 import React from "react";
 
-export type TheoryAtlasLensId = "starsim-stellar-evolution";
+export type TheoryAtlasLensId = "starsim-stellar-evolution" | "cosmic-distance-ladder";
 
 const placeholderColors = [
-  "bg-amber-500",
   "bg-cyan-500",
   "bg-violet-600",
   "bg-slate-500",
@@ -37,6 +36,19 @@ export default function TheoryAtlasRail({
         }`}
       >
         *
+      </button>
+      <button
+        type="button"
+        aria-label="Cosmic distance ladder lens"
+        title="Cosmic distance ladder"
+        onClick={() => onSelectLens("cosmic-distance-ladder")}
+        className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
+          activeLensId === "cosmic-distance-ladder"
+            ? "border-cyan-100 bg-amber-500 ring-2 ring-cyan-300"
+            : "border-zinc-800 bg-amber-600 hover:border-cyan-200"
+        }`}
+      >
+        z
       </button>
       {placeholderColors.map((color, index) => (
         <div
