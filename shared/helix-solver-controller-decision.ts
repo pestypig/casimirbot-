@@ -23,7 +23,8 @@ export type HelixSolverControllerBlockingReason =
   | "selected_capability_observation_missing"
   | "post_observation_model_decision_missing"
   | "subgoals_observed_not_satisfied"
-  | "prompt_requirement_coverage_incomplete";
+  | "prompt_requirement_coverage_incomplete"
+  | "compound_prompt_coverage_incomplete";
 
 export type HelixSolverControllerDecision = {
   schema: typeof HELIX_SOLVER_CONTROLLER_DECISION_SCHEMA;

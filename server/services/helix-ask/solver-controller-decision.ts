@@ -155,6 +155,15 @@ const hasIncompletePromptRequirementCoverage = (payload: RecordLike): boolean =>
   return Boolean(coverageState && coverageState !== "complete");
 };
 
+const hasIncompleteCompoundPromptCoverageGate = (payload: RecordLike): boolean => {
+  const gate = readRecord(payload.compound_prompt_coverage_gate);
+  return (
+    readString(gate?.schema) === "helix.compound_prompt_coverage_gate.v1" &&
+    gate?.applies === true &&
+    gate?.passed !== true
+  );
+};
+
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
@@ -371,6 +380,7 @@ export function buildSolverControllerDecision(input: {
     "final_route_reconciliation",
     "goal_satisfaction_evaluation",
     "prompt_requirement_coverage",
+    "compound_prompt_coverage_gate",
     "terminal_equivalence_harness_result",
     "capability_plan",
     "capability_result",
@@ -418,6 +428,9 @@ export function buildSolverControllerDecision(input: {
     }
     if (hasIncompletePromptRequirementCoverage(payload)) {
       pushUnique(blockingReasons, "prompt_requirement_coverage_incomplete");
+    }
+    if (hasIncompleteCompoundPromptCoverageGate(payload)) {
+      pushUnique(blockingReasons, "compound_prompt_coverage_incomplete");
     }
   }
 
@@ -570,7 +583,8 @@ export function buildSolverControllerDecision(input: {
       reason === "selected_capability_observation_missing" ||
       reason === "post_observation_model_decision_missing" ||
       reason === "subgoals_observed_not_satisfied" ||
-      reason === "prompt_requirement_coverage_incomplete"
+      reason === "prompt_requirement_coverage_incomplete" ||
+      reason === "compound_prompt_coverage_incomplete"
     )
   ) {
     pushUnique(blockingReasons, "solver_path_incomplete");
@@ -583,7 +597,8 @@ export function buildSolverControllerDecision(input: {
     reason === "required_artifact_contract_missing" ||
     reason === "terminal_kind_not_required" ||
     reason === "subgoals_observed_not_satisfied" ||
-    reason === "prompt_requirement_coverage_incomplete"
+    reason === "prompt_requirement_coverage_incomplete" ||
+    reason === "compound_prompt_coverage_incomplete"
   );
   const requestedGoalDecision =
     goalNextDecision === "continue" ||

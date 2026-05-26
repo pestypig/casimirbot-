@@ -33,6 +33,7 @@ import {
   type HelixFollowupReasoningGate,
 } from "./followup-reasoning-gate";
 import type { HelixLiveSourceIdentityAudit } from "./live-source-identity-audit";
+import type { HelixCompoundPromptCoverageGate } from "./compound-prompt-coverage-gate";
 
 type RecordLike = Record<string, unknown>;
 
@@ -61,7 +62,8 @@ export type HelixAskTurnSolverHardFailureCode =
   | "solver_path_incomplete_before_terminal"
   | "poison_clean_but_authority_failed"
   | "route_contract_missing"
-  | "hard_source_target_allowed_no_tool_direct";
+  | "hard_source_target_allowed_no_tool_direct"
+  | "compound_prompt_coverage_incomplete";
 
 export type HelixAskTurnSolverHardGate = {
   schema: "helix.ask_turn_solver_hard_gate.v1";
@@ -99,6 +101,7 @@ export type HelixAskTurnSolverTrace = {
     assistant_answer: false;
     raw_content_included: false;
   };
+  compound_prompt_coverage_gate?: HelixCompoundPromptCoverageGate;
   intent_hypotheses: HelixIntentHypothesis[];
   intent_arbitration: HelixIntentArbitration;
   selected_primary_intent: HelixAskTurnIntentKind | null;
@@ -549,6 +552,19 @@ export function evaluateAskTurnSolverHardGate(input: {
   if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "no_tool_direct_used_for_hard_source_target" && canonicalGoalKind !== "note_mutation") {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "route authority audit reported no_tool_direct for hard source-target");
   }
+  const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate ?? trace?.compound_prompt_coverage_gate);
+  if (
+    !typedFailureTerminal &&
+    readString(compoundCoverageGate?.schema) === "helix.compound_prompt_coverage_gate.v1" &&
+    compoundCoverageGate?.applies === true &&
+    compoundCoverageGate?.passed !== true
+  ) {
+    pushHardFailure(
+      details,
+      "compound_prompt_coverage_incomplete",
+      "required compound prompt items were not resolved before terminal authority",
+    );
+  }
 
   const failureCodes = details.map((entry) => entry.code);
   return {
@@ -770,6 +786,7 @@ export function buildAskTurnSolverTrace(input: {
   const compoundCoverage = compoundContract
     ? buildCompoundPromptCoverage(compoundContract, finalAnswerText)
     : null;
+  const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate) as HelixCompoundPromptCoverageGate | null;
   const routeCandidatesForIntent = collectRouteCandidatesForIntent(input.payload, input.selectedRoute);
   const terminalProductsAllowed = allowedTerminalProducts(input.payload);
   const terminalProductsForbidden = forbiddenTerminalProducts(input.payload);
@@ -891,6 +908,7 @@ export function buildAskTurnSolverTrace(input: {
     prompt_interpretation: promptInterpretation,
     ...(compoundContract ? { compound_prompt_contract: compoundContract } : {}),
     ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
+    ...(compoundCoverageGate ? { compound_prompt_coverage_gate: compoundCoverageGate } : {}),
     intent_hypotheses: intentHypotheses,
     intent_arbitration: intentArbitration,
     selected_primary_intent: primary,
