@@ -7,6 +7,7 @@ import { buildHelixTurnTerminalAuthority } from "../services/helix-ask/turn-term
 import {
   ALL_ROUTE_TERMINAL_PRODUCTS,
   buildRouteProductContract,
+  isStructuredDocsViewerPrompt,
 } from "../services/helix-ask/route-product-contract";
 
 const allTerminalSurfacesEqual = (body: Record<string, any>): void => {
@@ -330,5 +331,26 @@ describe("Helix Ask terminal authority contracts", () => {
         expect(allowed).not.toBe(forbidden);
       }
     }
+  });
+
+  it("treats natural docs path prompts as docs-viewer product contracts", () => {
+    const prompt =
+      "summarize /docs/architecture/paper-ingestion-paperrun-contract-v1.md from docs in 4 bullets include the path";
+
+    expect(isStructuredDocsViewerPrompt(prompt)).toBe(true);
+
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:natural-docs-path",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: prompt,
+    });
+
+    expect(contract.source_target).toBe("docs_viewer");
+    expect(contract.allowed_terminal_artifact_kinds).toContain("doc_summary");
+    expect(contract.forbidden_terminal_artifact_kinds).not.toContain("doc_summary");
   });
 });

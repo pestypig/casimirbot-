@@ -34,9 +34,19 @@ export function buildToolCallAdmissionDecision(input: {
   routeProductContract?: HelixRouteProductContract | Record<string, unknown> | null;
   promptText?: string | null;
 }): HelixToolCallAdmissionDecision {
-  const sourceTarget = String(
+  const intentSourceTarget = String(
     (input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source ??
+    "",
+  );
+  const contractSourceTarget = String(
     (input.routeProductContract as Record<string, unknown> | null | undefined)?.source_target ??
+    "",
+  );
+  const sourceTarget = String(
+    (intentSourceTarget && intentSourceTarget !== "unknown" ? intentSourceTarget : null) ??
+    (contractSourceTarget && contractSourceTarget !== "unknown" ? contractSourceTarget : null) ??
+    intentSourceTarget ??
+    contractSourceTarget ??
     "unknown",
   );
   const sourceTargetKind = String(

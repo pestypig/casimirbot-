@@ -30,6 +30,7 @@ export type TheoryCalculatorObjectContextV1 = {
     | "solar_spectrum_observation"
     | "casimir_cavity_object"
     | "nhm2_diagnostic_object"
+    | "tokamak_plasma_object"
     | "generic_physics_object"
     | "manual_symbol_bindings";
   objectId: string | null;

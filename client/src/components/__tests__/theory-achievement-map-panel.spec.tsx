@@ -259,15 +259,71 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+  it("uses the QEI / Stress-Energy lens to load object-bound diagnostic rows", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "QEI / Stress-Energy atlas lens" }));
 
-    expect(await screen.findByText("QEI / Stress-Energy")).toBeTruthy();
+    expect(await screen.findByText("Stress-Energy")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select QEI Margin" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select QEI Margin" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample QEI margin object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("qei_stress_energy");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedQeiStressEnergyGroupId).toBe(
+        "qei.stress_energy.qei_margin",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedQeiStressEnergyObjectBindingId).toBe(
+        "sample-qei-margin",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "nhm2_diagnostic_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("qei_margin = 1 - 0.9");
+    });
+  });
+
+  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Galactic Dynamics atlas lens" }));
+
+    expect(await screen.findByText("Galactic Dynamics")).toBeTruthy();
     expect(screen.getByText("Mapped Badges")).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+  });
+
+  it("uses the Tokamak Plasma lens to load object-bound plasma rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Tokamak Plasma atlas lens" }));
+
+    expect(await screen.findByText("Plasma")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Pressure / Beta" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Pressure / Beta" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample H-mode beta object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("tokamak_plasma");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedTokamakPlasmaGroupId).toBe(
+        "tokamak.plasma.pressure_beta",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedTokamakPlasmaObjectBindingId).toBe(
+        "sample-hmode-beta",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "tokamak_plasma_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "p_B = 5.3^2/(2*0.00000125663706212)",
+      );
+    });
   });
 
   it("remembers selected badges and viewport position across remounts", async () => {

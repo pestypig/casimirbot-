@@ -140,12 +140,19 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
   const docsViewerCue =
     /\bcurrent\s+docs?\s+viewer\s+context\b/i.test(prompt) ||
     /\bdocs?\s+viewer\b/i.test(prompt);
+  const naturalDocsPathCue =
+    /(?:^|\s)\/?docs\/[^\s"'`<>]+\.md\b/i.test(prompt) &&
+    /\b(?:from|in|using|with|via|open|read|summari[sz]e|explain|locate|find|where|search)\b[\s\S]{0,80}\bdocs?\b/i.test(prompt);
+  const naturalDocsTopicCue =
+    /\b(?:summari[sz]e|explain|locate|find|where|search)\b[\s\S]{0,80}\bdocs?\s+(?:about|for|on)\b/i.test(prompt) ||
+    /\bdocs?\s+(?:about|for|on)\b[\s\S]{0,80}\b(?:summari[sz]e|explain|locate|find|where|search)\b/i.test(prompt);
   const structuredPathCue = /^\s*Document\s+path\s*:/im.test(prompt);
   const locateQueryCue = /^\s*Locate\s+query\s*:/im.test(prompt);
   const locationsListCue =
     /\bReturn\s+a\s+short\s+"?Locations:"?\s+list\b/i.test(prompt) ||
     /\banchors?\/sections?\b/i.test(prompt) ||
     /\bevidence\s+snippets?\b/i.test(prompt);
+  if (naturalDocsPathCue || naturalDocsTopicCue) return true;
   return (docsViewerCue && (structuredPathCue || locateQueryCue || locationsListCue)) ||
     (structuredPathCue && locateQueryCue && locationsListCue);
 };

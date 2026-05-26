@@ -1732,6 +1732,71 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
     });
 
+    it("loads object-aware QEI / stress-energy diagnostic loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "nhm2.qei.sampling_window",
+              "nhm2.energy_condition.diagnostic_gate",
+            ],
+            object_context: {
+              kind: "nhm2_diagnostic_object",
+              observables: {
+                qei_bound: 1,
+                qei_sample: 0.9,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "nhm2_diagnostic_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("qei_margin = 1 - 0.9");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("loads object-aware Tokamak Plasma diagnostic loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "tokamak.plasma.magnetic_pressure",
+              "tokamak.plasma.beta_proxy",
+            ],
+            object_context: {
+              kind: "tokamak_plasma_object",
+              observables: {
+                B_T: 5.3,
+                p_B: 11176683.7,
+                p_Pa: 160217.6634,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "tokamak_plasma_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "p_B = 5.3^2/(2*0.00000125663706212)",
+      );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
     it("runs StarSim runtime receipts through theory badge actions", () => {
       const runtimeResult = executeHelixPanelAction(
         {

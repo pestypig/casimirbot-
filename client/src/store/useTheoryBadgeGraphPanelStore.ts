@@ -5,6 +5,8 @@ import type { CosmicDistanceLadderRungId } from "@shared/theory/cosmic-distance-
 import type { SolarSpectrumObservationGroupId } from "@shared/theory/solar-spectrum-observation-map";
 import type { CasimirCavityGroupId } from "@shared/theory/casimir-cavity-map";
 import type { WarpGrNhm2GroupId } from "@shared/theory/warp-gr-nhm2-map";
+import type { QeiStressEnergyGroupId } from "@shared/theory/qei-stress-energy-map";
+import type { TokamakPlasmaGroupId } from "@shared/theory/tokamak-plasma-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
@@ -31,6 +33,10 @@ type TheoryBadgeGraphPanelState = {
   selectedCasimirCavityObjectBindingId: string | null;
   selectedWarpGrNhm2GroupId: WarpGrNhm2GroupId | null;
   selectedWarpGrNhm2ObjectBindingId: string | null;
+  selectedQeiStressEnergyGroupId: QeiStressEnergyGroupId | null;
+  selectedQeiStressEnergyObjectBindingId: string | null;
+  selectedTokamakPlasmaGroupId: TokamakPlasmaGroupId | null;
+  selectedTokamakPlasmaObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -51,6 +57,12 @@ type TheoryBadgeGraphPanelState = {
   setSelectedWarpGrNhm2GroupId: (groupId: WarpGrNhm2GroupId | null) => void;
   setSelectedWarpGrNhm2ObjectBindingId: (bindingId: string | null) => void;
   clearWarpGrNhm2ObjectBinding: () => void;
+  setSelectedQeiStressEnergyGroupId: (groupId: QeiStressEnergyGroupId | null) => void;
+  setSelectedQeiStressEnergyObjectBindingId: (bindingId: string | null) => void;
+  clearQeiStressEnergyObjectBinding: () => void;
+  setSelectedTokamakPlasmaGroupId: (groupId: TokamakPlasmaGroupId | null) => void;
+  setSelectedTokamakPlasmaObjectBindingId: (bindingId: string | null) => void;
+  clearTokamakPlasmaObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -100,6 +112,10 @@ const initialState = {
   selectedCasimirCavityObjectBindingId: null as string | null,
   selectedWarpGrNhm2GroupId: null as WarpGrNhm2GroupId | null,
   selectedWarpGrNhm2ObjectBindingId: null as string | null,
+  selectedQeiStressEnergyGroupId: null as QeiStressEnergyGroupId | null,
+  selectedQeiStressEnergyObjectBindingId: null as string | null,
+  selectedTokamakPlasmaGroupId: null as TokamakPlasmaGroupId | null,
+  selectedTokamakPlasmaObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -163,6 +179,20 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedWarpGrNhm2ObjectBindingId: null,
         }),
+      setSelectedQeiStressEnergyGroupId: (groupId) => set({ selectedQeiStressEnergyGroupId: groupId }),
+      setSelectedQeiStressEnergyObjectBindingId: (bindingId) =>
+        set({ selectedQeiStressEnergyObjectBindingId: bindingId }),
+      clearQeiStressEnergyObjectBinding: () =>
+        set({
+          selectedQeiStressEnergyObjectBindingId: null,
+        }),
+      setSelectedTokamakPlasmaGroupId: (groupId) => set({ selectedTokamakPlasmaGroupId: groupId }),
+      setSelectedTokamakPlasmaObjectBindingId: (bindingId) =>
+        set({ selectedTokamakPlasmaObjectBindingId: bindingId }),
+      clearTokamakPlasmaObjectBinding: () =>
+        set({
+          selectedTokamakPlasmaObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -183,6 +213,10 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedCasimirCavityObjectBindingId: state.selectedCasimirCavityObjectBindingId,
         selectedWarpGrNhm2GroupId: state.selectedWarpGrNhm2GroupId,
         selectedWarpGrNhm2ObjectBindingId: state.selectedWarpGrNhm2ObjectBindingId,
+        selectedQeiStressEnergyGroupId: state.selectedQeiStressEnergyGroupId,
+        selectedQeiStressEnergyObjectBindingId: state.selectedQeiStressEnergyObjectBindingId,
+        selectedTokamakPlasmaGroupId: state.selectedTokamakPlasmaGroupId,
+        selectedTokamakPlasmaObjectBindingId: state.selectedTokamakPlasmaObjectBindingId,
       }),
     },
   ),

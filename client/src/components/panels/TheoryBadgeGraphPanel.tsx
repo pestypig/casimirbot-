@@ -22,10 +22,12 @@ import { Input } from "@/components/ui/input";
 import CasimirCavityLens from "@/components/panels/CasimirCavityLens";
 import CosmicDistanceLadderLens from "@/components/panels/CosmicDistanceLadderLens";
 import PhysicsAtlasBlockLens from "@/components/panels/PhysicsAtlasBlockLens";
+import QeiStressEnergyLens from "@/components/panels/QeiStressEnergyLens";
 import SolarSpectrumLens from "@/components/panels/SolarSpectrumLens";
 import StellarEvolutionLens from "@/components/panels/StellarEvolutionLens";
 import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
 import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/TheoryAtlasRail";
+import TokamakPlasmaLens from "@/components/panels/TokamakPlasmaLens";
 import WarpGrNhm2Lens from "@/components/panels/WarpGrNhm2Lens";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConnectionTrace";
@@ -40,6 +42,7 @@ import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distanc
 import { buildNhm2DiagnosticObjectBindings } from "@shared/theory/nhm2-diagnostic-object-bindings";
 import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
+import { buildTokamakPlasmaObjectBindings } from "@shared/theory/tokamak-plasma-object-bindings";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
@@ -64,6 +67,14 @@ import {
   WARP_GR_NHM2_GROUPS,
   type WarpGrNhm2Group,
 } from "@shared/theory/warp-gr-nhm2-map";
+import {
+  QEI_STRESS_ENERGY_GROUPS,
+  type QeiStressEnergyGroup,
+} from "@shared/theory/qei-stress-energy-map";
+import {
+  TOKAMAK_PLASMA_GROUPS,
+  type TokamakPlasmaGroup,
+} from "@shared/theory/tokamak-plasma-map";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -516,6 +527,14 @@ export default function TheoryBadgeGraphPanel() {
   const selectedWarpObjectBindingId = useTheoryBadgeGraphPanelStore(
     (state) => state.selectedWarpGrNhm2ObjectBindingId,
   );
+  const selectedQeiGroupId = useTheoryBadgeGraphPanelStore((state) => state.selectedQeiStressEnergyGroupId);
+  const selectedQeiObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.selectedQeiStressEnergyObjectBindingId,
+  );
+  const selectedTokamakGroupId = useTheoryBadgeGraphPanelStore((state) => state.selectedTokamakPlasmaGroupId);
+  const selectedTokamakObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.selectedTokamakPlasmaObjectBindingId,
+  );
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
@@ -551,6 +570,20 @@ export default function TheoryBadgeGraphPanel() {
   );
   const clearWarpGrNhm2ObjectBinding = useTheoryBadgeGraphPanelStore(
     (state) => state.clearWarpGrNhm2ObjectBinding,
+  );
+  const setSelectedQeiGroupId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedQeiStressEnergyGroupId);
+  const setSelectedQeiObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedQeiStressEnergyObjectBindingId,
+  );
+  const clearQeiStressEnergyObjectBinding = useTheoryBadgeGraphPanelStore(
+    (state) => state.clearQeiStressEnergyObjectBinding,
+  );
+  const setSelectedTokamakGroupId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedTokamakPlasmaGroupId);
+  const setSelectedTokamakObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedTokamakPlasmaObjectBindingId,
+  );
+  const clearTokamakPlasmaObjectBinding = useTheoryBadgeGraphPanelStore(
+    (state) => state.clearTokamakPlasmaObjectBinding,
   );
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
@@ -804,6 +837,74 @@ export default function TheoryBadgeGraphPanel() {
     setSelectionOverlay,
   ]);
 
+  useEffect(() => {
+    if (!graph || activeLensId !== "qei_stress_energy" || !selectedQeiGroupId) return;
+    const group = QEI_STRESS_ENERGY_GROUPS.find((candidate) => candidate.id === selectedQeiGroupId);
+    if (!group) return;
+    if (
+      selectedQeiObjectBindingId &&
+      !group.objectBindings.some((binding) => binding.id === selectedQeiObjectBindingId)
+    ) {
+      clearQeiStressEnergyObjectBinding();
+    }
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: QEI/stress diagnostic-only boundary.`,
+      ),
+    });
+  }, [
+    clearQeiStressEnergyObjectBinding,
+    activeLensId,
+    graph,
+    selectedQeiGroupId,
+    selectedQeiObjectBindingId,
+    setSelectionOverlay,
+  ]);
+
+  useEffect(() => {
+    if (!graph || activeLensId !== "tokamak_plasma" || !selectedTokamakGroupId) return;
+    const group = TOKAMAK_PLASMA_GROUPS.find((candidate) => candidate.id === selectedTokamakGroupId);
+    if (!group) return;
+    if (
+      selectedTokamakObjectBindingId &&
+      !group.objectBindings.some((binding) => binding.id === selectedTokamakObjectBindingId)
+    ) {
+      clearTokamakPlasmaObjectBinding();
+    }
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Tokamak diagnostic/proxy boundary.`,
+      ),
+    });
+  }, [
+    clearTokamakPlasmaObjectBinding,
+    activeLensId,
+    graph,
+    selectedTokamakGroupId,
+    selectedTokamakObjectBindingId,
+    setSelectionOverlay,
+  ]);
+
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
@@ -870,11 +971,15 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
@@ -918,11 +1023,15 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     setSelectedObjectBindingId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -953,10 +1062,14 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     const payloadIdsByBadgeId = stage.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
       acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
       return acc;
@@ -1008,10 +1121,14 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1077,10 +1194,14 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1146,10 +1267,14 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1215,10 +1340,14 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1275,6 +1404,152 @@ export default function TheoryBadgeGraphPanel() {
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
+  const selectQeiStressEnergyGroup = (group: QeiStressEnergyGroup) => {
+    if (!graph) return;
+    setActiveAtlasLensId("qei_stress_energy");
+    setSelectedQeiGroupId(group.id);
+    setSelectedQeiObjectBindingId(null);
+    setSelectedEvolutionStageId(null);
+    setSelectedCosmicRungId(null);
+    setSelectedSolarGroupId(null);
+    setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
+    clearStarSimObjectBinding();
+    clearCosmicDistanceObjectBinding();
+    clearSolarSpectrumObjectBinding();
+    clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: QEI/stress diagnostic-only boundary.`,
+      ),
+    });
+  };
+
+  const selectQeiObjectBinding = (group: QeiStressEnergyGroup, bindingId: string) => {
+    if (!graph) return;
+    const binding = group.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectQeiStressEnergyGroup(group);
+    setSelectedQeiObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = group.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildNhm2DiagnosticObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: group.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstQeiScalar =
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId === "nhm2.qei.sampling_window") ??
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId === "nhm2.closure.source_residual") ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstQeiScalar) scientificState.loadTheoryLoadoutItem(firstQeiScalar.index);
+  };
+
+  const clearQeiBindingSelection = () => {
+    clearQeiStressEnergyObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+  };
+
+  const selectTokamakPlasmaGroup = (group: TokamakPlasmaGroup) => {
+    if (!graph) return;
+    setActiveAtlasLensId("tokamak_plasma");
+    setSelectedTokamakGroupId(group.id);
+    setSelectedTokamakObjectBindingId(null);
+    setSelectedEvolutionStageId(null);
+    setSelectedCosmicRungId(null);
+    setSelectedSolarGroupId(null);
+    setSelectedCasimirGroupId(null);
+    setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    clearStarSimObjectBinding();
+    clearCosmicDistanceObjectBinding();
+    clearSolarSpectrumObjectBinding();
+    clearCasimirCavityObjectBinding();
+    clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Tokamak diagnostic/proxy boundary.`,
+      ),
+    });
+  };
+
+  const selectTokamakObjectBinding = (group: TokamakPlasmaGroup, bindingId: string) => {
+    if (!graph) return;
+    const binding = group.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectTokamakPlasmaGroup(group);
+    setSelectedTokamakObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = group.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildTokamakPlasmaObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: group.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstTokamakScalar =
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId === "tokamak.plasma.magnetic_pressure") ??
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId.startsWith("tokamak.")) ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstTokamakScalar) scientificState.loadTheoryLoadoutItem(firstTokamakScalar.index);
+  };
+
+  const clearTokamakBindingSelection = () => {
+    clearTokamakPlasmaObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+  };
+
   const runPathToBadge = (badgeId: string) => {
     if (!graph) return;
     void playbackStore.runPlayback({
@@ -1297,11 +1572,15 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedSolarGroupId(null);
     setSelectedCasimirGroupId(null);
     setSelectedWarpGroupId(null);
+    setSelectedQeiGroupId(null);
+    setSelectedTokamakGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearWarpGrNhm2ObjectBinding();
+    clearQeiStressEnergyObjectBinding();
+    clearTokamakPlasmaObjectBinding();
     if (!graph) return;
     const lens = resolvePhysicsAtlasLens({
       graph,
@@ -1383,12 +1662,38 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
+        {activeLensId === "qei_stress_energy" && graph ? (
+          <QeiStressEnergyLens
+            graph={graph}
+            groups={QEI_STRESS_ENERGY_GROUPS}
+            selectedGroupId={selectedQeiGroupId}
+            selectedObjectBindingId={selectedQeiObjectBindingId}
+            onSelectGroup={selectQeiStressEnergyGroup}
+            onSelectObjectBinding={selectQeiObjectBinding}
+            onClearObjectBinding={clearQeiBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
+        {activeLensId === "tokamak_plasma" && graph ? (
+          <TokamakPlasmaLens
+            graph={graph}
+            groups={TOKAMAK_PLASMA_GROUPS}
+            selectedGroupId={selectedTokamakGroupId}
+            selectedObjectBindingId={selectedTokamakObjectBindingId}
+            onSelectGroup={selectTokamakPlasmaGroup}
+            onSelectObjectBinding={selectTokamakObjectBinding}
+            onClearObjectBinding={clearTokamakBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
         {activeLensId &&
         activeLensId !== "stellar_evolution" &&
         activeLensId !== "cosmic_distance_ladder" &&
         activeLensId !== "solar_surface_spectrum" &&
         activeLensId !== "casimir_cavity_modes" &&
         activeLensId !== "warp_gr_nhm2" &&
+        activeLensId !== "qei_stress_energy" &&
+        activeLensId !== "tokamak_plasma" &&
         graph &&
         atlasLens &&
         activeAtlasBlock ? (

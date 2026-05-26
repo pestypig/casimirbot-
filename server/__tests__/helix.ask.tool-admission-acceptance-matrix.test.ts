@@ -728,6 +728,34 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     });
   });
 
+  it("uses a docs route-product contract to admit docs tools when source target arbitration is unknown", () => {
+    const prompt = "summarize docs about paper ingestion contracts in 4 bullets include paths";
+    const routeProductContract = buildRouteProductContract({
+      turnId: "ask:docs-topic-admission",
+      threadId: "thread:docs-topic-admission",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: prompt,
+    });
+    const toolCallAdmissionDecision = buildToolCallAdmissionDecision({
+      turnId: "ask:docs-topic-admission",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      routeProductContract,
+      promptText: prompt,
+    });
+
+    expect(routeProductContract.source_target).toBe("docs_viewer");
+    expect(toolCallAdmissionDecision.source_target).toBe("docs_viewer");
+    expect(toolCallAdmissionDecision.required).toBe(true);
+    expect(toolCallAdmissionDecision.admitted_tool_families).toContain("docs_viewer");
+    expect(toolCallAdmissionDecision.admitted_tool_families).not.toContain("model_only");
+  });
+
   it("flags retrieval-required turns that did not resolve a source target", () => {
     const audit = auditToolAdmissionCoverage({
       payload: {

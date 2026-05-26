@@ -2582,6 +2582,14 @@ describe("helix ask E52 panel control terminal contract", () => {
       "situation-room-pipelines.voice_delivery.propose_from_trace",
     ]));
     expect(response.body?.terminal_error_code ?? null).not.toBe("open_doc_unresolved");
+    expect(response.body?.final_answer_source).not.toBe("typed_failure");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.goal_satisfaction_evaluation).toMatchObject({
+      satisfaction: "satisfied",
+      next_decision: "allow_terminal",
+      canonical_goal_kind: "panel_control",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
     expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).not.toMatch(/temporal comparison/i);
   }, 60000);
 

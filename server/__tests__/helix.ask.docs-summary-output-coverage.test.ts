@@ -12,6 +12,7 @@ const createApp = (): express.Express => {
 };
 
 const docPath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const architectureDocPath = "/docs/architecture/paper-ingestion-paperrun-contract-v1.md";
 
 const workspaceSnapshot = (sessionId: string) => ({
   sessionId,
@@ -42,6 +43,8 @@ describe("Helix Ask docs summary output coverage", () => {
     const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
     const coverage = response.body?.prompt_requirement_coverage;
     expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
     expect(answerText).toContain(docPath);
     expect(visibleBulletCount(answerText)).toBeGreaterThanOrEqual(5);
     expect(
@@ -93,6 +96,8 @@ describe("Helix Ask docs summary output coverage", () => {
     const plannerItems = response.body?.planner_contract?.plan_items ?? [];
     expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
     expect(response.body?.final_status).toBe("final_answer");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
     expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
     expect(response.body?.initial_agent_step_decision?.chosen_capability).toBe("docs-viewer.search_docs");
     expect(
@@ -126,5 +131,83 @@ describe("Helix Ask docs summary output coverage", () => {
     if (response.body?.debug?.doc_summary_observation_candidate) {
       expect(response.body.debug.doc_summary_observation_candidate.terminal_authority).toBe(false);
     }
+  }, 60000);
+
+  it("reconciles natural exact-path docs summaries from dispatch into docs terminal authority", async () => {
+    const app = createApp();
+    const sessionId = `docs-summary-natural-path-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: `summarize ${architectureDocPath} from docs in 4 bullets include the path`,
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: architectureDocPath,
+          hasDocContext: true,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+    expect(response.body?.route_product_contract?.source_target).toBe("docs_viewer");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_summary");
+    expect(
+      response.body?.agent_runtime_loop?.iterations?.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.summarize_doc" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.some((ref: unknown) => String(ref).includes(":doc_summary:")),
+      ),
+    ).toBe(true);
+    expect(answerText).toContain(architectureDocPath);
+    expect(visibleBulletCount(answerText)).toBeGreaterThanOrEqual(4);
+  }, 60000);
+
+  it("admits broad natural docs-topic summaries to docs search instead of model-only reasoning", async () => {
+    const app = createApp();
+    const sessionId = `docs-summary-natural-topic-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "summarize docs about paper ingestion contracts in 4 bullets include paths",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: true,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    const iterations = response.body?.agent_runtime_loop?.iterations ?? [];
+    const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.route_product_contract?.source_target).toBe("docs_viewer");
+    expect(response.body?.tool_call_admission_decision?.source_target).toBe("docs_viewer");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toContain("docs_viewer");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).not.toContain("model_only");
+    expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(
+      iterations.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.summarize_doc" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.some((ref: unknown) => String(ref).includes(":doc_summary:")),
+      ),
+    ).toBe(true);
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+    expect(answerText).toMatch(/\/docs\//);
   }, 60000);
 });

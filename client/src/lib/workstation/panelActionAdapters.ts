@@ -54,6 +54,7 @@ import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distanc
 import { buildNhm2DiagnosticObjectBindings } from "@shared/theory/nhm2-diagnostic-object-bindings";
 import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
+import { buildTokamakPlasmaObjectBindings } from "@shared/theory/tokamak-plasma-object-bindings";
 import {
   buildTheoryCalculatorLoadout,
 } from "@shared/theory/theory-calculator-loadout";
@@ -347,6 +348,33 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       qei_bound: asNumber(observables.qei_bound ?? observables.qeiBound) ?? undefined,
       qei_sample: asNumber(observables.qei_sample ?? observables.qeiSample) ?? undefined,
       qei_margin: asNumber(observables.qei_margin ?? observables.qeiMargin) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "tokamak_plasma_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildTokamakPlasmaObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      B_T: asNumber(observables.B_T ?? observables.b_T ?? observables.magnetic_field_T) ?? undefined,
+      mu0: asNumber(observables.mu0) ?? undefined,
+      p_B: asNumber(observables.p_B ?? observables.magnetic_pressure_Pa) ?? undefined,
+      p_Pa: asNumber(observables.p_Pa ?? observables.pressure_Pa ?? observables.plasma_pressure_Pa) ?? undefined,
+      n_m3: asNumber(observables.n_m3 ?? observables.density_m3) ?? undefined,
+      T_eV: asNumber(observables.T_eV ?? observables.temperature_eV) ?? undefined,
+      e_charge: asNumber(observables.e_charge) ?? undefined,
+      P_in: asNumber(observables.P_in ?? observables.input_power_W) ?? undefined,
+      P_loss: asNumber(observables.P_loss ?? observables.loss_power_W) ?? undefined,
+      P_net: asNumber(observables.P_net ?? observables.net_power_W) ?? undefined,
+      tau_E: asNumber(observables.tau_E ?? observables.energy_confinement_s) ?? undefined,
+      W_th: asNumber(observables.W_th ?? observables.thermal_energy_J) ?? undefined,
+      score: asNumber(observables.score ?? observables.precursor_score) ?? undefined,
+      threshold: asNumber(observables.threshold) ?? undefined,
+      precursor_margin: asNumber(observables.precursor_margin) ?? undefined,
+      core_count: asNumber(observables.core_count) ?? undefined,
+      edge_count: asNumber(observables.edge_count) ?? undefined,
+      sol_count: asNumber(observables.sol_count) ?? undefined,
+      total_count: asNumber(observables.total_count) ?? undefined,
       source: "helix_ask",
     });
   }
