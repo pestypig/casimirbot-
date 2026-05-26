@@ -101,7 +101,7 @@ describe("helix ask E50 terminal consistency", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
     expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
-    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).toBe("model_direct_answer");
     expect(answerText(response.body)).toMatch(/\belectron\b/i);
     expect(answerText(response.body)).not.toMatch(/Completed reasoning turn|active doc|\/docs\//i);
   }, 60000);
@@ -129,7 +129,7 @@ describe("helix ask E50 terminal consistency", () => {
       expect(response.body?.terminal_error_code).toBe("model_only_answer_unavailable");
     } else {
       expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
-      expect(response.body?.final_answer_source).toBe("no_tool_direct");
+      expect(response.body?.final_answer_source).toBe("model_direct_answer");
       expect(response.body?.terminal_error_code ?? null).toBeNull();
     }
     expect(response.body?.selected_final_answer).not.toMatch(/ask_turn_invariant_violation|Completed reasoning turn/i);
@@ -213,7 +213,7 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
     expect(response.body?.agent_step_decision?.chosen_capability).toBe("model.direct_answer");
     expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
-    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).toBe("model_direct_answer");
     expect(response.body?.visual_evidence_refs ?? []).toEqual([]);
     expect(response.body?.artifact_promotion_audit?.blocked_artifact_promotions).toEqual(
       expect.arrayContaining([
@@ -336,7 +336,7 @@ describe("helix ask E50 terminal consistency", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
     expect(response.body?.canonical_goal_frame?.answer_scope).toBe("model_only");
     expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
-    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).toBe("model_direct_answer");
     expect(answerText(response.body)).toMatch(/proper time/i);
     expect(answerText(response.body)).toMatch(/coordinate time/i);
     expect(answerText(response.body)).not.toMatch(/workspace command|active doc|\/docs\//i);
@@ -364,7 +364,7 @@ describe("helix ask E50 terminal consistency", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
     expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
-    expect(response.body?.final_answer_source).toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).toBe("model_direct_answer");
     expect(answerText(response.body)).toMatch(/Doppler effect/i);
     expect(answerText(response.body)).not.toMatch(/Explained\s+\/docs|active doc|\/docs\//i);
   }, 60000);

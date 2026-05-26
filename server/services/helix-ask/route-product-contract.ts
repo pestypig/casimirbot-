@@ -448,10 +448,11 @@ export function buildRouteProductContract(input: {
     turnId: input.turnId,
     threadId: input.threadId,
     sourceTarget,
-    allowedCore: sourceTarget === "unknown" ? ["situation_context_pack"] : [],
+    allowedCore: [],
     allowedExtra: sourceTarget === "model_only" || sourceTarget === "general_background" || sourceTarget === "unknown"
-      ? ["direct_answer_text", "no_tool_direct", "model_only_concept", "source_binding_status", "source_binding_repair_candidate"]
+      ? ["direct_answer_text", "source_binding_status", "source_binding_repair_candidate"]
       : ["direct_answer_text", "workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation", "active_doc_identity", "doc_summary", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "composite_turn_receipt", "pending_server_request"],
-    precedenceReason: "default_terminal_product_contract_allows_only_universal_terminal_products",
+    forbiddenExtra: ["no_tool_direct", "model_only_concept", "client_projection", "panel_generated_answer"],
+    precedenceReason: "default_terminal_product_contract_allows_loop_owned_products",
   });
 }

@@ -37,6 +37,13 @@ const extractLiveSourceRequestedRateMs = (text: string): number | null => {
   return unit.startsWith("m") && unit !== "ms" ? count * 60_000 : count * 1_000;
 };
 
+const hasExplicitLiveOrVisualCue = (text: string): boolean =>
+  /\b(?:live\s+(?:source|answer|capture|screen|visual|pipeline|environment)|visual\s+(?:source|capture|frame|screen|context|evidence)|screen\s+(?:capture|share|frame)|current\s+(?:screen|frame|visual)|describe\s+(?:the\s+)?screen|use\s+(?:the\s+)?live\s+source|look\s+at\s+(?:the\s+)?screen|capture\s+(?:frame|screen)|camera|frames?)\b/i.test(text);
+
+const isBackendReasoningPromptWithoutLiveAsk = (text: string): boolean =>
+  /\b(?:backend|code|patch(?:es)?|route|runtime|terminal\s+authority|source-targeted|source\s+targeted|audit|controller|boundary|projection|debug|repo|grep|implementation|function|file|server|client)\b/i.test(text) &&
+  !hasExplicitLiveOrVisualCue(text);
+
 export const isNegatedLiveSourceCadenceMention = (prompt: string): boolean => {
   const text = normalize(prompt);
   if (!text) return false;
@@ -82,6 +89,7 @@ export const readLiveSourceRequestedRateMs = (text: string): number | null =>
 export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveSourceContinuationIntent | null {
   const text = normalize(prompt);
   if (!text) return null;
+  if (isBackendReasoningPromptWithoutLiveAsk(text)) return null;
   const contextualCadence = isContextualLiveSourceCadenceMention(prompt);
   const cadenceControl = isLiveSourceCadenceControlPrompt(prompt);
   const requestedRateMs = readLiveSourceRequestedRateMs(prompt);
@@ -91,9 +99,9 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
     /\b(?:last|previous|prior)\s+(?:seen\s+)?(?:scene|epoch|frame|visual|screen|capture)|\bscene\s+epoch\b|\bvisual\s+epoch\b/.test(text);
   const explicitBindingDiagnosis =
     /\b(?:worker\s+lanes?|lanes?|field\s+evaluations?|interpretations?|live\s+cognition|live\s+answer\s+(?:panel|environment|card)|no\s+active\s+live\s+answer\s+environment|producer\s+stale|capture\s+(?:health|bound|binding|adopted|adoption)|client\s+adoption|scene_procedure_ready|live_card_ready)\b/.test(text) &&
-    /\b(?:visual|screen|capture|live\s+answer|source|scene|frame|updating|bound|binding|attach|environment|producer|adopted|adoption|ready|readiness|stale)\b/.test(text);
+    /\b(?:visual|screen|capture|live\s+answer|live\s+source|scene|frame|updating|bound|binding|attach|environment|producer|adopted|adoption|ready|readiness|stale)\b/.test(text);
   const mentionsLiveSurface =
-    /\b(?:screen|screenshare|screen share|tab|window|visual|camera|frame|frames|source|live answer|live source|pipeline|share)\b/.test(text);
+    /\b(?:live\s+(?:source|answer|pipeline|capture)|visual\s+(?:source|capture|frame)|screen\s+(?:capture|share)|current\s+(?:screen|frame|visual)|screenshare|screen share|camera|frames?)\b/.test(text);
   const continuation =
     /\b(?:keep|continue|watch|checking|check|monitor|track|look at|observe|process|analyze|analyse|use)\b/.test(text);
   const screenVisibleControlText =
@@ -119,11 +127,11 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   if (workstationCalculatorLiveSource) return null;
   const inspect =
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
-    /\b(?:pipeline|visual source|screen|live answer|analysis|frame|minecraft events|world events|minehut|world event)\b/.test(text);
+    /\b(?:live\s+(?:source|answer|pipeline)|visual\s+source|screen\s+capture|frame|producer|capture\s+binding|minecraft events|world events|minehut|world event)\b/.test(text);
   const bindingDiagnosis = explicitBindingDiagnosis && !procedureEpochComparison;
   const repair =
     /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
-    /\b(?:pipeline|visual|frame|source|analysis|live answer|minecraft events|world events|minehut)\b/.test(text);
+    /\b(?:live\s+(?:source|answer|pipeline)|visual|frame|screen\s+capture|capture\s+binding|minecraft events|world events|minehut)\b/.test(text);
 
   if (bindingDiagnosis) {
     return {

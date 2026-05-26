@@ -8782,6 +8782,22 @@ type ReasoningTheaterParticle = {
   kind: MirekCellKind;
 };
 
+type MirekReasoningDisplayGridCell = {
+  id: string;
+  x: number;
+  y: number;
+  kind: MirekCellKind;
+  active: boolean;
+  semantic: boolean;
+  intensity: number;
+};
+
+type MirekReasoningDisplayGrid = {
+  width: number;
+  height: number;
+  cells: MirekReasoningDisplayGridCell[];
+};
+
 type ReasoningTheaterFrontierParticleNode = {
   id: string;
   phaseOffsetMs: number;
@@ -11815,6 +11831,152 @@ function mirekCellParticleClassName(kind: MirekCellKind): string {
   }
 }
 
+function mirekCellGridClassName(kind: MirekCellKind): string {
+  switch (kind) {
+    case "proof":
+      return "bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)]";
+    case "objective":
+      return "bg-white/95 shadow-[0_0_10px_rgba(255,255,255,0.55)]";
+    case "evidence":
+      return "bg-white/85 shadow-[0_0_9px_rgba(209,250,229,0.5)]";
+    case "support":
+      return "bg-cyan-100/80 shadow-[0_0_8px_rgba(207,250,254,0.45)]";
+    case "gap":
+      return "bg-amber-100/80 shadow-[0_0_8px_rgba(254,243,199,0.45)]";
+    case "conflict":
+      return "bg-orange-100/80 shadow-[0_0_9px_rgba(255,237,213,0.45)]";
+    case "blocked":
+      return "bg-rose-100/85 shadow-[0_0_10px_rgba(255,228,230,0.5)]";
+    case "afterglow":
+      return "bg-white/35 shadow-[0_0_6px_rgba(255,255,255,0.25)]";
+    case "context":
+    case "empty":
+    default:
+      return "bg-white/55 shadow-[0_0_6px_rgba(255,255,255,0.3)]";
+  }
+}
+
+function mirekReasoningDisplayDensity(
+  artifact: MirekReasoningArtifactV1,
+  theater: ReasoningTheaterState,
+): number {
+  const provenanceBase =
+    artifact.source.provenanceMode === "strict_exact"
+      ? 0.36
+      : artifact.source.provenanceMode === "derived"
+        ? 0.31
+        : 0.25;
+  const phaseBoost =
+    artifact.state.phase === "retrieve" || artifact.state.phase === "synthesize"
+      ? 0.07
+      : artifact.state.phase === "verify" || artifact.state.phase === "execute"
+        ? 0.04
+        : 0.02;
+  const pressureBoost = theater.stance === "contested" ? 0.06 : theater.stance === "fail_closed" ? -0.04 : 0;
+  return clampNumber(
+    provenanceBase + phaseBoost + pressureBoost + theater.momentum * 0.08 - theater.ambiguityPressure * 0.03,
+    0.22,
+    0.48,
+  );
+}
+
+function countMirekAliveNeighbors(cells: Uint8Array, width: number, height: number, x: number, y: number): number {
+  let count = 0;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      count += cells[ny * width + nx] ?? 0;
+    }
+  }
+  return count;
+}
+
+function buildMirekReasoningDisplayGrid(
+  artifact: MirekReasoningArtifactV1,
+  theater: ReasoningTheaterState,
+): MirekReasoningDisplayGrid {
+  const width = artifact.grid.width;
+  const height = artifact.grid.height;
+  const total = width * height;
+  const alive = new Uint8Array(total);
+  const intensity = new Float32Array(total);
+  const kinds: MirekCellKind[] = Array.from({ length: total }, () => "context");
+  const semantic = new Uint8Array(total);
+  const density = mirekReasoningDisplayDensity(artifact, theater);
+  for (let index = 0; index < total; index += 1) {
+    const seedRatio = (hash32(`${artifact.finalFrameHash}:display:${index}`) % 10_000) / 10_000;
+    const active = seedRatio < density;
+    alive[index] = active ? 1 : 0;
+    intensity[index] = active ? 0.24 + seedRatio * 0.38 : 0.05;
+  }
+  for (const cell of artifact.grid.cells) {
+    const index = cell.y * width + cell.x;
+    if (index < 0 || index >= total) continue;
+    alive[index] = 1;
+    semantic[index] = 1;
+    kinds[index] = cell.kind;
+    intensity[index] = Math.max(intensity[index] ?? 0, clamp01(0.52 + cell.opacity * 0.48));
+    for (let dy = -1; dy <= 1; dy += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const nx = cell.x + dx;
+        const ny = cell.y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        const neighborIndex = ny * width + nx;
+        alive[neighborIndex] = 1;
+        intensity[neighborIndex] = Math.max(intensity[neighborIndex] ?? 0, 0.28 + cell.opacity * 0.22);
+      }
+    }
+  }
+
+  const survive =
+    artifact.state.certaintyClass === "confirmed" || artifact.state.certaintyClass === "reasoned"
+      ? new Set([2, 3, 4])
+      : new Set([2, 3]);
+  const born =
+    artifact.state.phase === "retrieve" || artifact.state.phase === "synthesize"
+      ? new Set([3, 6])
+      : artifact.state.phase === "verify" || artifact.state.phase === "execute"
+        ? new Set([3, 4])
+        : new Set([3]);
+  const ticks = clampNumber(Math.round(5 + theater.momentum * 4 + theater.ambiguityPressure * 2), 4, 10);
+  for (let tick = 0; tick < ticks; tick += 1) {
+    const next = new Uint8Array(total);
+    const nextIntensity = new Float32Array(total);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const index = y * width + x;
+        const neighbors = countMirekAliveNeighbors(alive, width, height, x, y);
+        const keepSemantic = semantic[index] === 1;
+        const willLive = keepSemantic || (alive[index] ? survive.has(neighbors) : born.has(neighbors));
+        next[index] = willLive ? 1 : 0;
+        const neighborGlow = clamp01(neighbors / 8);
+        nextIntensity[index] = willLive
+          ? clamp01((intensity[index] ?? 0.2) * 0.78 + 0.16 + neighborGlow * 0.18)
+          : clamp01((intensity[index] ?? 0.05) * 0.55);
+      }
+    }
+    alive.set(next);
+    intensity.set(nextIntensity);
+  }
+
+  const cells: MirekReasoningDisplayGridCell[] = [];
+  for (let index = 0; index < total; index += 1) {
+    cells.push({
+      id: `mirek-display-${index}`,
+      x: index % width,
+      y: Math.floor(index / width),
+      kind: kinds[index] ?? "context",
+      active: alive[index] === 1,
+      semantic: semantic[index] === 1,
+      intensity: clamp01(intensity[index] ?? 0),
+    });
+  }
+  return { width, height, cells };
+}
+
 function buildReasoningTheaterFrontierParticles(
   seed: number,
   count: number,
@@ -14430,9 +14592,9 @@ export function HelixAskPill({
       previousObjectiveFingerprint: mirekObjectiveFingerprintRef.current,
       sharedExactPathRatio: calculateMirekSharedExactPathRatio(mirekEvidenceAnchors, previousArtifact),
       capsuleContinuityScore: contextCapsuleDetectedId ? 0.7 : 0,
-      width: 36,
-      height: 9,
-      ticks: 3,
+      width: 64,
+      height: 18,
+      ticks: 5,
       turnId: latestAskReply?.id ?? null,
       sessionId: askLiveSessionId ?? helixAskSessionRef.current,
     });
@@ -14462,6 +14624,10 @@ export function HelixAskPill({
       : mirekReasoningArtifact?.source.provenanceMode === "derived"
         ? 0.72
         : 0.48;
+  const mirekReasoningDisplayGrid = useMemo(() => {
+    if (!mirekReasoningArtifact || !reasoningTheater) return null;
+    return buildMirekReasoningDisplayGrid(mirekReasoningArtifact, reasoningTheater);
+  }, [mirekReasoningArtifact, reasoningTheater]);
   const reasoningTheaterFrontierParticles = useMemo(() => {
     if (!reasoningTheater) return [];
     return buildReasoningTheaterFrontierParticles(
@@ -29086,6 +29252,47 @@ export function HelixAskPill({
                 className={`pointer-events-none absolute inset-0 opacity-70 ${moodPalette.replyTint}`}
                 aria-hidden
               />
+              {reasoningTheater && mirekReasoningDisplayGrid ? (
+                <div
+                  data-testid="helix-ask-mirek-field"
+                  className="pointer-events-none absolute inset-0 overflow-hidden"
+                  aria-hidden
+                >
+                  <div
+                    className="absolute inset-0 opacity-70"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 18% 50%, rgba(255,255,255,0.12), transparent 32%), radial-gradient(circle at 82% 42%, rgba(34,211,238,0.1), transparent 34%)",
+                    }}
+                  />
+                  <div
+                    className="absolute inset-x-2 bottom-2 top-2 grid gap-[1px] opacity-95 mix-blend-screen"
+                    style={{
+                      gridTemplateColumns: `repeat(${mirekReasoningDisplayGrid.width}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${mirekReasoningDisplayGrid.height}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {mirekReasoningDisplayGrid.cells.map((cell, index) => (
+                      <span
+                        key={cell.id}
+                        className={`block h-full w-full rounded-[1px] ${
+                          cell.active ? `animate-pulse ${mirekCellGridClassName(cell.kind)}` : "bg-white/[0.035]"
+                        }`}
+                        style={{
+                          gridColumn: cell.x + 1,
+                          gridRow: cell.y + 1,
+                          opacity:
+                            (cell.active ? Math.max(0.18, cell.intensity) : 0.08) *
+                            (0.52 + reasoningTheater.fogOpacity * 0.24) *
+                            mirekReasoningFieldStrength,
+                          animationDelay: `${((cell.x + cell.y * 1.7 + index * 0.03) % 14) * 0.055}s`,
+                          animationDuration: `${0.95 + ((cell.x + cell.y + index) % 7) * 0.1}s`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="relative">
                 {reasoningTheater ? (
                   <div
@@ -29180,7 +29387,34 @@ export function HelixAskPill({
                         </div>
                       ) : null}
                       <div className="mt-2 relative h-1.5 overflow-visible rounded-full bg-black/45">
-                        <div className="absolute inset-0 overflow-hidden rounded-full">
+                        <div
+                          className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-5 overflow-hidden rounded-md"
+                          aria-hidden
+                        >
+                          <div
+                            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,211,238,0.16),rgba(15,23,42,0)_62%)]"
+                            style={{ opacity: 0.22 + mirekReasoningFieldStrength * 0.18 }}
+                          />
+                          {reasoningTheaterParticles.map((particle) => (
+                            <span
+                              key={`mirek-bar-${particle.id}`}
+                              className={`absolute rounded-full animate-pulse ${mirekCellParticleClassName(particle.kind)}`}
+                              style={{
+                                left: `${particle.leftPct}%`,
+                                top: `${particle.topPct}%`,
+                                width: `${particle.sizePx * 1.35}px`,
+                                height: `${particle.sizePx * 1.35}px`,
+                                opacity:
+                                  Math.max(0.2, particle.opacity) *
+                                  (0.48 + reasoningTheater.fogOpacity * 0.22) *
+                                  mirekReasoningFieldStrength,
+                                animationDelay: `${particle.delayS}s`,
+                                animationDuration: `${particle.durationS}s`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <div className="absolute inset-0 z-[1] overflow-hidden rounded-full">
                           <div
                             ref={reasoningTheaterMeterFillRef}
                             className={`relative h-full rounded-full ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar}`}

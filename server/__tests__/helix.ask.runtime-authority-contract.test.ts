@@ -4,22 +4,75 @@ import {
   evaluateTerminalBoundaryEligibility,
   goalSatisfactionAllowsTerminal,
   hasAgentRuntimeLoopDecisionChain,
+  hasDirectAnswerDraft,
   hasPostObservationModelDecision,
   hasSelectedCapabilityObservation,
   isSourceCapabilityDiagnosticTurn,
 } from "../services/helix-ask/runtime-authority-contract";
 
 describe("helix ask runtime authority contract", () => {
-  it("does not require the runtime loop for model-only direct answers", () => {
+  it("requires model-only direct answers to pass through the runtime answer step", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "model_only_concept" },
       terminal_artifact_kind: "direct_answer_text",
-      final_answer_source: "no_tool_direct",
+      final_answer_source: "model_direct_answer",
     });
 
-    expect(report.source_capability_diagnostic_turn).toBe(false);
-    expect(report.requires_runtime_loop).toBe(false);
+    expect(report.source_capability_diagnostic_turn).toBe(true);
+    expect(report.requires_runtime_loop).toBe(true);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toEqual(
+      expect.arrayContaining([
+        "agent_runtime_loop_missing",
+        "agent_step_decision_missing",
+        "direct_answer_text_missing",
+      ]),
+    );
+  });
+
+  it("allows model-only direct answers after the loop records a model answer draft", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "model_only_concept" },
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "model_only_concept",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-answer",
+            decision_authority: "llm",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["direct-answer-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "direct-answer-1",
+          kind: "direct_answer_text",
+          payload: {
+            schema: "helix.direct_answer_text.v1",
+            text: "An electron is a negatively charged elementary particle.",
+          },
+        },
+      ],
+    };
+
+    expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(false);
+    expect(hasAgentRuntimeLoopDecisionChain(payload)).toBe(true);
+    expect(hasDirectAnswerDraft(payload)).toBe(true);
+    expect(hasPostObservationModelDecision(payload)).toBe(true);
+    expect(goalSatisfactionAllowsTerminal(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.eligible).toBe(true);
+    expect(report.severity).toBe("pass");
     expect(report.blocking_reasons).toEqual([]);
   });
 
