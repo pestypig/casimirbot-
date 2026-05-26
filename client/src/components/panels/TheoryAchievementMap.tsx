@@ -69,6 +69,8 @@ function badgeAtlasBlockId(badge: TheoryBadgeV1): PhysicsAtlasBlockId | null {
 }
 
 function badgeGlyph(badge: TheoryBadgeV1): string {
+  if (badge.subjects.includes("uncertainty")) return "u";
+  if (badge.subjects.includes("curvature") || badge.subjects.includes("collapse")) return "K";
   if (badge.subjects.includes("galactic") || badge.subjects.includes("rotation_curve")) return "◎";
   if (badge.subjects.includes("relative_velocity")) return "v";
   if (badge.id.includes("halpha") || badge.subjects.includes("halpha")) return "Hα";

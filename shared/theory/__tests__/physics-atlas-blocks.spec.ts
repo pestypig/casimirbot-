@@ -29,5 +29,7 @@ describe("physics atlas blocks", () => {
       "solar.spectrum.photon_energy",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
+    expect(byId.get("curvature_collapse")?.status).toBe("active");
+    expect(byId.get("curvature_collapse")?.primaryBadgeIds).toContain("curvature.proxy.body_density");
   });
 });

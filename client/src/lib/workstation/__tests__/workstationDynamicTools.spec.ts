@@ -132,9 +132,26 @@ describe("workstation dynamic tools", () => {
 
   it("exposes Dottie observer tools as receipt-backed manual actions", () => {
     const tools = getWorkstationDynamicTools();
+    const manifest = tools.find((tool) => tool.name === "situation_room_pipelines.dottie_manifest");
     const attach = tools.find((tool) => tool.name === "situation_room_pipelines.observer_attach");
     const propose = tools.find((tool) => tool.name === "situation_room_pipelines.voice_delivery_propose_from_trace");
 
+    expect(manifest).toMatchObject({
+      namespace: "workstation",
+      panel_id: "situation-room-pipelines",
+      action_id: "dottie.manifest",
+      risk: "medium",
+      returns_artifact: true,
+      terminal_artifact_kind: "dottie_manifest_preset_receipt",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+    expect(manifest?.inputSchema).toMatchObject({
+      properties: {
+        voice_mode: { enum: expect.arrayContaining(["off", "propose_only", "on_confirm"]) },
+        commentary_cadence: { enum: ["milestones_only", "salience_only", "manual"] },
+      },
+    });
     expect(attach).toMatchObject({
       namespace: "workstation",
       panel_id: "situation-room-pipelines",

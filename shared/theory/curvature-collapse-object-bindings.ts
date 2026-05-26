@@ -1,0 +1,109 @@
+import type { TheoryCalculatorObjectContextV1 } from "../contracts/theory-calculator-loadout.v1";
+
+export type CurvatureCollapseObjectBindingInput = {
+  objectId?: string;
+  label?: string;
+  rho_kg_m3?: number;
+  power_W?: number;
+  area_m2?: number;
+  powerFlux_W_m2?: number;
+  d_eff?: number;
+  gain?: number;
+  kappa_body?: number;
+  kappa_drive?: number;
+  tau_ms?: number;
+  dt_ms?: number;
+  r_c_m?: number;
+  c?: number;
+  L_present?: number;
+  observed?: number;
+  bound?: number;
+  sigma?: number;
+  G?: number;
+  source?: TheoryCalculatorObjectContextV1["source"];
+};
+
+function definedEntries(values: Record<string, string | number | undefined>): Record<string, string | number> {
+  return Object.fromEntries(
+    Object.entries(values).filter((entry): entry is [string, string | number] => entry[1] !== undefined),
+  );
+}
+
+export function buildCurvatureCollapseObjectBindings(
+  input: CurvatureCollapseObjectBindingInput,
+): TheoryCalculatorObjectContextV1 {
+  const variableBindings = definedEntries({
+    rho_kg_m3: input.rho_kg_m3,
+    power_W: input.power_W,
+    area_m2: input.area_m2,
+    powerFlux_W_m2: input.powerFlux_W_m2,
+    d_eff: input.d_eff ?? 1,
+    gain: input.gain ?? 1,
+    kappa_body: input.kappa_body,
+    kappa_drive: input.kappa_drive,
+    tau_ms: input.tau_ms,
+    dt_ms: input.dt_ms,
+    r_c_m: input.r_c_m,
+    c: input.c ?? 299792458,
+    L_present: input.L_present,
+    observed: input.observed,
+    bound: input.bound,
+    sigma: input.sigma,
+    G: input.G ?? 6.6743e-11,
+  });
+
+  return {
+    kind: "curvature_collapse_object",
+    objectId: input.objectId ?? null,
+    label: input.label ?? "Curvature / collapse object",
+    observables: {
+      objectId: input.objectId ?? null,
+      label: input.label ?? null,
+      rho_kg_m3: input.rho_kg_m3 ?? null,
+      power_W: input.power_W ?? null,
+      area_m2: input.area_m2 ?? null,
+      powerFlux_W_m2: input.powerFlux_W_m2 ?? null,
+      d_eff: input.d_eff ?? null,
+      gain: input.gain ?? null,
+      kappa_body: input.kappa_body ?? null,
+      kappa_drive: input.kappa_drive ?? null,
+      tau_ms: input.tau_ms ?? null,
+      dt_ms: input.dt_ms ?? null,
+      r_c_m: input.r_c_m ?? null,
+      L_present: input.L_present ?? null,
+      observed: input.observed ?? null,
+      bound: input.bound ?? null,
+      sigma: input.sigma ?? null,
+    },
+    variableBindings,
+    units: {
+      rho_kg_m3: "kg/m^3",
+      power_W: "W",
+      area_m2: "m^2",
+      powerFlux_W_m2: "W/m^2",
+      d_eff: "1",
+      gain: "1",
+      kappa_body: "m^-2",
+      kappa_drive: "m^-2",
+      tau_ms: "ms",
+      dt_ms: "ms",
+      r_c_m: "m",
+      c: "m/s",
+      L_present: "m",
+      observed: "varies",
+      bound: "varies",
+      sigma: "varies",
+      G: "m^3 kg^-1 s^-2",
+    },
+    source: input.source ?? "manual",
+    assumptions: [
+      "Curvature/collapse rows are diagnostic calculator helpers.",
+      "Collapse benchmark rows model commit/selection cadence, not literal objective-collapse physics.",
+      "Runtime and certificate interpretation require backend receipts.",
+    ],
+    claimBoundaryNotes: [
+      "Curvature/collapse loadouts are benchmark diagnostics.",
+      "Calculator rows do not certify curvature gravity, signal behavior, or mechanism claims.",
+    ],
+  };
+}

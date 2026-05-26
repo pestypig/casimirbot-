@@ -129,6 +129,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.set_live_commentary_policy",
   "situation-room-pipelines.request_agentic_review",
   "situation-room-pipelines.set_companion_policy",
+  "situation-room-pipelines.dottie.manifest",
   "situation-room-pipelines.observer.attach",
   "situation-room-pipelines.observer.detach",
   "situation-room-pipelines.observer.query",
@@ -620,6 +621,32 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
   {
     panel_id: "situation-room-pipelines",
+    action_id: "dottie.manifest",
+    title: "Manifest Dottie",
+    description: "Create a witness-only Auntie Dottie observer preset for the active Situation Room.",
+    aliases: [
+      "manifest dottie",
+      "start auntie dottie",
+      "build dottie observer",
+      "make dottie watch this room",
+    ],
+    required_args: [],
+    optional_args: [
+      "thread_id",
+      "room_id",
+      "source_ids",
+      "mode",
+      "voice_mode",
+      "commentary_cadence",
+      "target_run_id",
+      "objective",
+      "max_chars",
+    ],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
     action_id: "observer.attach",
     title: "Attach Observer",
     description: "Attach a witness-only observer, such as Auntie Dottie, to a Helix Ask run's public commentary events.",
@@ -1098,8 +1125,9 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "environment_state", "environment_affordance", "procedure_graph", "calculator_stream", "simulation_stream"] };
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
+  if (arg === "commentary_cadence") return { enum: ["milestones_only", "salience_only", "manual"] };
   if (arg === "status") return { enum: ["active", "paused", "stopped"] };
-  if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
+  if (arg === "voice_mode") return { enum: ["off", "propose_only", "on_confirm", "text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "observer_profile") return { enum: ["auntie_dottie", "dottie", "custom"] };
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
   if (arg === "calculator_setup") {
@@ -1217,6 +1245,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "dottie.manifest") return "dottie_manifest_preset_receipt";
   if (panelId === "situation-room-pipelines" && ["observer.attach", "observer.detach"].includes(actionId)) return "dottie_observer_subscription_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "observer.query") return "dottie_observer_query_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") return "visual_producer_cadence_receipt";

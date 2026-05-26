@@ -131,6 +131,9 @@ const artifactKindMatchesCapability = (
   if (capability === "situation-room-pipelines.dottie_observer.evaluate") {
     return /workstation_tool_evaluation|helix\.workstation_tool_evaluation\.v1/i.test(joined) && /dottie_observer|dottie_voice|observer_|voice_delivery/i.test(joined);
   }
+  if (capability === "situation-room-pipelines.dottie.manifest") {
+    return /dottie_manifest_preset_receipt|helix\.dottie_manifest_preset_receipt\.v1/i.test(joined);
+  }
   if (capability.startsWith("situation-room-pipelines.") && /(?:observer|voice_delivery|dottie)/i.test(capability)) {
     return /dottie_|observer_|observer\.|voice_delivery|tool_observation/i.test(joined);
   }
@@ -139,6 +142,14 @@ const artifactKindMatchesCapability = (
   if (capability.includes(".")) return /tool_observation|workspace_action_receipt/i.test(joined);
   return false;
 };
+
+const isDottieObserverCapability = (capability: string): boolean =>
+  capability === "situation-room-pipelines.observer.attach" ||
+  capability === "situation-room-pipelines.observer.detach" ||
+  capability === "situation-room-pipelines.observer.query" ||
+  capability === "situation-room-pipelines.voice_delivery.propose_from_trace" ||
+  capability === "situation-room-pipelines.dottie_observer.evaluate" ||
+  capability === "situation-room-pipelines.dottie.manifest";
 
 const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): string | null => {
   if (!artifact) return null;
@@ -158,6 +169,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/dottie_voice_receipt|helix\.dottie_voice_receipt\.v1|voice_delivery\.propose_from_trace|voice_delivery/i.test(joined)) {
     return "situation-room-pipelines.voice_delivery.propose_from_trace";
   }
+  if (/dottie_manifest_preset_receipt|helix\.dottie_manifest_preset_receipt\.v1/i.test(joined)) {
+    return "situation-room-pipelines.dottie.manifest";
+  }
   if (/calculator_receipt|calculator_result/i.test(joined)) return "scientific-calculator.solve_expression";
   if (/doc_summary/i.test(joined)) return "docs-viewer.summarize_doc";
   if (/doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined)) return "docs-viewer.locate_in_doc";
@@ -170,6 +184,18 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/workspace_action_receipt/i.test(joined) && /scientific-calculator/i.test(joined)) return "scientific-calculator.open";
   if (/workspace_action_receipt/i.test(joined) && /workstation-notes/i.test(joined)) return "workstation-notes.open";
   return null;
+};
+
+const selectedDottieCapabilityHasCurrentTurnObservation = (
+  capability: string,
+  artifacts: Record<string, unknown>[],
+): boolean => {
+  if (!isDottieObserverCapability(capability)) return false;
+  return artifacts.some((artifact) => {
+    const sourceScope = readString(artifact.source_scope);
+    if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;
+    return artifactKindMatchesCapability(capability, artifact);
+  });
 };
 
 const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): string[] => {
@@ -274,6 +300,9 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
       const artifact = artifactById.get(ref) ?? null;
       return artifactLinkedToIteration(artifact, record) && artifactKindMatchesCapability(capability, artifact);
     })) return true;
+    if (selectedDottieCapabilityHasCurrentTurnObservation(capability, Array.from(artifactById.values()))) {
+      return true;
+    }
     const toolObservation = readRecord(record.tool_observation);
     if (!toolObservation) return false;
     const status = readString(toolObservation.status);

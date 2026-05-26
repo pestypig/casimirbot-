@@ -30,6 +30,9 @@ import {
 import {
   buildGalacticDynamicsTheoryBadgesV1,
 } from "./galactic-dynamics-theory-badges";
+import {
+  buildCurvatureCollapseTheoryBadgesV1,
+} from "./curvature-collapse-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -752,12 +755,13 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const casimir = buildCasimirCavityTheoryBadgesV1();
   const tokamak = buildTokamakPlasmaTheoryBadgesV1();
   const galactic = buildGalacticDynamicsTheoryBadgesV1();
+  const curvature = buildCurvatureCollapseTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2, StarSim, cosmic distance ladder, solar spectrum, Casimir cavity, tokamak plasma, and galactic dynamics contexts.",
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2, StarSim, cosmic distance ladder, solar spectrum, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
     badges: [
       ...FIRST_PRINCIPLES_THEORY_BADGES,
       ...badges,
@@ -767,6 +771,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...casimir.badges,
       ...tokamak.badges,
       ...galactic.badges,
+      ...curvature.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -777,6 +782,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...casimir.edges,
       ...tokamak.edges,
       ...galactic.edges,
+      ...curvature.edges,
     ],
   });
 }

@@ -56,6 +56,7 @@ import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spec
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { buildTokamakPlasmaObjectBindings } from "@shared/theory/tokamak-plasma-object-bindings";
 import { buildGalacticDynamicsObjectBindings } from "@shared/theory/galactic-dynamics-object-bindings";
+import { buildCurvatureCollapseObjectBindings } from "@shared/theory/curvature-collapse-object-bindings";
 import {
   buildTheoryCalculatorLoadout,
 } from "@shared/theory/theory-calculator-loadout";
@@ -82,6 +83,13 @@ import {
   HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
   type HelixDottieObserverSubscriptionV1,
 } from "@shared/helix-agent-commentary";
+import {
+  buildDottieManifestPreset,
+  buildDottieManifestPresetReceipts,
+  type HelixDottieManifestCommentaryCadence,
+  type HelixDottieManifestMode,
+  type HelixDottieManifestVoiceMode,
+} from "@shared/helix-dottie-manifest-preset";
 import { recordDottieVoiceDebugClip } from "@/lib/helix/dottie-voice-debug-clips";
 
 export type HelixPanelActionRequest = {
@@ -229,6 +237,26 @@ function boundedDottieMaxChars(value: unknown): number {
 
 function nextDottieObserverId(profile: string, targetRunId: string): string {
   return `observer:${slugify(profile) || "dottie"}:${slugify(targetRunId) || "run"}:${Date.now()}`;
+}
+
+function normalizeDottieManifestMode(value: unknown): HelixDottieManifestMode {
+  const mode = asNonEmptyString(value);
+  if (mode === "observer" || mode === "auntie_dottie" || mode === "operator_witness") return mode;
+  return "auntie_dottie";
+}
+
+function normalizeDottieManifestVoiceMode(value: unknown): HelixDottieManifestVoiceMode {
+  const mode = asNonEmptyString(value);
+  if (mode === "off" || mode === "propose_only" || mode === "on_confirm") return mode;
+  if (mode === "voice_on_confirm") return "on_confirm";
+  if (mode === "text_only") return "off";
+  return "propose_only";
+}
+
+function normalizeDottieManifestCommentaryCadence(value: unknown): HelixDottieManifestCommentaryCadence {
+  const cadence = asNonEmptyString(value);
+  if (cadence === "milestones_only" || cadence === "salience_only" || cadence === "manual") return cadence;
+  return "milestones_only";
 }
 
 function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObjectContextV1 | null {
@@ -403,6 +431,32 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       velocity_residual: asNumber(observables.velocity_residual) ?? undefined,
       residual_sum_sq: asNumber(observables.residual_sum_sq) ?? undefined,
       N_points: asNumber(observables.N_points ?? observables.n_points) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "curvature_collapse_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildCurvatureCollapseObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      rho_kg_m3: asNumber(observables.rho_kg_m3 ?? observables.rho) ?? undefined,
+      power_W: asNumber(observables.power_W ?? observables.power) ?? undefined,
+      area_m2: asNumber(observables.area_m2 ?? observables.area) ?? undefined,
+      powerFlux_W_m2:
+        asNumber(observables.powerFlux_W_m2 ?? observables.power_flux_W_m2 ?? observables.power_flux) ?? undefined,
+      d_eff: asNumber(observables.d_eff ?? observables.duty_eff) ?? undefined,
+      gain: asNumber(observables.gain) ?? undefined,
+      kappa_body: asNumber(observables.kappa_body ?? observables.kappa_body_m2) ?? undefined,
+      kappa_drive: asNumber(observables.kappa_drive ?? observables.kappa_drive_m2) ?? undefined,
+      tau_ms: asNumber(observables.tau_ms) ?? undefined,
+      dt_ms: asNumber(observables.dt_ms) ?? undefined,
+      r_c_m: asNumber(observables.r_c_m ?? observables.rc_m) ?? undefined,
+      c: asNumber(observables.c ?? observables.speed_of_light) ?? undefined,
+      L_present: asNumber(observables.L_present ?? observables.L_present_m) ?? undefined,
+      observed: asNumber(observables.observed) ?? undefined,
+      bound: asNumber(observables.bound) ?? undefined,
+      sigma: asNumber(observables.sigma) ?? undefined,
+      G: asNumber(observables.G) ?? undefined,
       source: "helix_ask",
     });
   }
@@ -2523,6 +2577,39 @@ export function executeHelixPanelAction(
           deterministic_content_role: "observation_not_assistant_answer",
         },
         message: `Set companion mode to ${companionMode}.`,
+      };
+    }
+
+    if (actionId === "dottie.manifest") {
+      const room = resolveSituationRoom(args);
+      const preset = buildDottieManifestPreset({
+        threadId: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+        roomId: asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? "situation-room:active",
+        sourceIds: Array.from(
+          new Set([
+            ...asStringArray(args.source_ids ?? args.sourceIds),
+            ...asStringArray(args.source_id ?? args.sourceId),
+            ...(room ? resolveSituationSourceIds(room, args) : []),
+          ].filter(Boolean)),
+        ),
+        mode: normalizeDottieManifestMode(args.mode),
+        voiceMode: normalizeDottieManifestVoiceMode(args.voice_mode ?? args.voiceMode),
+        commentaryCadence: normalizeDottieManifestCommentaryCadence(
+          args.commentary_cadence ?? args.commentaryCadence ?? args.cadence,
+        ),
+        targetRunId: asNonEmptyString(args.target_run_id ?? args.targetRunId),
+        objective: asNonEmptyString(args.objective),
+        maxChars: asNumber(args.max_chars ?? args.maxChars),
+      });
+      const receipt = buildDottieManifestPresetReceipts(preset);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: receipt,
+        message: "Manifested Auntie Dottie as a witness-only Situation Room preset.",
       };
     }
 

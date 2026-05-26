@@ -286,15 +286,57 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+  it("uses the Curvature / Collapse lens to load object-bound benchmark rows", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Curvature / Collapse atlas lens" }));
 
-    expect(await screen.findByText("Curvature / Collapse")).toBeTruthy();
-    expect(screen.getByText("Mapped Badges")).toBeTruthy();
+    expect(screen.getByTestId("theory-atlas-lens-overlay").className).toContain("absolute");
+    expect(await screen.findByText("Collapse")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Curvature Proxy" })).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
-    expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Curvature Proxy" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample curvature proxy object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("curvature_collapse");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCurvatureCollapseGroupId).toBe(
+        "curvature.proxy.kappa",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCurvatureCollapseObjectBindingId).toBe(
+        "sample-curvature-proxy",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "curvature_collapse_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("kappa_body = 6.217e-27*1000");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Curvature / Collapse atlas lens" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBeNull();
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCurvatureCollapseGroupId).toBe(
+        "curvature.proxy.kappa",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCurvatureCollapseObjectBindingId).toBe(
+        "sample-curvature-proxy",
+      );
+      expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toContain(
+        "curvature.proxy.body_density",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("kappa_body = 6.217e-27*1000");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Curvature / Collapse atlas lens" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("curvature_collapse");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCurvatureCollapseObjectBindingId).toBe(
+        "sample-curvature-proxy",
+      );
+    });
   });
 
   it("uses the Tokamak Plasma lens to load object-bound plasma rows", async () => {

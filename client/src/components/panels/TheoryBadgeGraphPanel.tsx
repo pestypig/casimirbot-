@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import CasimirCavityLens from "@/components/panels/CasimirCavityLens";
 import CosmicDistanceLadderLens from "@/components/panels/CosmicDistanceLadderLens";
+import CurvatureCollapseLens from "@/components/panels/CurvatureCollapseLens";
 import GalacticDynamicsLens from "@/components/panels/GalacticDynamicsLens";
 import PhysicsAtlasBlockLens from "@/components/panels/PhysicsAtlasBlockLens";
 import QeiStressEnergyLens from "@/components/panels/QeiStressEnergyLens";
@@ -45,6 +46,7 @@ import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spec
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { buildTokamakPlasmaObjectBindings } from "@shared/theory/tokamak-plasma-object-bindings";
 import { buildGalacticDynamicsObjectBindings } from "@shared/theory/galactic-dynamics-object-bindings";
+import { buildCurvatureCollapseObjectBindings } from "@shared/theory/curvature-collapse-object-bindings";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
@@ -81,6 +83,10 @@ import {
   GALACTIC_DYNAMICS_GROUPS,
   type GalacticDynamicsGroup,
 } from "@shared/theory/galactic-dynamics-map";
+import {
+  CURVATURE_COLLAPSE_GROUPS,
+  type CurvatureCollapseGroup,
+} from "@shared/theory/curvature-collapse-map";
 
 const LEVEL_ORDER = [
   "first_principle",
@@ -545,6 +551,10 @@ export default function TheoryBadgeGraphPanel() {
   const selectedGalacticObjectBindingId = useTheoryBadgeGraphPanelStore(
     (state) => state.selectedGalacticDynamicsObjectBindingId,
   );
+  const selectedCurvatureGroupId = useTheoryBadgeGraphPanelStore((state) => state.selectedCurvatureCollapseGroupId);
+  const selectedCurvatureObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.selectedCurvatureCollapseObjectBindingId,
+  );
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
@@ -604,10 +614,18 @@ export default function TheoryBadgeGraphPanel() {
   const clearGalacticDynamicsObjectBinding = useTheoryBadgeGraphPanelStore(
     (state) => state.clearGalacticDynamicsObjectBinding,
   );
+  const setSelectedCurvatureGroupId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedCurvatureCollapseGroupId,
+  );
+  const setSelectedCurvatureObjectBindingId = useTheoryBadgeGraphPanelStore(
+    (state) => state.setSelectedCurvatureCollapseObjectBindingId,
+  );
+  const clearCurvatureCollapseObjectBinding = useTheoryBadgeGraphPanelStore(
+    (state) => state.clearCurvatureCollapseObjectBinding,
+  );
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
-  const clearMapOverlay = useTheoryMapOverlayStore((state) => state.clearOverlay);
   const playbackStore = useTheoryBadgePlaybackStore();
   const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
   const calculatorArtifact = useScientificCalculatorStore((state) => state.lastArtifactV1);
@@ -958,6 +976,40 @@ export default function TheoryBadgeGraphPanel() {
     setSelectionOverlay,
   ]);
 
+  useEffect(() => {
+    if (!graph || activeLensId !== "curvature_collapse" || !selectedCurvatureGroupId) return;
+    const group = CURVATURE_COLLAPSE_GROUPS.find((candidate) => candidate.id === selectedCurvatureGroupId);
+    if (!group) return;
+    if (
+      selectedCurvatureObjectBindingId &&
+      !group.objectBindings.some((binding) => binding.id === selectedCurvatureObjectBindingId)
+    ) {
+      clearCurvatureCollapseObjectBinding();
+    }
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Curvature/collapse benchmark boundary.`,
+      ),
+    });
+  }, [
+    clearCurvatureCollapseObjectBinding,
+    activeLensId,
+    graph,
+    selectedCurvatureGroupId,
+    selectedCurvatureObjectBindingId,
+    setSelectionOverlay,
+  ]);
+
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
@@ -1027,6 +1079,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1035,6 +1088,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
@@ -1081,6 +1135,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     setSelectedObjectBindingId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1089,6 +1144,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1122,6 +1178,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
@@ -1129,6 +1186,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     const payloadIdsByBadgeId = stage.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
       acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
       return acc;
@@ -1183,6 +1241,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
@@ -1190,6 +1249,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1258,6 +1318,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearCasimirCavityObjectBinding();
@@ -1265,6 +1326,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1333,6 +1395,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1340,6 +1403,7 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1407,12 +1471,16 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedCasimirGroupId(null);
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
+    setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
     clearCasimirCavityObjectBinding();
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
+    clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1481,6 +1549,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedWarpGroupId(null);
     setSelectedTokamakGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1488,6 +1557,7 @@ export default function TheoryBadgeGraphPanel() {
     clearWarpGrNhm2ObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1557,6 +1627,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedWarpGroupId(null);
     setSelectedQeiGroupId(null);
     setSelectedGalacticGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1564,6 +1635,7 @@ export default function TheoryBadgeGraphPanel() {
     clearWarpGrNhm2ObjectBinding();
     clearQeiStressEnergyObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1633,6 +1705,7 @@ export default function TheoryBadgeGraphPanel() {
     setSelectedWarpGroupId(null);
     setSelectedQeiGroupId(null);
     setSelectedTokamakGroupId(null);
+    setSelectedCurvatureGroupId(null);
     clearStarSimObjectBinding();
     clearCosmicDistanceObjectBinding();
     clearSolarSpectrumObjectBinding();
@@ -1640,6 +1713,7 @@ export default function TheoryBadgeGraphPanel() {
     clearWarpGrNhm2ObjectBinding();
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
+    clearCurvatureCollapseObjectBinding();
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
@@ -1697,23 +1771,11 @@ export default function TheoryBadgeGraphPanel() {
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
-  const runPathToBadge = (badgeId: string) => {
+  const selectCurvatureCollapseGroup = (group: CurvatureCollapseGroup) => {
     if (!graph) return;
-    void playbackStore.runPlayback({
-      graph,
-      targetBadgeId: badgeId,
-    });
-  };
-
-  const selectAtlasLens = (lensId: TheoryAtlasLensId) => {
-    if (activeLensId === lensId) {
-      setActiveAtlasLensId(null);
-      clearMapOverlay();
-      return;
-    }
-    setActiveAtlasLensId(lensId);
-    setSelectedBadgeId(null);
-    setSelectedBadgeIds([]);
+    setActiveAtlasLensId("curvature_collapse");
+    setSelectedCurvatureGroupId(group.id);
+    setSelectedCurvatureObjectBindingId(null);
     setSelectedEvolutionStageId(null);
     setSelectedCosmicRungId(null);
     setSelectedSolarGroupId(null);
@@ -1730,6 +1792,129 @@ export default function TheoryBadgeGraphPanel() {
     clearQeiStressEnergyObjectBinding();
     clearTokamakPlasmaObjectBinding();
     clearGalacticDynamicsObjectBinding();
+    setSelectedBadgeId(null);
+    setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const groupBadgeIds = group.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(groupBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: groupBadgeIds,
+      highlightedBadgeIds: groupBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Curvature/collapse benchmark boundary.`,
+      ),
+    });
+  };
+
+  const selectCurvatureObjectBinding = (group: CurvatureCollapseGroup, bindingId: string) => {
+    if (!graph) return;
+    const binding = group.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectCurvatureCollapseGroup(group);
+    setSelectedCurvatureObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = group.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildCurvatureCollapseObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: group.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstCurvatureScalar =
+      loadout.items.find((item) => item.kind === "calculator_payload" && item.badgeId === "curvature.proxy.body_density") ??
+      loadout.items.find(
+        (item) =>
+          item.kind === "calculator_payload" &&
+          (item.badgeId.startsWith("curvature.") || item.badgeId.startsWith("collapse.")),
+      ) ??
+      loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstCurvatureScalar) scientificState.loadTheoryLoadoutItem(firstCurvatureScalar.index);
+  };
+
+  const clearCurvatureBindingSelection = () => {
+    clearCurvatureCollapseObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
+  };
+
+  const hasSavedLensSelection = (lensId: TheoryAtlasLensId) => {
+    switch (lensId) {
+      case "stellar_evolution":
+        return Boolean(selectedEvolutionStageId);
+      case "cosmic_distance_ladder":
+        return Boolean(selectedCosmicRungId);
+      case "solar_surface_spectrum":
+        return Boolean(selectedSolarGroupId);
+      case "casimir_cavity_modes":
+        return Boolean(selectedCasimirGroupId);
+      case "warp_gr_nhm2":
+        return Boolean(selectedWarpGroupId);
+      case "qei_stress_energy":
+        return Boolean(selectedQeiGroupId);
+      case "tokamak_plasma":
+        return Boolean(selectedTokamakGroupId);
+      case "galactic_dynamics":
+        return Boolean(selectedGalacticGroupId);
+      case "curvature_collapse":
+        return Boolean(selectedCurvatureGroupId);
+      default:
+        return false;
+    }
+  };
+
+  const runPathToBadge = (badgeId: string) => {
+    if (!graph) return;
+    void playbackStore.runPlayback({
+      graph,
+      targetBadgeId: badgeId,
+    });
+  };
+
+  const selectAtlasLens = (lensId: TheoryAtlasLensId) => {
+    if (activeLensId === lensId) {
+      setActiveAtlasLensId(null);
+      return;
+    }
+    const shouldRestoreCollapsedLens = activeLensId === null && hasSavedLensSelection(lensId);
+    setActiveAtlasLensId(lensId);
+    if (!shouldRestoreCollapsedLens) {
+      setSelectedBadgeId(null);
+      setSelectedBadgeIds([]);
+      setSelectedEvolutionStageId(null);
+      setSelectedCosmicRungId(null);
+      setSelectedSolarGroupId(null);
+      setSelectedCasimirGroupId(null);
+      setSelectedWarpGroupId(null);
+      setSelectedQeiGroupId(null);
+      setSelectedTokamakGroupId(null);
+      setSelectedGalacticGroupId(null);
+      setSelectedCurvatureGroupId(null);
+      clearStarSimObjectBinding();
+      clearCosmicDistanceObjectBinding();
+      clearSolarSpectrumObjectBinding();
+      clearCasimirCavityObjectBinding();
+      clearWarpGrNhm2ObjectBinding();
+      clearQeiStressEnergyObjectBinding();
+      clearTokamakPlasmaObjectBinding();
+      clearGalacticDynamicsObjectBinding();
+      clearCurvatureCollapseObjectBinding();
+    }
     if (!graph) return;
     const lens = resolvePhysicsAtlasLens({
       graph,
@@ -1746,11 +1931,15 @@ export default function TheoryBadgeGraphPanel() {
 
   if (viewMode === "map") {
     return (
-      <div className="flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
+      <div className="relative flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
         <TheoryAtlasRail
           activeLensId={activeLensId}
           onSelectLens={selectAtlasLens}
         />
+        <div
+          data-testid="theory-atlas-lens-overlay"
+          className="absolute bottom-0 left-9 top-0 z-30 flex shadow-2xl"
+        >
         {activeLensId === "stellar_evolution" && graph ? (
           <StellarEvolutionLens
             graph={graph}
@@ -1847,6 +2036,18 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
+        {activeLensId === "curvature_collapse" && graph ? (
+          <CurvatureCollapseLens
+            graph={graph}
+            groups={CURVATURE_COLLAPSE_GROUPS}
+            selectedGroupId={selectedCurvatureGroupId}
+            selectedObjectBindingId={selectedCurvatureObjectBindingId}
+            onSelectGroup={selectCurvatureCollapseGroup}
+            onSelectObjectBinding={selectCurvatureObjectBinding}
+            onClearObjectBinding={clearCurvatureBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
         {activeLensId &&
         activeLensId !== "stellar_evolution" &&
         activeLensId !== "cosmic_distance_ladder" &&
@@ -1856,6 +2057,7 @@ export default function TheoryBadgeGraphPanel() {
         activeLensId !== "qei_stress_energy" &&
         activeLensId !== "tokamak_plasma" &&
         activeLensId !== "galactic_dynamics" &&
+        activeLensId !== "curvature_collapse" &&
         graph &&
         atlasLens &&
         activeAtlasBlock ? (
@@ -1867,6 +2069,7 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
+        </div>
         <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
           <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
             {isLoading ? (

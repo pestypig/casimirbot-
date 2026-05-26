@@ -1099,6 +1099,54 @@ describe("panelActionAdapters", () => {
     );
   });
 
+  it("manifests Dottie as a Situation Room evidence-only preset", () => {
+    const room = useSituationRoomStore.getState().createRoom("Dottie Manifest Room");
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: () => undefined,
+      openSettings: () => undefined,
+    };
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "dottie.manifest",
+        args: {
+          room_id: room.room_id,
+          thread_id: "thread:dottie-manifest",
+          source_ids: ["source:visible"],
+          target_run_id: "run:ask:dottie-manifest",
+          voice_mode: "propose_only",
+          commentary_cadence: "salience_only",
+        },
+      },
+      context,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(context.openPanel).toHaveBeenCalledWith("situation-room-pipelines", undefined);
+    expect(result.artifact).toMatchObject({
+      schema: "helix.dottie_manifest_preset_receipt.v1",
+      kind: "dottie_manifest_preset_receipt",
+      preset_id: "auntie_dottie",
+      thread_id: "thread:dottie-manifest",
+      room_id: room.room_id,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      command_lane_enabled: false,
+    });
+    expect(result.artifact?.receipts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "live_answer_environment_receipt", assistant_answer: false }),
+        expect.objectContaining({ kind: "live_commentary_policy_receipt", assistant_answer: false }),
+        expect.objectContaining({ kind: "dottie_observer_subscription_receipt", assistant_answer: false }),
+        expect.objectContaining({ kind: "voice_policy_receipt", assistant_answer: false }),
+      ]),
+    );
+  });
+
   it("proposes Dottie voice from a public trace event without making an answer", () => {
     const result = executeHelixPanelAction(
       {
@@ -1830,6 +1878,38 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().currentLatex).toBe(
         "distance_pc = sqrt(3^2 + 4^2 + 12^2)",
       );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("loads object-aware Curvature / Collapse benchmark loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "curvature.proxy.body_density",
+              "collapse.benchmark.hazard_probability",
+            ],
+            object_context: {
+              kind: "curvature_collapse_object",
+              observables: {
+                rho_kg_m3: 1000,
+                dt_ms: 50,
+                tau_ms: 1000,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "curvature_collapse_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("kappa_body = 6.217e-27*1000");
       expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
     });
 

@@ -6339,6 +6339,35 @@ function collectHelixAgentSelectedCapabilities(...sources: unknown[]): string[] 
   return [...selected].filter(Boolean);
 }
 
+function readLatestHelixRuntimeChosenCapability(...sources: unknown[]): string | null {
+  for (const source of sources) {
+    const record = readAgentLoopAuditRecord(source);
+    if (!record) continue;
+    const debug = readAgentLoopAuditRecord(record.debug);
+    const loops = [record.agent_runtime_loop, debug?.agent_runtime_loop, record.agent_step_loop, debug?.agent_step_loop];
+    for (const loop of loops) {
+      const loopRecord = readAgentLoopAuditRecord(loop);
+      const iterations = Array.isArray(loopRecord?.iterations)
+        ? loopRecord.iterations
+        : Array.isArray(loopRecord?.steps)
+          ? loopRecord.steps
+          : [];
+      for (const iteration of [...iterations].reverse()) {
+        const iterationRecord = readAgentLoopAuditRecord(iteration);
+        const chosen = coerceText(iterationRecord?.chosen_capability).trim();
+        if (chosen) return chosen;
+      }
+    }
+    const direct = coerceText(
+      readAgentLoopAuditRecord(record.agent_step_decision)?.chosen_capability ??
+        readAgentLoopAuditRecord(debug?.agent_step_decision)?.chosen_capability ??
+        record.chosen_capability,
+    ).trim();
+    if (direct) return direct;
+  }
+  return null;
+}
+
 function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | Record<string, unknown>): string[] {
   const record = readAgentLoopAuditRecord(action);
   if (!record) return [];
@@ -29911,6 +29940,12 @@ export function HelixAskPill({
             const selectedAgentAction =
               readAgentLoopAuditRecord(agentLoopAudit?.selected_action) ??
               readAgentLoopAuditRecord(replyDebugRecord?.server_selected_action);
+            const latestRuntimeChosenCapability = readLatestHelixRuntimeChosenCapability(
+              reply,
+              replyDebugRecord,
+              agentLoopAudit,
+              runtimeSummary,
+            );
             const agentPlanItems = Array.isArray(plannerContract?.plan_items)
               ? plannerContract?.plan_items
               : [];
@@ -30344,10 +30379,11 @@ export function HelixAskPill({
                     | Route:{" "}
                     {visibleResolvedTurn.primary_route_label}
                   </p>
-                  {selectedAgentAction ? (
+                  {latestRuntimeChosenCapability || selectedAgentAction ? (
                     <p className="mt-1">
-                      Tool selected: {String(selectedAgentAction.panel_id ?? "unknown")}.
-                      {String(selectedAgentAction.action_id ?? "unknown")}
+                      Tool selected:{" "}
+                      {latestRuntimeChosenCapability ??
+                        `${String(selectedAgentAction?.panel_id ?? "unknown")}.${String(selectedAgentAction?.action_id ?? "unknown")}`}
                     </p>
                   ) : null}
                   {agentPlanItems.length > 0 ? (

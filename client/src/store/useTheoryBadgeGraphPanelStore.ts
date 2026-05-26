@@ -8,6 +8,7 @@ import type { WarpGrNhm2GroupId } from "@shared/theory/warp-gr-nhm2-map";
 import type { QeiStressEnergyGroupId } from "@shared/theory/qei-stress-energy-map";
 import type { TokamakPlasmaGroupId } from "@shared/theory/tokamak-plasma-map";
 import type { GalacticDynamicsGroupId } from "@shared/theory/galactic-dynamics-map";
+import type { CurvatureCollapseGroupId } from "@shared/theory/curvature-collapse-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
@@ -40,6 +41,8 @@ type TheoryBadgeGraphPanelState = {
   selectedTokamakPlasmaObjectBindingId: string | null;
   selectedGalacticDynamicsGroupId: GalacticDynamicsGroupId | null;
   selectedGalacticDynamicsObjectBindingId: string | null;
+  selectedCurvatureCollapseGroupId: CurvatureCollapseGroupId | null;
+  selectedCurvatureCollapseObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -69,6 +72,9 @@ type TheoryBadgeGraphPanelState = {
   setSelectedGalacticDynamicsGroupId: (groupId: GalacticDynamicsGroupId | null) => void;
   setSelectedGalacticDynamicsObjectBindingId: (bindingId: string | null) => void;
   clearGalacticDynamicsObjectBinding: () => void;
+  setSelectedCurvatureCollapseGroupId: (groupId: CurvatureCollapseGroupId | null) => void;
+  setSelectedCurvatureCollapseObjectBindingId: (bindingId: string | null) => void;
+  clearCurvatureCollapseObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -124,6 +130,8 @@ const initialState = {
   selectedTokamakPlasmaObjectBindingId: null as string | null,
   selectedGalacticDynamicsGroupId: null as GalacticDynamicsGroupId | null,
   selectedGalacticDynamicsObjectBindingId: null as string | null,
+  selectedCurvatureCollapseGroupId: null as CurvatureCollapseGroupId | null,
+  selectedCurvatureCollapseObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -208,6 +216,13 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedGalacticDynamicsObjectBindingId: null,
         }),
+      setSelectedCurvatureCollapseGroupId: (groupId) => set({ selectedCurvatureCollapseGroupId: groupId }),
+      setSelectedCurvatureCollapseObjectBindingId: (bindingId) =>
+        set({ selectedCurvatureCollapseObjectBindingId: bindingId }),
+      clearCurvatureCollapseObjectBinding: () =>
+        set({
+          selectedCurvatureCollapseObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -234,6 +249,8 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedTokamakPlasmaObjectBindingId: state.selectedTokamakPlasmaObjectBindingId,
         selectedGalacticDynamicsGroupId: state.selectedGalacticDynamicsGroupId,
         selectedGalacticDynamicsObjectBindingId: state.selectedGalacticDynamicsObjectBindingId,
+        selectedCurvatureCollapseGroupId: state.selectedCurvatureCollapseGroupId,
+        selectedCurvatureCollapseObjectBindingId: state.selectedCurvatureCollapseObjectBindingId,
       }),
     },
   ),
