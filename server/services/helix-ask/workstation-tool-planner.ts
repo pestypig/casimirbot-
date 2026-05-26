@@ -26,6 +26,7 @@ export type WorkstationToolIntent =
   | "notes_append"
   | "notes_store_large_text"
   | "ideology_compare"
+  | "dottie_observer"
   | "live_environment_create"
   | "direct_answer";
 
@@ -506,6 +507,85 @@ function extractIdeologyMotive(prompt: string): string | null {
     .slice(0, 800) || null;
 }
 
+function extractNamedArg(prompt: string, names: string[]): string | null {
+  for (const name of names) {
+    const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b\\s*(?::|=)?\\s*([A-Za-z0-9:._-]+)`, "i");
+    const match = prompt.match(pattern);
+    if (match?.[1]) return stripOuterPunctuation(match[1]);
+  }
+  return null;
+}
+
+function extractDottieTargetRunId(prompt: string): string | null {
+  return (
+    extractNamedArg(prompt, ["target_run_id", "target run id", "run_id", "run id"]) ??
+    prompt.match(/\brun:[A-Za-z0-9:._-]+\b/i)?.[0] ??
+    null
+  );
+}
+
+function extractDottieTargetTurnId(prompt: string): string | null {
+  return extractNamedArg(prompt, ["target_turn_id", "target turn id", "turn_id", "turn id"]);
+}
+
+function extractDottieSourceEventId(prompt: string): string | null {
+  return (
+    extractNamedArg(prompt, ["source_event_id", "source event id", "event_id", "event id"]) ??
+    prompt.match(/\bagent_commentary:[A-Za-z0-9:._-]+\b/i)?.[0] ??
+    null
+  );
+}
+
+function extractDottieObserverProfile(prompt: string): string {
+  const explicit = extractNamedArg(prompt, ["observer_profile", "observer profile", "profile"]);
+  if (explicit) return explicit;
+  return /\bauntie\s+dottie\b/i.test(prompt) ? "auntie_dottie" : "dottie";
+}
+
+function extractDottieVoiceMode(prompt: string): string {
+  const explicit = extractNamedArg(prompt, ["voice_mode", "voice mode"]);
+  if (explicit) return explicit;
+  if (/\b(?:prompt[-\s]?only|text[-\s]?only|do\s+not\s+speak|don't\s+speak|no\s+audio)\b/i.test(prompt)) return "text_only";
+  return "voice_on_confirm";
+}
+
+function extractDottieMaxChars(prompt: string): number | null {
+  const raw = extractNamedArg(prompt, ["max_chars", "max chars", "max_characters", "max characters"]);
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(500, Math.max(40, Math.round(parsed))) : null;
+}
+
+function extractDottieSourceText(prompt: string): string | null {
+  const match =
+    prompt.match(/\b(?:public\s+)?source\s+text\s*(?::|-)\s*([\s\S]+)$/i) ??
+    prompt.match(/\busing\s+this\s+(?:public\s+)?(?:source|commentary)\s+text\s*(?::|-)?\s*([\s\S]+)$/i);
+  const value = stripOuterPunctuation(match?.[1] ?? "");
+  if (!value) return null;
+  const clipped = value
+    .replace(/\s+(?:and\s+)?(?:then\s+)?(?:run\s+panel\s+action\s+)?(?:situation-room-pipelines\.)?observer\.query[\s\S]*$/i, "")
+    .replace(/\s+(?:and\s+)?(?:then\s+)?(?:query|show|list)\s+(?:the\s+)?observer[\s\S]*$/i, "")
+    .trim();
+  return stripOuterPunctuation(clipped);
+}
+
+function isDottieObserverToolPrompt(prompt: string): boolean {
+  const mentionsDottie =
+    /\b(?:auntie\s+dottie|dottie)\b/i.test(prompt) ||
+    /\bsituation-room-pipelines\.(?:observer|voice_delivery)\./i.test(prompt) ||
+    /\b(?:observer\.attach|observer\.detach|observer\.query|voice_delivery\.propose_from_trace)\b/i.test(prompt);
+  if (!mentionsDottie) return false;
+  const affirmativeCommand =
+    /\boperator\s+command\b/i.test(prompt) ||
+    /\brun\s+panel\s+action\b/i.test(prompt) ||
+    /\b(?:attach|detach|query|show|list|propose|prepare|create|add|set\s+up|start)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(prompt) ||
+    /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:attach|detach|query|show|list|propose|prepare|create|add|watch|witness)\b/i.test(prompt);
+  if (!affirmativeCommand) return false;
+  const negatedCommand =
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to)\s+(?:attach|detach|query|show|list|propose|prepare|create|add|run)\b/i.test(prompt) ||
+    /\b(?:should|could|would)\s+(?:we|you)\b[\s\S]{0,80}\b(?:attach|propose|run)\b/i.test(prompt);
+  return !negatedCommand;
+}
+
 function buildToolPlan(args: {
   prompt: string;
   intent: Exclude<HelixWorkstationToolPlanIntent, "direct_answer">;
@@ -562,6 +642,132 @@ export function planWorkstationToolUse(
   const normalized = normalizePrompt(prompt);
   const scores: AffordanceScore[] = [];
   const pushScore = (score: AffordanceScore) => scores.push(score);
+
+  if (isDottieObserverToolPrompt(normalized)) {
+    const targetRunId = extractDottieTargetRunId(normalized);
+    const targetTurnId = extractDottieTargetTurnId(normalized);
+    const sourceEventId = extractDottieSourceEventId(normalized);
+    const sourceText = extractDottieSourceText(normalized);
+    const observerProfile = extractDottieObserverProfile(normalized);
+    const voiceMode = extractDottieVoiceMode(normalized);
+    const maxChars = extractDottieMaxChars(normalized);
+    const wantsAttach = /\b(?:observer\.attach|attach|watch|witness|set\s+up|start|add)\b/i.test(normalized);
+    const wantsVoiceProposal = /\b(?:voice_delivery\.propose_from_trace|voice\s+delivery|propose|prepare|callout|speak)\b/i.test(normalized);
+    const wantsQuery =
+      /\b(?:observer\.query|query|show|list)\b/i.test(normalized) ||
+      /\bthen\s+(?:query|show|list)\b/i.test(normalized);
+    const missing = Array.from(new Set([
+      ...(wantsAttach && !targetRunId ? ["target_run_id"] : []),
+      ...(wantsVoiceProposal && !sourceEventId ? ["source_event_id"] : []),
+    ]));
+    const observerArgs = {
+      ...(targetRunId ? { target_run_id: targetRunId } : {}),
+      ...(targetTurnId ? { target_turn_id: targetTurnId } : {}),
+      observer_profile: observerProfile,
+      voice_mode: voiceMode,
+      ...(maxChars ? { max_chars: maxChars } : {}),
+      thread_id: options.threadId ?? "helix-ask:desktop",
+    };
+    const voiceArgs = {
+      ...(sourceEventId ? { source_event_id: sourceEventId } : {}),
+      ...(sourceText ? { source_text: sourceText } : {}),
+      source_event_schema: "helix.agent_commentary.v1",
+      observer_id: targetRunId ? `observer:dottie:${targetRunId.replace(/[^a-z0-9_-]+/gi, "_")}` : "observer:dottie:unassigned",
+      target_agent_id: "agent:helix_ask",
+      ...(targetTurnId ? { target_turn_id: targetTurnId } : {}),
+      voice_mode: voiceMode,
+      ...(maxChars ? { max_chars: maxChars } : {}),
+    };
+    const steps: HelixWorkstationToolPlanStep[] = [makeOpenStep("situation-room-pipelines")];
+    let primaryAction: WorkstationToolPlannerAction | null = null;
+    if (wantsAttach || !wantsVoiceProposal) {
+      const attachStep: HelixWorkstationToolPlanStep = {
+        step_id: "attach_dottie_observer",
+        kind: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "observer.attach",
+        args: observerArgs,
+        depends_on: ["open_situation_room_pipelines"],
+        expected_receipt_kind: "dottie_observer_subscription_receipt",
+        expected_state_change: { store: "situation-room-runtime", proof_key: "observer_id" },
+        required: true,
+      };
+      steps.push(attachStep);
+      primaryAction = { panel_id: attachStep.panel_id ?? "", action_id: attachStep.action_id ?? "", args: observerArgs };
+    }
+    if (wantsVoiceProposal) {
+      const voiceStep: HelixWorkstationToolPlanStep = {
+        step_id: "propose_dottie_voice_from_trace",
+        kind: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "voice_delivery.propose_from_trace",
+        args: voiceArgs,
+        depends_on: steps.some((step) => step.step_id === "attach_dottie_observer")
+          ? ["attach_dottie_observer"]
+          : ["open_situation_room_pipelines"],
+        expected_receipt_kind: "dottie_voice_receipt",
+        expected_state_change: { store: "situation-room-runtime", proof_key: "source_event_id" },
+        required: true,
+      };
+      steps.push(voiceStep);
+      primaryAction ??= { panel_id: voiceStep.panel_id ?? "", action_id: voiceStep.action_id ?? "", args: voiceArgs };
+    }
+    if (wantsQuery) {
+      const queryArgs = {
+        ...(targetRunId ? { target_run_id: targetRunId } : {}),
+        observer_profile: observerProfile,
+        thread_id: options.threadId ?? "helix-ask:desktop",
+      };
+      steps.push({
+        step_id: "query_dottie_observer",
+        kind: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "observer.query",
+        args: queryArgs,
+        depends_on: steps.some((step) => step.step_id === "propose_dottie_voice_from_trace")
+          ? ["propose_dottie_voice_from_trace"]
+          : steps.some((step) => step.step_id === "attach_dottie_observer")
+            ? ["attach_dottie_observer"]
+            : ["open_situation_room_pipelines"],
+        expected_receipt_kind: "dottie_observer_query_receipt",
+        expected_state_change: { store: "situation-room-runtime", proof_key: "count" },
+        required: true,
+      });
+    }
+    steps.push({
+      step_id: "evaluate_dottie_observer_receipts",
+      kind: "evaluate_result",
+      depends_on: steps.filter((step) => step.kind === "run_panel_action").map((step) => step.step_id),
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    });
+    pushScore({
+      affordance_id: "situation-room-pipelines.observer.attach",
+      panel_id: "situation-room-pipelines",
+      action_id: "observer.attach",
+      score: missing.length === 0 ? 0.94 : 0.64,
+      reason: missing.length === 0
+        ? "explicit Dottie observer command includes required public trace targets"
+        : "explicit Dottie observer command is missing required target/source arguments",
+      required_args_missing: missing,
+    });
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "dottie_observer",
+      missing,
+      options,
+      steps,
+    });
+    return {
+      intent: "dottie_observer",
+      action: missing.length === 0 ? primaryAction : null,
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt explicitly asks Situation Room to attach or inspect Dottie as a witness-only observer.",
+      missing_required_args: missing,
+    };
+  }
 
   if (isNoteCreatePrompt(normalized)) {
     const title = extractNoteTitle(normalized);

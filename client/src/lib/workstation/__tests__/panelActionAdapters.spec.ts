@@ -1617,6 +1617,73 @@ describe("panelActionAdapters", () => {
       expect(loadout.summary?.solvedCount).toBe(0);
     });
 
+    it("loads object-aware solar spectrum observation loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "solar.spectrum.photon_energy",
+              "solar.spectrum.doppler_shift",
+              "solar.spectrum.radial_velocity_proxy",
+            ],
+            object_context: {
+              kind: "solar_spectrum_observation",
+              observables: {
+                lambda: 656.28e-9,
+                lambda0: 656.28e-9,
+                lambda_obs: 656.35e-9,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "solar_spectrum_observation",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("E = 6.62607015e-34*299792458/6.5628e-7");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
+    it("loads object-aware Casimir cavity loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "casimir.cavity.parallel_plate_energy_density",
+              "casimir.cavity.per_tile_energy",
+            ],
+            object_context: {
+              kind: "casimir_cavity_object",
+              observables: {
+                a: 1e-9,
+                A_tile: 2.5e-3,
+                E_area: -0.4333,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "casimir_cavity_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "E_area = -(3.141592653589793^2*3.16152677e-26)/(720*1e-9^3)",
+      );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
     it("runs StarSim runtime receipts through theory badge actions", () => {
       const runtimeResult = executeHelixPanelAction(
         {

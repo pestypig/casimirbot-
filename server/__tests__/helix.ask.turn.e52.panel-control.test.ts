@@ -2552,6 +2552,56 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.poison_audit?.violations ?? []).toEqual([]);
   }, 60000);
 
+  it("admits explicit Auntie Dottie observer commands as Situation Room workstation actions", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: [
+          "Operator command: run panel action situation-room-pipelines.observer.attach",
+          "target_run_id run:ask:dottie-ui-smoke observer_profile auntie_dottie voice_mode text_only max_chars 120.",
+          "Then run panel action situation-room-pipelines.voice_delivery.propose_from_trace",
+          "source_event_id agent_commentary:orientation source text: I am checking the public commentary path.",
+          "Then run panel action situation-room-pipelines.observer.query for target_run_id run:ask:dottie-ui-smoke.",
+        ].join(" "),
+        mode: "read",
+        debug: true,
+        sessionId: `e52-dottie-observer-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons).toContain("workstation_tool_plan:dottie_observer");
+    expect(findAction(response.body, "situation-room-pipelines", "observer.attach")).toBeTruthy();
+    expect(findAction(response.body, "situation-room-pipelines", "voice_delivery.propose_from_trace")).toBeTruthy();
+    expect(findAction(response.body, "situation-room-pipelines", "observer.query")).toBeTruthy();
+    expect(response.body?.available_capabilities?.model_visible_capability_keys).toEqual(expect.arrayContaining([
+      "situation-room-pipelines.observer.attach",
+      "situation-room-pipelines.observer.query",
+      "situation-room-pipelines.voice_delivery.propose_from_trace",
+    ]));
+    expect(response.body?.terminal_error_code ?? null).not.toBe("open_doc_unresolved");
+    expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).not.toMatch(/temporal comparison/i);
+  }, 60000);
+
+  it("keeps contextual Dottie run analysis out of workstation action routing", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What can you infer from this Dottie run and what should the next patches be?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-dottie-context-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(findAction(response.body, "situation-room-pipelines", "observer.attach")).toBeFalsy();
+    expect(findAction(response.body, "situation-room-pipelines", "voice_delivery.propose_from_trace")).toBeFalsy();
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).not.toContain("workstation_tool_plan:dottie_observer");
+  }, 60000);
+
   it("does not steal real document acquisition prompts", async () => {
     const app = createApp();
     const response = await request(app)

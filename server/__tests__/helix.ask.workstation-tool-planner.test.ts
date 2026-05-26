@@ -330,4 +330,54 @@ describe("Helix Ask workstation tool planner", () => {
       "undefined.undefined",
     ]);
   });
+
+  it("routes explicit Auntie Dottie observer commands through Situation Room actions", () => {
+    const plan = planWorkstationToolUse(
+      [
+        "Operator command: run panel action situation-room-pipelines.observer.attach",
+        "target_run_id run:ask:dottie-ui-smoke observer_profile auntie_dottie voice_mode text_only max_chars 120.",
+        "Then run panel action situation-room-pipelines.voice_delivery.propose_from_trace",
+        "source_event_id agent_commentary:orientation source text: I am checking the public commentary path.",
+        "Then run panel action situation-room-pipelines.observer.query for target_run_id run:ask:dottie-ui-smoke.",
+      ].join(" "),
+      { threadId: "thread:dottie-test", turnId: "turn:dottie-test" },
+    );
+
+    expect(plan.intent).toBe("dottie_observer");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.action).toEqual({
+      panel_id: "situation-room-pipelines",
+      action_id: "observer.attach",
+      args: expect.objectContaining({
+        target_run_id: "run:ask:dottie-ui-smoke",
+        observer_profile: "auntie_dottie",
+        voice_mode: "text_only",
+        max_chars: 120,
+      }),
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "situation-room-pipelines.open",
+      "situation-room-pipelines.observer.attach",
+      "situation-room-pipelines.voice_delivery.propose_from_trace",
+      "situation-room-pipelines.observer.query",
+      "undefined.undefined",
+    ]);
+    const voiceStep = plan.tool_plan?.steps.find((step) => step.action_id === "voice_delivery.propose_from_trace");
+    expect(voiceStep?.args).toEqual(expect.objectContaining({
+      source_event_id: "agent_commentary:orientation",
+      source_text: "I am checking the public commentary path",
+      voice_mode: "text_only",
+    }));
+  });
+
+  it("does not turn contextual Dottie debugging into observer actions", () => {
+    const plan = planWorkstationToolUse(
+      "What can you infer from this Dottie run and what should the next patches be?",
+    );
+
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.action).toBeNull();
+  });
 });

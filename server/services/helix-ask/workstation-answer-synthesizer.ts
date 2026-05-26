@@ -214,6 +214,12 @@ function ideologyMotiveFromPlan(plan: HelixWorkstationToolPlan): string {
   return typeof motive === "string" && motive.trim() ? motive.trim() : "the provided motive";
 }
 
+function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
+  const attach = plan.steps.find((step) => step.panel_id === "situation-room-pipelines" && step.action_id === "observer.attach");
+  const target = attach?.args?.target_run_id ?? attach?.args?.target_turn_id;
+  return typeof target === "string" && target.trim() ? target.trim() : "the selected Helix Ask run";
+}
+
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
   if (input.plan.intent === "calculator_live_source") {
     const observation = buildCalculatorObservation(input.prompt, input.plan);
@@ -241,6 +247,12 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
     return [
       `Ran the ideology comparison tool for: ${ideologyMotiveFromPlan(input.plan)}`,
       "Use the Mission Ethos / Zen receipt as compact evidence, then synthesize the motive comparison from that evidence.",
+    ].join("\n");
+  }
+  if (input.plan.intent === "dottie_observer") {
+    return [
+      `Prepared Auntie Dottie as a witness-only observer for ${dottieTargetFromPlan(input.plan)}.`,
+      "Voice delivery remains a receipt-backed projection of public commentary; no audio is spoken unless a confirm-speak action is explicitly run.",
     ].join("\n");
   }
   return input.evaluation?.summary ?? "Completed workstation tool evaluation.";

@@ -56,6 +56,13 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "ideology",
     };
   }
+  if (intent === "dottie_observer") {
+    return {
+      source_family: "live_environment",
+      category: "context_reference",
+      produced_by: "deterministic_reducer",
+    };
+  }
   return {
     source_family: "unknown",
     category: "evidence",
@@ -107,6 +114,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Store text in workstation notes and keep compact references."
       : input.plan.intent === "ideology_compare"
         ? "Compare the motive against compact ideology/Zen framework evidence."
+      : input.plan.intent === "dottie_observer"
+        ? "Attach or inspect Auntie Dottie as a witness-only Situation Room observer."
       : "Evaluate workstation tool result.";
 
   const supportValue = input.supports_goal ?? (receiptIds.length > 0 || lastActionStep ? true : "unknown");

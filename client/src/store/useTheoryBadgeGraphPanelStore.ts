@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { StarSimStellarEvolutionStageId } from "@shared/theory/starsim-stellar-evolution-map";
 import type { CosmicDistanceLadderRungId } from "@shared/theory/cosmic-distance-ladder-map";
+import type { SolarSpectrumObservationGroupId } from "@shared/theory/solar-spectrum-observation-map";
+import type { CasimirCavityGroupId } from "@shared/theory/casimir-cavity-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
@@ -22,6 +24,10 @@ type TheoryBadgeGraphPanelState = {
   selectedStarSimObjectBindingId: string | null;
   selectedCosmicDistanceRungId: CosmicDistanceLadderRungId | null;
   selectedCosmicDistanceObjectBindingId: string | null;
+  selectedSolarSpectrumGroupId: SolarSpectrumObservationGroupId | null;
+  selectedSolarSpectrumObjectBindingId: string | null;
+  selectedCasimirCavityGroupId: CasimirCavityGroupId | null;
+  selectedCasimirCavityObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -33,6 +39,12 @@ type TheoryBadgeGraphPanelState = {
   setSelectedCosmicDistanceRungId: (rungId: CosmicDistanceLadderRungId | null) => void;
   setSelectedCosmicDistanceObjectBindingId: (bindingId: string | null) => void;
   clearCosmicDistanceObjectBinding: () => void;
+  setSelectedSolarSpectrumGroupId: (groupId: SolarSpectrumObservationGroupId | null) => void;
+  setSelectedSolarSpectrumObjectBindingId: (bindingId: string | null) => void;
+  clearSolarSpectrumObjectBinding: () => void;
+  setSelectedCasimirCavityGroupId: (groupId: CasimirCavityGroupId | null) => void;
+  setSelectedCasimirCavityObjectBindingId: (bindingId: string | null) => void;
+  clearCasimirCavityObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -76,6 +88,10 @@ const initialState = {
   selectedStarSimObjectBindingId: null as string | null,
   selectedCosmicDistanceRungId: null as CosmicDistanceLadderRungId | null,
   selectedCosmicDistanceObjectBindingId: null as string | null,
+  selectedSolarSpectrumGroupId: null as SolarSpectrumObservationGroupId | null,
+  selectedSolarSpectrumObjectBindingId: null as string | null,
+  selectedCasimirCavityGroupId: null as CasimirCavityGroupId | null,
+  selectedCasimirCavityObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -118,6 +134,20 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedCosmicDistanceObjectBindingId: null,
         }),
+      setSelectedSolarSpectrumGroupId: (groupId) => set({ selectedSolarSpectrumGroupId: groupId }),
+      setSelectedSolarSpectrumObjectBindingId: (bindingId) =>
+        set({ selectedSolarSpectrumObjectBindingId: bindingId }),
+      clearSolarSpectrumObjectBinding: () =>
+        set({
+          selectedSolarSpectrumObjectBindingId: null,
+        }),
+      setSelectedCasimirCavityGroupId: (groupId) => set({ selectedCasimirCavityGroupId: groupId }),
+      setSelectedCasimirCavityObjectBindingId: (bindingId) =>
+        set({ selectedCasimirCavityObjectBindingId: bindingId }),
+      clearCasimirCavityObjectBinding: () =>
+        set({
+          selectedCasimirCavityObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -132,6 +162,10 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedStarSimObjectBindingId: state.selectedStarSimObjectBindingId,
         selectedCosmicDistanceRungId: state.selectedCosmicDistanceRungId,
         selectedCosmicDistanceObjectBindingId: state.selectedCosmicDistanceObjectBindingId,
+        selectedSolarSpectrumGroupId: state.selectedSolarSpectrumGroupId,
+        selectedSolarSpectrumObjectBindingId: state.selectedSolarSpectrumObjectBindingId,
+        selectedCasimirCavityGroupId: state.selectedCasimirCavityGroupId,
+        selectedCasimirCavityObjectBindingId: state.selectedCasimirCavityObjectBindingId,
       }),
     },
   ),

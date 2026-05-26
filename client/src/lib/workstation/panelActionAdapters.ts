@@ -49,7 +49,9 @@ import type {
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 import type { TheoryBadgeV1 } from "@shared/contracts/theory-badge-graph.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildCasimirCavityObjectBindings } from "@shared/theory/casimir-cavity-object-bindings";
 import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
+import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import {
   buildTheoryCalculatorLoadout,
@@ -270,6 +272,57 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       z: asNumber(observables.z ?? observables.redshift) ?? undefined,
       H0_km_s_Mpc: asNumber(observables.H0_km_s_Mpc ?? observables.h0_km_s_mpc ?? observables.H0) ?? undefined,
       c_km_s: asNumber(observables.c_km_s ?? observables.c) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "solar_spectrum_observation") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildSolarSpectrumObservationBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      lambda: asNumber(observables.lambda ?? observables.wavelength_m) ?? undefined,
+      lambda0: asNumber(observables.lambda0 ?? observables.lambda_0 ?? observables.rest_wavelength_m) ?? undefined,
+      lambda_obs: asNumber(observables.lambda_obs ?? observables.lambdaObs ?? observables.observed_wavelength_m) ?? undefined,
+      T: asNumber(observables.T ?? observables.temperature_K) ?? undefined,
+      R: asNumber(observables.R ?? observables.radius_m) ?? undefined,
+      sigma: asNumber(observables.sigma) ?? undefined,
+      b: asNumber(observables.b ?? observables.wien_b) ?? undefined,
+      B: asNumber(observables.B ?? observables.magneticField_T ?? observables.magnetic_field_T) ?? undefined,
+      g_eff: asNumber(observables.g_eff ?? observables.gEff) ?? undefined,
+      h: asNumber(observables.h ?? observables.planck_h) ?? undefined,
+      c: asNumber(observables.c ?? observables.speed_of_light) ?? undefined,
+      mu_B: asNumber(observables.mu_B ?? observables.muB ?? observables.bohr_magneton) ?? undefined,
+      delta_nu: asNumber(observables.delta_nu ?? observables.deltaNu) ?? undefined,
+      P_rad: asNumber(observables.P_rad ?? observables.radiant_power_W ?? observables.radiantPower_W) ?? undefined,
+      delta_t: asNumber(observables.delta_t ?? observables.duration_s ?? observables.duration) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "casimir_cavity_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildCasimirCavityObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      a: asNumber(observables.a ?? observables.gap_m ?? observables.gapMeters) ?? undefined,
+      A_tile: asNumber(observables.A_tile ?? observables.tile_area_m2 ?? observables.tileArea_m2) ?? undefined,
+      hbar_c: asNumber(observables.hbar_c ?? observables.hbarC) ?? undefined,
+      c: asNumber(observables.c ?? observables.speed_of_light) ?? undefined,
+      pi: asNumber(observables.pi) ?? undefined,
+      E_area: asNumber(observables.E_area ?? observables.energy_per_area_J_m2) ?? undefined,
+      E_tile: asNumber(observables.E_tile ?? observables.tile_energy_J) ?? undefined,
+      absE_tile: asNumber(observables.absE_tile ?? observables.abs_tile_energy_J) ?? undefined,
+      N_tiles: asNumber(observables.N_tiles ?? observables.tile_count) ?? undefined,
+      U_static: asNumber(observables.U_static ?? observables.static_energy_J) ?? undefined,
+      absU_static: asNumber(observables.absU_static ?? observables.abs_static_energy_J) ?? undefined,
+      gammaGeo: asNumber(observables.gammaGeo ?? observables.gamma_geo) ?? undefined,
+      Q_L: asNumber(observables.Q_L ?? observables.q_l ?? observables.quality_factor) ?? undefined,
+      gamma_VdB: asNumber(observables.gamma_VdB ?? observables.gamma_vdb) ?? undefined,
+      d_eff: asNumber(observables.d_eff ?? observables.duty_eff) ?? undefined,
+      E_out: asNumber(observables.E_out ?? observables.output_energy_J) ?? undefined,
+      L: asNumber(observables.L ?? observables.length_m) ?? undefined,
+      n: asNumber(observables.n ?? observables.mode_n) ?? undefined,
+      h: asNumber(observables.h ?? observables.planck_h) ?? undefined,
+      f_n: asNumber(observables.f_n ?? observables.mode_frequency_Hz) ?? undefined,
       source: "helix_ask",
     });
   }

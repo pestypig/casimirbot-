@@ -58,6 +58,8 @@ describe("Helix Ask docs summary output coverage", () => {
     expect(response.body?.doc_retrieval_coverage?.requested_scope).toBe("full_doc");
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_min_5_bullets" && entry?.satisfied === true)).toBe(true);
     expect(coverage?.requirements?.some((entry: any) => entry?.id === "doc_summary_path_included" && entry?.satisfied === true)).toBe(true);
+    expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
+    expect(response.body?.debug?.doc_summary_observation_candidate?.terminal_authority).toBe(false);
   }, 60000);
 
   it("searches docs before summarizing when no exact or active document is supplied", async () => {
@@ -110,5 +112,9 @@ describe("Helix Ask docs summary output coverage", () => {
         (entry: any) => entry?.id === "doc_search_results_observed" && entry?.satisfied === true,
       ),
     ).toBe(true);
+    expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
+    if (response.body?.debug?.doc_summary_observation_candidate) {
+      expect(response.body.debug.doc_summary_observation_candidate.terminal_authority).toBe(false);
+    }
   }, 60000);
 });

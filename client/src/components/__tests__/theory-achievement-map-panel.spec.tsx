@@ -180,22 +180,69 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("opens generic atlas lens panels for the remaining blocks without auto-loading calculator rows", async () => {
+  it("uses the solar spectrum lens to load object-bound observation rows", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Solar Surface & Spectrum atlas lens" }));
 
-    expect(await screen.findByText("Solar Surface & Spectrum")).toBeTruthy();
-    expect(screen.getByText("Mapped Badges")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Select Solar Photon Energy" })).toBeTruthy();
+    expect(await screen.findByText("Surface & Spectrum")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select H-alpha Shift" })).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
 
-    fireEvent.click(screen.getByText("E = h*c/lambda"));
+    fireEvent.click(screen.getByRole("button", { name: "Select H-alpha Shift" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use H-alpha shifted line observation binding" }));
 
     await waitFor(() => {
-      expect(useScientificCalculatorStore.getState().currentLatex).toBe("E=\\frac{hc}{\\lambda}");
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("solar_surface_spectrum");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedSolarSpectrumGroupId).toBe("solar.observation.halpha_shift");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedSolarSpectrumObjectBindingId).toBe("halpha-slight-redshift");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "solar_spectrum_observation",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("E = 6.62607015e-34*299792458/6.5628e-7");
     });
+  });
+
+  it("uses the Casimir cavity lens to load object-bound cavity rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Casimir Cavities atlas lens" }));
+
+    expect(await screen.findByText("Cavities")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Parallel Plate Tile" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Parallel Plate Tile" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use 1 nm / 25 cm2 tile object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("casimir_cavity_modes");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCasimirCavityGroupId).toBe(
+        "casimir.cavity.parallel_plate_tile",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedCasimirCavityObjectBindingId).toBe(
+        "ideal-1nm-25cm2-tile",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "casimir_cavity_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "E_area = -(3.141592653589793^2*3.16152677e-26)/(720*1e-9^3)",
+      );
+    });
+  });
+
+  it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Warp / GR / NHM2 atlas lens" }));
+
+    expect(await screen.findByText("Warp / GR / NHM2")).toBeTruthy();
+    expect(screen.getByText("Mapped Badges")).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
   });
 
   it("remembers selected badges and viewport position across remounts", async () => {

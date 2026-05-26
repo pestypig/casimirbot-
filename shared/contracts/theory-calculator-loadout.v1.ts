@@ -24,7 +24,13 @@ export type TheoryCalculatorLoadoutItemKind = (typeof THEORY_CALCULATOR_LOADOUT_
 export type TheoryCalculatorLoadoutSource = (typeof THEORY_CALCULATOR_LOADOUT_SOURCES)[number];
 
 export type TheoryCalculatorObjectContextV1 = {
-  kind: "starsim_star" | "cosmic_distance_object" | "generic_physics_object" | "manual_symbol_bindings";
+  kind:
+    | "starsim_star"
+    | "cosmic_distance_object"
+    | "solar_spectrum_observation"
+    | "casimir_cavity_object"
+    | "generic_physics_object"
+    | "manual_symbol_bindings";
   objectId: string | null;
   label: string | null;
   observables: Record<string, string | number | boolean | null>;
