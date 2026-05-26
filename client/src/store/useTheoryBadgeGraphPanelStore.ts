@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import type { StarSimStellarEvolutionStageId } from "@shared/theory/starsim-stellar-evolution-map";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
 
@@ -15,11 +16,16 @@ type TheoryBadgeGraphPanelState = {
   selectedBadgeIds: string[];
   viewport: TheoryBadgeGraphViewport;
   activeAtlasLensId: TheoryBadgeGraphAtlasLensId | null;
+  selectedStarSimStageId: StarSimStellarEvolutionStageId | null;
+  selectedStarSimObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
   rememberViewport: (viewport: TheoryBadgeGraphViewport) => void;
   setActiveAtlasLensId: (lensId: TheoryBadgeGraphAtlasLensId | null) => void;
+  setSelectedStarSimStageId: (stageId: StarSimStellarEvolutionStageId | null) => void;
+  setSelectedStarSimObjectBindingId: (bindingId: string | null) => void;
+  clearStarSimObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -59,6 +65,8 @@ const initialState = {
     scrollTop: 0,
   },
   activeAtlasLensId: "starsim-stellar-evolution" as TheoryBadgeGraphAtlasLensId | null,
+  selectedStarSimStageId: null as StarSimStellarEvolutionStageId | null,
+  selectedStarSimObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -88,6 +96,12 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
           },
         }),
       setActiveAtlasLensId: (lensId) => set({ activeAtlasLensId: lensId }),
+      setSelectedStarSimStageId: (stageId) => set({ selectedStarSimStageId: stageId }),
+      setSelectedStarSimObjectBindingId: (bindingId) => set({ selectedStarSimObjectBindingId: bindingId }),
+      clearStarSimObjectBinding: () =>
+        set({
+          selectedStarSimObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -98,6 +112,8 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedBadgeIds: state.selectedBadgeIds,
         viewport: state.viewport,
         activeAtlasLensId: state.activeAtlasLensId,
+        selectedStarSimStageId: state.selectedStarSimStageId,
+        selectedStarSimObjectBindingId: state.selectedStarSimObjectBindingId,
       }),
     },
   ),

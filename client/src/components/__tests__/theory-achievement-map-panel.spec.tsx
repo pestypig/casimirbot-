@@ -31,7 +31,11 @@ afterEach(() => {
   useTheoryBadgePlaybackStore.getState().clearPlayback();
   useTheoryBadgeGraphPanelStore.getState().resetPanelMemory();
   useTheoryMapOverlayStore.getState().clearOverlay();
-  useScientificCalculatorStore.setState({ currentLatex: "" });
+  useScientificCalculatorStore.setState({
+    currentLatex: "",
+    lastTheoryLoadout: null,
+    activeTheoryLoadoutItemIndex: null,
+  });
   cleanup();
 });
 
@@ -98,6 +102,28 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
         "T_{eff}=T_{sun}\\left(\\frac{L}{R^2}\\right)^{1/4}",
       );
     });
+  });
+
+  it("persists the picked StarSim object binding and exposes its loadout to the calculator", async () => {
+    const firstRender = renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Select Red Giant" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use K1III red giant object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedStarSimStageId).toBe("starsim.lifecycle.red_giant");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedStarSimObjectBindingId).toBe("red-giant-k1iii");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.label).toBe("K1III red giant");
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "T_eff = 5772*(65/(12^2))^(1/4)",
+      );
+    });
+
+    firstRender.unmount();
+    renderPanel();
+
+    expect(await screen.findByRole("button", { name: "Use K1III red giant object binding" })).toBeTruthy();
+    expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.items.length).toBeGreaterThan(1);
   });
 
   it("collapses the StarSim lens when its atlas block is clicked again", async () => {

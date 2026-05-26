@@ -27,6 +27,8 @@ import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConne
 import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
+import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
+import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
@@ -34,7 +36,6 @@ import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import {
   STARSIM_STELLAR_EVOLUTION_STAGES,
   type StarSimStellarEvolutionStage,
-  type StarSimStellarEvolutionStageId,
 } from "@shared/theory/starsim-stellar-evolution-map";
 
 const LEVEL_ORDER = [
@@ -466,17 +467,20 @@ export default function TheoryBadgeGraphPanel() {
   const [subject, setSubject] = useState("all");
   const [level, setLevel] = useState("all");
   const [status, setStatus] = useState("all");
-  const [selectedEvolutionStageId, setSelectedEvolutionStageId] =
-    useState<StarSimStellarEvolutionStageId | null>(null);
   const selectedId = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeId);
   const selectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.selectedBadgeIds);
   const viewport = useTheoryBadgeGraphPanelStore((state) => state.viewport);
   const activeLensId = useTheoryBadgeGraphPanelStore((state) => state.activeAtlasLensId);
+  const selectedEvolutionStageId = useTheoryBadgeGraphPanelStore((state) => state.selectedStarSimStageId);
+  const selectedObjectBindingId = useTheoryBadgeGraphPanelStore((state) => state.selectedStarSimObjectBindingId);
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
   const rememberViewport = useTheoryBadgeGraphPanelStore((state) => state.rememberViewport);
   const setActiveAtlasLensId = useTheoryBadgeGraphPanelStore((state) => state.setActiveAtlasLensId);
+  const setSelectedEvolutionStageId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedStarSimStageId);
+  const setSelectedObjectBindingId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedStarSimObjectBindingId);
+  const clearStarSimObjectBinding = useTheoryBadgeGraphPanelStore((state) => state.clearStarSimObjectBinding);
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
@@ -558,6 +562,39 @@ export default function TheoryBadgeGraphPanel() {
     if (locator.matches.length > 0) setLocatorOverlay(locator);
   }, [calculatorArtifact, calculatorLatex, graph, setLocatorOverlay]);
 
+  useEffect(() => {
+    if (!graph || !selectedEvolutionStageId) return;
+    const stage = STARSIM_STELLAR_EVOLUTION_STAGES.find((candidate) => candidate.id === selectedEvolutionStageId);
+    if (!stage) return;
+    if (
+      selectedObjectBindingId &&
+      !stage.objectBindings.some((binding) => binding.id === selectedObjectBindingId)
+    ) {
+      clearStarSimObjectBinding();
+    }
+    const stageBadgeIds = stage.theoryBadgeIds.filter((badgeId: string) =>
+      graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+    );
+    const highlighted = new Set(stageBadgeIds);
+    const edgeIds = graph.edges
+      .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
+      .map((edge: TheoryBadgeEdgeV1) => edge.id);
+    setSelectionOverlay({
+      selectedBadgeIds: stageBadgeIds,
+      highlightedBadgeIds: stageBadgeIds,
+      highlightedEdgeIds: edgeIds,
+      claimBoundaryNotes: stage.claimBoundaryBadgeIds.map(
+        (badgeId: string) => `${badgeId}: Stage 1 reduced-order prior only.`,
+      ),
+    });
+  }, [
+    clearStarSimObjectBinding,
+    graph,
+    selectedEvolutionStageId,
+    selectedObjectBindingId,
+    setSelectionOverlay,
+  ]);
+
   const selectedBadge = useMemo(
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
@@ -604,6 +641,9 @@ export default function TheoryBadgeGraphPanel() {
   const selectBadge = (badgeId: string) => {
     setSelectedBadgeId(badgeId);
     setSelectedBadgeIds([]);
+    setSelectedEvolutionStageId(null);
+    clearStarSimObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
   const toggleBadgeSelection = (badgeId: string) => {
@@ -616,6 +656,21 @@ export default function TheoryBadgeGraphPanel() {
       (candidate: TheoryBadgeCalculatorPayloadV1) => candidate.id === payloadId,
     );
     if (!badge || !payload) return;
+    if (graph) {
+      const loadout = buildTheoryCalculatorLoadout({
+        graph,
+        badgeIds: [badge.id],
+        mode: "selected_badges",
+        source: "achievement_map",
+        includeContextItems: false,
+        payloadIdsByBadgeId: {
+          [badge.id]: [payload.id],
+        },
+      });
+      const scientificState = useScientificCalculatorStore.getState();
+      scientificState.setTheoryLoadout(loadout);
+      scientificState.loadTheoryLoadoutItem(1);
+    }
     dispatchScientificCalculatorMathPicked({
       latex: payload.displayLatex || payload.expression,
       sourcePath: `theory://${graph?.graphId ?? "nhm2-theory-badge-graph"}/${badge.id}/${payload.id}`,
@@ -626,8 +681,10 @@ export default function TheoryBadgeGraphPanel() {
   const selectEvolutionStage = (stage: StarSimStellarEvolutionStage) => {
     if (!graph) return;
     setSelectedEvolutionStageId(stage.id);
+    setSelectedObjectBindingId(null);
     setSelectedBadgeId(null);
     setSelectedBadgeIds([]);
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
     const stageBadgeIds = stage.theoryBadgeIds.filter((badgeId: string) =>
       graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
     );
@@ -643,6 +700,40 @@ export default function TheoryBadgeGraphPanel() {
         (badgeId: string) => `${badgeId}: Stage 1 reduced-order prior only.`,
       ),
     });
+  };
+
+  const selectStarSimObjectBinding = (stage: StarSimStellarEvolutionStage, bindingId: string) => {
+    if (!graph) return;
+    const binding = stage.objectBindings.find((candidate) => candidate.id === bindingId);
+    if (!binding) return;
+    selectEvolutionStage(stage);
+    setSelectedObjectBindingId(binding.id);
+    const payloadIdsByBadgeId = stage.calculatorPayloadRefs.reduce<Record<string, string[]>>((acc, ref) => {
+      acc[ref.badgeId] = [...(acc[ref.badgeId] ?? []), ref.payloadId];
+      return acc;
+    }, {});
+    const objectContext = buildStarSimObjectBindings({
+      ...binding.input,
+      source: "manual",
+    });
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: stage.theoryBadgeIds,
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+      payloadIdsByBadgeId,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
+    if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
+  };
+
+  const clearStarSimBindingSelection = () => {
+    clearStarSimObjectBinding();
+    useScientificCalculatorStore.getState().setTheoryLoadout(null);
   };
 
   const runPathToBadge = (badgeId: string) => {
@@ -666,7 +757,10 @@ export default function TheoryBadgeGraphPanel() {
             graph={graph}
             stages={STARSIM_STELLAR_EVOLUTION_STAGES}
             selectedStageId={selectedEvolutionStageId}
+            selectedObjectBindingId={selectedObjectBindingId}
             onSelectStage={selectEvolutionStage}
+            onSelectObjectBinding={selectStarSimObjectBinding}
+            onClearObjectBinding={clearStarSimBindingSelection}
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}

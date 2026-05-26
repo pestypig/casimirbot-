@@ -11,6 +11,7 @@ import {
 } from "@/lib/scientific-calculator/events";
 import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
+import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
@@ -149,7 +150,7 @@ export function resolveScientificCalculatorVisibleHistory(
 }
 
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, lastArtifactV1, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, recordDebugEvent, clear } =
+  const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, loadTheoryLoadoutItem, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
@@ -220,6 +221,24 @@ export default function ScientificCalculatorPanel() {
   const solve = (withSteps: boolean) => {
     const result = runScientificSolve(input, withSteps);
     setSolveResult(result, { actionId: withSteps ? "solve_with_steps" : "solve_expression", source: "panel" });
+  };
+
+  const handleLoadTheoryLoadoutItem = (index: number) => {
+    const item = loadTheoryLoadoutItem(index);
+    if (item?.solveExpression) {
+      setInput(item.solveExpression);
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, item.solveExpression);
+    }
+  };
+
+  const handleSolveTheoryLoadout = () => {
+    if (!lastTheoryLoadout) return;
+    const solved = solveTheoryCalculatorLoadoutNow(lastTheoryLoadout);
+    const firstSolved = solved.items.find((item) => item.kind === "calculator_payload" && item.solveExpression);
+    if (firstSolved?.solveExpression) {
+      setInput(firstSolved.solveExpression);
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, firstSolved.solveExpression);
+    }
   };
 
   const handleCopyResult = () => {
@@ -496,6 +515,74 @@ export default function ScientificCalculatorPanel() {
       </div>
 
       <ScientificCalculatorLiveSourceControls currentEquation={input} />
+
+      {lastTheoryLoadout ? (
+        <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-cyan-300">Theory Loadout</div>
+              <div className="text-xs text-slate-300">
+                {lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode} / {lastTheoryLoadout.summary.scalarCount} scalar rows / {lastTheoryLoadout.summary.contextCount} context rows
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadout}>
+              Solve All Scalar
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {lastTheoryLoadout.items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleLoadTheoryLoadoutItem(item.index)}
+                className={`w-full rounded border p-2 text-left text-xs ${
+                  activeTheoryLoadoutItemIndex === item.index
+                    ? "border-cyan-400 bg-cyan-950/50"
+                    : "border-slate-800 bg-slate-950/60 hover:border-slate-600"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                    {item.index}
+                  </Badge>
+                  <span className="font-semibold text-slate-100">{item.badgeTitle}</span>
+                  <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                    {item.kind}
+                  </Badge>
+                  {item.calculatorArtifactV1 ? (
+                    <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
+                      solved
+                    </Badge>
+                  ) : null}
+                </div>
+                {item.solveExpression ? (
+                  <div className="mt-2 break-all font-mono text-cyan-100">{item.solveExpression}</div>
+                ) : (
+                  <div className="mt-2 break-all font-mono text-slate-500">{item.displayLatex ?? "context row"}</div>
+                )}
+                {Object.keys(item.usedBindings).length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {Object.entries(item.usedBindings).map(([symbol, value]) => (
+                      <Badge key={`${item.id}:${symbol}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                        {symbol}={String(value)}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+                {item.resultText ? <div className="mt-2 font-mono text-slate-200">result: {item.resultText}</div> : null}
+                {item.warnings.length > 0 ? (
+                  <div className="mt-2 text-[11px] text-amber-200">{item.warnings.join("; ")}</div>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          {lastTheoryLoadout.claimBoundaryNotes.length > 0 ? (
+            <div className="mt-3 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+              {lastTheoryLoadout.claimBoundaryNotes.slice(0, 4).join("; ")}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {compoundSolveEvents.length >= 2 ? (
         <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">

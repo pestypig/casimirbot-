@@ -38,16 +38,23 @@ export default function StellarEvolutionLens({
   graph,
   stages,
   selectedStageId,
+  selectedObjectBindingId,
   onSelectStage,
+  onSelectObjectBinding,
+  onClearObjectBinding,
   onLoadPayload,
 }: {
   graph: TheoryBadgeGraphV1;
   stages: StarSimStellarEvolutionStage[];
   selectedStageId: StarSimStellarEvolutionStageId | null;
+  selectedObjectBindingId: string | null;
   onSelectStage: (stage: StarSimStellarEvolutionStage) => void;
+  onSelectObjectBinding: (stage: StarSimStellarEvolutionStage, bindingId: string) => void;
+  onClearObjectBinding: () => void;
   onLoadPayload: (badgeId: string, payloadId: string) => void;
 }) {
   const selectedStage = stages.find((stage) => stage.id === selectedStageId) ?? null;
+  const selectedBinding = selectedStage?.objectBindings.find((binding) => binding.id === selectedObjectBindingId) ?? null;
   const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
   const phases = uniquePhases(stages);
 
@@ -95,6 +102,41 @@ export default function StellarEvolutionLens({
             <div className="text-[11px] text-zinc-400">
               {selectedStage.theoryBadgeIds.length} mapped badges / {selectedStage.calculatorPayloadRefs.length} scalar loadouts
             </div>
+            {selectedStage.objectBindings.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Object Binding</div>
+                  {selectedBinding ? (
+                    <button
+                      type="button"
+                      onClick={onClearObjectBinding}
+                      className="border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:border-zinc-400"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                {selectedStage.objectBindings.map((binding) => {
+                  const selected = selectedObjectBindingId === binding.id;
+                  return (
+                    <button
+                      key={binding.id}
+                      type="button"
+                      aria-label={`Use ${binding.label} object binding`}
+                      onClick={() => onSelectObjectBinding(selectedStage, binding.id)}
+                      className={`w-full border px-2 py-1.5 text-left text-[11px] ${
+                        selected
+                          ? "border-cyan-300 bg-cyan-950 text-cyan-50"
+                          : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-cyan-700"
+                      }`}
+                    >
+                      <span className="block font-semibold">{binding.label}</span>
+                      <span className="mt-0.5 block text-[10px] opacity-75">{binding.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <div className="space-y-1">
               {selectedStage.calculatorPayloadRefs.slice(0, 4).map((ref) => {
                 const badge = badgesById.get(ref.badgeId);

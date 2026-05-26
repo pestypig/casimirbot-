@@ -13,6 +13,7 @@ import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGr
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
+import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -62,6 +63,8 @@ describe("panelActionAdapters", () => {
       history: [],
       lastSolve: null,
       lastArtifactV1: null,
+      lastTheoryLoadout: null,
+      activeTheoryLoadoutItemIndex: null,
       lastSetup: null,
       steps: [],
       debugEvents: [],
@@ -1154,9 +1157,82 @@ describe("panelActionAdapters", () => {
       );
 
       expect(result.ok).toBe(true);
-      expect(result.artifact?.kind).toBe("theory_badge_calculator_loadout");
-      expect(useScientificCalculatorStore.getState().currentLatex).toContain("qei");
-      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    expect(result.artifact?.kind).toBe("theory_badge_calculator_loadout");
+    expect(useScientificCalculatorStore.getState().currentLatex).toContain("qei");
+    expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+  });
+
+    it("builds and loads object-aware StarSim calculator loadouts", () => {
+      const buildResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "build_calculator_loadout",
+          args: {
+            target_badge_id: "starsim.runtime.evaluate_fusion_microphysics",
+            mode: "dependency_path",
+            object_context: {
+              kind: "starsim_star",
+              observables: {
+                objectClass: "red_giant",
+                spectralType: "K1III",
+                luminosity_Lsun: 65,
+                radius_Rsun: 12,
+                mass_Msun: 1.1,
+                r90_Rstar: 0.2,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(buildResult.ok).toBe(true);
+      expect(buildResult.artifact?.kind).toBe("theory_calculator_loadout");
+      expect(isTheoryCalculatorLoadoutV1(buildResult.artifact?.artifact_v1)).toBe(true);
+      expect(JSON.stringify(buildResult.artifact?.artifact_v1)).toContain("T_eff = 5772*(65/(12^2))^(1/4)");
+
+      const loadResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: ["starsim.observable.surface_temperature_proxy"],
+            object_context: {
+              kind: "starsim_star",
+              observables: { luminosity_Lsun: 65, radius_Rsun: 12 },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(loadResult.ok).toBe(true);
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.summary.scalarCount).toBe(1);
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("T_eff = 5772*(65/(12^2))^(1/4)");
+    });
+
+    it("solves scalar rows in a theory calculator loadout", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "solve_calculator_loadout",
+          args: {
+            badge_ids: ["starsim.observable.surface_temperature_proxy"],
+            object_context: {
+              kind: "starsim_star",
+              observables: { luminosity_Lsun: 65, radius_Rsun: 12 },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_solve");
+      const loadout = result.artifact?.artifact_v1;
+      expect(isTheoryCalculatorLoadoutV1(loadout)).toBe(true);
+      expect(result.artifact?.solved_count).toBeGreaterThanOrEqual(1);
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.items[0]?.calculatorArtifactV1).toBeTruthy();
     });
 
     it("clears theory map overlays", () => {

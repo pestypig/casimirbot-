@@ -6819,7 +6819,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
   const selectedFinalAnswerCandidate =
     isTypedFailure
-      ? terminalAuthorityText || liveFinalAnswer || renderTypedFailureFallback(terminalErrorCode)
+      ? terminalAuthorityText || terminalResolution.text || renderTypedFailureFallback(terminalErrorCode)
       : terminalAuthorityTrusted && terminalAuthorityText
         ? terminalAuthorityText
         : "";
@@ -6844,11 +6844,11 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     terminalResolution.source !== "empty" &&
     terminalResolution.source !== "typed_failure"
       ? terminalResolution.text
-      : terminalResolution.source === "typed_failure" && !liveFinalAnswer
+      : terminalResolution.source === "typed_failure"
       ? terminalResolution.text
       : situationContextAnswer
-      ? situationContextAnswer
-      : liveFinalAnswer && (isTypedFailure || isInvalidTerminalAnswerText(selectedFinalAnswerCandidate))
+        ? situationContextAnswer
+      : !isTypedFailure && liveFinalAnswer && isInvalidTerminalAnswerText(selectedFinalAnswerCandidate)
       ? liveFinalAnswer
       : selectedFinalAnswerCandidate;
   const selectedFinalAnswer =
@@ -26808,7 +26808,7 @@ export function HelixAskPill({
               turn_contract: localResponse.turn_contract ?? null,
               invariant_violations: localResponse.invariant_violations ?? [],
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
-              selected_final_answer: localResponseRecord.selected_final_answer ?? terminalResolution.text ?? null,
+              selected_final_answer: terminalResolution.text || localResponseRecord.selected_final_answer || null,
               final_answer_source: localResponseRecord.final_answer_source ?? null,
               final_artifact_scope:
                 typeof localResponseRecord.final_artifact_scope === "string"

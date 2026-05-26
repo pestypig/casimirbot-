@@ -1,3 +1,5 @@
+import type { StarSimObjectBindingInput } from "./starsim-object-bindings";
+
 export type StarSimStellarEvolutionStageId =
   | "starsim.lifecycle.molecular_cloud"
   | "starsim.lifecycle.protostar"
@@ -22,6 +24,12 @@ export type StarSimStellarEvolutionStage = {
   calculatorPayloadRefs: Array<{
     badgeId: string;
     payloadId: string;
+  }>;
+  objectBindings: Array<{
+    id: string;
+    label: string;
+    description: string;
+    input: StarSimObjectBindingInput;
   }>;
   claimBoundaryBadgeIds: string[];
 };
@@ -56,6 +64,14 @@ const COMMON_CALCULATOR_PAYLOADS = [
 
 const STARSIM_BOUNDARY_BADGES = ["starsim.claim_boundary.stage1_reduced_order_prior"];
 
+const normalizedSolarG = 1;
+
+const baseChannel = {
+  channelTemperature_K: 15000000,
+  channelDensity_g_cm3: 150,
+  gravitationalConstantNormalized: normalizedSolarG,
+};
+
 export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = [
   {
     id: "starsim.lifecycle.molecular_cloud",
@@ -76,6 +92,21 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       {
         badgeId: "starsim.observable.mean_density",
         payloadId: "mean_density_payload",
+      },
+    ],
+    objectBindings: [
+      {
+        id: "molecular-cloud-dense-core",
+        label: "Dense core proxy",
+        description: "Mass/radius proxy for a compact prestellar cloud region.",
+        input: {
+          objectId: "starsim-object:molecular-cloud-dense-core",
+          label: "Dense core proxy",
+          objectClass: "prestellar_cloud",
+          mass_Msun: 2.5,
+          radius_Rsun: 180,
+          source: "manual",
+        },
       },
     ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
@@ -99,6 +130,24 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       {
         badgeId: "starsim.structure.core_temperature_proxy",
         payloadId: "core_temperature_proxy_payload",
+      },
+    ],
+    objectBindings: [
+      {
+        id: "protostar-low-mass",
+        label: "Low-mass protostar",
+        description: "Young contracting object with inflated radius and weak luminosity.",
+        input: {
+          objectId: "starsim-object:protostar-low-mass",
+          label: "Low-mass protostar",
+          objectClass: "protostar",
+          spectralType: "protostar",
+          luminosity_Lsun: 0.8,
+          radius_Rsun: 3.2,
+          mass_Msun: 0.7,
+          ...baseChannel,
+          source: "manual",
+        },
       },
     ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
@@ -135,6 +184,44 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
         payloadId: "active_volume_fraction_payload",
       },
     ],
+    objectBindings: [
+      {
+        id: "main-sequence-solar-analog",
+        label: "Solar analog",
+        description: "G2V-like main-sequence object with solar-normalized observables.",
+        input: {
+          objectId: "starsim-object:solar-analog",
+          label: "Solar analog",
+          objectClass: "main_sequence",
+          spectralType: "G2V",
+          luminosity_Lsun: 1,
+          radius_Rsun: 1,
+          mass_Msun: 1,
+          r90_Rstar: 0.25,
+          ...baseChannel,
+          source: "manual",
+        },
+      },
+      {
+        id: "main-sequence-hot-cno-candidate",
+        label: "Hot CNO candidate",
+        description: "Hotter, heavier main-sequence proxy for CNO-prior context.",
+        input: {
+          objectId: "starsim-object:hot-cno-candidate",
+          label: "Hot CNO candidate",
+          objectClass: "main_sequence",
+          spectralType: "A5V",
+          luminosity_Lsun: 8,
+          radius_Rsun: 1.8,
+          mass_Msun: 1.7,
+          r90_Rstar: 0.18,
+          channelTemperature_K: 21000000,
+          channelDensity_g_cm3: 90,
+          gravitationalConstantNormalized: normalizedSolarG,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -162,6 +249,27 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       {
         badgeId: "starsim.fusion_zone.active_volume_fraction",
         payloadId: "active_volume_fraction_payload",
+      },
+    ],
+    objectBindings: [
+      {
+        id: "red-giant-k1iii",
+        label: "K1III red giant",
+        description: "Expanded red giant sample for shell-fusion context.",
+        input: {
+          objectId: "starsim-object:red-giant-k1iii",
+          label: "K1III red giant",
+          objectClass: "red_giant",
+          spectralType: "K1III",
+          luminosity_Lsun: 65,
+          radius_Rsun: 12,
+          mass_Msun: 1.1,
+          r90_Rstar: 0.42,
+          channelTemperature_K: 12000000,
+          channelDensity_g_cm3: 35,
+          gravitationalConstantNormalized: normalizedSolarG,
+          source: "manual",
+        },
       },
     ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
@@ -197,6 +305,27 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
         payloadId: "active_volume_fraction_payload",
       },
     ],
+    objectBindings: [
+      {
+        id: "red-supergiant-massive",
+        label: "Massive red supergiant",
+        description: "High-luminosity expanded star for late massive-star context.",
+        input: {
+          objectId: "starsim-object:red-supergiant-massive",
+          label: "Massive red supergiant",
+          objectClass: "red_supergiant",
+          spectralType: "M2I",
+          luminosity_Lsun: 90000,
+          radius_Rsun: 650,
+          mass_Msun: 16,
+          r90_Rstar: 0.58,
+          channelTemperature_K: 26000000,
+          channelDensity_g_cm3: 18,
+          gravitationalConstantNormalized: normalizedSolarG,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -213,6 +342,22 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [],
+    objectBindings: [
+      {
+        id: "white-dwarf-remnant",
+        label: "White dwarf remnant",
+        description: "Compact remnant context; calculator rows are intentionally absent.",
+        input: {
+          objectId: "starsim-object:white-dwarf-remnant",
+          label: "White dwarf remnant",
+          objectClass: "white_dwarf",
+          spectralType: "DA",
+          mass_Msun: 0.62,
+          radius_Rsun: 0.012,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -230,6 +375,20 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [],
+    objectBindings: [
+      {
+        id: "supernova-context",
+        label: "Supernova context",
+        description: "Death-stage context that routes to runtime/reference badges.",
+        input: {
+          objectId: "starsim-object:supernova-context",
+          label: "Supernova context",
+          objectClass: "supernova_context",
+          mass_Msun: 16,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -246,6 +405,21 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [],
+    objectBindings: [
+      {
+        id: "neutron-star-remnant",
+        label: "Neutron star remnant",
+        description: "Compact quantum-fluid context; not a pp-chain fusion case.",
+        input: {
+          objectId: "starsim-object:neutron-star-remnant",
+          label: "Neutron star remnant",
+          objectClass: "neutron_star",
+          mass_Msun: 1.4,
+          radius_Rsun: 0.000016,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -262,6 +436,20 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [],
+    objectBindings: [
+      {
+        id: "black-hole-remnant-context",
+        label: "Black hole context",
+        description: "Compact remnant context; no scalar StarSim fusion solve.",
+        input: {
+          objectId: "starsim-object:black-hole-remnant-context",
+          label: "Black hole context",
+          objectClass: "black_hole_context",
+          mass_Msun: 8,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
   {
@@ -278,6 +466,21 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [],
+    objectBindings: [
+      {
+        id: "black-dwarf-context",
+        label: "Black dwarf context",
+        description: "Hypothetical cold remnant context with inactive fusion.",
+        input: {
+          objectId: "starsim-object:black-dwarf-context",
+          label: "Black dwarf context",
+          objectClass: "black_dwarf_context",
+          mass_Msun: 0.6,
+          radius_Rsun: 0.01,
+          source: "manual",
+        },
+      },
+    ],
     claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
   },
 ];

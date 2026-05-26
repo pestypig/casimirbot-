@@ -81,6 +81,62 @@ describe("helix ask E42 universal final composer", () => {
     expect(answerText(response.body)).not.toMatch(/^You are currently on:/i);
   }, 60000);
 
+  it("routes exact docs path where/find prompts to doc location instead of summary", async () => {
+    const app = createApp();
+    const sessionId = `e42-doc-location-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Find where /docs/research/nhm2-current-status-whitepaper-2026-05-02.md discusses assumptions. Return the section or nearby anchors and a short explanation.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: workspaceSnapshot(sessionId),
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_evidence_location");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_evidence_location");
+    console.error(
+      "DOC_LOCATION_RUNTIME",
+      JSON.stringify({
+        initial: {
+          chosen: response.body?.initial_agent_step_decision?.chosen_capability,
+          action: response.body?.initial_agent_step_decision?.action,
+        },
+        terminal_artifact_kind: response.body?.terminal_artifact_kind,
+        final_answer_source: response.body?.final_answer_source,
+        terminal_error_code: response.body?.terminal_error_code,
+        selected_final_answer: response.body?.selected_final_answer,
+        runtime_boundary: response.body?.runtime_boundary_eligibility,
+        solver_controller_decision: response.body?.solver_controller_decision,
+        goal: response.body?.goal_satisfaction_evaluation,
+        runtime: response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => ({
+          i: iteration?.iteration,
+          chosen: iteration?.chosen_capability,
+          role: iteration?.observation_role,
+          refs: iteration?.observed_artifact_refs,
+          produced: iteration?.produced_artifacts,
+          missing: iteration?.missing_requirement_ids,
+        })),
+        artifactKinds: response.body?.current_turn_artifact_ledger?.map((artifact: any) => `${artifact?.kind}:${artifact?.producer_item_id}`),
+      }),
+    );
+    expect(JSON.stringify(response.body)).toContain("docs-viewer.locate_in_doc");
+    expect(JSON.stringify(response.body)).not.toContain("docs_viewer_summary_precedence");
+    expect(
+      response.body?.agent_runtime_loop?.iterations?.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.locate_in_doc" &&
+          iteration?.observation_role === "preobserved_tool_result" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.length > 0,
+      ),
+    ).toBe(true);
+  }, 60000);
+
   it("composes summary-to-note final answers from note update receipts", async () => {
     const app = createApp();
     const sessionId = `e42-summary-note-${Date.now()}`;

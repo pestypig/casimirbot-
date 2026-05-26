@@ -11,6 +11,7 @@ import {
 } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
@@ -48,6 +49,15 @@ import type {
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 import type { TheoryBadgeV1 } from "@shared/contracts/theory-badge-graph.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
+import {
+  buildTheoryCalculatorLoadout,
+} from "@shared/theory/theory-calculator-loadout";
+import {
+  isTheoryCalculatorLoadoutV1,
+  type TheoryCalculatorLoadoutV1,
+  type TheoryCalculatorObjectContextV1,
+} from "@shared/contracts/theory-calculator-loadout.v1";
 import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
@@ -186,6 +196,72 @@ function asStringArray(value: unknown): string[] {
   }
   const single = asNonEmptyString(value);
   return single ? [single] : [];
+}
+
+function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObjectContextV1 | null {
+  const record = asRecord(value);
+  if (!record) return null;
+  const kind = asNonEmptyString(record.kind);
+  if (kind === "starsim_star") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildStarSimObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id),
+      label: asNonEmptyString(record.label),
+      spectralType: asNonEmptyString(observables.spectralType ?? observables.spectral_type),
+      objectClass: asNonEmptyString(observables.objectClass ?? observables.object_class),
+      luminosity_Lsun: asNumber(observables.luminosity_Lsun ?? observables.luminosity),
+      radius_Rsun: asNumber(observables.radius_Rsun ?? observables.radius),
+      mass_Msun: asNumber(observables.mass_Msun ?? observables.mass),
+      effectiveTemperature_K: asNumber(observables.effectiveTemperature_K ?? observables.effective_temperature_K),
+      parallax_mas: asNumber(observables.parallax_mas),
+      properMotionRa_masyr: asNumber(observables.properMotionRa_masyr ?? observables.proper_motion_ra_masyr),
+      properMotionDec_masyr: asNumber(observables.properMotionDec_masyr ?? observables.proper_motion_dec_masyr),
+      radialVelocity_kms: asNumber(observables.radialVelocity_kms ?? observables.radial_velocity_kms),
+      r90_Rstar: asNumber(observables.r90_Rstar ?? observables.r90_rstar),
+      distance_pc: asNumber(observables.distance_pc),
+      magneticField_T: asNumber(observables.magneticField_T ?? observables.magnetic_field_T),
+      spectralLineNm: asNumber(observables.spectralLineNm ?? observables.spectral_line_nm),
+      source: "helix_ask",
+    });
+  }
+  if (kind === "manual_symbol_bindings" || kind === "generic_physics_object") {
+    const variableBindings = asRecord(record.variableBindings ?? record.variable_bindings) ?? {};
+    const normalizedBindings = Object.fromEntries(
+      Object.entries(variableBindings)
+        .map(([key, rawValue]) => [key, typeof rawValue === "number" || typeof rawValue === "string" ? rawValue : null])
+        .filter((entry): entry is [string, string | number] => entry[1] !== null),
+    );
+    return {
+      kind,
+      objectId: asNonEmptyString(record.objectId ?? record.object_id),
+      label: asNonEmptyString(record.label),
+      observables: {},
+      variableBindings: normalizedBindings,
+      units: asRecord(record.units) as Record<string, string> ?? {},
+      source: "helix_ask",
+      assumptions: asStringArray(record.assumptions),
+      claimBoundaryNotes: asStringArray(record.claim_boundary_notes ?? record.claimBoundaryNotes),
+    };
+  }
+  return null;
+}
+
+function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>): TheoryCalculatorLoadoutV1 {
+  const existingLoadout = asRecord(args.loadout);
+  if (existingLoadout && isTheoryCalculatorLoadoutV1(existingLoadout)) return existingLoadout;
+  const targetBadgeId = asNonEmptyString(args.target_badge_id ?? args.targetBadgeId ?? args.badge_id ?? args.badgeId);
+  const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
+  const selectedBadgeIds = badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : [];
+  const mode = asNonEmptyString(args.mode) === "dependency_path" ? "dependency_path" : "selected_badges";
+  const objectContext = asTheoryCalculatorObjectContext(args.object_context ?? args.objectContext);
+  return buildTheoryCalculatorLoadout({
+    graph,
+    badgeIds: selectedBadgeIds,
+    mode,
+    source: "workstation_action",
+    objectContext,
+    includeContextItems: asBoolean(args.include_context_items ?? args.includeContextItems) ?? true,
+  });
 }
 
 function claimBoundaryNotesForBadges(
@@ -3078,6 +3154,64 @@ export function executeHelixPanelAction(
         artifact: {
           kind: "theory_badge_overlay_cleared",
           graph_id: graph.graphId,
+        },
+      };
+    }
+
+    if (
+      actionId === "build_calculator_loadout" ||
+      actionId === "load_calculator_loadout" ||
+      actionId === "solve_calculator_loadout"
+    ) {
+      const loadout = buildTheoryLoadoutFromActionArgs(args, graph);
+      if (loadout.targetBadgeIds.length === 0) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `${panelId}.${actionId} requires badge_ids, badge_id, target_badge_id, or a valid loadout.`,
+        };
+      }
+      if (actionId === "build_calculator_loadout") {
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            kind: "theory_calculator_loadout",
+            artifact_v1: loadout,
+            graph_id: graph.graphId,
+            scalar_count: loadout.summary.scalarCount,
+            context_count: loadout.summary.contextCount,
+            claim_boundary_notes: loadout.claimBoundaryNotes,
+          },
+        };
+      }
+
+      const scientificState = useScientificCalculatorStore.getState();
+      scientificState.setTheoryLoadout(loadout);
+      const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
+      if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
+      const finalLoadout =
+        actionId === "solve_calculator_loadout"
+          ? solveTheoryCalculatorLoadoutNow(loadout)
+          : useScientificCalculatorStore.getState().lastTheoryLoadout ?? loadout;
+      context.openPanel("scientific-calculator", undefined);
+      context.focusPanel("scientific-calculator", undefined);
+      return {
+        ok: finalLoadout.summary.scalarCount > 0 || finalLoadout.summary.contextCount > 0,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: actionId === "solve_calculator_loadout" ? "theory_calculator_loadout_solve" : "theory_calculator_loadout_loaded",
+          artifact_v1: finalLoadout,
+          graph_id: graph.graphId,
+          loaded_scalar_count: finalLoadout.summary.scalarCount,
+          context_count: finalLoadout.summary.contextCount,
+          solved_count: finalLoadout.summary.solvedCount,
+          failed_count: finalLoadout.summary.failedCount,
+          claim_boundary_notes: finalLoadout.claimBoundaryNotes,
+          calculator_focused: true,
         },
       };
     }

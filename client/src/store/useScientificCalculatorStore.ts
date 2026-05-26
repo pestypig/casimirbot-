@@ -3,6 +3,10 @@ import { persist } from "zustand/middleware";
 import type { ScientificSolveResult } from "@/lib/scientific-calculator/solver";
 import type { HelixCalculatorSetupContext } from "@shared/helix-calculator-setup-context";
 import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
+import type {
+  TheoryCalculatorLoadoutItemV1,
+  TheoryCalculatorLoadoutV1,
+} from "@shared/contracts/theory-calculator-loadout.v1";
 
 const SCIENTIFIC_CALCULATOR_STORAGE_KEY = "scientific-calculator:v1";
 
@@ -54,6 +58,8 @@ type ScientificCalculatorState = {
   history: ScientificCalculatorHistoryEntry[];
   lastSolve: ScientificSolveResult | null;
   lastArtifactV1: ScientificCalculatorStepTraceArtifactV1 | null;
+  lastTheoryLoadout: TheoryCalculatorLoadoutV1 | null;
+  activeTheoryLoadoutItemIndex: number | null;
   lastSetup: HelixCalculatorSetupContext | null;
   steps: ScientificSolveResult["steps"];
   debugEvents: ScientificCalculatorDebugEvent[];
@@ -78,6 +84,9 @@ type ScientificCalculatorState = {
       compoundSubgoalId?: string | null;
     },
   ) => void;
+  setTheoryLoadout: (loadout: TheoryCalculatorLoadoutV1 | null) => void;
+  loadTheoryLoadoutItem: (index: number) => TheoryCalculatorLoadoutItemV1 | null;
+  updateTheoryLoadout: (loadout: TheoryCalculatorLoadoutV1) => void;
   recordDebugEvent: (
     event: Omit<ScientificCalculatorDebugEvent, "id" | "ts" | "panel_id">,
   ) => ScientificCalculatorDebugEvent;
@@ -115,6 +124,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
       history: [],
       lastSolve: null,
       lastArtifactV1: null,
+      lastTheoryLoadout: null,
+      activeTheoryLoadoutItemIndex: null,
       lastSetup: null,
       steps: [],
       debugEvents: [],
@@ -174,6 +185,60 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
         }));
       },
+      setTheoryLoadout: (loadout) =>
+        set({
+          lastTheoryLoadout: loadout,
+          activeTheoryLoadoutItemIndex: loadout?.items.find((item) => item.kind === "calculator_payload")?.index ?? null,
+        }),
+      loadTheoryLoadoutItem: (index) => {
+        let selectedItem: TheoryCalculatorLoadoutItemV1 | null = null;
+        set((state) => {
+          selectedItem = state.lastTheoryLoadout?.items.find((item) => item.index === index) ?? null;
+          if (!selectedItem || selectedItem.kind !== "calculator_payload" || !selectedItem.solveExpression) {
+            return {
+              activeTheoryLoadoutItemIndex: index,
+            };
+          }
+          const debugEvent = makeDebugEvent({
+            action_id: "ingest_latex",
+            source: "workstation_action",
+            ok: true,
+            input_latex: selectedItem.solveExpression,
+            source_path: selectedItem.sourcePath,
+            anchor: selectedItem.payloadId,
+            calculator_setup: selectedItem.setupContext,
+            compound_run_id: state.lastTheoryLoadout?.loadoutId ?? null,
+            compound_subgoal_id: selectedItem.id,
+            message: "theory_loadout_item_loaded",
+          });
+          const entry: ScientificCalculatorHistoryEntry = {
+            id: `scicalc:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
+            latex: selectedItem.solveExpression,
+            sourcePath: selectedItem.sourcePath,
+            anchor: selectedItem.payloadId,
+            calculatorSetup: selectedItem.setupContext,
+            compound_run_id: state.lastTheoryLoadout?.loadoutId ?? null,
+            compound_subgoal_id: selectedItem.id,
+            ts: new Date().toISOString(),
+          };
+          return {
+            activeTheoryLoadoutItemIndex: index,
+            currentLatex: selectedItem.solveExpression,
+            lastSetup: selectedItem.setupContext,
+            history: [entry, ...state.history].slice(0, MAX_HISTORY),
+            debugEvents: [debugEvent, ...state.debugEvents].slice(0, MAX_DEBUG_EVENTS),
+          };
+        });
+        return selectedItem;
+      },
+      updateTheoryLoadout: (loadout) =>
+        set((state) => ({
+          lastTheoryLoadout: loadout,
+          activeTheoryLoadoutItemIndex:
+            state.activeTheoryLoadoutItemIndex ??
+            loadout.items.find((item) => item.kind === "calculator_payload")?.index ??
+            null,
+        })),
       recordDebugEvent: (event) => {
         const debugEvent = makeDebugEvent(event);
         set((state) => ({
@@ -206,6 +271,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           currentLatex: "",
           lastSolve: null,
           lastArtifactV1: null,
+          lastTheoryLoadout: null,
+          activeTheoryLoadoutItemIndex: null,
           lastSetup: null,
           steps: [],
           debugEvents: [
@@ -226,6 +293,8 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
         history: state.history,
         lastSolve: state.lastSolve,
         lastArtifactV1: state.lastArtifactV1,
+        lastTheoryLoadout: state.lastTheoryLoadout,
+        activeTheoryLoadoutItemIndex: state.activeTheoryLoadoutItemIndex,
         lastSetup: state.lastSetup,
         steps: state.steps,
         debugEvents: state.debugEvents,

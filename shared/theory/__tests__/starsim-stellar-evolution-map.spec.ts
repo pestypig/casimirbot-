@@ -12,6 +12,7 @@ describe("StarSim stellar evolution map", () => {
 
     for (const stage of STARSIM_STELLAR_EVOLUTION_STAGES) {
       expect(stage.theoryBadgeIds.length).toBeGreaterThan(0);
+      expect(stage.objectBindings.length).toBeGreaterThan(0);
       expect(stage.claimBoundaryBadgeIds).toContain("starsim.claim_boundary.stage1_reduced_order_prior");
       for (const badgeId of stage.theoryBadgeIds) {
         expect(badgeIds.has(badgeId), `${stage.id} references missing badge ${badgeId}`).toBe(true);
@@ -34,6 +35,7 @@ describe("StarSim stellar evolution map", () => {
     expect(stage?.calculatorPayloadRefs.map((payload) => payload.payloadId)).toContain(
       "teff_from_luminosity_radius_payload",
     );
+    expect(stage?.objectBindings.map((binding) => binding.id)).toContain("main-sequence-solar-analog");
   });
 
   it("routes neutron stars to compact-object context instead of ordinary fusion payloads", () => {

@@ -4,6 +4,7 @@ let buildVisibleResolvedTurn: typeof import("@/components/helix/HelixAskPill").b
 let chooseVisibleFinalText: typeof import("@/components/helix/HelixAskPill").chooseVisibleFinalText;
 
 beforeAll(async () => {
+  (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({ buildVisibleResolvedTurn, chooseVisibleFinalText } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -145,7 +146,7 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(text).not.toContain("legacy ghost answer");
   });
 
-  it("uses authoritative final live event text over stale typed failure projection", () => {
+  it("does not let live event text override backend typed failure authority", () => {
     const reply = {
       id: "turn-e63-live-final",
       turn_id: "turn-e63-live-final",
@@ -171,8 +172,8 @@ describe("Helix Ask E63 terminal projection", () => {
 
     const text = chooseVisibleFinalText(reply as never);
 
-    expect(text).toContain("properTimeS_expected = alpha * T");
-    expect(text).toContain("/docs/research/nhm2-frontier-distance-report.md");
-    expect(text).not.toContain("equation_source_unavailable");
+    expect(text).toContain("equation_source_unavailable");
+    expect(text).not.toContain("properTimeS_expected = alpha * T");
+    expect(text).not.toContain("/docs/research/nhm2-frontier-distance-report.md");
   });
 });
