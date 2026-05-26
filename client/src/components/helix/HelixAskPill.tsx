@@ -29386,7 +29386,7 @@ export function HelixAskPill({
                 </div>
               </div>
             ) : null}
-            {latestConversationBrief ? (
+            {latestConversationBrief && userSettings.showHelixAskObserverLane ? (
               <div className="-mt-1 px-4 pb-2 text-[11px]">
                 <p className="text-[9px] uppercase tracking-[0.14em] text-cyan-300/80">brief</p>
                 <p className="mt-0.5 whitespace-pre-wrap text-cyan-100/90">{latestConversationBrief.text}</p>

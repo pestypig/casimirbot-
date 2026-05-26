@@ -21,6 +21,23 @@ export type HelixRuntimeAuthorityBoundaryReport = {
   raw_content_included: false;
 };
 
+export type HelixCapabilityBindingMismatchObservation = {
+  schema: "helix.capability_binding_mismatch_observation.v1";
+  selected_capability: string;
+  observed_artifact_refs: string[];
+  observed_artifact_kinds: string[];
+  observed_capability_families: string[];
+  suggested_capability: string | null;
+  suggested_repair:
+    | "rebind_selected_capability_to_observed_tool_plan"
+    | "retry_selected_capability"
+    | "ask_user"
+    | "fail_closed";
+  repair_reason: string;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "active_doc_identity",
   "active_doc_summary",
@@ -80,7 +97,8 @@ const artifactKindMatchesCapability = (
   const schema = readString(payload?.schema);
   const actionId = readString(payload?.action_id) ?? readString(readRecord(payload?.action)?.action_id);
   const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
-  const joined = [kind, payloadKind, schema, actionId, panelId].filter(Boolean).join(" ");
+  const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
+  const joined = [kind, payloadKind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
 
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
@@ -92,10 +110,66 @@ const artifactKindMatchesCapability = (
   if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
   if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
   if (capability.startsWith("live_env.")) return /live_environment_tool_observation|live_environment_agent_loop|interpreted_log|minecraft_navigation_state|source_capability|runtime_tool_observation|tool_observation/i.test(joined);
+  if (capability === "situation-room-pipelines.observer.attach" || capability === "situation-room-pipelines.observer.detach") {
+    return (
+      /dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer_subscription/i.test(joined) ||
+      (/workstation_tool_evaluation/i.test(joined) && /dottie|observer\.attach|observer\.detach|observer_subscription/i.test(joined))
+    );
+  }
+  if (capability === "situation-room-pipelines.observer.query") {
+    return (
+      /dottie_observer_query_receipt|observer\.query|observer_query/i.test(joined) ||
+      (/workstation_tool_evaluation/i.test(joined) && /dottie|observer\.query|observer_query/i.test(joined))
+    );
+  }
+  if (capability === "situation-room-pipelines.voice_delivery.propose_from_trace") {
+    return (
+      /dottie_voice_receipt|helix\.dottie_voice_receipt\.v1|voice_delivery\.propose_from_trace|voice_delivery/i.test(joined) ||
+      (/workstation_tool_evaluation/i.test(joined) && /dottie_voice|voice_delivery/i.test(joined))
+    );
+  }
+  if (capability === "situation-room-pipelines.dottie_observer.evaluate") {
+    return /workstation_tool_evaluation|helix\.workstation_tool_evaluation\.v1/i.test(joined) && /dottie_observer|dottie_voice|observer_|voice_delivery/i.test(joined);
+  }
+  if (capability.startsWith("situation-room-pipelines.") && /(?:observer|voice_delivery|dottie)/i.test(capability)) {
+    return /dottie_|observer_|observer\.|voice_delivery|tool_observation/i.test(joined);
+  }
   if (capability.startsWith("live-source.") || capability.startsWith("situation-room.")) return /live_pipeline_receipt|live_source|visual_context_pack|situation_context_pack|permission_denied|workspace_action_receipt/i.test(joined);
   if (capability.startsWith("process-graph.")) return /process_graph_overview|workspace_action_receipt/i.test(joined);
   if (capability.includes(".")) return /tool_observation|workspace_action_receipt/i.test(joined);
   return false;
+};
+
+const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): string | null => {
+  if (!artifact) return null;
+  const kind = readString(artifact.kind);
+  const payload = readRecord(artifact.payload);
+  const schema = readString(payload?.schema);
+  const actionId = readString(payload?.action_id) ?? readString(readRecord(payload?.action)?.action_id);
+  const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
+  const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
+  const joined = [kind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
+  if (/dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer\.attach|observer\.detach|observer_subscription/i.test(joined)) {
+    return "situation-room-pipelines.observer.attach";
+  }
+  if (/dottie_observer_query_receipt|observer\.query|observer_query/i.test(joined)) {
+    return "situation-room-pipelines.observer.query";
+  }
+  if (/dottie_voice_receipt|helix\.dottie_voice_receipt\.v1|voice_delivery\.propose_from_trace|voice_delivery/i.test(joined)) {
+    return "situation-room-pipelines.voice_delivery.propose_from_trace";
+  }
+  if (/calculator_receipt|calculator_result/i.test(joined)) return "scientific-calculator.solve_expression";
+  if (/doc_summary/i.test(joined)) return "docs-viewer.summarize_doc";
+  if (/doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined)) return "docs-viewer.locate_in_doc";
+  if (/doc_open_receipt|active_doc_path/i.test(joined)) return "docs-viewer.open_doc_by_path";
+  if (/doc_search_results|doc_candidate_validation/i.test(joined)) return "docs-viewer.search_docs";
+  if (/note_update_receipt|note_/i.test(joined)) return "workstation-notes.append";
+  if (/process_graph_overview/i.test(joined)) return "process-graph.inspect";
+  if (/live_pipeline_receipt|live_source|visual_context_pack|situation_context_pack|permission_denied/i.test(joined)) return "situation-room.describe_visual_capture";
+  if (/workspace_action_receipt/i.test(joined) && /docs-viewer|docs_viewer/i.test(joined)) return "docs-viewer.open";
+  if (/workspace_action_receipt/i.test(joined) && /scientific-calculator/i.test(joined)) return "scientific-calculator.open";
+  if (/workspace_action_receipt/i.test(joined) && /workstation-notes/i.test(joined)) return "workstation-notes.open";
+  return null;
 };
 
 const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): string[] => {
@@ -220,6 +294,54 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
       return Boolean(artifact) && artifactKindMatchesCapability(capability, artifact);
     });
   });
+}
+
+export function buildCapabilityBindingMismatchObservation(
+  payload: Record<string, unknown>,
+): HelixCapabilityBindingMismatchObservation | null {
+  if (hasSelectedCapabilityObservation(payload)) return null;
+  const loop = readRecord(payload.agent_runtime_loop);
+  const iterations = readArray(loop?.iterations)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const artifacts = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const artifactById = new Map<string, Record<string, unknown>>();
+  for (const artifact of artifacts) {
+    const artifactId = readString(artifact.artifact_id);
+    if (artifactId) artifactById.set(artifactId, artifact);
+  }
+  for (const iteration of iterations) {
+    const selectedCapability = readString(iteration.chosen_capability);
+    if (!selectedCapability || selectedCapability === "model.direct_answer") continue;
+    const observedArtifacts = observedArtifactRefsForIteration(iteration)
+      .map((ref) => artifactById.get(ref) ?? null)
+      .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+    if (observedArtifacts.length === 0) continue;
+    if (observedArtifacts.some((artifact) => artifactLinkedToIteration(artifact, iteration) && artifactKindMatchesCapability(selectedCapability, artifact))) {
+      continue;
+    }
+    const observedFamilies = Array.from(new Set(observedArtifacts.map(capabilityFamilyForArtifact).filter((entry): entry is string => Boolean(entry))));
+    if (observedFamilies.length === 0) continue;
+    const suggestedCapability = observedFamilies.find((family) => family !== selectedCapability) ?? null;
+    if (!suggestedCapability) continue;
+    const observedRefs = observedArtifacts.map((artifact) => readString(artifact.artifact_id)).filter((entry): entry is string => Boolean(entry));
+    const observedKinds = Array.from(new Set(observedArtifacts.map((artifact) => readString(artifact.kind)).filter((entry): entry is string => Boolean(entry))));
+    return {
+      schema: "helix.capability_binding_mismatch_observation.v1",
+      selected_capability: selectedCapability,
+      observed_artifact_refs: observedRefs,
+      observed_artifact_kinds: observedKinds,
+      observed_capability_families: observedFamilies,
+      suggested_capability: suggestedCapability,
+      suggested_repair: "rebind_selected_capability_to_observed_tool_plan",
+      repair_reason: `Selected capability ${selectedCapability} did not match observed artifact family ${suggestedCapability}; expose this as an observation so the model can repair, retry, ask the user, or fail closed.`,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  return null;
 }
 
 export function hasPostObservationModelDecision(payload: Record<string, unknown>): boolean {

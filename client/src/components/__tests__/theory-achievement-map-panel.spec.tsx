@@ -289,9 +289,9 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("opens generic atlas lens panels for planned blocks without auto-loading calculator rows", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Galactic Dynamics atlas lens" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Curvature / Collapse atlas lens" }));
 
-    expect(await screen.findByText("Galactic Dynamics")).toBeTruthy();
+    expect(await screen.findByText("Curvature / Collapse")).toBeTruthy();
     expect(screen.getByText("Mapped Badges")).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
@@ -322,6 +322,35 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
       );
       expect(useScientificCalculatorStore.getState().currentLatex).toBe(
         "p_B = 5.3^2/(2*0.00000125663706212)",
+      );
+    });
+  });
+
+  it("uses the Galactic Dynamics lens to load object-bound map rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Galactic Dynamics atlas lens" }));
+
+    expect(await screen.findByText("Dynamics")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Map Geometry" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Map Geometry" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample local stream object binding" }));
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("galactic_dynamics");
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedGalacticDynamicsGroupId).toBe(
+        "galactic.map.geometry",
+      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedGalacticDynamicsObjectBindingId).toBe(
+        "sample-local-stream",
+      );
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "galactic_dynamics_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "distance_pc = sqrt(3^2 + 4^2 + 12^2)",
       );
     });
   });

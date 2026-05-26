@@ -1,7 +1,10 @@
 import type { HelixFinalRouteReconciliation } from "@shared/helix-final-route-reconciliation";
 import type { HelixSolverControllerBlockingReason, HelixSolverControllerDecision } from "@shared/helix-solver-controller-decision";
 import type { HelixTurnIdIntegrityAudit, HelixTurnIdIntegrityViolationCode } from "@shared/helix-turn-id-integrity-audit";
-import { evaluateTerminalBoundaryEligibility } from "./runtime-authority-contract";
+import {
+  buildCapabilityBindingMismatchObservation,
+  evaluateTerminalBoundaryEligibility,
+} from "./runtime-authority-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -390,6 +393,9 @@ export function buildSolverControllerDecision(input: {
       )
     );
   const runtimeBoundary = evaluateTerminalBoundaryEligibility(payload);
+  const capabilityBindingMismatchObservation =
+    readRecord(payload.capability_binding_mismatch_observation) ??
+    buildCapabilityBindingMismatchObservation(payload);
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const consumedRefs: string[] = [
@@ -631,6 +637,15 @@ export function buildSolverControllerDecision(input: {
   }
 
   const effectiveBlockingReasons = nonAnswerTerminal ? [] : blockingReasons;
+  const bindingMismatchRepairable =
+    Boolean(capabilityBindingMismatchObservation) &&
+    effectiveBlockingReasons.includes("selected_capability_observation_missing") &&
+    effectiveBlockingReasons.every((reason) =>
+      reason === "selected_capability_observation_missing" ||
+      reason === "post_observation_model_decision_missing" ||
+      reason === "capability_lifecycle_incomplete" ||
+      reason === "solver_path_incomplete",
+    );
   const goalBlocked = effectiveBlockingReasons.some((reason) =>
     reason === "goal_satisfaction_missing" ||
     reason === "goal_not_satisfied" ||
@@ -651,6 +666,8 @@ export function buildSolverControllerDecision(input: {
   const controllerDecision =
     effectiveBlockingReasons.length === 0
       ? "allow_terminal"
+      : bindingMismatchRepairable
+        ? "retry"
       : requestedGoalDecision
         ? requestedGoalDecision
         : goalBlocked
@@ -672,7 +689,10 @@ export function buildSolverControllerDecision(input: {
     selected_terminal_artifact_kind: terminalArtifactKind,
     decision: controllerDecision,
     blocking_reasons: effectiveBlockingReasons,
-    consumed_artifact_refs: consumedRefs,
+    consumed_artifact_refs: capabilityBindingMismatchObservation
+      ? [...consumedRefs, "capability_binding_mismatch_observation"]
+      : consumedRefs,
+    retry_policy_ref: capabilityBindingMismatchObservation ? "capability_binding_mismatch_observation" : undefined,
     typed_failure_code: typedFailureCode,
     assistant_answer: false,
     raw_content_included: false,

@@ -7,6 +7,7 @@ import type { CasimirCavityGroupId } from "@shared/theory/casimir-cavity-map";
 import type { WarpGrNhm2GroupId } from "@shared/theory/warp-gr-nhm2-map";
 import type { QeiStressEnergyGroupId } from "@shared/theory/qei-stress-energy-map";
 import type { TokamakPlasmaGroupId } from "@shared/theory/tokamak-plasma-map";
+import type { GalacticDynamicsGroupId } from "@shared/theory/galactic-dynamics-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
@@ -37,6 +38,8 @@ type TheoryBadgeGraphPanelState = {
   selectedQeiStressEnergyObjectBindingId: string | null;
   selectedTokamakPlasmaGroupId: TokamakPlasmaGroupId | null;
   selectedTokamakPlasmaObjectBindingId: string | null;
+  selectedGalacticDynamicsGroupId: GalacticDynamicsGroupId | null;
+  selectedGalacticDynamicsObjectBindingId: string | null;
   setSelectedBadgeId: (badgeId: string | null) => void;
   setSelectedBadgeIds: (badgeIds: string[]) => void;
   toggleSelectedBadgeId: (badgeId: string) => void;
@@ -63,6 +66,9 @@ type TheoryBadgeGraphPanelState = {
   setSelectedTokamakPlasmaGroupId: (groupId: TokamakPlasmaGroupId | null) => void;
   setSelectedTokamakPlasmaObjectBindingId: (bindingId: string | null) => void;
   clearTokamakPlasmaObjectBinding: () => void;
+  setSelectedGalacticDynamicsGroupId: (groupId: GalacticDynamicsGroupId | null) => void;
+  setSelectedGalacticDynamicsObjectBindingId: (bindingId: string | null) => void;
+  clearGalacticDynamicsObjectBinding: () => void;
   resetPanelMemory: () => void;
 };
 
@@ -116,6 +122,8 @@ const initialState = {
   selectedQeiStressEnergyObjectBindingId: null as string | null,
   selectedTokamakPlasmaGroupId: null as TokamakPlasmaGroupId | null,
   selectedTokamakPlasmaObjectBindingId: null as string | null,
+  selectedGalacticDynamicsGroupId: null as GalacticDynamicsGroupId | null,
+  selectedGalacticDynamicsObjectBindingId: null as string | null,
 };
 
 export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>()(
@@ -193,6 +201,13 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         set({
           selectedTokamakPlasmaObjectBindingId: null,
         }),
+      setSelectedGalacticDynamicsGroupId: (groupId) => set({ selectedGalacticDynamicsGroupId: groupId }),
+      setSelectedGalacticDynamicsObjectBindingId: (bindingId) =>
+        set({ selectedGalacticDynamicsObjectBindingId: bindingId }),
+      clearGalacticDynamicsObjectBinding: () =>
+        set({
+          selectedGalacticDynamicsObjectBindingId: null,
+        }),
       resetPanelMemory: () => set(initialState),
     }),
     {
@@ -217,6 +232,8 @@ export const useTheoryBadgeGraphPanelStore = create<TheoryBadgeGraphPanelState>(
         selectedQeiStressEnergyObjectBindingId: state.selectedQeiStressEnergyObjectBindingId,
         selectedTokamakPlasmaGroupId: state.selectedTokamakPlasmaGroupId,
         selectedTokamakPlasmaObjectBindingId: state.selectedTokamakPlasmaObjectBindingId,
+        selectedGalacticDynamicsGroupId: state.selectedGalacticDynamicsGroupId,
+        selectedGalacticDynamicsObjectBindingId: state.selectedGalacticDynamicsObjectBindingId,
       }),
     },
   ),

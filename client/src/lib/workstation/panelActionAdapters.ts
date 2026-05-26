@@ -55,6 +55,7 @@ import { buildNhm2DiagnosticObjectBindings } from "@shared/theory/nhm2-diagnosti
 import { buildSolarSpectrumObservationBindings } from "@shared/theory/solar-spectrum-observation-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
 import { buildTokamakPlasmaObjectBindings } from "@shared/theory/tokamak-plasma-object-bindings";
+import { buildGalacticDynamicsObjectBindings } from "@shared/theory/galactic-dynamics-object-bindings";
 import {
   buildTheoryCalculatorLoadout,
 } from "@shared/theory/theory-calculator-loadout";
@@ -375,6 +376,33 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
       edge_count: asNumber(observables.edge_count) ?? undefined,
       sol_count: asNumber(observables.sol_count) ?? undefined,
       total_count: asNumber(observables.total_count) ?? undefined,
+      source: "helix_ask",
+    });
+  }
+  if (kind === "galactic_dynamics_object") {
+    const observables = asRecord(record.observables) ?? record;
+    return buildGalacticDynamicsObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      dx_pc: asNumber(observables.dx_pc ?? observables.dx) ?? undefined,
+      dy_pc: asNumber(observables.dy_pc ?? observables.dy) ?? undefined,
+      dz_pc: asNumber(observables.dz_pc ?? observables.dz) ?? undefined,
+      dvx_kms: asNumber(observables.dvx_kms ?? observables.dvx) ?? undefined,
+      dvy_kms: asNumber(observables.dvy_kms ?? observables.dvy) ?? undefined,
+      dvz_kms: asNumber(observables.dvz_kms ?? observables.dvz) ?? undefined,
+      distance_pc: asNumber(observables.distance_pc) ?? undefined,
+      relativeVelocity_kms:
+        asNumber(observables.relativeVelocity_kms ?? observables.relative_velocity_kms) ?? undefined,
+      structureWeight: asNumber(observables.structureWeight ?? observables.structure_weight) ?? undefined,
+      G: asNumber(observables.G) ?? undefined,
+      M_enc: asNumber(observables.M_enc ?? observables.enclosed_mass_Msun) ?? undefined,
+      r_kpc: asNumber(observables.r_kpc ?? observables.radius_kpc) ?? undefined,
+      v_rot: asNumber(observables.v_rot ?? observables.rotation_velocity_kms) ?? undefined,
+      v_obs: asNumber(observables.v_obs ?? observables.observedVelocity_km_s ?? observables.observed_velocity_kms) ?? undefined,
+      v_model: asNumber(observables.v_model ?? observables.modelVelocity_km_s ?? observables.model_velocity_kms) ?? undefined,
+      velocity_residual: asNumber(observables.velocity_residual) ?? undefined,
+      residual_sum_sq: asNumber(observables.residual_sum_sq) ?? undefined,
+      N_points: asNumber(observables.N_points ?? observables.n_points) ?? undefined,
       source: "helix_ask",
     });
   }

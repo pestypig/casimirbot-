@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCapabilityBindingMismatchObservation,
   evaluateTerminalBoundaryEligibility,
   goalSatisfactionAllowsTerminal,
   hasAgentRuntimeLoopDecisionChain,
@@ -342,6 +343,176 @@ describe("helix ask runtime authority contract", () => {
     const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.eligible).toBe(false);
     expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
+  });
+
+  it("treats Dottie observer receipts as observations for selected Situation Room observer capabilities", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "panel_control", required_terminal_kind: "workstation_tool_evaluation" },
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "panel_control",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-dottie-attach",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "situation-room-pipelines.observer.attach",
+            observed_artifact_refs: ["dottie-attach-1"],
+          },
+          {
+            decision_id: "agent-step-dottie-voice",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "situation-room-pipelines.voice_delivery.propose_from_trace",
+            observed_artifact_refs: ["dottie-voice-1"],
+          },
+          {
+            decision_id: "agent-step-dottie-query",
+            decision_authority: "llm",
+            decision_timing: "terminal_review",
+            chosen_capability: "situation-room-pipelines.observer.query",
+            observed_artifact_refs: ["dottie-query-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "dottie-attach-1",
+          kind: "dottie_observer_subscription_receipt",
+          decision_ref: "agent-step-dottie-attach",
+          payload: {
+            schema: "helix.dottie_observer_subscription.v1",
+            panel_id: "situation-room-pipelines",
+            action_id: "observer.attach",
+            target_run_id: "run:ask:dottie-ui-smoke",
+          },
+        },
+        {
+          artifact_id: "dottie-voice-1",
+          kind: "dottie_voice_receipt",
+          decision_ref: "agent-step-dottie-voice",
+          payload: {
+            schema: "helix.dottie_voice_receipt.v1",
+            panel_id: "situation-room-pipelines",
+            action_id: "voice_delivery.propose_from_trace",
+            source_event_id: "agent_commentary:orientation",
+          },
+        },
+        {
+          artifact_id: "dottie-query-1",
+          kind: "dottie_observer_query_receipt",
+          decision_ref: "agent-step-dottie-query",
+          payload: {
+            panel_id: "situation-room-pipelines",
+            action_id: "observer.query",
+            observer_count: 1,
+          },
+        },
+      ],
+    };
+
+    expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
+  it("does not let Dottie receipts satisfy a stale docs capability selection", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "panel_control", required_terminal_kind: "workstation_tool_evaluation" },
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "panel_control",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stale-docs",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "docs-viewer.open",
+            observed_artifact_refs: ["dottie-attach-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "dottie-attach-1",
+          kind: "dottie_observer_subscription_receipt",
+          decision_ref: "agent-step-stale-docs",
+          payload: {
+            schema: "helix.dottie_observer_subscription.v1",
+            panel_id: "situation-room-pipelines",
+            action_id: "observer.attach",
+            target_run_id: "run:ask:dottie-ui-smoke",
+          },
+        },
+      ],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
+  });
+
+  it("builds a repair observation when selected capability and observed artifact family diverge", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "panel_control", required_terminal_kind: "workstation_tool_evaluation" },
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "panel_control",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stale-docs",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "docs-viewer.open",
+            observed_artifact_refs: ["dottie-attach-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "dottie-attach-1",
+          kind: "dottie_observer_subscription_receipt",
+          decision_ref: "agent-step-stale-docs",
+          payload: {
+            schema: "helix.dottie_observer_subscription.v1",
+            panel_id: "situation-room-pipelines",
+            action_id: "observer.attach",
+            target_run_id: "run:ask:dottie-ui-smoke",
+          },
+        },
+      ],
+    };
+
+    const observation = buildCapabilityBindingMismatchObservation(payload);
+
+    expect(observation).toMatchObject({
+      schema: "helix.capability_binding_mismatch_observation.v1",
+      selected_capability: "docs-viewer.open",
+      observed_artifact_refs: ["dottie-attach-1"],
+      observed_artifact_kinds: ["dottie_observer_subscription_receipt"],
+      suggested_capability: "situation-room-pipelines.observer.attach",
+      suggested_repair: "rebind_selected_capability_to_observed_tool_plan",
+    });
   });
 
   it("allows clean typed failures for source/capability turns without minting a successful terminal", () => {

@@ -209,6 +209,7 @@ function resolveLocatorMatchedBadgeIds(args: {
 
 function contextKindForBadge(badge: TheoryBadgeV1): TheoryCalculatorLoadoutItemKind {
   if (badge.level === "claim_boundary") return "claim_boundary";
+  if (badge.subjects.includes("runtime") || badge.tags.includes("runtime_reference")) return "runtime_context";
   if (badge.equations.some((equation) => equation.operatorKind === "gate_status")) return "runtime_context";
   return "reference_context";
 }

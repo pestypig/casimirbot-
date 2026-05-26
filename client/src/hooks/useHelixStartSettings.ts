@@ -23,14 +23,14 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 11,
+  settingsVersion: 12,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
   voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
-  showHelixAskObserverLane: true,
+  showHelixAskObserverLane: false,
   showDottieVoiceDebugClips: false,
   showHelixVoiceCaptureDiagnostics: false,
   showPowerShellDebug: false,
@@ -70,6 +70,7 @@ export function useHelixStartSettings() {
           typeof parsed.showDottieVoiceDebugClips === "boolean"
             ? parsed.showDottieVoiceDebugClips
             : DEFAULT_SETTINGS.showDottieVoiceDebugClips;
+        merged.showHelixAskObserverLane = DEFAULT_SETTINGS.showHelixAskObserverLane;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
         merged.showWorkstationDebug =
           typeof parsed.showWorkstationDebug === "boolean"

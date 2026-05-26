@@ -837,6 +837,91 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).toContain("required_artifact_contract_missing");
   });
 
+  it("treats capability binding mismatch as a retryable observation before terminal failure", () => {
+    const payload = {
+      active_prompt: "Run the Dottie observer chain.",
+      canonical_goal_frame: {
+        turn_id: "ask:dottie-mismatch",
+        goal_kind: "panel_control",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_reason_code: "panel_control",
+      source_target_intent: {
+        target_source: "workstation_panel",
+        target_kind: "panel_control",
+        strength: "hard",
+        requested_outputs: ["workstation_tool_evaluation"],
+        allow_no_tool_direct: false,
+      },
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: "ask:dottie-mismatch",
+        route: "panel_control",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: "ask:dottie-mismatch", completed_solver_path: false },
+      goal_satisfaction_evaluation: satisfiedGoal("panel_control", "workstation_tool_evaluation"),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: "ask:dottie-mismatch:decision:1",
+        chosen_capability: "docs-viewer.open",
+        decision_authority: "llm",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            decision_id: "ask:dottie-mismatch:decision:1",
+            chosen_capability: "docs-viewer.open",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            observed_artifact_refs: ["ask:dottie-mismatch:dottie-attach"],
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:dottie-mismatch:dottie-attach",
+          turn_id: "ask:dottie-mismatch",
+          kind: "dottie_observer_subscription_receipt",
+          payload: {
+            schema: "helix.dottie_observer_subscription.v1",
+            panel_id: "situation-room-pipelines",
+            action_id: "observer.attach",
+          },
+        },
+      ],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId: "ask:dottie-mismatch",
+      finalRoute: "panel_control",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId: "ask:dottie-mismatch", payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId: "ask:dottie-mismatch",
+        finalRoute: "panel_control",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("retry");
+    expect(decision.retry_policy_ref).toBe("capability_binding_mismatch_observation");
+    expect(decision.blocking_reasons).toContain("selected_capability_observation_missing");
+    expect(decision.consumed_artifact_refs).toContain("capability_binding_mismatch_observation");
+  });
+
   it("allows a satisfied workstation tool evaluation without generic adapter envelope", () => {
     const payload = {
       active_prompt: "Use the scientific calculator to solve 2+2.",

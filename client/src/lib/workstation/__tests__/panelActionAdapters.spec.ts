@@ -1797,6 +1797,42 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
     });
 
+    it("loads object-aware Galactic Dynamics loadouts", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "load_calculator_loadout",
+          args: {
+            badge_ids: [
+              "galactic.map.distance_3d",
+              "galactic.rotation.velocity_residual",
+            ],
+            object_context: {
+              kind: "galactic_dynamics_object",
+              observables: {
+                dx_pc: 3,
+                dy_pc: 4,
+                dz_pc: 12,
+                v_obs: 220,
+                v_model: 190,
+              },
+            },
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe(
+        "galactic_dynamics_object",
+      );
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe(
+        "distance_pc = sqrt(3^2 + 4^2 + 12^2)",
+      );
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    });
+
     it("runs StarSim runtime receipts through theory badge actions", () => {
       const runtimeResult = executeHelixPanelAction(
         {
