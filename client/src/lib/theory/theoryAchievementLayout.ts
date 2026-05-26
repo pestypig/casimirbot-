@@ -54,6 +54,10 @@ const LANE_RULES: Array<{ lane: number; matches: string[] }> = [
   { lane: 7, matches: ["source", "closure"] },
   { lane: 8, matches: ["qei", "diagnostic", "energy_conditions"] },
   { lane: 9, matches: ["claim_boundary", "safety"] },
+  { lane: 10, matches: ["starsim", "stellar", "observable", "radiation"] },
+  { lane: 11, matches: ["stellar_structure", "hydrostatic", "fusion_zone"] },
+  { lane: 12, matches: ["fusion", "main_sequence", "compact_object"] },
+  { lane: 13, matches: ["star_map", "runtime"] },
 ];
 
 const LAYOUT_EDGE_RELATIONS = new Set([

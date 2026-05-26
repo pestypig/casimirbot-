@@ -10,6 +10,10 @@ import {
   FIRST_PRINCIPLES_THEORY_BADGES,
   FIRST_PRINCIPLES_THEORY_EDGES,
 } from "./first-principles-theory-badges";
+import {
+  STARSIM_THEORY_BADGES,
+  STARSIM_THEORY_EDGES,
+} from "./starsim-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -730,10 +734,10 @@ const edges: TheoryBadgeEdgeV1[] = [
 export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
-    title: "NHM2 Theory Badge Graph",
+    title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, and claim boundaries for NHM2.",
-    badges: [...FIRST_PRINCIPLES_THEORY_BADGES, ...badges],
-    edges: [...FIRST_PRINCIPLES_THEORY_EDGES, ...edges],
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2 and StarSim.",
+    badges: [...FIRST_PRINCIPLES_THEORY_BADGES, ...badges, ...STARSIM_THEORY_BADGES],
+    edges: [...FIRST_PRINCIPLES_THEORY_EDGES, ...edges, ...STARSIM_THEORY_EDGES],
   });
 }

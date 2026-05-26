@@ -139,6 +139,14 @@ function textIncludesAny(haystack: string, needles: string[]) {
   return needles.filter((needle) => normalizedHaystack.includes(normalize(needle)));
 }
 
+function unitSignaturesInQuery(query: string, unitSignatures: string[]) {
+  const normalizedQuery = normalize(query);
+  return unitSignatures.filter((signature) => {
+    const normalizedSignature = normalize(signature);
+    return normalizedSignature.length >= 3 && normalizedQuery.includes(normalizedSignature);
+  });
+}
+
 function symbolMatchesQuery(queryTokens: string[], symbols: string[]) {
   const tokenKeys = new Set(queryTokens.map(normalizeKey));
   return symbols.filter((symbol) => {
@@ -208,7 +216,7 @@ export function locateTheoryBadges(args: {
 
       const matchedUnitSignatures = unique([
         ...intersectNormalized(requestedUnitSignatures, unitSignatures),
-        ...textIncludesAny(query, unitSignatures),
+        ...unitSignaturesInQuery(query, unitSignatures),
       ]);
       if (matchedUnitSignatures.length > 0) {
         addScore(30 * matchedUnitSignatures.length, `unit signature match: ${matchedUnitSignatures.join(", ")}`);
