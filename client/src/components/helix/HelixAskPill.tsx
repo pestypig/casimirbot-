@@ -206,10 +206,27 @@ import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 
+const HELIX_ASK_TURN_EXPANSION_STORAGE_KEY = "helix.ask.turnExpansion.v1";
+
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
 
 export function resolveInitialMicArmState(persisted: string | null | undefined): MicArmState {
   return persisted === "off" ? "off" : "on";
+}
+
+function readStoredHelixAskTurnExpansion(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === "boolean"),
+    ) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
 }
 
 export function transitionReadAloudState(
@@ -13578,7 +13595,7 @@ export function HelixAskPill({
   const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
-  const latestAskReply = askReplies[askReplies.length - 1] ?? null;
+  const latestAskReply = askReplies[0] ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
   const debugCopyInFlightRef = useRef(false);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
@@ -13755,6 +13772,32 @@ export function HelixAskPill({
     [voiceNoisyEnvironmentMode],
   );
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>({});
+  const [askTurnExpandedByReply, setAskTurnExpandedByReply] = useState<Record<string, boolean>>(
+    () => readStoredHelixAskTurnExpansion(),
+  );
+
+  useEffect(() => {
+    if (!latestAskReplyId) return;
+    setAskExpandedByReply((prev) =>
+      Object.prototype.hasOwnProperty.call(prev, latestAskReplyId)
+        ? prev
+        : { ...prev, [latestAskReplyId]: true },
+    );
+  }, [latestAskReplyId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (askReplies.length === 0) return;
+    try {
+      const liveIds = new Set(askReplies.map((reply) => reply.id));
+      const pruned = Object.fromEntries(
+        Object.entries(askTurnExpandedByReply).filter(([replyId]) => liveIds.has(replyId)),
+      );
+      window.localStorage.setItem(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY, JSON.stringify(pruned));
+    } catch {
+      // Ignore storage failures; expansion controls should still work for the session.
+    }
+  }, [askReplies, askTurnExpandedByReply]);
 
   useEffect(() => {
     pendingWorkstationUserInputRef.current = pendingWorkstationUserInput;
@@ -29577,7 +29620,41 @@ export function HelixAskPill({
         ) : null}
         {askReplies.length > 0 ? (
           <div className={replyListClassNameResolved}>
-          {askReplies.map((reply, replyIndex) => {
+          {askReplies.length > 1 ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setAskTurnExpandedByReply((prev) => {
+                    const next = { ...prev };
+                    askReplies.forEach((reply) => {
+                      next[reply.id] = true;
+                    });
+                    return next;
+                  })
+                }
+                className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                Expand all
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setAskTurnExpandedByReply((prev) => {
+                    const next = { ...prev };
+                    askReplies.forEach((reply) => {
+                      next[reply.id] = false;
+                    });
+                    return next;
+                  })
+                }
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
+              >
+                Collapse previous
+              </button>
+            </div>
+          ) : null}
+          {askReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
               const leftTs = resolveAskLiveEventTimestampMs(left);
@@ -29732,6 +29809,7 @@ export function HelixAskPill({
                 String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
             );
             const isLatestReply = reply.id === latestAskReplyId;
+            const turnExpanded = Boolean(askTurnExpandedByReply[reply.id]);
             const shouldRenderLiveSituationProjection =
               Boolean(liveSituationArtifact) ||
               (isLatestReply &&
@@ -30453,6 +30531,13 @@ export function HelixAskPill({
             return (
               <details
                 key={reply.id}
+                open={turnExpanded}
+                onToggle={(event) => {
+                  const open = event.currentTarget.open;
+                  setAskTurnExpandedByReply((prev) =>
+                    prev[reply.id] === open ? prev : { ...prev, [reply.id]: open },
+                  );
+                }}
                 className="rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-xs text-slate-300"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-left">
@@ -30465,7 +30550,7 @@ export function HelixAskPill({
                     </span>
                   </span>
                   <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-400">
-                    expand
+                    {turnExpanded ? "collapse" : "expand"}
                   </span>
                 </summary>
                 <div className="mt-3 opacity-90">

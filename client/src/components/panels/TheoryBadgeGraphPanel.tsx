@@ -621,19 +621,9 @@ export default function TheoryBadgeGraphPanel() {
 
   if (viewMode === "map") {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-300 p-1 text-zinc-950">
-        <div className="flex h-full min-h-0 flex-col border-2 border-zinc-950 bg-zinc-300 shadow-inner">
-          <div className="flex h-7 shrink-0 items-center justify-between border-b-2 border-zinc-950 px-2 font-mono text-sm">
-            <span>Achievements</span>
-            {graph ? (
-              <span className="text-xs">
-                {graph.summary.badgeCount} badges / {graph.summary.edgeCount} branches /{" "}
-                {graph.summary.calculatorLoadableCount} loadouts
-              </span>
-            ) : null}
-          </div>
-
-          <div className="relative min-h-0 flex-1 overflow-hidden border-b-2 border-zinc-950 bg-zinc-900">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-zinc-900 text-zinc-950">
+        <div className="flex h-full min-h-0 flex-col bg-zinc-900">
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
             {isLoading ? (
               <div className="p-4 text-sm text-zinc-200">Loading theory badge graph...</div>
             ) : error ? (
@@ -693,24 +683,6 @@ export default function TheoryBadgeGraphPanel() {
                 ) : null}
               </>
             ) : null}
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 p-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Button type="button" size="sm" variant="secondary" className="h-8 min-w-32" disabled>
-                Achievement Map
-              </Button>
-              {selectedBadge ? <span>Selected: {selectedBadge.title}</span> : <span>Select a badge to inspect it.</span>}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 min-w-28 border-zinc-700"
-              onClick={() => setSelectedBadgeIds([])}
-            >
-              Done
-            </Button>
           </div>
         </div>
       </div>

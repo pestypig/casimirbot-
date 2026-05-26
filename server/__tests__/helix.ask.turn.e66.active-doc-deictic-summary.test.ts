@@ -149,6 +149,36 @@ describe("helix ask E66 active document deictic summary", () => {
     expect(response.body?.active_doc_summary_intent?.reasons ?? []).toContain("explicit_doc_path_available");
   }, 90000);
 
+  it("keeps exact /docs path summary prompts in the docs summary lane", async () => {
+    const app = createApp();
+    const sessionId = `e66-exact-doc-path-summary-${Date.now()}`;
+    const currentStatusPath = "/docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: `Summarize ${currentStatusPath} from docs. Cover lapse shift and source closure. Return the path.`,
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: false,
+          docContextValid: false,
+        },
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_summary");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_summary");
+    expect(response.body?.terminal_error_code ?? null).toBeNull();
+    expect(String(response.body?.selected_final_answer ?? "")).toContain(currentStatusPath);
+    expect(String(response.body?.route_reason_code ?? "")).not.toMatch(/repo_code/i);
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("docs-viewer.summarize_doc");
+    expect(response.body?.agent_step_decision?.chosen_capability).toBe("docs-viewer.summarize_doc");
+  }, 90000);
+
   it("fails cleanly when a deictic doc summary has no active document", async () => {
     const app = createApp();
 

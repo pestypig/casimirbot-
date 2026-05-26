@@ -130,7 +130,7 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
   return artifacts.some((artifact) => {
     const record = readRecord(artifact);
     const kind = readString(record?.kind);
-    return Boolean(kind && /tool_observation|workspace_action_receipt|calculator_receipt|doc_open_receipt|doc_search_results|doc_location_result|note_update_receipt|situation_context_pack|live_pipeline_receipt/i.test(kind));
+    return Boolean(kind && /tool_observation|workspace_action_receipt|calculator_receipt|doc_open_receipt|doc_search_results|doc_location_result|doc_summary|note_update_receipt|situation_context_pack|live_pipeline_receipt/i.test(kind));
   });
 }
 

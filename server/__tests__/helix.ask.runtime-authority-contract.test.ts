@@ -140,6 +140,48 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toEqual([]);
   });
 
+  it("treats doc_summary artifacts as docs capability observations", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "active_doc_summary", required_terminal_kind: "doc_summary" },
+      terminal_artifact_kind: "doc_summary",
+      final_answer_source: "artifact_synthesis",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "active_doc_summary",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-doc-summary",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            chosen_capability: "docs-viewer.summarize_doc",
+            artifact_refs: ["doc-summary-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc-summary-1",
+          kind: "doc_summary",
+          payload: {
+            kind: "doc_summary",
+            path: "/docs/research/example.md",
+            text: "This document summarizes the current status and caveats.",
+          },
+        },
+      ],
+    };
+
+    expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
   it("allows clean typed failures for source/capability turns without minting a successful terminal", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "debug_diagnosis" },

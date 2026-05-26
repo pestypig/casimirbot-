@@ -39,12 +39,14 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("loads a badge equation to the calculator without opening an inspector popup", async () => {
     renderPanel();
 
-    expect(await screen.findByText("Achievement Map")).toBeTruthy();
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
 
-    expect(screen.getByText(/Selected: Rest Energy/)).toBeTruthy();
+    expect(screen.queryByText(/Selected: Rest Energy/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Load to Calculator/i })).toBeNull();
     expect(screen.queryByRole("button", { name: "Inspector List" })).toBeNull();
+    expect(screen.queryByText("Achievements")).toBeNull();
+    expect(screen.queryByText("Done")).toBeNull();
 
     await waitFor(() => {
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("E_0=mc^2");
@@ -95,6 +97,6 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
 
     expect(await screen.findByText("Trace Selected Badges")).toBeTruthy();
-    expect(screen.getByText(/Selected: QEI sampling window/)).toBeTruthy();
+    expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeId).toBe("nhm2.qei.sampling_window");
   });
 });
