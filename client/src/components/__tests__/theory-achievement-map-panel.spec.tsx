@@ -180,6 +180,24 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
+  it("opens generic atlas lens panels for the remaining blocks without auto-loading calculator rows", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Solar Surface & Spectrum atlas lens" }));
+
+    expect(await screen.findByText("Solar Surface & Spectrum")).toBeTruthy();
+    expect(screen.getByText("Mapped Badges")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select Solar Photon Energy" })).toBeTruthy();
+    expect(screen.queryByText("Load Examples")).toBeNull();
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+
+    fireEvent.click(screen.getByText("E = h*c/lambda"));
+
+    await waitFor(() => {
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("E=\\frac{hc}{\\lambda}");
+    });
+  });
+
   it("remembers selected badges and viewport position across remounts", async () => {
     const firstRender = renderPanel();
 

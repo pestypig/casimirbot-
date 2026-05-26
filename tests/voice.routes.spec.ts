@@ -36,6 +36,7 @@ const buildAcceptedCandidate = (input: {
   text: string;
   text_certainty: string;
   voice_certainty: string;
+  source_kind?: "operator_callout_v1" | "terminal_answer_authority" | "solver_public_commentary";
   evidence_refs?: string[];
   expires_at?: string | null;
 }) => ({
@@ -46,7 +47,7 @@ const buildAcceptedCandidate = (input: {
   expires_at: input.expires_at ?? "2099-01-01T00:00:00.000Z",
   status: "accepted",
   voice_authority_state: "callout_voice",
-  source_kind: "operator_callout_v1",
+  source_kind: input.source_kind ?? "operator_callout_v1",
   source_event_ids: ["event_voice_test"],
   evidence_refs: input.evidence_refs ?? ["docs/verify.md#L1"],
   text_certainty: input.text_certainty,
@@ -461,6 +462,32 @@ describe("voice routes", () => {
       }),
       evidenceRefs: ["docs/verify.md#L1"],
       traceId: "trace-callout-accepted",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.suppressed ?? false).toBe(false);
+  });
+
+  it("allows Dottie callout voice from solver public commentary", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+
+    const text = "I am checking route authority before the voice lane.";
+    const res = await request(app).post("/api/voice/speak").send({
+      text,
+      mode: "callout",
+      priority: "info",
+      voiceAuthorityState: "callout_voice",
+      accepted_arbitration_candidate: buildAcceptedCandidate({
+        text,
+        text_certainty: "reasoned",
+        voice_certainty: "reasoned",
+        source_kind: "solver_public_commentary",
+        evidence_refs: ["ask_turn_solver_trace:turn_voice_test"],
+      }),
+      evidenceRefs: ["ask_turn_solver_trace:turn_voice_test"],
+      traceId: "trace-dottie-public-commentary",
     });
 
     expect(res.status).toBe(200);

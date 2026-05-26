@@ -70,6 +70,13 @@ import {
 } from "@shared/contracts/physics-atlas.v1";
 import { buildHelixPhysicsAtlasV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
+import {
+  buildDottieVoiceReceipt,
+  HELIX_AGENT_COMMENTARY_SCHEMA,
+  HELIX_DOTTIE_OBSERVER_SUBSCRIPTION_SCHEMA,
+  HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
+  type HelixDottieObserverSubscriptionV1,
+} from "@shared/helix-agent-commentary";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -204,6 +211,18 @@ function asStringArray(value: unknown): string[] {
   }
   const single = asNonEmptyString(value);
   return single ? [single] : [];
+}
+
+const dottieObserverSubscriptions = new Map<string, HelixDottieObserverSubscriptionV1>();
+
+function boundedDottieMaxChars(value: unknown): number {
+  const parsed = asNumber(value);
+  if (!parsed) return 220;
+  return Math.max(24, Math.min(500, Math.floor(parsed)));
+}
+
+function nextDottieObserverId(profile: string, targetRunId: string): string {
+  return `observer:${slugify(profile) || "dottie"}:${slugify(targetRunId) || "run"}:${Date.now()}`;
 }
 
 function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObjectContextV1 | null {
@@ -2371,6 +2390,192 @@ export function executeHelixPanelAction(
           deterministic_content_role: "observation_not_assistant_answer",
         },
         message: `Set companion mode to ${companionMode}.`,
+      };
+    }
+
+    if (actionId === "observer.attach") {
+      const targetRunId = asNonEmptyString(args.target_run_id ?? args.targetRunId);
+      const observerProfile = asNonEmptyString(args.observer_profile ?? args.observerProfile);
+      if (!targetRunId || !observerProfile) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.observer.attach requires target_run_id and observer_profile.",
+        };
+      }
+      const observerId = nextDottieObserverId(observerProfile, targetRunId);
+      const subscription: HelixDottieObserverSubscriptionV1 = {
+        schema: HELIX_DOTTIE_OBSERVER_SUBSCRIPTION_SCHEMA,
+        observer_id: observerId,
+        observer_profile: observerProfile,
+        target_run_id: targetRunId,
+        target_agent_id: asNonEmptyString(args.target_agent_id ?? args.targetAgentId) ?? "agent:helix_ask",
+        target_turn_id: asNonEmptyString(args.target_turn_id ?? args.targetTurnId),
+        thread_id: asNonEmptyString(args.thread_id ?? args.threadId),
+        voice_mode: asNonEmptyString(args.voice_mode ?? args.voiceMode) ?? "voice_on_confirm",
+        max_chars: boundedDottieMaxChars(args.max_chars ?? args.maxChars),
+        event_filter: asStringArray(args.event_filter ?? args.eventFilter).length
+          ? asStringArray(args.event_filter ?? args.eventFilter)
+          : [HELIX_AGENT_COMMENTARY_SCHEMA],
+        status: "active",
+        authority: "witness_only",
+        can_execute_tools: false,
+        assistant_answer: false,
+        raw_reasoning_included: false,
+      };
+      dottieObserverSubscriptions.set(observerId, subscription);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "dottie_observer_subscription_receipt",
+          ok: true,
+          subscription,
+          context_policy: "compact_context_pack_only",
+          deterministic_content_role: "observation_not_assistant_answer",
+          raw_logs_included: false,
+          raw_transcript_included: false,
+          raw_reasoning_included: false,
+        },
+        message: `Attached ${observerProfile} as a witness-only observer.`,
+      };
+    }
+
+    if (actionId === "observer.detach") {
+      const observerId = asNonEmptyString(args.observer_id ?? args.observerId);
+      if (!observerId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.observer.detach requires observer_id.",
+        };
+      }
+      const existing = dottieObserverSubscriptions.get(observerId);
+      const subscription: HelixDottieObserverSubscriptionV1 = existing
+        ? { ...existing, status: "detached" }
+        : {
+            schema: HELIX_DOTTIE_OBSERVER_SUBSCRIPTION_SCHEMA,
+            observer_id: observerId,
+            observer_profile: asNonEmptyString(args.observer_profile ?? args.observerProfile) ?? "auntie_dottie",
+            target_run_id: asNonEmptyString(args.target_run_id ?? args.targetRunId) ?? "unknown",
+            target_agent_id: "agent:helix_ask",
+            target_turn_id: null,
+            thread_id: asNonEmptyString(args.thread_id ?? args.threadId),
+            voice_mode: "voice_on_confirm",
+            max_chars: 220,
+            event_filter: [HELIX_AGENT_COMMENTARY_SCHEMA],
+            status: "detached",
+            authority: "witness_only",
+            can_execute_tools: false,
+            assistant_answer: false,
+            raw_reasoning_included: false,
+          };
+      dottieObserverSubscriptions.set(observerId, subscription);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "dottie_observer_subscription_receipt",
+          ok: true,
+          subscription,
+          deterministic_content_role: "observation_not_assistant_answer",
+          raw_reasoning_included: false,
+        },
+        message: `Detached observer ${observerId}.`,
+      };
+    }
+
+    if (actionId === "observer.query") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId);
+      const targetRunId = asNonEmptyString(args.target_run_id ?? args.targetRunId);
+      const observerProfile = asNonEmptyString(args.observer_profile ?? args.observerProfile);
+      const subscriptions = Array.from(dottieObserverSubscriptions.values()).filter((subscription) => {
+        if (threadId && subscription.thread_id !== threadId) return false;
+        if (targetRunId && subscription.target_run_id !== targetRunId) return false;
+        if (observerProfile && subscription.observer_profile !== observerProfile) return false;
+        return true;
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "dottie_observer_query_receipt",
+          ok: true,
+          subscriptions,
+          count: subscriptions.length,
+          deterministic_content_role: "observation_not_assistant_answer",
+          raw_reasoning_included: false,
+        },
+        message: `Found ${subscriptions.length} observer subscription${subscriptions.length === 1 ? "" : "s"}.`,
+      };
+    }
+
+    if (actionId === "voice_delivery.propose_from_trace") {
+      const sourceEventId = asNonEmptyString(args.source_event_id ?? args.sourceEventId);
+      if (!sourceEventId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.voice_delivery.propose_from_trace requires source_event_id.",
+        };
+      }
+      const sourceText = asNonEmptyString(args.source_text ?? args.sourceText);
+      const observerId = asNonEmptyString(args.observer_id ?? args.observerId) ?? "observer:dottie:unassigned";
+      if (!sourceText) {
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            kind: "dottie_voice_receipt",
+            schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
+            observer_id: observerId,
+            source_event_id: sourceEventId,
+            source_event_schema: asNonEmptyString(args.source_event_schema ?? args.sourceEventSchema) ?? HELIX_AGENT_COMMENTARY_SCHEMA,
+            spoken: false,
+            assistant_answer: false,
+            authority: "witness_only",
+            suppression_reason: "missing_source_text",
+            deterministic_content_role: "observation_not_assistant_answer",
+            raw_reasoning_included: false,
+          },
+          message: "Dottie voice proposal suppressed because no public source text was provided.",
+        };
+      }
+      const receipt = buildDottieVoiceReceipt({
+        observer_id: observerId,
+        target_agent_id: asNonEmptyString(args.target_agent_id ?? args.targetAgentId),
+        target_turn_id: asNonEmptyString(args.target_turn_id ?? args.targetTurnId),
+        source_event_id: sourceEventId,
+        source_event_schema: asNonEmptyString(args.source_event_schema ?? args.sourceEventSchema),
+        source_text: sourceText,
+        max_chars: boundedDottieMaxChars(args.max_chars ?? args.maxChars),
+        spoken: false,
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "dottie_voice_receipt",
+          ok: true,
+          proposed: true,
+          ...receipt,
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+        message: "Prepared a witness-only Dottie voice proposal from the source event.",
       };
     }
 

@@ -19,7 +19,7 @@ export type AcceptedArbitrationCandidate = {
   expires_at?: string | null;
   status: "accepted";
   voice_authority_state: "callout_voice";
-  source_kind: "operator_callout_v1" | "terminal_answer_authority";
+  source_kind: "operator_callout_v1" | "terminal_answer_authority" | "solver_public_commentary";
   source_event_ids: string[];
   evidence_refs: string[];
   text_certainty: "reasoned" | "confirmed";
@@ -228,7 +228,11 @@ function authorizeAcceptedCandidate(input: {
   const sourceKind = normalizeText(candidate.source_kind).toLowerCase();
   const sourceKindSuppression = classifySourceKindSuppression(sourceKind);
   if (sourceKindSuppression) return { ok: false, reason: sourceKindSuppression };
-  if (sourceKind !== "operator_callout_v1" && sourceKind !== "terminal_answer_authority") {
+  if (
+    sourceKind !== "operator_callout_v1" &&
+    sourceKind !== "terminal_answer_authority" &&
+    sourceKind !== "solver_public_commentary"
+  ) {
     return { ok: false, reason: "invalid_accepted_arbitration_candidate" };
   }
 

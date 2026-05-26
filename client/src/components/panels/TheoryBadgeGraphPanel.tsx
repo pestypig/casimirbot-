@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import CosmicDistanceLadderLens from "@/components/panels/CosmicDistanceLadderLens";
+import PhysicsAtlasBlockLens from "@/components/panels/PhysicsAtlasBlockLens";
 import StellarEvolutionLens from "@/components/panels/StellarEvolutionLens";
 import TheoryAchievementMap from "@/components/panels/TheoryAchievementMap";
 import TheoryAtlasRail, { type TheoryAtlasLensId } from "@/components/panels/TheoryAtlasRail";
@@ -674,6 +675,11 @@ export default function TheoryBadgeGraphPanel() {
     });
   }, [activeLensId, graph]);
 
+  const activeAtlasBlock = useMemo(() => {
+    if (!graph || !activeLensId) return null;
+    return buildHelixPhysicsAtlasV1({ graph }).blocks.find((block) => block.id === activeLensId) ?? null;
+  }, [activeLensId, graph]);
+
   const highlightedBadgeIds =
     multiTrace?.connectingBadgeIds ??
     singlePlaybackPlan?.orderedBadgeIds ??
@@ -920,36 +926,12 @@ export default function TheoryBadgeGraphPanel() {
     });
   };
 
-  const loadAtlasExamples = (lensId: TheoryAtlasLensId) => {
-    if (!graph) return;
-    const atlas = buildHelixPhysicsAtlasV1({ graph });
-    const block = atlas.blocks.find((candidate) => candidate.id === lensId);
-    if (!block) return;
-    const queryText = block.calculatorExamples
-      .flatMap((example) => [example.label, example.expression, example.displayLatex, ...example.symbols])
-      .join(" ");
-    const loadout = buildTheoryCalculatorLoadout({
-      graph,
-      badgeIds: [],
-      mode: "locator_matches",
-      source: "achievement_map",
-      atlasBlockId: lensId,
-      query: queryText,
-      includeContextItems: false,
-    });
-    const scientificState = useScientificCalculatorStore.getState();
-    scientificState.setTheoryLoadout(loadout);
-    const firstScalar = loadout.items.find((item) => item.kind === "calculator_payload");
-    if (firstScalar) scientificState.loadTheoryLoadoutItem(firstScalar.index);
-  };
-
   if (viewMode === "map") {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
         <TheoryAtlasRail
           activeLensId={activeLensId}
           onSelectLens={selectAtlasLens}
-          onLoadExamples={loadAtlasExamples}
         />
         {activeLensId === "stellar_evolution" && graph ? (
           <StellarEvolutionLens
@@ -972,6 +954,20 @@ export default function TheoryBadgeGraphPanel() {
             onSelectRung={selectCosmicDistanceRung}
             onSelectObjectBinding={selectCosmicObjectBinding}
             onClearObjectBinding={clearCosmicBindingSelection}
+            onLoadPayload={loadCalculatorPayload}
+          />
+        ) : null}
+        {activeLensId &&
+        activeLensId !== "stellar_evolution" &&
+        activeLensId !== "cosmic_distance_ladder" &&
+        graph &&
+        atlasLens &&
+        activeAtlasBlock ? (
+          <PhysicsAtlasBlockLens
+            graph={graph}
+            block={activeAtlasBlock}
+            lens={atlasLens}
+            onSelectBadge={selectBadge}
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}

@@ -129,6 +129,9 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.set_live_commentary_policy",
   "situation-room-pipelines.request_agentic_review",
   "situation-room-pipelines.set_companion_policy",
+  "situation-room-pipelines.observer.attach",
+  "situation-room-pipelines.observer.detach",
+  "situation-room-pipelines.observer.query",
   "situation-room-pipelines.create_live_workstation_pipeline",
   "situation-room-pipelines.pause_live_workstation_pipeline",
   "situation-room-pipelines.resume_live_workstation_pipeline",
@@ -144,6 +147,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.goal_ledger.mark_blocked",
   "situation-room-pipelines.situation_context.attach_to_ask",
   "situation-room-pipelines.callout_policy.set_mode",
+  "situation-room-pipelines.voice_delivery.propose_from_trace",
   "situation-room-pipelines.voice_delivery.confirm_speak",
   "situation-room-pipelines.start_categorization_job",
   "situation-room-pipelines.pause_categorization_job",
@@ -616,6 +620,43 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
   {
     panel_id: "situation-room-pipelines",
+    action_id: "observer.attach",
+    title: "Attach Observer",
+    description: "Attach a witness-only observer, such as Auntie Dottie, to a Helix Ask run's public commentary events.",
+    aliases: [
+      "attach dottie observer",
+      "have dottie watch this ask turn",
+      "watch helix ask with dottie",
+      "start dottie witness mode",
+    ],
+    required_args: ["target_run_id", "observer_profile"],
+    optional_args: ["thread_id", "target_turn_id", "target_agent_id", "voice_mode", "max_chars", "event_filter"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "observer.detach",
+    title: "Detach Observer",
+    description: "Detach a witness-only observer subscription without changing the target Helix Ask run.",
+    aliases: ["detach dottie observer", "stop dottie watching", "remove observer subscription"],
+    required_args: ["observer_id"],
+    optional_args: ["thread_id", "target_run_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "observer.query",
+    title: "Query Observers",
+    description: "List witness-only observer subscriptions and their public commentary targets.",
+    aliases: ["show dottie observers", "list observer subscriptions", "what is dottie watching"],
+    required_args: [],
+    optional_args: ["thread_id", "target_run_id", "observer_profile"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
     action_id: "live-source.set_rate",
     title: "Set Live Source Rate",
     description: "Set the cadence/rate policy for an active live source producer, such as visual screen capture.",
@@ -684,6 +725,14 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "goal_ledger.mark_blocked", required_args: ["thread_id", "goal"], optional_args: ["room_id", "reason"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "situation_context.attach_to_ask", required_args: ["thread_id"], optional_args: ["room_id", "session_id"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "callout_policy.set_mode", required_args: ["thread_id", "mode"], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "voice_delivery.propose_from_trace",
+    required_args: ["source_event_id"],
+    optional_args: ["observer_id", "voice_mode", "max_chars", "source_text", "source_event_schema", "target_turn_id", "target_agent_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
   { panel_id: "situation-room-pipelines", action_id: "voice_delivery.confirm_speak", required_args: ["thread_id"], optional_args: ["proposal_id", "delivery_id"], risk: "medium", returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "open", required_args: [], optional_args: [] },
@@ -1015,7 +1064,7 @@ function normalizeIdentifier(value: string): string {
 
 function argSchema(arg: string): Record<string, unknown> {
   if (arg.endsWith("_ids") || arg === "source_ids") return { type: "array", items: { type: "string" } };
-  if (arg === "active_pressures") return { type: "array", items: { type: "string" } };
+  if (arg === "active_pressures" || arg === "event_filter") return { type: "array", items: { type: "string" } };
   if (arg === "chunk_ranges") {
     return {
       type: "array",
@@ -1033,7 +1082,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "confirmed" || arg === "derived_outputs_auto_attach" || arg === "command_lane_enabled") {
     return { type: "boolean" };
   }
-  if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline") return { type: "number" };
+  if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline" || arg === "max_chars") return { type: "number" };
   if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
   if (arg === "intent") return { enum: ["translate_conversation", "monitor_conversation", "summarize_conversation"] };
   if (arg === "capture_preference") return { enum: ["existing_source", "browser_tab_audio", "display_audio", "mic", "unknown"] };
@@ -1051,6 +1100,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
   if (arg === "status") return { enum: ["active", "paused", "stopped"] };
   if (arg === "voice_mode") return { enum: ["text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
+  if (arg === "observer_profile") return { enum: ["auntie_dottie", "dottie", "custom"] };
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
   if (arg === "calculator_setup") {
     const physicalDimensionSchema = {
@@ -1167,6 +1217,8 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
+  if (panelId === "situation-room-pipelines" && ["observer.attach", "observer.detach"].includes(actionId)) return "dottie_observer_subscription_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "observer.query") return "dottie_observer_query_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") return "visual_producer_cadence_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_source", "resume_live_source", "stop_live_source", "set_live_source_tick_rate"].includes(actionId)) return "workstation_live_source_receipt";
   if (panelId === "scientific-calculator" && ["ingest_latex", "solve_expression", "solve_with_steps"].includes(actionId)) return "workspace_action_receipt";
@@ -1180,6 +1232,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId.startsWith("goal_ledger.")) return "situation_goal_ledger_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "episode_timeline.summarize_window") return "situation_episode_summary";
   if (panelId === "situation-room-pipelines" && actionId === "callout_policy.set_mode") return "standby_callout_policy_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.propose_from_trace") return "dottie_voice_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.confirm_speak") return "standby_callout_delivery_receipt";
   if (panelId === "workstation-process-graph" && actionId !== "open") {
     if (actionId === "export_svg") return "workstation_process_graph_svg";

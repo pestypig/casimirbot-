@@ -1037,6 +1037,106 @@ describe("panelActionAdapters", () => {
     );
   });
 
+  it("attaches and queries Dottie as a witness-only observer", () => {
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: () => undefined,
+      openSettings: () => undefined,
+    };
+    const attach = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "observer.attach",
+        args: {
+          target_run_id: "run:ask:voice-lane",
+          observer_profile: "auntie_dottie",
+          target_turn_id: "turn:voice-lane",
+          max_chars: 120,
+        },
+      },
+      context,
+    );
+
+    expect(attach.ok).toBe(true);
+    expect(attach.artifact?.kind).toBe("dottie_observer_subscription_receipt");
+    expect(attach.artifact?.subscription).toMatchObject({
+      schema: "helix.dottie_observer_subscription.v1",
+      observer_profile: "auntie_dottie",
+      target_run_id: "run:ask:voice-lane",
+      target_agent_id: "agent:helix_ask",
+      target_turn_id: "turn:voice-lane",
+      authority: "witness_only",
+      can_execute_tools: false,
+      assistant_answer: false,
+      raw_reasoning_included: false,
+    });
+
+    const query = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "observer.query",
+        args: { target_run_id: "run:ask:voice-lane" },
+      },
+      context,
+    );
+
+    expect(query.ok).toBe(true);
+    expect(query.artifact?.kind).toBe("dottie_observer_query_receipt");
+    expect(query.artifact?.count).toBeGreaterThanOrEqual(1);
+    expect(query.artifact?.subscriptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_run_id: "run:ask:voice-lane",
+          authority: "witness_only",
+        }),
+      ]),
+    );
+  });
+
+  it("proposes Dottie voice from a public trace event without making an answer", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "voice_delivery.propose_from_trace",
+        args: {
+          observer_id: "observer:dottie:test",
+          source_event_id: "agent_commentary:orientation",
+          source_event_schema: "helix.agent_commentary.v1",
+          source_text: "I am checking route authority before the voice lane and then I will inspect the public commentary source.",
+          target_turn_id: "turn:voice-lane",
+          max_chars: 64,
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      kind: "dottie_voice_receipt",
+      schema: "helix.dottie_voice_receipt.v1",
+      observer_id: "observer:dottie:test",
+      source_event_id: "agent_commentary:orientation",
+      source_event_schema: "helix.agent_commentary.v1",
+      target_turn_id: "turn:voice-lane",
+      spoken: false,
+      proposed: true,
+      assistant_answer: false,
+      authority: "witness_only",
+      certainty_parity_ok: true,
+      evidence_parity_ok: true,
+      raw_reasoning_included: false,
+    });
+    expect(String(result.artifact?.spoken_text).length).toBeLessThanOrEqual(64);
+    expect(result.artifact?.spoken_text_hash).toMatch(/^fnv1a64:/);
+    expect(result.artifact?.source_text_hash).toMatch(/^fnv1a64:/);
+  });
+
   it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {
     const room = useSituationRoomStore.getState().createRoom("Setup Delegation Room");
     const source = {

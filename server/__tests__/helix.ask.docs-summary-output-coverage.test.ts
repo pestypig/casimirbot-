@@ -73,7 +73,8 @@ describe("Helix Ask docs summary output coverage", () => {
         workspace_context_snapshot: {
           sessionId,
           activePanel: "docs-viewer",
-          hasDocContext: false,
+          activeDocPath: docPath,
+          hasDocContext: true,
           hasNoteContext: false,
         },
       })
@@ -81,8 +82,11 @@ describe("Helix Ask docs summary output coverage", () => {
 
     const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
     const iterations = response.body?.agent_runtime_loop?.iterations ?? [];
+    const plannerItems = response.body?.planner_contract?.plan_items ?? [];
     expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.final_status).toBe("final_answer");
     expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(response.body?.initial_agent_step_decision?.chosen_capability).toBe("docs-viewer.search_docs");
     expect(
       iterations.some(
         (iteration: any) =>
@@ -93,6 +97,11 @@ describe("Helix Ask docs summary output coverage", () => {
     ).toBe(true);
     expect(answerText).toMatch(/\/docs\//);
     expect(visibleBulletCount(answerText)).toBeGreaterThanOrEqual(4);
+    expect(
+      plannerItems.some((item: any) => String(item?.id ?? "").includes("reasoning_followup_opened_doc_answer")),
+    ).toBe(false);
+    expect(response.body?.satisfaction_report?.missing_artifacts ?? []).not.toContain("doc_concept_explanation");
+    expect(response.body?.agent_loop_budget?.missing_requirement_ids ?? []).not.toContain("doc_concept_explanation");
     expect(response.body?.prompt_requirement_coverage?.coverage).toBe("complete");
     expect(response.body?.doc_retrieval_coverage?.coverage).toBe("complete");
     expect(response.body?.doc_retrieval_coverage?.requested_scope).toBe("broad_topic");

@@ -130,6 +130,38 @@ describe("workstation dynamic tools", () => {
     });
   });
 
+  it("exposes Dottie observer tools as receipt-backed manual actions", () => {
+    const tools = getWorkstationDynamicTools();
+    const attach = tools.find((tool) => tool.name === "situation_room_pipelines.observer_attach");
+    const propose = tools.find((tool) => tool.name === "situation_room_pipelines.voice_delivery_propose_from_trace");
+
+    expect(attach).toMatchObject({
+      namespace: "workstation",
+      panel_id: "situation-room-pipelines",
+      action_id: "observer.attach",
+      risk: "medium",
+      returns_artifact: true,
+      terminal_artifact_kind: "dottie_observer_subscription_receipt",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+    expect(attach?.inputSchema).toMatchObject({
+      required: ["target_run_id", "observer_profile"],
+      properties: {
+        observer_profile: { enum: ["auntie_dottie", "dottie", "custom"] },
+        event_filter: { type: "array", items: { type: "string" } },
+        max_chars: { type: "number" },
+      },
+    });
+    expect(propose).toMatchObject({
+      panel_id: "situation-room-pipelines",
+      action_id: "voice_delivery.propose_from_trace",
+      terminal_artifact_kind: "dottie_voice_receipt",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+  });
+
   it("exposes ideology and Zen framework actions as receipt-backed tools", () => {
     const tools = getWorkstationDynamicTools();
     const compare = tools.find((tool) => tool.name === "mission_ethos.compare_motive_to_zen");
