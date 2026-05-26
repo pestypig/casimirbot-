@@ -96,10 +96,10 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
 const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === "string");
+  Array.isArray(value) && value.every((item: unknown) => typeof item === "string");
 
 function countStatus(blocks: PhysicsAtlasBlockV1[], status: PhysicsAtlasBlockStatus): number {
-  return blocks.filter((block) => block.status === status).length;
+  return blocks.filter((block: PhysicsAtlasBlockV1) => block.status === status).length;
 }
 
 export function buildPhysicsAtlasV1(input: BuildPhysicsAtlasV1Input): PhysicsAtlasV1 {

@@ -28,6 +28,7 @@ import { resolveTheoryBadgeConnectionTrace } from "@/lib/theory/theoryBadgeConne
 import { resolveTheoryBadgePlaybackPlan } from "@/lib/theory/theoryBadgePlaybackPlan";
 import { formatTheoryBadgePlaybackMarkdown } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
+import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildCosmicDistanceObjectBindings } from "@shared/theory/cosmic-distance-object-bindings";
 import { buildStarSimObjectBindings } from "@shared/theory/starsim-object-bindings";
@@ -580,7 +581,7 @@ export default function TheoryBadgeGraphPanel() {
   }, [calculatorArtifact, calculatorLatex, graph, setLocatorOverlay]);
 
   useEffect(() => {
-    if (!graph || !selectedEvolutionStageId) return;
+    if (!graph || activeLensId !== "stellar_evolution" || !selectedEvolutionStageId) return;
     const stage = STARSIM_STELLAR_EVOLUTION_STAGES.find((candidate) => candidate.id === selectedEvolutionStageId);
     if (!stage) return;
     if (
@@ -606,6 +607,7 @@ export default function TheoryBadgeGraphPanel() {
     });
   }, [
     clearStarSimObjectBinding,
+    activeLensId,
     graph,
     selectedEvolutionStageId,
     selectedObjectBindingId,
@@ -613,7 +615,7 @@ export default function TheoryBadgeGraphPanel() {
   ]);
 
   useEffect(() => {
-    if (!graph || !selectedCosmicRungId) return;
+    if (!graph || activeLensId !== "cosmic_distance_ladder" || !selectedCosmicRungId) return;
     const rung = COSMIC_DISTANCE_LADDER_RUNGS.find((candidate) => candidate.id === selectedCosmicRungId);
     if (!rung) return;
     if (
@@ -639,6 +641,7 @@ export default function TheoryBadgeGraphPanel() {
     });
   }, [
     clearCosmicDistanceObjectBinding,
+    activeLensId,
     graph,
     selectedCosmicObjectBindingId,
     selectedCosmicRungId,
@@ -660,19 +663,25 @@ export default function TheoryBadgeGraphPanel() {
     return resolveTheoryBadgeConnectionTrace({ graph, badgeIds: selectedBadgeIds });
   }, [graph, selectedBadgeIds]);
 
+  const atlasLens = useMemo(() => {
+    if (!graph || !activeLensId) return null;
+    return resolvePhysicsAtlasLens({ graph, blockId: activeLensId });
+  }, [activeLensId, graph]);
+
   const highlightedBadgeIds =
     multiTrace?.connectingBadgeIds ??
     singlePlaybackPlan?.orderedBadgeIds ??
-    mapOverlay.highlightedBadgeIds;
+    (mapOverlay.highlightedBadgeIds.length > 0 ? mapOverlay.highlightedBadgeIds : atlasLens?.badgeIds ?? []);
   const highlightedEdgeIds = useMemo(() => {
     if (!graph) return [];
     if (multiTrace) return multiTrace.connectingEdgeIds;
     if (!singlePlaybackPlan && mapOverlay.highlightedEdgeIds.length > 0) return mapOverlay.highlightedEdgeIds;
+    if (!singlePlaybackPlan && atlasLens) return atlasLens.edgeIds;
     const highlighted = new Set(highlightedBadgeIds);
     return graph.edges
       .filter((edge: TheoryBadgeEdgeV1) => highlighted.has(edge.from) && highlighted.has(edge.to))
       .map((edge: TheoryBadgeEdgeV1) => edge.id);
-  }, [graph, highlightedBadgeIds, mapOverlay.highlightedEdgeIds, multiTrace, singlePlaybackPlan]);
+  }, [atlasLens, graph, highlightedBadgeIds, mapOverlay.highlightedEdgeIds, multiTrace, singlePlaybackPlan]);
 
   const activePlayback =
     playbackStore.activeTargetBadgeId === selectedBadge?.id || playbackStore.activeTargetBadgeId
@@ -732,6 +741,7 @@ export default function TheoryBadgeGraphPanel() {
 
   const selectEvolutionStage = (stage: StarSimStellarEvolutionStage) => {
     if (!graph) return;
+    setActiveAtlasLensId("stellar_evolution");
     setSelectedEvolutionStageId(stage.id);
     setSelectedCosmicRungId(null);
     setSelectedObjectBindingId(null);
@@ -808,6 +818,7 @@ export default function TheoryBadgeGraphPanel() {
 
   const selectCosmicDistanceRung = (rung: CosmicDistanceLadderRung) => {
     if (!graph) return;
+    setActiveAtlasLensId("cosmic_distance_ladder");
     setSelectedCosmicRungId(rung.id);
     setSelectedCosmicObjectBindingId(null);
     setSelectedEvolutionStageId(null);
@@ -884,7 +895,7 @@ export default function TheoryBadgeGraphPanel() {
     return (
       <div className="flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
         <TheoryAtlasRail activeLensId={activeLensId} onSelectLens={toggleAtlasLens} />
-        {activeLensId === "starsim-stellar-evolution" && graph ? (
+        {activeLensId === "stellar_evolution" && graph ? (
           <StellarEvolutionLens
             graph={graph}
             stages={STARSIM_STELLAR_EVOLUTION_STAGES}
@@ -896,7 +907,7 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
-        {activeLensId === "cosmic-distance-ladder" && graph ? (
+        {activeLensId === "cosmic_distance_ladder" && graph ? (
           <CosmicDistanceLadderLens
             graph={graph}
             rungs={COSMIC_DISTANCE_LADDER_RUNGS}

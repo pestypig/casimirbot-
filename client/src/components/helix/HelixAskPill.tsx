@@ -4614,7 +4614,16 @@ export function shouldForceObserveDispatchFromSuppression(args: {
     normalizedRoute === "suppressed:multilang_dispatch_blocked" ||
     normalizedRoute === "suppressed:multilang_confirmation_required"
   ) {
-    return shouldDispatchReasoningAttempt(transcript) || isStrongQuestionDispatchCandidate(transcript);
+    const normalizedTranscript = transcript.toLowerCase();
+    const genericSubstantiveQuestion =
+      /^(?:what|how|why|where|which|who|when|can|could|would|should|is|are|do|does|did)\b/.test(
+        normalizedTranscript,
+      ) || normalizedTranscript.includes("?");
+    return (
+      shouldDispatchReasoningAttempt(transcript) ||
+      isStrongQuestionDispatchCandidate(transcript) ||
+      genericSubstantiveQuestion
+    );
   }
   if (shouldDispatchReasoningAttempt(transcript)) return true;
   return isStrongQuestionDispatchCandidate(transcript);

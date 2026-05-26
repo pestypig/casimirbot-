@@ -1,16 +1,20 @@
 import React from "react";
+import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
+import { PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 
-export type TheoryAtlasLensId = "starsim-stellar-evolution" | "cosmic-distance-ladder";
+export type TheoryAtlasLensId = PhysicsAtlasBlockId;
 
-const placeholderColors = [
-  "bg-cyan-500",
-  "bg-violet-600",
-  "bg-slate-500",
-  "bg-orange-500",
-  "bg-sky-500",
-  "bg-emerald-500",
-  "bg-teal-600",
-];
+const blockColors: Record<PhysicsAtlasBlockId, string> = {
+  stellar_evolution: "bg-fuchsia-700",
+  cosmic_distance_ladder: "bg-amber-600",
+  solar_surface_spectrum: "bg-yellow-500",
+  casimir_cavity_modes: "bg-cyan-500",
+  warp_gr_nhm2: "bg-violet-600",
+  qei_stress_energy: "bg-slate-500",
+  tokamak_plasma: "bg-orange-500",
+  galactic_dynamics: "bg-sky-500",
+  curvature_collapse: "bg-emerald-600",
+};
 
 export default function TheoryAtlasRail({
   activeLensId,
@@ -24,40 +28,26 @@ export default function TheoryAtlasRail({
       aria-label="Theory atlas lenses"
       className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
     >
-      <button
-        type="button"
-        aria-label="StarSim stellar evolution lens"
-        title="StarSim stellar evolution"
-        onClick={() => onSelectLens("starsim-stellar-evolution")}
-        className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
-          activeLensId === "starsim-stellar-evolution"
-            ? "border-cyan-100 bg-fuchsia-600 ring-2 ring-cyan-300"
-            : "border-zinc-800 bg-fuchsia-700 hover:border-cyan-200"
-        }`}
-      >
-        *
-      </button>
-      <button
-        type="button"
-        aria-label="Cosmic distance ladder lens"
-        title="Cosmic distance ladder"
-        onClick={() => onSelectLens("cosmic-distance-ladder")}
-        className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
-          activeLensId === "cosmic-distance-ladder"
-            ? "border-cyan-100 bg-amber-500 ring-2 ring-cyan-300"
-            : "border-zinc-800 bg-amber-600 hover:border-cyan-200"
-        }`}
-      >
-        z
-      </button>
-      {placeholderColors.map((color, index) => (
-        <div
-          key={`${color}-${index}`}
-          aria-hidden="true"
-          className={`h-6 w-6 border-2 border-zinc-800 ${color} opacity-55`}
-          title="Future atlas lens"
-        />
-      ))}
+      {PHYSICS_ATLAS_BLOCKS.map((block) => {
+        const active = activeLensId === block.id;
+        const planned = block.status === "planned";
+        return (
+          <button
+            key={block.id}
+            type="button"
+            aria-label={`${block.title} atlas lens`}
+            title={block.title}
+            onClick={() => onSelectLens(block.id)}
+            className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
+              active
+                ? "border-cyan-100 ring-2 ring-cyan-300"
+                : "border-zinc-800 hover:border-cyan-200"
+            } ${blockColors[block.id]} ${planned && !active ? "opacity-60" : ""}`}
+          >
+            {block.glyph}
+          </button>
+        );
+      })}
     </div>
   );
 }

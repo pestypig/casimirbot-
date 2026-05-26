@@ -80,7 +80,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("uses the StarSim stellar evolution lens to light mapped badges and load scalar formulas", async () => {
     renderPanel();
 
-    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
     expect(starSimLensButton).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Select Main Sequence" }));
 
@@ -129,7 +129,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("collapses the StarSim lens when its atlas block is clicked again", async () => {
     renderPanel();
 
-    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
     expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
 
     fireEvent.click(starSimLensButton);
@@ -145,7 +145,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("remembers whether the StarSim lens is collapsed across remounts", async () => {
     const firstRender = renderPanel();
 
-    const starSimLensButton = await screen.findByRole("button", { name: "StarSim stellar evolution lens" });
+    const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
     expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
 
     fireEvent.click(starSimLensButton);
@@ -156,21 +156,21 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     firstRender.unmount();
     renderPanel();
 
-    expect(await screen.findByRole("button", { name: "StarSim stellar evolution lens" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Stellar Evolution atlas lens" })).toBeTruthy();
     expect(screen.queryByText("Stellar Evolution")).toBeNull();
   });
 
   it("uses the cosmic distance ladder lens to load object-bound redshift rows", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Cosmic distance ladder lens" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cosmic Distance Ladder atlas lens" }));
     expect(await screen.findByText("Distance Ladder")).toBeTruthy();
 
     fireEvent.click(await screen.findByRole("button", { name: "Select Spectral Shift" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use H-alpha z≈0.1 object binding" }));
 
     await waitFor(() => {
-      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("cosmic-distance-ladder");
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("cosmic_distance_ladder");
       expect(useTheoryBadgeGraphPanelStore.getState().selectedCosmicDistanceRungId).toBe("cosmic.ladder.spectral_shift");
       expect(useTheoryBadgeGraphPanelStore.getState().selectedCosmicDistanceObjectBindingId).toBe("h-alpha-redshift-0p1");
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe("cosmic_distance_object");

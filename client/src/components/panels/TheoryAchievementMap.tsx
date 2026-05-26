@@ -40,6 +40,7 @@ function badgeGlyph(badge: TheoryBadgeV1): string {
   if (badge.subjects.includes("qei")) return "Q";
   if (badge.subjects.includes("starsim")) return "*";
   if (badge.subjects.includes("cosmic_distance")) return "z";
+  if (badge.subjects.includes("solar")) return "S";
   if (badge.subjects.includes("nhm2")) return "N";
   if (badge.level === "claim_boundary") return "!";
   return "S";

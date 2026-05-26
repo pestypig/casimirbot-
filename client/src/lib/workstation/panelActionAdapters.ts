@@ -16,6 +16,7 @@ import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
+import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import {
   useSituationRoomStore,
@@ -62,6 +63,9 @@ import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
 } from "@shared/theory/theory-badge-overlap-locator";
+import { PHYSICS_ATLAS_BLOCK_IDS, type PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
+import { buildPhysicsAtlasBlocksV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
+import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -228,21 +232,21 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
     });
   }
   if (kind === "cosmic_distance_object") {
-    const observables = asRecord(record.observables) ?? record;
-    return buildCosmicDistanceObjectBindings({
-      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id),
-      label: asNonEmptyString(record.label ?? observables.label),
-      lambda_rest: asNumber(observables.lambda_rest ?? observables.lambdaRest),
-      lambda_obs: asNumber(observables.lambda_obs ?? observables.lambdaObs),
-      parallax_mas: asNumber(observables.parallax_mas ?? observables.parallaxMas),
-      P_days: asNumber(observables.P_days ?? observables.period_days ?? observables.periodDays),
-      alpha: asNumber(observables.alpha),
-      beta: asNumber(observables.beta),
-      m_app: asNumber(observables.m_app ?? observables.apparent_magnitude ?? observables.apparentMagnitude),
-      M_abs: asNumber(observables.M_abs ?? observables.absolute_magnitude ?? observables.absoluteMagnitude),
-      z: asNumber(observables.z ?? observables.redshift),
-      H0_km_s_Mpc: asNumber(observables.H0_km_s_Mpc ?? observables.h0_km_s_mpc ?? observables.H0),
-      c_km_s: asNumber(observables.c_km_s ?? observables.c),
+      const observables = asRecord(record.observables) ?? record;
+      return buildCosmicDistanceObjectBindings({
+      objectId: asNonEmptyString(record.objectId ?? record.object_id ?? observables.objectId ?? observables.object_id) ?? undefined,
+      label: asNonEmptyString(record.label ?? observables.label) ?? undefined,
+      lambda_rest: asNumber(observables.lambda_rest ?? observables.lambdaRest) ?? undefined,
+      lambda_obs: asNumber(observables.lambda_obs ?? observables.lambdaObs) ?? undefined,
+      parallax_mas: asNumber(observables.parallax_mas ?? observables.parallaxMas) ?? undefined,
+      P_days: asNumber(observables.P_days ?? observables.period_days ?? observables.periodDays) ?? undefined,
+      alpha: asNumber(observables.alpha) ?? undefined,
+      beta: asNumber(observables.beta) ?? undefined,
+      m_app: asNumber(observables.m_app ?? observables.apparent_magnitude ?? observables.apparentMagnitude) ?? undefined,
+      M_abs: asNumber(observables.M_abs ?? observables.absolute_magnitude ?? observables.absoluteMagnitude) ?? undefined,
+      z: asNumber(observables.z ?? observables.redshift) ?? undefined,
+      H0_km_s_Mpc: asNumber(observables.H0_km_s_Mpc ?? observables.h0_km_s_mpc ?? observables.H0) ?? undefined,
+      c_km_s: asNumber(observables.c_km_s ?? observables.c) ?? undefined,
       source: "helix_ask",
     });
   }
@@ -268,12 +272,25 @@ function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObject
   return null;
 }
 
+function asPhysicsAtlasBlockId(value: unknown): PhysicsAtlasBlockId | null {
+  const text = asNonEmptyString(value);
+  if (!text) return null;
+  return PHYSICS_ATLAS_BLOCK_IDS.includes(text as PhysicsAtlasBlockId) ? (text as PhysicsAtlasBlockId) : null;
+}
+
 function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>): TheoryCalculatorLoadoutV1 {
   const existingLoadout = asRecord(args.loadout);
   if (existingLoadout && isTheoryCalculatorLoadoutV1(existingLoadout)) return existingLoadout;
   const targetBadgeId = asNonEmptyString(args.target_badge_id ?? args.targetBadgeId ?? args.badge_id ?? args.badgeId);
   const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
-  const selectedBadgeIds = badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : [];
+  const atlasBlockId = asPhysicsAtlasBlockId(args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId);
+  const atlasBlock = atlasBlockId ? PHYSICS_ATLAS_BLOCKS.find((block) => block.id === atlasBlockId) : null;
+  const atlasBadgeIds = atlasBlock
+    ? [...atlasBlock.primaryBadgeIds, ...atlasBlock.claimBoundaryBadgeIds].filter((badgeId) =>
+        graph.badges.some((badge) => badge.id === badgeId),
+      )
+    : [];
+  const selectedBadgeIds = badgeIds.length > 0 ? badgeIds : targetBadgeId ? [targetBadgeId] : atlasBadgeIds;
   const mode = asNonEmptyString(args.mode) === "dependency_path" ? "dependency_path" : "selected_badges";
   const objectContext = asTheoryCalculatorObjectContext(args.object_context ?? args.objectContext);
   return buildTheoryCalculatorLoadout({
@@ -2880,6 +2897,82 @@ export function executeHelixPanelAction(
           graph_id: graph.graphId,
           badge_count: graph.badges.length,
           edge_count: graph.edges.length,
+        },
+      };
+    }
+
+    if (actionId === "list_physics_atlas") {
+      const atlas = buildPhysicsAtlasBlocksV1(graph.graphId);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "physics_atlas",
+          schemaVersion: atlas.schemaVersion,
+          artifact_v1: atlas,
+          graph_id: graph.graphId,
+          blocks: atlas.blocks.map((block) => ({
+            id: block.id,
+            title: block.title,
+            glyph: block.glyph,
+            status: block.status,
+            subjects: block.subjects,
+            primary_badge_ids: block.primaryBadgeIds,
+            calculator_examples: block.calculatorExamples,
+            claim_boundary_notes: block.claimBoundaryNotes,
+          })),
+        },
+      };
+    }
+
+    if (actionId === "select_atlas_block") {
+      const blockId = asPhysicsAtlasBlockId(args.block_id ?? args.blockId ?? args.atlas_block_id ?? args.atlasBlockId);
+      if (!blockId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.select_atlas_block requires a valid block_id.",
+        };
+      }
+      const atlas = buildPhysicsAtlasBlocksV1(graph.graphId);
+      const block = atlas.blocks.find((candidate) => candidate.id === blockId);
+      const lens = resolvePhysicsAtlasLens({ graph, blockId });
+      if (!block || !lens) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "No atlas block lens matched the request.",
+        };
+      }
+      if (asBoolean(args.overlay) ?? true) {
+        useTheoryBadgeGraphPanelStore.getState().setActiveAtlasLensId(blockId);
+        useTheoryMapOverlayStore.getState().setSelectionOverlay({
+          selectedBadgeIds: lens.rootBadgeIds,
+          highlightedBadgeIds: lens.badgeIds,
+          highlightedEdgeIds: lens.edgeIds,
+          claimBoundaryNotes: lens.claimBoundaryNotes,
+        });
+        context.openPanel(panelId, undefined);
+        context.focusPanel(panelId, undefined);
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "physics_atlas_lens",
+          graph_id: graph.graphId,
+          block,
+          lens,
+          badge_count: lens.badgeIds.length,
+          edge_count: lens.edgeIds.length,
+          calculator_payload_count: lens.calculatorPayloadIds.length,
+          claim_boundary_notes: lens.claimBoundaryNotes,
         },
       };
     }

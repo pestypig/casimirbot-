@@ -429,6 +429,22 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "list_physics_atlas",
+        title: "List Physics Atlas",
+        description: "Return the compact physics atlas domain lenses over the theory badge graph.",
+        risk: "low",
+        returns_artifact: true,
+      },
+      {
+        id: "select_atlas_block",
+        title: "Select Atlas Block",
+        description: "Highlight a compact physics atlas block on the theory achievement map.",
+        risk: "low",
+        required_args: ["block_id"],
+        optional_args: ["overlay"],
+        returns_artifact: true,
+      },
+      {
         id: "lookup_badges",
         title: "Lookup Theory Badges",
         description: "Find matching theory badges by prompt text, subject, symbol, unit signature, source path, family, or simulation owner.",
@@ -468,7 +484,7 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         title: "Build Calculator Loadout",
         description: "Build an object-aware theory calculator loadout from selected badges or a dependency path without mutating panels.",
         risk: "low",
-        optional_args: ["badge_ids", "target_badge_id", "mode", "object_context", "include_context_items", "loadout"],
+        optional_args: ["badge_ids", "target_badge_id", "atlas_block_id", "mode", "object_context", "include_context_items", "loadout"],
         returns_artifact: true,
       },
       {
@@ -476,7 +492,7 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         title: "Load Calculator Loadout",
         description: "Load a theory calculator loadout into the Scientific Calculator without solving.",
         risk: "low",
-        optional_args: ["badge_ids", "target_badge_id", "mode", "object_context", "include_context_items", "loadout"],
+        optional_args: ["badge_ids", "target_badge_id", "atlas_block_id", "mode", "object_context", "include_context_items", "loadout"],
         returns_artifact: true,
       },
       {
@@ -484,7 +500,7 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         title: "Solve Calculator Loadout",
         description: "Solve scalar rows in a theory calculator loadout and optionally run StarSim runtime receipt rows.",
         risk: "low",
-        optional_args: ["badge_ids", "target_badge_id", "mode", "object_context", "include_context_items", "loadout", "solve_scope"],
+        optional_args: ["badge_ids", "target_badge_id", "atlas_block_id", "mode", "object_context", "include_context_items", "loadout", "solve_scope"],
         returns_artifact: true,
       },
       {

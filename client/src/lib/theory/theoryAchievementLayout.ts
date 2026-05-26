@@ -62,6 +62,9 @@ const LANE_RULES: Array<{ lane: number; matches: string[] }> = [
   { lane: 15, matches: ["spectrum", "redshift", "wavelength", "scale_factor"] },
   { lane: 16, matches: ["cepheid", "standard_candle", "distance_modulus"] },
   { lane: 17, matches: ["hubble_law", "cosmology", "accordion"] },
+  { lane: 18, matches: ["solar", "doppler", "flare"] },
+  { lane: 19, matches: ["blackbody", "wien_displacement", "stefan_boltzmann_law"] },
+  { lane: 20, matches: ["solar_flare", "solar_spectrum"] },
 ];
 
 const LAYOUT_EDGE_RELATIONS = new Set([

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { StarSimStellarEvolutionStageId } from "@shared/theory/starsim-stellar-evolution-map";
 import type { CosmicDistanceLadderRungId } from "@shared/theory/cosmic-distance-ladder-map";
+import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
 const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
 
@@ -10,7 +11,7 @@ type TheoryBadgeGraphViewport = {
   scrollTop: number;
 };
 
-export type TheoryBadgeGraphAtlasLensId = "starsim-stellar-evolution" | "cosmic-distance-ladder";
+export type TheoryBadgeGraphAtlasLensId = PhysicsAtlasBlockId;
 
 type TheoryBadgeGraphPanelState = {
   selectedBadgeId: string | null;
@@ -70,7 +71,7 @@ const initialState = {
     scrollLeft: 0,
     scrollTop: 0,
   },
-  activeAtlasLensId: "starsim-stellar-evolution" as TheoryBadgeGraphAtlasLensId | null,
+  activeAtlasLensId: "stellar_evolution" as TheoryBadgeGraphAtlasLensId | null,
   selectedStarSimStageId: null as StarSimStellarEvolutionStageId | null,
   selectedStarSimObjectBindingId: null as string | null,
   selectedCosmicDistanceRungId: null as CosmicDistanceLadderRungId | null,

@@ -11,6 +11,7 @@ import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardSto
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
+import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
@@ -71,6 +72,7 @@ describe("panelActionAdapters", () => {
     });
     useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
     useTheoryMapOverlayStore.getState().clearOverlay();
+    useTheoryBadgeGraphPanelStore.getState().resetPanelMemory();
     useScientificCalculatorLiveSourceStore.setState({
       status: "idle",
       sourceId: "source:calculator-prime-stream",
@@ -1237,7 +1239,37 @@ describe("panelActionAdapters", () => {
         ]),
       );
       expect(useTheoryMapOverlayStore.getState().rippleBadgeIds).toContain("nhm2.qei.sampling_window");
-      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+    expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+  });
+
+    it("exposes physics atlas blocks and can select the solar lens", () => {
+      const atlasResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "list_physics_atlas",
+        },
+        actionContext(),
+      );
+
+      expect(atlasResult.ok).toBe(true);
+      expect(atlasResult.artifact?.kind).toBe("physics_atlas");
+      expect(JSON.stringify(atlasResult.artifact)).toContain("solar_surface_spectrum");
+
+      const selectResult = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "select_atlas_block",
+          args: { block_id: "solar_surface_spectrum", overlay: true },
+        },
+        actionContext(),
+      );
+
+      expect(selectResult.ok).toBe(true);
+      expect(selectResult.artifact?.kind).toBe("physics_atlas_lens");
+      expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("solar_surface_spectrum");
+      expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toContain(
+        "solar.spectrum.photon_energy_wavelength",
+      );
     });
 
     it("loads theory badge payloads to the calculator without solving", () => {
@@ -1357,6 +1389,25 @@ describe("panelActionAdapters", () => {
       expect(result.artifact?.kind).toBe("theory_calculator_loadout_loaded");
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout?.objectContext?.kind).toBe("cosmic_distance_object");
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("z = (721.91 - 656.28) / 656.28");
+    });
+
+    it("builds solar atlas calculator loadouts for Helix Ask", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "build_calculator_loadout",
+          args: {
+            atlas_block_id: "solar_surface_spectrum",
+            include_context_items: false,
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_calculator_loadout");
+      expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("E = h*c/lambda");
+      expect(JSON.stringify(result.artifact?.artifact_v1)).toContain("v = c*(lambda_obs - lambda0)/lambda0");
     });
 
     it("runs StarSim runtime receipts through theory badge actions", () => {

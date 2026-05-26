@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA } from "@shared/helix-live-agent-step";
 import { runLiveEnvironmentAgentLoop } from "../services/helix-ask/live-environment-agent-loop";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
+import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
+import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
+import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildLiveEnvironmentRuntimePacket } from "../services/situation-room/live-environment-runtime-packet-builder";
 import {
   createLiveAnswerEnvironment,
@@ -174,5 +177,85 @@ describe("Helix Ask live environment agent loop", () => {
       assistant_answer: false,
       raw_logs_included: false,
     });
+  });
+
+  it("admits live environment review as evidence-only capability authority", () => {
+    const turnId = "turn:live-env-admission";
+    const promptText = "Dottie, check the live environment event log and route context before answering.";
+    const sourceTargetIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      suppressed_routes: [],
+    };
+    const routeProductContract = {
+      source_target: "live_environment",
+      forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_only_concept"],
+    };
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      routeProductContract,
+      promptText,
+    });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      routeProductContract,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "live_environment_tool_observation",
+      },
+    });
+    const report = evaluateTerminalBoundaryEligibility({
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+      },
+      terminal_artifact_kind: "live_environment_tool_observation",
+      final_answer_source: "artifact_synthesis",
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "decision:1",
+            chosen_capability: "live_env.query_event_log",
+            decision_timing: "pre_action",
+            decision_authority: "deterministic_policy_fallback",
+            observed_artifact_refs: ["artifact:live-env-tool"],
+          },
+          {
+            decision_id: "decision:2",
+            next_step: "answer",
+            decision_timing: "post_observation",
+            decision_authority: "deterministic_policy_fallback",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "artifact:live-env-tool",
+          kind: "live_environment_tool_observation",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.query_event_log",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    });
+
+    expect(admission.required).toBe(true);
+    expect(admission.admitted_tool_families).toContain("live_environment");
+    expect(admission.forbidden_terminal_artifact_kinds).toContain("direct_answer_text");
+    expect(plan.capability_family).toBe("live_environment");
+    expect(plan.admission_status).toBe("needs_evidence");
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.eligible).toBe(true);
   });
 });

@@ -128,6 +128,19 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       projectEntity: null,
     };
   }
+  const looksLikeActiveDocsViewerLocationRequest =
+    /\b(?:current|active|this|that|the)\s+(?:doc|document|paper|white\s*paper|whitepaper)\b/i.test(prompt) &&
+    /\b(?:find|locate|where|location|locations|line-backed|line\s+backed|lines?|section|sections|discuss(?:es|ed|ing)?|mention(?:s|ed|ing)?)\b/i.test(prompt) &&
+    !/\b(?:repo|repository|codebase|source\s+code|implementation|where\s+in\s+(?:the\s+)?code|file\s+paths?\s+and\s+lines?)\b/i.test(prompt);
+  if (looksLikeActiveDocsViewerLocationRequest) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["active_docs_viewer_location_request_not_repo_code"],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
 
   const hardMatches = HARD_REPO_CODE_SPECS.filter((spec) => spec.pattern.test(prompt));
   if (hardMatches.length > 0) {

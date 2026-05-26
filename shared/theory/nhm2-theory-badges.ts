@@ -18,6 +18,10 @@ import {
   COSMIC_DISTANCE_LADDER_BADGES,
   COSMIC_DISTANCE_LADDER_EDGES,
 } from "./cosmic-distance-ladder-badges";
+import {
+  SOLAR_SPECTRUM_THEORY_BADGES,
+  SOLAR_SPECTRUM_THEORY_EDGES,
+} from "./solar-spectrum-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -746,12 +750,14 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...badges,
       ...STARSIM_THEORY_BADGES,
       ...COSMIC_DISTANCE_LADDER_BADGES,
+      ...SOLAR_SPECTRUM_THEORY_BADGES,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
       ...edges,
       ...STARSIM_THEORY_EDGES,
       ...COSMIC_DISTANCE_LADDER_EDGES,
+      ...SOLAR_SPECTRUM_THEORY_EDGES,
     ],
   });
 }

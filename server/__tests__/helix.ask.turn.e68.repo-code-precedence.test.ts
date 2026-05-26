@@ -54,6 +54,16 @@ describe("helix ask repo/code intent precedence", () => {
     );
   });
 
+  it("does not treat active-doc line-backed location prompts as repo/code evidence", () => {
+    const intent = detectRepoCodeEvidenceIntent(
+      "Find lapse shift in the current doc and return the line-backed locations.",
+    );
+
+    expect(intent.repoEvidenceRequested).toBe(false);
+    expect(intent.strength).toBe("none");
+    expect(intent.reasons).toContain("active_docs_viewer_location_request_not_repo_code");
+  });
+
   it("does not treat repo file-path requests as selected visible file references", () => {
     const ref = detectDeicticReference({
       threadId: "test",
