@@ -22,6 +22,7 @@ export type HelixSolverControllerBlockingReason =
   | "agent_step_decision_missing"
   | "selected_capability_observation_missing"
   | "post_observation_model_decision_missing"
+  | "direct_answer_text_missing"
   | "subgoals_observed_not_satisfied"
   | "prompt_requirement_coverage_incomplete"
   | "compound_prompt_coverage_incomplete";

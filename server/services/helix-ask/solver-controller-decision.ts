@@ -360,12 +360,23 @@ export function buildSolverControllerDecision(input: {
   const finalRouteReconciliation = input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
   const disciplineGuardRequired = isSourceTargetedOrCapabilityTurn(payload);
   const capabilityTerminal = isCapabilityTerminalKind(terminalArtifactKind);
+  const modelDirectAnswerTerminal =
+    terminalArtifactKind === "direct_answer_text" &&
+    readString(payload.final_answer_source) === "model_direct_answer" &&
+    (
+      canonicalGoalKind === "model_only_concept" ||
+      canonicalGoalKind === "workspace_help" ||
+      canonicalGoalKind === "conversation"
+    );
   const capabilityGuardRequired =
-    capabilityTerminal ||
-    Boolean(
-      readRecord(payload.capability_plan) ||
-        readRecord(payload.capability_result) ||
-        readRecord(payload.capability_lifecycle_ledger),
+    !modelDirectAnswerTerminal &&
+    (
+      capabilityTerminal ||
+      Boolean(
+        readRecord(payload.capability_plan) ||
+          readRecord(payload.capability_result) ||
+          readRecord(payload.capability_lifecycle_ledger),
+      )
     );
   const runtimeBoundary = evaluateTerminalBoundaryEligibility(payload);
 
@@ -426,6 +437,18 @@ export function buildSolverControllerDecision(input: {
         pushUnique(blockingReasons, "post_observation_model_decision_missing");
       }
     }
+    const modelDirectAnswerMissingApplies =
+      runtimeBoundary.blocking_reasons.includes("direct_answer_text_missing") &&
+      readString(payload.final_answer_source) !== "no_tool_direct" &&
+      (
+        canonicalGoalKind === "model_only_concept" ||
+        canonicalGoalKind === "workspace_help" ||
+        canonicalGoalKind === "conversation" ||
+        readString(payload.final_answer_source) === "model_direct_answer"
+      );
+    if (modelDirectAnswerMissingApplies) {
+      pushUnique(blockingReasons, "direct_answer_text_missing");
+    }
     if (hasIncompletePromptRequirementCoverage(payload)) {
       pushUnique(blockingReasons, "prompt_requirement_coverage_incomplete");
     }
@@ -435,7 +458,7 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!turnIdIntegrityAudit.ok) pushUnique(blockingReasons, "turn_id_integrity_failed");
-  if (!finalRouteReconciliation.ok && !noteMutationTerminal) {
+  if (!finalRouteReconciliation.ok && !noteMutationTerminal && !modelDirectAnswerTerminal) {
     pushUnique(blockingReasons, "terminal_route_mismatch");
     if (finalRouteReconciliation.violations.some((entry) => entry.code === "terminal_artifact_forbidden_by_final_route")) {
       pushUnique(blockingReasons, "route_product_contract_rejected_terminal");
@@ -447,15 +470,16 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
-  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal) {
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) {
     pushUnique(blockingReasons, "route_authority_failed");
   }
   if (
     readBoolean(routeAuthority?.route_authority_ok) === false &&
     !noteMutationTerminal &&
     !liveMaintenanceTerminal &&
+    !modelDirectAnswerTerminal &&
     (
       (poisonFailed && !staleRouteOnlyPoisonFailure) ||
       readString(routeAuthority?.primary_violation_code) === "terminal_artifact_forbidden_by_route_contract" ||
@@ -582,6 +606,7 @@ export function buildSolverControllerDecision(input: {
       reason === "agent_step_decision_missing" ||
       reason === "selected_capability_observation_missing" ||
       reason === "post_observation_model_decision_missing" ||
+      reason === "direct_answer_text_missing" ||
       reason === "subgoals_observed_not_satisfied" ||
       reason === "prompt_requirement_coverage_incomplete" ||
       reason === "compound_prompt_coverage_incomplete"
@@ -596,6 +621,7 @@ export function buildSolverControllerDecision(input: {
     reason === "goal_not_satisfied" ||
     reason === "required_artifact_contract_missing" ||
     reason === "terminal_kind_not_required" ||
+    reason === "direct_answer_text_missing" ||
     reason === "subgoals_observed_not_satisfied" ||
     reason === "prompt_requirement_coverage_incomplete" ||
     reason === "compound_prompt_coverage_incomplete"

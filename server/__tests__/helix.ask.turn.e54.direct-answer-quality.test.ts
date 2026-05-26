@@ -14,6 +14,49 @@ const createApp = (): express.Express => {
 const answerText = (body: any): string => String(body?.selected_final_answer ?? body?.text ?? "");
 
 describe("helix ask E54 direct-answer quality", () => {
+  it("treats model.direct_answer as a terminal model step, not a tool call", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Explain why momentum is conserved in an isolated two-object collision. Do not use workstation tools unless genuinely needed.",
+        mode: "read",
+        debug: true,
+        sessionId: `e54-model-direct-answer-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const answer = answerText(body).toLowerCase();
+    const debugText = JSON.stringify(body).toLowerCase();
+
+    expect(body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(body?.final_answer_source).toBe("model_direct_answer");
+    expect(answer).toContain("isolated");
+    expect(answer).toMatch(/external (force|impulse)|net external/);
+    expect(answer).toMatch(/equal and opposite|newton|internal forces?/);
+    expect(answer).toMatch(/total momentum/);
+
+    expect(body?.direct_answer_text?.text).toBeTruthy();
+    expect(body?.final_answer_draft?.text).toBeTruthy();
+    expect(body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+    expect(body?.terminal_answer_authority?.server_authoritative).toBe(true);
+
+    const loopIterations = body?.agent_runtime_loop?.iterations ?? [];
+    expect(loopIterations.some((iteration: any) =>
+      iteration?.next_step === "answer" &&
+      iteration?.chosen_capability === "model.direct_answer" &&
+      iteration?.observation_role === "model_answer_draft"
+    )).toBe(true);
+
+    const actualCalls = body?.loop_parity_trace?.actual_tool_calls ?? [];
+    expect(actualCalls.some((call: any) => call?.tool_id === "model.direct_answer")).toBe(false);
+    expect(debugText).not.toContain("invalid_args");
+    expect(debugText).not.toContain("capability_lifecycle_incomplete");
+    expect(debugText).not.toContain("budget_exhausted");
+  }, 60000);
+
   it("does not accept the retry placeholder as a successful background-only final answer", async () => {
     const app = createApp();
     const response = await request(app)
