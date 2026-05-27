@@ -1,0 +1,500 @@
+import {
+  HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+  type HelixModelObservationPacket,
+  type HelixModelObservationSource,
+  type HelixModelObservationStatus,
+} from "@shared/helix-model-observation-packet";
+
+export const HELIX_MODEL_CONTEXT_ECONOMY_REPORT_SCHEMA =
+  "helix.model_context_economy_report.v1" as const;
+
+export type HelixModelContextEconomySection =
+  | "user_goal"
+  | "canonical_goal"
+  | "capability_surface_compact"
+  | "route_contract_compact"
+  | "terminal_contract_compact"
+  | "compact_observations"
+  | "exact_excerpts"
+  | "goal_satisfaction"
+  | "final_answer_constraints"
+  | "commentary"
+  | "debug_excluded"
+  | "raw_spans_excluded"
+  | "receipts_excluded";
+
+export type HelixModelContextEconomyReport = {
+  schema: typeof HELIX_MODEL_CONTEXT_ECONOMY_REPORT_SCHEMA;
+  estimated_input_tokens_by_section: Record<HelixModelContextEconomySection, number>;
+  dropped_sections: string[];
+  selected_observation_refs: string[];
+  raw_debug_excluded_from_model_context: boolean;
+  raw_span_refs_available: string[];
+  exact_excerpt_refs_included: string[];
+  section_char_caps: Record<string, number>;
+};
+
+export type HelixModelPromptContext = {
+  compact_observations: HelixModelObservationPacket[];
+  terminal_contract_compact: Record<string, unknown> | null;
+  route_contract_compact: Record<string, unknown> | null;
+  capability_surface_compact: Array<Record<string, unknown>>;
+  exact_excerpts: Array<Record<string, unknown>>;
+  economy_report: HelixModelContextEconomyReport;
+};
+
+const DEFAULT_COMMENTARY_MAX_CHARS = 280;
+const DEFAULT_MODEL_OBSERVATION_MAX_PACKETS = 12;
+const DEFAULT_MODEL_OBSERVATION_MAX_FINDINGS = 6;
+const DEFAULT_MODEL_OBSERVATION_MAX_PROVES = 6;
+const DEFAULT_EXACT_EXCERPT_MAX_CHARS = 1200;
+
+const readEnvInt = (key: string, fallback: number, min: number, max: number): number => {
+  const raw = Number(process.env[key]);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(raw)));
+};
+
+const config = () => ({
+  commentaryMaxChars: readEnvInt("HELIX_ASK_COMMENTARY_MAX_CHARS", DEFAULT_COMMENTARY_MAX_CHARS, 80, 1000),
+  observationMaxPackets: readEnvInt("HELIX_ASK_MODEL_OBSERVATION_MAX_PACKETS", DEFAULT_MODEL_OBSERVATION_MAX_PACKETS, 1, 48),
+  observationMaxFindings: readEnvInt("HELIX_ASK_MODEL_OBSERVATION_MAX_FINDINGS", DEFAULT_MODEL_OBSERVATION_MAX_FINDINGS, 1, 20),
+  observationMaxProves: readEnvInt("HELIX_ASK_MODEL_OBSERVATION_MAX_PROVES", DEFAULT_MODEL_OBSERVATION_MAX_PROVES, 1, 20),
+  exactExcerptMaxChars: readEnvInt("HELIX_ASK_EXACT_EXCERPT_MAX_CHARS", DEFAULT_EXACT_EXCERPT_MAX_CHARS, 120, 6000),
+  rawDebugInModelContext: String(process.env.HELIX_ASK_RAW_DEBUG_IN_MODEL_CONTEXT ?? "0").trim() === "1",
+});
+
+const SECTION_KEYS: HelixModelContextEconomySection[] = [
+  "user_goal",
+  "canonical_goal",
+  "capability_surface_compact",
+  "route_contract_compact",
+  "terminal_contract_compact",
+  "compact_observations",
+  "exact_excerpts",
+  "goal_satisfaction",
+  "final_answer_constraints",
+  "commentary",
+  "debug_excluded",
+  "raw_spans_excluded",
+  "receipts_excluded",
+];
+
+const estimateTokens = (value: unknown): number => {
+  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  return Math.max(0, Math.ceil(text.length / 4));
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const readString = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const readStringArray = (value: unknown): string[] =>
+  readArray(value).map((entry) => readString(entry)).filter((entry): entry is string => Boolean(entry));
+
+const compactText = (value: unknown, maxChars: number): string => {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+};
+
+const unique = (values: Array<string | null | undefined>, limit = 64): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const normalized = String(value ?? "").trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+    if (out.length >= limit) break;
+  }
+  return out;
+};
+
+const normalizeStatus = (value: unknown): HelixModelObservationStatus => {
+  const text = readString(value);
+  if (
+    text === "succeeded" ||
+    text === "blocked" ||
+    text === "missing_input" ||
+    text === "needs_confirmation" ||
+    text === "failed" ||
+    text === "client_pending"
+  ) {
+    return text;
+  }
+  if (text === "completed" || text === "ok" || text === "observed") return "succeeded";
+  return "unknown";
+};
+
+const inferSource = (record: Record<string, unknown>, kind?: string | null): HelixModelObservationSource => {
+  const schema = readString(record.schema) ?? "";
+  const capability = readString(record.capability_key) ?? "";
+  const panelId = readString(record.panel_id) ?? "";
+  const searchable = `${schema} ${kind ?? ""} ${capability} ${panelId}`.toLowerCase();
+  if (searchable.includes("repo_code")) return "repo_code";
+  if (searchable.includes("docs-viewer") || searchable.includes("doc_")) return "docs";
+  if (searchable.includes("active_doc")) return "active_doc";
+  if (searchable.includes("visual") || searchable.includes("screen")) return "visual_capture";
+  if (searchable.includes("situation")) return "situation_room";
+  if (searchable.includes("tool") || capability) return "tool";
+  return "runtime_evidence";
+};
+
+const missingRequirements = (record: Record<string, unknown>, maxItems: number): string[] =>
+  readArray(record.missing_requirements)
+    .map((entry) => {
+      const item = readRecord(entry);
+      return compactText(
+        readString(item?.message) ??
+          readString(item?.code) ??
+          readString(item?.repair_action) ??
+          entry,
+        220,
+      );
+    })
+    .filter(Boolean)
+    .slice(0, maxItems);
+
+export const compactAgentStepObservationPacketForModel = (input: {
+  turnId: string;
+  observation: unknown;
+  source?: HelixModelObservationSource;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const record = readRecord(input.observation);
+  if (!record) return null;
+  const cfg = config();
+  const receipts = readArray(record.receipts).map((entry) => readRecord(entry));
+  const receiptRefs = receipts.map((entry) => readString(entry?.receipt_ref));
+  const producedRefs = readStringArray(record.produced_artifact_refs);
+  const observationRef =
+    readString(record.call_id) ??
+    readString(record.observation_id) ??
+    readString(record.artifact_id) ??
+    producedRefs[0] ??
+    "observation";
+  const summary =
+    readString(record.observation_summary) ??
+    readString(record.summary) ??
+    "Tool produced a non-terminal observation.";
+  const found = unique([compactText(summary, 420)], cfg.observationMaxFindings);
+  const supportRefs = unique([...producedRefs, ...receiptRefs], 64);
+  const missing = missingRequirements(record, cfg.observationMaxFindings);
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(record.turn_id) ?? input.turnId,
+    iteration: typeof record.iteration === "number" ? record.iteration : undefined,
+    observation_ref: observationRef,
+    source: input.source ?? inferSource(record),
+    source_target: readString(record.source_target) ?? undefined,
+    capability_key: readString(record.capability_key) ?? undefined,
+    panel_id: readString(record.panel_id) ?? undefined,
+    action: readString(record.action) ?? undefined,
+    status: normalizeStatus(record.status),
+    user_requested: compactText(input.userRequested ?? record.user_requested ?? "", 320),
+    found,
+    proves: unique(supportRefs.map((ref) => `Observation is supported by ${ref}.`), cfg.observationMaxProves),
+    support_refs: supportRefs,
+    missing_or_uncertain: missing,
+    suggested_next_steps: readStringArray(record.suggested_next_steps)
+      .filter((entry): entry is HelixModelObservationPacket["suggested_next_steps"][number] =>
+        entry === "answer" ||
+        entry === "ask_user" ||
+        entry === "use_another_tool" ||
+        entry === "repair" ||
+        entry === "fail_closed",
+      )
+      .slice(0, 5),
+    raw_debug_ref: `${observationRef}:raw_debug`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+export const compactRepoEvidenceArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+  requiresExactExcerpts?: boolean;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const cfg = config();
+  const observations = readArray(payload.observations).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const spans = readArray(payload.spans).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const supportRefs = unique([
+    readString(artifact?.artifact_id),
+    ...readStringArray(payload.evidence_refs),
+    ...observations.flatMap((entry) => readStringArray(entry.refs)),
+    ...spans.map((entry) => readString(entry.ref)),
+  ], 96);
+  const matchedFiles = unique([
+    ...observations.map((entry) => readString(entry.filePath)),
+    ...spans.map((entry) => readString(entry.path)),
+  ], cfg.observationMaxFindings);
+  const found = matchedFiles.length
+    ? matchedFiles.map((file) => `${file} matched the repo evidence query.`)
+    : [compactText(`Repo evidence found for ${readString(payload.concept) ?? "the requested concept"}.`, 360)];
+  const proves = observations
+    .map((entry) => {
+      const file = readString(entry.filePath) ?? readString(entry.source_id) ?? "repo evidence";
+      const term = readString(entry.term) ?? readString(payload.concept) ?? "requested concept";
+      return compactText(`${file} contributes implementation evidence for ${term}.`, 260);
+    })
+    .filter(Boolean)
+    .slice(0, cfg.observationMaxProves);
+  const exactExcerptRefs = input.requiresExactExcerpts
+    ? spans.map((entry) => readString(entry.ref)).filter((entry): entry is string => Boolean(entry)).slice(0, 8)
+    : undefined;
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? `${input.turnId}:repo_code_evidence_observation`,
+    source: "repo_code",
+    source_target: "repo_code",
+    capability_key: "repo-code.search_concept",
+    status: readArray(payload.observations).length > 0 || readArray(payload.spans).length > 0 ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? readString(payload.query) ?? readString(payload.concept) ?? "", 320),
+    found: found.slice(0, cfg.observationMaxFindings),
+    proves: proves.length ? proves : ["Repo evidence is available for final synthesis."],
+    support_refs: supportRefs,
+    missing_or_uncertain: readArray(payload.observations).length || readArray(payload.spans).length
+      ? []
+      : ["No repo evidence observations were present in the artifact payload."],
+    suggested_next_steps: ["answer", "repair"],
+    raw_debug_ref: `${readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? input.turnId}:raw_spans`,
+    exact_excerpt_refs: exactExcerptRefs,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+export const compactRouteOrTerminalContractForModel = (
+  value: unknown,
+  options: { includeForbidden?: boolean; failedValidation?: boolean } = {},
+): Record<string, unknown> | null => {
+  const record = readRecord(value);
+  if (!record) return null;
+  const includeForbidden =
+    options.includeForbidden ||
+    options.failedValidation ||
+    String(process.env.HELIX_ASK_ROUTE_CONTRACT_COMPACT ?? "1").trim() === "0";
+  const sourceTarget = readString(record.source_target) ?? readString(record.target_source) ?? readString(record.goal_kind);
+  const allowedTerminalKinds = unique([
+    ...readStringArray(record.allowed_terminal_artifact_kinds),
+    ...readStringArray(record.allowed_terminal_products),
+    ...readStringArray(record.required_terminal_kinds),
+    ...readStringArray(record.acceptable_fallbacks),
+  ], 24);
+  const requiredArtifactRefs = unique([
+    ...readStringArray(record.required_artifact_refs),
+    ...readStringArray(record.required_evidence),
+    ...readStringArray(record.required_actions),
+  ], 24);
+  return {
+    source_target: sourceTarget ?? null,
+    allowed_terminal_artifact_kinds: allowedTerminalKinds,
+    required_artifact_refs: requiredArtifactRefs,
+    precedence_reason:
+      readString(record.precedence_reason) ??
+      readString(record.precedenceReason) ??
+      readString(record.reason) ??
+      null,
+    ...(readArray(record.side_artifact_kinds_allowed).length
+      ? { side_artifact_kinds_allowed: readStringArray(record.side_artifact_kinds_allowed) }
+      : {}),
+    ...(includeForbidden
+      ? { forbidden_terminal_kinds: readStringArray(record.forbidden_terminal_kinds).slice(0, 48) }
+      : {}),
+  };
+};
+
+export const compactToolSurfaceForModel = (
+  surface: unknown,
+  options: { includeInputSchema?: boolean } = {},
+): Array<Record<string, unknown>> => {
+  const entries = readArray(readRecord(surface)?.entries ?? surface);
+  return entries
+    .map((entry) => {
+      const record = readRecord(entry);
+      if (!record) return null;
+      return {
+        capability_key: readString(record.capability_key),
+        display_name: readString(record.display_name),
+        description: compactText(record.description, 260),
+        runtime_shape: readString(record.runtime_shape),
+        execution_target: readString(record.execution_target),
+        source_requirements: readArray(record.source_requirements).slice(0, 6),
+        safety_tags: readStringArray(record.safety_tags).slice(0, 10),
+        expected_observation_schema: readString(record.expected_observation_schema),
+        ...(options.includeInputSchema ? { input_schema: record.input_schema ?? null } : {}),
+      };
+    })
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .slice(0, 48);
+};
+
+export const buildHelixModelContextEconomyReport = (input: {
+  sections: Partial<Record<HelixModelContextEconomySection, unknown>>;
+  selectedObservationRefs?: string[];
+  rawSpanRefsAvailable?: string[];
+  exactExcerptRefsIncluded?: string[];
+  droppedSections?: string[];
+  sectionCharCaps?: Record<string, number>;
+  rawDebugExcludedFromModelContext?: boolean;
+}): HelixModelContextEconomyReport => {
+  const estimates = Object.fromEntries(
+    SECTION_KEYS.map((key) => [key, estimateTokens(input.sections[key] ?? "")]),
+  ) as Record<HelixModelContextEconomySection, number>;
+  return {
+    schema: HELIX_MODEL_CONTEXT_ECONOMY_REPORT_SCHEMA,
+    estimated_input_tokens_by_section: estimates,
+    dropped_sections: unique(input.droppedSections ?? [], 64),
+    selected_observation_refs: unique(input.selectedObservationRefs ?? [], 96),
+    raw_debug_excluded_from_model_context: input.rawDebugExcludedFromModelContext ?? !config().rawDebugInModelContext,
+    raw_span_refs_available: unique(input.rawSpanRefsAvailable ?? [], 96),
+    exact_excerpt_refs_included: unique(input.exactExcerptRefsIncluded ?? [], 96),
+    section_char_caps: input.sectionCharCaps ?? {
+      commentary: config().commentaryMaxChars,
+      exact_excerpt: config().exactExcerptMaxChars,
+    },
+  };
+};
+
+export const buildHelixModelPromptContext = (input: {
+  turnId: string;
+  userGoal: string;
+  canonicalGoal?: unknown;
+  terminalContract?: unknown;
+  routeContract?: unknown;
+  capabilitySurface?: unknown;
+  selectedArtifacts?: unknown[];
+  toolObservations?: unknown[];
+  goalSatisfaction?: unknown;
+  finalAnswerConstraints?: unknown;
+  commentary?: unknown;
+  requiresExactExcerpts?: boolean;
+}): HelixModelPromptContext => {
+  const cfg = config();
+  const artifactPackets = (input.selectedArtifacts ?? [])
+    .map((artifact) => {
+      const record = readRecord(artifact);
+      const payload = readRecord(record?.payload) ?? record;
+      const kind = readString(record?.kind) ?? readString(payload?.kind) ?? readString(payload?.schema);
+      if (/repo_code_evidence_observation/i.test(kind ?? "")) {
+        return compactRepoEvidenceArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+          requiresExactExcerpts: input.requiresExactExcerpts,
+        });
+      }
+      if (/agent_step_observation_packet|runtime_tool_observation|tool_observation/i.test(kind ?? "")) {
+        return compactAgentStepObservationPacketForModel({
+          turnId: input.turnId,
+          observation: payload ?? artifact,
+          userRequested: input.userGoal,
+        });
+      }
+      return null;
+    })
+    .filter((entry): entry is HelixModelObservationPacket => Boolean(entry));
+  const toolPackets = (input.toolObservations ?? [])
+    .map((observation) => compactAgentStepObservationPacketForModel({
+      turnId: input.turnId,
+      observation,
+      userRequested: input.userGoal,
+      source: "tool",
+    }))
+    .filter((entry): entry is HelixModelObservationPacket => Boolean(entry));
+  const compactObservations = [...artifactPackets, ...toolPackets]
+    .filter((packet, index, arr) => arr.findIndex((entry) => entry.observation_ref === packet.observation_ref) === index)
+    .slice(0, cfg.observationMaxPackets);
+  const exactExcerpts = input.requiresExactExcerpts
+    ? (input.selectedArtifacts ?? [])
+        .flatMap((artifact) => {
+          const record = readRecord(artifact);
+          const payload = readRecord(record?.payload) ?? record;
+          return readArray(payload?.spans).map((span) => {
+            const spanRecord = readRecord(span);
+            return {
+              ref: readString(spanRecord?.ref),
+              excerpt: compactText(
+                readString(spanRecord?.sanitized_excerpt) ??
+                  readString(spanRecord?.excerpt) ??
+                  readString(spanRecord?.raw_excerpt) ??
+                  "",
+                cfg.exactExcerptMaxChars,
+              ),
+            };
+          });
+        })
+        .filter((entry) => entry.ref && entry.excerpt)
+        .slice(0, 8)
+    : [];
+  const rawSpanRefsAvailable = (input.selectedArtifacts ?? []).flatMap((artifact) => {
+    const record = readRecord(artifact);
+    const payload = readRecord(record?.payload) ?? record;
+    return readArray(payload?.spans).map((span) => readString(readRecord(span)?.ref)).filter((entry): entry is string => Boolean(entry));
+  });
+  const terminalContractCompact = compactRouteOrTerminalContractForModel(input.terminalContract);
+  const routeContractCompact = compactRouteOrTerminalContractForModel(input.routeContract);
+  const capabilitySurfaceCompact = compactToolSurfaceForModel(input.capabilitySurface);
+  const commentary = compactText(input.commentary, cfg.commentaryMaxChars);
+  const economyReport = buildHelixModelContextEconomyReport({
+    sections: {
+      user_goal: input.userGoal,
+      canonical_goal: input.canonicalGoal,
+      capability_surface_compact: capabilitySurfaceCompact,
+      route_contract_compact: routeContractCompact,
+      terminal_contract_compact: terminalContractCompact,
+      compact_observations: compactObservations,
+      exact_excerpts: exactExcerpts,
+      goal_satisfaction: input.goalSatisfaction,
+      final_answer_constraints: input.finalAnswerConstraints,
+      commentary,
+      debug_excluded: "raw debug excluded from model context",
+      raw_spans_excluded: rawSpanRefsAvailable,
+      receipts_excluded: "receipt JSON excluded; receipt refs retained in support_refs",
+    },
+    selectedObservationRefs: compactObservations.map((packet) => packet.observation_ref),
+    rawSpanRefsAvailable,
+    exactExcerptRefsIncluded: exactExcerpts.map((entry) => String(entry.ref)),
+    droppedSections: [
+      "raw_debug_snapshots",
+      "raw_receipt_json",
+      "raw_selected_artifact_payloads",
+      ...(input.requiresExactExcerpts ? [] : ["exact_excerpts"]),
+    ],
+    rawDebugExcludedFromModelContext: !cfg.rawDebugInModelContext,
+    sectionCharCaps: {
+      commentary: cfg.commentaryMaxChars,
+      exact_excerpt: cfg.exactExcerptMaxChars,
+      model_observation_packets: cfg.observationMaxPackets,
+      model_observation_findings: cfg.observationMaxFindings,
+      model_observation_proves: cfg.observationMaxProves,
+    },
+  });
+  return {
+    compact_observations: compactObservations,
+    terminal_contract_compact: terminalContractCompact,
+    route_contract_compact: routeContractCompact,
+    capability_surface_compact: capabilitySurfaceCompact,
+    exact_excerpts: exactExcerpts,
+    economy_report: economyReport,
+  };
+};
