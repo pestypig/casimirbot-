@@ -1,5 +1,6 @@
 import type { RepoSearchHit } from "../repo-search";
 import type { HelixRepoCodeEvidenceObservation } from "../../../../shared/helix-repo-code-evidence-observation";
+import { sanitizeRepoEvidenceExcerptForPresentation } from "../repo-evidence-presentation-sanitizer";
 
 const INDEX_ONLY_PATHS = [
   /(?:^|\/)\.cache\//i,
@@ -240,12 +241,17 @@ export function buildRepoCodeEvidenceSpans(input: {
     const score = scoreHit(hit, queryTokens, exactTerms);
     const ref = `${hit.filePath}:${hit.line}`;
     const path = hit.filePath.replace(/\\/g, "/");
+    const sanitized = sanitizeRepoEvidenceExcerptForPresentation({ raw: hit.text });
     return {
       ref,
       path,
       start_line: Math.max(1, Math.trunc(Number(hit.line) || 1)),
       end_line: Math.max(1, Math.trunc(Number(hit.line) || 1)),
       excerpt: hit.text,
+      raw_excerpt: hit.text,
+      sanitized_excerpt: sanitized.sanitized,
+      raw_excerpt_hash: sanitized.rawHash,
+      sanitizer_changed: sanitized.changed,
       reason: score > 0 ? "matched_concept_path_or_text_signal" : "retrieved_repo_search_hit",
       source_kind: sourceKindForPath(path),
       score,

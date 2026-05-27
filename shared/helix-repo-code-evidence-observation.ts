@@ -27,6 +27,10 @@ export type HelixRepoCodeEvidenceObservation = {
     start_line: number;
     end_line: number;
     excerpt: string;
+    raw_excerpt?: string;
+    sanitized_excerpt?: string;
+    raw_excerpt_hash?: string;
+    sanitizer_changed?: boolean;
     reason: string;
     source_kind: "repo_code" | "repo_doc";
     score: number;
@@ -65,9 +69,58 @@ export type HelixRepoCodeEvidenceAnswer = {
   turn_id: string;
   concept: string;
   answer_text: string;
+  model_authored?: boolean;
+  synthesis_attempt_ref?: string;
+  source_observation_refs?: string[];
   support_refs: string[];
+  claim_support_ref?: string;
+  raw_spans_debug_ref?: string;
   uncertainty: string[];
   evidence_observation_ref: string;
   assistant_answer: true;
+  raw_content_included: false;
+};
+
+export type HelixRepoEvidenceSynthesisAttempt = {
+  schema: "helix.repo_evidence_synthesis_attempt.v1";
+  attempt_id: string;
+  turn_id: string;
+  source_observation_refs: string[];
+  model_input_refs: string[];
+  produced_final_answer_draft_ref?: string;
+  produced_repo_code_evidence_answer_ref?: string;
+  model_invoked: true;
+  model_step_kind: "post_observation_synthesis";
+  status:
+    | "succeeded"
+    | "empty"
+    | "stale"
+    | "excerpt_like"
+    | "renderer_hostile"
+    | "unsupported_claims"
+    | "failed";
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export const HELIX_REPO_EVIDENCE_SYNTHESIS_REPAIR_OBSERVATION_SCHEMA =
+  "helix.repo_evidence_synthesis_repair_observation.v1" as const;
+
+export type HelixRepoEvidenceSynthesisRepairObservation = {
+  schema: typeof HELIX_REPO_EVIDENCE_SYNTHESIS_REPAIR_OBSERVATION_SCHEMA;
+  observation_id: string;
+  turn_id: string;
+  failed_attempt_ref: string;
+  source_observation_refs: string[];
+  repair_reason:
+    | "empty_answer"
+    | "stale_answer"
+    | "excerpt_like_answer"
+    | "renderer_hostile_answer"
+    | "unsupported_claims"
+    | "missing_support_refs"
+    | "canned_fallback_text";
+  instruction_to_model: string;
+  assistant_answer: false;
   raw_content_included: false;
 };

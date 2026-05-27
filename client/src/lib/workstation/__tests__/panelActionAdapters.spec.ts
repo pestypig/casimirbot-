@@ -1224,6 +1224,63 @@ describe("panelActionAdapters", () => {
     });
   });
 
+  it("updates live job operating prompts as observation-only receipts", () => {
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: () => undefined,
+      openSettings: () => undefined,
+    };
+    const created = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "auntie_dottie_witness",
+          room_id: "room:prompt-edit",
+          thread_id: "thread:prompt-edit",
+          operating_prompt: "Watch Minecraft and stay quiet.",
+        },
+      },
+      context,
+    );
+    const contract = created.artifact?.live_job_contract as { contract_id: string };
+
+    const updated = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.set_operating_prompt",
+        args: {
+          contract_id: contract.contract_id,
+          operating_prompt: "Only interrupt for confirmed route drift.",
+        },
+      },
+      context,
+    );
+
+    expect(updated.ok).toBe(true);
+    expect(updated.artifact).toMatchObject({
+      kind: "situation_live_job_prompt_update_receipt",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      assistant_answer: false,
+      raw_content_included: false,
+      live_job_contract: {
+        contract_id: contract.contract_id,
+        operating_prompt: "Only interrupt for confirmed route drift.",
+        compiled_policy: {
+          evidence_threshold: "confirmed",
+        },
+      },
+      construct_observation: {
+        action: "construct.set_operating_prompt",
+        terminal_eligible: false,
+        panel_generated_answer: false,
+      },
+    });
+  });
+
   it("creates a browser audio transcriber construct recipe without answer authority", () => {
     const result = executeHelixPanelAction(
       {

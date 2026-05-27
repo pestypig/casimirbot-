@@ -2,6 +2,7 @@ import { auditHelixAskContextForPoison } from "./ask-context-poison-audit";
 import { auditTerminalPresentationCoverage } from "./terminal-presentation-coverage-audit";
 import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "./turn-terminal-authority";
 import { evaluateTerminalBoundaryEligibility, type HelixRuntimeAuthorityBoundaryReport } from "./runtime-authority-contract";
+import { evaluateRepoAnswerTextQualityGate } from "./repo-answer-text-quality-gate";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -356,6 +357,49 @@ function buildUnavailableTerminalTextFailureEnvelope(
   };
 }
 
+function buildRepoAnswerQualityFailureEnvelope(
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): HelixTerminalAnswerEnvelope {
+  const gate = evaluateRepoAnswerTextQualityGate({
+    turnId: envelope.turn_id,
+    answerRef: readString(readRecord(payload.repo_code_evidence_answer)?.artifact_id) ??
+      readString(readRecord(payload.final_answer_draft)?.artifact_id) ??
+      envelope.terminal_artifact_kind,
+    answerText: envelope.terminal_text,
+    payload,
+  });
+  payload.repo_answer_text_quality_gate = gate;
+  if (gate.ok) return envelope;
+
+  const terminalText = [
+    "I could not complete this repo-grounded answer because repo evidence was retrieved, but no valid model-authored synthesis passed terminal authority.",
+    `Repo answer quality violations: ${gate.violations.join(", ")}.`,
+  ].join(" ");
+  payload.terminal_error_code = "repo_evidence_synthesis_failed";
+  payload.typed_failure = {
+    ...(readRecord(payload.typed_failure) ?? {}),
+    kind: "typed_failure",
+    error_code: payload.terminal_error_code,
+    text: terminalText,
+    answer_text: terminalText,
+    rejected_terminal_artifact_kind: envelope.terminal_artifact_kind,
+    rejected_final_answer_source: envelope.final_answer_source,
+    repo_answer_text_quality_gate: gate,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    ...envelope,
+    terminal_artifact_kind: "typed_failure",
+    final_answer_source: "typed_failure",
+    terminal_text: terminalText,
+    terminal_text_hash: hashHelixTerminalText(terminalText),
+    terminal_kind: "failure",
+    authority_origin: "typed_failure",
+  };
+}
+
 function clearStaleFailureFieldsForSuccessfulTerminal(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
@@ -420,25 +464,8 @@ export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): HelixTerminalAnswerEnvelope {
-  if (
-    envelope.terminal_artifact_kind === "repo_code_evidence_answer" &&
-    (isStaleRepoEvidenceTerminalText(envelope.terminal_text) || isUnbackedRepoEvidenceTerminalText(envelope.terminal_text))
-  ) {
-    const repairedText = buildRepoEvidenceTerminalRepairText(payload);
-    if (repairedText) {
-      envelope = {
-        ...envelope,
-        terminal_text: repairedText,
-        terminal_text_hash: hashHelixTerminalText(repairedText),
-        final_answer_source: envelope.final_answer_source === "typed_failure"
-          ? "artifact_synthesis"
-          : envelope.final_answer_source,
-        terminal_kind: "answer",
-        authority_origin: "terminal_presentation",
-      };
-      payload.final_answer_source = envelope.final_answer_source;
-      payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
-    }
+  if (envelope.terminal_artifact_kind === "repo_code_evidence_answer") {
+    envelope = buildRepoAnswerQualityFailureEnvelope(payload, envelope);
   }
   if (
     envelope.terminal_kind !== "failure" &&

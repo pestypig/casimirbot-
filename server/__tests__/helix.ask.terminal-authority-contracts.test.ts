@@ -263,6 +263,57 @@ describe("Helix Ask terminal authority contracts", () => {
     });
   });
 
+  it("does not promote deterministic repo evidence fallback text into a successful terminal", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:repo-fallback-terminal",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      final_answer_source: "model_synthesis_from_repo_evidence",
+      selected_final_answer: [
+        "I found current repo evidence for Situation Room.",
+        "",
+        "Key evidence:",
+        "- client/src/components/workstation/SituationRoomPipelinesPanel.tsx: export function SituationRoomPipelinesPanel()",
+      ].join("\n"),
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "final-draft-repo",
+        authority: "deterministic_receipt_fallback",
+        text: "I found current repo evidence for Situation Room.",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "repo-obs-1",
+          kind: "repo_code_evidence_observation",
+          payload: {
+            schema: "helix.repo_code_evidence_observation.v1",
+            evidence_refs: ["client/src/components/workstation/SituationRoomPipelinesPanel.tsx:1"],
+          },
+        },
+      ],
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: [
+          "I found current repo evidence for Situation Room.",
+          "",
+          "Key evidence:",
+          "- client/src/components/workstation/SituationRoomPipelinesPanel.tsx: export function SituationRoomPipelinesPanel()",
+        ].join("\n"),
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("repo_evidence_synthesis_failed");
+    expect((payload.repo_answer_text_quality_gate as Record<string, unknown>).ok).toBe(false);
+    expect((payload.repo_answer_text_quality_gate as Record<string, unknown>).violations).toEqual(
+      expect.arrayContaining(["missing_model_synthesis", "canned_fallback_text"]),
+    );
+  });
+
   it("does not let stale presentation text override typed failure authority", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:typed-failure-stale-presentation",

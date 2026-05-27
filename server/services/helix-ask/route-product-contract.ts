@@ -323,7 +323,14 @@ export function buildRouteProductContract(input: {
         "docs_viewer_receipt",
       ],
       precedenceReason: "repo_code_source_target_allows_only_repo_evidence_terminal_products",
-      sideArtifactKindsAllowed: ["repo_code_evidence_observation"],
+      sideArtifactKindsAllowed: [
+        "repo_code_evidence_observation",
+        "repo_evidence_synthesis_attempt",
+        "repo_evidence_synthesis_repair_observation",
+        "repo_answer_text_quality_gate",
+        "repo_claim_support",
+        "repo_claim_observation_gate",
+      ],
     });
   }
 
@@ -336,7 +343,14 @@ export function buildRouteProductContract(input: {
       allowedExtra: ["repo_entity_definition", "tool_evaluation", "workstation_tool_evaluation"],
       forbiddenExtra: ["direct_answer_text", "no_tool_direct", "model_only_concept", "process_graph_overview", "situation_context_pack", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location"],
       precedenceReason: "runtime_evidence_source_target_allows_repo_and_runtime_evidence_products",
-      sideArtifactKindsAllowed: ["repo_code_evidence_observation"],
+      sideArtifactKindsAllowed: [
+        "repo_code_evidence_observation",
+        "repo_evidence_synthesis_attempt",
+        "repo_evidence_synthesis_repair_observation",
+        "repo_answer_text_quality_gate",
+        "repo_claim_support",
+        "repo_claim_observation_gate",
+      ],
     });
   }
 

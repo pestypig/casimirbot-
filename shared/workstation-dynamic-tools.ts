@@ -132,6 +132,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.construct.create_from_recipe",
   "situation-room-pipelines.construct.query",
   "situation-room-pipelines.construct.explain",
+  "situation-room-pipelines.construct.set_operating_prompt",
   "situation-room-pipelines.construct.detach",
   "situation-room-pipelines.construct.activate",
   "situation-room-pipelines.construct.attach_source",
@@ -683,6 +684,17 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     aliases: ["explain construct", "explain dottie construct", "why does this construct exist"],
     required_args: ["construct_id"],
     optional_args: ["thread_id", "room_id"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.set_operating_prompt",
+    title: "Set Live Job Prompt",
+    description: "Update a visible live job operating prompt without granting answer authority.",
+    aliases: ["change live job prompt", "edit dottie prompt", "set operating prompt"],
+    required_args: ["contract_id", "operating_prompt"],
+    optional_args: ["thread_id", "room_id", "reason"],
+    risk: "medium",
     returns_artifact: true,
   },
   {
@@ -1383,6 +1395,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "construct.list_recipes") return "situation_construct_recipe_registry";
   if (panelId === "situation-room-pipelines" && actionId === "construct.query") return "situation_construct_query_result";
   if (panelId === "situation-room-pipelines" && actionId === "construct.explain") return "situation_construct_explanation";
+  if (panelId === "situation-room-pipelines" && actionId === "construct.set_operating_prompt") return "situation_live_job_prompt_update_receipt";
   if (
     panelId === "situation-room-pipelines" &&
     ["construct.detach", "construct.activate", "construct.attach_source", "construct.bind_output"].includes(actionId)

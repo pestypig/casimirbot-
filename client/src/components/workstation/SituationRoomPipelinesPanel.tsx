@@ -43,7 +43,7 @@ import {
   type SituationRoomJobRecipeId,
 } from "@/lib/helix/situation-room-job-recipes";
 import { cn } from "@/lib/utils";
-import { useSituationRoomStore } from "@/store/useSituationRoomStore";
+import { useSituationRoomStore, type SituationRoomSource } from "@/store/useSituationRoomStore";
 import {
   selectSituationRoomMasterScroll,
   useSituationRoomJobStore,
@@ -55,6 +55,7 @@ import {
 } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { buildSituationStandbyKey, useSituationStandbyStore } from "@/store/useSituationStandbyStore";
+import { useWorkstationActionExecutionStore } from "@/store/useWorkstationActionExecutionStore";
 import {
   selectActiveLiveAnswerEnvironment,
   useLiveAnswerEnvironmentStore,
@@ -67,6 +68,8 @@ import {
   type LiveAnswerEnvironmentRecipe,
 } from "@shared/helix-live-answer-recipes";
 import type { SituationStandbyMode } from "@shared/helix-situation-standby";
+import type { SituationRoomConstructObservation } from "@shared/situation-room-construct-observation";
+import type { SituationRoomLiveJobContract } from "@shared/situation-room-live-job-contract";
 
 const JOB_OUTPUT_READ_PROVIDER = "elevenlabs";
 const JOB_OUTPUT_READ_PROFILE_ID = "vU0dJF9WOwsWEUfX1Aqw";
@@ -114,7 +117,7 @@ type PipelinePanelPage = "setup" | "constructs" | "sources" | "graph" | "recipes
 const PRIMARY_PIPELINE_PANEL_PAGES: PipelinePanelPage[] = ["setup", "constructs", "sources", "jobs", "output", "runtime"];
 const PIPELINE_PANEL_PAGE_LABELS: Record<PipelinePanelPage, string> = {
   setup: "Build",
-  constructs: "Constructs",
+  constructs: "Live Jobs",
   sources: "Sources",
   output: "Outputs",
   runtime: "Debug",
@@ -162,12 +165,31 @@ const CONSTRUCT_POLICY_OPTIONS = [
   "Bounded worker",
   "No assistant answer",
 ] as const;
+const DOTTIE_DEFAULT_OPERATING_PROMPT =
+  "Watch my Minecraft route while I play. Only interrupt for confirmed route drift, missing source data, or direct questions. Keep callouts short and tactical.";
 
 type ConstructBuilderPurpose = (typeof CONSTRUCT_PURPOSE_OPTIONS)[number];
 type ConstructBuilderSource = (typeof CONSTRUCT_SOURCE_OPTIONS)[number];
 type ConstructBuilderRecipeId = (typeof CONSTRUCT_RECIPE_OPTIONS)[number]["id"];
 type ConstructBuilderOutput = (typeof CONSTRUCT_OUTPUT_OPTIONS)[number];
 type ConstructBuilderPolicy = (typeof CONSTRUCT_POLICY_OPTIONS)[number];
+type LiveJobWorkbenchCard = {
+  id: string;
+  name: string;
+  status: SituationRoomLiveJobContract["runtime_status"] | "receipt_only";
+  operatingPrompt: string;
+  sources: SituationRoomLiveJobContract["source_requirements"];
+  outputs: SituationRoomLiveJobContract["output_bindings"];
+  voicePolicy: SituationRoomLiveJobContract["voice_policy"];
+  authority: SituationRoomLiveJobContract["authority_policy"]["construct_answer_authority"];
+  lastObservation: string;
+  diagnostics: SituationRoomLiveJobContract["diagnostics"];
+  contract: SituationRoomLiveJobContract | null;
+  observation: SituationRoomConstructObservation | null;
+  constructIds: string[];
+  receipt: Record<string, unknown> | null;
+  updatedAt: string;
+};
 type PipelineSetupIntentKind = "live_answer_environment" | "live_workstation_pipeline" | "source_job" | "situation_graph";
 type PipelineSetupIntent = {
   id: string;
@@ -479,7 +501,7 @@ function constructOutputArg(output: ConstructBuilderOutput): string {
 
 function sourceLabelForConstruct(source: SituationRoomSource | undefined): string {
   if (!source) return "whole room";
-  return `${source.label} / ${source.kind}`;
+  return `${source.label} / ${source.capture_source}`;
 }
 
 function constructTone(status: string): string {
@@ -487,6 +509,89 @@ function constructTone(status: string): string {
   if (status === "receipt_only" || status === "planned") return "border-cyan-400/45 bg-cyan-500/10 text-cyan-100";
   if (status === "blocked" || status === "stale") return "border-amber-400/45 bg-amber-500/10 text-amber-100";
   return "border-slate-500/45 bg-slate-700/20 text-slate-300";
+}
+
+function asRecordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function asStringValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function isLiveJobContract(value: unknown): value is SituationRoomLiveJobContract {
+  return asRecordValue(value)?.schema === "helix.situation_room_live_job_contract.v1";
+}
+
+function isConstructObservation(value: unknown): value is SituationRoomConstructObservation {
+  return asRecordValue(value)?.schema === "helix.situation_room_construct_observation.v1";
+}
+
+function readArtifactFromReceipt(receipt: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  return asRecordValue(receipt?.artifact);
+}
+
+function readLiveJobContractFromReceipt(receipt: Record<string, unknown> | null | undefined): SituationRoomLiveJobContract | null {
+  const artifact = readArtifactFromReceipt(receipt);
+  if (!artifact) return null;
+  if (isLiveJobContract(artifact.live_job_contract)) return artifact.live_job_contract;
+  const recipeRun = asRecordValue(artifact.recipe_run);
+  if (isLiveJobContract(recipeRun?.live_job_contract)) return recipeRun.live_job_contract;
+  return null;
+}
+
+function readConstructObservationFromReceipt(
+  receipt: Record<string, unknown> | null | undefined,
+): SituationRoomConstructObservation | null {
+  const artifact = readArtifactFromReceipt(receipt);
+  if (!artifact) return null;
+  if (isConstructObservation(artifact.construct_observation)) return artifact.construct_observation;
+  const recipeRun = asRecordValue(artifact.recipe_run);
+  if (isConstructObservation(recipeRun?.construct_observation)) return recipeRun.construct_observation;
+  return null;
+}
+
+function liveJobStatusTone(status: string): string {
+  if (status === "active") return "border-emerald-400/50 bg-emerald-500/10 text-emerald-100";
+  if (status === "blocked" || status === "stale") return "border-amber-400/50 bg-amber-500/10 text-amber-100";
+  if (status === "paused" || status === "stopped") return "border-slate-500/50 bg-slate-700/20 text-slate-300";
+  return "border-cyan-400/50 bg-cyan-500/10 text-cyan-100";
+}
+
+function sourceRequirementTone(status: SituationRoomLiveJobContract["source_requirements"][number]["status"]): string {
+  if (status === "connected") return "border-emerald-400/45 bg-emerald-500/10 text-emerald-100";
+  if (status === "missing" || status === "blocked" || status === "stale") return "border-amber-400/45 bg-amber-500/10 text-amber-100";
+  return "border-slate-500/45 bg-slate-700/20 text-slate-300";
+}
+
+function outputBindingTone(status: SituationRoomLiveJobContract["output_bindings"][number]["status"]): string {
+  if (status === "bound") return "border-emerald-400/45 bg-emerald-500/10 text-emerald-100";
+  if (status === "blocked" || status === "disabled") return "border-amber-400/45 bg-amber-500/10 text-amber-100";
+  return "border-cyan-400/45 bg-cyan-500/10 text-cyan-100";
+}
+
+function voicePolicyLabel(policy: SituationRoomLiveJobContract["voice_policy"]): string {
+  if (policy === "propose_only") return "proposal only";
+  if (policy === "confirm_speak_required") return "confirm required";
+  if (policy === "automatic_when_policy_allows") return "automatic by policy";
+  return "muted";
+}
+
+function authorityPolicyLabel(authority: SituationRoomLiveJobContract["authority_policy"]["construct_answer_authority"]): string {
+  if (authority === "witness_only") return "witness-only";
+  if (authority === "evidence_only") return "evidence-only";
+  return "none";
+}
+
+function liveJobLastObservation(observation: SituationRoomConstructObservation | null, contract: SituationRoomLiveJobContract): string {
+  const diagnostic = observation?.diagnostics?.[0]?.message ?? contract.diagnostics[0]?.message;
+  if (diagnostic) return diagnostic;
+  const missing = observation?.missing_inputs?.[0];
+  if (missing) return `Waiting for ${missing}.`;
+  if (observation?.policy_state?.spoken === false && observation.policy_state.voice_policy !== "muted") {
+    return "Voice proposal path is available; no audio has been spoken.";
+  }
+  return contract.runtime_status === "active" ? "Live job is active." : "Live job is ready for review.";
 }
 
 function JobCard({
@@ -606,6 +711,8 @@ export default function SituationRoomPipelinesPanel() {
   const setStandbyMode = useSituationStandbyStore((state) => state.setMode);
   const ingestStandbySignal = useSituationStandbyStore((state) => state.ingestSignal);
   const dismissStandbyProposal = useSituationStandbyStore((state) => state.dismissProposal);
+  const actionExecutions = useWorkstationActionExecutionStore((state) => state.executions);
+  const actionExecutionOrder = useWorkstationActionExecutionStore((state) => state.order);
   const [panelPage, setPanelPage] = React.useState<PipelinePanelPage>("setup");
   const [setupIntentId, setSetupIntentId] = React.useState("");
   const [setupMode, setSetupMode] = React.useState<"text_only" | "voice_on_confirm" | "critical_voice" | "direct_address_only">("text_only");
@@ -651,6 +758,7 @@ export default function SituationRoomPipelinesPanel() {
   const [constructRecipeId, setConstructRecipeId] =
     React.useState<ConstructBuilderRecipeId>("auntie_dottie_witness");
   const [constructOutput, setConstructOutput] = React.useState<ConstructBuilderOutput>("Typed commentary");
+  const [constructOperatingPrompt, setConstructOperatingPrompt] = React.useState(DOTTIE_DEFAULT_OPERATING_PROMPT);
   const [constructPolicies, setConstructPolicies] = React.useState<Record<ConstructBuilderPolicy, boolean>>({
     "Witness-only": true,
     "Voice propose-only": true,
@@ -659,6 +767,9 @@ export default function SituationRoomPipelinesPanel() {
     "No assistant answer": true,
   });
   const [constructBuilderStatus, setConstructBuilderStatus] = React.useState<string | null>(null);
+  const [selectedLiveJobId, setSelectedLiveJobId] = React.useState<string | null>(null);
+  const [liveJobPromptDraft, setLiveJobPromptDraft] = React.useState("");
+  const [liveJobActionStatus, setLiveJobActionStatus] = React.useState<string | null>(null);
   const activeLiveAnswerEnvironment = useLiveAnswerEnvironmentStore((state) =>
     selectActiveLiveAnswerEnvironment(state, bindingThreadId.trim() || "helix-ask:desktop"),
   );
@@ -993,11 +1104,128 @@ export default function SituationRoomPipelinesPanel() {
     minecraftSourceId,
     liveAnswerBindingLabel,
   ]);
+  const liveJobCards = React.useMemo((): LiveJobWorkbenchCard[] => {
+    const latestByContract = new Map<string, LiveJobWorkbenchCard>();
+    for (const executionId of actionExecutionOrder) {
+      const execution = actionExecutions[executionId];
+      if (!execution?.receipt) continue;
+      const contract = readLiveJobContractFromReceipt(execution.receipt);
+      if (!contract) continue;
+      const observation = readConstructObservationFromReceipt(execution.receipt);
+      const id = contract.contract_id;
+      if (latestByContract.has(id)) continue;
+      latestByContract.set(id, {
+        id,
+        name: contract.name,
+        status: contract.runtime_status,
+        operatingPrompt: contract.operating_prompt,
+        sources: contract.source_requirements,
+        outputs: contract.output_bindings,
+        voicePolicy: contract.voice_policy,
+        authority: contract.authority_policy.construct_answer_authority,
+        lastObservation: liveJobLastObservation(observation, contract),
+        diagnostics: contract.diagnostics,
+        contract,
+        observation,
+        constructIds: observation?.construct_ids ?? [],
+        receipt: execution.receipt,
+        updatedAt: execution.updated_at,
+      });
+    }
+    const cards = Array.from(latestByContract.values());
+    const hasDottie = cards.some((card) => /dottie/i.test(card.name) || card.contract?.selected_recipe === "auntie_dottie_witness");
+    if (!hasDottie) {
+      const sourceStatus = detectedMinecraftSource ? "connected" : "unknown";
+      cards.push({
+        id: "draft:auntie_dottie_witness",
+        name: "Auntie Dottie Minecraft Watch",
+        status: "receipt_only",
+        operatingPrompt: constructOperatingPrompt,
+        sources: [
+          {
+            source_kind: "minecraft_world_events",
+            required: true,
+            status: sourceStatus,
+            binding_id: detectedMinecraftSource?.source_id,
+            missing_reason: detectedMinecraftSource ? undefined : "Connect the Minecraft plugin before route watching can become active.",
+          },
+          {
+            source_kind: "mic_audio",
+            required: false,
+            status: activeSources.some((source) => /mic|audio/i.test(`${source.capture_source} ${source.label}`)) ? "connected" : "unknown",
+          },
+          {
+            source_kind: "screen_capture",
+            required: false,
+            status: activeSources.some((source) => /screen|visual|display/i.test(`${source.capture_source} ${source.label}`)) ? "connected" : "unknown",
+          },
+        ],
+        outputs: [
+          { output_kind: "typed_commentary", status: "planned", policy: { authority: "evidence_only" } },
+          { output_kind: "route_evidence", status: detectedMinecraftSource ? "planned" : "blocked", policy: { source_required: true } },
+          { output_kind: "voice_proposal", status: "planned", policy: { voice_policy: "propose_only" } },
+          { output_kind: "live_answers_card", status: activeLiveAnswerEnvironmentId ? "bound" : "planned", policy: { projection_only: true } },
+        ],
+        voicePolicy: "propose_only",
+        authority: "witness_only",
+        lastObservation: detectedMinecraftSource
+          ? "Draft is ready to create as a receipt-backed live job."
+          : "Minecraft source is not connected; route watching would start blocked.",
+        diagnostics: detectedMinecraftSource
+          ? []
+          : [{
+              code: "minecraft_source_missing",
+              severity: "warning",
+              message: "Minecraft world events are required before route watching can become active.",
+              repair_action: "attach_source",
+            }],
+        contract: null,
+        observation: null,
+        constructIds: [],
+        receipt: null,
+        updatedAt: new Date(0).toISOString(),
+      });
+    }
+    return cards;
+  }, [
+    actionExecutionOrder,
+    actionExecutions,
+    activeLiveAnswerEnvironmentId,
+    activeSources,
+    constructOperatingPrompt,
+    detectedMinecraftSource,
+  ]);
+  const selectedLiveJob = React.useMemo(
+    () => liveJobCards.find((card) => card.id === selectedLiveJobId) ?? liveJobCards[0] ?? null,
+    [liveJobCards, selectedLiveJobId],
+  );
+
+  React.useEffect(() => {
+    if (!selectedLiveJob) {
+      setSelectedLiveJobId(null);
+      return;
+    }
+    if (selectedLiveJobId !== selectedLiveJob.id) setSelectedLiveJobId(selectedLiveJob.id);
+  }, [selectedLiveJob, selectedLiveJobId]);
+
+  React.useEffect(() => {
+    if (!selectedLiveJob) return;
+    setLiveJobPromptDraft(selectedLiveJob.operatingPrompt);
+  }, [selectedLiveJob?.id, selectedLiveJob?.operatingPrompt]);
 
   React.useEffect(() => {
     if (!activeJobs.length || selectedJobId === ALL_OUTPUT_JOB_ID || (selectedJobId && jobs[selectedJobId])) return;
     setSelectedJobId(activeJobs[0]?.job_id);
   }, [activeJobs, jobs, selectedJobId]);
+
+  React.useEffect(() => {
+    if (constructRecipeId === "auntie_dottie_witness" && !constructOperatingPrompt.trim()) {
+      setConstructOperatingPrompt(DOTTIE_DEFAULT_OPERATING_PROMPT);
+    }
+    if (constructRecipeId === "browser_audio_transcriber" && !constructOperatingPrompt.trim()) {
+      setConstructOperatingPrompt("Transcribe the selected browser or display audio into evidence. Do not answer for the user.");
+    }
+  }, [constructOperatingPrompt, constructRecipeId]);
 
   const loadThreadBindings = React.useCallback(async () => {
     try {
@@ -1473,6 +1701,7 @@ export default function SituationRoomPipelinesPanel() {
         source_ids: constructSourceIds,
         target_run_id: "run:helix-ask:active",
         mode: constructPurpose.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        operating_prompt: constructOperatingPrompt.trim() || DOTTIE_DEFAULT_OPERATING_PROMPT,
         voice_mode: constructPolicies["Voice propose-only"] ? "propose_only" : "off",
         commentary_cadence: "milestones_only",
         output: constructOutputArg(constructOutput),
@@ -1489,11 +1718,82 @@ export default function SituationRoomPipelinesPanel() {
     activeLiveAnswerEnvironmentId,
     bindingThreadId,
     constructOutput,
+    constructOperatingPrompt,
     constructPolicies,
     constructPurpose,
     constructRecipeId,
     constructSourceIds,
   ]);
+
+  const dispatchLiveJobConstructAction = React.useCallback(
+    (actionId: string, constructId: string | undefined, extraArgs?: Record<string, unknown>) => {
+      if (!constructId || !activeRoom) {
+        setLiveJobActionStatus("This live job needs a receipt-backed construct before that action can run.");
+        return;
+      }
+      dispatchHelixWorkstationActions([{
+        action: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: actionId,
+        args: {
+          construct_id: constructId,
+          room_id: activeRoom.room_id,
+          thread_id: bindingThreadId.trim() || "helix-ask:desktop",
+          ...extraArgs,
+        },
+      }]);
+      setLiveJobActionStatus(`Submitted ${actionId} for ${constructId}.`);
+    },
+    [activeRoom, bindingThreadId],
+  );
+
+  const handleStartLiveJob = React.useCallback((job: LiveJobWorkbenchCard) => {
+    dispatchLiveJobConstructAction("construct.activate", job.constructIds[0]);
+  }, [dispatchLiveJobConstructAction]);
+
+  const handleStopLiveJob = React.useCallback((job: LiveJobWorkbenchCard) => {
+    dispatchLiveJobConstructAction("construct.detach", job.constructIds[0]);
+  }, [dispatchLiveJobConstructAction]);
+
+  const handleAttachSelectedSourceToLiveJob = React.useCallback((job: LiveJobWorkbenchCard) => {
+    const sourceIds = selectedSource ? [selectedSource.source_id] : constructSourceIds;
+    dispatchLiveJobConstructAction("construct.attach_source", job.constructIds[0], { source_ids: sourceIds });
+  }, [constructSourceIds, dispatchLiveJobConstructAction, selectedSource]);
+
+  const handleSaveLiveJobPrompt = React.useCallback((job: LiveJobWorkbenchCard) => {
+    if (!job.contract) {
+      setConstructOperatingPrompt(liveJobPromptDraft);
+      setLiveJobActionStatus("Updated the builder prompt. Create the live job to record it as a receipt-backed contract.");
+      return;
+    }
+    dispatchHelixWorkstationActions([{
+      action: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "construct.set_operating_prompt",
+      args: {
+        contract_id: job.contract.contract_id,
+        operating_prompt: liveJobPromptDraft,
+        thread_id: bindingThreadId.trim() || "helix-ask:desktop",
+        room_id: activeRoom?.room_id,
+        reason: "operator_edited_live_job_prompt",
+      },
+    }]);
+    setLiveJobActionStatus("Submitted operating prompt update as an observation-only action.");
+  }, [activeRoom?.room_id, bindingThreadId, liveJobPromptDraft]);
+
+  const handleConfirmSpeakLiveJob = React.useCallback((job: LiveJobWorkbenchCard) => {
+    dispatchHelixWorkstationActions([{
+      action: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "voice_delivery.confirm_speak",
+      args: {
+        thread_id: bindingThreadId.trim() || "helix-ask:desktop",
+        contract_id: job.contract?.contract_id,
+        spoken_text: job.lastObservation,
+      },
+    }]);
+    setLiveJobActionStatus("Submitted confirm-speak receipt for the selected live job.");
+  }, [bindingThreadId]);
 
   const persistCustomSetupIntents = React.useCallback((nextIntents: PipelineSetupIntent[]) => {
     setCustomSetupIntents(nextIntents);
@@ -1569,7 +1869,7 @@ export default function SituationRoomPipelinesPanel() {
     panelPage === "setup"
       ? "Build"
       : panelPage === "constructs"
-        ? "Constructs"
+        ? "Live Jobs"
       : panelPage === "sources"
         ? "Sources"
         : panelPage === "output"
@@ -1657,9 +1957,9 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-cyan-300/25 bg-slate-950/80 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Construct builder</p>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Create Live Job</p>
                   <p className="mt-1 text-lg font-semibold text-white">
-                    Assemble a Situation Room construct
+                    Assemble a Situation Room live job
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
                     {activeRoom?.title ?? "No active room"} / {sourceLabelForConstruct(selectedSource)}
@@ -1672,7 +1972,7 @@ export default function SituationRoomPipelinesPanel() {
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Plus className="h-4 w-4" />
-                  Create construct
+                  Create Live Job
                 </button>
               </div>
 
@@ -1715,6 +2015,18 @@ export default function SituationRoomPipelinesPanel() {
                           <option key={source} value={source}>{source}</option>
                         ))}
                       </select>
+                    </label>
+                    <label className="block md:col-span-2">
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">Operating Prompt</span>
+                      <textarea
+                        value={constructOperatingPrompt}
+                        onChange={(event) => setConstructOperatingPrompt(event.target.value)}
+                        rows={4}
+                        className="mt-2 w-full resize-y rounded border border-cyan-300/25 bg-slate-900 px-3 py-2 text-sm leading-5 text-slate-100 outline-none focus:border-cyan-300/60"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        This is the visible job rule. It guides live outputs without changing Helix Ask final-answer authority.
+                      </p>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-semibold uppercase text-slate-500">Recipe</span>
@@ -2210,10 +2522,10 @@ export default function SituationRoomPipelinesPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-slate-500">Construct ledger</p>
-                  <p className="mt-1 text-lg font-semibold text-white">Visible Situation Room constructs</p>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Live Job Workbench</p>
+                  <p className="mt-1 text-lg font-semibold text-white">Visible Situation Room live jobs</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {activeRoom?.title ?? "No active room"} / {constructCards.length} construct{constructCards.length === 1 ? "" : "s"}
+                    {activeRoom?.title ?? "No active room"} / {liveJobCards.length} live job{liveJobCards.length === 1 ? "" : "s"}
                   </p>
                 </div>
                 <button
@@ -2226,7 +2538,256 @@ export default function SituationRoomPipelinesPanel() {
                 </button>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
+                <div className="space-y-3">
+                  {liveJobCards.map((job) => {
+                    const spoken = job.observation?.policy_state.spoken === true;
+                    const confirmPresent = job.observation?.policy_state.confirm_speak_receipt_present === true;
+                    return (
+                      <article
+                        key={job.id}
+                        className={cn(
+                          "rounded-lg border bg-slate-950/70 p-3 transition-colors",
+                          selectedLiveJob?.id === job.id ? "border-cyan-400/70 ring-1 ring-cyan-400/25" : "border-white/10 hover:border-white/25",
+                        )}
+                      >
+                        <button type="button" onClick={() => setSelectedLiveJobId(job.id)} className="block w-full text-left">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-white">{job.name}</p>
+                              <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{job.operatingPrompt}</p>
+                            </div>
+                            <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px]", liveJobStatusTone(job.status))}>
+                              {job.status}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-[11px] sm:grid-cols-2">
+                            <div className="rounded border border-white/10 bg-black/20 px-2 py-1.5">
+                              <span className="text-slate-500">Voice</span>
+                              <p className="mt-0.5 text-slate-200">
+                                {voicePolicyLabel(job.voicePolicy)} / {spoken && confirmPresent ? "spoken yes" : "no audio spoken"}
+                              </p>
+                            </div>
+                            <div className="rounded border border-white/10 bg-black/20 px-2 py-1.5">
+                              <span className="text-slate-500">Authority</span>
+                              <p className="mt-0.5 text-slate-200">
+                                {authorityPolicyLabel(job.authority)} / Helix Ask final answers
+                              </p>
+                            </div>
+                          </div>
+                          <p className="mt-3 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+                            {job.lastObservation}
+                          </p>
+                        </button>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedLiveJobId(job.id);
+                              setLiveJobPromptDraft(job.operatingPrompt);
+                            }}
+                            className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                          >
+                            Edit Prompt
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAttachSelectedSourceToLiveJob(job)}
+                            disabled={!job.constructIds.length || constructSourceIds.length === 0}
+                            className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            Attach Source
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStartLiveJob(job)}
+                            disabled={!job.constructIds.length || job.status === "blocked"}
+                            className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                            Start
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleStopLiveJob(job)}
+                            disabled={!job.constructIds.length}
+                            className="inline-flex items-center gap-1 rounded border border-slate-400/35 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <Square className="h-3.5 w-3.5" />
+                            Stop
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmSpeakLiveJob(job)}
+                            disabled={job.voicePolicy === "muted"}
+                            className="inline-flex items-center gap-1 rounded border border-cyan-400/35 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <Volume2 className="h-3.5 w-3.5" />
+                            Confirm Speak
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <section className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                  {selectedLiveJob ? (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-white">{selectedLiveJob.name}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {selectedLiveJob.contract?.selected_recipe ?? "draft recipe"} / updated {formatClock(selectedLiveJob.updatedAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-[10px]">
+                          <span className={cn("rounded border px-2 py-0.5", liveJobStatusTone(selectedLiveJob.status))}>
+                            {selectedLiveJob.status}
+                          </span>
+                          <span className="rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">
+                            voice {voicePolicyLabel(selectedLiveJob.voicePolicy)}
+                          </span>
+                          <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-slate-200">
+                            {authorityPolicyLabel(selectedLiveJob.authority)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <label className="block">
+                        <span className="text-[10px] font-semibold uppercase text-slate-500">Operating Prompt</span>
+                        <textarea
+                          value={liveJobPromptDraft}
+                          onChange={(event) => setLiveJobPromptDraft(event.target.value)}
+                          rows={5}
+                          className="mt-2 w-full resize-y rounded border border-cyan-300/25 bg-black/30 px-3 py-2 text-sm leading-5 text-slate-100 outline-none focus:border-cyan-300/60"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLiveJobPrompt(selectedLiveJob)}
+                          className="inline-flex items-center gap-1 rounded border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-100 hover:bg-emerald-500/20"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          Save Prompt
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPanelPage("runtime")}
+                          className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                        >
+                          Diagnose
+                        </button>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded border border-white/10 bg-black/20 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">Compiled Policy</p>
+                          <dl className="mt-2 space-y-1 text-xs">
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">interruptions</dt>
+                              <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.interruption_policy ?? "policy_triggered"}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">threshold</dt>
+                              <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.evidence_threshold ?? "observed"}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">cadence</dt>
+                              <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.cadence ?? "event_driven"}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-slate-500">callouts</dt>
+                              <dd className="text-right text-slate-200">{selectedLiveJob.contract?.compiled_policy.callout_style ?? "short"}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                        <div className="rounded border border-white/10 bg-black/20 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">Voice Boundary</p>
+                          <p className="mt-2 text-xs text-slate-200">
+                            {selectedLiveJob.observation?.policy_state.spoken === true &&
+                            selectedLiveJob.observation.policy_state.confirm_speak_receipt_present === true
+                              ? "Spoken audio is receipt-confirmed."
+                              : "Voice proposal only. No audio has been spoken."}
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            Dottie callouts are witness outputs. Helix Ask remains the answer surface.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="rounded border border-white/10 bg-black/20 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">Sources</p>
+                          <div className="mt-2 space-y-2">
+                            {selectedLiveJob.sources.map((source) => (
+                              <div key={`${source.source_kind}:${source.binding_id ?? "none"}`} className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs">
+                                <div className="min-w-0">
+                                  <p className="truncate text-slate-200">{source.source_kind}</p>
+                                  <p className="truncate text-[10px] text-slate-500">{source.binding_id ?? source.missing_reason ?? "no binding"}</p>
+                                </div>
+                                <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px]", sourceRequirementTone(source.status))}>
+                                  {source.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded border border-white/10 bg-black/20 p-3">
+                          <p className="text-[10px] font-semibold uppercase text-slate-500">Outputs</p>
+                          <div className="mt-2 space-y-2">
+                            {selectedLiveJob.outputs.map((output) => (
+                              <div key={output.output_kind} className="flex items-center justify-between gap-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs">
+                                <span className="truncate text-slate-200">{output.output_kind}</span>
+                                <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px]", outputBindingTone(output.status))}>
+                                  {output.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded border border-white/10 bg-black/20 p-3">
+                        <p className="text-[10px] font-semibold uppercase text-slate-500">Diagnostics</p>
+                        {selectedLiveJob.diagnostics.length === 0 ? (
+                          <p className="mt-2 text-xs text-slate-400">No blocking diagnostics in the latest contract.</p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {selectedLiveJob.diagnostics.map((diagnostic) => (
+                              <div key={diagnostic.code} className="rounded border border-amber-400/25 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-100">
+                                {diagnostic.message}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="mt-3 rounded border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs text-slate-300">
+                          Last observation: {selectedLiveJob.lastObservation}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No live job selected.</p>
+                  )}
+                </section>
+              </div>
+              {liveJobActionStatus ? (
+                <p className="mt-3 rounded border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">{liveJobActionStatus}</p>
+              ) : null}
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Underlying constructs</p>
+                  <p className="mt-1 text-sm font-semibold text-white">Receipt-backed parts</p>
+                </div>
+                <span className="rounded border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] uppercase text-slate-400">
+                  {constructCards.length} construct{constructCards.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {constructCards.map((construct) => (
                   <article key={construct.id} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -2257,23 +2818,6 @@ export default function SituationRoomPipelinesPanel() {
                     </p>
                   </article>
                 ))}
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Dottie</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{constructCards.some((card) => card.title === "Auntie Dottie") ? "available" : "not planned"}</p>
-                </div>
-                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Transcribers</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{activeJobs.length}</p>
-                </div>
-                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Route evidence</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{activeGraph ? "planned" : "none"}</p>
-                </div>
               </div>
             </section>
           </div>
@@ -2446,6 +2990,29 @@ export default function SituationRoomPipelinesPanel() {
                 <WorkstationActionTrace limit={8} />
               </div>
             </section>
+            {selectedLiveJob ? (
+              <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase text-slate-500">Live Job Contract Debug</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Raw contract and observation for the selected live job. These are observations, not terminal answers.
+                    </p>
+                  </div>
+                  <span className={cn("rounded border px-2 py-0.5 text-[10px]", liveJobStatusTone(selectedLiveJob.status))}>
+                    {selectedLiveJob.status}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  <pre className="max-h-80 overflow-auto rounded border border-white/10 bg-slate-950/80 p-3 text-[10px] leading-5 text-slate-200">
+                    {JSON.stringify(selectedLiveJob.contract ?? { draft: true, operating_prompt: selectedLiveJob.operatingPrompt }, null, 2)}
+                  </pre>
+                  <pre className="max-h-80 overflow-auto rounded border border-white/10 bg-slate-950/80 p-3 text-[10px] leading-5 text-slate-200">
+                    {JSON.stringify(selectedLiveJob.observation ?? { draft: true, policy_state: { spoken: false, output_authority: "proposal" } }, null, 2)}
+                  </pre>
+                </div>
+              </section>
+            ) : null}
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -3107,6 +3674,43 @@ export default function SituationRoomPipelinesPanel() {
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
                   <p className="text-[10px] uppercase text-slate-500">Selected source</p>
                   <p className="mt-1 truncate text-sm font-semibold text-white">{selectedSource?.label ?? "whole room"}</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Construct outputs</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Live Answers is an output surface. Voice proposals are separate from spoken audio.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("constructs")}
+                  className="rounded border border-white/15 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
+                >
+                  Live Jobs
+                </button>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {(selectedLiveJob?.outputs ?? []).map((output) => (
+                  <div key={output.output_kind} className="rounded border border-white/10 bg-slate-950/70 p-3">
+                    <p className="truncate text-xs font-semibold text-slate-200">{output.output_kind}</p>
+                    <span className={cn("mt-2 inline-flex rounded border px-2 py-0.5 text-[10px]", outputBindingTone(output.status))}>
+                      {output.status}
+                    </span>
+                  </div>
+                ))}
+                <div className="rounded border border-cyan-400/25 bg-cyan-500/10 p-3">
+                  <p className="text-xs font-semibold text-cyan-100">Voice proposal</p>
+                  <p className="mt-1 text-[11px] text-cyan-100/80">
+                    {selectedLiveJob?.observation?.policy_state.spoken === true &&
+                    selectedLiveJob.observation.policy_state.confirm_speak_receipt_present === true
+                      ? "Confirmed spoken receipt present."
+                      : "No audio spoken. Confirmation required before speech."}
+                  </p>
                 </div>
               </div>
             </section>

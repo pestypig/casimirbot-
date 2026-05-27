@@ -3568,6 +3568,88 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "construct.set_operating_prompt") {
+      const contractId = asNonEmptyString(args.contract_id ?? args.contractId);
+      const operatingPrompt = asNonEmptyString(args.operating_prompt ?? args.operatingPrompt);
+      if (!contractId || !operatingPrompt) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.construct.set_operating_prompt requires contract_id and operating_prompt.",
+        };
+      }
+      let updatedRun: (HelixSituationConstructRecipeRun & Record<string, unknown>) | null = null;
+      for (const run of situationConstructRecipeRuns.values()) {
+        const contract = asRecord(run.live_job_contract) as (SituationRoomLiveJobContract & Record<string, unknown>) | null;
+        if (contract?.contract_id !== contractId) continue;
+        const now = new Date().toISOString();
+        const updatedContract: SituationRoomLiveJobContract = {
+          ...contract,
+          operating_prompt: operatingPrompt,
+          operating_prompt_history: [
+            ...contract.operating_prompt_history,
+            {
+              prompt: operatingPrompt,
+              changed_at: now,
+              changed_by: "user",
+              reason: asNonEmptyString(args.reason) ?? "operator_updated_operating_prompt",
+            },
+          ],
+          compiled_policy: {
+            ...contract.compiled_policy,
+            evidence_threshold: /confirmed|only\s+if/i.test(operatingPrompt) ? "confirmed" : contract.compiled_policy.evidence_threshold,
+          },
+        };
+        const constructs = run.created_construct_ids
+          .map((constructId) => situationConstructs.get(constructId))
+          .filter((construct): construct is HelixSituationConstruct => Boolean(construct));
+        const constructObservation = buildPanelConstructObservation({
+          action: "construct.set_operating_prompt",
+          runId: `construct_set_prompt:${Date.now()}`,
+          constructs,
+          contract: updatedContract,
+          missingInputs: [],
+        });
+        updatedRun = {
+          ...run,
+          live_job_contract: updatedContract,
+          construct_observation: constructObservation,
+        };
+        situationConstructRecipeRuns.set(run.run_id, updatedRun);
+        break;
+      }
+      if (!updatedRun) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `No live job contract found for ${contractId}.`,
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_live_job_prompt_update_receipt",
+          schema: "helix.situation_live_job_prompt_update_receipt.v1",
+          recipe_run: updatedRun,
+          live_job_contract: updatedRun.live_job_contract,
+          construct_observation: updatedRun.construct_observation,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+        },
+        message: "Updated live job operating prompt as an observation-only receipt.",
+      };
+    }
+
     if (actionId === "construct.detach" || actionId === "construct.activate") {
       const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
       const nextStatus: HelixSituationConstructStatus = actionId === "construct.detach" ? "detached" : "active";

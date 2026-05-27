@@ -31,6 +31,20 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
     })
     .filter(Boolean) as Array<{ event: string; data: any }>;
 
+const withRepoSynthesisResponse = async <T>(answer: string, fn: () => Promise<T>): Promise<T> => {
+  const previous = process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+  process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = answer;
+  try {
+    return await fn();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+    } else {
+      process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previous;
+    }
+  }
+};
+
 describe("helix ask repo/code intent precedence", () => {
   it("detects hard repo/code evidence prompts", () => {
     const intent = detectRepoCodeEvidenceIntent(
@@ -306,15 +320,18 @@ describe("helix ask repo/code intent precedence", () => {
 
   it("routes Situation Room concept questions through repo evidence instead of generic direct answer", async () => {
     const app = createApp();
-    const response = await request(app)
-      .post("/api/agi/ask/turn")
-      .send({
-        question: "What is the Situation Room?",
-        mode: "read",
-        debug: true,
-        sessionId: `repo-entity-situation-room-${Date.now()}`,
-      })
-      .expect(200);
+    const response = await withRepoSynthesisResponse(
+      "The Situation Room is the workstation control surface for live sources, pipeline setup, observer workflows, and Ask-visible evidence handoffs. Sources: client/src/components/workstation/SituationRoomPipelinesPanel.tsx; shared/workstation-dynamic-tools.ts.",
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "What is the Situation Room?",
+          mode: "read",
+          debug: true,
+          sessionId: `repo-entity-situation-room-${Date.now()}`,
+        })
+        .expect(200),
+    );
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_entity_definition");
     expect(response.body?.source_target_intent).toMatchObject({
@@ -362,7 +379,10 @@ describe("helix ask repo/code intent precedence", () => {
     });
     expect(response.body?.resolved_turn_summary?.resolved_route_label).not.toMatch(/typed_failure|unavailable/i);
     expect(visibleAnswerText(response.body)).not.toMatch(/required artifacts.*(?:doc_summary|doc_concept_explanation)/i);
-    expect(visibleAnswerText(response.body)).toMatch(/repo evidence|key evidence|situation room/i);
+    expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(response.body?.repo_answer_text_quality_gate).toMatchObject({ ok: true });
+    expect(visibleAnswerText(response.body)).toMatch(/workstation control surface|situation room/i);
+    expect(visibleAnswerText(response.body)).not.toMatch(/I found current repo evidence|Key evidence:/i);
     expect(response.body?.repo_claim_observation_gate).toMatchObject({
       decision: "observe",
       failedClosed: false,
@@ -386,15 +406,18 @@ describe("helix ask repo/code intent precedence", () => {
     },
   ])("routes $entity concept questions through repo evidence before ambient panel/live routing", async ({ prompt, evidencePath }) => {
     const app = createApp();
-    const response = await request(app)
-      .post("/api/agi/ask/turn")
-      .send({
-        question: prompt,
-        mode: "read",
-        debug: true,
-        sessionId: `repo-entity-${prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
-      })
-      .expect(200);
+    const response = await withRepoSynthesisResponse(
+      `${prompt.replace(/\?$/, "")} is a project-internal workstation concept that should be explained from repo evidence, not from a generic definition. Sources: shared/helix-dottie-manifest-preset.ts; client/src/components/workstation/SituationRoomPipelinesPanel.tsx.`,
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: prompt,
+          mode: "read",
+          debug: true,
+          sessionId: `repo-entity-${prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
+        })
+        .expect(200),
+    );
 
     const answer = visibleAnswerText(response.body);
     const repoObservation = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
@@ -418,6 +441,8 @@ describe("helix ask repo/code intent precedence", () => {
     expect(repoObservation).toBeTruthy();
     expect(spanPaths).toMatch(evidencePath);
     expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(response.body?.repo_answer_text_quality_gate).toMatchObject({ ok: true });
     expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
     expect(response.body?.final_status).toBe("final_answer");
@@ -426,15 +451,18 @@ describe("helix ask repo/code intent precedence", () => {
 
   it("does not stream stale failed turn completion before authoritative repo concept final", async () => {
     const app = createApp();
-    const response = await request(app)
-      .post("/api/agi/ask/turn/stream")
-      .send({
-        question: "What is Auntie Dottie in this app?",
-        mode: "read",
-        debug: true,
-        sessionId: `repo-entity-dottie-stream-${Date.now()}`,
-      })
-      .expect(200);
+    const response = await withRepoSynthesisResponse(
+      "Auntie Dottie is a witness-only Situation Room observer preset that can attach to public trace events and voice proposals while keeping Helix Ask responsible for terminal answers. Sources: shared/helix-dottie-manifest-preset.ts; server/services/helix-ask/workstation-tool-planner.ts.",
+      () => request(app)
+        .post("/api/agi/ask/turn/stream")
+        .send({
+          question: "What is Auntie Dottie in this app?",
+          mode: "read",
+          debug: true,
+          sessionId: `repo-entity-dottie-stream-${Date.now()}`,
+        })
+        .expect(200),
+    );
 
     const events = parseSseEvents(response.text ?? "");
     const turnFinal = events.findLast((event) => event.event === "turn_final")?.data;
