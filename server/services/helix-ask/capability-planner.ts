@@ -5,6 +5,7 @@ import {
   type HelixCapabilityPlan,
 } from "@shared/helix-capability-plan";
 import { detectRepoConcept } from "./repo-concept-detector";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 
 type RecordLike = Record<string, unknown>;
 
@@ -193,9 +194,11 @@ export const buildCapabilityPlan = (input: {
   const toolCallAdmissionDecision = readRecord(input.toolCallAdmissionDecision);
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
   const instructionFrame = readRecord(input.instructionFrame);
+  const contextualSuppression = detectContextualToolAdmissionSuppression(input.promptText);
   const repoConceptDetection = detectRepoConcept(input.promptText);
-  const requiresRepoConceptEvidence = repoConceptDetection.require_repo_evidence === true;
+  const requiresRepoConceptEvidence = !contextualSuppression && repoConceptDetection.require_repo_evidence === true;
   const sourceTarget =
+    (contextualSuppression ? "model_only" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
@@ -212,15 +215,18 @@ export const buildCapabilityPlan = (input: {
   });
   const family: HelixCapabilityFamily = requiresRepoConceptEvidence
     ? "repo_evidence"
-    : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
-    ? "workstation_action"
-    : classifiedFamily;
+    : contextualSuppression
+      ? "debug_export"
+      : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
+        ? "workstation_action"
+        : classifiedFamily;
   const rules = instructionRules(instructionFrame);
-  const requestedAction =
-    family === "live_source" &&
-    rules.includes("do_not_change_cadence_without_affirmative_operator_command")
-      ? "inspect_live_source"
-      : requestedActionFor(family, input.promptText);
+  const requestedAction = contextualSuppression
+    ? "suppressed_contextual_tool_reference"
+    : family === "live_source" &&
+      rules.includes("do_not_change_cadence_without_affirmative_operator_command")
+        ? "inspect_live_source"
+        : requestedActionFor(family, input.promptText);
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
     (
@@ -263,6 +269,12 @@ export const buildCapabilityPlan = (input: {
       ? "repo_code_evidence_answer"
       : readString(canonicalGoalFrame?.required_terminal_kind) || null,
     admission_status: admission.status,
+    ...(contextualSuppression
+      ? {
+          tool_admission_suppressed: true,
+          suppression_reason: contextualSuppression.suppression_reason,
+        }
+      : {}),
     ...(admission.rejectionReason ? { rejection_reason: admission.rejectionReason } : {}),
     assistant_answer: false,
     raw_content_included: false,

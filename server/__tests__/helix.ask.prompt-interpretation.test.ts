@@ -127,6 +127,28 @@ describe("Helix Ask prompt interpretation", () => {
     expect(interpretation.executable_operator_commands).toEqual([]);
   });
 
+  it("records contextual docs-viewer open language without executable commands", () => {
+    const cases = [
+      ["Do not open the docs viewer; just explain what the docs viewer is for.", "negated"],
+      ["Explain what would happen if I opened the docs viewer.", "conditional"],
+      ['"Open the docs viewer" is the command I typed; explain what it means.', "quoted"],
+      ["I opened the docs viewer earlier; what is it for?", "historical"],
+    ] as const;
+
+    for (const [prompt, reason] of cases) {
+      const interpretation = interpretHelixAskPrompt(prompt);
+      expect(interpretation.contextual_tool_mentions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            verb_or_cue: "docs_viewer.open",
+            reason,
+          }),
+        ]),
+      );
+      expect(interpretation.executable_operator_commands).toEqual([]);
+    }
+  });
+
   it("records affirmative visual cadence as an executable operator command", () => {
     const interpretation = interpretHelixAskPrompt("Set the visual capture interval to 10 seconds.");
 

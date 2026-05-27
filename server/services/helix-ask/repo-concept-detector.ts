@@ -1,3 +1,5 @@
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+
 export type RepoConceptDetection = {
   applies: boolean;
   confidence: "high" | "medium" | "low";
@@ -121,6 +123,7 @@ const extractQuestionSubject = (prompt: string): string | null => {
 
 export function detectRepoConcept(promptText: string): RepoConceptDetection {
   const prompt = promptText.trim();
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   if (!prompt) {
     return {
       applies: false,
@@ -128,6 +131,17 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
       concept: null,
       normalized_terms: [],
       reason: "empty_prompt",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    };
+  }
+  if (contextualSuppression) {
+    return {
+      applies: true,
+      confidence: "high",
+      concept: null,
+      normalized_terms: [],
+      reason: "contextual_tool_reference_suppressed",
       require_repo_evidence: false,
       allow_model_direct_answer: true,
     };

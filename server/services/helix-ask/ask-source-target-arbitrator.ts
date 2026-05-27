@@ -20,6 +20,7 @@ import {
   isContextualLiveSourceCadenceMention,
   isLiveSourceCadenceControlPrompt,
 } from "./live-source-continuation-intent";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -40,6 +41,7 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
     .map((cue: CueRule["cues"][number]) => cue.label);
 
 const isExplicitModelOnlyPrompt = (prompt: string): boolean =>
+  Boolean(detectContextualToolAdmissionSuppression(prompt)) ||
   /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
   /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
   /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||

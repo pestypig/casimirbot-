@@ -147,10 +147,13 @@ import {
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
+  buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
   reasoningBattleBeatPrimitive,
   reasoningBattleBeatClassName,
+  type ReasoningBattleAmbientState,
   type ReasoningBattleBeat,
+  type ReasoningBattleLane,
   type ReasoningBattleVisualPrimitive,
 } from "@/lib/helix/reasoning-battle-stage";
 import {
@@ -9664,20 +9667,64 @@ function reasoningBattlePrimitiveStyle(input: {
   };
 }
 
+function reasoningBattleAmbientClassName(state: ReasoningBattleAmbientState, reducedMotion: boolean): string {
+  const laneClass =
+    state.lane === "orb"
+      ? "border-emerald-200/30 bg-emerald-300/10 text-emerald-100"
+      : state.lane === "ambiguity"
+        ? "border-rose-200/35 bg-rose-300/10 text-rose-100"
+        : state.lane === "terminal"
+          ? "border-cyan-200/35 bg-cyan-300/10 text-cyan-100"
+          : "border-slate-200/25 bg-white/5 text-slate-200";
+  const motionClass = reducedMotion || state.intensity === 0 ? "" : "animate-pulse";
+  return `${laneClass} ${motionClass}`.trim();
+}
+
+function reasoningBattleAmbientMarkerClassName(state: ReasoningBattleAmbientState, reducedMotion: boolean): string {
+  const laneClass =
+    state.lane === "orb"
+      ? "bg-emerald-200/45 shadow-[0_0_12px_rgba(110,231,183,0.42)]"
+      : state.lane === "ambiguity"
+        ? "bg-rose-300/45 shadow-[0_0_12px_rgba(251,113,133,0.40)]"
+        : state.lane === "terminal"
+          ? "bg-cyan-200/45 shadow-[0_0_12px_rgba(103,232,249,0.42)]"
+          : "bg-slate-200/35 shadow-[0_0_8px_rgba(226,232,240,0.24)]";
+  const motionClass = reducedMotion || state.intensity === 0 ? "" : "animate-pulse";
+  return `${laneClass} ${motionClass}`.trim();
+}
+
 function renderReasoningBattleStage(input: {
   beats: ReasoningBattleBeat[];
   pressurePct: number;
   reducedMotion: boolean;
+  ambient?: ReasoningBattleAmbientState | null;
   replay?: boolean;
   className?: string;
   testId?: string;
 }): React.ReactNode {
-  if (input.beats.length === 0) return null;
+  if (input.beats.length === 0 && !input.ambient) return null;
   const visibleBeats = input.beats.slice(-8);
   const staticMotion = input.replay || input.reducedMotion;
-  const positiveImpact = visibleBeats.reduce((total, beat) => total + Math.max(0, beat.progress_delta), 0);
-  const negativeImpact = visibleBeats.reduce((total, beat) => total + Math.max(0, beat.pressure_delta), 0);
+  const positiveImpact = visibleBeats.reduce(
+    (total: number, beat: ReasoningBattleBeat) => total + Math.max(0, beat.progress_delta),
+    0,
+  );
+  const negativeImpact = visibleBeats.reduce(
+    (total: number, beat: ReasoningBattleBeat) => total + Math.max(0, beat.pressure_delta),
+    0,
+  );
   const orbPct = clampNumber(34 + positiveImpact * 6 - negativeImpact * 3, 18, 82);
+  const ambient = input.ambient ?? null;
+  const ambientPct =
+    ambient?.lane === "ambiguity"
+      ? 86
+      : ambient?.lane === "terminal"
+        ? 94
+        : ambient?.lane === "orb"
+          ? clampNumber(orbPct, 18, 78)
+          : 50;
+  const ambientElapsedLabel =
+    ambient && !input.replay && ambient.elapsed_ms >= 1000 ? ` ${Math.floor(ambient.elapsed_ms / 1000)}s` : "";
   return (
     <div
       data-testid={input.testId ?? "helix-ask-reasoning-battle-stage"}
@@ -9694,6 +9741,13 @@ function renderReasoningBattleStage(input: {
           className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-rose-400/35 via-fuchsia-300/15 to-transparent"
           style={{ width: `${input.pressurePct}%` }}
         />
+        {ambient ? (
+          <span
+            data-testid="helix-ask-reasoning-battle-ambient-marker"
+            className={`pointer-events-none absolute top-1/2 z-[3] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${reasoningBattleAmbientMarkerClassName(ambient, staticMotion)}`}
+            style={{ left: `${ambientPct}%`, opacity: 0.42 + ambient.intensity * 0.14 }}
+          />
+        ) : null}
         <div className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-7 z-[5] overflow-visible">
           {visibleBeats.map((beat) => {
             const primitive = reasoningBattleBeatPrimitive(beat);
@@ -9728,9 +9782,71 @@ function renderReasoningBattleStage(input: {
             );
           })}
         </div>
+        {ambient ? (
+          <span
+            data-testid="helix-ask-reasoning-battle-ambient"
+            className={`pointer-events-none absolute right-0 top-4 z-[6] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] ${reasoningBattleAmbientClassName(ambient, staticMotion)}`}
+            title={ambient.stage}
+          >
+            {ambient.label}
+            {ambientElapsedLabel}
+          </span>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function buildReasoningBattleAnswerTint(input: {
+  beats: ReasoningBattleBeat[];
+  ambient: ReasoningBattleAmbientState;
+}): { style: React.CSSProperties; palette: string; label: string } | null {
+  if (input.beats.length === 0 && input.ambient.kind === "idle") return null;
+  const palette = {
+    orb: { r: 16, g: 185, b: 129 },
+    ambiguity: { r: 244, g: 63, b: 94 },
+    terminal: { r: 34, g: 211, b: 238 },
+    neutral: { r: 148, g: 163, b: 184 },
+  } satisfies Record<ReasoningBattleLane, { r: number; g: number; b: number }>;
+  const totals = input.beats.reduce(
+    (acc, beat) => {
+      const weight = Math.max(1, Math.abs(beat.impact)) * (beat.lane === "terminal" ? 1.25 : 1);
+      const color = palette[beat.lane];
+      acc.r += color.r * weight;
+      acc.g += color.g * weight;
+      acc.b += color.b * weight;
+      acc.weight += weight;
+      acc.pressure += beat.pressure_delta;
+      acc.progress += beat.progress_delta;
+      return acc;
+    },
+    { r: 0, g: 0, b: 0, weight: 0, pressure: 0, progress: 0 },
+  );
+  const ambientColor = palette[input.ambient.lane];
+  const ambientWeight = input.ambient.intensity === 0 ? 0.35 : input.ambient.intensity * 0.75;
+  totals.r += ambientColor.r * ambientWeight;
+  totals.g += ambientColor.g * ambientWeight;
+  totals.b += ambientColor.b * ambientWeight;
+  totals.weight += ambientWeight;
+  if (totals.weight <= 0) return null;
+  const r = Math.round(totals.r / totals.weight);
+  const g = Math.round(totals.g / totals.weight);
+  const b = Math.round(totals.b / totals.weight);
+  const balance =
+    totals.pressure > totals.progress
+      ? "pressure"
+      : totals.progress > totals.pressure
+        ? "constructive"
+        : input.ambient.kind;
+  return {
+    label: balance,
+    palette: `rgb(${r}, ${g}, ${b})`,
+    style: {
+      background:
+        `linear-gradient(135deg, rgba(${r}, ${g}, ${b}, 0.18), rgba(${r}, ${g}, ${b}, 0.07) 48%, rgba(8, 47, 73, 0.18)), rgba(8, 47, 73, 0.18)`,
+      boxShadow: `inset 0 1px 0 rgba(${r}, ${g}, ${b}, 0.16), 0 0 26px rgba(${r}, ${g}, ${b}, 0.08)`,
+    },
+  };
 }
 
 function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
@@ -15384,6 +15500,16 @@ export function HelixAskPill({
     const pressure = reasoningBattleBeats.reduce((total, beat) => total + beat.pressure_delta, 0);
     return clampNumber(pressure * 8 + (reasoningTheaterCanonicalState?.indices.ambiguity_pressure ?? 0) * 28, 0, 46);
   }, [reasoningBattleBeats, reasoningTheaterCanonicalState]);
+  const reasoningBattleAmbientState = useMemo(
+    () =>
+      buildReasoningBattleAmbientState({
+        timelineEvents: latestCausalTurnTimeline?.events ?? [],
+        liveEvents: askLiveEvents,
+        theaterState: reasoningTheaterCanonicalState,
+        nowMs: askBusy ? Date.now() : undefined,
+      }),
+    [askBusy, askElapsedMs, askLiveEvents, latestCausalTurnTimeline, reasoningTheaterCanonicalState],
+  );
   const reasoningTheaterHardFailureSignals = useMemo(
     () =>
       readReasoningTheaterHardFailureSignals(
@@ -30362,6 +30488,7 @@ export function HelixAskPill({
                           beats: reasoningBattleBeats,
                           pressurePct: reasoningBattlePressurePct,
                           reducedMotion: prefersReducedMotion,
+                          ambient: reasoningBattleAmbientState,
                           className: "pointer-events-none absolute inset-x-0 top-0 z-[5]",
                         })}
                         <div
@@ -30774,6 +30901,15 @@ export function HelixAskPill({
               0,
               46,
             );
+            const replyBattleAmbientState = buildReasoningBattleAmbientState({
+              timelineEvents: replyCausalTurnTimeline?.events ?? [],
+              liveEvents: replyEventsChronological,
+              theaterState: replyReasoningTheaterState,
+            });
+            const replyBattleAnswerTint = buildReasoningBattleAnswerTint({
+              beats: replyBattleBeats,
+              ambient: replyBattleAmbientState,
+            });
             const causalTraceHasIssue = causalTurnTraceRows.some((row) =>
               /\b(?:failed|blocked|superseded)\b/i.test(row.status),
             );
@@ -30838,7 +30974,6 @@ export function HelixAskPill({
             const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
             const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
             const latestCausalTraceTestId = isLatestReply ? "helix-ask-latest-causal-trace" : undefined;
-            const latestBattleStageTestId = isLatestReply ? "helix-ask-latest-reasoning-battle-stage" : undefined;
             const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
             const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
             const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
@@ -30936,24 +31071,6 @@ export function HelixAskPill({
                       </div>
                     </details>
                   ) : null}
-                  {replyBattleBeats.length > 0 ? (
-                    <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/35 px-3 py-2 text-xs text-cyan-50">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Reasoning stage</p>
-                        <span className="rounded border border-cyan-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
-                          {replyBattleBeats.length} beats
-                        </span>
-                      </div>
-                      {renderReasoningBattleStage({
-                        beats: replyBattleBeats,
-                        pressurePct: replyBattlePressurePct,
-                        reducedMotion: prefersReducedMotion,
-                        replay: true,
-                        testId: latestBattleStageTestId,
-                        className: "mt-1 px-2 pb-3 pt-7",
-                      })}
-                    </div>
-                  ) : null}
                   {causalTurnTraceRows.length > 0 ? (
                     <details
                       open={askBusy || causalTraceHasIssue}
@@ -30997,8 +31114,11 @@ export function HelixAskPill({
                   ) : null}
                   <div
                     className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50"
+                    style={replyBattleAnswerTint?.style}
                     data-testid={latestFinalAnswerTestId}
                     data-final-answer-text={finalAnswerRawText}
+                    data-reasoning-stage-palette={replyBattleAnswerTint?.palette ?? ""}
+                    data-reasoning-stage-balance={replyBattleAnswerTint?.label ?? ""}
                     data-visible-terminal-source={transcriptTerminal.source}
                     data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? ""}
                   >

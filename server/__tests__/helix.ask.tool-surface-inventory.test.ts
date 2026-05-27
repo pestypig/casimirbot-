@@ -60,4 +60,20 @@ describe("Helix Ask tool surface inventory", () => {
     expect(packet.omitted.some((entry) => entry.reason === "manual_only")).toBe(true);
     expect(packet.omitted.some((entry) => entry.reason === "explicit_attachment_missing")).toBe(true);
   });
+
+  it("suppresses executable tools for contextual docs-viewer references", () => {
+    const packet = buildHelixToolSurfacePacket({
+      turnId: "turn-negated-docs-open",
+      prompt: "Do not open the docs viewer; just explain what the docs viewer is for.",
+      activePanels: [],
+      focusedPanelId: null,
+      explicitAttachmentAvailable: false,
+      explicitToolIntent: false,
+      maxEntries: 20,
+    });
+
+    expect(packet.entries).toEqual([]);
+    expect(packet.generation_reason).toContain("negated_tool_instruction");
+    expect(packet.omitted.some((entry) => entry.reason === "contextual_tool_reference_suppressed")).toBe(true);
+  });
 });

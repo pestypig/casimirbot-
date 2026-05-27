@@ -62,6 +62,33 @@ export type ReasoningBattleVisualPrimitive = {
   raw_content_included: false;
 };
 
+export type ReasoningBattleAmbientKind =
+  | "idle"
+  | "orienting"
+  | "waiting_model"
+  | "waiting_tool"
+  | "integrating"
+  | "checking_gates"
+  | "pressure_hold"
+  | "quiet"
+  | "blocked"
+  | "settled";
+
+export type ReasoningBattleAmbientState = {
+  id: string;
+  kind: ReasoningBattleAmbientKind;
+  lane: ReasoningBattleLane;
+  label: string;
+  source_event_id: string | null;
+  stage?: string;
+  status?: string;
+  reason_code?: string;
+  elapsed_ms: number;
+  intensity: 0 | 1 | 2 | 3;
+  stale: boolean;
+  raw_content_included: false;
+};
+
 export type ReasoningBattleLiveEventEntry = {
   id?: string;
   text?: string;
@@ -256,6 +283,10 @@ function liveEventTimestampMs(event: ReasoningBattleLiveEventEntry, fallbackMs: 
   return fallbackMs;
 }
 
+function liveEventSequence(event: ReasoningBattleLiveEventEntry, fallbackSequence: number): number {
+  return typeof event.seq === "number" && Number.isFinite(event.seq) ? event.seq : fallbackSequence;
+}
+
 function classifyLiveEvent(event: ReasoningBattleLiveEventEntry): BeatDraft | null {
   const metaStage = typeof event.meta?.stage === "string" ? event.meta.stage : "";
   const metaStatus = typeof event.meta?.status === "string" ? event.meta.status : "";
@@ -282,6 +313,54 @@ function classifyLiveEvent(event: ReasoningBattleLiveEventEntry): BeatDraft | nu
     return { lane: "terminal", kind: "settle", label: "settle", impact: 1 };
   }
   return null;
+}
+
+function latestTimelineEvent(events: HelixCausalTurnEvent[]): HelixCausalTurnEvent | null {
+  return [...events]
+    .filter((event) => event.raw_content_included === false && event.assistant_answer === false)
+    .sort((left, right) => left.sequence - right.sequence)
+    .at(-1) ?? null;
+}
+
+function latestLiveEvent(events: ReasoningBattleLiveEventEntry[]): ReasoningBattleLiveEventEntry | null {
+  return [...events]
+    .sort((left, right) => liveEventSequence(left, 0) - liveEventSequence(right, 0))
+    .at(-1) ?? null;
+}
+
+function classifyAmbientFromStage(input: {
+  stage: string;
+  status: string;
+  reasonCode: string;
+  text: string;
+}): Pick<ReasoningBattleAmbientState, "kind" | "lane" | "label"> {
+  const stage = input.stage.toLowerCase();
+  const statusText = [input.status, input.reasonCode, input.text].join(" ").toLowerCase();
+  if (/\b(blocked|failed|error|rejected|contract_violation|terminal_artifact_forbidden)\b/i.test(statusText)) {
+    return { kind: "blocked", lane: "ambiguity", label: "blocked" };
+  }
+  if (/\b(stale[_\s-]?route|projection mismatch|missing evidence|coverage gap|gap)\b/i.test(statusText)) {
+    return { kind: "pressure_hold", lane: "ambiguity", label: "pressure" };
+  }
+  if (/(terminal_artifact|visible_response|terminal_answer|turn_completed|final)/i.test(stage)) {
+    return { kind: "settled", lane: "terminal", label: "settled" };
+  }
+  if (/(coverage_gate|quality_gate|goal_satisfaction|solver_controller|projection_mismatch)/i.test(stage)) {
+    return { kind: "checking_gates", lane: "neutral", label: "checking" };
+  }
+  if (/(tool_dispatched|tool_call|runtime_tool|tool_result)/i.test(stage)) {
+    return { kind: "waiting_tool", lane: "orb", label: "waiting tool" };
+  }
+  if (/(tool_observation|repo_evidence|repo_docs_synthesis|observation|receipt_observed)/i.test(stage)) {
+    return { kind: "integrating", lane: "orb", label: "integrating" };
+  }
+  if (/(model_step|model_decision|reasoning_pass|composer|synthes)/i.test(stage)) {
+    return { kind: "waiting_model", lane: "orb", label: "thinking" };
+  }
+  if (/(prompt_received|turn_started|goal_classified|source_target|route_label|tool_surface)/i.test(stage)) {
+    return { kind: "orienting", lane: "neutral", label: "orienting" };
+  }
+  return { kind: "quiet", lane: "neutral", label: "quiet" };
 }
 
 function buildTheaterStateHardStopBeats(input: {
@@ -330,6 +409,82 @@ function buildTheaterStateHardStopBeats(input: {
     );
   }
   return beats;
+}
+
+export function buildReasoningBattleAmbientState(input: {
+  timelineEvents: HelixCausalTurnEvent[];
+  liveEvents: ReasoningBattleLiveEventEntry[];
+  theaterState?: ReasoningBattleTheaterStateV1 | null;
+  nowMs?: number;
+}): ReasoningBattleAmbientState {
+  const timelineEvent = latestTimelineEvent(input.timelineEvents ?? []);
+  const liveEvent = latestLiveEvent(input.liveEvents ?? []);
+  const nowMs = input.nowMs ?? timelineEvent?.timestamp_ms ?? liveEventTimestampMs(liveEvent ?? {}, 0);
+  const timelineCreatedAt = timelineEvent?.timestamp_ms;
+  const liveCreatedAt = liveEvent ? liveEventTimestampMs(liveEvent, nowMs) : undefined;
+  const useTimeline =
+    timelineEvent &&
+    (typeof liveCreatedAt !== "number" ||
+      typeof timelineCreatedAt !== "number" ||
+      timelineCreatedAt >= liveCreatedAt);
+  const sourceEventId = useTimeline ? timelineEvent?.event_id ?? null : liveEvent?.id ?? null;
+  const stage = useTimeline
+    ? timelineEvent?.stage ?? ""
+    : typeof liveEvent?.meta?.stage === "string"
+      ? liveEvent.meta.stage
+      : "live_event";
+  const status = useTimeline
+    ? timelineEvent?.status ?? ""
+    : typeof liveEvent?.meta?.status === "string"
+      ? liveEvent.meta.status
+      : "";
+  const reasonCode = useTimeline
+    ? timelineEvent?.reason_code ?? ""
+    : typeof liveEvent?.meta?.reason_code === "string"
+      ? liveEvent.meta.reason_code
+      : "";
+  const text = useTimeline ? timelineEvent?.public_summary ?? "" : liveEvent?.text ?? "";
+  const createdAtMs = useTimeline ? timelineCreatedAt ?? nowMs : liveCreatedAt ?? nowMs;
+  const elapsedMs = Math.max(0, nowMs - createdAtMs);
+  const classified =
+    input.theaterState?.telemetry.proof_verdict === "FAIL" || input.theaterState?.telemetry.certificate_integrity_ok === false
+      ? ({ kind: "blocked", lane: "ambiguity", label: "sealed" } as const)
+      : input.theaterState?.suppression_reason === "missing_evidence" ||
+          input.theaterState?.suppression_reason === "contract_violation"
+        ? ({ kind: "pressure_hold", lane: "ambiguity", label: "pressure" } as const)
+        : sourceEventId
+          ? classifyAmbientFromStage({ stage, status, reasonCode, text })
+          : ({ kind: "idle", lane: "neutral", label: "idle" } as const);
+  const stale = classified.kind !== "settled" && classified.kind !== "idle" && elapsedMs >= 6000;
+  const intensity = (
+    classified.kind === "settled" || classified.kind === "idle"
+      ? 0
+      : elapsedMs >= 6000
+        ? 3
+        : elapsedMs >= 3000
+          ? 2
+          : 1
+  ) as ReasoningBattleAmbientState["intensity"];
+  const traceKey =
+    timelineEvent?.turn_id ??
+    input.theaterState?.trace_id ??
+    input.theaterState?.scenario_id ??
+    sourceEventId ??
+    "helix-reasoning-battle";
+  return {
+    id: `reasoning-battle-ambient:${hash32([traceKey, sourceEventId ?? "none", stage, status, reasonCode, classified.kind].join("|"))}`,
+    kind: stale && classified.kind !== "blocked" ? "quiet" : classified.kind,
+    lane: stale && classified.kind !== "blocked" ? "neutral" : classified.lane,
+    label: stale && classified.kind !== "blocked" ? "quiet" : classified.label,
+    source_event_id: sourceEventId,
+    stage: stage || undefined,
+    status: status || undefined,
+    reason_code: reasonCode || undefined,
+    elapsed_ms: elapsedMs,
+    intensity,
+    stale,
+    raw_content_included: false,
+  };
 }
 
 export function buildReasoningBattleBeats(input: {

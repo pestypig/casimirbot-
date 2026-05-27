@@ -16,6 +16,7 @@ import {
   type HelixToolSurfaceOmittedReason,
   type HelixToolSurfacePacket,
 } from "@shared/helix-tool-surface";
+import { detectContextualToolAdmissionSuppression } from "../contextual-tool-admission";
 
 export type BuildHelixToolSurfaceInput = {
   turnId: string;
@@ -164,6 +165,32 @@ export const buildHelixToolSurfacePacket = (input: BuildHelixToolSurfaceInput): 
   const activePanelSet = new Set((input.activePanels ?? []).map((panel) => panel.trim()).filter(Boolean));
   const allEntries = WORKSTATION_DYNAMIC_TOOL_ACTIONS.map((action) => buildHelixToolSurfaceEntry(action, activePanelSet));
   const omitted = new Map<string, number>();
+  const contextualSuppression = detectContextualToolAdmissionSuppression(input.prompt);
+  if (contextualSuppression) {
+    for (const entry of allEntries) {
+      incrementOmitted(omitted, entry.panel_id, "contextual_tool_reference_suppressed");
+    }
+    return {
+      schema: HELIX_TOOL_SURFACE_PACKET_SCHEMA,
+      turn_id: input.turnId,
+      total_registered_tools: WORKSTATION_DYNAMIC_TOOL_ACTIONS.length,
+      visible_panel_count: WORKSPACE_ACTION_VISIBLE_PANEL_IDS.length,
+      workspace_action_count: WORKSPACE_ACTION_REGISTRY.filter((entry) => entry.enabled).length,
+      entries: [],
+      omitted: [...omitted.entries()].map(([key, count]) => {
+        const [panel_id, reason] = key.split("\u0000") as [string, HelixToolSurfaceOmittedReason];
+        return { panel_id, count, reason };
+      }),
+      active_panels: WORKSPACE_ACTION_VISIBLE_PANEL_IDS.map((panelId) => ({
+        panel_id: panelId,
+        active: activePanelSet.has(panelId),
+        focused: input.focusedPanelId === panelId,
+      })),
+      generation_reason: `workstation tool surface suppressed: ${contextualSuppression.suppression_reason}`,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   const scored = allEntries
     .map((entry) => ({
       entry,

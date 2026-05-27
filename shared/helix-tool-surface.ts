@@ -43,7 +43,8 @@ export type HelixToolSurfaceOmittedReason =
   | "explicit_attachment_missing"
   | "unsafe_without_confirmation"
   | "too_many_candidates"
-  | "requires_missing_source";
+  | "requires_missing_source"
+  | "contextual_tool_reference_suppressed";
 
 export type HelixToolSurfacePacket = {
   schema: typeof HELIX_TOOL_SURFACE_PACKET_SCHEMA;

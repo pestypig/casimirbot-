@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 
 export type HelixContextualToolMentionReason =
   | "negated"
@@ -352,8 +353,10 @@ export const buildHelixCompoundPromptContract = (
 
 export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpretation {
   const prompt = promptText.trim();
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const contextualMentions = uniqueBy(
-    contextualRules
+    [
+      ...contextualRules
       .map((rule) => {
         const text = prompt.match(rule.pattern)?.[0]?.trim();
         return text
@@ -365,6 +368,22 @@ export function interpretHelixAskPrompt(promptText: string): HelixPromptInterpre
           : null;
       })
       .filter((entry): entry is HelixPromptInterpretation["contextual_tool_mentions"][number] => Boolean(entry)),
+      ...(contextualSuppression
+        ? [{
+            text: contextualSuppression.text,
+            verb_or_cue: contextualSuppression.verb_or_cue,
+            reason: contextualSuppression.suppression_reason === "negated_tool_instruction"
+              ? "negated" as const
+              : contextualSuppression.suppression_reason === "quoted_tool_command"
+                ? "quoted" as const
+                : contextualSuppression.suppression_reason === "historical_tool_reference"
+                  ? "historical" as const
+                  : contextualSuppression.suppression_reason === "hypothetical_tool_reference"
+                    ? "conditional" as const
+                    : "background_context" as const,
+          }]
+        : []),
+    ],
     (entry) => `${entry.verb_or_cue}:${entry.reason}:${entry.text.toLowerCase()}`,
   );
   const negativeConstraints = uniqueBy(matchTexts(prompt, negativeConstraintPatterns), (entry) => entry.toLowerCase());

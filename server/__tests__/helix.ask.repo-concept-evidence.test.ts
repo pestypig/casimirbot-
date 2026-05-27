@@ -112,6 +112,22 @@ describe("Helix Ask repo concept evidence", () => {
     expect(intent.requestedOutputs).toEqual(expect.arrayContaining(["repo_code", "file_path"]));
   });
 
+  it("does not turn contextual docs-viewer open references into repo concepts", () => {
+    const prompt = "Do not open the docs viewer; just explain what the docs viewer is for.";
+
+    expect(detectRepoConcept(prompt)).toMatchObject({
+      reason: "contextual_tool_reference_suppressed",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    });
+    expect(detectRepoConceptDefinition(prompt)).toBeNull();
+    expect(detectRepoCodeEvidenceIntent(prompt)).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["contextual_tool_reference_suppressed"],
+    });
+  });
+
   it("defines the answer contract as repo evidence first, terminal answer second", () => {
     const contract = buildRepoCodeEvidenceAnswerContract({
       turnId: "turn:repo-concept",

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HelixCausalTurnEvent } from "@shared/helix-causal-turn-timeline";
 import {
+  buildReasoningBattleAmbientState,
   buildReasoningBattleBeats,
   reasoningBattleBeatPrimitive,
   reasoningBattleBeatClassName,
@@ -242,5 +243,55 @@ describe("reasoning battle stage", () => {
         raw_content_included: false,
       });
     }
+  });
+
+  it("categorizes the interval after a model decision as model waiting", () => {
+    const state = buildReasoningBattleAmbientState({
+      timelineEvents: [event({ sequence: 1, stage: "model_step_decided", timestamp_ms: 1000 })],
+      liveEvents: [],
+      nowMs: 2500,
+    });
+
+    expect(state).toMatchObject({
+      kind: "waiting_model",
+      lane: "orb",
+      label: "thinking",
+      elapsed_ms: 1500,
+      raw_content_included: false,
+    });
+  });
+
+  it("categorizes stale blocked intervals as quiet pressure-free waiting", () => {
+    const state = buildReasoningBattleAmbientState({
+      timelineEvents: [event({ sequence: 1, stage: "runtime_tool_dispatched", timestamp_ms: 1000 })],
+      liveEvents: [],
+      nowMs: 8000,
+    });
+
+    expect(state).toMatchObject({
+      kind: "quiet",
+      lane: "neutral",
+      label: "quiet",
+      stale: true,
+      intensity: 3,
+      raw_content_included: false,
+    });
+  });
+
+  it("categorizes terminal intervals as settled", () => {
+    const state = buildReasoningBattleAmbientState({
+      timelineEvents: [event({ sequence: 1, stage: "visible_response_written", timestamp_ms: 1000 })],
+      liveEvents: [],
+      nowMs: 9000,
+    });
+
+    expect(state).toMatchObject({
+      kind: "settled",
+      lane: "terminal",
+      label: "settled",
+      intensity: 0,
+      stale: false,
+      raw_content_included: false,
+    });
   });
 });

@@ -35,6 +35,8 @@ export type HelixCapabilityPlan = {
 
   admission_status: HelixCapabilityAdmissionStatus;
   rejection_reason?: string;
+  tool_admission_suppressed?: boolean;
+  suppression_reason?: string;
 
   assistant_answer: false;
   raw_content_included: false;

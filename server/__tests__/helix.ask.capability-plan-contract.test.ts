@@ -184,6 +184,38 @@ describe("Helix capability plan contract", () => {
     expect(plan.capability_family).not.toBe("workstation_action");
   });
 
+  it("does not admit repo/docs tools for contextual docs-viewer open references", () => {
+    const prompts = [
+      ["Do not open the docs viewer; just explain what the docs viewer is for.", "negated_tool_instruction"],
+      ["Explain what would happen if I opened the docs viewer.", "hypothetical_tool_reference"],
+      ['"Open the docs viewer" is the command I typed; explain what it means.', "quoted_tool_command"],
+      ["I opened the docs viewer earlier; what is it for?", "historical_tool_reference"],
+    ] as const;
+
+    for (const [promptText, suppressionReason] of prompts) {
+      const plan = buildCapabilityPlan({
+        turnId: "ask:contextual-docs-viewer",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+        toolCallAdmissionDecision: toolAdmission("model_only", ["model_only"]),
+        canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+      });
+
+      expect(plan).toMatchObject({
+        capability_family: "debug_export",
+        requested_action: "suppressed_contextual_tool_reference",
+        source_target: "model_only",
+        mutating: false,
+        operator_command_required: false,
+        operator_command_present: false,
+        tool_admission_suppressed: true,
+        suppression_reason: suppressionReason,
+      });
+      expect(plan.capability_family).not.toBe("repo_evidence");
+      expect(plan.capability_family).not.toBe("docs");
+    }
+  });
+
   it("admits a workstation action only when the prompt contains the operator command and goal accepts action receipt", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:click-start",

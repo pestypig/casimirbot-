@@ -2,6 +2,7 @@ import {
   detectRepoConceptDefinition,
   resolveRepoConceptEntity,
 } from "./repo-concept-detector";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 
 export type HelixRepoCodeEvidenceIntent = {
   repoEvidenceRequested: boolean;
@@ -93,6 +94,16 @@ const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
 
 export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeEvidenceIntent {
   const prompt = promptText.trim();
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  if (contextualSuppression) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["contextual_tool_reference_suppressed"],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
   if (!prompt || NEGATIVE_MODEL_ONLY_RE.test(prompt)) {
     return {
       repoEvidenceRequested: false,

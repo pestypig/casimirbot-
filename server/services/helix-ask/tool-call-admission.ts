@@ -5,6 +5,7 @@ import {
   type HelixToolCallAdmissionDecision,
   type HelixToolCallAdmissionFamily,
 } from "@shared/helix-tool-call-admission";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -59,6 +60,23 @@ export function buildToolCallAdmissionDecision(input: {
     ? (input.sourceTargetIntent as Record<string, unknown>).suppressed_routes as string[]
     : [];
   const promptText = String(input.promptText ?? "");
+  const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
+  if (contextualSuppression) {
+    return {
+      schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
+      turn_id: input.turnId,
+      source_target: "model_only",
+      required: false,
+      admitted_tool_families: ["model_only"],
+      forbidden_terminal_artifact_kinds: [],
+      forbidden_routes: [],
+      reason: "contextual_tool_reference_suppressed",
+      tool_admission_suppressed: true,
+      suppression_reason: contextualSuppression.suppression_reason,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
 
   let required = HARD_SOURCE_TARGETS.has(sourceTarget);
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];

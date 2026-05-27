@@ -1558,6 +1558,23 @@ describe("thread-bound situation context bridge", () => {
     expect(sourceTarget.suppressed_routes).toEqual(expect.arrayContaining(["doc_open_best", "model_only_concept"]));
   });
 
+  it("suppresses negated docs-panel open prompts to model-only explanation", () => {
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:negated-docs-panel",
+      threadId: "helix-ask:desktop",
+      promptText: "Do not open the docs viewer; just explain what the docs viewer is for.",
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "model_only",
+      target_kind: "general_background",
+      strength: "hard",
+      allow_no_tool_direct: true,
+      precedence_reason: "explicit_model_only_target",
+    });
+    expect(sourceTarget.reasons).toEqual(expect.arrayContaining(["negative_workspace_scope"]));
+  });
+
   it("routes live-capture content prompts to visual evidence instead of model-only answers", () => {
     const sourceTarget = arbitrateAskSourceTarget({
       turnId: "ask:live-capture-content",
