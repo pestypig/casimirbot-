@@ -56,11 +56,29 @@ const countPathLikeLines = (text: string): number =>
       /\b(?:client|server|shared|docs|scripts|tools|packages|src)\/[^\s:]+:\d+\b/i.test(line),
     ).length;
 
+const stripTrailingSourceList = (text: string): string => {
+  const lines = text.split(/\r?\n/);
+  const sourceIndex = lines.findIndex((line) => /^\s*(?:Sources?|Refs?|References?)\s*:\s*$/i.test(line.trim()));
+  if (sourceIndex < 0) return text.trim();
+  return lines.slice(0, sourceIndex).join("\n").trim();
+};
+
+const hasSubstantiveProse = (text: string): boolean => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  return wordCount >= 18 && /[.!?]/.test(normalized);
+};
+
 const isExcerptLikeAnswer = (text: string): boolean => {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim());
-  const pathLines = countPathLikeLines(text);
+  const proseWithoutTrailingSources = stripTrailingSourceList(text);
+  const analysisText = hasSubstantiveProse(proseWithoutTrailingSources)
+    ? proseWithoutTrailingSources
+    : text;
+  const lines = analysisText.split(/\r?\n/).filter((line) => line.trim());
+  const pathLines = countPathLikeLines(analysisText);
   if (pathLines >= 2 && pathLines >= Math.max(1, Math.floor(lines.length * 0.45))) return true;
-  if (/\b(?:export|const|function|type|interface|class)\s+\w+[\s\S]{0,80}\{/.test(text) && pathLines > 0) return true;
+  if (/\b(?:export|const|function|type|interface|class)\s+\w+[\s\S]{0,80}\{/.test(analysisText) && pathLines > 0) return true;
   return false;
 };
 

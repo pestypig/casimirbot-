@@ -3,6 +3,8 @@ import { auditTerminalPresentationCoverage } from "./terminal-presentation-cover
 import { buildHelixTurnTerminalAuthority, hashHelixTerminalText } from "./turn-terminal-authority";
 import { evaluateTerminalBoundaryEligibility, type HelixRuntimeAuthorityBoundaryReport } from "./runtime-authority-contract";
 import { evaluateRepoAnswerTextQualityGate } from "./repo-answer-text-quality-gate";
+import { applyPostToolAuthorityBridgeRepair } from "./post-tool-authority-bridge";
+import { evaluateVisibleAnswerPolicyFaithfulnessGate } from "./visible-answer-policy-faithfulness-gate";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -68,6 +70,61 @@ const requestUserInputText = (payload: Record<string, unknown>): string =>
   readString(readRecord(payload.pending_request)?.prompt) ??
   "I need more information before I can answer this turn.";
 
+const hasRequestUserInputArtifact = (payload: Record<string, unknown>): boolean =>
+  Boolean(
+    readRecord(payload.pending_server_request) ||
+    readRecord(payload.request_user_input) ||
+    readRecord(payload.pending_request),
+  );
+
+const shouldPromoteRequestUserInputTerminal = (payload: Record<string, unknown>): boolean => {
+  if (!hasRequestUserInputArtifact(payload)) return false;
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  const solver = readRecord(payload.solver_controller_decision);
+  const postToolBridge = readRecord(payload.post_tool_authority_bridge);
+  return (
+    readString(goal?.next_decision) === "request_user_input" ||
+    readString(solver?.decision) === "request_user_input" ||
+    readString(postToolBridge?.required_terminal_kind) === "request_user_input" ||
+    readString(postToolBridge?.terminal_repair_action) === "materialize_request_user_input" ||
+    readString(payload.final_status) === "pending_input" ||
+    readString(payload.response_type) === "pending_input" ||
+    readString(payload.terminal_artifact_kind) === "request_user_input" ||
+    readString(payload.final_answer_source) === "request_user_input"
+  );
+};
+
+const promoteRequestUserInputTerminal = (
+  payload: Record<string, unknown>,
+  turnId: string,
+): void => {
+  const text = requestUserInputText(payload);
+  const priorTerminalArtifactKind = readString(payload.terminal_artifact_kind);
+  const priorFinalAnswerSource = readString(payload.final_answer_source);
+  const priorTerminalErrorCode = readString(payload.terminal_error_code);
+  payload.ok = true;
+  payload.response_type = "pending_input";
+  payload.final_status = "pending_input";
+  payload.terminal_artifact_kind = "request_user_input";
+  payload.final_answer_source = "request_user_input";
+  payload.selected_final_answer = text;
+  payload.answer = text;
+  payload.text = text;
+  payload.finalAnswer = text;
+  payload.content = text;
+  payload.terminal_request_user_input_promotion = {
+    schema: "helix.terminal_request_user_input_promotion.v1",
+    turn_id: turnId,
+    applied: true,
+    prior_terminal_artifact_kind: priorTerminalArtifactKind,
+    prior_final_answer_source: priorFinalAnswerSource,
+    prior_terminal_error_code: priorTerminalErrorCode,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  delete payload.terminal_error_code;
+};
+
 const typedFailureText = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_failure_text) ??
   readString(readRecord(payload.typed_failure)?.message) ??
@@ -94,6 +151,27 @@ const isUnbackedRepoEvidenceTerminalText = (value: unknown): boolean => {
 
 const clipText = (value: string, max = 180): string =>
   value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}...`;
+
+const repairVisiblePolicyFaithfulness = (text: string): string => {
+  const repaired = text
+    .replace(
+      /\bFinal answers? must be derived from the observations? and must satisfy the terminal contract requirements?\.?/gi,
+      "Final answers must be model-synthesized from observations and selected by terminal authority; receipts and tool outputs are supporting observations, not answer authority.",
+    )
+    .replace(
+      /\bFinal answers? must be derived from the observations?\.?/gi,
+      "Final answers must be model-synthesized from observations and selected by terminal authority.",
+    )
+    .replace(
+      /\bReceipts? (?:validate|confirm|authorize|prove|determine) (?:the )?(?:final|terminal|visible) answers?\.?/gi,
+      "Receipts are observations that can support a later model-authored answer; they do not validate or become the final answer.",
+    )
+    .replace(
+      /\b(?:Final|terminal|visible) answers? (?:are|must be) based on (?:validated )?receipts?\.?/gi,
+      "Final answers require model synthesis and terminal authority; receipts remain supporting observations.",
+    );
+  return repaired.replace(/\n{3,}/g, "\n\n").trim();
+};
 
 const buildRepoEvidenceTerminalRepairText = (payload: Record<string, unknown>): string | null => {
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
@@ -210,6 +288,11 @@ export function resolveTerminalAnswerEnvelope(
 ): HelixTerminalAnswerEnvelope {
   const turnId = readTurnId(payload, options.turnId);
   const threadId = readThreadId(payload, options.threadId);
+  const postToolBridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
+  payload.post_tool_authority_bridge = postToolBridge as unknown as Record<string, unknown>;
+  if (shouldPromoteRequestUserInputTerminal(payload)) {
+    promoteRequestUserInputTerminal(payload, turnId);
+  }
   const sourceTarget = readSourceTarget(payload);
   let terminalArtifactKind = readTerminalArtifactKind(payload);
   let finalAnswerSource = readFinalAnswerSource(payload);
@@ -242,6 +325,27 @@ export function resolveTerminalAnswerEnvelope(
     finalAnswerSource = "typed_failure";
     terminalText = typedFailureText(payload);
     authorityOrigin = "typed_failure";
+  }
+  const visibleFaithfulnessGate = evaluateVisibleAnswerPolicyFaithfulnessGate({
+    turnId,
+    text: terminalText,
+    payload,
+    checkedTextRef: readString(payload.terminal_artifact_id) ?? terminalArtifactKind,
+  });
+  payload.visible_answer_policy_faithfulness_gate = visibleFaithfulnessGate as unknown as Record<string, unknown>;
+  if (!visibleFaithfulnessGate.ok && visibleFaithfulnessGate.repair_allowed) {
+    const repaired = repairVisiblePolicyFaithfulness(terminalText);
+    if (repaired && repaired !== terminalText) {
+      terminalText = repaired;
+      payload.visible_answer_policy_faithfulness_repair = {
+        schema: "helix.visible_answer_policy_faithfulness_repair.v1",
+        turn_id: turnId,
+        repaired: true,
+        violations: visibleFaithfulnessGate.violations,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
   }
 
   return {
@@ -482,7 +586,7 @@ export function applyTerminalAnswerEnvelope(
     terminal_answer_envelope: envelope,
   };
   const initialBoundary = evaluateTerminalBoundaryEligibility(previewPayload);
-  if (!initialBoundary.eligible) {
+  if (!initialBoundary.eligible && envelope.terminal_kind !== "request_user_input") {
     envelope = buildTerminalBoundaryFailureEnvelope(payload, envelope, initialBoundary);
   }
 

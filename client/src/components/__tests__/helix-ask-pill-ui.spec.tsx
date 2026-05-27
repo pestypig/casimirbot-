@@ -385,6 +385,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("terminal_artifact_forbidden_by_route_contract");
     expect(source).toContain("buildReasoningBattleBeats");
     expect(source).toContain("helix-ask-reasoning-battle-stage");
+    expect(source).toContain("helix-ask-latest-reasoning-battle-stage");
     expect(source).toContain("helix-ask-reasoning-battle-beat");
     expect(source).toContain("helix-ask-reasoning-battle-primitive");
     expect(source).toContain("helix-ask-reasoning-battle-pressure");

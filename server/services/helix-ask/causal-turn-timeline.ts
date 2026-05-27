@@ -278,6 +278,29 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
       status: "succeeded",
     });
   }
+  if (toolObservationRefs.length > 0) {
+    factory.push({
+      stage: "tool_observation_created",
+      producer: "runtime_tool",
+      input_refs: ["runtime_tool_call", "workspace_action"],
+      output_refs: toolObservationRefs,
+      status: "succeeded",
+      public_summary: "Tool/runtime results were recorded as observations, not terminal answers.",
+    });
+  }
+  if (toolObservationRefs.length > 0 && (directAnswerRef || finalDraftRef)) {
+    factory.push({
+      stage: "model_step_decided",
+      producer: "model",
+      input_refs: toolObservationRefs,
+      output_refs: ["post_tool_answer_decision"],
+      decision: "answer",
+      selected_capability: "model.answer_after_tool_observation",
+      model_step_capability: "model.answer_after_tool_observation",
+      status: "succeeded",
+      public_summary: "The model answered after receiving the tool observation.",
+    });
+  }
   if (directAnswerRef || finalDraftRef) {
     const directArtifact = readArray(payload.current_turn_artifact_ledger).find((artifact) => artifactId(artifact) === directAnswerRef);
     const fallback = inferFallbackRule(artifactText(directArtifact));
@@ -299,20 +322,10 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
     factory.push({
       stage: "model_answer_artifact_created",
       producer: fallback ? "deterministic_fallback" : "model",
-      input_refs: ["agent_step_decision"],
+      input_refs: toolObservationRefs.length > 0 ? toolObservationRefs : ["agent_step_decision"],
       output_refs: [directAnswerRef, finalDraftRef].filter((ref): ref is string => Boolean(ref)),
-      selected_capability: selectedCapability,
+      selected_capability: toolObservationRefs.length > 0 ? "model.answer_after_tool_observation" : selectedCapability,
       status: "succeeded",
-    });
-  }
-  if (toolObservationRefs.length > 0) {
-    factory.push({
-      stage: "tool_observation_created",
-      producer: "runtime_tool",
-      input_refs: ["runtime_tool_call", "workspace_action"],
-      output_refs: toolObservationRefs,
-      status: "succeeded",
-      public_summary: "Tool/runtime results were recorded as observations, not terminal answers.",
     });
   }
   if (repoEvidenceRefs.length > 0) {

@@ -9664,6 +9664,75 @@ function reasoningBattlePrimitiveStyle(input: {
   };
 }
 
+function renderReasoningBattleStage(input: {
+  beats: ReasoningBattleBeat[];
+  pressurePct: number;
+  reducedMotion: boolean;
+  replay?: boolean;
+  className?: string;
+  testId?: string;
+}): React.ReactNode {
+  if (input.beats.length === 0) return null;
+  const visibleBeats = input.beats.slice(-8);
+  const staticMotion = input.replay || input.reducedMotion;
+  const positiveImpact = visibleBeats.reduce((total, beat) => total + Math.max(0, beat.progress_delta), 0);
+  const negativeImpact = visibleBeats.reduce((total, beat) => total + Math.max(0, beat.pressure_delta), 0);
+  const orbPct = clampNumber(34 + positiveImpact * 6 - negativeImpact * 3, 18, 82);
+  return (
+    <div
+      data-testid={input.testId ?? "helix-ask-reasoning-battle-stage"}
+      className={input.className}
+      aria-hidden="true"
+    >
+      <div className="relative h-2 overflow-visible rounded-full bg-black/45">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-300/40 via-cyan-200/28 to-transparent"
+          style={{ width: `${orbPct}%` }}
+        />
+        <div
+          data-testid="helix-ask-reasoning-battle-pressure"
+          className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-rose-400/35 via-fuchsia-300/15 to-transparent"
+          style={{ width: `${input.pressurePct}%` }}
+        />
+        <div className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-7 z-[5] overflow-visible">
+          {visibleBeats.map((beat) => {
+            const primitive = reasoningBattleBeatPrimitive(beat);
+            const driftPx = ((hash32(`${beat.id}:drift`) % 17) - 8) * (beat.lane === "ambiguity" ? -1 : 1);
+            const yPx = reasoningBattleBeatHeightPx(beat);
+            const displayLabel = `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`;
+            return (
+              <React.Fragment key={beat.id}>
+                <span
+                  data-testid="helix-ask-reasoning-battle-primitive"
+                  className={`pointer-events-none absolute top-1/2 z-[4] block border ${reasoningBattlePrimitiveClassName(primitive)}`}
+                  style={reasoningBattlePrimitiveStyle({ beat, primitive, reducedMotion: staticMotion })}
+                />
+                <span
+                  data-testid="helix-ask-reasoning-battle-beat"
+                  className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, staticMotion)}`}
+                  style={
+                    {
+                      left: `${reasoningBattleBeatPositionPct(beat)}%`,
+                      transform: staticMotion
+                        ? `translate3d(-50%, ${yPx}px, 0)`
+                        : "translate3d(-50%, 0, 0)",
+                      animation: staticMotion ? undefined : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
+                      "--beat-drift": `${driftPx}px`,
+                      "--beat-y": `${yPx}px`,
+                    } as React.CSSProperties & Record<string, string | undefined>
+                  }
+                >
+                  {displayLabel}
+                </span>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
   const base = latest
     ? "border-slate-500/40 bg-slate-950/35 text-slate-100"
@@ -26335,6 +26404,50 @@ export function HelixAskPill({
     if (reply.liveEvents && reply.liveEvents.length > 0) {
       return reply.liveEvents.filter((event) => !isStaleWorkstationEvent(event));
     }
+    const currentTurnEvents = Array.isArray(debugRecord?.current_turn_events) ? debugRecord.current_turn_events : [];
+    if (currentTurnEvents.length > 0) {
+      return currentTurnEvents
+        .map((entry, index): AskLiveEventEntry | null => {
+          const record = readAgentLoopAuditRecord(entry);
+          if (!record) return null;
+          const type = coerceText(record.type).trim() || "turn_event";
+          const status = coerceText(record.status).trim();
+          const phase = coerceText(record.phase).trim();
+          const summary = coerceText(record.summary).trim();
+          const reason = coerceText(record.reason ?? record.error_code).trim();
+          const safeText =
+            summary ||
+            (type === "terminal_answer"
+              ? "Terminal answer written."
+              : type === "turn_started"
+                ? "Turn started."
+                : [humanizeAskLiveEventToken(type), humanizeAskLiveEventToken(status || phase || reason)]
+                    .filter(Boolean)
+                    .join(": "));
+          return {
+            id:
+              coerceText(record.id).trim() ||
+              coerceText(record.event_id).trim() ||
+              `${reply.id}-current-turn-${index}`,
+            text: safeText || "Helix Ask update",
+            tool: coerceText(record.lane).trim() || coerceText(record.step_id).trim() || "agent",
+            seq: index,
+            tsMs: typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : undefined,
+            meta: {
+              stage: type,
+              detail: phase || reason || null,
+              status: status || null,
+              traceId: coerceText(record.turn_id).trim() || null,
+              turnKey: coerceText(record.turn_id).trim() || null,
+              stepId: coerceText(record.step_id).trim() || null,
+              lane: coerceText(record.lane).trim() || null,
+              reason_code: reason || null,
+              event_source: "current_turn_events",
+            },
+          };
+        })
+        .filter((event): event is AskLiveEventEntry => event !== null && !isStaleWorkstationEvent(event));
+    }
     const debugEvents = reply.debug?.live_events;
     if (!debugEvents || debugEvents.length === 0) {
       return [];
@@ -30245,48 +30358,12 @@ export function HelixAskPill({
                         </div>
                       ) : null}
                       <div className="mt-2 relative h-1.5 overflow-visible rounded-full bg-black/45">
-                        {reasoningBattleBeats.length > 0 ? (
-                          <div
-                            data-testid="helix-ask-reasoning-battle-stage"
-                            className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-7 z-[5] overflow-visible"
-                            aria-hidden="true"
-                          >
-                            {reasoningBattleBeats.slice(-8).map((beat) => {
-                              const primitive = reasoningBattleBeatPrimitive(beat);
-                              const driftPx = ((hash32(`${beat.id}:drift`) % 17) - 8) * (beat.lane === "ambiguity" ? -1 : 1);
-                              const yPx = reasoningBattleBeatHeightPx(beat);
-                              const displayLabel = `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`;
-                              return (
-                                <React.Fragment key={beat.id}>
-                                  <span
-                                    data-testid="helix-ask-reasoning-battle-primitive"
-                                    className={`pointer-events-none absolute top-1/2 z-[4] block border ${reasoningBattlePrimitiveClassName(primitive)}`}
-                                    style={reasoningBattlePrimitiveStyle({ beat, primitive, reducedMotion: prefersReducedMotion })}
-                                  />
-                                  <span
-                                    data-testid="helix-ask-reasoning-battle-beat"
-                                    className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, prefersReducedMotion)}`}
-                                    style={
-                                      {
-                                        left: `${reasoningBattleBeatPositionPct(beat)}%`,
-                                        transform: prefersReducedMotion
-                                          ? `translate3d(-50%, ${yPx}px, 0)`
-                                          : "translate3d(-50%, 0, 0)",
-                                        animation: prefersReducedMotion
-                                          ? undefined
-                                          : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
-                                        "--beat-drift": `${driftPx}px`,
-                                        "--beat-y": `${yPx}px`,
-                                      } as React.CSSProperties & Record<string, string | undefined>
-                                    }
-                                  >
-                                    {displayLabel}
-                                  </span>
-                                </React.Fragment>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                        {renderReasoningBattleStage({
+                          beats: reasoningBattleBeats,
+                          pressurePct: reasoningBattlePressurePct,
+                          reducedMotion: prefersReducedMotion,
+                          className: "pointer-events-none absolute inset-x-0 top-0 z-[5]",
+                        })}
                         <div
                           className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-5 overflow-hidden rounded-md"
                           aria-hidden
@@ -30684,6 +30761,19 @@ export function HelixAskPill({
             ) ?? visibleResolvedTurn.primary_source_label;
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
             const causalTurnTraceRows = buildHelixCausalTurnTraceRows(reply);
+            const replyCausalTurnTimeline = readHelixCausalTurnTimeline(reply);
+            const replyReasoningTheaterState = coerceReasoningTheaterStateV1(reply.debug?.reasoning_theater_state_v1);
+            const replyBattleBeats = buildReasoningBattleBeats({
+              timelineEvents: replyCausalTurnTimeline?.events ?? [],
+              liveEvents: replyEventsChronological,
+              theaterState: replyReasoningTheaterState,
+            });
+            const replyBattlePressurePct = clampNumber(
+              replyBattleBeats.reduce((total, beat) => total + beat.pressure_delta, 0) * 8 +
+                (replyReasoningTheaterState?.indices.ambiguity_pressure ?? 0) * 28,
+              0,
+              46,
+            );
             const causalTraceHasIssue = causalTurnTraceRows.some((row) =>
               /\b(?:failed|blocked|superseded)\b/i.test(row.status),
             );
@@ -30748,6 +30838,7 @@ export function HelixAskPill({
             const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
             const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
             const latestCausalTraceTestId = isLatestReply ? "helix-ask-latest-causal-trace" : undefined;
+            const latestBattleStageTestId = isLatestReply ? "helix-ask-latest-reasoning-battle-stage" : undefined;
             const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
             const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
             const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
@@ -30844,6 +30935,24 @@ export function HelixAskPill({
                         ))}
                       </div>
                     </details>
+                  ) : null}
+                  {replyBattleBeats.length > 0 ? (
+                    <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/35 px-3 py-2 text-xs text-cyan-50">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Reasoning stage</p>
+                        <span className="rounded border border-cyan-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-cyan-100">
+                          {replyBattleBeats.length} beats
+                        </span>
+                      </div>
+                      {renderReasoningBattleStage({
+                        beats: replyBattleBeats,
+                        pressurePct: replyBattlePressurePct,
+                        reducedMotion: prefersReducedMotion,
+                        replay: true,
+                        testId: latestBattleStageTestId,
+                        className: "mt-1 px-2 pb-3 pt-7",
+                      })}
+                    </div>
                   ) : null}
                   {causalTurnTraceRows.length > 0 ? (
                     <details

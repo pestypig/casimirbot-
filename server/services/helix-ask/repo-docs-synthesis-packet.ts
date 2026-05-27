@@ -209,6 +209,13 @@ export function buildRepoDocsSynthesisPacket(input: {
   const requiredTerminalKind = input.routeFamily === "repo_evidence"
     ? "repo_code_evidence_answer"
     : "model_synthesized_answer";
+  const isDottieConcept = /\bdottie\b/i.test(`${concept} ${input.promptText}`);
+  const citationInstruction =
+    "When citing, do not put each source on its own bullet line; use one short parenthetical citation or one compact Sources sentence with semicolon-separated refs.";
+  const dottieInstruction = isDottieConcept
+    ? "For Auntie Dottie, answer the identity question first: explain that it is a Dottie/Situation Room observer or preset for public commentary/evidence, mention voice proposals require confirmation when supported, and do not present it as terminal-answer authority."
+    : "";
+
   return {
     schema: HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA,
     turn_id: input.turnId,
@@ -239,10 +246,12 @@ export function buildRepoDocsSynthesisPacket(input: {
       "Preserve authority claims exactly: receipts are observations/supporting artifacts, not final-answer authority.",
       "Do not claim evidence is missing when compact_evidence is non-empty.",
       "Use compact refs from compact_evidence as support_refs for terminal authority.",
+      citationInstruction,
+      dottieInstruction,
       input.routeFamily === "repo_evidence"
         ? "The required model step is model.synthesize_from_repo_evidence and the terminal product is repo_code_evidence_answer."
         : "The required model step is model.synthesize_from_docs_evidence and the terminal product is model_synthesized_answer.",
-    ].join(" "),
+    ].filter(Boolean).join(" "),
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -313,10 +322,13 @@ export function buildRepoDocsSynthesisRepairInstruction(input: {
   const evidenceSentence = evidenceRefs
     ? ` Use these compact evidence refs as support, not as the answer itself: ${evidenceRefs}.`
     : "";
+  const dottieInstruction = input.packet && /\bdottie\b/i.test(`${input.packet.concept ?? ""} ${input.packet.user_question}`)
+    ? " For Auntie Dottie, write two or three sentences that start by explaining what it is in this app before adding caveats about observer/preset behavior, commentary, or voice confirmation."
+    : "";
   const common =
-    " Write one concise natural-language synthesis that directly answers the user. Explain what the evidence establishes. Include compact support refs only as short citations or a Sources line. Do not paste code, do not list files as the answer, and do not claim evidence is missing.";
+    " Write one concise natural-language synthesis that directly answers the user. Explain what the evidence establishes. Include compact support refs only as short inline citations or one semicolon-separated Sources sentence. Do not put each source on its own bullet line, do not paste code, do not list files as the answer, and do not claim evidence is missing.";
   if (violations.has("excerpt_like_answer") || violations.has("file_list_only")) {
-    return `${prefix}${common}${evidenceSentence} The previous answer was excerpt-like or file-list-like; replace it with prose about meaning and behavior.`;
+    return `${prefix}${common}${dottieInstruction}${evidenceSentence} The previous answer was excerpt-like or file-list-like; replace it with prose about meaning and behavior.`;
   }
   if (violations.has("unsupported_repo_claim")) {
     return `${prefix}${common}${evidenceSentence} The previous answer incorrectly claimed evidence was missing even though compact evidence exists.`;

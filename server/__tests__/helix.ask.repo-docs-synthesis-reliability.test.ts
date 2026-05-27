@@ -145,6 +145,61 @@ describe("repo/docs synthesis reliability", () => {
     expect(gate.violations).toEqual([]);
   });
 
+  it("accepts substantive Dottie prose even when compact source refs are multiline", () => {
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId,
+      promptText: "What is Auntie Dottie in this app?",
+      routeFamily: "repo_evidence",
+      artifactLedger: ledger,
+    });
+    const answerText = [
+      "Auntie Dottie in this app is a Dottie/Situation Room observer preset for public commentary and evidence. The repo evidence shows that it is meant to watch selected public streams, produce commentary artifacts under policy, and keep voice delivery on the proposal/confirmation path rather than treating speech or receipts as final-answer authority.",
+      "",
+      "Sources:",
+      "- shared/helix-dottie-manifest-preset.ts:111",
+      "- shared/helix-dottie-manifest-preset.ts:114",
+      "- shared/workstation-dynamic-tools.ts:142",
+      "- docs/helix-ask-agent-policy.md:32",
+    ].join("\n");
+    const payload = {
+      repo_docs_synthesis_packet: packet,
+      repo_code_evidence_answer: {
+        schema: "helix.repo_code_evidence_answer.v1",
+        support_refs: packet.compact_evidence.map((entry) => entry.ref),
+        model_authored: true,
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        synthesis_attempt_ref: `${turnId}:repo_evidence_synthesis_attempt`,
+      },
+      final_answer_draft: {
+        authority: "llm_post_observation_composer",
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        artifact_refs: packet.compact_evidence.map((entry) => entry.ref),
+      },
+      current_turn_artifact_ledger: [
+        ...ledger,
+        {
+          artifact_id: `${turnId}:repo_evidence_synthesis_attempt`,
+          kind: "repo_evidence_synthesis_attempt",
+          payload: {
+            schema: "helix.repo_evidence_synthesis_attempt.v1",
+            model_step_capability: "model.synthesize_from_repo_evidence",
+          },
+        },
+      ],
+    };
+
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: "candidate:dottie-prose-with-sources",
+      answerText,
+      payload,
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).not.toContain("excerpt_like_answer");
+    expect(gate.violations).not.toContain("file_list_only");
+  });
+
   it("keeps file inventories and no-evidence refusals from passing the quality gate", () => {
     const packet = buildRepoDocsSynthesisPacket({
       turnId,
@@ -185,6 +240,17 @@ describe("repo/docs synthesis reliability", () => {
       answerText: "shared/helix-dottie-manifest-preset.ts\nserver/services/situation-room/dottie-manifest-preset.ts",
       payload,
     });
+    const sourceOnly = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: "candidate:source-only",
+      answerText: [
+        "Sources:",
+        "- shared/helix-dottie-manifest-preset.ts:111",
+        "- shared/helix-dottie-manifest-preset.ts:114",
+        "- server/services/situation-room/dottie-manifest-preset.ts:22",
+      ].join("\n"),
+      payload,
+    });
     const refusal = evaluateRepoAnswerTextQualityGate({
       turnId,
       answerRef: "candidate:refusal",
@@ -193,6 +259,7 @@ describe("repo/docs synthesis reliability", () => {
     });
 
     expect(fileList.violations).toContain("file_list_only");
+    expect(sourceOnly.violations).toContain("excerpt_like_answer");
     expect(refusal.violations).toContain("unsupported_repo_claim");
   });
 
@@ -276,6 +343,8 @@ describe("repo/docs synthesis reliability", () => {
     expect(status).toBe("excerpt_like");
     expect(instruction).toMatch(/previous answer was excerpt-like or file-list-like/i);
     expect(instruction).toMatch(/compact evidence refs/i);
+    expect(instruction).toMatch(/Do not put each source on its own bullet line/i);
+    expect(instruction).toMatch(/Auntie Dottie/i);
     expect(errorCode).toBe("repo_docs_synthesis_file_inventory_after_repair");
   });
 

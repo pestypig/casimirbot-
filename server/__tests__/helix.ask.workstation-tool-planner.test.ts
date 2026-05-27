@@ -420,6 +420,22 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("routes Dottie read-aloud requests to voice proposal planning with missing source input", () => {
+    const plan = planWorkstationToolUse(
+      "Have Dottie read that out loud.",
+      { threadId: "thread:dottie-voice", turnId: "turn:dottie-voice" },
+    );
+
+    expect(plan.intent).toBe("dottie_observer");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toContain("source_event_id");
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toContain(
+      "situation-room-pipelines.voice_delivery.propose_from_trace",
+    );
+    expect(plan.action).toBeNull();
+    expect(plan.scores.some((score) => score.action_id === "voice_delivery.propose_from_trace")).toBe(true);
+  });
+
   it("does not turn contextual Dottie debugging into observer actions", () => {
     const plan = planWorkstationToolUse(
       "What can you infer from this Dottie run and what should the next patches be?",

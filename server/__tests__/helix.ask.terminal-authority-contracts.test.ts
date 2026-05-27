@@ -199,6 +199,41 @@ describe("Helix Ask terminal authority contracts", () => {
     expect((payload.debug as Record<string, unknown>).typed_failure).toBeUndefined();
   });
 
+  it("promotes pending request-user-input over stale terminal-boundary typed failure", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:pending-input-over-failure",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "terminal_boundary_ineligible",
+      final_status: "pending_input",
+      response_type: "pending_input",
+      pending_server_request: {
+        schema: "helix.request_user_input.v1",
+        prompt: "I can prepare Dottie voice output, but I need the source event or text and your confirmation before speaking.",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "needs_user_input",
+        next_decision: "request_user_input",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(envelope.terminal_artifact_kind).toBe("request_user_input");
+    expect(envelope.final_answer_source).toBe("request_user_input");
+    expect(envelope.terminal_kind).toBe("request_user_input");
+    expect(envelope.terminal_text).toMatch(/need the source event or text/i);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.terminal_request_user_input_promotion).toMatchObject({
+      applied: true,
+      prior_terminal_artifact_kind: "typed_failure",
+      prior_terminal_error_code: "terminal_boundary_ineligible",
+    });
+    allTerminalSurfacesEqual(payload);
+  });
+
   it("does not promote unavailable placeholder text into a successful terminal answer", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:placeholder-success",

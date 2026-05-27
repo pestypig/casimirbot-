@@ -578,6 +578,9 @@ function isDottieObserverToolPrompt(prompt: string): boolean {
     /\boperator\s+command\b/i.test(prompt) ||
     /\brun\s+panel\s+action\b/i.test(prompt) ||
     /\b(?:go\s+into|enter|enable|turn\s+on)\s+(?:auntie\s+dottie|dottie)\s+(?:mode|watch|preset)\b/i.test(prompt) ||
+    /\b(?:have|ask|tell)\s+(?:auntie\s+)?dottie\b[\s\S]{0,120}\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|out\s*loud|outloud|aloud|to\s+me)\b/i.test(prompt) ||
+    /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|out\s*loud|outloud|aloud|to\s+me)\b/i.test(prompt) ||
+    /\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|out\s*loud|outloud|aloud|to\s+me)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie)\b/i.test(prompt) ||
     /\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|set\s+up|start|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(prompt) ||
     /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|watch|witness|preset|mode)\b/i.test(prompt);
   if (!affirmativeCommand) return false;
@@ -657,7 +660,7 @@ export function planWorkstationToolUse(
       /\b(?:dottie\.manifest|manifest|materiali[sz]e|create|start|set\s+up|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie)\b/i.test(normalized) ||
       /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|preset|mode)\b/i.test(normalized);
     const wantsAttach = /\b(?:observer\.attach|attach|watch|witness|set\s+up|start|add)\b/i.test(normalized);
-    const wantsVoiceProposal = /\b(?:voice_delivery\.propose_from_trace|voice\s+delivery|propose|prepare|callout|speak)\b/i.test(normalized);
+    const wantsVoiceProposal = /\b(?:voice_delivery\.propose_from_trace|voice\s+delivery|propose|prepare|callout|speak|read|say|narrate|out\s*loud|outloud|aloud)\b/i.test(normalized);
     const wantsQuery =
       /\b(?:observer\.query|query|show|list)\b/i.test(normalized) ||
       /\bthen\s+(?:query|show|list)\b/i.test(normalized);
@@ -773,15 +776,25 @@ export function planWorkstationToolUse(
     pushScore({
       affordance_id: wantsManifest
         ? "situation-room-pipelines.dottie.manifest"
-        : "situation-room-pipelines.observer.attach",
+        : wantsVoiceProposal
+          ? "situation-room-pipelines.voice_delivery.propose_from_trace"
+          : "situation-room-pipelines.observer.attach",
       panel_id: "situation-room-pipelines",
-      action_id: wantsManifest ? "dottie.manifest" : "observer.attach",
+      action_id: wantsManifest
+        ? "dottie.manifest"
+        : wantsVoiceProposal
+          ? "voice_delivery.propose_from_trace"
+          : "observer.attach",
       score: missing.length === 0 ? 0.94 : 0.64,
       reason: missing.length === 0
         ? wantsManifest
           ? "explicit Dottie manifest command can create the witness-only preset"
-          : "explicit Dottie observer command includes required public trace targets"
-        : "explicit Dottie observer command is missing required target/source arguments",
+          : wantsVoiceProposal
+            ? "explicit Dottie voice request includes required public trace source"
+            : "explicit Dottie observer command includes required public trace targets"
+        : wantsVoiceProposal
+          ? "explicit Dottie voice request is missing the required source event or source text"
+          : "explicit Dottie observer command is missing required target/source arguments",
       required_args_missing: missing,
     });
     const toolPlan = buildToolPlan({
@@ -797,7 +810,9 @@ export function planWorkstationToolUse(
       tool_plan: toolPlan,
       scores,
       should_use_tool: true,
-      reason: "Prompt explicitly asks Situation Room to attach or inspect Dottie as a witness-only observer.",
+      reason: wantsVoiceProposal
+        ? "Prompt explicitly asks Situation Room to prepare Dottie voice output from a trace source."
+        : "Prompt explicitly asks Situation Room to attach or inspect Dottie as a witness-only observer.",
       missing_required_args: missing,
     };
   }

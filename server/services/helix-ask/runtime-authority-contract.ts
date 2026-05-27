@@ -1,3 +1,5 @@
+import { buildPostToolAuthorityBridge } from "./post-tool-authority-bridge";
+
 export type HelixRuntimeAuthoritySeverity = "pass" | "p0" | "p1" | "p2";
 
 export type HelixRuntimeAuthorityBoundaryReport = {
@@ -466,12 +468,24 @@ export function hasPostObservationModelDecision(payload: Record<string, unknown>
     return true;
   }
   const artifacts = readArray(payload.current_turn_artifact_ledger);
-  return artifacts.some((artifact) => {
+  if (artifacts.some((artifact) => {
     const record = readRecord(artifact);
     const kind = readString(record?.kind);
     const payloadRecord = readRecord(record?.payload);
     return kind === "post_tool_observation_review" || readString(payloadRecord?.schema) === "helix.post_tool_observation_review.v1";
-  });
+  })) {
+    return true;
+  }
+  const bridge = readRecord(payload.post_tool_authority_bridge);
+  if (
+    readString(bridge?.schema) === "helix.post_tool_authority_bridge.v1" &&
+    readString(bridge?.observation_support_status) === "supports_answer" &&
+    readArray(bridge?.tool_observation_refs).length > 0 &&
+    readArray(bridge?.answer_draft_refs).length > 0
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function hasDirectAnswerDraft(payload: Record<string, unknown>): boolean {
@@ -502,6 +516,21 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   const terminalKind = readString(payload.terminal_artifact_kind);
   if (terminalKind === "typed_failure") return hasCleanTypedFailure(payload);
   if (satisfaction === "satisfied" && (!nextDecision || nextDecision === "allow_terminal")) return true;
+  const bridge = readRecord(payload.post_tool_authority_bridge);
+  if (
+    terminalKind === "model_synthesized_answer" &&
+    readString(bridge?.schema) === "helix.post_tool_authority_bridge.v1" &&
+    readString(bridge?.observation_support_status) === "supports_answer"
+  ) {
+    return true;
+  }
+  if (
+    terminalKind === "request_user_input" &&
+    readString(bridge?.schema) === "helix.post_tool_authority_bridge.v1" &&
+    readString(bridge?.observation_support_status) === "supports_request_user_input"
+  ) {
+    return true;
+  }
   if (readString(goalSatisfaction?.terminal_kind) === "final_answer" && goalSatisfaction?.satisfied === true) return true;
   return false;
 }
@@ -517,6 +546,10 @@ export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean 
 }
 
 export function evaluateTerminalBoundaryEligibility(payload: Record<string, unknown>): HelixRuntimeAuthorityBoundaryReport {
+  if (!readRecord(payload.post_tool_authority_bridge)) {
+    const turnId = readString(payload.turn_id) ?? readString(readRecord(payload.canonical_goal_frame)?.turn_id) ?? "unknown";
+    payload.post_tool_authority_bridge = buildPostToolAuthorityBridge({ turnId, payload }) as unknown as Record<string, unknown>;
+  }
   const sourceCapabilityDiagnosticTurn = isSourceCapabilityDiagnosticTurn(payload);
   const modelDirectAnswerTurn = isModelDirectAnswerTurn(payload);
   const runtimeBoundTurn = sourceCapabilityDiagnosticTurn || modelDirectAnswerTurn;
