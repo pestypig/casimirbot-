@@ -23,6 +23,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.query_navigation_state", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_source_health", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_constructs", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.query_job_evidence", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.request_probe", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.spawn_field_worker", requires_user_confirmation: false, can_run_automatically: false },
   { tool_id: "live_env.record_commentary", requires_user_confirmation: false, can_run_automatically: true },

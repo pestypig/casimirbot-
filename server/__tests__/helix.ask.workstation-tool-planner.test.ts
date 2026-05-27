@@ -400,6 +400,26 @@ describe("Helix Ask workstation tool planner", () => {
     ]);
   });
 
+  it("routes Auntie Dottie mode requests as Situation Room manifest setup", () => {
+    const plan = planWorkstationToolUse(
+      "Go into Auntie Dottie mode while I play Minecraft.",
+      { threadId: "thread:dottie-mode", turnId: "turn:dottie-mode" },
+    );
+
+    expect(plan.intent).toBe("dottie_observer");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.action).toEqual({
+      panel_id: "situation-room-pipelines",
+      action_id: "dottie.manifest",
+      args: expect.objectContaining({
+        thread_id: "thread:dottie-mode",
+        observer_profile: "auntie_dottie",
+        objective: "Manifest Auntie Dottie as a witness-only Situation Room observer preset.",
+      }),
+    });
+  });
+
   it("does not turn contextual Dottie debugging into observer actions", () => {
     const plan = planWorkstationToolUse(
       "What can you infer from this Dottie run and what should the next patches be?",

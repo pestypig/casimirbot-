@@ -42,12 +42,14 @@ const boundaryCallPattern =
 
 const approvedTerminalBoundaryFiles = new Set([
   "server/services/helix-ask/terminal-answer-envelope.ts",
+  "server/services/helix-ask/terminal-authority-single-writer.ts",
   "server/services/helix-ask/runtime-authority-contract.ts",
   "server/services/helix-ask/turn-terminal-authority.ts",
 ]);
 
 const approvedAuditFiles = new Set([
   "scripts/helix-ask-runtime-authority-audit.ts",
+  "scripts/helix-ask-terminal-writer-audit.ts",
   "scripts/helix-ask-discipline-check.ts",
 ]);
 

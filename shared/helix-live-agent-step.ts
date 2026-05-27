@@ -14,6 +14,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_navigation_state"
   | "live_env.query_source_health"
   | "live_env.query_constructs"
+  | "live_env.query_job_evidence"
   | "live_env.request_probe"
   | "live_env.spawn_field_worker"
   | "live_env.record_commentary"

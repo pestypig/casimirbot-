@@ -24,6 +24,7 @@ import {
 } from "../situation-room/live-situation-run-store";
 import { registerFieldWorkersForSituationRun } from "../situation-room/live-field-worker-registry";
 import { listSituationConstructs } from "../situation-room/situation-construct-store";
+import { queryLiveAnswersEvidence } from "../live-answers/live-answers-evidence-index";
 
 type ExecuteLiveEnvironmentToolInput = {
   tool_name: HelixLiveEnvironmentToolName;
@@ -360,6 +361,24 @@ export function executeLiveEnvironmentTool(
         ...construct.commentary_refs,
         ...construct.evidence_refs,
       ]),
+    });
+  }
+
+  if (input.tool_name === "live_env.query_job_evidence") {
+    const result = queryLiveAnswersEvidence({
+      query: readString(args.query),
+      contractId: readString(args.contract_id),
+      threadId: input.thread_id,
+      limit: readNumber(args.limit, 50),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Retrieved live job evidence with ${result.evidence_refs.length} evidence ref(s).`,
+      observation: result,
+      evidenceRefs: result.evidence_refs,
     });
   }
 

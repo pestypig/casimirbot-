@@ -226,6 +226,11 @@ export function resolveHelixVisibleTerminal(
   const record = readRecord(value);
   const debug = readRecord(record?.debug);
   const agentLoop = readRecord(record?.agent_runtime_loop ?? debug?.agent_runtime_loop ?? record?.agent_loop_audit ?? debug?.agent_loop_audit);
+  const singleWriter = firstRecord(
+    record?.terminal_authority_single_writer,
+    debug?.terminal_authority_single_writer,
+    agentLoop?.terminal_authority_single_writer,
+  );
   const envelope = firstRecord(record?.terminal_answer_envelope, debug?.terminal_answer_envelope, agentLoop?.terminal_answer_envelope);
   const authority = firstRecord(record?.terminal_answer_authority, debug?.terminal_answer_authority, agentLoop?.terminal_answer_authority);
   const presentation = firstRecord(record?.terminal_presentation, debug?.terminal_presentation, agentLoop?.terminal_presentation);
@@ -246,6 +251,21 @@ export function resolveHelixVisibleTerminal(
   const finalAnswerSource =
     firstText(envelope?.final_answer_source, authority?.final_answer_source, record?.final_answer_source, debug?.final_answer_source) ||
     (terminalErrorCode ? "typed_failure" : null);
+
+  const singleWriterText = firstText(singleWriter?.visible_text);
+  const singleWriterIntegrity = readRecord(singleWriter?.integrity);
+  if (singleWriterText && singleWriterIntegrity?.single_writer_applied === true) {
+    return {
+      text: singleWriterText,
+      source: "terminal_authority_single_writer",
+      backendTerminalText: singleWriterText,
+      terminalKind,
+      finalAnswerSource,
+      terminalErrorCode,
+      authorityVerified: Boolean(authority?.server_authoritative === true),
+      usedLegacyShadow: false,
+    };
+  }
 
   const envelopeText = firstText(envelope?.terminal_text);
   if (envelopeText) {

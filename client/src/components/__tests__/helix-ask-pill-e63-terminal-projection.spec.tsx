@@ -124,6 +124,32 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(chooseVisibleFinalText(reply as never)).toBe("authoritative envelope answer");
   });
 
+  it("prefers terminal single-writer text over stale selected_final_answer", () => {
+    const reply = {
+      id: "turn-e63-single-writer",
+      turn_id: "turn-e63-single-writer",
+      content: "stale content",
+      selected_final_answer: "Failed to execute docs-viewer.open (workspace_step_failed).",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        visible_text: "docs-viewer has been successfully opened.",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+        integrity: {
+          single_writer_applied: true,
+          stale_failure_visible: false,
+          receipt_visible_as_answer: false,
+        },
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: "docs-viewer has been successfully opened.",
+      },
+    };
+
+    expect(chooseVisibleFinalText(reply as never)).toBe("docs-viewer has been successfully opened.");
+  });
+
   it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {
     const reply = {
       id: "turn-e63-source-no-authority",

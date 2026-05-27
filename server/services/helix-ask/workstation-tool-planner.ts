@@ -577,8 +577,9 @@ function isDottieObserverToolPrompt(prompt: string): boolean {
   const affirmativeCommand =
     /\boperator\s+command\b/i.test(prompt) ||
     /\brun\s+panel\s+action\b/i.test(prompt) ||
+    /\b(?:go\s+into|enter|enable|turn\s+on)\s+(?:auntie\s+dottie|dottie)\s+(?:mode|watch|preset)\b/i.test(prompt) ||
     /\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|set\s+up|start|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b/i.test(prompt) ||
-    /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|watch|witness|preset)\b/i.test(prompt);
+    /\b(?:auntie\s+dottie|dottie|observer|voice\s+delivery|voice_delivery)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|watch|witness|preset|mode)\b/i.test(prompt);
   if (!affirmativeCommand) return false;
   const negatedCommand =
     /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to)\s+(?:manifest|materiali[sz]e|attach|detach|query|show|list|propose|prepare|create|add|run)\b/i.test(prompt) ||
@@ -652,8 +653,9 @@ export function planWorkstationToolUse(
     const voiceMode = extractDottieVoiceMode(normalized);
     const maxChars = extractDottieMaxChars(normalized);
     const wantsManifest =
+      /\b(?:go\s+into|enter|enable|turn\s+on)\s+(?:auntie\s+dottie|dottie)\s+(?:mode|watch|preset)\b/i.test(normalized) ||
       /\b(?:dottie\.manifest|manifest|materiali[sz]e|create|start|set\s+up|build)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie)\b/i.test(normalized) ||
-      /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|preset)\b/i.test(normalized);
+      /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:manifest|materiali[sz]e|preset|mode)\b/i.test(normalized);
     const wantsAttach = /\b(?:observer\.attach|attach|watch|witness|set\s+up|start|add)\b/i.test(normalized);
     const wantsVoiceProposal = /\b(?:voice_delivery\.propose_from_trace|voice\s+delivery|propose|prepare|callout|speak)\b/i.test(normalized);
     const wantsQuery =

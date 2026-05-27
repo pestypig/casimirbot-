@@ -161,8 +161,8 @@ export function planSituationRoomLiveJobSetup(input: {
       cadence: "event_driven",
       suppress_until_trigger: true,
       trigger_rules: selectedRecipe === "auntie_dottie_minecraft_watch"
-        ? ["confirmed_route_drift", "missing_required_source", "direct_question"]
-        : ["source_available", "translation_segment_ready", "direct_question"],
+        ? ["route_drift_confirmed", "required_source_stale", "required_source_missing", "direct_address_detected"]
+        : ["source_available", "translation_segment_ready", "direct_address_detected"],
       stop_conditions: ["user_stops_job", "source_detached", "operating_prompt_replaced"],
     },
     source_requirements: requiredSources,
