@@ -9193,6 +9193,16 @@ type ReasoningTheaterFrontierParticleNode = {
   baseRadiusPx: number;
 };
 
+type ReasoningTheaterFloatingActionText = {
+  id: string;
+  text: string;
+  tone: "gain" | "loss" | "tool" | "gate" | "steady";
+  leftPct: number;
+  driftPx: number;
+  yPx: number;
+  durationMs: number;
+};
+
 const REASONING_THEATER_STANCE_META: Record<
   ReasoningTheaterStance,
   { badge: string; bar: string; label: string }
@@ -9530,6 +9540,59 @@ function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgent
         meta: [timestamp, duration].filter(Boolean).join(" / "),
       };
     });
+}
+
+function buildReasoningTheaterFloatingActionText(input: {
+  id: string;
+  frontierAction: ReasoningTheaterFrontierAction;
+  frontierDeltaPct: number;
+  meterPct: number;
+  latestLiveEvent: AskLiveAgenticEventRow | null;
+  seed: number;
+}): ReasoningTheaterFloatingActionText {
+  const magnitude = Math.max(1, Math.round(Math.abs(input.frontierDeltaPct)));
+  const eventLabel = input.latestLiveEvent?.label ?? "Working";
+  let text = "";
+  let tone: ReasoningTheaterFloatingActionText["tone"] = "steady";
+  if (input.frontierAction === "large_gain" || input.frontierAction === "small_gain") {
+    text = `+${magnitude} clarity`;
+    tone = "gain";
+  } else if (
+    input.frontierAction === "large_loss" ||
+    input.frontierAction === "small_loss" ||
+    input.frontierAction === "hard_drop"
+  ) {
+    text = `-${magnitude} pressure`;
+    tone = "loss";
+  } else if (eventLabel === "Observation") {
+    text = "tool";
+    tone = "tool";
+  } else if (eventLabel === "Decision" || eventLabel === "Final") {
+    text = eventLabel === "Final" ? "settle" : "choose";
+    tone = "gate";
+  } else {
+    text = "hold";
+  }
+  const seedJitter = ((input.seed % 23) - 11) * 0.9;
+  return {
+    id: input.id,
+    text,
+    tone,
+    leftPct: clampNumber(input.meterPct + seedJitter, 5, 95),
+    driftPx: ((input.seed >>> 3) % 15) - 7,
+    yPx: -18 - ((input.seed >>> 7) % 12),
+    durationMs: 1180 + ((input.seed >>> 11) % 360),
+  };
+}
+
+function reasoningTheaterFloatingActionTextClassName(
+  tone: ReasoningTheaterFloatingActionText["tone"],
+): string {
+  if (tone === "gain") return "border-emerald-200/35 bg-emerald-300/10 text-emerald-100";
+  if (tone === "loss") return "border-rose-200/35 bg-rose-300/10 text-rose-100";
+  if (tone === "tool") return "border-cyan-200/35 bg-cyan-300/10 text-cyan-100";
+  if (tone === "gate") return "border-violet-200/35 bg-violet-300/10 text-violet-100";
+  return "border-slate-200/25 bg-white/5 text-slate-200";
 }
 
 function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
@@ -11799,6 +11862,11 @@ const REASONING_THEATER_SUPPRESSION_REASON_SET = new Set<ReasoningTheaterSuppres
   "agi_overload_admission_control",
 ]);
 
+export type ReasoningTheaterHardFailureSignals = {
+  failed: boolean;
+  reasons: string[];
+};
+
 function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheaterStateV1 | null {
   const record = asObjectRecord(value);
   if (!record) return null;
@@ -11813,6 +11881,172 @@ function coerceReasoningTheaterStateV1(value: unknown): HelixAskReasoningTheater
   const stance = String(record.stance ?? "").trim() as ReasoningTheaterStance;
   if (!(stance in REASONING_THEATER_STANCE_META)) return null;
   return record as unknown as HelixAskReasoningTheaterStateV1;
+}
+
+function pushReasoningTheaterHardFailureReason(reasons: string[], reason: string | null | undefined): void {
+  const normalized = (reason ?? "").trim();
+  if (!normalized || reasons.includes(normalized)) return;
+  reasons.push(normalized);
+}
+
+function collectReasoningTheaterAuditFailureReasons(
+  record: Record<string, unknown>,
+  key: string,
+  reasons: string[],
+): void {
+  const audit = asObjectRecord(record[key]);
+  if (!audit) return;
+  if (audit.ok === false) {
+    pushReasoningTheaterHardFailureReason(reasons, `${key}.ok_false`);
+  }
+  const violations = Array.isArray(audit.violations) ? audit.violations : [];
+  for (const violation of violations) {
+    const violationRecord = asObjectRecord(violation);
+    if (!violationRecord) continue;
+    const kind = coerceText(violationRecord.kind).trim();
+    const summary = coerceText(violationRecord.summary).trim();
+    pushReasoningTheaterHardFailureReason(reasons, kind || summary || `${key}.violation`);
+  }
+}
+
+function collectReasoningTheaterHardFailureReasonsFromRecord(
+  record: Record<string, unknown>,
+  reasons: string[],
+): void {
+  collectReasoningTheaterAuditFailureReasons(record, "poison_audit", reasons);
+  collectReasoningTheaterAuditFailureReasons(record, "prompt_poison_audit", reasons);
+
+  const visibleProjectionInvariant = asObjectRecord(record.visible_projection_invariant);
+  const visibleProjectionViolations = Array.isArray(visibleProjectionInvariant?.violations)
+    ? visibleProjectionInvariant.violations
+    : [];
+  for (const violation of visibleProjectionViolations) {
+    const text = coerceText(violation).trim();
+    pushReasoningTheaterHardFailureReason(reasons, text || "visible_projection_invariant.violation");
+  }
+
+  const resolvedTurnSummary = asObjectRecord(record.resolved_turn_summary);
+  const terminalErrorCode = coerceText(resolvedTurnSummary?.terminal_error_code ?? record.terminal_error_code).trim();
+  if (terminalErrorCode) {
+    pushReasoningTheaterHardFailureReason(reasons, terminalErrorCode);
+  }
+  const resolvedFinalStatus = coerceText(resolvedTurnSummary?.final_status).trim();
+  if (/^(failed|error|fail_closed)$/i.test(resolvedFinalStatus)) {
+    pushReasoningTheaterHardFailureReason(reasons, `resolved_turn_summary.${resolvedFinalStatus}`);
+  }
+
+  const observationReview = asObjectRecord(record.observation_review);
+  const reviewNextAction = coerceText(observationReview?.runtime_next_action ?? observationReview?.next_action).trim();
+  if (/^fail_closed$/i.test(reviewNextAction)) {
+    pushReasoningTheaterHardFailureReason(reasons, "observation_review.fail_closed");
+  }
+  const reviewReason = [
+    observationReview?.reason,
+    observationReview?.missing_piece,
+    observationReview?.observed_artifact_kind,
+  ]
+    .map((value) => coerceText(value).trim())
+    .filter(Boolean)
+    .join(" ");
+  if (/\b(direct_answer_unavailable|terminal_error|contract|forbidden|poison|fail_closed)\b/i.test(reviewReason)) {
+    pushReasoningTheaterHardFailureReason(reasons, reviewReason);
+  }
+
+  const routeHistoryDebug = asObjectRecord(record.route_history_debug);
+  const terminalRoute = coerceText(routeHistoryDebug?.terminal_route).trim();
+  if (/\b(typed_failure|direct_answer_unavailable|forbidden|fail_closed)\b/i.test(terminalRoute)) {
+    pushReasoningTheaterHardFailureReason(reasons, terminalRoute);
+  }
+
+  const currentTurnEvents = Array.isArray(record.current_turn_events) ? record.current_turn_events : [];
+  for (const event of currentTurnEvents) {
+    const eventRecord = asObjectRecord(event);
+    if (!eventRecord) continue;
+    const type = coerceText(eventRecord.type).trim();
+    const status = coerceText(eventRecord.status).trim();
+    const errorCode = coerceText(eventRecord.error_code).trim();
+    const reason = coerceText(eventRecord.reason).trim();
+    if (
+      /^(failed|error|fail_closed|blocked)$/i.test(status) &&
+      /\b(turn_completed|terminal|final|authority|audit)\b/i.test(type)
+    ) {
+      pushReasoningTheaterHardFailureReason(reasons, `event.${type || "unknown"}.${status}`);
+    }
+    if (/\b(direct_answer_unavailable|terminal_error|contract|forbidden|poison|fail_closed)\b/i.test(`${errorCode} ${reason}`)) {
+      pushReasoningTheaterHardFailureReason(reasons, `${type || "event"} ${errorCode || reason}`.trim());
+    }
+  }
+}
+
+export function readReasoningTheaterHardFailureSignals(
+  debug: unknown,
+  askLiveEvents: readonly unknown[] = [],
+): ReasoningTheaterHardFailureSignals {
+  const reasons: string[] = [];
+  const debugRecord = asObjectRecord(debug);
+  if (debugRecord) {
+    collectReasoningTheaterHardFailureReasonsFromRecord(debugRecord, reasons);
+  }
+  for (const event of askLiveEvents) {
+    const eventRecord = asObjectRecord(event);
+    if (!eventRecord) continue;
+    const eventText = [
+      eventRecord.type,
+      eventRecord.status,
+      eventRecord.text,
+      eventRecord.reason,
+      eventRecord.error_code,
+    ]
+      .map((value) => coerceText(value).trim())
+      .filter(Boolean)
+      .join(" ");
+    if (/\b(terminal_artifact_forbidden_by_route_contract|direct_answer_unavailable|fail_closed|poison_audit|turn_completed failed)\b/i.test(eventText)) {
+      pushReasoningTheaterHardFailureReason(reasons, eventText);
+    }
+    const eventMeta = asObjectRecord(eventRecord.meta);
+    if (eventMeta) {
+      collectReasoningTheaterHardFailureReasonsFromRecord(eventMeta, reasons);
+    }
+  }
+  return {
+    failed: reasons.length > 0,
+    reasons: reasons.slice(0, 8),
+  };
+}
+
+function resolveReasoningTheaterFailureOverrideArchetype(
+  signals: ReasoningTheaterHardFailureSignals,
+): ReasoningTheaterArchetype {
+  const reasonText = signals.reasons.join(" ").toLowerCase();
+  if (/\b(missing|unavailable|evidence)\b/.test(reasonText)) return "missing_evidence";
+  if (/\b(overload|rate|cooldown|admission)\b/.test(reasonText)) return "overload";
+  if (/\b(coverage|gap)\b/.test(reasonText)) return "coverage_gap";
+  return "contradiction";
+}
+
+function applyReasoningTheaterFailureOverride(
+  state: ReasoningTheaterState | null,
+  signals: ReasoningTheaterHardFailureSignals,
+): ReasoningTheaterState | null {
+  if (!state || !signals.failed) return state;
+  const battleIndex = Math.min(state.battleIndex, -0.72);
+  const momentum = Math.min(state.momentum, 0.18);
+  const ambiguityPressure = Math.max(state.ambiguityPressure, 0.88);
+  return {
+    ...state,
+    stance: "fail_closed",
+    archetype: resolveReasoningTheaterFailureOverrideArchetype(signals),
+    certaintyClass: "unknown",
+    suppressionReason: state.suppressionReason ?? "contract_violation",
+    momentum,
+    ambiguityPressure,
+    battleIndex,
+    pulseHz: 0.8 + 1.4 * clamp01(Math.abs(battleIndex)),
+    fogOpacity: clamp01(0.12 + 0.75 * ambiguityPressure),
+    particleCount: clampNumber(Math.round(6 + momentum * 16), 4, 24),
+    allText: `${state.allText} ${signals.reasons.join(" ")}`.trim().toLowerCase(),
+    symbolicLine: "Seal engaged: terminal audit/contract failure surfaced.",
+  };
 }
 
 function deriveReasoningTheaterStateFromCanonical(
@@ -14514,6 +14748,11 @@ export function HelixAskPill({
   const reasoningTheaterFrontierBurstRef = useRef<HTMLDivElement | null>(null);
   const reasoningTheaterFrontierPulseUntilMsRef = useRef(0);
   const reasoningTheaterFrontierDebugUpdateAtRef = useRef(0);
+  const reasoningTheaterFloatingTextTimersRef = useRef<Record<string, number>>({});
+  const reasoningTheaterFloatingTextLastTokenRef = useRef<string | null>(null);
+  const [reasoningTheaterFloatingActionTexts, setReasoningTheaterFloatingActionTexts] = useState<
+    ReasoningTheaterFloatingActionText[]
+  >([]);
   const convergenceStripHoldTimerRef = useRef<number | null>(null);
   const convergenceStripCollapseTimerRef = useRef<number | null>(null);
   const convergenceStripLastCommitTokenRef = useRef<string | null>(null);
@@ -14919,10 +15158,22 @@ export function HelixAskPill({
     reasoningTheaterMedalTimersRef.current = {};
   }, []);
 
+  const clearReasoningTheaterFloatingTextTimers = useCallback(() => {
+    if (typeof window === "undefined") return;
+    for (const timer of Object.values(reasoningTheaterFloatingTextTimersRef.current)) {
+      window.clearTimeout(timer);
+    }
+    reasoningTheaterFloatingTextTimersRef.current = {};
+  }, []);
+
   useEffect(() => () => clearMoodTimer(), [clearMoodTimer]);
   useEffect(() => () => cancelMoodHint(), [cancelMoodHint]);
   useEffect(() => () => clearLiveDraftFlush(), [clearLiveDraftFlush]);
   useEffect(() => () => clearReasoningTheaterMedalTimers(), [clearReasoningTheaterMedalTimers]);
+  useEffect(
+    () => () => clearReasoningTheaterFloatingTextTimers(),
+    [clearReasoningTheaterFloatingTextTimers],
+  );
   useEffect(() => {
     if (!askBusy) return;
     cancelMoodHint();
@@ -14968,23 +15219,34 @@ export function HelixAskPill({
     const latestReplyDebug = askReplies[askReplies.length - 1]?.debug;
     return coerceReasoningTheaterStateV1(latestReplyDebug?.reasoning_theater_state_v1);
   }, [askLiveEvents, askReplies]);
+  const reasoningTheaterHardFailureSignals = useMemo(
+    () =>
+      readReasoningTheaterHardFailureSignals(
+        latestAskReply?.debug ?? askReplies[askReplies.length - 1]?.debug,
+        askLiveEvents,
+      ),
+    [askLiveEvents, askReplies, latestAskReply],
+  );
   const reasoningTheater = useMemo(
     () => {
       if (!askBusy) return null;
+      let theaterState: ReasoningTheaterState | null = null;
       if (
         reasoningTheaterCanonicalState &&
         (!askLiveTraceId || reasoningTheaterCanonicalState.trace_id === askLiveTraceId)
       ) {
-        return deriveReasoningTheaterStateFromCanonical(reasoningTheaterCanonicalState);
+        theaterState = deriveReasoningTheaterStateFromCanonical(reasoningTheaterCanonicalState);
+      } else {
+        theaterState = deriveReasoningTheaterState({
+          askBusy,
+          askStatus,
+          askLiveDraft,
+          askElapsedMs,
+          askLiveEvents,
+          askLiveTraceId,
+        });
       }
-      return deriveReasoningTheaterState({
-        askBusy,
-        askStatus,
-        askLiveDraft,
-        askElapsedMs,
-        askLiveEvents,
-        askLiveTraceId,
-      });
+      return applyReasoningTheaterFailureOverride(theaterState, reasoningTheaterHardFailureSignals);
     },
     [
       askBusy,
@@ -14993,6 +15255,7 @@ export function HelixAskPill({
       askLiveEvents,
       askLiveTraceId,
       askStatus,
+      reasoningTheaterHardFailureSignals,
       reasoningTheaterCanonicalState,
     ],
   );
@@ -25776,6 +26039,50 @@ export function HelixAskPill({
     () => collectAskLiveFallbackSignals(askLiveEvents),
     [askLiveEvents],
   );
+  useEffect(() => {
+    if (!askBusy || !reasoningTheater) {
+      clearReasoningTheaterFloatingTextTimers();
+      reasoningTheaterFloatingTextLastTokenRef.current = null;
+      setReasoningTheaterFloatingActionTexts([]);
+      return;
+    }
+    const action = reasoningTheaterFrontierDebug.action;
+    const delta = reasoningTheaterFrontierDebug.deltaPct;
+    const latestEventKey = askLiveLatestAgenticEvent?.key ?? "none";
+    const shouldEmit =
+      action !== "steady" ||
+      askLiveLatestAgenticEvent?.label === "Observation" ||
+      askLiveLatestAgenticEvent?.label === "Decision" ||
+      askLiveLatestAgenticEvent?.label === "Final";
+    if (!shouldEmit) return;
+    const token = `${action}:${Math.round(delta * 10)}:${latestEventKey}`;
+    if (token === reasoningTheaterFloatingTextLastTokenRef.current) return;
+    reasoningTheaterFloatingTextLastTokenRef.current = token;
+    const id = `reasoning-pop-${Date.now()}-${hash32(token)}`;
+    const pop = buildReasoningTheaterFloatingActionText({
+      id,
+      frontierAction: action,
+      frontierDeltaPct: delta,
+      meterPct: reasoningTheaterMeterDisplayRef.current || reasoningTheaterMeterTarget,
+      latestLiveEvent: askLiveLatestAgenticEvent,
+      seed: hash32(`${token}:${reasoningTheater.seed}`),
+    });
+    setReasoningTheaterFloatingActionTexts((prev) => [...prev.slice(-3), pop]);
+    if (typeof window !== "undefined") {
+      reasoningTheaterFloatingTextTimersRef.current[id] = window.setTimeout(() => {
+        setReasoningTheaterFloatingActionTexts((prev) => prev.filter((entry) => entry.id !== id));
+        delete reasoningTheaterFloatingTextTimersRef.current[id];
+      }, pop.durationMs + 120);
+    }
+  }, [
+    askBusy,
+    askLiveLatestAgenticEvent,
+    clearReasoningTheaterFloatingTextTimers,
+    reasoningTheater,
+    reasoningTheaterFrontierDebug.action,
+    reasoningTheaterFrontierDebug.deltaPct,
+    reasoningTheaterMeterTarget,
+  ]);
   const observerLaneEvents = useMemo(() => {
     if (!askBusy) return [];
     const activeTraceId = (askLiveTraceId ?? "").trim();
@@ -29704,6 +30011,9 @@ export function HelixAskPill({
                 className={`pointer-events-none absolute inset-0 opacity-70 ${moodPalette.replyTint}`}
                 aria-hidden
               />
+              <style>
+                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}`}
+              </style>
               {reasoningTheater && mirekReasoningDisplayGrid ? (
                 <div
                   data-testid="helix-ask-mirek-field"
@@ -29928,6 +30238,23 @@ export function HelixAskPill({
                             </div>
                           </div>
                         ) : null}
+                        {reasoningTheaterFloatingActionTexts.map((pop) => (
+                          <span
+                            key={pop.id}
+                            data-testid="helix-ask-reasoning-floating-action-text"
+                            className={`pointer-events-none absolute top-1/2 z-[4] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningTheaterFloatingActionTextClassName(pop.tone)}`}
+                            style={
+                              {
+                                left: `${pop.leftPct}%`,
+                                animation: `helixReasoningFloatingText ${pop.durationMs}ms ease-out forwards`,
+                                "--helix-pop-drift": `${pop.driftPx}px`,
+                                "--helix-pop-y": `${pop.yPx}px`,
+                              } as React.CSSProperties & Record<string, string>
+                            }
+                          >
+                            {pop.text}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   </div>

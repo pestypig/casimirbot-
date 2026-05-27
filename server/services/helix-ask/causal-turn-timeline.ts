@@ -195,6 +195,10 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
   const finalDraftRef = latestArtifactRefByKind(payload, /final_answer_draft|helix\.final_answer_draft\.v1/);
   const toolObservationRefs = artifactRefsByKind(payload, /agent_step_observation_packet|workspace_action_receipt|workstation_tool_evaluation|tool_observation/);
   const repoEvidenceRefs = artifactRefsByKind(payload, /repo_code_evidence_observation|repo_search|repo_code/);
+  const repoDocsSynthesisPacketRef = latestArtifactRefByKind(payload, /repo_docs_synthesis_packet|helix\.repo_docs_synthesis_packet\.v1/);
+  const repoAnswerQualityGateRef = latestArtifactRefByKind(payload, /repo_answer_text_quality_gate|helix\.repo_answer_text_quality_gate\.v1/);
+  const repoRepairRef = latestArtifactRefByKind(payload, /repo_evidence_synthesis_repair_observation|repo_docs_synthesis_repair/);
+  const repoAnswerRef = latestArtifactRefByKind(payload, /repo_code_evidence_answer|helix\.repo_code_evidence_answer\.v1/);
   const modelStepSynthesizesRepoEvidence = Boolean(selectedCapability && /synthesize_from_repo_evidence/i.test(selectedCapability));
 
   factory.push({
@@ -250,6 +254,16 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
       input_refs: ["repo_code.search_concept", "current_turn_artifact_ledger"],
       output_refs: repoEvidenceRefs,
       status: "succeeded",
+    });
+  }
+  if (repoDocsSynthesisPacketRef || payload.repo_docs_synthesis_packet) {
+    factory.push({
+      stage: "repo_docs_synthesis_packet_created",
+      producer: "repo_retrieval",
+      input_refs: repoEvidenceRefs,
+      output_refs: [repoDocsSynthesisPacketRef ?? "repo_docs_synthesis_packet"],
+      status: "succeeded",
+      public_summary: "Repo/docs evidence was compacted into a model-facing synthesis packet.",
     });
   }
   if (agentStep) {
@@ -323,6 +337,29 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
       reason_code: readString(coverage.reason) ?? undefined,
     });
   }
+  if (payload.repo_answer_text_quality_gate || repoAnswerQualityGateRef) {
+    const repoGate = readRecord(payload.repo_answer_text_quality_gate);
+    const ok = repoGate?.ok === true;
+    factory.push({
+      stage: "quality_gate_evaluated",
+      producer: "quality_gate",
+      input_refs: [finalDraftRef, repoDocsSynthesisPacketRef, ...repoEvidenceRefs].filter((ref): ref is string => Boolean(ref)),
+      output_refs: [repoAnswerQualityGateRef ?? "repo_answer_text_quality_gate"],
+      decision: ok ? "PASS" : "FAIL_CLOSED",
+      status: ok ? "succeeded" : "blocked",
+      reason_code: readArray(repoGate?.violations).map(readString).filter(Boolean).join(",") || undefined,
+    });
+  }
+  if (repoRepairRef || payload.repo_evidence_synthesis_repair_observation) {
+    factory.push({
+      stage: "repo_docs_synthesis_repair_observation_created",
+      producer: "quality_gate",
+      input_refs: [repoAnswerQualityGateRef ?? "repo_answer_text_quality_gate"],
+      output_refs: [repoRepairRef ?? "repo_evidence_synthesis_repair_observation"],
+      status: "blocked",
+      public_summary: "Repo/docs synthesis failed quality checks and produced a targeted repair observation.",
+    });
+  }
   if (goal) {
     factory.push({
       stage: "goal_satisfaction_evaluated",
@@ -357,6 +394,16 @@ export function getHelixCausalTurnTimeline(payload: RecordLike): HelixCausalTurn
   const selectedRef = readString(terminalWriter?.selected_terminal_artifact_ref) ??
     (selectedKind === "direct_answer_text" ? directAnswerRef : selectedKind === "model_synthesized_answer" ? finalDraftRef : null);
   if (selectedKind) {
+    if (repoAnswerRef && selectedKind === "repo_code_evidence_answer") {
+      factory.push({
+        stage: "terminal_artifact_materialized",
+        producer: "terminal_authority",
+        input_refs: [finalDraftRef, repoAnswerQualityGateRef, repoDocsSynthesisPacketRef].filter((ref): ref is string => Boolean(ref)),
+        output_refs: [repoAnswerRef],
+        decision: "repo_code_evidence_answer",
+        status: "succeeded",
+      });
+    }
     factory.push({
       stage: "terminal_artifact_selected",
       producer: "terminal_authority",

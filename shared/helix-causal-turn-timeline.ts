@@ -33,6 +33,8 @@ export type HelixCausalTurnStage =
   | "runtime_tool_dispatched"
   | "tool_observation_created"
   | "repo_evidence_observation_created"
+  | "repo_docs_synthesis_packet_created"
+  | "repo_docs_synthesis_repair_observation_created"
   | "model_answer_artifact_created"
   | "coverage_gate_evaluated"
   | "quality_gate_evaluated"

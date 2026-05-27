@@ -82,6 +82,7 @@ let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/H
 let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
 let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
 let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPill").buildHelixCausalTurnTraceRows;
+let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -165,6 +166,7 @@ beforeAll(async () => {
     copyDebugPayloadToClipboard,
     buildHelixTurnTranscriptRows,
     buildHelixCausalTurnTraceRows,
+    readReasoningTheaterHardFailureSignals,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -375,6 +377,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Causal trace");
     expect(source).toContain("helix-ask-latest-causal-trace");
     expect(source).toContain("causal_turn_timeline");
+    expect(source).toContain("buildReasoningTheaterFloatingActionText");
+    expect(source).toContain("helix-ask-reasoning-floating-action-text");
+    expect(source).toContain("helixReasoningFloatingText");
+    expect(source).toContain("readReasoningTheaterHardFailureSignals");
+    expect(source).toContain("applyReasoningTheaterFailureOverride");
+    expect(source).toContain("terminal_artifact_forbidden_by_route_contract");
     expect(source).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
     expect(source).toContain("turn_transcript_events");
@@ -385,6 +393,42 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("stream_fallback_reason");
     expect(source).toContain("async_executor_used");
     expect(source).toContain("async_step_durations");
+  });
+
+  it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {
+    const signals = readReasoningTheaterHardFailureSignals(
+      {
+        resolved_turn_summary: {
+          final_status: "final_answer",
+          terminal_error_code: "direct_answer_unavailable",
+        },
+        observation_review: {
+          runtime_next_action: "fail_closed",
+          missing_piece: "direct_answer_unavailable",
+        },
+        poison_audit: {
+          ok: false,
+          violations: [
+            {
+              kind: "terminal_artifact_forbidden_by_route_contract",
+            },
+          ],
+        },
+        current_turn_events: [
+          {
+            type: "turn_completed",
+            status: "failed",
+          },
+        ],
+      },
+      [],
+    );
+
+    expect(signals.failed).toBe(true);
+    expect(signals.reasons).toContain("terminal_artifact_forbidden_by_route_contract");
+    expect(signals.reasons).toContain("direct_answer_unavailable");
+    expect(signals.reasons).toContain("observation_review.fail_closed");
+    expect(signals.reasons).toContain("event.turn_completed.failed");
   });
 
   it("prefers runtime loop events over stale procedural transcript events", () => {
