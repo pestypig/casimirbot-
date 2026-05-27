@@ -48,6 +48,26 @@ const isSituationRoomQuery = (queryTokens: Set<string>, exactTerms: string[]): b
   return /situation[\s_-]*room|situationroom|situation_context|situation-capture/.test(joined);
 };
 
+const isDottieQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /\bdottie\b|auntie\s+dottie|voice_delivery|observer\.(?:attach|query)|dottie[_-]?manifest/.test(joined);
+};
+
+const isRouteEvidenceQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /route[\s_-]*evidence|route[_-]?drift|field[_-]?worker|live[_-]?perturbation|query_navigation_state/.test(joined);
+};
+
+const isDocsPanelQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /docs?[\s_-]*(?:panel|viewer)|document\s+viewer|docviewerpanel/.test(joined);
+};
+
+const isTerminalAuthorityQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /terminal[\s_-]*authority|terminal[_-]?answer[_-]?authority|terminal-answer-envelope|runtime-authority-contract/.test(joined);
+};
+
 const scoreSituationRoomPath = (filePath: string, text: string): number => {
   let score = 0;
   if (/client\/src\/store\/usesituationroomstore\.ts$/.test(filePath)) score += 230;
@@ -64,6 +84,69 @@ const scoreSituationRoomPath = (filePath: string, text: string): number => {
   }
   if (/^\s*import\b/i.test(text) && !/\b(?:type|interface|class|function|const|enum|schema|createRoom|appendSituationEvent|attachDisplayAudioSource|SituationRoomSource)\b/i.test(text)) {
     score -= 45;
+  }
+  return score;
+};
+
+const scoreDottiePath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/shared\/helix-dottie-manifest-preset\.ts$/.test(filePath)) score += 230;
+  if (/server\/services\/situation-room\/dottie-manifest-preset\.ts$/.test(filePath)) score += 215;
+  if (/shared\/helix-agent-commentary\.ts$/.test(filePath)) score += 175;
+  if (/shared\/workstation-dynamic-tools\.ts$/.test(filePath)) score += 165;
+  if (/server\/services\/helix-ask\/workstation-tool-planner\.ts$/.test(filePath)) score += 150;
+  if (/server\/services\/helix-ask\/runtime-authority-contract\.ts$/.test(filePath)) score += 120;
+  if (/client\/src\/lib\/workstation\/panel(?:capabilities|actionadapters)\.ts$/.test(filePath)) score += 105;
+  if (/dottie|voice_delivery|observer/.test(filePath)) score += 95;
+  if (/\b(?:dottie\.manifest|dottie_manifest|auntie\s+dottie|observer\.attach|voice_delivery\.propose_from_trace)\b/i.test(text)) {
+    score += 85;
+  }
+  if (/server\/services\/helix-ask/.test(filePath) && !/dottie|observer|voice|workstation-tool-planner|runtime-authority/.test(filePath)) {
+    score -= 35;
+  }
+  return score;
+};
+
+const scoreRouteEvidencePath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/shared\/helix-situation-construct\.ts$/.test(filePath)) score += 220;
+  if (/shared\/situation-room-live-job-contract\.ts$/.test(filePath)) score += 205;
+  if (/server\/services\/situation-room\/situation-construct-recipe(?:-registry|-runner)?\.ts$/.test(filePath)) score += 180;
+  if (/server\/services\/helix-ask\/situation-room-live-job-setup-planner\.ts$/.test(filePath)) score += 165;
+  if (/client\/src\/components\/workstation\/situationroompipelinespanel\.tsx$/.test(filePath)) score += 145;
+  if (/client\/src\/lib\/workstation\/panelactionadapters\.ts$/.test(filePath)) score += 125;
+  if (/route[_-]?evidence|route[_-]?drift|field[_-]?worker|live[_-]?perturbation/.test(filePath)) score += 100;
+  if (/\b(?:route evidence|route_drift|missing_evidence|field_worker|live_env\.query_navigation_state)\b/i.test(text)) {
+    score += 85;
+  }
+  if (/server\/services\/helix-ask/.test(filePath) && !/situation|route|field|live/.test(filePath)) score -= 35;
+  return score;
+};
+
+const scoreDocsPanelPath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/client\/src\/components\/docviewerpanel\.tsx$/.test(filePath)) score += 230;
+  if (/client\/src\/lib\/docs\/docviewer\.ts$/.test(filePath)) score += 210;
+  if (/client\/src\/lib\/workstation\/panelcapabilities\.ts$/.test(filePath)) score += 175;
+  if (/client\/src\/lib\/workstation\/panelactionadapters\.ts$/.test(filePath)) score += 165;
+  if (/shared\/workstation-dynamic-tools\.ts$/.test(filePath)) score += 145;
+  if (/server\/services\/helix-ask\/(?:runtime-authority-contract|route-product-contract)\.ts$/.test(filePath)) score += 100;
+  if (/docs?-viewer|docviewer|doc_summary|doc_location/.test(filePath)) score += 95;
+  if (/\b(?:docs-viewer|DocViewerPanel|doc_summary|doc_location_matches|summarize_doc|locate_in_doc)\b/i.test(text)) {
+    score += 90;
+  }
+  return score;
+};
+
+const scoreTerminalAuthorityPath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/server\/services\/helix-ask\/terminal-answer-envelope\.ts$/.test(filePath)) score += 230;
+  if (/server\/services\/helix-ask\/runtime-authority-contract\.ts$/.test(filePath)) score += 220;
+  if (/server\/services\/helix-ask\/solver-controller-decision\.ts$/.test(filePath)) score += 165;
+  if (/server\/services\/helix-ask\/route-product-contract\.ts$/.test(filePath)) score += 155;
+  if (/shared\/helix.*terminal.*authority/.test(filePath)) score += 120;
+  if (/\b(?:terminal_answer_authority|terminal boundary|terminal authority|terminal_artifact_kind|final_answer_source)\b/i.test(text)) {
+    score += 95;
   }
   return score;
 };
@@ -87,6 +170,10 @@ const scoreHit = (
   const text = hit.text.toLowerCase();
   let score = 0;
   const situationRoomQuery = isSituationRoomQuery(queryTokens, exactTerms);
+  const dottieQuery = isDottieQuery(queryTokens, exactTerms);
+  const routeEvidenceQuery = isRouteEvidenceQuery(queryTokens, exactTerms);
+  const docsPanelQuery = isDocsPanelQuery(queryTokens, exactTerms);
+  const terminalAuthorityQuery = isTerminalAuthorityQuery(queryTokens, exactTerms);
   for (const term of exactTerms) {
     const normalizedTerm = term.toLowerCase();
     if (!normalizedTerm) continue;
@@ -110,6 +197,10 @@ const scoreHit = (
   if (/(?:^|\/)__tests__\/|(?:\.test|\.spec)\.[tj]sx?$/.test(filePath)) score += 35;
   if (/docs\//.test(filePath)) score += 25;
   if (situationRoomQuery) score += scoreSituationRoomPath(filePath, hit.text);
+  if (dottieQuery) score += scoreDottiePath(filePath, hit.text);
+  if (routeEvidenceQuery) score += scoreRouteEvidencePath(filePath, hit.text);
+  if (docsPanelQuery) score += scoreDocsPanelPath(filePath, hit.text);
+  if (terminalAuthorityQuery) score += scoreTerminalAuthorityPath(filePath, hit.text);
   if (GENERATED_OR_ARTIFACT_PATHS.some((pattern) => pattern.test(filePath))) score -= 40;
   if (INDEX_ONLY_PATHS.some((pattern) => pattern.test(filePath))) score -= 60;
   return score;

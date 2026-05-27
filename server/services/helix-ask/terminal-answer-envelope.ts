@@ -77,6 +77,11 @@ const isStaleRepoEvidenceTerminalText = (value: unknown): boolean => {
   return /\b(?:could not complete|could not answer|could not produce|terminal boundary blocked|source\/capability answer before the agent runtime loop|turn stopped before required artifacts|missing required artifacts|required artifacts (?:were|are) satisfied|repo_code_evidence_unavailable)\b/i.test(text);
 };
 
+const isUnavailableTerminalPlaceholderText = (value: unknown): boolean => {
+  const text = readString(value) ?? "";
+  return /\b(?:I could not produce a terminal answer for this turn|direct_answer_unavailable|model_only_answer_unavailable|repo_code_evidence_unavailable|could not produce a final answer|could not complete this turn)\b/i.test(text);
+};
+
 const isUnbackedRepoEvidenceTerminalText = (value: unknown): boolean => {
   const text = readString(value) ?? "";
   if (!text) return true;
@@ -322,6 +327,35 @@ function buildTerminalBoundaryFailureEnvelope(
   };
 }
 
+function buildUnavailableTerminalTextFailureEnvelope(
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): HelixTerminalAnswerEnvelope {
+  const terminalText = envelope.terminal_text || UNAVAILABLE_TERMINAL_TEXT;
+  payload.terminal_error_code = readString(payload.terminal_error_code) ?? "terminal_answer_unavailable";
+  payload.typed_failure = {
+    ...(readRecord(payload.typed_failure) ?? {}),
+    kind: "typed_failure",
+    error_code: payload.terminal_error_code,
+    text: terminalText,
+    answer_text: terminalText,
+    rejected_terminal_artifact_kind: envelope.terminal_artifact_kind,
+    rejected_final_answer_source: envelope.final_answer_source,
+    rejected_reason: "unavailable_terminal_placeholder_text",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    ...envelope,
+    terminal_artifact_kind: "typed_failure",
+    final_answer_source: "typed_failure",
+    terminal_text: terminalText,
+    terminal_text_hash: hashHelixTerminalText(terminalText),
+    terminal_kind: "failure",
+    authority_origin: "typed_failure",
+  };
+}
+
 function clearStaleFailureFieldsForSuccessfulTerminal(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
@@ -365,10 +399,16 @@ function syncSuccessfulTerminalStatusMirrors(
   payload.response_type = "final_answer";
 
   const existingSummary = readRecord(payload.resolved_turn_summary);
+  const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const resolvedRouteLabel = [
+    readString(canonicalGoalFrame?.goal_kind) ?? "terminal_answer",
+    envelope.terminal_artifact_kind,
+  ].join(" / ");
   payload.resolved_turn_summary = {
     ...(existingSummary ?? {}),
     turn_id: envelope.turn_id,
     final_status: "final_answer",
+    resolved_route_label: resolvedRouteLabel,
     terminal_kind: "final_answer",
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     terminal_error_code: null,
@@ -399,6 +439,13 @@ export function applyTerminalAnswerEnvelope(
       payload.final_answer_source = envelope.final_answer_source;
       payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
     }
+  }
+  if (
+    envelope.terminal_kind !== "failure" &&
+    envelope.final_answer_source !== "typed_failure" &&
+    isUnavailableTerminalPlaceholderText(envelope.terminal_text)
+  ) {
+    envelope = buildUnavailableTerminalTextFailureEnvelope(payload, envelope);
   }
   const previewPayload = {
     ...payload,

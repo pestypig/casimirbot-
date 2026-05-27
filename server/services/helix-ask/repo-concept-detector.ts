@@ -56,6 +56,9 @@ export const PROJECT_ENTITY_DEFINITION_RE =
 const PROJECT_ANCHOR_RE =
   /\b(?:in\s+helix|helix\s+ask|in\s+this\s+app|this\s+app|repo|repository|codebase|agent|workstation|casimirbot|casimir\s*bot)\b/i;
 
+const NEGATIVE_TOOL_CONSTRAINT_ANCHOR_RE =
+  /\b(?:do\s+not|don't|dont|without|unless\s+needed,?\s*do\s+not)\s+use\s+(?:the\s+)?(?:workstation\s+)?tools?\b|\bdo\s+not\s+use\s+workstation\s+tools\s+unless\s+(?:needed|necessary|genuinely\s+needed)\b/gi;
+
 const EXPLICIT_NON_REPO_GROUNDING_RE =
   /\b(?:do\s+not|don't|dont|without)\s+(?:search|use|look\s+in|inspect|read)\s+(?:the\s+)?(?:repo|repository|code|codebase|workspace|source)\b|\b(?:just|only)\s+answer\s+generally\b|\bgeneral\s+(?:answer|explanation)\s+only\b/i;
 
@@ -171,8 +174,9 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
     };
   }
 
-  const hasProjectAnchor = PROJECT_ANCHOR_RE.test(prompt);
-  if (entity && LEGAL_TERMINAL_AUTHORITY_RE.test(prompt) && !hasProjectAnchor) {
+  const projectAnchorPrompt = prompt.replace(NEGATIVE_TOOL_CONSTRAINT_ANCHOR_RE, " ");
+  const hasPositiveProjectAnchor = PROJECT_ANCHOR_RE.test(projectAnchorPrompt);
+  if (entity && LEGAL_TERMINAL_AUTHORITY_RE.test(prompt) && !hasPositiveProjectAnchor) {
     return {
       applies: true,
       confidence: "low",
@@ -196,7 +200,7 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
     };
   }
 
-  if (hasProjectAnchor) {
+  if (hasPositiveProjectAnchor) {
     const projectLikeConcept = extractProjectLikeConcept(prompt) ?? extractQuestionSubject(prompt);
     return {
       applies: true,

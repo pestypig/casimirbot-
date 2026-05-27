@@ -16,6 +16,21 @@ const createApp = (): express.Express => {
 const visibleAnswerText = (body: any): string =>
   String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? body?.finalAnswer ?? "");
 
+const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\r?\n\r?\n/)
+    .map((block) => {
+      const lines = block.split(/\r?\n/);
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+      const data = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!event || !data) return null;
+      return { event, data: JSON.parse(data) };
+    })
+    .filter(Boolean) as Array<{ event: string; data: any }>;
+
 describe("helix ask repo/code intent precedence", () => {
   it("detects hard repo/code evidence prompts", () => {
     const intent = detectRepoCodeEvidenceIntent(
@@ -339,11 +354,13 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.response_type).toBe("final_answer");
     expect(response.body?.resolved_turn_summary).toMatchObject({
       final_status: "final_answer",
+      resolved_route_label: "repo_entity_definition / repo_code_evidence_answer",
       terminal_kind: "final_answer",
       terminal_artifact_kind: "repo_code_evidence_answer",
       terminal_error_code: null,
       pending_server_request_present: false,
     });
+    expect(response.body?.resolved_turn_summary?.resolved_route_label).not.toMatch(/typed_failure|unavailable/i);
     expect(visibleAnswerText(response.body)).not.toMatch(/required artifacts.*(?:doc_summary|doc_concept_explanation)/i);
     expect(visibleAnswerText(response.body)).toMatch(/repo evidence|key evidence|situation room/i);
     expect(response.body?.repo_claim_observation_gate).toMatchObject({
@@ -352,6 +369,99 @@ describe("helix ask repo/code intent precedence", () => {
     });
     expect(Array.isArray(response.body?.evidence_observations)).toBe(true);
     expect(response.body?.evidence_observations.length).toBeGreaterThan(0);
+  }, 90000);
+
+  it.each([
+    {
+      prompt: "What is Auntie Dottie in this app?",
+      entity: "Auntie Dottie",
+      evidencePath:
+        /helix-dottie-manifest-preset|dottie-manifest-preset|workstation-tool-planner|workstation-dynamic-tools|helix-agent-commentary|runtime-authority-contract/i,
+    },
+    {
+      prompt: "What is Route Evidence supposed to be?",
+      entity: "Route Evidence",
+      evidencePath:
+        /helix-situation-construct|situation-room-live-job-contract|situation-construct-recipe|situation-room-live-job-setup-planner|SituationRoomPipelinesPanel|panelActionAdapters/i,
+    },
+  ])("routes $entity concept questions through repo evidence before ambient panel/live routing", async ({ prompt, evidencePath }) => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: prompt,
+        mode: "read",
+        debug: true,
+        sessionId: `repo-entity-${prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`,
+      })
+      .expect(200);
+
+    const answer = visibleAnswerText(response.body);
+    const repoObservation = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "repo_code_evidence_observation" &&
+      artifact?.payload?.schema === "helix.repo_code_evidence_observation.v1"
+    );
+    const spanPaths = String((repoObservation?.payload?.spans ?? []).map((span: any) => span?.path).join("\n"));
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_entity_definition");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("repo-code.search_concept");
+    expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+      iteration?.chosen_capability === "repo-code.search_concept" &&
+      iteration?.observation_role === "executed_tool_result"
+    )).toBe(true);
+    expect(repoObservation).toBeTruthy();
+    expect(spanPaths).toMatch(evidencePath);
+    expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.final_status).toBe("final_answer");
+    expect(answer).not.toMatch(/I could not produce a terminal answer|direct_answer_unavailable|agent_loop_budget_exhausted/i);
+  }, 90000);
+
+  it("does not stream stale failed turn completion before authoritative repo concept final", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "What is Auntie Dottie in this app?",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-entity-dottie-stream-${Date.now()}`,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const turnFinal = events.findLast((event) => event.event === "turn_final")?.data;
+    const streamedFailedCompletions = events.filter((event) =>
+      event.event === "turn_transcript_event" &&
+      event.data?.source_event_type === "turn_completed" &&
+      (event.data?.status === "failed" || event.data?.status === "final_failure")
+    );
+    const streamedPrematureFinalFailureDecisions = events.filter((event) =>
+      event.event === "turn_transcript_event" &&
+      event.data?.type === "decision" &&
+      (event.data?.status === "failed" || event.data?.status === "final_failure")
+    );
+
+    expect(streamedFailedCompletions).toEqual([]);
+    expect(streamedPrematureFinalFailureDecisions).toEqual([]);
+    expect(turnFinal).toMatchObject({
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      final_status: "final_answer",
+      client_server_terminal_match: true,
+    });
+    expect((turnFinal?.turn_transcript_events ?? []).some((event: any) =>
+      event?.type === "decision" && (event?.status === "failed" || event?.status === "final_failure")
+    )).toBe(false);
+    expect(String(turnFinal?.selected_final_answer ?? turnFinal?.answer ?? turnFinal?.text ?? "")).not.toMatch(
+      /I could not produce a terminal answer|missing_required_artifacts|doc_concept_explanation/i,
+    );
   }, 90000);
 
   it("keeps explicit background-only prompts direct", async () => {

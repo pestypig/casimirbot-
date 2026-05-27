@@ -93,7 +93,57 @@ export const expandRepoCodeEvidenceTerms = (input: {
     );
   }
   if (/\bauntie\s+dottie\b|\bdottie\b/.test(joined)) {
-    terms.push("Auntie Dottie", "Dottie", "dottie", "voice_delivery", "observer");
+    terms.push(
+      "Auntie Dottie",
+      "Dottie",
+      "dottie",
+      "dottie.manifest",
+      "dottie_manifest",
+      "dottie_manifest_preset",
+      "dottie_observer_subscription",
+      "dottie_voice_receipt",
+      "voice_delivery",
+      "observer.attach",
+      "observer.query",
+      "helix-agent-commentary",
+      "helix-dottie-manifest-preset",
+      "dottie-manifest-preset",
+      "workstation-tool-planner",
+    );
+  }
+  if (/\broute\s+evidence\b/.test(joined)) {
+    terms.push(
+      "Route Evidence",
+      "route_evidence",
+      "route-evidence",
+      "route_drift",
+      "route watcher",
+      "route_watcher",
+      "minecraft_route_watcher",
+      "live_perturbation",
+      "field_worker_policy",
+      "field_worker",
+      "situation-room-live-job-contract",
+      "helix-situation-construct",
+      "situation-construct-recipe",
+      "live_env.query_navigation_state",
+      "live_env.query_source_health",
+    );
+  }
+  if (/\bdocs?\s+(?:panel|viewer)\b|\bdocument\s+viewer\b/.test(joined)) {
+    terms.push(
+      "Docs & Papers",
+      "docs-viewer",
+      "docs_viewer",
+      "DocViewerPanel",
+      "docs panel",
+      "docs viewer",
+      "panelCapabilities",
+      "panelActionAdapters",
+      "workstation-dynamic-tools",
+      "doc_summary",
+      "doc_location_matches",
+    );
   }
   if (/\bterminal\s+authority\b/.test(joined)) {
     terms.push(
@@ -102,6 +152,9 @@ export const expandRepoCodeEvidenceTerms = (input: {
       "terminal_answer_authority",
       "turn-terminal-authority",
       "repo_code_evidence_answer",
+      "terminal-answer-envelope",
+      "runtime-authority-contract",
+      "terminal_presentation",
     );
   }
 
@@ -168,6 +221,18 @@ const enumerateRepoFiles = async (repoRoot: string): Promise<string[]> => {
 const isSituationRoomSearch = (terms: string[]): boolean =>
   terms.some((term) => /situation[\s_-]*room|situationroom|situation_context|situation-capture/i.test(term));
 
+const isDottieSearch = (terms: string[]): boolean =>
+  terms.some((term) => /\bdottie\b|auntie\s+dottie|voice_delivery|observer\.(?:attach|query)|dottie[_-]?manifest/i.test(term));
+
+const isRouteEvidenceSearch = (terms: string[]): boolean =>
+  terms.some((term) => /route[\s_-]*evidence|route[_-]?drift|field[_-]?worker|live[_-]?perturbation|query_navigation_state/i.test(term));
+
+const isDocsPanelSearch = (terms: string[]): boolean =>
+  terms.some((term) => /docs?[\s_-]*(?:panel|viewer)|docviewerpanel|panel(?:capabilities|actionadapters)|workstation-dynamic-tools/i.test(term));
+
+const isTerminalAuthoritySearch = (terms: string[]): boolean =>
+  terms.some((term) => /terminal[\s_-]*authority|terminal[_-]?answer[_-]?authority|terminal-answer-envelope|runtime-authority-contract/i.test(term));
+
 const situationRoomFileSearchPriority = (filePath: string): number | null => {
   const normalized = normalizePath(filePath).toLowerCase();
   if (/client\/src\/store\/usesituationroomstore\.ts$/.test(normalized)) return -60;
@@ -183,11 +248,74 @@ const situationRoomFileSearchPriority = (filePath: string): number | null => {
   return null;
 };
 
+const dottieFileSearchPriority = (filePath: string): number | null => {
+  const normalized = normalizePath(filePath).toLowerCase();
+  if (/shared\/helix-dottie-manifest-preset\.ts$/.test(normalized)) return -66;
+  if (/server\/services\/situation-room\/dottie-manifest-preset\.ts$/.test(normalized)) return -64;
+  if (/shared\/helix-agent-commentary\.ts$/.test(normalized)) return -58;
+  if (/shared\/workstation-dynamic-tools\.ts$/.test(normalized)) return -54;
+  if (/server\/services\/helix-ask\/workstation-tool-planner\.ts$/.test(normalized)) return -52;
+  if (/server\/services\/helix-ask\/runtime-authority-contract\.ts$/.test(normalized)) return -46;
+  if (/client\/src\/lib\/workstation\/panel(?:capabilities|actionadapters)\.ts$/.test(normalized)) return -42;
+  if (/dottie|voice_delivery|observer/.test(normalized)) return -38;
+  return null;
+};
+
+const routeEvidenceFileSearchPriority = (filePath: string): number | null => {
+  const normalized = normalizePath(filePath).toLowerCase();
+  if (/shared\/helix-situation-construct\.ts$/.test(normalized)) return -64;
+  if (/shared\/situation-room-live-job-contract\.ts$/.test(normalized)) return -62;
+  if (/server\/services\/situation-room\/situation-construct-recipe(?:-registry|-runner)?\.ts$/.test(normalized)) return -58;
+  if (/server\/services\/helix-ask\/situation-room-live-job-setup-planner\.ts$/.test(normalized)) return -54;
+  if (/client\/src\/components\/workstation\/situationroompipelinespanel\.tsx$/.test(normalized)) return -50;
+  if (/client\/src\/lib\/workstation\/panelactionadapters\.ts$/.test(normalized)) return -44;
+  if (/route[_-]?evidence|route[_-]?drift|field[_-]?worker|live[_-]?perturbation/.test(normalized)) return -40;
+  return null;
+};
+
+const docsPanelFileSearchPriority = (filePath: string): number | null => {
+  const normalized = normalizePath(filePath).toLowerCase();
+  if (/client\/src\/components\/docviewerpanel\.tsx$/.test(normalized)) return -66;
+  if (/client\/src\/lib\/docs\/docviewer\.ts$/.test(normalized)) return -62;
+  if (/client\/src\/lib\/workstation\/panelcapabilities\.ts$/.test(normalized)) return -58;
+  if (/client\/src\/lib\/workstation\/panelactionadapters\.ts$/.test(normalized)) return -56;
+  if (/shared\/workstation-dynamic-tools\.ts$/.test(normalized)) return -52;
+  if (/server\/services\/helix-ask\/(?:runtime-authority-contract|route-product-contract)\.ts$/.test(normalized)) return -42;
+  if (/docs?-viewer|docviewer|doc_summary|doc_location/.test(normalized)) return -38;
+  return null;
+};
+
+const terminalAuthorityFileSearchPriority = (filePath: string): number | null => {
+  const normalized = normalizePath(filePath).toLowerCase();
+  if (/server\/services\/helix-ask\/terminal-answer-envelope\.ts$/.test(normalized)) return -68;
+  if (/server\/services\/helix-ask\/runtime-authority-contract\.ts$/.test(normalized)) return -66;
+  if (/server\/services\/helix-ask\/solver-controller-decision\.ts$/.test(normalized)) return -56;
+  if (/server\/services\/helix-ask\/route-product-contract\.ts$/.test(normalized)) return -52;
+  if (/shared\/helix.*terminal.*authority/.test(normalized)) return -44;
+  return null;
+};
+
 const fileSearchPriority = (filePath: string, terms: string[]): number => {
   const normalized = normalizePath(filePath).toLowerCase();
   if (isSituationRoomSearch(terms)) {
     const situationPriority = situationRoomFileSearchPriority(normalized);
     if (situationPriority !== null) return situationPriority;
+  }
+  if (isDottieSearch(terms)) {
+    const dottiePriority = dottieFileSearchPriority(normalized);
+    if (dottiePriority !== null) return dottiePriority;
+  }
+  if (isRouteEvidenceSearch(terms)) {
+    const routeEvidencePriority = routeEvidenceFileSearchPriority(normalized);
+    if (routeEvidencePriority !== null) return routeEvidencePriority;
+  }
+  if (isDocsPanelSearch(terms)) {
+    const docsPriority = docsPanelFileSearchPriority(normalized);
+    if (docsPriority !== null) return docsPriority;
+  }
+  if (isTerminalAuthoritySearch(terms)) {
+    const terminalPriority = terminalAuthorityFileSearchPriority(normalized);
+    if (terminalPriority !== null) return terminalPriority;
   }
   if (/server\/services\/helix-ask/.test(normalized)) return 0;
   if (/shared\//.test(normalized)) return 1;

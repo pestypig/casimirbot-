@@ -199,6 +199,70 @@ describe("Helix Ask terminal authority contracts", () => {
     expect((payload.debug as Record<string, unknown>).typed_failure).toBeUndefined();
   });
 
+  it("does not promote unavailable placeholder text into a successful terminal answer", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:placeholder-success",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      source_target_intent: {
+        target_source: "model_only",
+        target_kind: "general_background",
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+      },
+      agent_step_decision: {
+        decision_id: "decision:model-direct-placeholder",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "decision:model-direct-placeholder",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            decision_timing: "terminal_review",
+            decision_authority: "model",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["direct-answer-placeholder", "final-draft-placeholder"],
+          },
+        ],
+      },
+      direct_answer_text: {
+        schema: "helix.direct_answer_text.v1",
+        artifact_id: "direct-answer-placeholder",
+        text: "I could not produce a terminal answer for this turn.",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "final-draft-placeholder",
+        text: "I could not produce a terminal answer for this turn.",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "I could not produce a terminal answer for this turn.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("terminal_answer_unavailable");
+    expect(payload.final_status).not.toBe("final_answer");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+    });
+  });
+
   it("does not let stale presentation text override typed failure authority", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:typed-failure-stale-presentation",

@@ -50,6 +50,21 @@ describe("Helix Ask repo concept evidence", () => {
       require_repo_evidence: false,
       allow_model_direct_answer: true,
     });
+    expect(detectRepoConcept("What is an electron in one paragraph? Do not use workstation tools unless needed.")).toMatchObject({
+      applies: true,
+      confidence: "low",
+      reason: "generic_concept_without_project_anchor",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    });
+    expect(
+      detectRepoCodeEvidenceIntent(
+        "Explain why momentum is conserved in an isolated two-object collision. Do not use workstation tools unless genuinely needed.",
+      ),
+    ).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+    });
   });
 
   it("honors non-repo and action guardrails for concept-looking prompts", () => {
@@ -206,6 +221,44 @@ describe("Helix Ask repo concept evidence", () => {
     expect(ranked.some((hit) => hit.filePath.includes("node_modules"))).toBe(false);
   });
 
+  it("ranks Dottie, Route Evidence, and docs panel concept files ahead of generic Helix Ask hits", () => {
+    const dottieRanked = rankRepoCodeEvidenceHits({
+      query: "What is Auntie Dottie in this app?",
+      concept: "Auntie Dottie",
+      exactTerms: ["Auntie Dottie", "dottie.manifest", "observer.attach", "voice_delivery"],
+      hits: [
+        { filePath: "server/services/helix-ask/ask-turn-solver.ts", line: 10, text: "generic Helix Ask turn solver", term: "ask" },
+        { filePath: "shared/helix-dottie-manifest-preset.ts", line: 1, text: "export type HelixDottieManifestPreset = { observer_profile: 'auntie_dottie' }", term: "Dottie" },
+        { filePath: "server/services/helix-ask/workstation-tool-planner.ts", line: 2, text: "dottie.manifest observer.attach voice_delivery.propose_from_trace", term: "dottie" },
+      ],
+    });
+    expect(dottieRanked[0]?.filePath).toMatch(/helix-dottie-manifest-preset|workstation-tool-planner/);
+
+    const routeEvidenceRanked = rankRepoCodeEvidenceHits({
+      query: "What is Route Evidence supposed to be?",
+      concept: "Route Evidence",
+      exactTerms: ["Route Evidence", "route_evidence", "live_env.query_navigation_state", "field_worker"],
+      hits: [
+        { filePath: "server/services/helix-ask/ask-turn-solver.ts", line: 10, text: "generic live environment review", term: "live" },
+        { filePath: "shared/helix-situation-construct.ts", line: 5, text: "route_evidence missing_evidence field_worker policy", term: "route_evidence" },
+        { filePath: "client/src/components/workstation/SituationRoomPipelinesPanel.tsx", line: 8, text: "Route Evidence and perturbations", term: "Route Evidence" },
+      ],
+    });
+    expect(routeEvidenceRanked[0]?.filePath).toMatch(/helix-situation-construct|SituationRoomPipelinesPanel/);
+
+    const docsRanked = rankRepoCodeEvidenceHits({
+      query: "How does the docs panel work?",
+      concept: "docs panel",
+      exactTerms: ["docs panel", "docs-viewer", "DocViewerPanel", "doc_summary"],
+      hits: [
+        { filePath: "server/__tests__/helix.ask.domain-continuation-decision.test.ts", line: 1, text: "docs panel domain continuation", term: "docs" },
+        { filePath: "client/src/components/DocViewerPanel.tsx", line: 1, text: "export function DocViewerPanel", term: "DocViewerPanel" },
+        { filePath: "client/src/lib/workstation/panelActionAdapters.ts", line: 1, text: "docs-viewer summarize_doc locate_in_doc", term: "docs-viewer" },
+      ],
+    });
+    expect(docsRanked[0]?.filePath).toMatch(/DocViewerPanel|panelActionAdapters/);
+  });
+
   it("expands known concepts into repo search terms without treating them as commands", () => {
     expect(expandRepoCodeEvidenceTerms({
       concept: "Situation Room",
@@ -227,6 +280,35 @@ describe("Helix Ask repo concept evidence", () => {
       "terminal_answer_authority",
       "turn-terminal-authority",
       "repo_code_evidence_answer",
+    ]));
+    expect(expandRepoCodeEvidenceTerms({
+      concept: "Auntie Dottie",
+      query: "What is Auntie Dottie in this app?",
+    })).toEqual(expect.arrayContaining([
+      "Auntie Dottie",
+      "dottie.manifest",
+      "dottie_manifest_preset",
+      "voice_delivery",
+      "observer.attach",
+    ]));
+    expect(expandRepoCodeEvidenceTerms({
+      concept: "Route Evidence",
+      query: "What is Route Evidence supposed to be?",
+    })).toEqual(expect.arrayContaining([
+      "Route Evidence",
+      "route_evidence",
+      "live_perturbation",
+      "field_worker",
+      "live_env.query_navigation_state",
+    ]));
+    expect(expandRepoCodeEvidenceTerms({
+      concept: "docs panel",
+      query: "How does the docs panel work?",
+    })).toEqual(expect.arrayContaining([
+      "docs-viewer",
+      "DocViewerPanel",
+      "panelActionAdapters",
+      "doc_summary",
     ]));
   });
 
