@@ -44,6 +44,24 @@ export type ReasoningBattleBeat = {
   raw_content_included: false;
 };
 
+export type ReasoningBattleVisualPrimitiveKind =
+  | "slash"
+  | "pulse"
+  | "gate"
+  | "notch"
+  | "recoil"
+  | "ring"
+  | "spark"
+  | "settle";
+
+export type ReasoningBattleVisualPrimitive = {
+  kind: ReasoningBattleVisualPrimitiveKind;
+  lane: ReasoningBattleLane;
+  direction: "forward" | "backward" | "center";
+  intensity: 1 | 2 | 3;
+  raw_content_included: false;
+};
+
 export type ReasoningBattleLiveEventEntry = {
   id?: string;
   text?: string;
@@ -402,4 +420,37 @@ export function reasoningBattleBeatClassName(
           : "reasoning-battle-pop--neutral border-slate-200/25 bg-white/5 text-slate-200";
   const motionClass = reducedMotion ? "reasoning-battle-pop--static" : "reasoning-battle-pop--float";
   return `reasoning-battle-pop reasoning-battle-pop--${beat.kind} ${laneClass} ${motionClass}`;
+}
+
+export function reasoningBattleBeatPrimitive(
+  beat: Pick<ReasoningBattleBeat, "kind" | "lane" | "impact">,
+): ReasoningBattleVisualPrimitive {
+  const intensity = (Math.max(1, Math.min(3, Math.abs(beat.impact))) || 1) as 1 | 2 | 3;
+  const direction =
+    beat.lane === "ambiguity" ? "backward" : beat.lane === "terminal" ? "center" : "forward";
+  const primitiveKind: ReasoningBattleVisualPrimitiveKind =
+    beat.kind === "strike"
+      ? "slash"
+      : beat.kind === "support" || beat.kind === "observe" || beat.kind === "clarify"
+        ? "pulse"
+        : beat.kind === "gap"
+          ? "notch"
+          : beat.kind === "block"
+            ? "gate"
+            : beat.kind === "recoil"
+              ? "recoil"
+              : beat.kind === "seal"
+                ? "ring"
+                : beat.kind === "settle"
+                  ? "settle"
+                  : beat.kind === "repair" || beat.kind === "arm"
+                    ? "spark"
+                    : "pulse";
+  return {
+    kind: primitiveKind,
+    lane: beat.lane,
+    direction,
+    intensity,
+    raw_content_included: false,
+  };
 }

@@ -1,5 +1,6 @@
 export {
   buildReasoningBattleBeats,
+  reasoningBattleBeatPrimitive,
   reasoningBattleBeatClassName,
 } from "@shared/helix-reasoning-battle-stage";
 export type {
@@ -8,4 +9,6 @@ export type {
   ReasoningBattleLane,
   ReasoningBattleLiveEventEntry,
   ReasoningBattleTheaterStateV1,
+  ReasoningBattleVisualPrimitive,
+  ReasoningBattleVisualPrimitiveKind,
 } from "@shared/helix-reasoning-battle-stage";

@@ -386,7 +386,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildReasoningBattleBeats");
     expect(source).toContain("helix-ask-reasoning-battle-stage");
     expect(source).toContain("helix-ask-reasoning-battle-beat");
+    expect(source).toContain("helix-ask-reasoning-battle-primitive");
+    expect(source).toContain("helix-ask-reasoning-battle-pressure");
     expect(source).toContain("helixReasoningBattleBeat");
+    expect(source).toContain("helixReasoningBattlePrimitive");
+    expect(source).toContain("reasoningBattleBeatPrimitive");
+    expect(source).toContain("reasoningBattlePrimitiveClassName");
     expect(source).toContain("prefers-reduced-motion: reduce");
     expect(source).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");

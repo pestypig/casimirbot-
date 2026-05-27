@@ -148,8 +148,10 @@ import {
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
   buildReasoningBattleBeats,
+  reasoningBattleBeatPrimitive,
   reasoningBattleBeatClassName,
   type ReasoningBattleBeat,
+  type ReasoningBattleVisualPrimitive,
 } from "@/lib/helix/reasoning-battle-stage";
 import {
   applyLatestWinsVoiceQueue,
@@ -9613,6 +9615,55 @@ function reasoningBattleBeatHeightPx(beat: ReasoningBattleBeat): number {
   return -18 - Math.abs(beat.impact) * 4 - jitter;
 }
 
+function reasoningBattlePrimitiveClassName(primitive: ReasoningBattleVisualPrimitive): string {
+  const laneClass =
+    primitive.lane === "orb"
+      ? "border-emerald-200/55 bg-emerald-200/45 shadow-[0_0_10px_rgba(110,231,183,0.45)]"
+      : primitive.lane === "ambiguity"
+        ? "border-rose-200/60 bg-rose-300/45 shadow-[0_0_10px_rgba(251,113,133,0.42)]"
+        : primitive.lane === "terminal"
+          ? "border-cyan-100/70 bg-cyan-200/50 shadow-[0_0_12px_rgba(103,232,249,0.48)]"
+          : "border-slate-200/45 bg-slate-200/35 shadow-[0_0_8px_rgba(226,232,240,0.28)]";
+  if (primitive.kind === "slash") return `${laneClass} h-7 w-[2px] rotate-[24deg] rounded-full`;
+  if (primitive.kind === "gate") return `${laneClass} h-8 w-[3px] rounded-sm`;
+  if (primitive.kind === "notch") return `${laneClass} h-3 w-5 rounded-[2px]`;
+  if (primitive.kind === "recoil") return `${laneClass} h-[2px] w-7 rounded-full`;
+  if (primitive.kind === "ring") return `${laneClass} h-7 w-7 rounded-full border-2 bg-transparent`;
+  if (primitive.kind === "spark") return `${laneClass} h-2.5 w-2.5 rotate-45 rounded-[2px]`;
+  if (primitive.kind === "settle") return `${laneClass} h-6 w-6 rounded-full border-2 bg-cyan-200/15`;
+  return `${laneClass} h-4 w-4 rounded-full`;
+}
+
+function reasoningBattlePrimitiveStyle(input: {
+  beat: ReasoningBattleBeat;
+  primitive: ReasoningBattleVisualPrimitive;
+  reducedMotion: boolean;
+}): React.CSSProperties & Record<string, string | undefined> {
+  const { beat, primitive, reducedMotion } = input;
+  const yPx =
+    primitive.kind === "ring" || primitive.kind === "settle"
+      ? -8
+      : primitive.lane === "ambiguity"
+        ? -4
+        : -10;
+  const driftBase = (hash32(`${beat.id}:primitive-drift`) % 15) - 7;
+  const driftPx =
+    primitive.direction === "backward" ? -Math.abs(driftBase) - 5 : primitive.direction === "forward" ? Math.abs(driftBase) + 5 : 0;
+  return {
+    left: `${reasoningBattleBeatPositionPct(beat)}%`,
+    opacity: `${0.62 + primitive.intensity * 0.1}`,
+    transform: reducedMotion
+      ? `translate3d(-50%, ${yPx}px, 0)`
+      : "translate3d(-50%, -50%, 0)",
+    animation: reducedMotion
+      ? undefined
+      : `helixReasoningBattlePrimitive ${beat.ttl_ms + 140}ms ease-out forwards`,
+    "--battle-primitive-drift": `${driftPx}px`,
+    "--battle-primitive-y": `${yPx}px`,
+    "--battle-primitive-scale": `${1 + primitive.intensity * 0.09}`,
+  };
+}
+
 function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
   const base = latest
     ? "border-slate-500/40 bg-slate-950/35 text-slate-100"
@@ -15260,6 +15311,10 @@ export function HelixAskPill({
       }),
     [askLiveEvents, latestCausalTurnTimeline, reasoningTheaterCanonicalState],
   );
+  const reasoningBattlePressurePct = useMemo(() => {
+    const pressure = reasoningBattleBeats.reduce((total, beat) => total + beat.pressure_delta, 0);
+    return clampNumber(pressure * 8 + (reasoningTheaterCanonicalState?.indices.ambiguity_pressure ?? 0) * 28, 0, 46);
+  }, [reasoningBattleBeats, reasoningTheaterCanonicalState]);
   const reasoningTheaterHardFailureSignals = useMemo(
     () =>
       readReasoningTheaterHardFailureSignals(
@@ -30053,7 +30108,7 @@ export function HelixAskPill({
                 aria-hidden
               />
               <style>
-                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattleBeat{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.92)}16%{opacity:1}70%{opacity:.86}100%{opacity:0;transform:translate3d(calc(-50% + var(--beat-drift,0px)),var(--beat-y,-28px),0) scale(1.04)}}`}
+                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattleBeat{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.92)}16%{opacity:1}72%{opacity:.86}100%{opacity:0;transform:translate3d(calc(-50% + var(--beat-drift,0px)),var(--beat-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattlePrimitive{0%{opacity:0;transform:translate3d(-50%,-50%,0) scale(.72)}15%{opacity:1;transform:translate3d(-50%,-50%,0) scale(var(--battle-primitive-scale,1.1))}72%{opacity:.84}100%{opacity:0;transform:translate3d(calc(-50% + var(--battle-primitive-drift,0px)),var(--battle-primitive-y,-12px),0) scale(.86)}}`}
               </style>
               {reasoningTheater && mirekReasoningDisplayGrid ? (
                 <div
@@ -30197,30 +30252,37 @@ export function HelixAskPill({
                             aria-hidden="true"
                           >
                             {reasoningBattleBeats.slice(-8).map((beat) => {
+                              const primitive = reasoningBattleBeatPrimitive(beat);
                               const driftPx = ((hash32(`${beat.id}:drift`) % 17) - 8) * (beat.lane === "ambiguity" ? -1 : 1);
                               const yPx = reasoningBattleBeatHeightPx(beat);
                               const displayLabel = `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`;
                               return (
-                                <span
-                                  key={beat.id}
-                                  data-testid="helix-ask-reasoning-battle-beat"
-                                  className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, prefersReducedMotion)}`}
-                                  style={
-                                    {
-                                      left: `${reasoningBattleBeatPositionPct(beat)}%`,
-                                      transform: prefersReducedMotion
-                                        ? `translate3d(-50%, ${yPx}px, 0)`
-                                        : "translate3d(-50%, 0, 0)",
-                                      animation: prefersReducedMotion
-                                        ? undefined
-                                        : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
-                                      "--beat-drift": `${driftPx}px`,
-                                      "--beat-y": `${yPx}px`,
-                                    } as React.CSSProperties & Record<string, string | undefined>
-                                  }
-                                >
-                                  {displayLabel}
-                                </span>
+                                <React.Fragment key={beat.id}>
+                                  <span
+                                    data-testid="helix-ask-reasoning-battle-primitive"
+                                    className={`pointer-events-none absolute top-1/2 z-[4] block border ${reasoningBattlePrimitiveClassName(primitive)}`}
+                                    style={reasoningBattlePrimitiveStyle({ beat, primitive, reducedMotion: prefersReducedMotion })}
+                                  />
+                                  <span
+                                    data-testid="helix-ask-reasoning-battle-beat"
+                                    className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, prefersReducedMotion)}`}
+                                    style={
+                                      {
+                                        left: `${reasoningBattleBeatPositionPct(beat)}%`,
+                                        transform: prefersReducedMotion
+                                          ? `translate3d(-50%, ${yPx}px, 0)`
+                                          : "translate3d(-50%, 0, 0)",
+                                        animation: prefersReducedMotion
+                                          ? undefined
+                                          : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
+                                        "--beat-drift": `${driftPx}px`,
+                                        "--beat-y": `${yPx}px`,
+                                      } as React.CSSProperties & Record<string, string | undefined>
+                                    }
+                                  >
+                                    {displayLabel}
+                                  </span>
+                                </React.Fragment>
                               );
                             })}
                           </div>
@@ -30253,6 +30315,16 @@ export function HelixAskPill({
                           ))}
                         </div>
                         <div className="absolute inset-0 z-[1] overflow-hidden rounded-full">
+                          {reasoningBattlePressurePct > 0 ? (
+                            <div
+                              data-testid="helix-ask-reasoning-battle-pressure"
+                              className="pointer-events-none absolute inset-y-0 right-0 z-[2] rounded-full bg-[repeating-linear-gradient(120deg,rgba(251,113,133,0.0)_0px,rgba(251,113,133,0.0)_5px,rgba(251,113,133,0.55)_7px,rgba(251,113,133,0.08)_12px)]"
+                              style={{
+                                width: `${reasoningBattlePressurePct}%`,
+                                opacity: 0.34 + Math.min(0.34, reasoningBattlePressurePct / 100),
+                              }}
+                            />
+                          ) : null}
                           <div
                             ref={reasoningTheaterMeterFillRef}
                             className={`relative h-full rounded-full ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].bar}`}

@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { HelixCausalTurnEvent } from "@shared/helix-causal-turn-timeline";
 import {
   buildReasoningBattleBeats,
+  reasoningBattleBeatPrimitive,
   reasoningBattleBeatClassName,
   type ReasoningBattleBeat,
+  type ReasoningBattleBeatKind,
+  type ReasoningBattleLane,
 } from "../reasoning-battle-stage";
 
 function event(input: Partial<HelixCausalTurnEvent> & Pick<HelixCausalTurnEvent, "stage" | "sequence">): HelixCausalTurnEvent {
@@ -25,7 +28,7 @@ function event(input: Partial<HelixCausalTurnEvent> & Pick<HelixCausalTurnEvent,
 }
 
 function labels(beats: ReasoningBattleBeat[]): string[] {
-  return beats.map((beat) => `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`);
+  return beats.map((beat: ReasoningBattleBeat) => `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`);
 }
 
 describe("reasoning battle stage", () => {
@@ -62,7 +65,9 @@ describe("reasoning battle stage", () => {
 
     expect(labels(first)).toEqual(["+orient", "+tool"]);
     expect(labels(second)).toEqual(["+tool", "+orient"]);
-    expect(second.map((beat) => beat.id)).not.toEqual(first.map((beat) => beat.id));
+    expect(second.map((beat: ReasoningBattleBeat) => beat.id)).not.toEqual(
+      first.map((beat: ReasoningBattleBeat) => beat.id),
+    );
   });
 
   it("maps blocked coverage gates to gap pressure", () => {
@@ -142,60 +147,36 @@ describe("reasoning battle stage", () => {
       timelineEvents: [],
       liveEvents: [],
       theaterState: {
-        contract_version: "reasoning_theater.v1",
         trace_id: "trace-a",
-        phase: "gate",
-        archetype: "contradiction",
-        certainty_class: "unknown",
         suppression_reason: "contract_violation",
         telemetry: {
-          evidence_gate_ok: null,
-          coverage_ratio: null,
-          evidence_claim_ratio: null,
-          belief_unsupported_rate: null,
-          belief_contradictions: null,
-          ambiguity_term_count: 0,
-          graph_block_ratio: null,
-          graph_cross_tree_ratio: null,
-          alignment_margin: null,
-          alignment_decision: null,
-          event_latency_ms_p95: null,
-          suppression_active: true,
           proof_verdict: "FAIL",
           certificate_integrity_ok: false,
         },
-        indices: {
-          momentum: 0,
-          ambiguity_pressure: 1,
-          battle_index: -1,
-        },
-        stance: "fail_closed",
         scenario_id: "scenario-a",
-        seed: 1,
-        ts: "2026-05-27T00:00:00.000Z",
       },
       nowMs: 123,
     });
 
     expect(labels(beats)).toEqual(["-sealed", "-sealed"]);
-    expect(beats.every((beat) => beat.raw_content_included === false)).toBe(true);
+    expect(beats.every((beat: ReasoningBattleBeat) => beat.raw_content_included === false)).toBe(true);
   });
 
   it("bounds and deduplicates beat output", () => {
-    const timelineEvents = Array.from({ length: 14 }, (_, index) =>
+    const timelineEvents = Array.from({ length: 14 }, (_: unknown, index: number) =>
       event({ sequence: index + 1, stage: "model_step_decided" }),
     );
     const allBeats = buildReasoningBattleBeats({ timelineEvents, liveEvents: [], nowMs: 123 });
     const nextBeats = buildReasoningBattleBeats({
       timelineEvents,
       liveEvents: [],
-      previousBeatIds: new Set(allBeats.map((beat) => beat.id)),
+      previousBeatIds: new Set(allBeats.map((beat: ReasoningBattleBeat) => beat.id)),
       nowMs: 123,
     });
 
     expect(allBeats).toHaveLength(10);
     expect(nextBeats).toHaveLength(4);
-    expect(new Set(allBeats.map((beat) => beat.id)).size).toBe(10);
+    expect(new Set(allBeats.map((beat: ReasoningBattleBeat) => beat.id)).size).toBe(10);
   });
 
   it("never copies final answer or raw model text into beat labels", () => {
@@ -225,5 +206,41 @@ describe("reasoning battle stage", () => {
 
     expect(reasoningBattleBeatClassName(beat, true)).toContain("reasoning-battle-pop--static");
     expect(reasoningBattleBeatClassName(beat, true)).not.toContain("reasoning-battle-pop--float");
+  });
+
+  it("maps every beat kind to a replay-safe visual primitive", () => {
+    const expected: Record<ReasoningBattleBeatKind, string> = {
+      orient: "pulse",
+      arm: "spark",
+      strike: "slash",
+      observe: "pulse",
+      clarify: "pulse",
+      support: "pulse",
+      gap: "notch",
+      block: "gate",
+      recoil: "recoil",
+      repair: "spark",
+      settle: "settle",
+      seal: "ring",
+    };
+
+    for (const [kind, primitiveKind] of Object.entries(expected) as Array<[ReasoningBattleBeatKind, string]>) {
+      const lane: ReasoningBattleLane =
+        kind === "gap" || kind === "block" || kind === "recoil" || kind === "seal"
+          ? "ambiguity"
+          : kind === "settle"
+            ? "terminal"
+            : "orb";
+      const primitive = reasoningBattleBeatPrimitive({
+        kind,
+        lane,
+        impact: lane === "ambiguity" ? -2 : 2,
+      });
+      expect(primitive).toMatchObject({
+        kind: primitiveKind,
+        lane,
+        raw_content_included: false,
+      });
+    }
   });
 });
