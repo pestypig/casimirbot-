@@ -84,6 +84,12 @@ export const expandRepoCodeEvidenceTerms = (input: {
       "situation_room",
       "situation_context",
       "situation-room-pipelines",
+      "situation-room-sources",
+      "SituationRoomSource",
+      "SituationRoomStore",
+      "useSituationRoomStore",
+      "useSituationRoomJobStore",
+      "situation-capture-context",
     );
   }
   if (/\bauntie\s+dottie\b|\bdottie\b/.test(joined)) {
@@ -159,8 +165,30 @@ const enumerateRepoFiles = async (repoRoot: string): Promise<string[]> => {
   );
 };
 
-const fileSearchPriority = (filePath: string): number => {
+const isSituationRoomSearch = (terms: string[]): boolean =>
+  terms.some((term) => /situation[\s_-]*room|situationroom|situation_context|situation-capture/i.test(term));
+
+const situationRoomFileSearchPriority = (filePath: string): number | null => {
   const normalized = normalizePath(filePath).toLowerCase();
+  if (/client\/src\/store\/usesituationroomstore\.ts$/.test(normalized)) return -60;
+  if (/client\/src\/store\/usesituationroom(?:jobstore|graphstore)\.ts$/.test(normalized)) return -56;
+  if (/client\/src\/lib\/helix\/situation-room\.ts$/.test(normalized)) return -48;
+  if (/client\/src\/lib\/helix\/situation-capture-context\.ts$/.test(normalized)) return -46;
+  if (/server\/services\/situation-room/.test(normalized)) return -44;
+  if (/shared\/.*situation/.test(normalized)) return -42;
+  if (/client\/src\/components\/(?:helix|workstation)\/.*situation/.test(normalized)) return -40;
+  if (/situation-room-pipelines|situation-room-sources/.test(normalized)) return -38;
+  if (/server\/services\/helix-ask\/.*situation/.test(normalized)) return -20;
+  if (/server\/services\/helix-ask/.test(normalized)) return 8;
+  return null;
+};
+
+const fileSearchPriority = (filePath: string, terms: string[]): number => {
+  const normalized = normalizePath(filePath).toLowerCase();
+  if (isSituationRoomSearch(terms)) {
+    const situationPriority = situationRoomFileSearchPriority(normalized);
+    if (situationPriority !== null) return situationPriority;
+  }
   if (/server\/services\/helix-ask/.test(normalized)) return 0;
   if (/shared\//.test(normalized)) return 1;
   if (/client\/src\/lib\/workstation/.test(normalized)) return 2;
@@ -172,9 +200,9 @@ const fileSearchPriority = (filePath: string): number => {
   return 10;
 };
 
-const prioritizeRepoFilesForSearch = (files: string[]): string[] =>
+const prioritizeRepoFilesForSearch = (files: string[], terms: string[]): string[] =>
   [...files].sort((left, right) => {
-    const priorityDelta = fileSearchPriority(left) - fileSearchPriority(right);
+    const priorityDelta = fileSearchPriority(left, terms) - fileSearchPriority(right, terms);
     return priorityDelta || left.localeCompare(right);
   });
 
@@ -286,7 +314,7 @@ export async function runRepoCodeEvidenceSearch(input: {
   const maxSpans = Math.max(1, Math.min(input.max_spans ?? input.maxHits ?? DEFAULT_MAX_SPANS, 80));
   const maxFiles = Math.max(1, Math.min(input.max_files ?? DEFAULT_MAX_FILES, 80));
   const contextLines = Math.max(0, Math.min(input.context_lines ?? DEFAULT_CONTEXT_LINES, 12));
-  const files = prioritizeRepoFilesForSearch(await enumerateRepoFiles(repoRoot));
+  const files = prioritizeRepoFilesForSearch(await enumerateRepoFiles(repoRoot), terms);
   const rawResult = await searchRepoFiles({
     repoRoot,
     files,

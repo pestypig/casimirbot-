@@ -43,6 +43,31 @@ const exactTermsFor = (input: {
 const sourceKindForPath = (filePath: string): "repo_code" | "repo_doc" =>
   normalize(filePath).startsWith("docs/") ? "repo_doc" : "repo_code";
 
+const isSituationRoomQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /situation[\s_-]*room|situationroom|situation_context|situation-capture/.test(joined);
+};
+
+const scoreSituationRoomPath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/client\/src\/store\/usesituationroomstore\.ts$/.test(filePath)) score += 230;
+  if (/client\/src\/store\/usesituationroom(?:jobstore|graphstore)\.ts$/.test(filePath)) score += 185;
+  if (/client\/src\/lib\/helix\/situation-room\.ts$/.test(filePath)) score += 165;
+  if (/client\/src\/lib\/helix\/situation-capture-context\.ts$/.test(filePath)) score += 145;
+  if (/server\/services\/situation-room/.test(filePath)) score += 135;
+  if (/shared\/.*situation/.test(filePath)) score += 115;
+  if (/client\/src\/components\/(?:helix|workstation)\/.*situation/.test(filePath)) score += 105;
+  if (/situation-room-pipelines|situation-room-sources/.test(filePath)) score += 95;
+  if (/server\/services\/helix-ask\/.*situation/.test(filePath)) score += 70;
+  if (/server\/services\/helix-ask/.test(filePath) && !/situation|live[_-]?environment|dottie|observer/.test(filePath)) {
+    score -= 55;
+  }
+  if (/^\s*import\b/i.test(text) && !/\b(?:type|interface|class|function|const|enum|schema|createRoom|appendSituationEvent|attachDisplayAudioSource|SituationRoomSource)\b/i.test(text)) {
+    score -= 45;
+  }
+  return score;
+};
+
 const isContractLikeLine = (hit: RepoSearchHit): boolean => {
   const filePath = normalize(hit.filePath);
   const text = hit.text;
@@ -61,6 +86,7 @@ const scoreHit = (
   const filePath = normalize(hit.filePath);
   const text = hit.text.toLowerCase();
   let score = 0;
+  const situationRoomQuery = isSituationRoomQuery(queryTokens, exactTerms);
   for (const term of exactTerms) {
     const normalizedTerm = term.toLowerCase();
     if (!normalizedTerm) continue;
@@ -83,6 +109,7 @@ const scoreHit = (
   if (/server\/services\/situation-room/.test(filePath)) score += 45;
   if (/(?:^|\/)__tests__\/|(?:\.test|\.spec)\.[tj]sx?$/.test(filePath)) score += 35;
   if (/docs\//.test(filePath)) score += 25;
+  if (situationRoomQuery) score += scoreSituationRoomPath(filePath, hit.text);
   if (GENERATED_OR_ARTIFACT_PATHS.some((pattern) => pattern.test(filePath))) score -= 40;
   if (INDEX_ONLY_PATHS.some((pattern) => pattern.test(filePath))) score -= 60;
   return score;

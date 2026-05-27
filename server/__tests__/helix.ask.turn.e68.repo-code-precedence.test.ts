@@ -335,7 +335,16 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
     expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
     expect(response.body?.terminal_artifact_kind).not.toBe("direct_answer_text");
-    expect(visibleAnswerText(response.body)).not.toMatch(/required artifacts.*doc_summary/i);
+    expect(response.body?.final_status).toBe("final_answer");
+    expect(response.body?.response_type).toBe("final_answer");
+    expect(response.body?.resolved_turn_summary).toMatchObject({
+      final_status: "final_answer",
+      terminal_kind: "final_answer",
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      terminal_error_code: null,
+      pending_server_request_present: false,
+    });
+    expect(visibleAnswerText(response.body)).not.toMatch(/required artifacts.*(?:doc_summary|doc_concept_explanation)/i);
     expect(visibleAnswerText(response.body)).toMatch(/repo evidence|key evidence|situation room/i);
     expect(response.body?.repo_claim_observation_gate).toMatchObject({
       decision: "observe",

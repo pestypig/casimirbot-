@@ -74,7 +74,16 @@ const typedFailureText = (payload: Record<string, unknown>): string =>
 
 const isStaleRepoEvidenceTerminalText = (value: unknown): boolean => {
   const text = readString(value) ?? "";
-  return /\b(?:could not complete|could not answer|terminal boundary blocked|source\/capability answer before the agent runtime loop|turn stopped before required artifacts|missing required artifacts|required artifacts (?:were|are) satisfied|repo_code_evidence_unavailable)\b/i.test(text);
+  return /\b(?:could not complete|could not answer|could not produce|terminal boundary blocked|source\/capability answer before the agent runtime loop|turn stopped before required artifacts|missing required artifacts|required artifacts (?:were|are) satisfied|repo_code_evidence_unavailable)\b/i.test(text);
+};
+
+const isUnbackedRepoEvidenceTerminalText = (value: unknown): boolean => {
+  const text = readString(value) ?? "";
+  if (!text) return true;
+  if (/\b(?:repo evidence|key evidence|source|file|path|client\/|server\/|shared\/|docs\/|\.ts|\.tsx|\.js|\.md)\b/i.test(text)) {
+    return false;
+  }
+  return /\btypically refers to\b/i.test(text);
 };
 
 const clipText = (value: string, max = 180): string =>
@@ -344,13 +353,36 @@ function clearStaleFailureFieldsForSuccessfulTerminal(
   }
 }
 
+function syncSuccessfulTerminalStatusMirrors(
+  payload: Record<string, unknown>,
+  envelope: HelixTerminalAnswerEnvelope,
+): void {
+  if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
+
+  payload.ok = true;
+  payload.status = "final_answer";
+  payload.final_status = "final_answer";
+  payload.response_type = "final_answer";
+
+  const existingSummary = readRecord(payload.resolved_turn_summary);
+  payload.resolved_turn_summary = {
+    ...(existingSummary ?? {}),
+    turn_id: envelope.turn_id,
+    final_status: "final_answer",
+    terminal_kind: "final_answer",
+    terminal_artifact_kind: envelope.terminal_artifact_kind,
+    terminal_error_code: null,
+    pending_server_request_present: false,
+  };
+}
+
 export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): HelixTerminalAnswerEnvelope {
   if (
     envelope.terminal_artifact_kind === "repo_code_evidence_answer" &&
-    isStaleRepoEvidenceTerminalText(envelope.terminal_text)
+    (isStaleRepoEvidenceTerminalText(envelope.terminal_text) || isUnbackedRepoEvidenceTerminalText(envelope.terminal_text))
   ) {
     const repairedText = buildRepoEvidenceTerminalRepairText(payload);
     if (repairedText) {
@@ -381,6 +413,7 @@ export function applyTerminalAnswerEnvelope(
   }
 
   clearStaleFailureFieldsForSuccessfulTerminal(payload, envelope);
+  syncSuccessfulTerminalStatusMirrors(payload, envelope);
 
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
@@ -393,6 +426,19 @@ export function applyTerminalAnswerEnvelope(
   payload.final_answer_source = envelope.final_answer_source;
   payload.terminal_answer_envelope = envelope;
   payload.terminal_boundary_eligibility = evaluateTerminalBoundaryEligibility(payload);
+  const runtimeRecord = readRecord(payload.turn_runtime);
+  if (runtimeRecord && envelope.terminal_kind !== "failure" && envelope.final_answer_source !== "typed_failure") {
+    payload.turn_runtime = {
+      ...runtimeRecord,
+      status: "completed",
+      terminal: {
+        kind: "final_answer",
+        text: envelope.terminal_text,
+        error_code: null,
+      },
+      missing_required_artifacts: [],
+    };
+  }
 
   const presentation = readRecord(payload.terminal_presentation);
   payload.terminal_presentation = {
@@ -461,6 +507,11 @@ export function applyTerminalAnswerEnvelope(
     debug.terminal_answer_authority = payload.terminal_answer_authority;
     debug.terminal_answer_envelope = envelope;
     if (envelope.terminal_kind !== "failure" && envelope.final_answer_source !== "typed_failure") {
+      debug.ok = true;
+      debug.status = "final_answer";
+      debug.final_status = "final_answer";
+      debug.response_type = "final_answer";
+      debug.resolved_turn_summary = payload.resolved_turn_summary;
       delete debug.terminal_error_code;
       delete debug.terminal_failure_text;
       delete debug.typed_failure;

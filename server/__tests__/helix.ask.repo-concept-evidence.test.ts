@@ -190,13 +190,19 @@ describe("Helix Ask repo concept evidence", () => {
     const ranked = rankRepoCodeEvidenceHits({
       query: "Situation Room",
       concept: "Situation Room",
+      exactTerms: ["Situation Room", "SituationRoom", "SituationRoomStore", "useSituationRoomStore"],
       hits: [
         { filePath: "docs/random.md", line: 1, text: "unrelated", term: "room" },
+        { filePath: "server/services/helix-ask/ask-turn-solver.ts", line: 12, text: "import { buildSituationContextPack } from '../situation-room/situation-context-pack';", term: "situation" },
+        { filePath: "client/src/store/useSituationRoomStore.ts", line: 82, text: "export type SituationRoomStoreState = { createRoom: (title?: string) => SituationRoom; sources: Record<string, SituationRoomSource>; }", term: "SituationRoom" },
         { filePath: "server/services/helix-ask/situation-room-router.ts", line: 12, text: "Situation Room routes", term: "situation" },
         { filePath: "node_modules/pkg/index.js", line: 1, text: "Situation Room", term: "situation" },
       ],
     });
-    expect(ranked[0]?.filePath).toBe("server/services/helix-ask/situation-room-router.ts");
+    expect(ranked[0]?.filePath).toBe("client/src/store/useSituationRoomStore.ts");
+    expect(ranked.findIndex((hit) => hit.filePath === "client/src/store/useSituationRoomStore.ts")).toBeLessThan(
+      ranked.findIndex((hit) => hit.filePath === "server/services/helix-ask/ask-turn-solver.ts"),
+    );
     expect(ranked.some((hit) => hit.filePath.includes("node_modules"))).toBe(false);
   });
 
@@ -249,6 +255,8 @@ describe("Helix Ask repo concept evidence", () => {
     expect(result.rankedResult.hits.length).toBeGreaterThan(0);
     expect(result.rankedResult.hits.length).toBeLessThanOrEqual(6);
     expect(result.observation.spans.length).toBe(result.rankedResult.hits.length);
+    expect(result.observation.spans[0]?.path).toMatch(/client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts|client\/src\/lib\/helix\/situation-room\.ts|server\/services\/situation-room\//);
+    expect(result.observation.spans.some((span) => /client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts/.test(span.path))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes("node_modules"))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes(".."))).toBe(true);
   });
