@@ -50,6 +50,7 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "workstation_tool_evaluation",
   "repo_entity_definition",
   "direct_answer_text",
+  "model_synthesized_answer",
   "no_tool_direct",
   "model_only_concept",
   "client_projection",
@@ -213,7 +214,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget,
       allowedCore: ["doc_location_result"],
-      allowedExtra: ["active_doc_identity", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation"],
+      allowedExtra: ["active_doc_identity", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation", "model_synthesized_answer"],
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
     });
@@ -415,6 +416,7 @@ export function buildRouteProductContract(input: {
         "workspace_action_receipt",
         "workstation_tool_evaluation",
         "tool_evaluation",
+        "model_synthesized_answer",
         "note_update_receipt",
         "note_context_pack",
         "source_binding_status",
@@ -441,6 +443,7 @@ export function buildRouteProductContract(input: {
         "workspace_action_receipt",
         "workstation_tool_evaluation",
         "tool_evaluation",
+        "model_synthesized_answer",
         "note_update_receipt",
         "note_context_pack",
         "source_binding_status",
@@ -488,6 +491,7 @@ export function buildRouteProductContract(input: {
         "calculation_trace",
         "tool_evaluation",
         "turn_final_text",
+        "model_synthesized_answer",
         "source_binding_status",
         "source_binding_repair_candidate",
       ],
@@ -514,8 +518,8 @@ export function buildRouteProductContract(input: {
     sourceTarget,
     allowedCore: [],
     allowedExtra: sourceTarget === "model_only" || sourceTarget === "general_background" || sourceTarget === "unknown"
-      ? ["direct_answer_text", "source_binding_status", "source_binding_repair_candidate"]
-      : ["direct_answer_text", "workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation", "active_doc_identity", "doc_summary", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "composite_turn_receipt", "pending_server_request"],
+      ? ["direct_answer_text", "model_synthesized_answer", "source_binding_status", "source_binding_repair_candidate"]
+      : ["direct_answer_text", "model_synthesized_answer", "workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation", "active_doc_identity", "doc_summary", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "composite_turn_receipt", "pending_server_request"],
     forbiddenExtra: ["no_tool_direct", "model_only_concept", "client_projection", "panel_generated_answer"],
     precedenceReason: "default_terminal_product_contract_allows_loop_owned_products",
   });

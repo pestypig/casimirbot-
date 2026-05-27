@@ -1,0 +1,305 @@
+import type { HelixRouteProductContract } from "@shared/helix-route-product-contract";
+import { evaluateRepoAnswerTextQualityGate } from "./repo-answer-text-quality-gate";
+import {
+  collectFinalAnswerDraftSupportRefs,
+  evaluateFinalAnswerDraftQualityGate,
+  inferFinalAnswerDraftRouteFamily,
+  type FinalAnswerDraftQualityGate,
+} from "./final-answer-draft-quality-gate";
+
+export type FinalAnswerDraftTerminalMaterializerResult = {
+  schema: "helix.final_answer_draft_terminal_materializer_result.v1";
+  turn_id: string;
+  final_answer_draft_ref: string;
+  ok: boolean;
+  materialized_terminal_artifact_ref?: string;
+  materialized_terminal_artifact_kind?:
+    | "model_synthesized_answer"
+    | "repo_code_evidence_answer"
+    | "situation_room_live_job_setup_answer"
+    | "request_user_input"
+    | "typed_failure";
+  blocked_reason?:
+    | "draft_empty"
+    | "draft_refusal"
+    | "draft_not_later_than_selected_direct_answer"
+    | "route_contract_forbids_model_synthesized_answer"
+    | "repo_evidence_required_but_missing"
+    | "repo_support_refs_missing"
+    | "repo_quality_gate_failed"
+    | "live_job_contract_missing"
+    | "unsupported_route_terminal_kind";
+  route_allowed_terminal_artifact_kinds: string[];
+  final_answer_draft_quality_gate: FinalAnswerDraftQualityGate;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+type ArtifactLike = {
+  artifact_id?: unknown;
+  kind?: unknown;
+  payload?: unknown;
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
+  readRecord(artifact.payload);
+
+const artifactKind = (artifact: ArtifactLike): string =>
+  readString(artifact.kind) ?? readString(artifactPayload(artifact)?.kind) ?? "";
+
+const artifactSchema = (artifact: ArtifactLike): string =>
+  readString(artifactPayload(artifact)?.schema) ?? "";
+
+const artifactId = (artifact: ArtifactLike): string | null =>
+  readString(artifact.artifact_id) ?? readString(artifactPayload(artifact)?.artifact_id);
+
+const artifactText = (artifact: ArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.visible_text);
+};
+
+export const isFinalAnswerDraftArtifact = (artifact: ArtifactLike): boolean =>
+  artifactKind(artifact) === "final_answer_draft" ||
+  artifactSchema(artifact) === "helix.final_answer_draft.v1";
+
+const isDirectAnswerArtifact = (artifact: ArtifactLike): boolean =>
+  artifactKind(artifact) === "direct_answer_text" ||
+  artifactSchema(artifact) === "helix.direct_answer_text.v1";
+
+const isRepoEvidenceObservation = (artifact: ArtifactLike): boolean =>
+  /repo_code_evidence_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+
+export const findLatestFinalAnswerDraftCandidate = (
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; sequence: number; text: string; ref: string } | null => {
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || !isFinalAnswerDraftArtifact(artifact)) continue;
+    const text = artifactText(artifact);
+    const ref = artifactId(artifact);
+    if (!text || !ref) continue;
+    return { artifact, sequence: index, text, ref };
+  }
+  return null;
+};
+
+export const latestDirectAnswerSequence = (artifacts: ArtifactLike[]): number =>
+  artifacts.reduce((latest, artifact, index) => isDirectAnswerArtifact(artifact) ? index : latest, -1);
+
+const allowedKinds = (contract?: HelixRouteProductContract | Record<string, unknown> | null): string[] =>
+  readArray(contract?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+
+const contractAllows = (
+  contract: HelixRouteProductContract | Record<string, unknown> | null | undefined,
+  kind: string,
+): boolean => {
+  const allowed = allowedKinds(contract);
+  return allowed.length === 0 || allowed.includes(kind);
+};
+
+const materializedRef = (turnId: string, kind: string): string =>
+  `${turnId}:${kind}:from_final_answer_draft`;
+
+export function materializeFinalAnswerDraftTerminal(input: {
+  turnId: string;
+  payload: Record<string, unknown>;
+  artifactLedger: ArtifactLike[];
+  routeProductContract?: HelixRouteProductContract | Record<string, unknown> | null;
+  finalAnswerDraftRef?: string | null;
+}): FinalAnswerDraftTerminalMaterializerResult | null {
+  const draft = findLatestFinalAnswerDraftCandidate(input.artifactLedger);
+  if (!draft) return null;
+  if (input.finalAnswerDraftRef && input.finalAnswerDraftRef !== draft.ref) return null;
+
+  const draftPayload = artifactPayload(draft.artifact);
+  const contract = input.routeProductContract ?? readRecord(input.payload.route_product_contract);
+  const routeAllowed = allowedKinds(contract);
+  const qualityGate = evaluateFinalAnswerDraftQualityGate({
+    turnId: input.turnId,
+    finalAnswerDraftRef: draft.ref,
+    draftText: draft.text,
+    draftPayload,
+    promptText: readString(input.payload.active_prompt),
+    routeProductContract: contract,
+    payload: input.payload,
+    artifactLedger: input.artifactLedger,
+  });
+  input.payload.final_answer_draft_quality_gate = qualityGate;
+
+  const directSequence = latestDirectAnswerSequence(input.artifactLedger);
+  const routeFamily = inferFinalAnswerDraftRouteFamily({
+    routeProductContract: contract,
+    payload: input.payload,
+    artifactLedger: input.artifactLedger,
+  });
+  if (!qualityGate.ok) {
+    const blocked = qualityGate.violations.includes("empty_draft")
+      ? "draft_empty"
+      : qualityGate.violations.includes("refusal_without_error")
+        ? "draft_refusal"
+        : qualityGate.violations.includes("missing_support_refs_for_repo_route")
+          ? "repo_support_refs_missing"
+          : "unsupported_route_terminal_kind";
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: false,
+      blocked_reason: blocked,
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (routeFamily === "repo_evidence") {
+    if (!input.artifactLedger.some(isRepoEvidenceObservation)) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "repo_evidence_required_but_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const supportRefs = collectFinalAnswerDraftSupportRefs({
+      draftPayload,
+      artifactLedger: input.artifactLedger,
+    });
+    if (supportRefs.length === 0) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "repo_support_refs_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const repoAnswerRef = materializedRef(input.turnId, "repo_code_evidence_answer");
+    input.payload.repo_code_evidence_answer = {
+      schema: "helix.repo_code_evidence_answer.v1",
+      artifact_id: repoAnswerRef,
+      turn_id: input.turnId,
+      text: draft.text,
+      answer_text: draft.text,
+      support_refs: supportRefs,
+      model_authored: true,
+      synthesis_attempt_ref:
+        readString(input.artifactLedger.find((artifact) =>
+          artifactKind(artifact) === "repo_evidence_synthesis_attempt" ||
+          artifactSchema(artifact) === "helix.repo_evidence_synthesis_attempt.v1",
+        )?.artifact_id) ?? `${input.turnId}:repo_evidence_synthesis_attempt:from_final_answer_draft`,
+      model_step_capability:
+        readString(draftPayload?.model_step_capability) ??
+        "model.synthesize_from_repo_evidence",
+      final_answer_draft_ref: draft.ref,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const repoGate = evaluateRepoAnswerTextQualityGate({
+      turnId: input.turnId,
+      answerRef: repoAnswerRef,
+      answerText: draft.text,
+      payload: input.payload,
+    });
+    input.payload.repo_answer_text_quality_gate = repoGate;
+    if (!repoGate.ok) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "repo_quality_gate_failed",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: true,
+      materialized_terminal_artifact_ref: repoAnswerRef,
+      materialized_terminal_artifact_kind: "repo_code_evidence_answer",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (directSequence >= draft.sequence) {
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: false,
+      blocked_reason: "draft_not_later_than_selected_direct_answer",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (!contractAllows(contract, "model_synthesized_answer")) {
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: false,
+      blocked_reason: "route_contract_forbids_model_synthesized_answer",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  const ref = materializedRef(input.turnId, "model_synthesized_answer");
+  input.payload.model_synthesized_answer = {
+    schema: "helix.model_synthesized_answer.v1",
+    artifact_id: ref,
+    turn_id: input.turnId,
+    text: draft.text,
+    answer_text: draft.text,
+    final_answer_draft_ref: draft.ref,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return {
+    schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+    turn_id: input.turnId,
+    final_answer_draft_ref: draft.ref,
+    ok: true,
+    materialized_terminal_artifact_ref: ref,
+    materialized_terminal_artifact_kind: "model_synthesized_answer",
+    route_allowed_terminal_artifact_kinds: routeAllowed,
+    final_answer_draft_quality_gate: qualityGate,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}

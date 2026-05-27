@@ -6,6 +6,11 @@ import {
   applyTerminalAnswerEnvelope,
   resolveTerminalAnswerEnvelope,
 } from "./terminal-answer-envelope";
+import {
+  findLatestFinalAnswerDraftCandidate,
+  latestDirectAnswerSequence,
+  materializeFinalAnswerDraftTerminal,
+} from "./final-answer-draft-terminal-materializer";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -160,6 +165,38 @@ export function applyHelixTerminalAuthoritySingleWriter(
   };
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] = [];
+  const draftMaterialization = materializeFinalAnswerDraftTerminal({
+    turnId: input.turnId,
+    payload: input.payload,
+    artifactLedger: artifacts,
+    routeProductContract: readRecord(input.payload.route_product_contract),
+  });
+  if (draftMaterialization) {
+    input.payload.final_answer_draft_selection = {
+      candidate_count: artifacts.filter(isFinalAnswerDraft).length,
+      latest_final_answer_draft_ref: draftMaterialization.final_answer_draft_ref,
+      latest_final_answer_draft_sequence: findLatestFinalAnswerDraftCandidate(artifacts)?.sequence ?? null,
+      latest_final_answer_draft_quality_ok: draftMaterialization.final_answer_draft_quality_gate.ok,
+      latest_final_answer_draft_quality_violations: draftMaterialization.final_answer_draft_quality_gate.violations,
+      materialized_terminal_artifact_kind: draftMaterialization.materialized_terminal_artifact_kind ?? null,
+      materialized_terminal_artifact_ref: draftMaterialization.materialized_terminal_artifact_ref ?? null,
+      selected_over_direct_answer_text: draftMaterialization.ok && latestDirectAnswerSequence(artifacts) >= 0,
+      rejected_direct_answer_text_reason:
+        draftMaterialization.ok && latestDirectAnswerSequence(artifacts) >= 0
+          ? "later_valid_final_answer_draft"
+          : null,
+      blocked_reason: draftMaterialization.blocked_reason ?? null,
+    };
+    input.payload.route_terminal_materialization = {
+      route_family: draftMaterialization.final_answer_draft_quality_gate.route_family,
+      source_target: readString(readRecord(input.payload.route_product_contract)?.source_target),
+      required_terminal_kind: readString(readRecord(input.payload.canonical_goal_frame)?.required_terminal_kind),
+      allowed_terminal_artifact_kinds: draftMaterialization.route_allowed_terminal_artifact_kinds,
+      materialization_attempted: true,
+      materialization_ok: draftMaterialization.ok,
+      materialization_blocked_reason: draftMaterialization.blocked_reason ?? null,
+    };
+  }
   const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isPostToolObservation(artifact) ? index : latest, -1);
@@ -199,7 +236,37 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (selectedDraft) {
+  if (draftMaterialization?.ok) {
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    const text = latestDraft?.text ?? readString(input.payload.selected_final_answer) ?? "I could not produce a terminal answer for this turn.";
+    selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;
+    selectedArtifactKind = draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer";
+    selectedSource = "final_answer_draft";
+    input.payload.terminal_artifact_kind = selectedArtifactKind;
+    input.payload.final_answer_source = "final_answer_draft";
+    input.payload.selected_final_answer = text;
+    input.payload.answer = text;
+    input.payload.text = text;
+    input.payload.assistant_answer = text;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: selectedArtifactKind,
+      concise_text: text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const directSequence = latestDirectAnswerSequence(artifacts);
+    if (directSequence >= 0) {
+      const direct = artifacts[directSequence];
+      rejectedCandidates.push({
+        ref: direct ? artifactId(direct) ?? undefined : undefined,
+        kind: "direct_answer_text",
+        reason: "later_valid_final_answer_draft",
+      });
+    }
+  } else if (selectedDraft) {
     const text = artifactText(selectedDraft.artifact) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = artifactId(selectedDraft.artifact);
     selectedArtifactKind = "model_synthesized_answer";
@@ -247,7 +314,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
   });
   const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   const visibleText = appliedEnvelope.terminal_text;
-  const draftText = selectedDraft ? artifactText(selectedDraft.artifact) : null;
+  const latestDraftForIntegrity = findLatestFinalAnswerDraftCandidate(artifacts);
+  const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const receiptVisibleAsAnswer = artifacts.some((artifact) => {
     if (!isForbiddenReceiptOrProjection(artifact)) return false;
     const text = artifactText(artifact);
@@ -296,6 +364,12 @@ export function applyHelixTerminalAuthoritySingleWriter(
         entry.reason === "receipt_or_projection" || entry.reason === "route_contract_forbidden"
       ).length,
       payload_mirror_written_after_terminal_selection: true,
+      selected_over_direct_answer_text: draftMaterialization?.ok === true && latestDirectAnswerSequence(artifacts) >= 0,
+      final_answer_draft_quality_ok: draftMaterialization?.final_answer_draft_quality_gate.ok,
+      final_answer_draft_quality_violations: draftMaterialization?.final_answer_draft_quality_gate.violations,
+      materialized_terminal_artifact_kind: draftMaterialization?.materialized_terminal_artifact_kind ?? null,
+      materialized_terminal_artifact_ref: draftMaterialization?.materialized_terminal_artifact_ref ?? null,
+      materialization_blocked_reason: draftMaterialization?.blocked_reason ?? null,
     },
   };
 

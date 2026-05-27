@@ -33,6 +33,7 @@ import {
 } from "./situation-construct-store";
 import { getSituationConstructRecipe } from "./situation-construct-recipe-registry";
 import { planSituationRoomLiveJobSetup } from "../helix-ask/situation-room-live-job-setup-planner";
+import { upsertLiveJobContract } from "../live-job/live-job-contract-store";
 
 export type RunSituationConstructRecipeInput = {
   recipe_id: HelixSituationConstructRecipeId | string;
@@ -218,6 +219,19 @@ const liveAnswerOutputBinding = (
   status: environmentId ? "active" : "planned",
 });
 
+const registerLiveJobContract = (args: {
+  contract: SituationRoomLiveJobContract;
+  threadId: string;
+  roomId: string;
+  environmentId?: string | null;
+}): SituationRoomLiveJobContract =>
+  upsertLiveJobContract({
+    contract: args.contract,
+    thread_id: args.threadId,
+    room_id: args.roomId,
+    environment_id: args.environmentId ?? null,
+  });
+
 const constructName = (
   recipe: HelixSituationConstructRecipe,
   type: HelixSituationConstructType,
@@ -287,6 +301,12 @@ const runGenericPlannedRecipe = (args: {
     sourceIds,
     now: args.createdAt,
   });
+  const liveJobContract = registerLiveJobContract({
+    contract: setupPlan.live_job_contract,
+    threadId: args.threadId,
+    roomId: args.roomId,
+    environmentId: normalizeString(args.input.environment_id),
+  });
   return {
     schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
     run_id: args.runId,
@@ -298,7 +318,7 @@ const runGenericPlannedRecipe = (args: {
     receipt_refs: [],
     commentary_refs: [],
     missing_evidence: [],
-    live_job_contract: setupPlan.live_job_contract,
+    live_job_contract: liveJobContract,
     construct_observation: buildConstructObservation({
       recipe: args.recipe,
       runId: args.runId,
@@ -307,7 +327,7 @@ const runGenericPlannedRecipe = (args: {
       createdAt: args.createdAt,
       constructs,
       missingInputs: setupPlan.missing_inputs,
-      contract: setupPlan.live_job_contract,
+      contract: liveJobContract,
     }),
     assistant_answer: false,
     raw_content_included: false,
@@ -515,6 +535,12 @@ const runBrowserAudioTranscriberRecipe = (args: {
     sourceIds,
     now: args.createdAt,
   });
+  const liveJobContract = registerLiveJobContract({
+    contract: setupPlan.live_job_contract,
+    threadId: args.threadId,
+    roomId: args.roomId,
+    environmentId,
+  });
 
   return {
     schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
@@ -527,7 +553,7 @@ const runBrowserAudioTranscriberRecipe = (args: {
     receipt_refs: [sourceBindingId, transcriptionJobId, commentaryPolicyId],
     commentary_refs: [],
     missing_evidence: [],
-    live_job_contract: setupPlan.live_job_contract,
+    live_job_contract: liveJobContract,
     construct_observation: buildConstructObservation({
       recipe: args.recipe,
       runId: args.runId,
@@ -536,7 +562,7 @@ const runBrowserAudioTranscriberRecipe = (args: {
       createdAt: args.createdAt,
       constructs,
       missingInputs: setupPlan.missing_inputs,
-      contract: setupPlan.live_job_contract,
+      contract: liveJobContract,
     }),
     assistant_answer: false,
     raw_content_included: false,
@@ -586,6 +612,12 @@ export function runSituationConstructRecipe(
       sourceIds: uniqueStrings(input.source_ids ?? []),
       now: createdAt,
     });
+    const liveJobContract = registerLiveJobContract({
+      contract: setupPlan.live_job_contract,
+      threadId,
+      roomId,
+      environmentId: normalizeString(input.environment_id),
+    });
     return {
       schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
       run_id: runId,
@@ -597,7 +629,7 @@ export function runSituationConstructRecipe(
       receipt_refs: [],
       commentary_refs: [],
       missing_evidence: missing.map((key: string) => `Missing required recipe input: ${key}`),
-      live_job_contract: setupPlan.live_job_contract,
+      live_job_contract: liveJobContract,
       construct_observation: buildConstructObservation({
         recipe,
         runId,
@@ -606,7 +638,7 @@ export function runSituationConstructRecipe(
         createdAt,
         constructs: [],
         missingInputs: Array.from(new Set([...missing, ...setupPlan.missing_inputs])),
-        contract: setupPlan.live_job_contract,
+        contract: liveJobContract,
       }),
       assistant_answer: false,
       raw_content_included: false,
@@ -647,6 +679,12 @@ export function runSituationConstructRecipe(
       sourceIds: uniqueStrings(input.source_ids ?? []),
       now: createdAt,
     });
+    const liveJobContract = registerLiveJobContract({
+      contract: setupPlan.live_job_contract,
+      threadId,
+      roomId,
+      environmentId: normalizeString(input.environment_id),
+    });
     return {
       schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
       run_id: runId,
@@ -658,7 +696,7 @@ export function runSituationConstructRecipe(
       receipt_refs: receipt.child_artifact_refs,
       commentary_refs: Array.from(new Set(commentaryRefs)),
       missing_evidence: [],
-      live_job_contract: setupPlan.live_job_contract,
+      live_job_contract: liveJobContract,
       construct_observation: buildConstructObservation({
         recipe,
         runId,
@@ -667,7 +705,7 @@ export function runSituationConstructRecipe(
         createdAt,
         constructs,
         missingInputs: setupPlan.missing_inputs,
-        contract: setupPlan.live_job_contract,
+        contract: liveJobContract,
       }),
       assistant_answer: false,
       raw_content_included: false,

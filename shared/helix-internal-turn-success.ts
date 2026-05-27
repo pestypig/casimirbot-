@@ -30,6 +30,13 @@ export type HelixInternalTurnSuccess = {
     final_answer_draft_exists: boolean;
     final_answer_draft_ref?: string;
     final_answer_draft_sequence?: number;
+    final_answer_draft_is_later_than_direct_answer?: boolean;
+    final_answer_draft_quality_ok?: boolean;
+    materialized_terminal_artifact_kind?: string;
+    model_only_synthesis_succeeded?: boolean;
+    repo_source_synthesis_succeeded?: boolean;
+    docs_source_synthesis_succeeded?: boolean;
+    calculator_synthesis_succeeded?: boolean;
     goal_satisfaction: "satisfied" | "partially_satisfied" | "unsatisfied" | "unknown";
     pending_tool_call_ids: string[];
   };
@@ -49,6 +56,9 @@ export type HelixInternalTurnSuccess = {
     receipt_visible_as_answer: boolean;
     legacy_fallback_visible: boolean;
     generic_terminal_failure_visible: boolean;
+    visible_selected_earlier_direct_answer?: boolean;
+    missing_allowed_terminal_artifact_despite_valid_draft?: boolean;
+    typed_failure_despite_valid_draft?: boolean;
   };
   outcome: HelixInternalTurnSuccessOutcome;
   repair: {
@@ -57,6 +67,7 @@ export type HelixInternalTurnSuccess = {
       | "invoke_terminal_authority_single_writer"
       | "replace_visible_text_with_selected_artifact"
       | "emit_projection_failure_typed_failure"
+      | "materialize_final_answer_draft"
       | "none";
     repair_succeeded?: boolean;
   };
@@ -74,4 +85,7 @@ export type HelixTerminalProjectionHealth = {
   stale_failure_visible: boolean;
   projection_mismatch_gate_applied: boolean;
   projection_mismatch_repaired: boolean;
+  visible_selected_earlier_direct_answer?: boolean;
+  missing_allowed_terminal_artifact_despite_valid_draft?: boolean;
+  typed_failure_despite_valid_draft?: boolean;
 };

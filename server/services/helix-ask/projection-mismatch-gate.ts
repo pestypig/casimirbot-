@@ -38,6 +38,9 @@ const projectionHealthFrom = (
   stale_failure_visible: success.visible.stale_failure_visible,
   projection_mismatch_gate_applied: gateApplied,
   projection_mismatch_repaired: repaired,
+  visible_selected_earlier_direct_answer: success.visible.visible_selected_earlier_direct_answer,
+  missing_allowed_terminal_artifact_despite_valid_draft: success.visible.missing_allowed_terminal_artifact_despite_valid_draft,
+  typed_failure_despite_valid_draft: success.visible.typed_failure_despite_valid_draft,
 });
 
 export function applyHelixProjectionMismatchGate(input: {

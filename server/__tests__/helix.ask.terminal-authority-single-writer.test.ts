@@ -62,7 +62,7 @@ describe("Helix terminal authority single writer", () => {
     });
 
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
-    expect(result.selected_terminal_artifact_ref).toBe(`${turnId}:final_answer_draft`);
+    expect(result.selected_terminal_artifact_ref).toBe(`${turnId}:model_synthesized_answer:from_final_answer_draft`);
     expect(result.visible_text).toBe("docs-viewer has been successfully opened.");
     expect(result.integrity.visible_matches_draft).toBe(true);
     expect(result.integrity.stale_failure_visible).toBe(false);

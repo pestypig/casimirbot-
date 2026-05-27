@@ -1,9 +1,11 @@
 import type { LiveJobPolicyObservation } from "@shared/live-job-policy-observation";
+import type { LiveAnswersProjection } from "@shared/live-answers-projection";
 import type { LiveSourceObservation } from "@shared/live-source-observation";
 import type { VoiceProposal } from "@shared/voice-proposal";
 import { listLiveJobPolicyObservations } from "../live-job/live-job-policy-observation-store";
 import { listLiveSourceObservations } from "../live-source/live-source-observation-store";
 import { listVoiceProposals } from "../voice/voice-proposal-store";
+import { listLiveAnswersProjections } from "./live-answers-projection";
 
 export const LIVE_ANSWERS_QUERY_OBSERVATION_SCHEMA =
   "helix.live_answers_query_observation.v1" as const;
@@ -22,12 +24,14 @@ export type LiveAnswersQueryObservation = {
     voice_policy?: string | null;
     spoken: false;
   };
+  live_answers_projections: LiveAnswersProjection[];
   source_observations: LiveSourceObservation[];
   policy_observations: LiveJobPolicyObservation[];
   voice_proposals: VoiceProposal[];
   assistant_answer: false;
   raw_content_included: false;
   terminal_eligible: false;
+  post_tool_model_step_required: true;
 };
 
 const latest = <T>(values: T[]): T | null =>
@@ -52,9 +56,14 @@ export function queryLiveAnswersEvidence(input: {
     contractId: input.contractId,
     limit: input.limit ?? 20,
   });
+  const liveAnswersProjections = listLiveAnswersProjections({
+    contractId: input.contractId,
+    limit: input.limit ?? 50,
+  });
   const latestPolicy = latest(policyObservations);
   const latestSource = latest(sourceObservations);
   const latestVoice = latest(voiceProposals);
+  const latestProjection = latest(liveAnswersProjections);
   const routeState = latestSource?.payload_summary?.route_state?.status ?? "unknown";
   const jobStatus =
     latestPolicy?.status === "blocked"
@@ -71,6 +80,12 @@ export function queryLiveAnswersEvidence(input: {
     ...sourceObservations.flatMap((entry) => entry.evidence_refs),
     ...policyObservations.map((entry) => entry.observation_id),
     ...policyObservations.flatMap((entry) => entry.source_observation_refs),
+    ...liveAnswersProjections.map((entry) => entry.projection_id),
+    ...liveAnswersProjections.flatMap((entry) => [
+      ...entry.source_observation_refs,
+      ...entry.policy_observation_refs,
+      ...entry.voice_proposal_refs,
+    ]),
     ...voiceProposals.map((entry) => entry.proposal_id),
   ]));
 
@@ -81,18 +96,20 @@ export function queryLiveAnswersEvidence(input: {
     evidence_refs: evidenceRefs,
     current_state: {
       job_status: jobStatus,
-      route_state: routeState,
-      source_freshness: latestSource?.freshness.status ?? "unknown",
+      route_state: latestProjection?.state.route_state ?? routeState,
+      source_freshness: latestProjection?.state.source_freshness ?? latestSource?.freshness.status ?? "unknown",
       last_trigger: latestPolicy?.policy_evaluation.trigger_matched ? latestPolicy.event_kind : null,
       last_suppression_reason: latestPolicy?.policy_evaluation.suppression_reason ?? null,
       voice_policy: latestVoice?.voice_policy ?? null,
       spoken: false,
     },
+    live_answers_projections: liveAnswersProjections,
     source_observations: sourceObservations,
     policy_observations: policyObservations,
     voice_proposals: voiceProposals,
     assistant_answer: false,
     raw_content_included: false,
     terminal_eligible: false,
+    post_tool_model_step_required: true,
   };
 }

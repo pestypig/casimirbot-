@@ -43,7 +43,9 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "missing_post_tool_model_step"
   | "pending_tool_call"
   | "legacy_direct_writer_quarantined"
-  | "lower_priority_than_selected_artifact";
+  | "lower_priority_than_selected_artifact"
+  | "later_valid_final_answer_draft"
+  | "route_requires_synthesis";
 
 export type HelixTerminalAuthoritySingleWriterResult = {
   schema: "helix.terminal_authority_single_writer_result.v1";
@@ -91,5 +93,11 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     legacy_terminal_candidate_count: number;
     forbidden_terminal_candidate_count: number;
     payload_mirror_written_after_terminal_selection: boolean;
+    selected_over_direct_answer_text?: boolean;
+    final_answer_draft_quality_ok?: boolean;
+    final_answer_draft_quality_violations?: string[];
+    materialized_terminal_artifact_kind?: string | null;
+    materialized_terminal_artifact_ref?: string | null;
+    materialization_blocked_reason?: string | null;
   };
 };

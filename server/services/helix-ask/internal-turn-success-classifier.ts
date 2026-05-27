@@ -61,6 +61,10 @@ const isFinalDraft = (artifact: HelixClassifierArtifact): boolean =>
   kindOf(artifact) === "final_answer_draft" ||
   schemaOf(artifact) === "helix.final_answer_draft.v1";
 
+const isDirectAnswer = (artifact: HelixClassifierArtifact): boolean =>
+  kindOf(artifact) === "direct_answer_text" ||
+  schemaOf(artifact) === "helix.direct_answer_text.v1";
+
 const isGenericTerminalFailure = (text: string | null | undefined): boolean =>
   /\bI could not produce a terminal answer for this turn\b/i.test(text ?? "");
 
@@ -82,11 +86,13 @@ export function classifyHelixInternalTurnSuccess(input: {
   const ledger = input.artifact_ledger;
   let latestObservation: { artifact: HelixClassifierArtifact; sequence: number } | null = null;
   let finalDraft: { artifact: HelixClassifierArtifact; sequence: number } | null = null;
+  let directAnswer: { artifact: HelixClassifierArtifact; sequence: number } | null = null;
   for (let index = 0; index < ledger.length; index += 1) {
     const artifact = ledger[index];
     if (!artifact) continue;
     if (isSuccessfulObservationPacket(artifact)) latestObservation = { artifact, sequence: index };
     if (isFinalDraft(artifact) && textOf(artifact)) finalDraft = { artifact, sequence: index };
+    if (isDirectAnswer(artifact) && textOf(artifact)) directAnswer = { artifact, sequence: index };
   }
 
   const writer = input.terminal_authority_single_writer_result ?? null;
@@ -123,9 +129,37 @@ export function classifyHelixInternalTurnSuccess(input: {
   const legacyFallbackVisible = isLegacyFallback(visibleText);
   const receiptVisibleAsAnswer = writer?.integrity?.receipt_visible_as_answer === true;
   const terminalErrorCode = readString(input.payload_snapshot?.terminal_error_code) ?? undefined;
-  const internalSuccess = Boolean(postToolSatisfied || finalDraft);
+  const finalDraftSelection = readRecord(input.payload_snapshot?.final_answer_draft_selection);
+  const materialization = readRecord(input.payload_snapshot?.route_terminal_materialization);
+  const materializationOk = materialization?.materialization_ok === true || Boolean(finalDraftSelection?.materialized_terminal_artifact_kind);
+  const draftQualityOk =
+    finalDraftSelection?.latest_final_answer_draft_quality_ok === true ||
+    readRecord(input.payload_snapshot?.final_answer_draft_quality_gate)?.ok === true ||
+    (Boolean(finalDraft) && !finalDraftSelection);
+  const finalDraftLaterThanDirect = Boolean(finalDraft && (!directAnswer || finalDraft.sequence > directAnswer.sequence));
+  const routeFamily = readString(materialization?.route_family);
+  const internalSuccess = Boolean(postToolSatisfied || (finalDraft && draftQualityOk));
   const visibleSuccess = Boolean(singleWriterApplied && visibleMatchesSelected && !staleFailureVisible && !genericFailureVisible && !receiptVisibleAsAnswer);
   const visibleHasText = Boolean(visibleText && !staleFailureVisible && !genericFailureVisible);
+  const visibleSelectedEarlierDirectAnswer = Boolean(
+    finalDraft &&
+    directAnswer &&
+    finalDraft.sequence > directAnswer.sequence &&
+    visibleText &&
+    visibleText === textOf(directAnswer.artifact) &&
+    visibleText !== finalDraftText,
+  );
+  const missingAllowedTerminalArtifactDespiteValidDraft = Boolean(
+    finalDraft &&
+    draftQualityOk &&
+    terminalErrorCode === "missing_allowed_terminal_artifact",
+  );
+  const typedFailureDespiteValidDraft = Boolean(
+    finalDraft &&
+    draftQualityOk &&
+    (readString(input.payload_snapshot?.terminal_artifact_kind) === "typed_failure" ||
+      readString(input.payload_snapshot?.final_answer_source) === "typed_failure"),
+  );
   const outcome: HelixInternalTurnSuccess["outcome"] =
     internalSuccess && visibleSuccess
       ? "internal_success_and_visible_success"
@@ -150,6 +184,13 @@ export function classifyHelixInternalTurnSuccess(input: {
       final_answer_draft_exists: Boolean(finalDraft),
       final_answer_draft_ref: finalDraft ? idOf(finalDraft.artifact) : undefined,
       final_answer_draft_sequence: finalDraft?.sequence,
+      final_answer_draft_is_later_than_direct_answer: finalDraftLaterThanDirect,
+      final_answer_draft_quality_ok: draftQualityOk,
+      materialized_terminal_artifact_kind: readString(finalDraftSelection?.materialized_terminal_artifact_kind) ?? readString(materialization?.materialized_terminal_artifact_kind) ?? undefined,
+      model_only_synthesis_succeeded: Boolean(finalDraft && draftQualityOk && routeFamily === "model_only"),
+      repo_source_synthesis_succeeded: Boolean(finalDraft && draftQualityOk && routeFamily === "repo_evidence" && materializationOk),
+      docs_source_synthesis_succeeded: Boolean(finalDraft && draftQualityOk && routeFamily === "docs_source"),
+      calculator_synthesis_succeeded: Boolean(finalDraft && draftQualityOk && routeFamily === "calculator_tool"),
       goal_satisfaction: goalSatisfaction,
       pending_tool_call_ids: [],
     },
@@ -172,6 +213,9 @@ export function classifyHelixInternalTurnSuccess(input: {
       receipt_visible_as_answer: receiptVisibleAsAnswer,
       legacy_fallback_visible: legacyFallbackVisible,
       generic_terminal_failure_visible: genericFailureVisible,
+      visible_selected_earlier_direct_answer: visibleSelectedEarlierDirectAnswer,
+      missing_allowed_terminal_artifact_despite_valid_draft: missingAllowedTerminalArtifactDespiteValidDraft,
+      typed_failure_despite_valid_draft: typedFailureDespiteValidDraft,
     },
     outcome,
     repair: input.repair ?? {
