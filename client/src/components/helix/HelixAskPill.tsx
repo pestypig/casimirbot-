@@ -177,6 +177,10 @@ import {
   type MirekReasoningArtifactV1,
   type MirekReasoningCanonicalStateV1,
 } from "@shared/helix-reasoning-mirek";
+import type {
+  HelixCausalTurnEvent,
+  HelixCausalTurnTimeline,
+} from "@shared/helix-causal-turn-timeline";
 import type { KnowledgeProjectExport } from "@shared/knowledge";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
@@ -6021,6 +6025,8 @@ type HelixAskReply = {
     stage05_two_pass_batches?: number;
     stage05_overflow_policy?: "single_pass" | "two_pass" | null;
     reasoning_theater_state_v1?: HelixAskReasoningTheaterStateV1;
+    causal_turn_timeline?: HelixCausalTurnTimeline;
+    causal_turn_timeline_summary?: unknown;
     intent_contract_hash?: string;
     intent_contract_mutation_detected?: boolean;
     equation_candidate_total?: number;
@@ -7420,14 +7426,142 @@ function resolveHelixTurnTranscriptEvents(reply: HelixAskReply): Record<string, 
   return normalizeEvents(auditEvents);
 }
 
-export function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
+type HelixTurnTranscriptRow = {
   key: string;
   role: string;
   label: string;
   text: string;
   meta: string;
   status: string;
-}> {
+};
+
+function readHelixCausalTurnTimeline(reply: HelixAskReply): HelixCausalTurnTimeline | null {
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const timelineRecord =
+    readAgentLoopAuditRecord(debugRecord?.causal_turn_timeline) ??
+    readAgentLoopAuditRecord((reply as Record<string, unknown>).causal_turn_timeline);
+  if (!timelineRecord) return null;
+  if (timelineRecord.schema !== "helix.causal_turn_timeline.v1") return null;
+  if (!Array.isArray(timelineRecord.events)) return null;
+  return timelineRecord as HelixCausalTurnTimeline;
+}
+
+function readHelixCausalTraceLabel(event: HelixCausalTurnEvent): string {
+  if (event.status === "blocked" || event.status === "failed") return "Notice";
+  switch (event.stage) {
+    case "prompt_received":
+      return "Input";
+    case "goal_classified":
+    case "source_target_decided":
+    case "route_label_set":
+    case "tool_surface_built":
+      return "Setup";
+    case "model_step_requested":
+    case "model_step_decided":
+    case "model_answer_artifact_created":
+      return event.stage === "model_step_decided" ? "Decision" : "Thinking";
+    case "deterministic_fallback_considered":
+    case "deterministic_fallback_used":
+      return "Fallback";
+    case "runtime_tool_call_validated":
+    case "runtime_tool_dispatched":
+      return "Working";
+    case "tool_observation_created":
+    case "repo_evidence_observation_created":
+      return "Observation";
+    case "coverage_gate_evaluated":
+    case "quality_gate_evaluated":
+    case "goal_satisfaction_evaluated":
+    case "solver_controller_decided":
+    case "projection_mismatch_checked":
+      return "Gate";
+    case "terminal_artifact_materialized":
+    case "terminal_artifact_selected":
+    case "terminal_candidate_rejected":
+      return "Terminal";
+    case "visible_response_written":
+      return "Final";
+    case "debug_export_written":
+      return "Debug";
+    default:
+      return "Trace";
+  }
+}
+
+function readHelixCausalTraceText(event: HelixCausalTurnEvent): string {
+  const publicSummary = coerceText(event.public_summary).trim();
+  if (publicSummary) return clipText(publicSummary, 260);
+
+  const parts: string[] = [];
+  const decision = coerceText(event.decision).trim();
+  const routeLabel = coerceText(event.route_label).trim();
+  const sourceTarget = coerceText(event.source_target).trim();
+  const capability = coerceText(event.selected_capability ?? event.model_step_capability).trim();
+  const reasonCode = coerceText(event.reason_code).trim();
+  if (decision) parts.push(humanizeAskLiveEventToken(decision));
+  if (capability) parts.push(`Capability: ${humanizeAskLiveEventToken(capability)}`);
+  if (routeLabel) parts.push(`Route: ${humanizeAskLiveEventToken(routeLabel)}`);
+  if (sourceTarget) parts.push(`Source: ${humanizeAskLiveEventToken(sourceTarget)}`);
+  if (event.fallback?.used) {
+    parts.push(`Fallback rule: ${humanizeAskLiveEventToken(event.fallback.rule_id ?? "used")}`);
+  }
+  if (event.terminal?.selected_terminal_artifact_kind) {
+    parts.push(`Selected ${humanizeAskLiveEventToken(event.terminal.selected_terminal_artifact_kind)}`);
+  }
+  if (Array.isArray(event.rejected) && event.rejected.length > 0) {
+    const reasons = dedupeStrings(event.rejected.map((entry) => entry.reason)).slice(0, 3);
+    parts.push(`Rejected: ${reasons.map(humanizeAskLiveEventToken).join(", ")}`);
+  }
+  if (reasonCode) parts.push(`Reason: ${humanizeAskLiveEventToken(reasonCode)}`);
+  return parts.length ? clipText(parts.join(". "), 260) : humanizeAskLiveEventToken(event.stage);
+}
+
+export function buildHelixCausalTurnTraceRows(reply: HelixAskReply): HelixTurnTranscriptRow[] {
+  const timeline = readHelixCausalTurnTimeline(reply);
+  if (!timeline) return [];
+  return timeline.events
+    .filter((event) => {
+      if (!event || event.raw_content_included !== false || event.assistant_answer !== false) return false;
+      return event.stage !== "prompt_received" && event.stage !== "debug_export_written";
+    })
+    .sort((left, right) => left.sequence - right.sequence)
+    .map((event) => {
+      const meta = [
+        humanizeAskLiveEventToken(event.producer),
+        humanizeAskLiveEventToken(event.stage),
+        event.status ? humanizeAskLiveEventToken(event.status) : "",
+        event.reason_code ? humanizeAskLiveEventToken(event.reason_code) : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+      return {
+        key: `${reply.id}-causal-trace-${event.event_id || event.sequence}`,
+        role: event.producer,
+        label: readHelixCausalTraceLabel(event),
+        text: readHelixCausalTraceText(event),
+        meta,
+        status: event.status ?? "succeeded",
+      };
+    });
+}
+
+function readHelixCausalTraceRowClass(row: HelixTurnTranscriptRow): string {
+  if (/\b(?:failed|blocked)\b/i.test(row.status)) {
+    return "border-amber-300/30 bg-amber-950/20 text-amber-50";
+  }
+  if (row.label === "Final" || row.label === "Terminal") {
+    return "border-violet-300/25 bg-violet-950/15 text-violet-50";
+  }
+  if (row.label === "Observation") {
+    return "border-emerald-300/25 bg-emerald-950/15 text-emerald-50";
+  }
+  if (row.label === "Gate") {
+    return "border-cyan-300/25 bg-cyan-950/15 text-cyan-50";
+  }
+  return "border-slate-600/30 bg-black/15 text-slate-100";
+}
+
+export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTranscriptRow[] {
   const transcriptEvents = resolveHelixTurnTranscriptEvents(reply);
   if (transcriptEvents.length > 0) {
     return transcriptEvents
@@ -7485,7 +7619,7 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskReply): Array<{
   const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
   const planItems = Array.isArray(plannerContract?.plan_items) ? plannerContract.plan_items : [];
   const observations = Array.isArray(runtimeSummary?.observations) ? runtimeSummary.observations : [];
-  const rows: Array<{ key: string; role: string; label: string; text: string; meta: string; status: string }> = [];
+  const rows: HelixTurnTranscriptRow[] = [];
   planItems.slice(0, 4).forEach((item, index) => {
     const record = readAgentLoopAuditRecord(item);
     rows.push({
@@ -30074,6 +30208,10 @@ export function HelixAskPill({
               runtimeSummary,
             ) ?? visibleResolvedTurn.primary_source_label;
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
+            const causalTurnTraceRows = buildHelixCausalTurnTraceRows(reply);
+            const causalTraceHasIssue = causalTurnTraceRows.some((row) =>
+              /\b(?:failed|blocked|superseded)\b/i.test(row.status),
+            );
             const transcriptFinalRowText =
               [...turnTranscriptRows]
                 .reverse()
@@ -30134,6 +30272,7 @@ export function HelixAskPill({
             const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
             const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
             const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
+            const latestCausalTraceTestId = isLatestReply ? "helix-ask-latest-causal-trace" : undefined;
             const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
             const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
             const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
@@ -30223,6 +30362,47 @@ export function HelixAskPill({
                                 {clipText(row.text, 260)}
                               </p>
                               <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-100/65">
+                                {row.meta}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                  {causalTurnTraceRows.length > 0 ? (
+                    <details
+                      open={askBusy || causalTraceHasIssue}
+                      className="rounded-2xl border border-slate-500/25 bg-slate-950/35 px-3 py-2 text-xs text-slate-50"
+                      data-testid={latestCausalTraceTestId}
+                    >
+                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-slate-200">
+                        Causal trace
+                        <span className="ml-2 rounded border border-slate-300/20 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100">
+                          {causalTurnTraceRows.length} events
+                        </span>
+                        {causalTraceHasIssue ? (
+                          <span className="ml-2 rounded border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-amber-100">
+                            needs attention
+                          </span>
+                        ) : null}
+                      </summary>
+                      <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                        {causalTurnTraceRows.map((row, index) => (
+                          <div
+                            key={row.key}
+                            className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 ${readHelixCausalTraceRowClass(row)}`}
+                            data-testid={isLatestReply ? "helix-ask-latest-causal-trace-row" : undefined}
+                          >
+                            <span className="mt-0.5 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] tabular-nums">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="break-words">
+                                <span className="text-slate-200/80">{row.label}: </span>
+                                {clipText(row.text, 260)}
+                              </p>
+                              <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-300/70">
                                 {row.meta}
                               </p>
                             </div>

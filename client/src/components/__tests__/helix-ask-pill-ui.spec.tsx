@@ -81,6 +81,7 @@ let buildNeedsRetrievalPlanEvent: typeof import("@/components/helix/HelixAskPill
 let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/HelixAskPill").syncDocViewerStateFromWorkstationAction;
 let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
 let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
+let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPill").buildHelixCausalTurnTraceRows;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -163,6 +164,7 @@ beforeAll(async () => {
     syncDocViewerStateFromWorkstationAction,
     copyDebugPayloadToClipboard,
     buildHelixTurnTranscriptRows,
+    buildHelixCausalTurnTraceRows,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -368,7 +370,11 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("buildHelixTurnTranscriptRows");
+    expect(source).toContain("buildHelixCausalTurnTraceRows");
     expect(source).toContain("Agent work log");
+    expect(source).toContain("Causal trace");
+    expect(source).toContain("helix-ask-latest-causal-trace");
+    expect(source).toContain("causal_turn_timeline");
     expect(source).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
     expect(source).toContain("turn_transcript_events");
@@ -420,12 +426,94 @@ describe("HelixAskPill mic-first surface contract", () => {
         },
       },
     } as never);
-    const combined = rows.map((row) => `${row.label}: ${row.text} ${row.meta}`).join("\n");
+    const combined = rows
+      .map((row: { label: string; text: string; meta: string }) => `${row.label}: ${row.text} ${row.meta}`)
+      .join("\n");
     expect(combined).toContain("docs-viewer.search_docs");
     expect(combined).toContain("docs-viewer.summarize_doc");
     expect(combined).toContain("Composed final answer");
     expect(combined).not.toContain("No tool step selected");
     expect(rows.some((row) => row.label === "Final" && /final_answer_draft/i.test(row.text))).toBe(false);
+  });
+
+  it("renders causal timeline events as public transparency rows without raw answer content", () => {
+    const rows = buildHelixCausalTurnTraceRows({
+      id: "reply-causal",
+      question: "open docs",
+      content: "Opened docs.",
+      debug: {
+        causal_turn_timeline: {
+          schema: "helix.causal_turn_timeline.v1",
+          turn_id: "turn-causal",
+          assistant_answer: false,
+          raw_content_included: false,
+          integrity: {
+            ok: false,
+            missing_created_by_event_refs: [],
+            terminal_without_selected_event: false,
+            visible_without_terminal_event: false,
+            stale_route_label_detected: true,
+            deterministic_fallback_without_rule_id: false,
+          },
+          events: [
+            {
+              schema: "helix.causal_turn_event.v1",
+              turn_id: "turn-causal",
+              event_id: "evt-1",
+              sequence: 1,
+              stage: "prompt_received",
+              producer: "user",
+              input_refs: [],
+              output_refs: ["prompt:hash"],
+              status: "succeeded",
+              public_summary: "Prompt was received.",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.causal_turn_event.v1",
+              turn_id: "turn-causal",
+              event_id: "evt-2",
+              sequence: 2,
+              stage: "tool_observation_created",
+              producer: "runtime_tool",
+              input_refs: ["tool_call:docs"],
+              output_refs: ["observation:docs"],
+              status: "succeeded",
+              selected_capability: "docs-viewer.open_doc_by_path",
+              public_summary: "Docs tool produced an observation.",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+            {
+              schema: "helix.causal_turn_event.v1",
+              turn_id: "turn-causal",
+              event_id: "evt-3",
+              sequence: 3,
+              stage: "terminal_artifact_selected",
+              producer: "terminal_authority",
+              input_refs: ["observation:docs"],
+              output_refs: ["terminal:typed_failure"],
+              status: "failed",
+              reason_code: "stale_route_label",
+              terminal: { selected_terminal_artifact_kind: "typed_failure" },
+              rejected: [{ artifact_kind: "direct_answer", reason: "stale_route_label" }],
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          ],
+        },
+      },
+    } as never);
+
+    const combined = rows
+      .map((row: { label: string; text: string; meta: string }) => `${row.label}: ${row.text} ${row.meta}`)
+      .join("\n");
+    expect(combined).toContain("Observation: Docs tool produced an observation");
+    expect(combined).toContain("Notice: Selected typed failure");
+    expect(combined).toContain("stale route label");
+    expect(combined).not.toContain("Prompt was received");
+    expect(rows.some((row: { status: string }) => row.status === "failed")).toBe(true);
   });
 
   it("renders a procedural workspace timeline from the turn truth table", () => {
