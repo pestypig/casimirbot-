@@ -383,6 +383,11 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("readReasoningTheaterHardFailureSignals");
     expect(source).toContain("applyReasoningTheaterFailureOverride");
     expect(source).toContain("terminal_artifact_forbidden_by_route_contract");
+    expect(source).toContain("buildReasoningBattleBeats");
+    expect(source).toContain("helix-ask-reasoning-battle-stage");
+    expect(source).toContain("helix-ask-reasoning-battle-beat");
+    expect(source).toContain("helixReasoningBattleBeat");
+    expect(source).toContain("prefers-reduced-motion: reduce");
     expect(source).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
     expect(source).toContain("turn_transcript_events");

@@ -13,6 +13,7 @@ export type HelixRepoAnswerTextQualityGate = {
     | "missing_support_refs"
     | "unsupported_repo_claim"
     | "wrong_model_step_identity"
+    | "policy_claim_inversion"
   >;
   repair_allowed: boolean;
   terminal_allowed: boolean;
@@ -67,6 +68,18 @@ const isFileListOnly = (text: string): boolean => {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (lines.length < 2) return false;
   return lines.every((line) => /^[-*]?\s*(?:client|server|shared|docs|scripts|tools|packages|src)\//i.test(line));
+};
+
+const isPolicyClaimInversion = (text: string): boolean => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const mentionsReceipts = /\breceipts?\b/i.test(normalized);
+  const mentionsFinalAnswers = /\bfinal answers?\b|\bterminal answers?\b|\bvisible answers?\b/i.test(normalized);
+  if (!mentionsReceipts || !mentionsFinalAnswers) return false;
+  return (
+    /\bfinal answers?\s+(?:must\s+be\s+)?(?:are\s+)?(?:derived|generated|created|validated|confirmed)\s+from\s+(?:validated\s+)?receipts?\b/i.test(normalized) ||
+    /\breceipts?\s+(?:validate|confirm|authorize|prove|determine)\s+(?:the\s+)?(?:final|terminal|visible)\s+answers?\b/i.test(normalized) ||
+    /\b(?:final|terminal|visible)\s+answers?\s+(?:are|must be)\s+based\s+on\s+(?:validated\s+)?receipts?\b/i.test(normalized)
+  );
 };
 
 const collectSupportRefs = (payload: RecordLike): string[] => {
@@ -130,6 +143,7 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isMissingRepoEvidenceRefusalText(text)) violations.push("unsupported_repo_claim");
   if (isExcerptLikeAnswer(text)) violations.push("excerpt_like_answer");
   if (isFileListOnly(text)) violations.push("file_list_only");
+  if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
   if (collectSupportRefs(input.payload).length === 0) violations.push("missing_support_refs");
   const uniqueViolations = unique(violations);

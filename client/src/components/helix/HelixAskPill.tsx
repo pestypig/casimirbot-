@@ -147,6 +147,11 @@ import {
   type ConvergenceStripState,
 } from "@/lib/helix/reasoning-theater-convergence";
 import {
+  buildReasoningBattleBeats,
+  reasoningBattleBeatClassName,
+  type ReasoningBattleBeat,
+} from "@/lib/helix/reasoning-battle-stage";
+import {
   applyLatestWinsVoiceQueue,
   createVoicePlaybackUtterance,
   trimVoicePlaybackQueue,
@@ -9595,6 +9600,19 @@ function reasoningTheaterFloatingActionTextClassName(
   return "border-slate-200/25 bg-white/5 text-slate-200";
 }
 
+function reasoningBattleBeatPositionPct(beat: ReasoningBattleBeat): number {
+  const jitter = (hash32(`${beat.id}:x`) % 1700) / 100;
+  if (beat.lane === "orb") return clampNumber(24 + jitter, 10, 58);
+  if (beat.lane === "ambiguity") return clampNumber(62 + jitter, 54, 94);
+  if (beat.lane === "terminal") return clampNumber(76 + jitter * 0.7, 70, 96);
+  return clampNumber(10 + jitter * 0.9, 6, 30);
+}
+
+function reasoningBattleBeatHeightPx(beat: ReasoningBattleBeat): number {
+  const jitter = hash32(`${beat.id}:y`) % 8;
+  return -18 - Math.abs(beat.impact) * 4 - jitter;
+}
+
 function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
   const base = latest
     ? "border-slate-500/40 bg-slate-950/35 text-slate-100"
@@ -14408,6 +14426,16 @@ export function HelixAskPill({
   const [askTurnExpandedByReply, setAskTurnExpandedByReply] = useState<Record<string, boolean>>(
     () => readStoredHelixAskTurnExpansion(),
   );
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setPrefersReducedMotion(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -15219,6 +15247,19 @@ export function HelixAskPill({
     const latestReplyDebug = askReplies[askReplies.length - 1]?.debug;
     return coerceReasoningTheaterStateV1(latestReplyDebug?.reasoning_theater_state_v1);
   }, [askLiveEvents, askReplies]);
+  const latestCausalTurnTimeline = useMemo(
+    () => (latestAskReply ? readHelixCausalTurnTimeline(latestAskReply) : null),
+    [latestAskReply],
+  );
+  const reasoningBattleBeats = useMemo(
+    () =>
+      buildReasoningBattleBeats({
+        timelineEvents: latestCausalTurnTimeline?.events ?? [],
+        liveEvents: askLiveEvents,
+        theaterState: reasoningTheaterCanonicalState,
+      }),
+    [askLiveEvents, latestCausalTurnTimeline, reasoningTheaterCanonicalState],
+  );
   const reasoningTheaterHardFailureSignals = useMemo(
     () =>
       readReasoningTheaterHardFailureSignals(
@@ -30012,7 +30053,7 @@ export function HelixAskPill({
                 aria-hidden
               />
               <style>
-                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}`}
+                {`@keyframes helixReasoningFloatingText{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.94)}14%{opacity:1}72%{opacity:.82}100%{opacity:0;transform:translate3d(calc(-50% + var(--helix-pop-drift,0px)),var(--helix-pop-y,-28px),0) scale(1.04)}}@keyframes helixReasoningBattleBeat{0%{opacity:0;transform:translate3d(-50%,0,0) scale(.92)}16%{opacity:1}70%{opacity:.86}100%{opacity:0;transform:translate3d(calc(-50% + var(--beat-drift,0px)),var(--beat-y,-28px),0) scale(1.04)}}`}
               </style>
               {reasoningTheater && mirekReasoningDisplayGrid ? (
                 <div
@@ -30149,6 +30190,41 @@ export function HelixAskPill({
                         </div>
                       ) : null}
                       <div className="mt-2 relative h-1.5 overflow-visible rounded-full bg-black/45">
+                        {reasoningBattleBeats.length > 0 ? (
+                          <div
+                            data-testid="helix-ask-reasoning-battle-stage"
+                            className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-7 z-[5] overflow-visible"
+                            aria-hidden="true"
+                          >
+                            {reasoningBattleBeats.slice(-8).map((beat) => {
+                              const driftPx = ((hash32(`${beat.id}:drift`) % 17) - 8) * (beat.lane === "ambiguity" ? -1 : 1);
+                              const yPx = reasoningBattleBeatHeightPx(beat);
+                              const displayLabel = `${beat.impact > 0 ? "+" : beat.impact < 0 ? "-" : ""}${beat.label}`;
+                              return (
+                                <span
+                                  key={beat.id}
+                                  data-testid="helix-ask-reasoning-battle-beat"
+                                  className={`pointer-events-none absolute top-1/2 z-[5] rounded border px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-[0.12em] shadow-[0_0_12px_rgba(255,255,255,0.12)] backdrop-blur-sm ${reasoningBattleBeatClassName(beat, prefersReducedMotion)}`}
+                                  style={
+                                    {
+                                      left: `${reasoningBattleBeatPositionPct(beat)}%`,
+                                      transform: prefersReducedMotion
+                                        ? `translate3d(-50%, ${yPx}px, 0)`
+                                        : "translate3d(-50%, 0, 0)",
+                                      animation: prefersReducedMotion
+                                        ? undefined
+                                        : `helixReasoningBattleBeat ${beat.ttl_ms}ms ease-out forwards`,
+                                      "--beat-drift": `${driftPx}px`,
+                                      "--beat-y": `${yPx}px`,
+                                    } as React.CSSProperties & Record<string, string | undefined>
+                                  }
+                                >
+                                  {displayLabel}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                         <div
                           className="pointer-events-none absolute -inset-x-2 -bottom-5 -top-5 overflow-hidden rounded-md"
                           aria-hidden

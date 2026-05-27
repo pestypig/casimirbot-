@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   attachSynthesisSupportRefs,
+  buildRepoDocsSynthesisRepairInstruction,
   buildRepoDocsSynthesisPacket,
+  classifyRepoDocsSynthesisAttemptStatus,
+  repoDocsSynthesisTerminalErrorCode,
 } from "../services/helix-ask/repo-docs-synthesis-packet";
 import { evaluateRepoAnswerTextQualityGate } from "../services/helix-ask/repo-answer-text-quality-gate";
 import { getHelixCausalTurnTimeline } from "../services/helix-ask/causal-turn-timeline";
@@ -191,6 +194,89 @@ describe("repo/docs synthesis reliability", () => {
 
     expect(fileList.violations).toContain("file_list_only");
     expect(refusal.violations).toContain("unsupported_repo_claim");
+  });
+
+  it("rejects policy claim inversions about receipts and final-answer authority", () => {
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId,
+      promptText: "Summarize what the loop discipline says about receipts and final answers.",
+      routeFamily: "repo_evidence",
+      artifactLedger: ledger,
+    });
+    const payload = {
+      repo_docs_synthesis_packet: packet,
+      repo_code_evidence_answer: {
+        schema: "helix.repo_code_evidence_answer.v1",
+        support_refs: packet.compact_evidence.map((entry) => entry.ref),
+        model_authored: true,
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        synthesis_attempt_ref: `${turnId}:repo_evidence_synthesis_attempt`,
+      },
+      final_answer_draft: {
+        authority: "llm_post_observation_composer",
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        artifact_refs: packet.compact_evidence.map((entry) => entry.ref),
+      },
+      current_turn_artifact_ledger: [
+        ...ledger,
+        {
+          artifact_id: `${turnId}:repo_evidence_synthesis_attempt`,
+          kind: "repo_evidence_synthesis_attempt",
+          payload: {
+            schema: "helix.repo_evidence_synthesis_attempt.v1",
+            model_step_capability: "model.synthesize_from_repo_evidence",
+          },
+        },
+      ],
+    };
+
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: "candidate:inverted-policy",
+      answerText:
+        "Receipts are essential because they validate final answers. Final answers must be derived from validated receipts to maintain the integrity of Helix Ask.",
+      payload,
+    });
+    const instruction = buildRepoDocsSynthesisRepairInstruction({
+      violations: gate.violations,
+      packet,
+    });
+    const errorCode = repoDocsSynthesisTerminalErrorCode({
+      status: classifyRepoDocsSynthesisAttemptStatus({ ok: gate.ok, violations: gate.violations }),
+      repairAttempted: true,
+      violations: gate.violations,
+    });
+
+    expect(gate.violations).toContain("policy_claim_inversion");
+    expect(instruction).toMatch(/receipts\/tool outputs are observations/i);
+    expect(errorCode).toBe("repo_docs_synthesis_policy_claim_inversion_after_repair");
+  });
+
+  it("builds targeted repair instructions and precise terminal codes for bad synthesis drafts", () => {
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId,
+      promptText: "What is Auntie Dottie in this app?",
+      routeFamily: "repo_evidence",
+      artifactLedger: ledger,
+    });
+    const instruction = buildRepoDocsSynthesisRepairInstruction({
+      violations: ["excerpt_like_answer", "file_list_only"],
+      packet,
+    });
+    const status = classifyRepoDocsSynthesisAttemptStatus({
+      ok: false,
+      violations: ["excerpt_like_answer", "file_list_only"],
+    });
+    const errorCode = repoDocsSynthesisTerminalErrorCode({
+      status,
+      repairAttempted: true,
+      violations: ["excerpt_like_answer", "file_list_only"],
+    });
+
+    expect(status).toBe("excerpt_like");
+    expect(instruction).toMatch(/previous answer was excerpt-like or file-list-like/i);
+    expect(instruction).toMatch(/compact evidence refs/i);
+    expect(errorCode).toBe("repo_docs_synthesis_file_inventory_after_repair");
   });
 
   it("adds repo/docs packet and quality events to the causal timeline", () => {

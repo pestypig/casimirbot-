@@ -11,6 +11,28 @@ type RecordLike = Record<string, unknown>;
 export const HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA =
   "helix.repo_docs_synthesis_packet.v1" as const;
 
+export type HelixRepoDocsSynthesisAttemptStatus =
+  | "succeeded"
+  | "empty"
+  | "stale"
+  | "renderer_hostile"
+  | "unsupported_claims"
+  | "missing_support_refs"
+  | "excerpt_like"
+  | "failed";
+
+export type HelixRepoDocsSynthesisViolation =
+  | "missing_model_synthesis"
+  | "empty_answer"
+  | "excerpt_like_answer"
+  | "file_list_only"
+  | "canned_fallback_text"
+  | "renderer_hostile_text"
+  | "missing_support_refs"
+  | "unsupported_repo_claim"
+  | "wrong_model_step_identity"
+  | "policy_claim_inversion";
+
 export type HelixRepoDocsSynthesisPacket = {
   schema: typeof HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA;
   turn_id: string;
@@ -214,6 +236,7 @@ export function buildRepoDocsSynthesisPacket(input: {
     model_instruction: [
       "Answer the user's question directly from the compact evidence.",
       "Explain what the evidence means; do not answer with a file list or raw excerpt dump.",
+      "Preserve authority claims exactly: receipts are observations/supporting artifacts, not final-answer authority.",
       "Do not claim evidence is missing when compact_evidence is non-empty.",
       "Use compact refs from compact_evidence as support_refs for terminal authority.",
       input.routeFamily === "repo_evidence"
@@ -258,4 +281,75 @@ export function attachSynthesisSupportRefs<T extends RecordLike>(input: {
     artifact_refs: refs,
     support_refs: refs,
   };
+}
+
+export function classifyRepoDocsSynthesisAttemptStatus(input: {
+  ok: boolean;
+  violations: readonly string[];
+  staleFallbackText?: boolean;
+}): HelixRepoDocsSynthesisAttemptStatus {
+  const violations = new Set(input.violations);
+  if (input.ok) return "succeeded";
+  if (violations.has("empty_answer")) return "empty";
+  if (violations.has("canned_fallback_text") || input.staleFallbackText) return "stale";
+  if (violations.has("renderer_hostile_text")) return "renderer_hostile";
+  if (violations.has("unsupported_repo_claim")) return "unsupported_claims";
+  if (violations.has("missing_support_refs")) return "missing_support_refs";
+  if (violations.has("excerpt_like_answer") || violations.has("file_list_only")) return "excerpt_like";
+  return "failed";
+}
+
+export function buildRepoDocsSynthesisRepairInstruction(input: {
+  violations: readonly string[];
+  packet: HelixRepoDocsSynthesisPacket | null;
+}): string {
+  const violations = new Set(input.violations);
+  const prefix =
+    "The repo/docs evidence retrieval succeeded, but the previous draft was not a valid terminal answer.";
+  const evidenceRefs = input.packet?.compact_evidence
+    .map((entry) => `${entry.ref} (${entry.role})`)
+    .slice(0, 8)
+    .join("; ");
+  const evidenceSentence = evidenceRefs
+    ? ` Use these compact evidence refs as support, not as the answer itself: ${evidenceRefs}.`
+    : "";
+  const common =
+    " Write one concise natural-language synthesis that directly answers the user. Explain what the evidence establishes. Include compact support refs only as short citations or a Sources line. Do not paste code, do not list files as the answer, and do not claim evidence is missing.";
+  if (violations.has("excerpt_like_answer") || violations.has("file_list_only")) {
+    return `${prefix}${common}${evidenceSentence} The previous answer was excerpt-like or file-list-like; replace it with prose about meaning and behavior.`;
+  }
+  if (violations.has("unsupported_repo_claim")) {
+    return `${prefix}${common}${evidenceSentence} The previous answer incorrectly claimed evidence was missing even though compact evidence exists.`;
+  }
+  if (violations.has("policy_claim_inversion")) {
+    return `${prefix}${common}${evidenceSentence} The previous answer inverted an authority rule. Preserve this doctrine when supported by evidence: receipts/tool outputs are observations or support, while final answers require model synthesis and terminal authority.`;
+  }
+  if (violations.has("missing_support_refs")) {
+    return `${prefix}${common}${evidenceSentence} The previous answer lacked support refs; attach refs from the synthesis packet.`;
+  }
+  if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
+    return `${prefix}${common}${evidenceSentence} The retry must be authored as the post-observation synthesis step for the repo/docs evidence.`;
+  }
+  return `${prefix}${common}${evidenceSentence}`;
+}
+
+export function repoDocsSynthesisTerminalErrorCode(input: {
+  status: HelixRepoDocsSynthesisAttemptStatus;
+  repairAttempted: boolean;
+  violations: readonly string[];
+}): string {
+  const suffix = input.repairAttempted ? "_after_repair" : "";
+  const violations = new Set(input.violations);
+  if (violations.has("file_list_only")) return `repo_docs_synthesis_file_inventory${suffix}`;
+  if (input.status === "excerpt_like" || violations.has("excerpt_like_answer")) {
+    return `repo_docs_synthesis_excerpt_like${suffix}`;
+  }
+  if (input.status === "unsupported_claims") return `repo_docs_synthesis_refusal_after_evidence${suffix}`;
+  if (violations.has("policy_claim_inversion")) return `repo_docs_synthesis_policy_claim_inversion${suffix}`;
+  if (input.status === "missing_support_refs") return `repo_docs_synthesis_missing_support_refs${suffix}`;
+  if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
+    return `repo_docs_synthesis_wrong_model_step${suffix}`;
+  }
+  if (input.status === "empty") return `repo_docs_synthesis_empty${suffix}`;
+  return `repo_docs_synthesis_quality_failed${suffix}`;
 }
