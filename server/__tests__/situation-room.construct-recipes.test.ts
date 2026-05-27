@@ -111,6 +111,35 @@ describe("Situation Room construct recipes", () => {
     expect(run.receipt_refs.length).toBeGreaterThanOrEqual(5);
     expect(run.commentary_refs.length).toBeGreaterThan(0);
     expect(run.created_construct_ids.length).toBeGreaterThanOrEqual(7);
+    expect(run.live_job_contract).toMatchObject({
+      schema: "helix.situation_room_live_job_contract.v1",
+      name: "Auntie Dottie Minecraft Watch",
+      purpose: "voice_witness",
+      voice_policy: "propose_only",
+      authority_policy: {
+        assistant_answer: false,
+        construct_answer_authority: "witness_only",
+        helix_ask_terminal_authority_required: true,
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(run.construct_observation).toMatchObject({
+      schema: "helix.situation_room_construct_observation.v1",
+      action: "construct.create_from_recipe",
+      live_job_contract_ref: run.live_job_contract?.contract_id,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      assistant_answer: false,
+      raw_content_included: false,
+      policy_state: {
+        voice_policy: "propose_only",
+        spoken: false,
+        confirm_speak_receipt_present: false,
+        output_authority: "proposal",
+      },
+    });
     expect(constructs.map((construct) => construct.type)).toEqual(expect.arrayContaining([
       "dottie_manifest",
       "live_environment",
@@ -163,6 +192,25 @@ describe("Situation Room construct recipes", () => {
       commentary_refs: [],
       missing_evidence: [],
       assistant_answer: false,
+    });
+    expect(run.live_job_contract).toMatchObject({
+      schema: "helix.situation_room_live_job_contract.v1",
+      purpose: "transcription",
+      selected_recipe: "browser_audio_transcriber",
+      voice_policy: "muted",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(run.construct_observation).toMatchObject({
+      schema: "helix.situation_room_construct_observation.v1",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      policy_state: {
+        spoken: false,
+        confirm_speak_receipt_present: false,
+        output_authority: "typed_only",
+      },
     });
     expect(constructs.map((construct) => construct.type)).toEqual([
       "source_binding",

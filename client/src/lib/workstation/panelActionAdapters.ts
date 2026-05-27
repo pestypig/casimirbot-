@@ -106,6 +106,15 @@ import {
   type HelixSituationConstructRecipeRun,
   type HelixSituationConstructRecipeRunStatus,
 } from "@shared/helix-situation-construct-recipe";
+import {
+  SITUATION_ROOM_CONSTRUCT_OBSERVATION_SCHEMA,
+  type SituationRoomConstructObservation,
+} from "@shared/situation-room-construct-observation";
+import {
+  SITUATION_ROOM_LIVE_JOB_CONTRACT_SCHEMA,
+  type SituationRoomLiveJobContract,
+  type SituationRoomVoicePolicy,
+} from "@shared/situation-room-live-job-contract";
 import { recordDottieVoiceDebugClip } from "@/lib/helix/dottie-voice-debug-clips";
 
 export type HelixPanelActionRequest = {
@@ -488,6 +497,21 @@ function resolveSituationConstructStatus(value: unknown): HelixSituationConstruc
   return null;
 }
 
+function resolveSituationRoomVoicePolicy(value: unknown, fallback: SituationRoomVoicePolicy = "muted"): SituationRoomVoicePolicy {
+  const policy = asNonEmptyString(value);
+  if (
+    policy === "muted" ||
+    policy === "propose_only" ||
+    policy === "confirm_speak_required" ||
+    policy === "automatic_when_policy_allows"
+  ) {
+    return policy;
+  }
+  if (policy === "on_confirm" || policy === "voice_on_confirm") return "confirm_speak_required";
+  if (policy === "off" || policy === "text_only") return "muted";
+  return fallback;
+}
+
 function nextSituationConstructId(type: HelixSituationConstructType, name: string): string {
   return `construct:${type}:${slugify(name) || "construct"}:${Date.now()}:${situationConstructs.size + 1}`;
 }
@@ -608,6 +632,199 @@ function updatePanelSituationConstruct(
   const updated = mutate({ ...existing, updated_at: new Date().toISOString() });
   situationConstructs.set(constructId, updated);
   return updated;
+}
+
+function buildPanelLiveJobContract(input: {
+  recipeId: HelixSituationConstructRecipeId;
+  runId: string;
+  threadId: string;
+  roomId: string;
+  sourceIds: string[];
+  args: Record<string, unknown>;
+  status: HelixSituationConstructRecipeRunStatus;
+  missingEvidence: string[];
+}): SituationRoomLiveJobContract {
+  const now = new Date().toISOString();
+  const operatingPrompt =
+    asNonEmptyString(input.args.operating_prompt ?? input.args.operatingPrompt ?? input.args.objective) ??
+    (input.recipeId === "auntie_dottie_witness"
+      ? "Watch the live situation as Auntie Dottie. Only propose short witness callouts from public evidence, and do not speak unless confirmed."
+      : input.recipeId === "browser_audio_transcriber"
+        ? "Transcribe browser audio into evidence without creating answer authority."
+        : "Run this Situation Room construct as evidence-only live work.");
+  const voicePolicy = input.recipeId === "auntie_dottie_witness"
+    ? resolveSituationRoomVoicePolicy(input.args.voice_policy ?? input.args.voicePolicy ?? input.args.voice_mode ?? input.args.voiceMode, "propose_only")
+    : "muted";
+  const sourceRequirements: SituationRoomLiveJobContract["source_requirements"] =
+    input.recipeId === "browser_audio_transcriber"
+      ? [{
+          source_kind: "browser_audio",
+          required: true,
+          status: input.sourceIds.length ? "connected" : "missing",
+          binding_id: input.sourceIds[0],
+          missing_reason: input.sourceIds.length ? undefined : "Browser or display audio source is required for transcription.",
+        }]
+      : input.recipeId === "auntie_dottie_witness"
+        ? [
+            {
+              source_kind: "minecraft_world_events",
+              required: false,
+              status: input.sourceIds.some((source) => /minecraft|world/i.test(source)) ? "connected" : "unknown",
+              binding_id: input.sourceIds.find((source) => /minecraft|world/i.test(source)),
+              missing_reason: "Minecraft world events are required before route watching can become active.",
+            },
+            {
+              source_kind: "mic_audio",
+              required: false,
+              status: input.sourceIds.some((source) => /mic|audio/i.test(source)) ? "connected" : "unknown",
+              binding_id: input.sourceIds.find((source) => /mic|audio/i.test(source)),
+            },
+          ]
+        : [{
+            source_kind: "operator_text",
+            required: false,
+            status: "unknown",
+          }];
+  return {
+    schema: SITUATION_ROOM_LIVE_JOB_CONTRACT_SCHEMA,
+    contract_id: `situation_live_job:${slugify(input.recipeId)}:${Date.now()}`,
+    turn_id: asNonEmptyString(input.args.turn_id ?? input.args.turnId) ?? input.runId,
+    name: input.recipeId === "auntie_dottie_witness"
+      ? "Auntie Dottie Witness"
+      : input.recipeId === "browser_audio_transcriber"
+        ? "Browser Audio Transcriber"
+        : "Situation Room Construct",
+    purpose: input.recipeId === "auntie_dottie_witness"
+      ? "voice_witness"
+      : input.recipeId === "browser_audio_transcriber"
+        ? "transcription"
+        : "custom",
+    selected_recipe: input.recipeId,
+    operating_prompt: operatingPrompt,
+    operating_prompt_history: [{
+      prompt: operatingPrompt,
+      changed_at: now,
+      changed_by: "user",
+      reason: "initial_construct_recipe_prompt",
+    }],
+    compiled_policy: {
+      callout_style: input.recipeId === "auntie_dottie_witness" ? "tactical" : "short",
+      interruption_policy: input.recipeId === "auntie_dottie_witness" ? "policy_triggered" : "direct_questions_only",
+      evidence_threshold: /confirmed|only\s+if/i.test(operatingPrompt) ? "confirmed" : "observed",
+      cadence: "event_driven",
+      suppress_until_trigger: true,
+      trigger_rules: input.recipeId === "auntie_dottie_witness"
+        ? ["public_commentary_available", "direct_question", "policy_triggered_event"]
+        : ["source_available", "transcript_chunk_ready"],
+      stop_conditions: ["user_stops_job", "source_detached", "operating_prompt_replaced"],
+    },
+    source_requirements: sourceRequirements,
+    output_bindings: input.recipeId === "auntie_dottie_witness"
+      ? [
+          { output_kind: "typed_commentary", status: "planned", policy: { authority: "evidence_only" } },
+          { output_kind: "voice_proposal", status: "planned", policy: { voice_policy: voicePolicy } },
+          { output_kind: "live_answers_card", status: "planned", policy: { projection_only: true } },
+        ]
+      : input.recipeId === "browser_audio_transcriber"
+        ? [
+            { output_kind: "transcript_stream", status: "planned", policy: { raw_audio_included: false } },
+            { output_kind: "typed_commentary", status: "planned", policy: { authority: "evidence_only" } },
+            { output_kind: "live_answers_card", status: "planned", policy: { projection_only: true } },
+          ]
+        : [{ output_kind: "typed_commentary", status: "planned", policy: { authority: "evidence_only" } }],
+    voice_policy: voicePolicy,
+    authority_policy: {
+      assistant_answer: false,
+      construct_answer_authority: input.recipeId === "auntie_dottie_witness" ? "witness_only" : "evidence_only",
+      helix_ask_terminal_authority_required: true,
+    },
+    runtime_status: input.status === "active"
+      ? "active"
+      : input.status === "blocked"
+        ? "blocked"
+        : "proposed",
+    diagnostics: input.missingEvidence.map((missing) => ({
+      code: `missing_${missing}`,
+      severity: "warning",
+      message: `Missing required input: ${missing}.`,
+      repair_action: "attach_source",
+    })),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+function constructObservationRole(
+  construct: HelixSituationConstruct,
+): SituationRoomConstructObservation["created_constructs"][number]["role"] {
+  if (construct.type === "observer" || construct.type === "dottie_manifest" || construct.type === "voice_policy") return "observer";
+  if (construct.type === "transcription_job") return "transcriber";
+  if (construct.type === "route_evidence_view") return "route_watcher";
+  return "source_health_watcher";
+}
+
+function constructObservationStatus(
+  construct: HelixSituationConstruct,
+): SituationRoomConstructObservation["created_constructs"][number]["status"] {
+  if (construct.status === "active") return "active";
+  if (construct.status === "blocked") return "blocked";
+  if (construct.status === "stale") return "stale";
+  if (construct.status === "detached" || construct.status === "completed") return "paused";
+  return "created";
+}
+
+function buildPanelConstructObservation(input: {
+  action: SituationRoomConstructObservation["action"];
+  runId: string;
+  constructs: HelixSituationConstruct[];
+  contract?: SituationRoomLiveJobContract | null;
+  missingInputs?: string[];
+  voicePolicy?: SituationRoomVoicePolicy;
+  spoken?: boolean;
+  confirmSpeakReceiptPresent?: boolean;
+}): SituationRoomConstructObservation {
+  const voicePolicy = input.voicePolicy ?? input.contract?.voice_policy ?? "muted";
+  const spoken = input.spoken === true;
+  return {
+    schema: SITUATION_ROOM_CONSTRUCT_OBSERVATION_SCHEMA,
+    observation_id: `${input.runId}:construct_observation:${Date.now()}`,
+    turn_id: input.contract?.turn_id ?? input.runId,
+    action: input.action,
+    live_job_contract_ref: input.contract?.contract_id,
+    construct_ids: input.constructs.map((construct) => construct.construct_id),
+    created_constructs: input.constructs.map((construct) => ({
+      construct_id: construct.construct_id,
+      name: construct.name,
+      role: constructObservationRole(construct),
+      authority: construct.policy.witness_only ? "witness_only" : "evidence_only",
+      status: constructObservationStatus(construct),
+    })),
+    missing_inputs: input.missingInputs ?? [],
+    policy_state: {
+      voice_policy: voicePolicy,
+      spoken,
+      confirm_speak_receipt_present: input.confirmSpeakReceiptPresent === true,
+      output_authority: spoken ? "confirmed_spoken" : voicePolicy === "muted" ? "typed_only" : "proposal",
+    },
+    output_bindings: Array.from(
+      new Set(input.constructs.flatMap((construct) => construct.output_bindings.map((binding) => binding.output_kind))),
+    ),
+    source_status: input.contract?.source_requirements.map((source) => ({
+      source_kind: source.source_kind,
+      status: source.status,
+      message: source.missing_reason ?? `${source.source_kind} is ${source.status}.`,
+    })) ?? [],
+    diagnostics: input.contract?.diagnostics.map((diagnostic) => ({
+      code: diagnostic.code,
+      message: diagnostic.message,
+      severity: diagnostic.severity,
+    })) ?? [],
+    terminal_eligible: false,
+    panel_generated_answer: false,
+    next_step_authority: "agent_step_decision",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 }
 
 function buildConstructRecipeRunArtifact(args: Record<string, unknown>): {
@@ -827,10 +1044,29 @@ function buildConstructRecipeRunArtifact(args: Record<string, unknown>): {
   }
 
   const now = new Date().toISOString();
+  const runId = `construct_recipe_run:${slugify(recipeId)}:${Date.now()}`;
+  const liveJobContract = buildPanelLiveJobContract({
+    recipeId,
+    runId,
+    threadId,
+    roomId,
+    sourceIds,
+    args,
+    status,
+    missingEvidence,
+  });
+  const constructObservation = buildPanelConstructObservation({
+    action: "construct.create_from_recipe",
+    runId,
+    constructs: createdConstructs,
+    contract: liveJobContract,
+    missingInputs: missingEvidence,
+    voicePolicy: liveJobContract.voice_policy,
+  });
   const recipeRun: HelixSituationConstructRecipeRun & Record<string, unknown> = {
     schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
     kind: "situation_construct_recipe_run",
-    run_id: `construct_recipe_run:${slugify(recipeId)}:${Date.now()}`,
+    run_id: runId,
     recipe_id: recipeId,
     thread_id: threadId,
     room_id: roomId,
@@ -839,8 +1075,13 @@ function buildConstructRecipeRunArtifact(args: Record<string, unknown>): {
     receipt_refs: Array.from(new Set(receiptRefs)),
     commentary_refs: [],
     missing_evidence: missingEvidence,
+    live_job_contract: liveJobContract,
+    construct_observation: constructObservation,
     constructs: createdConstructs,
     compatibility_receipt: compatibilityReceipt,
+    terminal_eligible: false,
+    panel_generated_answer: false,
+    next_step_authority: "agent_step_decision",
     assistant_answer: false,
     raw_content_included: false,
     instruction_authority: "none",
@@ -3194,6 +3435,9 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: `Found ${recipes.length} Situation Room construct recipe${recipes.length === 1 ? "" : "s"}.`,
       };
@@ -3267,6 +3511,15 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+          construct_observation: buildPanelConstructObservation({
+            action: "construct.query",
+            runId: `construct_query:${Date.now()}`,
+            constructs,
+            missingInputs: [],
+          }),
         },
         message: `Found ${constructs.length} construct${constructs.length === 1 ? "" : "s"}.`,
       };
@@ -3301,6 +3554,15 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+          construct_observation: buildPanelConstructObservation({
+            action: "construct.query",
+            runId: `construct_explain:${Date.now()}`,
+            constructs: [construct, ...childConstructs],
+            missingInputs: [],
+          }),
         },
         message: `Explained construct ${constructId}.`,
       };
@@ -3333,6 +3595,15 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+          construct_observation: buildPanelConstructObservation({
+            action: actionId === "construct.detach" ? "construct.detach" : "construct.activate",
+            runId: `construct_update:${Date.now()}`,
+            constructs: [updated],
+            missingInputs: [],
+          }),
         },
         message: `Marked construct ${constructId} ${nextStatus}.`,
       };
@@ -3369,6 +3640,15 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+          construct_observation: buildPanelConstructObservation({
+            action: "construct.attach_source",
+            runId: `construct_attach_source:${Date.now()}`,
+            constructs: [updated],
+            missingInputs: [],
+          }),
         },
         message: `Attached ${sourceIds.length} source${sourceIds.length === 1 ? "" : "s"} to construct ${constructId}.`,
       };
@@ -3421,6 +3701,15 @@ export function executeHelixPanelAction(
           instruction_authority: "none",
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
+          construct_observation: buildPanelConstructObservation({
+            action: "construct.bind_output",
+            runId: `construct_bind_output:${Date.now()}`,
+            constructs: [updated],
+            missingInputs: [],
+          }),
         },
         message: `Bound ${outputKind} output to construct ${constructId}.`,
       };
@@ -3446,6 +3735,11 @@ export function executeHelixPanelAction(
         artifact: {
           ...receipt,
           recipe_run: artifact.recipeRun,
+          live_job_contract: artifact.recipeRun.live_job_contract,
+          construct_observation: artifact.recipeRun.construct_observation,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: "Manifested Auntie Dottie as a witness-only Situation Room preset.",
       };
@@ -3498,6 +3792,11 @@ export function executeHelixPanelAction(
           raw_logs_included: false,
           raw_transcript_included: false,
           raw_reasoning_included: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: `Attached ${observerProfile} as a witness-only observer.`,
       };
@@ -3544,6 +3843,11 @@ export function executeHelixPanelAction(
           subscription,
           deterministic_content_role: "observation_not_assistant_answer",
           raw_reasoning_included: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: `Detached observer ${observerId}.`,
       };
@@ -3572,6 +3876,11 @@ export function executeHelixPanelAction(
           count: subscriptions.length,
           deterministic_content_role: "observation_not_assistant_answer",
           raw_reasoning_included: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: `Found ${subscriptions.length} observer subscription${subscriptions.length === 1 ? "" : "s"}.`,
       };
@@ -3613,7 +3922,20 @@ export function executeHelixPanelAction(
           ok: true,
           panel_id: panelId,
           action_id: actionId,
-          artifact: suppressedReceipt,
+          artifact: {
+            ...suppressedReceipt,
+            construct_observation: buildPanelConstructObservation({
+              action: "voice_delivery.propose_from_trace",
+              runId: `voice_proposal:${Date.now()}`,
+              constructs: [],
+              voicePolicy: "propose_only",
+              spoken: false,
+              confirmSpeakReceiptPresent: false,
+            }),
+            terminal_eligible: false,
+            panel_generated_answer: false,
+            next_step_authority: "agent_step_decision",
+          },
           message: "Dottie voice proposal suppressed because no public source text was provided.",
         };
       }
@@ -3644,6 +3966,17 @@ export function executeHelixPanelAction(
           proposed: true,
           ...receipt,
           deterministic_content_role: "observation_not_assistant_answer",
+          construct_observation: buildPanelConstructObservation({
+            action: "voice_delivery.propose_from_trace",
+            runId: `voice_proposal:${Date.now()}`,
+            constructs: [],
+            voicePolicy: "propose_only",
+            spoken: false,
+            confirmSpeakReceiptPresent: false,
+          }),
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: "Prepared a witness-only Dottie voice proposal from the source event.",
       };
@@ -3921,12 +4254,49 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "voice_delivery.confirm_speak") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const spokenText = asNonEmptyString(args.spoken_text ?? args.spokenText ?? args.text) ?? "";
+      const receipt = {
+        kind: "standby_callout_delivery_receipt",
+        schema: "helix.voice_delivery_confirm_speak_receipt.v1",
+        ok: true,
+        thread_id: threadId,
+        request: args,
+        spoken: true,
+        confirm_speak_receipt_present: true,
+        output_authority: "confirmed_spoken",
+        spoken_text: spokenText,
+        command_lane_enabled: false,
+        minecraft_actions_enabled: false,
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+        panel_generated_answer: false,
+        next_step_authority: "agent_step_decision",
+        construct_observation: buildPanelConstructObservation({
+          action: "voice_delivery.confirm_speak",
+          runId: `voice_confirm_speak:${Date.now()}`,
+          constructs: [],
+          voicePolicy: "confirm_speak_required",
+          spoken: true,
+          confirmSpeakReceiptPresent: true,
+        }),
+      };
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: receipt,
+        message: "Confirmed voice delivery for the proposed callout.",
+      };
+    }
+
     if (
       actionId === "episode_timeline.summarize_window" ||
       actionId === "situation_context.attach_to_ask" ||
       actionId.startsWith("goal_ledger.") ||
-      actionId === "callout_policy.set_mode" ||
-      actionId === "voice_delivery.confirm_speak"
+      actionId === "callout_policy.set_mode"
     ) {
       const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
       return {
@@ -3949,6 +4319,11 @@ export function executeHelixPanelAction(
           request: args,
           command_lane_enabled: false,
           minecraft_actions_enabled: false,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          next_step_authority: "agent_step_decision",
         },
         message: `Recorded ${actionId} as a bounded Situation Room tool request.`,
       };

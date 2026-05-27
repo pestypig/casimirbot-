@@ -15,6 +15,11 @@ import type {
 import type { HelixLiveEnvironmentCommentary } from "@shared/helix-live-environment-commentary";
 import type { HelixDottieManifestRun } from "@shared/helix-dottie-manifest-run";
 import {
+  SITUATION_ROOM_CONSTRUCT_OBSERVATION_SCHEMA,
+  type SituationRoomConstructObservation,
+} from "@shared/situation-room-construct-observation";
+import type { SituationRoomLiveJobContract } from "@shared/situation-room-live-job-contract";
+import {
   applySituationRoomDottieManifestPreset,
   buildSituationRoomDottieManifestPreset,
 } from "./dottie-manifest-preset";
@@ -27,6 +32,7 @@ import {
   upsertSituationConstruct,
 } from "./situation-construct-store";
 import { getSituationConstructRecipe } from "./situation-construct-recipe-registry";
+import { planSituationRoomLiveJobSetup } from "../helix-ask/situation-room-live-job-setup-planner";
 
 export type RunSituationConstructRecipeInput = {
   recipe_id: HelixSituationConstructRecipeId | string;
@@ -42,6 +48,7 @@ export type RunSituationConstructRecipeInput = {
   native_language?: string | null;
   minecraft_world_id?: string | null;
   objective?: string | null;
+  operating_prompt?: string | null;
   now?: string | null;
 };
 
@@ -88,6 +95,109 @@ const makeRecipeRunId = (input: {
     input.roomId,
     input.createdAt,
   ])}`;
+
+const inferSetupPrompt = (
+  recipe: HelixSituationConstructRecipe,
+  input: RunSituationConstructRecipeInput,
+): string => {
+  const explicitPrompt = normalizeString(input.operating_prompt) ?? normalizeString(input.objective);
+  if (recipe.recipe_id === "auntie_dottie_witness") {
+    return explicitPrompt
+      ? `Go into Auntie Dottie mode while I play Minecraft. ${explicitPrompt}`
+      : "Go into Auntie Dottie mode while I play Minecraft.";
+  }
+  if (explicitPrompt) return explicitPrompt;
+  if (recipe.recipe_id === "browser_audio_transcriber") {
+    return "Transcribe my browser tab audio as evidence.";
+  }
+  return recipe.description;
+};
+
+const constructRoleForObservation = (
+  construct: HelixSituationConstruct,
+): SituationRoomConstructObservation["created_constructs"][number]["role"] => {
+  if (construct.type === "observer" || construct.type === "dottie_manifest" || construct.type === "voice_policy") {
+    return "observer";
+  }
+  if (construct.type === "transcription_job") return "transcriber";
+  if (construct.type === "route_evidence_view") return "route_watcher";
+  if (construct.type === "source_binding" || construct.type === "commentary_policy") return "source_health_watcher";
+  return "source_health_watcher";
+};
+
+const observationStatusForConstruct = (
+  construct: HelixSituationConstruct,
+): SituationRoomConstructObservation["created_constructs"][number]["status"] => {
+  if (construct.status === "active") return "active";
+  if (construct.status === "blocked") return "blocked";
+  if (construct.status === "stale") return "stale";
+  if (construct.status === "detached" || construct.status === "completed") return "paused";
+  return "created";
+};
+
+const buildConstructObservation = (args: {
+  recipe: HelixSituationConstructRecipe;
+  runId: string;
+  threadId: string;
+  roomId: string;
+  createdAt: string;
+  constructs: HelixSituationConstruct[];
+  missingInputs: string[];
+  contract?: SituationRoomLiveJobContract | null;
+  action?: SituationRoomConstructObservation["action"];
+}): SituationRoomConstructObservation => {
+  const contract = args.contract ?? null;
+  const voicePolicy = contract?.voice_policy ?? "muted";
+  return {
+    schema: SITUATION_ROOM_CONSTRUCT_OBSERVATION_SCHEMA,
+    observation_id: `${args.runId}:construct_observation`,
+    turn_id: contract?.turn_id ?? args.runId,
+    action: args.action ?? "construct.create_from_recipe",
+    live_job_contract_ref: contract?.contract_id,
+    construct_ids: args.constructs.map((construct) => construct.construct_id),
+    created_constructs: args.constructs.map((construct) => ({
+      construct_id: construct.construct_id,
+      name: construct.name,
+      role: constructRoleForObservation(construct),
+      authority: construct.policy.witness_only ? "witness_only" : "evidence_only",
+      status: observationStatusForConstruct(construct),
+    })),
+    missing_inputs: args.missingInputs,
+    policy_state: {
+      voice_policy: voicePolicy,
+      spoken: false,
+      confirm_speak_receipt_present: false,
+      output_authority: voicePolicy === "muted" ? "typed_only" : "proposal",
+    },
+    output_bindings: Array.from(
+      new Set(args.constructs.flatMap((construct) => construct.output_bindings.map((binding) => binding.output_kind))),
+    ),
+    source_status: contract
+      ? contract.source_requirements.map((source) => ({
+          source_kind: source.source_kind,
+          status: source.status,
+          message: source.missing_reason ?? `${source.source_kind} is ${source.status}.`,
+        }))
+      : [],
+    diagnostics: [
+      ...(contract?.diagnostics.map((diagnostic) => ({
+        code: diagnostic.code,
+        message: diagnostic.message,
+        severity: diagnostic.severity,
+      })) ?? []),
+      ...args.missingInputs.map((missing) => ({
+        code: `missing_${missing}`,
+        message: `Missing required input: ${missing}.`,
+        severity: "warning" as const,
+      })),
+    ],
+    terminal_eligible: false,
+    panel_generated_answer: false,
+    next_step_authority: "agent_step_decision",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const outputBindingsForRecipe = (
   recipe: HelixSituationConstructRecipe,
@@ -167,6 +277,16 @@ const runGenericPlannedRecipe = (args: {
       linkSituationConstructs({ parentConstructId, childConstructId });
     }
   }
+  const constructs = constructIds
+    .map((constructId) => listSituationConstructs({ threadId: args.threadId, roomId: args.roomId, limit: 100 })
+      .find((construct) => construct.construct_id === constructId))
+    .filter((construct): construct is HelixSituationConstruct => Boolean(construct));
+  const setupPlan = planSituationRoomLiveJobSetup({
+    prompt: inferSetupPrompt(args.recipe, args.input),
+    turnId: args.runId,
+    sourceIds,
+    now: args.createdAt,
+  });
   return {
     schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
     run_id: args.runId,
@@ -178,6 +298,17 @@ const runGenericPlannedRecipe = (args: {
     receipt_refs: [],
     commentary_refs: [],
     missing_evidence: [],
+    live_job_contract: setupPlan.live_job_contract,
+    construct_observation: buildConstructObservation({
+      recipe: args.recipe,
+      runId: args.runId,
+      threadId: args.threadId,
+      roomId: args.roomId,
+      createdAt: args.createdAt,
+      constructs,
+      missingInputs: setupPlan.missing_inputs,
+      contract: setupPlan.live_job_contract,
+    }),
     assistant_answer: false,
     raw_content_included: false,
     instruction_authority: "none",
@@ -374,6 +505,17 @@ const runBrowserAudioTranscriberRecipe = (args: {
     linkSituationConstructs({ parentConstructId: transcriptionJobId, childConstructId: noteOutputId });
   }
 
+  const constructs = createdConstructIds
+    .map((constructId) => listSituationConstructs({ threadId: args.threadId, roomId: args.roomId, limit: 100 })
+      .find((construct) => construct.construct_id === constructId))
+    .filter((construct): construct is HelixSituationConstruct => Boolean(construct));
+  const setupPlan = planSituationRoomLiveJobSetup({
+    prompt: inferSetupPrompt(args.recipe, args.input),
+    turnId: args.runId,
+    sourceIds,
+    now: args.createdAt,
+  });
+
   return {
     schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
     run_id: args.runId,
@@ -385,6 +527,17 @@ const runBrowserAudioTranscriberRecipe = (args: {
     receipt_refs: [sourceBindingId, transcriptionJobId, commentaryPolicyId],
     commentary_refs: [],
     missing_evidence: [],
+    live_job_contract: setupPlan.live_job_contract,
+    construct_observation: buildConstructObservation({
+      recipe: args.recipe,
+      runId: args.runId,
+      threadId: args.threadId,
+      roomId: args.roomId,
+      createdAt: args.createdAt,
+      constructs,
+      missingInputs: setupPlan.missing_inputs,
+      contract: setupPlan.live_job_contract,
+    }),
     assistant_answer: false,
     raw_content_included: false,
     instruction_authority: "none",
@@ -427,6 +580,12 @@ export function runSituationConstructRecipe(
 
   const missing = missingInputs(recipe, { ...input, thread_id: threadId, room_id: roomId });
   if (missing.length > 0) {
+    const setupPlan = planSituationRoomLiveJobSetup({
+      prompt: inferSetupPrompt(recipe, input),
+      turnId: runId,
+      sourceIds: uniqueStrings(input.source_ids ?? []),
+      now: createdAt,
+    });
     return {
       schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
       run_id: runId,
@@ -438,6 +597,17 @@ export function runSituationConstructRecipe(
       receipt_refs: [],
       commentary_refs: [],
       missing_evidence: missing.map((key: string) => `Missing required recipe input: ${key}`),
+      live_job_contract: setupPlan.live_job_contract,
+      construct_observation: buildConstructObservation({
+        recipe,
+        runId,
+        threadId,
+        roomId,
+        createdAt,
+        constructs: [],
+        missingInputs: Array.from(new Set([...missing, ...setupPlan.missing_inputs])),
+        contract: setupPlan.live_job_contract,
+      }),
       assistant_answer: false,
       raw_content_included: false,
       instruction_authority: "none",
@@ -471,6 +641,12 @@ export function runSituationConstructRecipe(
         limit: 5,
       }).map((commentary: HelixLiveEnvironmentCommentary) => commentary.commentary_id),
     ];
+    const setupPlan = planSituationRoomLiveJobSetup({
+      prompt: inferSetupPrompt(recipe, input),
+      turnId: runId,
+      sourceIds: uniqueStrings(input.source_ids ?? []),
+      now: createdAt,
+    });
     return {
       schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
       run_id: runId,
@@ -482,6 +658,17 @@ export function runSituationConstructRecipe(
       receipt_refs: receipt.child_artifact_refs,
       commentary_refs: Array.from(new Set(commentaryRefs)),
       missing_evidence: [],
+      live_job_contract: setupPlan.live_job_contract,
+      construct_observation: buildConstructObservation({
+        recipe,
+        runId,
+        threadId,
+        roomId,
+        createdAt,
+        constructs,
+        missingInputs: setupPlan.missing_inputs,
+        contract: setupPlan.live_job_contract,
+      }),
       assistant_answer: false,
       raw_content_included: false,
       instruction_authority: "none",

@@ -2,6 +2,8 @@ import type {
   HelixSituationConstructOutputKind,
   HelixSituationConstructType,
 } from "./helix-situation-construct";
+import type { SituationRoomConstructObservation } from "./situation-room-construct-observation";
+import type { SituationRoomLiveJobContract } from "./situation-room-live-job-contract";
 
 export const HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA =
   "helix.situation_construct_recipe.v1" as const;
@@ -71,6 +73,8 @@ export type HelixSituationConstructRecipeRun = {
   receipt_refs: string[];
   commentary_refs: string[];
   missing_evidence: string[];
+  live_job_contract?: SituationRoomLiveJobContract;
+  construct_observation?: SituationRoomConstructObservation;
   assistant_answer: false;
   raw_content_included: false;
   instruction_authority: "none";

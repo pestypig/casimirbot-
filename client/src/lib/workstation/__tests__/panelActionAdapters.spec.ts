@@ -1184,6 +1184,32 @@ describe("panelActionAdapters", () => {
       instruction_authority: "none",
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+    });
+    expect(result.artifact?.live_job_contract).toMatchObject({
+      schema: "helix.situation_room_live_job_contract.v1",
+      purpose: "voice_witness",
+      voice_policy: "propose_only",
+      authority_policy: {
+        construct_answer_authority: "witness_only",
+        helix_ask_terminal_authority_required: true,
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result.artifact?.construct_observation).toMatchObject({
+      schema: "helix.situation_room_construct_observation.v1",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      policy_state: {
+        voice_policy: "propose_only",
+        spoken: false,
+        confirm_speak_receipt_present: false,
+        output_authority: "proposal",
+      },
     });
     expect(result.artifact?.constructs).toEqual(
       expect.arrayContaining([
@@ -1228,6 +1254,19 @@ describe("panelActionAdapters", () => {
       assistant_answer: false,
       raw_content_included: false,
       instruction_authority: "none",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+    });
+    expect(result.artifact?.construct_observation).toMatchObject({
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      policy_state: {
+        spoken: false,
+        confirm_speak_receipt_present: false,
+        output_authority: "typed_only",
+      },
     });
     expect(result.artifact?.constructs).toEqual(
       expect.arrayContaining([
@@ -1372,6 +1411,21 @@ describe("panelActionAdapters", () => {
       certainty_parity_ok: true,
       evidence_parity_ok: true,
       raw_reasoning_included: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+    });
+    expect(result.artifact?.construct_observation).toMatchObject({
+      action: "voice_delivery.propose_from_trace",
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      policy_state: {
+        voice_policy: "propose_only",
+        spoken: false,
+        confirm_speak_receipt_present: false,
+        output_authority: "proposal",
+      },
     });
     expect(String(result.artifact?.spoken_text).length).toBeLessThanOrEqual(64);
     expect(result.artifact?.spoken_text_hash).toMatch(/^fnv1a64:/);
@@ -1386,6 +1440,47 @@ describe("panelActionAdapters", () => {
         authority: "witness_only",
       }),
     ]);
+  });
+
+  it("marks voice delivery as spoken only through confirm_speak", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "voice_delivery.confirm_speak",
+        args: {
+          thread_id: "thread:voice-confirm",
+          spoken_text: "Route drift confirmed.",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      kind: "standby_callout_delivery_receipt",
+      schema: "helix.voice_delivery_confirm_speak_receipt.v1",
+      spoken: true,
+      confirm_speak_receipt_present: true,
+      output_authority: "confirmed_spoken",
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      next_step_authority: "agent_step_decision",
+      construct_observation: {
+        action: "voice_delivery.confirm_speak",
+        policy_state: {
+          spoken: true,
+          confirm_speak_receipt_present: true,
+          output_authority: "confirmed_spoken",
+        },
+      },
+    });
   });
 
   it("delegates Situation Room setup-from-prompt and mic source actions with receipts", () => {

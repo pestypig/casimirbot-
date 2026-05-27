@@ -204,6 +204,18 @@ const selectedDottieCapabilityHasCurrentTurnObservation = (
   });
 };
 
+const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
+  capability: string,
+  artifacts: Record<string, unknown>[],
+): boolean => {
+  if (capability !== "repo-code.search_concept") return false;
+  return artifacts.some((artifact) => {
+    const sourceScope = readString(artifact.source_scope);
+    if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;
+    return artifactKindMatchesCapability(capability, artifact);
+  });
+};
+
 const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): string[] => {
   const toolObservation = readRecord(iteration.tool_observation);
   return Array.from(new Set([
@@ -307,6 +319,9 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
       return artifactLinkedToIteration(artifact, record) && artifactKindMatchesCapability(capability, artifact);
     })) return true;
     if (selectedDottieCapabilityHasCurrentTurnObservation(capability, Array.from(artifactById.values()))) {
+      return true;
+    }
+    if (selectedRepoEvidenceCapabilityHasCurrentTurnObservation(capability, Array.from(artifactById.values()))) {
       return true;
     }
     const toolObservation = readRecord(record.tool_observation);

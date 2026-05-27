@@ -31,6 +31,9 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readArray = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
 const readTerminalPresentationText = (payload: Record<string, unknown>): string | null => {
   const presentation = readRecord(payload.terminal_presentation);
   return presentation?.schema === "helix.terminal_presentation.v1"
@@ -68,6 +71,64 @@ const typedFailureText = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_failure_text) ??
   readString(readRecord(payload.typed_failure)?.message) ??
   "I could not produce a terminal answer for this turn.";
+
+const isStaleRepoEvidenceTerminalText = (value: unknown): boolean => {
+  const text = readString(value) ?? "";
+  return /\b(?:could not complete|could not answer|terminal boundary blocked|source\/capability answer before the agent runtime loop|turn stopped before required artifacts|missing required artifacts|required artifacts (?:were|are) satisfied|repo_code_evidence_unavailable)\b/i.test(text);
+};
+
+const clipText = (value: string, max = 180): string =>
+  value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}...`;
+
+const buildRepoEvidenceTerminalRepairText = (payload: Record<string, unknown>): string | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const concept =
+    readString(readArray(canonicalGoal?.corpus_anchors)[0]) ??
+    readString(readArray(canonicalGoal?.concept_tokens)[0]) ??
+    "this internal concept";
+  const directObservations = readArray(payload.evidence_observations);
+  const ledgerObservations = readArray(payload.current_turn_artifact_ledger).flatMap((entry) => {
+    const artifact = readRecord(entry);
+    const artifactPayload = readRecord(artifact?.payload);
+    const searchable = [
+      readString(artifact?.kind),
+      readString(artifactPayload?.kind),
+      readString(artifactPayload?.schema),
+    ].join(" ");
+    if (!/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1/i.test(searchable)) return [];
+    if (readArray(artifactPayload?.observations).length > 0) return readArray(artifactPayload?.observations);
+    if (readArray(artifactPayload?.spans).length > 0) return readArray(artifactPayload?.spans);
+    return artifactPayload ? [artifactPayload] : [];
+  });
+  const observations = directObservations.length > 0 ? directObservations : ledgerObservations;
+  const sourceLines = observations
+    .map((entry) => {
+      const record = readRecord(entry);
+      if (!record) return null;
+      const source =
+        readString(record.source_id) ??
+        readString(record.ref) ??
+        readString(record.path) ??
+        readString(record.filePath) ??
+        readString(record.id);
+      const excerpt = clipText(
+        readString(record.snippet) ??
+          readString(record.excerpt) ??
+          readString(record.reason) ??
+          "",
+      );
+      return source ? `- ${source}${excerpt ? `: ${excerpt}` : ""}` : null;
+    })
+    .filter((entry): entry is string => Boolean(entry))
+    .slice(0, 6);
+  if (sourceLines.length === 0) return null;
+  return [
+    `I found current repo evidence for ${concept}.`,
+    "",
+    "Key evidence:",
+    ...sourceLines,
+  ].join("\n").trim();
+};
 
 export const applyDocConceptExplanationTerminalCandidate = (
   payload: Record<string, unknown>,
@@ -287,6 +348,26 @@ export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): HelixTerminalAnswerEnvelope {
+  if (
+    envelope.terminal_artifact_kind === "repo_code_evidence_answer" &&
+    isStaleRepoEvidenceTerminalText(envelope.terminal_text)
+  ) {
+    const repairedText = buildRepoEvidenceTerminalRepairText(payload);
+    if (repairedText) {
+      envelope = {
+        ...envelope,
+        terminal_text: repairedText,
+        terminal_text_hash: hashHelixTerminalText(repairedText),
+        final_answer_source: envelope.final_answer_source === "typed_failure"
+          ? "artifact_synthesis"
+          : envelope.final_answer_source,
+        terminal_kind: "answer",
+        authority_origin: "terminal_presentation",
+      };
+      payload.final_answer_source = envelope.final_answer_source;
+      payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
+    }
+  }
   const previewPayload = {
     ...payload,
     selected_final_answer: envelope.terminal_text,
