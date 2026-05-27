@@ -13,7 +13,10 @@ import {
   validateHelixRouterToolCall,
   type HelixToolRouterContext,
 } from "./helix-tool-call-validator";
-import { buildHelixAgentStepObservationPacket } from "./helix-tool-observation-packet";
+import {
+  buildHelixAgentStepObservationPacket,
+  buildSituationRoomLiveJobObservationPacket,
+} from "./helix-tool-observation-packet";
 
 export class HelixToolRouter {
   buildToolSurfacePacket(input: BuildHelixToolSurfaceInput): HelixToolSurfacePacket {
@@ -110,6 +113,12 @@ export class HelixToolRouter {
     call: HelixRuntimeToolCallV1;
     result: HelixRawToolResult;
   }) {
+    if (
+      args.call.panel_id === "situation-room-pipelines" &&
+      /^(?:construct\.|dottie\.|observer\.|voice_delivery\.)/i.test(args.call.action)
+    ) {
+      return buildSituationRoomLiveJobObservationPacket(args);
+    }
     return buildHelixAgentStepObservationPacket(args);
   }
 }

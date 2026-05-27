@@ -74,6 +74,34 @@ const upgradesConstructStatus = (text: string, serialized: string): string | nul
   return null;
 };
 
+const upgradesSourceStatus = (text: string, serialized: string): boolean => {
+  if (!/\b(?:missing|stale|blocked|unknown)\b/i.test(serialized)) return false;
+  return /\b(?:source|minecraft|mic|microphone|visual|browser\s+audio|tab\s+audio|world\s+events?)\b/i.test(text) &&
+    /\b(?:connected|fresh|live|ready|available|working)\b/i.test(text);
+};
+
+const receiptMessageWasUsedAsAnswer = (text: string, payload: Record<string, unknown> | null, serialized: string): boolean => {
+  const candidates = [
+    readString(payload?.workspace_action_receipt),
+    readString(payload?.message),
+    readString(readRecord(payload?.workspace_action_receipt)?.message),
+    readString(readRecord(payload?.workspace_action_receipt)?.summary),
+    readString(readRecord(payload?.receipt_presentation_snapshot)?.full_summary),
+  ].filter((entry): entry is string => Boolean(entry));
+  const normalizedText = text.trim().replace(/\s+/g, " ");
+  return candidates.some((candidate) => {
+    const normalizedCandidate = candidate.trim().replace(/\s+/g, " ");
+    return normalizedCandidate.length >= 24 &&
+      (normalizedText === normalizedCandidate || normalizedText.startsWith(normalizedCandidate)) &&
+      /workspace_action_receipt|panel_generated_answer|terminal_eligible["']?\s*:\s*false|assistant_answer["']?\s*:\s*false/i.test(serialized);
+  });
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
 export function guardSituationRoomReceiptFactDrift(
   input: SituationRoomReceiptFactDriftGuardInput,
 ): SituationRoomReceiptFactDriftGuardResult {
@@ -91,6 +119,8 @@ export function guardSituationRoomReceiptFactDrift(
 
   const statusUpgrade = upgradesConstructStatus(text, serialized);
   if (statusUpgrade) codes.push(statusUpgrade);
+  if (upgradesSourceStatus(text, serialized)) codes.push("SOURCE_STATUS_UPGRADED");
+  if (receiptMessageWasUsedAsAnswer(text, payload, serialized)) codes.push("PANEL_RECEIPT_USED_AS_ANSWER");
 
   if (codes.length === 0) {
     return {
