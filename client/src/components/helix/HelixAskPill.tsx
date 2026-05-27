@@ -13643,8 +13643,8 @@ function stripLeadingQuestion(response: string, question?: string): string {
   return lines.slice(startIndex).join("\n").trim();
 }
 
-function stripPromptEcho(response: string, question?: string): string {
-  let trimmed = stripQuestionPrefixText(response.trim(), question);
+function stripPromptEcho(response: unknown, question?: string): string {
+  let trimmed = stripQuestionPrefixText(coerceText(response).trim(), question);
   trimmed = stripLeadingQuestion(trimmed, question);
   trimmed = stripEvidencePromptBlock(trimmed);
   trimmed = stripAnswerBoundaryPrefix(trimmed);
@@ -25922,7 +25922,7 @@ export function HelixAskPill({
           });
           responseEnvelope = localResponse.envelope;
           const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
-          const envelopeAnswer = (responseEnvelope?.assistant_answer ?? responseEnvelope?.answer)?.trim() ?? "";
+          const envelopeAnswer = coerceText(responseEnvelope?.assistant_answer ?? responseEnvelope?.answer).trim();
           responseText = terminalResolution.text
             ? terminalResolution.text
             : envelopeAnswer
@@ -26963,7 +26963,7 @@ export function HelixAskPill({
           localResponseForTerminal = localResponse;
           responseEnvelope = localResponse.envelope;
           const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
-          const envelopeAnswer = (responseEnvelope?.assistant_answer ?? responseEnvelope?.answer)?.trim() ?? "";
+          const envelopeAnswer = coerceText(responseEnvelope?.assistant_answer ?? responseEnvelope?.answer).trim();
           responseText = terminalResolution.text
             ? terminalResolution.text
             : envelopeAnswer
