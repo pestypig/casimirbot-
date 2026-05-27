@@ -58,6 +58,8 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "note_mutation",
   "panel_control",
   "process_graph_overview",
+  "repo_code_evidence_question",
+  "repo_entity_definition",
   "situation_context_question",
   "visual_capture_describe",
 ]);
@@ -100,6 +102,7 @@ const artifactKindMatchesCapability = (
   const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
   const joined = [kind, payloadKind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
 
+  if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
   if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);
@@ -160,6 +163,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
   const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
   const joined = [kind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
+  if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
+    return "repo-code.search_concept";
+  }
   if (/dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer\.attach|observer\.detach|observer_subscription/i.test(joined)) {
     return "situation-room-pipelines.observer.attach";
   }

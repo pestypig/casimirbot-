@@ -51,7 +51,12 @@ const reasonFor = (input: {
   if (input.primaryIntent === "content_question" || /visual_capture|visual_scene/i.test(input.sourceTarget)) {
     return "visual_content_requires_post_evidence_reasoning";
   }
-  if (input.primaryIntent === "repo_evidence_question" || input.primaryIntent === "implementation_question" || /repo_code/i.test(input.sourceTarget)) {
+  if (
+    input.primaryIntent === "repo_evidence_question" ||
+    input.primaryIntent === "implementation_question" ||
+    /repo_code/i.test(input.sourceTarget) ||
+    /repo_code_evidence_answer|repo_entity_definition/i.test(input.terminalArtifactKind)
+  ) {
     return "repo_evidence_requires_post_evidence_reasoning";
   }
   if (input.primaryIntent === "debug_diagnosis" || /runtime_evidence/i.test(input.sourceTarget)) {

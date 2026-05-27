@@ -29,6 +29,18 @@ The Helix loop is aligned to the proven codex app-server patterns:
 Helix parity principle: prefer typed, streamed lifecycle artifacts over prose-only status text.
 Do not treat a planning/subgoal statement as a terminal answer unless the required action artifact has actually been produced.
 
+## Repo Concept Evidence Lane
+Internal product/workstation concept questions such as "What is the Situation Room?", "What is Auntie Dottie in this app?", "How does terminal authority work in Helix Ask?", "What is Route Evidence supposed to be?", and "How does the docs panel work?" are repo-backed turns, not generic background answers.
+
+Current contract:
+- `server/services/helix-ask/repo-concept-detector.ts` detects known internal concepts.
+- `repo-code.search_concept` is the model-visible retrieval capability.
+- `server/services/helix-ask/retrieval/repo-code-evidence-search.ts` runs the repo search and emits `helix.repo_code_evidence_observation.v1`.
+- `server/services/helix-ask/retrieval/repo-code-evidence-ranker.ts` ranks implementation/docs/shared hits and filters index-only paths.
+- `server/services/helix-ask/repo-code-evidence-answer-contract.ts` requires the repo observation before `repo_entity_definition` or `repo_code_evidence_answer` can be terminal.
+
+The repo search result is evidence only. It must be re-entered into the runtime loop, followed by model synthesis, and only then terminal authority may write the visible answer. The forbidden terminal shapes for this lane are `direct_answer_text`, `no_tool_direct`, `model_only_concept`, and `panel_generated_answer`.
+
 ## Runtime Lanes
 1. Workspace lane: deterministic action routing and execution first.
 2. Reasoning lane: queued deep reasoning for synthesize/compare/verify and forced reasoning dispatch.

@@ -90,6 +90,22 @@ import {
   type HelixDottieManifestMode,
   type HelixDottieManifestVoiceMode,
 } from "@shared/helix-dottie-manifest-preset";
+import {
+  HELIX_SITUATION_CONSTRUCT_SCHEMA,
+  type HelixSituationConstruct,
+  type HelixSituationConstructOutputBinding,
+  type HelixSituationConstructOutputKind,
+  type HelixSituationConstructStatus,
+  type HelixSituationConstructType,
+} from "@shared/helix-situation-construct";
+import {
+  HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
+  HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+  type HelixSituationConstructRecipe,
+  type HelixSituationConstructRecipeId,
+  type HelixSituationConstructRecipeRun,
+  type HelixSituationConstructRecipeRunStatus,
+} from "@shared/helix-situation-construct-recipe";
 import { recordDottieVoiceDebugClip } from "@/lib/helix/dottie-voice-debug-clips";
 
 export type HelixPanelActionRequest = {
@@ -228,6 +244,181 @@ function asStringArray(value: unknown): string[] {
 }
 
 const dottieObserverSubscriptions = new Map<string, HelixDottieObserverSubscriptionV1>();
+const situationConstructs = new Map<string, HelixSituationConstruct>();
+const situationConstructRecipeRuns = new Map<string, HelixSituationConstructRecipeRun & Record<string, unknown>>();
+
+const SITUATION_CONSTRUCT_RECIPE_CATALOG: HelixSituationConstructRecipe[] = [
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "auntie_dottie_witness",
+    title: "Auntie Dottie Witness",
+    description: "Create a witness-only Dottie construct over Situation Room evidence and public Helix Ask commentary.",
+    required_inputs: ["thread_id", "room_id"],
+    optional_inputs: ["source_ids", "target_run_id", "environment_id", "mode", "voice_mode", "commentary_cadence", "output"],
+    creates_constructs: [
+      "dottie_manifest",
+      "observer",
+      "commentary_policy",
+      "voice_policy",
+      "field_worker_policy",
+      "live_environment",
+      "live_answer_output",
+    ],
+    default_outputs: ["typed_commentary", "voice_proposal"],
+    default_policy: {
+      may_execute_tools: false,
+      allowed_tools: [],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: true,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "browser_audio_transcriber",
+    title: "Browser Audio Transcriber",
+    description: "Bind browser or display audio sources to a supervised transcription job and transcript output.",
+    required_inputs: ["thread_id", "room_id", "source_ids"],
+    optional_inputs: ["label", "language", "environment_id", "output"],
+    creates_constructs: ["source_binding", "transcription_job", "commentary_policy", "live_environment", "note_output"],
+    default_outputs: ["transcript_stream"],
+    default_policy: {
+      may_execute_tools: false,
+      allowed_tools: [],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: false,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "minecraft_route_watcher",
+    title: "Minecraft Route Watcher",
+    description: "Plan a route evidence watcher over Minecraft source evidence.",
+    required_inputs: ["thread_id", "room_id", "minecraft_world_id"],
+    optional_inputs: ["source_ids", "output"],
+    creates_constructs: ["route_evidence_view", "commentary_policy", "field_worker_policy"],
+    default_outputs: ["route_evidence_view", "typed_commentary"],
+    default_policy: {
+      may_execute_tools: true,
+      allowed_tools: [
+        "live_env.query_navigation_state",
+        "live_env.query_world_events",
+        "live_env.query_source_health",
+        "live_env.query_constructs",
+        "minecraft.query_navigation_state",
+      ],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: false,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "live_source_summarizer",
+    title: "Live Source Summarizer",
+    description: "Plan a live source summarizer construct that writes typed commentary or notes.",
+    required_inputs: ["thread_id", "room_id", "source_ids"],
+    optional_inputs: ["output"],
+    creates_constructs: ["commentary_policy", "commentary_output", "note_output"],
+    default_outputs: ["typed_commentary"],
+    default_policy: {
+      may_execute_tools: false,
+      allowed_tools: [],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: false,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "translation_pair",
+    title: "Translation Pair",
+    description: "Plan a bounded translation construct over two speaker/source bindings.",
+    required_inputs: ["thread_id", "room_id", "target_language", "native_language"],
+    optional_inputs: ["source_ids", "output"],
+    creates_constructs: ["source_binding", "transcription_job", "commentary_output"],
+    default_outputs: ["transcript_stream", "note"],
+    default_policy: {
+      may_execute_tools: false,
+      allowed_tools: [],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: false,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+  {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_SCHEMA,
+    recipe_id: "source_health_watch",
+    title: "Source Health Watch",
+    description: "Plan a source health construct for stale, missing, or contradictory source evidence.",
+    required_inputs: ["thread_id", "room_id", "source_ids"],
+    optional_inputs: ["output"],
+    creates_constructs: ["source_binding", "commentary_policy", "field_worker_policy"],
+    default_outputs: ["typed_commentary"],
+    default_policy: {
+      may_execute_tools: false,
+      allowed_tools: [],
+      may_spawn_workers: false,
+      may_speak: false,
+      may_surface_user_text: false,
+      requires_user_confirmation: true,
+      witness_only: false,
+    },
+    safety: {
+      assistant_answer: false,
+      ask_instruction_authority: "none",
+      instruction_authority: "none",
+      raw_content_included: false,
+      raw_audio_included: false,
+    },
+  },
+];
 
 function boundedDottieMaxChars(value: unknown): number {
   const parsed = asNumber(value);
@@ -257,6 +448,408 @@ function normalizeDottieManifestCommentaryCadence(value: unknown): HelixDottieMa
   const cadence = asNonEmptyString(value);
   if (cadence === "milestones_only" || cadence === "salience_only" || cadence === "manual") return cadence;
   return "milestones_only";
+}
+
+function resolveSituationConstructRecipeId(value: unknown): HelixSituationConstructRecipeId | null {
+  const recipeId = asNonEmptyString(value);
+  return SITUATION_CONSTRUCT_RECIPE_CATALOG.some((recipe) => recipe.recipe_id === recipeId)
+    ? (recipeId as HelixSituationConstructRecipeId)
+    : null;
+}
+
+function resolveSituationConstructOutput(value: unknown): HelixSituationConstructOutputKind | null {
+  const output = asNonEmptyString(value);
+  if (
+    output === "live_answer_environment" ||
+    output === "transcript_stream" ||
+    output === "typed_commentary" ||
+    output === "voice_proposal" ||
+    output === "route_evidence_view" ||
+    output === "note"
+  ) {
+    return output;
+  }
+  return null;
+}
+
+function resolveSituationConstructStatus(value: unknown): HelixSituationConstructStatus | null {
+  const status = asNonEmptyString(value);
+  if (
+    status === "planned" ||
+    status === "receipt_only" ||
+    status === "active" ||
+    status === "blocked" ||
+    status === "stale" ||
+    status === "detached" ||
+    status === "completed"
+  ) {
+    return status;
+  }
+  return null;
+}
+
+function nextSituationConstructId(type: HelixSituationConstructType, name: string): string {
+  return `construct:${type}:${slugify(name) || "construct"}:${Date.now()}:${situationConstructs.size + 1}`;
+}
+
+function outputBindingsForPanelConstruct(input: {
+  outputKinds?: HelixSituationConstructOutputKind[];
+  outputBindings?: HelixSituationConstructOutputBinding[];
+  environmentId?: string | null;
+  status?: HelixSituationConstructStatus;
+}): HelixSituationConstructOutputBinding[] {
+  if (input.outputBindings) return input.outputBindings;
+  return (input.outputKinds ?? []).map((output_kind) => ({
+    output_kind,
+    artifact_ref: output_kind === "live_answer_environment" ? input.environmentId ?? null : null,
+    status:
+      output_kind === "live_answer_environment" && input.environmentId
+        ? "active"
+        : input.status === "active"
+          ? "active"
+          : "planned",
+  }));
+}
+
+function createPanelSituationConstruct(input: {
+  type: HelixSituationConstructType;
+  name: string;
+  description?: string | null;
+  status?: HelixSituationConstructStatus;
+  threadId: string;
+  roomId: string;
+  environmentId?: string | null;
+  sourceIds?: string[];
+  parentConstructIds?: string[];
+  receiptRefs?: string[];
+  evidenceRefs?: string[];
+  outputKinds?: HelixSituationConstructOutputKind[];
+  outputBindings?: HelixSituationConstructOutputBinding[];
+  allowedTools?: string[];
+  mayExecuteTools?: boolean;
+  maySpeak?: boolean;
+  maySurfaceUserText?: boolean;
+  witnessOnly?: boolean;
+}): HelixSituationConstruct {
+  const now = new Date().toISOString();
+  const allowedTools = Array.from(new Set(input.allowedTools ?? []))
+    .filter((tool) => /^live_env\.query_[a-z0-9_]+$/i.test(tool) || /^minecraft\.query_[a-z0-9_]+$/i.test(tool));
+  const executableType =
+    input.type === "route_evidence_view" ||
+    input.type === "field_worker_policy" ||
+    input.type === "field_worker";
+  const witnessOnly = input.witnessOnly ?? input.type === "observer";
+  const construct: HelixSituationConstruct = {
+    schema: HELIX_SITUATION_CONSTRUCT_SCHEMA,
+    construct_id: nextSituationConstructId(input.type, input.name),
+    type: input.type,
+    name: input.name,
+    description: input.description ?? null,
+    status: input.status ?? "planned",
+    thread_id: input.threadId,
+    room_id: input.roomId,
+    environment_id: input.environmentId ?? null,
+    source_ids: Array.from(new Set(input.sourceIds ?? [])),
+    parent_construct_ids: Array.from(new Set(input.parentConstructIds ?? [])),
+    child_construct_ids: [],
+    artifact_refs: [],
+    receipt_refs: Array.from(new Set(input.receiptRefs ?? [])),
+    commentary_refs: [],
+    evidence_refs: Array.from(new Set(input.evidenceRefs ?? [])),
+    output_bindings: outputBindingsForPanelConstruct(input),
+    policy: {
+      may_execute_tools: input.mayExecuteTools === true && executableType && allowedTools.length > 0,
+      allowed_tools: input.mayExecuteTools === true && executableType ? allowedTools : [],
+      may_spawn_workers: false,
+      may_speak:
+        input.type !== "observer" &&
+        input.type !== "dottie_manifest" &&
+        input.type !== "voice_policy" &&
+        input.type !== "transcription_job" &&
+        input.type !== "source_binding" &&
+        input.maySpeak === true,
+      may_surface_user_text: input.maySurfaceUserText === true && !witnessOnly && input.type !== "transcription_job",
+      requires_user_confirmation: true,
+      witness_only: witnessOnly,
+    },
+    safety: {
+      assistant_answer: false,
+      raw_content_included: false,
+      raw_audio_included: false,
+      raw_user_text_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      ask_context_policy: "evidence_only",
+      context_role: "tool_evidence",
+    },
+    created_at: now,
+    updated_at: now,
+  };
+  situationConstructs.set(construct.construct_id, construct);
+  for (const parentId of construct.parent_construct_ids) {
+    const parent = situationConstructs.get(parentId);
+    if (parent && !parent.child_construct_ids.includes(construct.construct_id)) {
+      situationConstructs.set(parentId, {
+        ...parent,
+        child_construct_ids: [...parent.child_construct_ids, construct.construct_id],
+        updated_at: now,
+      });
+    }
+  }
+  return construct;
+}
+
+function updatePanelSituationConstruct(
+  constructId: string,
+  mutate: (construct: HelixSituationConstruct) => HelixSituationConstruct,
+): HelixSituationConstruct | null {
+  const existing = situationConstructs.get(constructId);
+  if (!existing) return null;
+  const updated = mutate({ ...existing, updated_at: new Date().toISOString() });
+  situationConstructs.set(constructId, updated);
+  return updated;
+}
+
+function buildConstructRecipeRunArtifact(args: Record<string, unknown>): {
+  recipeRun: HelixSituationConstructRecipeRun & Record<string, unknown>;
+  constructs: HelixSituationConstruct[];
+  compatibilityReceipt?: Record<string, unknown>;
+} | null {
+  const recipeId = resolveSituationConstructRecipeId(args.recipe_id ?? args.recipeId);
+  if (!recipeId) return null;
+  const room = resolveSituationRoom(args);
+  const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+  const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? "situation-room:active";
+  const sourceIds = Array.from(
+    new Set([
+      ...asStringArray(args.source_ids ?? args.sourceIds),
+      ...asStringArray(args.source_id ?? args.sourceId),
+      ...(room ? resolveSituationSourceIds(room, args) : []),
+    ].filter(Boolean)),
+  );
+  const output = resolveSituationConstructOutput(args.output);
+  const environmentId = asNonEmptyString(args.environment_id ?? args.environmentId);
+  const createdConstructs: HelixSituationConstruct[] = [];
+  const receiptRefs: string[] = [];
+  const missingEvidence: string[] = [];
+  let status: HelixSituationConstructRecipeRunStatus = "planned";
+  let compatibilityReceipt: Record<string, unknown> | undefined;
+
+  if (recipeId === "auntie_dottie_witness") {
+    const preset = buildDottieManifestPreset({
+      threadId,
+      roomId,
+      sourceIds,
+      mode: normalizeDottieManifestMode(args.mode),
+      voiceMode: normalizeDottieManifestVoiceMode(args.voice_mode ?? args.voiceMode),
+      commentaryCadence: normalizeDottieManifestCommentaryCadence(
+        args.commentary_cadence ?? args.commentaryCadence ?? args.cadence,
+      ),
+      targetRunId: asNonEmptyString(args.target_run_id ?? args.targetRunId),
+      objective: asNonEmptyString(args.objective),
+      maxChars: asNumber(args.max_chars ?? args.maxChars),
+      environmentId,
+    });
+    const receipt = buildDottieManifestPresetReceipts(preset);
+    compatibilityReceipt = receipt as unknown as Record<string, unknown>;
+    receiptRefs.push(...receipt.child_artifact_refs);
+    const manifest = createPanelSituationConstruct({
+      type: "dottie_manifest",
+      name: "Auntie Dottie Manifest",
+      description: "Witness-only Dottie construct recipe receipt.",
+      status: "receipt_only",
+      threadId,
+      roomId,
+      sourceIds,
+      receiptRefs,
+      outputKinds: ["typed_commentary"],
+    });
+    createdConstructs.push(
+      manifest,
+      createPanelSituationConstruct({
+        type: "observer",
+        name: "Auntie Dottie Observer",
+        description: "Observer subscription over public Helix Ask commentary.",
+        status: "receipt_only",
+        threadId,
+        roomId,
+        environmentId,
+        sourceIds,
+        parentConstructIds: [manifest.construct_id],
+        receiptRefs,
+        outputKinds: ["typed_commentary"],
+      }),
+      createPanelSituationConstruct({
+        type: "commentary_policy",
+        name: "Dottie Commentary Policy",
+        status: "receipt_only",
+        threadId,
+        roomId,
+        sourceIds,
+        parentConstructIds: [manifest.construct_id],
+        receiptRefs,
+        outputKinds: ["typed_commentary"],
+      }),
+      createPanelSituationConstruct({
+        type: "voice_policy",
+        name: "Dottie Voice Policy",
+        status: "receipt_only",
+        threadId,
+        roomId,
+        sourceIds,
+        parentConstructIds: [manifest.construct_id],
+        receiptRefs,
+        outputKinds: ["voice_proposal"],
+      }),
+      createPanelSituationConstruct({
+        type: "field_worker_policy",
+        name: "Dottie Field Worker Policy",
+        status: "receipt_only",
+        threadId,
+        roomId,
+        sourceIds,
+        parentConstructIds: [manifest.construct_id],
+        receiptRefs,
+      }),
+    );
+    if (output === "live_answer_environment") {
+      const live = createPanelSituationConstruct({
+        type: "live_environment",
+        name: "Dottie Live Environment",
+        status: environmentId ? "active" : "receipt_only",
+        threadId,
+        roomId,
+        environmentId,
+        sourceIds,
+        parentConstructIds: [manifest.construct_id],
+        receiptRefs,
+        outputKinds: ["live_answer_environment"],
+      });
+      createdConstructs.push(
+        live,
+        createPanelSituationConstruct({
+          type: "live_answer_output",
+          name: "Dottie Live Answer Output",
+          status: environmentId ? "active" : "receipt_only",
+          threadId,
+          roomId,
+          environmentId,
+          sourceIds,
+          parentConstructIds: [live.construct_id],
+          receiptRefs,
+          outputKinds: ["live_answer_environment"],
+        }),
+      );
+    }
+    status = "applied_as_receipts";
+  } else if (recipeId === "browser_audio_transcriber") {
+    if (sourceIds.length === 0) missingEvidence.push("source_ids");
+    status = missingEvidence.length ? "blocked" : "active";
+    createdConstructs.push(
+      createPanelSituationConstruct({
+        type: "source_binding",
+        name: asNonEmptyString(args.label) ?? "Browser Tab Audio Source",
+        description: "Source binding for browser/display audio. Raw audio is not Ask context.",
+        status: missingEvidence.length ? "blocked" : "active",
+        threadId,
+        roomId,
+        sourceIds,
+        outputKinds: ["transcript_stream"],
+      }),
+      createPanelSituationConstruct({
+        type: "transcription_job",
+        name: "Transcript Job",
+        description: "Supervised transcription job. Transcript chunks are evidence, not answers.",
+        status: missingEvidence.length ? "blocked" : "active",
+        threadId,
+        roomId,
+        environmentId: output === "live_answer_environment" ? environmentId : null,
+        sourceIds,
+        outputKinds: output === "live_answer_environment" ? ["transcript_stream", "live_answer_environment"] : [output ?? "transcript_stream"],
+      }),
+      createPanelSituationConstruct({
+        type: "commentary_policy",
+        name: "Transcription Commentary Policy",
+        status: "receipt_only",
+        threadId,
+        roomId,
+        sourceIds,
+        outputKinds: ["typed_commentary"],
+      }),
+    );
+    if (output === "live_answer_environment") {
+      createdConstructs.push(
+        createPanelSituationConstruct({
+          type: "live_environment",
+          name: "Live Summary Card",
+          status: missingEvidence.length ? "blocked" : environmentId ? "active" : "planned",
+          threadId,
+          roomId,
+          environmentId,
+          sourceIds,
+          outputKinds: ["live_answer_environment"],
+        }),
+      );
+    }
+    if (output === "note") {
+      createdConstructs.push(
+        createPanelSituationConstruct({
+          type: "note_output",
+          name: "Transcript Note Output",
+          status: missingEvidence.length ? "blocked" : "planned",
+          threadId,
+          roomId,
+          sourceIds,
+          outputKinds: ["note"],
+        }),
+      );
+    }
+  } else {
+    const recipe = SITUATION_CONSTRUCT_RECIPE_CATALOG.find((candidate) => candidate.recipe_id === recipeId);
+    for (const type of recipe?.creates_constructs ?? []) {
+      createdConstructs.push(
+        createPanelSituationConstruct({
+          type,
+          name: `${recipe?.title ?? recipeId} ${type.replace(/_/g, " ")}`,
+          status: "planned",
+          threadId,
+          roomId,
+          environmentId: output === "live_answer_environment" ? environmentId : null,
+          sourceIds,
+          outputKinds: output ? [output] : recipe?.default_outputs,
+          mayExecuteTools: recipe?.default_policy.may_execute_tools ?? false,
+          allowedTools: recipe?.default_policy.allowed_tools ?? [],
+          maySurfaceUserText: recipe?.default_policy.may_surface_user_text ?? false,
+          witnessOnly: recipe?.default_policy.witness_only ?? false,
+        }),
+      );
+    }
+  }
+
+  const now = new Date().toISOString();
+  const recipeRun: HelixSituationConstructRecipeRun & Record<string, unknown> = {
+    schema: HELIX_SITUATION_CONSTRUCT_RECIPE_RUN_SCHEMA,
+    kind: "situation_construct_recipe_run",
+    run_id: `construct_recipe_run:${slugify(recipeId)}:${Date.now()}`,
+    recipe_id: recipeId,
+    thread_id: threadId,
+    room_id: roomId,
+    status,
+    created_construct_ids: createdConstructs.map((construct) => construct.construct_id),
+    receipt_refs: Array.from(new Set(receiptRefs)),
+    commentary_refs: [],
+    missing_evidence: missingEvidence,
+    constructs: createdConstructs,
+    compatibility_receipt: compatibilityReceipt,
+    assistant_answer: false,
+    raw_content_included: false,
+    instruction_authority: "none",
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+    created_at: now,
+  };
+  situationConstructRecipeRuns.set(recipeRun.run_id, recipeRun);
+  return { recipeRun, constructs: createdConstructs, compatibilityReceipt };
 }
 
 function asTheoryCalculatorObjectContext(value: unknown): TheoryCalculatorObjectContextV1 | null {
@@ -2580,35 +3173,280 @@ export function executeHelixPanelAction(
       };
     }
 
-    if (actionId === "dottie.manifest") {
-      const room = resolveSituationRoom(args);
-      const preset = buildDottieManifestPreset({
-        threadId: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
-        roomId: asNonEmptyString(args.room_id ?? args.roomId) ?? room?.room_id ?? "situation-room:active",
-        sourceIds: Array.from(
-          new Set([
-            ...asStringArray(args.source_ids ?? args.sourceIds),
-            ...asStringArray(args.source_id ?? args.sourceId),
-            ...(room ? resolveSituationSourceIds(room, args) : []),
-          ].filter(Boolean)),
-        ),
-        mode: normalizeDottieManifestMode(args.mode),
-        voiceMode: normalizeDottieManifestVoiceMode(args.voice_mode ?? args.voiceMode),
-        commentaryCadence: normalizeDottieManifestCommentaryCadence(
-          args.commentary_cadence ?? args.commentaryCadence ?? args.cadence,
-        ),
-        targetRunId: asNonEmptyString(args.target_run_id ?? args.targetRunId),
-        objective: asNonEmptyString(args.objective),
-        maxChars: asNumber(args.max_chars ?? args.maxChars),
-      });
-      const receipt = buildDottieManifestPresetReceipts(preset);
+    if (actionId === "construct.list_recipes") {
+      const recipeId = resolveSituationConstructRecipeId(args.recipe_id ?? args.recipeId);
+      const recipes = recipeId
+        ? SITUATION_CONSTRUCT_RECIPE_CATALOG.filter((recipe) => recipe.recipe_id === recipeId)
+        : SITUATION_CONSTRUCT_RECIPE_CATALOG;
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       return {
         ok: true,
         panel_id: panelId,
         action_id: actionId,
-        artifact: receipt,
+        artifact: {
+          kind: "situation_construct_recipe_registry",
+          schema: "helix.situation_construct_recipe_registry.v1",
+          recipes,
+          count: recipes.length,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Found ${recipes.length} Situation Room construct recipe${recipes.length === 1 ? "" : "s"}.`,
+      };
+    }
+
+    if (actionId === "construct.create_from_recipe") {
+      const recipeId = resolveSituationConstructRecipeId(args.recipe_id ?? args.recipeId);
+      if (!recipeId) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.construct.create_from_recipe requires a known recipe_id.",
+        };
+      }
+      const artifact = buildConstructRecipeRunArtifact({ ...args, recipe_id: recipeId });
+      if (!artifact) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "Unable to create Situation Room construct recipe run.",
+        };
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: artifact.recipeRun,
+        message: `Created Situation Room construct recipe ${recipeId}.`,
+      };
+    }
+
+    if (actionId === "construct.query") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId);
+      const roomId = asNonEmptyString(args.room_id ?? args.roomId);
+      const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
+      const recipeId = resolveSituationConstructRecipeId(args.recipe_id ?? args.recipeId);
+      const type = asNonEmptyString(args.type);
+      const status = resolveSituationConstructStatus(args.status);
+      const constructs = Array.from(situationConstructs.values()).filter((construct) => {
+        if (constructId && construct.construct_id !== constructId) return false;
+        if (threadId && construct.thread_id !== threadId) return false;
+        if (roomId && construct.room_id !== roomId) return false;
+        if (type && construct.type !== type) return false;
+        if (status && construct.status !== status) return false;
+        return true;
+      });
+      const recipeRuns = Array.from(situationConstructRecipeRuns.values()).filter((run) => {
+        if (threadId && run.thread_id !== threadId) return false;
+        if (roomId && run.room_id !== roomId) return false;
+        if (recipeId && run.recipe_id !== recipeId) return false;
+        return true;
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_construct_query_result",
+          schema: "helix.situation_construct_query_result.v1",
+          constructs,
+          recipe_runs: recipeRuns,
+          count: constructs.length,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Found ${constructs.length} construct${constructs.length === 1 ? "" : "s"}.`,
+      };
+    }
+
+    if (actionId === "construct.explain") {
+      const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
+      const construct = constructId ? situationConstructs.get(constructId) : null;
+      if (!constructId || !construct) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.construct.explain requires an existing construct_id.",
+        };
+      }
+      const childConstructs = construct.child_construct_ids
+        .map((childId) => situationConstructs.get(childId))
+        .filter((entry): entry is HelixSituationConstruct => Boolean(entry));
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_construct_explanation",
+          schema: "helix.situation_construct_explanation.v1",
+          construct,
+          child_constructs: childConstructs,
+          summary: `${construct.name} is a ${construct.type} construct with ${construct.output_bindings.length} output binding${construct.output_bindings.length === 1 ? "" : "s"}.`,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Explained construct ${constructId}.`,
+      };
+    }
+
+    if (actionId === "construct.detach" || actionId === "construct.activate") {
+      const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
+      const nextStatus: HelixSituationConstructStatus = actionId === "construct.detach" ? "detached" : "active";
+      const updated = constructId
+        ? updatePanelSituationConstruct(constructId, (construct) => ({ ...construct, status: nextStatus }))
+        : null;
+      if (!constructId || !updated) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `situation-room-pipelines.${actionId} requires an existing construct_id.`,
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_construct_update_receipt",
+          schema: "helix.situation_construct_update_receipt.v1",
+          construct: updated,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Marked construct ${constructId} ${nextStatus}.`,
+      };
+    }
+
+    if (actionId === "construct.attach_source") {
+      const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
+      const sourceIds = asStringArray(args.source_ids ?? args.sourceIds);
+      const updated = constructId
+        ? updatePanelSituationConstruct(constructId, (construct) => ({
+            ...construct,
+            source_ids: Array.from(new Set([...construct.source_ids, ...sourceIds])),
+          }))
+        : null;
+      if (!constructId || !updated || sourceIds.length === 0) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.construct.attach_source requires construct_id and source_ids.",
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_construct_update_receipt",
+          schema: "helix.situation_construct_update_receipt.v1",
+          construct: updated,
+          attached_source_ids: sourceIds,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Attached ${sourceIds.length} source${sourceIds.length === 1 ? "" : "s"} to construct ${constructId}.`,
+      };
+    }
+
+    if (actionId === "construct.bind_output") {
+      const constructId = asNonEmptyString(args.construct_id ?? args.constructId);
+      const outputKind = resolveSituationConstructOutput(args.output);
+      const artifactRef = asNonEmptyString(args.artifact_ref ?? args.artifactRef ?? args.environment_id ?? args.environmentId);
+      const requestedStatus = resolveSituationConstructStatus(args.status);
+      const bindingStatus: HelixSituationConstructOutputBinding["status"] =
+        requestedStatus === "active" || requestedStatus === "blocked" || requestedStatus === "detached"
+          ? requestedStatus
+          : outputKind === "live_answer_environment" && artifactRef
+            ? "active"
+            : "planned";
+      const updated =
+        constructId && outputKind
+          ? updatePanelSituationConstruct(constructId, (construct) => ({
+              ...construct,
+              output_bindings: [
+                ...construct.output_bindings,
+                {
+                  output_kind: outputKind,
+                  artifact_ref: artifactRef ?? null,
+                  status: bindingStatus,
+                },
+              ],
+            }))
+          : null;
+      if (!constructId || !outputKind || !updated) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "situation-room-pipelines.construct.bind_output requires construct_id and output.",
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "situation_construct_update_receipt",
+          schema: "helix.situation_construct_update_receipt.v1",
+          construct: updated,
+          output_kind: outputKind,
+          assistant_answer: false,
+          raw_content_included: false,
+          instruction_authority: "none",
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        message: `Bound ${outputKind} output to construct ${constructId}.`,
+      };
+    }
+
+    if (actionId === "dottie.manifest") {
+      const artifact = buildConstructRecipeRunArtifact({ ...args, recipe_id: "auntie_dottie_witness" });
+      const receipt = artifact?.compatibilityReceipt;
+      if (!artifact || !receipt) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "Unable to manifest Auntie Dottie as a Situation Room construct recipe.",
+        };
+      }
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          ...receipt,
+          recipe_run: artifact.recipeRun,
+        },
         message: "Manifested Auntie Dottie as a witness-only Situation Room preset.",
       };
     }

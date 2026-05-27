@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import {
   HELIX_DOTTIE_MANIFEST_RUN_SCHEMA,
   type HelixDottieManifestRun,
+  type HelixDottieManifestRunStep,
+  type HelixDottieManifestRunStepStatus,
   type HelixDottieManifestRunStatus,
 } from "@shared/helix-dottie-manifest-run";
 
@@ -19,8 +21,15 @@ const normalizeString = (value: unknown): string | null => {
 
 const uniqueStrings = (values: unknown): string[] =>
   Array.isArray(values)
-    ? Array.from(new Set(values.map(normalizeString).filter((entry): entry is string => Boolean(entry))))
+    ? Array.from(new Set(values.map(normalizeString).filter((entry: string | null): entry is string => Boolean(entry))))
     : [];
+
+type DottieManifestRunAppliedStepInput = {
+  step: HelixDottieManifestRunStep;
+  status: HelixDottieManifestRunStepStatus;
+  artifact_ref?: string | null;
+  missing_evidence?: string[] | null;
+};
 
 export function makeDottieManifestRunId(input: {
   threadId: string;
@@ -47,7 +56,7 @@ export function recordDottieManifestRun(input: {
   preset_ref: string;
   receipt_refs?: string[] | null;
   commentary_refs?: string[] | null;
-  applied_steps: HelixDottieManifestRun["applied_steps"];
+  applied_steps: DottieManifestRunAppliedStepInput[];
   created_at?: string | null;
   updated_at?: string | null;
 }): HelixDottieManifestRun {
@@ -80,7 +89,7 @@ export function recordDottieManifestRun(input: {
     preset_ref: presetRef,
     receipt_refs: receiptRefs,
     commentary_refs: uniqueStrings(input.commentary_refs ?? []),
-    applied_steps: input.applied_steps.map((step) => ({
+    applied_steps: input.applied_steps.map((step: DottieManifestRunAppliedStepInput) => ({
       step: step.step,
       status: step.status,
       artifact_ref: normalizeString(step.artifact_ref),
@@ -114,11 +123,11 @@ export function listDottieManifestRuns(input: {
 }): HelixDottieManifestRun[] {
   const limit = Number.isFinite(input.limit) ? Math.max(0, Math.min(200, Math.trunc(input.limit ?? 50))) : 50;
   return (runIdsByThread.get(input.threadId) ?? [])
-    .map((runId) => runsById.get(runId))
-    .filter((run): run is HelixDottieManifestRun => Boolean(run))
-    .filter((run) => !input.roomId || run.room_id === input.roomId)
-    .filter((run) => !input.environmentId || run.environment_id === input.environmentId)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((runId: string) => runsById.get(runId))
+    .filter((run: HelixDottieManifestRun | undefined): run is HelixDottieManifestRun => Boolean(run))
+    .filter((run: HelixDottieManifestRun) => !input.roomId || run.room_id === input.roomId)
+    .filter((run: HelixDottieManifestRun) => !input.environmentId || run.environment_id === input.environmentId)
+    .sort((a: HelixDottieManifestRun, b: HelixDottieManifestRun) => a.created_at.localeCompare(b.created_at))
     .slice(-limit);
 }
 

@@ -17,6 +17,7 @@ export type HelixDottieManifestPreset = {
   creates_voice_policy: true;
   creates_field_worker_policy: true;
   live_environment: {
+    environment_id?: string | null;
     preset: "environment_run_monitor" | "minecraft_run_monitor" | "custom";
     objective: string;
     mode: "text_only" | "voice_on_confirm" | "critical_voice" | "direct_address_only";
@@ -76,6 +77,7 @@ export type BuildDottieManifestPresetInput = {
   targetRunId?: string | null;
   objective?: string | null;
   maxChars?: number | null;
+  environmentId?: string | null;
 };
 
 const cleanId = (value: string | null | undefined, fallback: string): string => {
@@ -120,6 +122,7 @@ export function buildDottieManifestPreset(input: BuildDottieManifestPresetInput 
     creates_voice_policy: true,
     creates_field_worker_policy: true,
     live_environment: {
+      environment_id: cleanId(input.environmentId, "") || null,
       preset: "environment_run_monitor",
       objective,
       mode: voiceMode === "off" ? "text_only" : "voice_on_confirm",
@@ -148,7 +151,7 @@ export function buildDottieManifestPreset(input: BuildDottieManifestPresetInput 
       {
         worker_kind: "source_health_watch",
         max_runs: 1,
-        allowed_tools: ["live_env.query_source_health"],
+        allowed_tools: ["live_env.query_source_health", "live_env.query_constructs"],
         may_surface_user_text: false,
       },
     ],

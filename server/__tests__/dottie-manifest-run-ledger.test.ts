@@ -13,10 +13,15 @@ import {
   listLiveEnvironmentCommentary,
   resetLiveEnvironmentCommentaryForTest,
 } from "../services/situation-room/live-environment-commentary-store";
+import {
+  listSituationConstructs,
+  resetSituationConstructStoreForTest,
+} from "../services/situation-room/situation-construct-store";
 
 const resetAll = () => {
   resetDottieManifestRunsForTest();
   resetLiveEnvironmentCommentaryForTest();
+  resetSituationConstructStoreForTest();
   clearInterpretedEventLogForTest();
 };
 
@@ -42,6 +47,11 @@ describe("Dottie manifest run ledger", () => {
       roomId: "room:dottie-run",
       subject: "dottie_observer",
       limit: 10,
+    });
+    const constructs = listSituationConstructs({
+      threadId: "thread:dottie-run",
+      roomId: "room:dottie-run",
+      limit: 20,
     });
 
     expect(receipt).toMatchObject({
@@ -84,5 +94,83 @@ describe("Dottie manifest run ledger", () => {
       ask_context_policy: "evidence_only",
     });
     expect(runs[0]?.commentary_refs).toContain(commentary.at(-1)?.commentary_id);
+    expect(constructs.map((construct) => construct.type)).toEqual(expect.arrayContaining([
+      "dottie_manifest",
+      "live_environment",
+      "live_answer_output",
+      "commentary_policy",
+      "observer",
+      "voice_policy",
+      "field_worker_policy",
+    ]));
+    expect(constructs.every((construct) => construct.safety.assistant_answer === false)).toBe(true);
+    expect(constructs.every((construct) => construct.safety.instruction_authority === "none")).toBe(true);
+    expect(constructs.every((construct) => construct.safety.ask_instruction_authority === "none")).toBe(true);
+    expect(constructs.every((construct) => construct.safety.raw_audio_included === false)).toBe(true);
+    expect(constructs.every((construct) => construct.safety.ask_context_policy === "evidence_only")).toBe(true);
+    const manifestConstruct = constructs.find((construct) => construct.type === "dottie_manifest");
+    const liveEnvironmentConstruct = constructs.find((construct) => construct.type === "live_environment");
+    const liveAnswerOutputConstruct = constructs.find((construct) => construct.type === "live_answer_output");
+    const observerConstruct = constructs.find((construct) => construct.type === "observer");
+    const voicePolicyConstruct = constructs.find((construct) => construct.type === "voice_policy");
+    expect(manifestConstruct?.child_construct_ids.length).toBe(6);
+    expect(liveEnvironmentConstruct?.child_construct_ids).toContain(liveAnswerOutputConstruct?.construct_id);
+    expect(liveAnswerOutputConstruct).toMatchObject({
+      name: "Dottie live answer output",
+      status: "receipt_only",
+      safety: {
+        assistant_answer: false,
+        instruction_authority: "none",
+      },
+    });
+    expect(liveAnswerOutputConstruct?.output_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ output_kind: "live_answer_environment", status: "planned" }),
+      expect.objectContaining({ output_kind: "typed_commentary", status: "active" }),
+    ]));
+    expect(observerConstruct).toMatchObject({
+      name: "Auntie Dottie",
+      status: "receipt_only",
+      policy: {
+        may_execute_tools: false,
+        may_spawn_workers: false,
+        may_speak: false,
+        may_surface_user_text: false,
+        witness_only: true,
+      },
+    });
+    expect(observerConstruct?.parent_construct_ids).toContain(manifestConstruct?.construct_id);
+    expect(observerConstruct?.output_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ output_kind: "typed_commentary", status: "active" }),
+    ]));
+    expect(voicePolicyConstruct?.output_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ output_kind: "voice_proposal", status: "planned" }),
+    ]));
+  });
+
+  it("binds a Dottie live answer output to an existing environment when supplied", () => {
+    const preset = buildSituationRoomDottieManifestPreset({
+      threadId: "thread:dottie-existing-env",
+      roomId: "room:dottie-existing-env",
+      environmentId: "live_answer:dottie-existing-env",
+    });
+
+    applySituationRoomDottieManifestPreset(preset);
+    const constructs = listSituationConstructs({
+      threadId: "thread:dottie-existing-env",
+      roomId: "room:dottie-existing-env",
+      limit: 20,
+    });
+
+    expect(constructs.find((construct) => construct.type === "live_answer_output")).toMatchObject({
+      status: "active",
+      environment_id: "live_answer:dottie-existing-env",
+      output_bindings: expect.arrayContaining([
+        expect.objectContaining({
+          output_kind: "live_answer_environment",
+          artifact_ref: "live_answer:dottie-existing-env",
+          status: "active",
+        }),
+      ]),
+    });
   });
 });

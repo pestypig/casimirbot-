@@ -179,6 +179,71 @@ describe("workstation dynamic tools", () => {
     });
   });
 
+  it("exposes generic construct recipe actions as the Situation Room builder surface", () => {
+    const tools = getWorkstationDynamicTools();
+    const createConstruct = tools.find((tool) => tool.name === "situation_room_pipelines.construct_create_from_recipe");
+    const listRecipes = tools.find((tool) => tool.name === "situation_room_pipelines.construct_list_recipes");
+    const queryConstructs = tools.find((tool) => tool.name === "situation_room_pipelines.construct_query");
+
+    expect(createConstruct).toMatchObject({
+      namespace: "workstation",
+      panel_id: "situation-room-pipelines",
+      action_id: "construct.create_from_recipe",
+      risk: "medium",
+      returns_artifact: true,
+      terminal_artifact_kind: "situation_construct_recipe_run",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+    expect(createConstruct?.inputSchema).toMatchObject({
+      required: ["recipe_id"],
+      properties: {
+        recipe_id: {
+          enum: expect.arrayContaining(["auntie_dottie_witness", "browser_audio_transcriber"]),
+        },
+        output: {
+          enum: expect.arrayContaining(["transcript_stream", "voice_proposal", "live_answer_environment"]),
+        },
+        environment_id: {
+          type: "string",
+        },
+      },
+    });
+    expect(listRecipes).toMatchObject({
+      terminal_artifact_kind: "situation_construct_recipe_registry",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+    expect(queryConstructs).toMatchObject({
+      terminal_artifact_kind: "situation_construct_query_result",
+      attachment_policy: "manual_only",
+      context_injection: "explicit_attachment_only",
+    });
+  });
+
+  it("maps construct recipe calls onto panel actions", () => {
+    const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.construct_create_from_recipe", {
+      recipe_id: "auntie_dottie_witness",
+      thread_id: "thread:dottie",
+      room_id: "room:dottie",
+    });
+
+    expect(mapped).toEqual({
+      ok: true,
+      action: {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "auntie_dottie_witness",
+          thread_id: "thread:dottie",
+          room_id: "room:dottie",
+        },
+      },
+    });
+  });
+
   it("exposes ideology and Zen framework actions as receipt-backed tools", () => {
     const tools = getWorkstationDynamicTools();
     const compare = tools.find((tool) => tool.name === "mission_ethos.compare_motive_to_zen");

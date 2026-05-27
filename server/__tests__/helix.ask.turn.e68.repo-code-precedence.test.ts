@@ -259,6 +259,87 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.retrieval_required_signal?.required).toBe(true);
   }, 90000);
 
+  it("detects internal workstation concepts as repo-backed entity definitions", () => {
+    const cases = [
+      ["What is the Situation Room?", "Situation Room"],
+      ["What is Auntie Dottie in this app?", "Auntie Dottie"],
+      ["What is Route Evidence supposed to be?", "Route Evidence"],
+      ["How does the docs panel work?", "docs panel"],
+      ["What are field workers?", "field worker"],
+      ["What is the perturbation broker?", "perturbation broker"],
+    ] as const;
+
+    for (const [prompt, entity] of cases) {
+      const intent = detectRepoCodeEvidenceIntent(prompt);
+      expect(intent.repoEvidenceRequested, prompt).toBe(true);
+      expect(["soft", "hard"], prompt).toContain(intent.strength);
+      expect(intent.reasons, prompt).toEqual(
+        expect.arrayContaining(
+          intent.strength === "hard" ? ["project_local_agent_loop"] : ["project_local_entity_definition"],
+        ),
+      );
+      expect(intent.projectEntity, prompt).toBe(entity);
+      expect(intent.requestedOutputs, prompt).toContain("repo_code");
+      if (intent.strength === "soft") {
+        expect(intent.requestedOutputs, prompt).toContain("file_path");
+      }
+    }
+  });
+
+  it("routes Situation Room concept questions through repo evidence instead of generic direct answer", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What is the Situation Room?",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-entity-situation-room-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_entity_definition");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      strength: "soft",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      precedence_reason: "project_local_entity_source_target",
+    });
+    expect(response.body?.retrieval_required_signal).toMatchObject({
+      required: true,
+    });
+    expect(["soft", "hard"]).toContain(response.body?.retrieval_required_signal?.strength);
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("repo-code.search_concept");
+    expect(response.body?.available_capabilities?.model_visible_capability_keys).toContain("repo-code.search_concept");
+    expect(response.body?.capability_plan).toMatchObject({
+      capability_family: "repo_evidence",
+      requested_action: "repo-code.search_concept",
+      source_target: "repo_code",
+    });
+    expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+      iteration?.chosen_capability === "repo-code.search_concept" &&
+      iteration?.observation_role === "executed_tool_result"
+    )).toBe(true);
+    expect(response.body?.current_turn_artifact_ledger?.some((artifact: any) =>
+      artifact?.kind === "repo_code_evidence_observation" &&
+      artifact?.payload?.schema === "helix.repo_code_evidence_observation.v1"
+    )).toBe(true);
+    expect(response.body?.post_tool_observation_reviews?.length).toBeGreaterThan(0);
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
+    expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(response.body?.terminal_artifact_kind).not.toBe("direct_answer_text");
+    expect(response.body?.repo_claim_observation_gate).toMatchObject({
+      decision: "observe",
+      failedClosed: false,
+    });
+    expect(Array.isArray(response.body?.evidence_observations)).toBe(true);
+    expect(response.body?.evidence_observations.length).toBeGreaterThan(0);
+  }, 90000);
+
   it("keeps explicit background-only prompts direct", async () => {
     const app = createApp();
     const response = await request(app)

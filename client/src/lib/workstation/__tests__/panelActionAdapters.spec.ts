@@ -1147,6 +1147,194 @@ describe("panelActionAdapters", () => {
     );
   });
 
+  it("creates Dottie through the generic construct recipe action", () => {
+    const room = useSituationRoomStore.getState().createRoom("Construct Dottie Room");
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: () => undefined,
+      openSettings: () => undefined,
+    };
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "auntie_dottie_witness",
+          room_id: room.room_id,
+          thread_id: "thread:construct-dottie",
+          target_run_id: "run:ask:construct-dottie",
+          voice_mode: "propose_only",
+        },
+      },
+      context,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      schema: "helix.situation_construct_recipe_run.v1",
+      kind: "situation_construct_recipe_run",
+      recipe_id: "auntie_dottie_witness",
+      thread_id: "thread:construct-dottie",
+      room_id: room.room_id,
+      status: "applied_as_receipts",
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(result.artifact?.constructs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "dottie_manifest", status: "receipt_only" }),
+        expect.objectContaining({ type: "observer", status: "receipt_only" }),
+        expect.objectContaining({ type: "voice_policy", status: "receipt_only" }),
+      ]),
+    );
+    expect(result.artifact?.compatibility_receipt).toMatchObject({
+      kind: "dottie_manifest_preset_receipt",
+      assistant_answer: false,
+    });
+  });
+
+  it("creates a browser audio transcriber construct recipe without answer authority", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "browser_audio_transcriber",
+          room_id: "room:transcriber",
+          thread_id: "thread:transcriber",
+          source_ids: ["source:tab-audio"],
+          output: "transcript_stream",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      schema: "helix.situation_construct_recipe_run.v1",
+      kind: "situation_construct_recipe_run",
+      recipe_id: "browser_audio_transcriber",
+      status: "active",
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+    });
+    expect(result.artifact?.constructs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "source_binding", status: "active", source_ids: ["source:tab-audio"] }),
+        expect.objectContaining({ type: "transcription_job", status: "active", source_ids: ["source:tab-audio"] }),
+        expect.objectContaining({ type: "commentary_policy", status: "receipt_only" }),
+      ]),
+    );
+  });
+
+  it("binds browser audio transcriber constructs to Live Answers as an output surface", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "browser_audio_transcriber",
+          room_id: "room:transcriber-live-answer",
+          thread_id: "thread:transcriber-live-answer",
+          source_ids: ["source:tab-audio"],
+          output: "live_answer_environment",
+          environment_id: "live_answer:client-transcriber",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact?.constructs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "transcription_job",
+          environment_id: "live_answer:client-transcriber",
+          output_bindings: expect.arrayContaining([
+            expect.objectContaining({
+              output_kind: "live_answer_environment",
+              artifact_ref: "live_answer:client-transcriber",
+              status: "active",
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          type: "live_environment",
+          status: "active",
+          environment_id: "live_answer:client-transcriber",
+        }),
+      ]),
+    );
+  });
+
+  it("queries and updates Situation Room constructs through generic construct actions", () => {
+    const context = {
+      openPanel: vi.fn(),
+      focusPanel: vi.fn(),
+      closePanel: () => undefined,
+      openSettings: () => undefined,
+    };
+    const created = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.create_from_recipe",
+        args: {
+          recipe_id: "browser_audio_transcriber",
+          room_id: "room:construct-query",
+          thread_id: "thread:construct-query",
+          source_ids: ["source:tab-audio"],
+        },
+      },
+      context,
+    );
+    const constructs = created.artifact?.constructs as Array<{ construct_id: string; type: string }> | undefined;
+    const transcriptionConstructId = constructs?.find((construct) => construct.type === "transcription_job")?.construct_id;
+
+    const query = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.query",
+        args: { thread_id: "thread:construct-query", type: "transcription_job" },
+      },
+      context,
+    );
+    const detach = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "construct.detach",
+        args: { construct_id: transcriptionConstructId },
+      },
+      context,
+    );
+
+    expect(query.ok).toBe(true);
+    expect(query.artifact?.constructs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ construct_id: transcriptionConstructId })]),
+    );
+    expect(detach.ok).toBe(true);
+    expect(detach.artifact).toMatchObject({
+      kind: "situation_construct_update_receipt",
+      construct: expect.objectContaining({ construct_id: transcriptionConstructId, status: "detached" }),
+      assistant_answer: false,
+    });
+  });
+
   it("proposes Dottie voice from a public trace event without making an answer", () => {
     const result = executeHelixPanelAction(
       {

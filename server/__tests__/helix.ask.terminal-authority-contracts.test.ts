@@ -451,4 +451,35 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(contract.allowed_terminal_artifact_kinds).toContain("workstation_tool_evaluation");
     expect(contract.forbidden_terminal_artifact_kinds).not.toContain("workstation_tool_evaluation");
   });
+
+  it("keeps repo evidence observations as side evidence and repo answers as terminals", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:repo-concept",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "repo_code",
+      },
+      promptText: "What is the Situation Room?",
+    });
+
+    expect(contract.allowed_terminal_artifact_kinds).toContain("repo_code_evidence_answer");
+    expect(contract.allowed_terminal_artifact_kinds).toEqual([
+      "repo_code_evidence_answer",
+      "request_user_input",
+      "typed_failure",
+    ]);
+    expect(contract.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "direct_answer_text",
+      "no_tool_direct",
+      "model_only_concept",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "repo_entity_definition",
+    ]));
+    expect(contract.side_artifact_kinds_allowed).toContain("repo_code_evidence_observation");
+  });
 });

@@ -23,6 +23,7 @@ import {
   ensureLiveSituationRunForEnvironment,
 } from "../situation-room/live-situation-run-store";
 import { registerFieldWorkersForSituationRun } from "../situation-room/live-field-worker-registry";
+import { listSituationConstructs } from "../situation-room/situation-construct-store";
 
 type ExecuteLiveEnvironmentToolInput = {
   tool_name: HelixLiveEnvironmentToolName;
@@ -321,6 +322,44 @@ export function executeLiveEnvironmentTool(
       summary: `Read ${result.capabilities.length} source capability state(s).`,
       observation: result,
       evidenceRefs: result.capabilities.map((capability) => capability.source_id),
+    });
+  }
+
+  if (input.tool_name === "live_env.query_constructs") {
+    const constructs = listSituationConstructs({
+      threadId: input.thread_id,
+      roomId,
+      type: readString(args.type),
+      status: readString(args.status),
+      limit: readNumber(args.limit, 50),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Retrieved ${constructs.length} Situation Room construct record(s).`,
+      observation: {
+        schema: "helix.situation_construct_query_result.v1",
+        thread_id: input.thread_id,
+        room_id: roomId,
+        type: readString(args.type),
+        status: readString(args.status),
+        constructs,
+        count: constructs.length,
+        assistant_answer: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: constructs.flatMap((construct) => [
+        construct.construct_id,
+        ...construct.source_ids,
+        ...construct.artifact_refs,
+        ...construct.receipt_refs,
+        ...construct.commentary_refs,
+        ...construct.evidence_refs,
+      ]),
     });
   }
 

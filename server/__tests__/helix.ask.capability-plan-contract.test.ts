@@ -50,6 +50,31 @@ const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null)
 });
 
 describe("Helix capability plan contract", () => {
+  it("exposes repo-code.search_concept for internal concept questions", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:repo-concept",
+      promptText: "What is the Situation Room?",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      schema: "helix.capability_plan.v1",
+      capability_family: "repo_evidence",
+      requested_action: "repo-code.search_concept",
+      mutating: false,
+      operator_command_required: false,
+      operator_command_present: false,
+      source_target: "repo_code",
+      goal_kind: "repo_concept_explanation",
+      required_terminal_kind: "repo_code_evidence_answer",
+      admission_status: "needs_evidence",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("plans docs capability and only selects doc_open_receipt for doc-open canonical goals", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:docs-open",

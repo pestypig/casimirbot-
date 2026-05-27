@@ -33,6 +33,22 @@ export {
   type HelixFollowupReasoningReason,
 } from "./followup-reasoning-gate";
 export {
+  detectRepoConcept,
+  detectRepoConceptDefinition,
+  resolveRepoConceptEntity,
+  type HelixRepoConceptMatch,
+  type RepoConceptDetection,
+} from "./repo-concept-detector";
+export {
+  buildRepoCodeEvidenceAnswerContract,
+  hasRepoCodeEvidenceObservation,
+  isRepoCodeEvidenceGoal,
+} from "./repo-code-evidence-answer-contract";
+export {
+  runRepoCodeEvidenceSearch,
+  type HelixRepoCodeEvidenceSearchResult,
+} from "./retrieval/repo-code-evidence-search";
+export {
   buildLiveSourceIdentityAudit,
   isLiveSourceIdentityAuditRelevant,
   type HelixLiveSourceIdentityAudit,

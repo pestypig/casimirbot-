@@ -34,6 +34,10 @@ import {
 } from "./followup-reasoning-gate";
 import type { HelixLiveSourceIdentityAudit } from "./live-source-identity-audit";
 import type { HelixCompoundPromptCoverageGate } from "./compound-prompt-coverage-gate";
+import {
+  detectRepoConcept,
+  type RepoConceptDetection,
+} from "./repo-concept-detector";
 
 type RecordLike = Record<string, unknown>;
 
@@ -63,6 +67,7 @@ export type HelixAskTurnSolverHardFailureCode =
   | "poison_clean_but_authority_failed"
   | "route_contract_missing"
   | "hard_source_target_allowed_no_tool_direct"
+  | "repo_evidence_required_before_answer"
   | "compound_prompt_coverage_incomplete";
 
 export type HelixAskTurnSolverHardGate = {
@@ -90,6 +95,7 @@ export type HelixAskTurnSolverTrace = {
   prompt_hash: string;
 
   prompt_interpretation: HelixPromptInterpretation;
+  repo_concept_detection?: RepoConceptDetection;
   compound_prompt_contract?: HelixCompoundPromptContract;
   compound_prompt_coverage?: {
     schema: "helix.compound_prompt_coverage.v1";
@@ -287,6 +293,8 @@ const terminalMatchesEvidenceProductContract = (payload: RecordLike, terminalArt
     "doc_evidence_location",
     "doc_summary",
     "repo_code_evidence_answer",
+    "repo_entity_definition",
+    "repo_code_evidence_observation",
     "procedure_evidence_retrieval_result",
     "situation_context_pack",
     "visual_context_pack",
@@ -565,6 +573,28 @@ export function evaluateAskTurnSolverHardGate(input: {
       "required compound prompt items were not resolved before terminal authority",
     );
   }
+  const repoConceptDetection = readRecord(trace?.repo_concept_detection);
+  const repoConceptRequiresEvidence = repoConceptDetection?.require_repo_evidence === true;
+  const repoEvidenceSelected = (Array.isArray(trace?.evidence_results) ? trace.evidence_results : [])
+    .map((entry) => readRecord(entry))
+    .some((entry) => readString(entry?.source_kind) === "repo_code" && entry?.selected_for_answer === true);
+  const modelDirectTerminal =
+    readString(input.payload.terminal_artifact_kind) === "direct_answer_text" ||
+    readString(input.payload.final_answer_source) === "model_direct_answer" ||
+    traceTerminalArtifactKind === "direct_answer_text" ||
+    traceFinalAnswerSource === "model_direct_answer";
+  if (
+    !typedFailureTerminal &&
+    repoConceptRequiresEvidence &&
+    modelDirectTerminal &&
+    !repoEvidenceSelected
+  ) {
+    pushHardFailure(
+      details,
+      "repo_evidence_required_before_answer",
+      "project-internal concept answers require repo_code_evidence_observation before model.direct_answer can terminalize",
+    );
+  }
 
   const failureCodes = details.map((entry) => entry.code);
   return {
@@ -641,7 +671,21 @@ const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrac
   return Array.from(candidates.values());
 };
 
-const buildEvidenceResults = (loopTrace: HelixLoopParityTrace | RecordLike | null): HelixAskTurnSolverTrace["evidence_results"] => {
+const isRepoCodeEvidenceArtifact = (entry: RecordLike): boolean => {
+  const payload = readRecord(entry.payload);
+  const searchable = [
+    readString(entry.kind),
+    readString(payload?.kind),
+    readString(payload?.schema),
+    readString(payload?.source_kind),
+  ].join(" ");
+  return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_code/i.test(searchable);
+};
+
+const buildEvidenceResults = (
+  loopTrace: HelixLoopParityTrace | RecordLike | null,
+  payload: RecordLike,
+): HelixAskTurnSolverTrace["evidence_results"] => {
   const observations = (Array.isArray(loopTrace?.observations_created) ? loopTrace.observations_created : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -673,6 +717,19 @@ const buildEvidenceResults = (loopTrace: HelixLoopParityTrace | RecordLike | nul
       source_kind: "rejected_evidence_ref",
       selected_for_answer: false,
       rejected_reason: readString(entry.reason) || "rejected",
+    });
+  }
+  const ledgerRepoArtifacts = (Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [])
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry) && isRepoCodeEvidenceArtifact(entry));
+  for (const artifact of ledgerRepoArtifacts) {
+    const artifactId = readString(artifact.artifact_id) || readString(readRecord(artifact.payload)?.artifact_id);
+    if (!artifactId || results.some((entry) => entry.result_id === artifactId)) continue;
+    const artifactPayload = readRecord(artifact.payload);
+    results.push({
+      result_id: artifactId,
+      source_kind: "repo_code",
+      selected_for_answer: artifactPayload?.selected_for_answer !== false,
     });
   }
   return results;
@@ -778,6 +835,8 @@ export function buildAskTurnSolverTrace(input: {
   const loopTrace = (input.loopParityTrace ?? readRecord(input.payload.loop_parity_trace)) as HelixLoopParityTrace | RecordLike | null;
   const sourceTargetInfo = sourceTargetFromPayload(input.payload);
   const promptInterpretation = interpretHelixAskPrompt(promptText);
+  const repoConceptDetection = detectRepoConcept(promptText);
+  const repoConceptRequiresEvidence = repoConceptDetection.require_repo_evidence === true;
   const compoundContract = promptInterpretation.compound_contract;
   const finalAnswerText =
     readString(input.payload.selected_final_answer) ||
@@ -810,8 +869,11 @@ export function buildAskTurnSolverTrace(input: {
   const secondary = intentArbitration.secondary_intent_ids
     .map((id) => intentHypotheses.find((entry) => entry.id === id)?.kind)
     .filter((kind): kind is HelixAskTurnIntentKind => Boolean(kind));
-  const evidenceRequired = sourceRequiresEvidence(sourceTargetInfo.sourceTarget);
-  const evidenceResults = buildEvidenceResults(loopTrace);
+  const evidenceRequired = sourceRequiresEvidence(sourceTargetInfo.sourceTarget) || repoConceptRequiresEvidence;
+  const evidenceResults = buildEvidenceResults(loopTrace, input.payload);
+  const repoEvidenceResultSelected = evidenceResults.some((entry) =>
+    entry.source_kind === "repo_code" && entry.selected_for_answer,
+  );
   const liveSourceIdentityAudit = readRecord(input.payload.live_source_identity_audit) as HelixLiveSourceIdentityAudit | null;
   const liveSourceIdentityAuditRef = readString(liveSourceIdentityAudit?.audit_id) || null;
   const finalArbitrationRan = Boolean(
@@ -843,6 +905,14 @@ export function buildAskTurnSolverTrace(input: {
   const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
+  const finalTraceTerminalArtifactKind =
+    repoConceptRequiresEvidence && repoEvidenceResultSelected && /repo_code_evidence_answer|repo_entity_definition|repo_code_evidence_observation/i.test(terminalArtifactKind)
+      ? "repo_code_evidence_answer"
+      : terminalArtifactKind;
+  const finalTraceAnswerSource =
+    repoConceptRequiresEvidence && repoEvidenceResultSelected && finalTraceTerminalArtifactKind === "repo_code_evidence_answer"
+      ? "model_synthesis_from_repo_evidence"
+      : finalAnswerSource;
   const canonicalTerminalAllowed =
     (
       terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind) &&
@@ -906,6 +976,7 @@ export function buildAskTurnSolverTrace(input: {
     turn_id: input.turnId,
     prompt_hash: hashShort(promptText),
     prompt_interpretation: promptInterpretation,
+    ...(repoConceptDetection.applies ? { repo_concept_detection: repoConceptDetection } : {}),
     ...(compoundContract ? { compound_prompt_contract: compoundContract } : {}),
     ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
     ...(compoundCoverageGate ? { compound_prompt_coverage_gate: compoundCoverageGate } : {}),
@@ -922,14 +993,21 @@ export function buildAskTurnSolverTrace(input: {
           evidence_required: evidenceRequired,
         }],
     tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace),
-    evidence_requests: [{
-      request_id: `evidence_request:${hashShort([input.turnId, sourceTargetInfo.sourceTarget, input.selectedRoute])}`,
-      source_target: sourceTargetInfo.sourceTarget,
-      required: evidenceReentryGate.required,
-      purpose: evidenceReentryGate.required
-        ? "provide source evidence before final arbitration"
-        : "confirm terminal product contract without source evidence",
-    }],
+    evidence_requests: repoConceptRequiresEvidence
+      ? [{
+          request_id: `repo-concept:${input.turnId}`,
+          source_target: "repo_code",
+          required: true,
+          purpose: "Explain project-internal concept from repo evidence",
+        }]
+      : [{
+          request_id: `evidence_request:${hashShort([input.turnId, sourceTargetInfo.sourceTarget, input.selectedRoute])}`,
+          source_target: sourceTargetInfo.sourceTarget,
+          required: evidenceReentryGate.required,
+          purpose: evidenceReentryGate.required
+            ? "provide source evidence before final arbitration"
+            : "confirm terminal product contract without source evidence",
+        }],
     evidence_results: evidenceResults,
     evidence_reentry: {
       required: evidenceReentryGate.required,
@@ -1003,8 +1081,8 @@ export function buildAskTurnSolverTrace(input: {
       : {}),
     final_arbitration: {
       selected_route: input.selectedRoute,
-      terminal_artifact_kind: terminalArtifactKind,
-      final_answer_source: finalAnswerSource,
+      terminal_artifact_kind: finalTraceTerminalArtifactKind,
+      final_answer_source: finalTraceAnswerSource,
       why_complete: completedSolverPath
         ? "route authority, poison audit, terminal authority, evidence re-entry, and follow-up reasoning gates completed"
         : "solver path recorded with missing or risky authority gates",

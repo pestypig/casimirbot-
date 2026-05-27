@@ -305,7 +305,29 @@ export function buildRouteProductContract(input: {
     });
   }
 
-  if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") {
+  if (sourceTarget === "repo_code") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: ["repo_code_evidence_answer"],
+      allowedExtra: [],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+      ],
+      precedenceReason: "repo_code_source_target_allows_only_repo_evidence_terminal_products",
+      sideArtifactKindsAllowed: ["repo_code_evidence_observation"],
+    });
+  }
+
+  if (sourceTarget === "runtime_evidence") {
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -313,7 +335,8 @@ export function buildRouteProductContract(input: {
       allowedCore: ["repo_code_evidence_answer"],
       allowedExtra: ["repo_entity_definition", "tool_evaluation", "workstation_tool_evaluation"],
       forbiddenExtra: ["direct_answer_text", "no_tool_direct", "model_only_concept", "process_graph_overview", "situation_context_pack", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location"],
-      precedenceReason: "repo_code_source_target_allows_only_repo_evidence_terminal_products",
+      precedenceReason: "runtime_evidence_source_target_allows_repo_and_runtime_evidence_products",
+      sideArtifactKindsAllowed: ["repo_code_evidence_observation"],
     });
   }
 

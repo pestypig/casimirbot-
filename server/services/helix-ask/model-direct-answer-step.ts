@@ -21,6 +21,76 @@ export const isModelDirectAnswerDecision = (
   return nextStep === "answer" || chosenCapability === "model.direct_answer";
 };
 
+const isRepoCodeEvidenceObservationEntry = (entry: unknown): boolean => {
+  const record = readRecord(entry);
+  const payload = readRecord(record?.payload) ?? record;
+  const searchable = [
+    readString(record?.kind),
+    readString(payload?.kind),
+    readString(payload?.schema),
+    readString(payload?.source_kind),
+  ].join(" ");
+  return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_code/i.test(searchable);
+};
+
+export function hasRepoCodeEvidenceObservation(payload: RecordLike): boolean {
+  if (readArray(payload.current_turn_artifact_ledger).some(isRepoCodeEvidenceObservationEntry)) return true;
+  if (readArray(payload.repo_evidence_observations).length > 0) return true;
+  return readArray(payload.evidence_observations).some(isRepoCodeEvidenceObservationEntry);
+}
+
+export function shouldBlockModelDirectAnswerForRepoEvidence(input: {
+  payload: RecordLike;
+  agentStepDecision?: RecordLike | null;
+}): boolean {
+  const decision = input.agentStepDecision ?? readRecord(input.payload.agent_step_decision);
+  if (!isModelDirectAnswerDecision(decision)) return false;
+  if (hasRepoCodeEvidenceObservation(input.payload)) return false;
+  const canonicalGoalFrame = readRecord(input.payload.canonical_goal_frame);
+  const capabilityPlan = readRecord(input.payload.capability_plan);
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const goalKind = readString(canonicalGoalFrame?.goal_kind);
+  return (
+    goalKind === "repo_code_evidence_question" ||
+    goalKind === "repo_entity_definition" ||
+    goalKind === "repo_concept_explanation" ||
+    readString(capabilityPlan?.requested_action) === "repo-code.search_concept" ||
+    readString(capabilityPlan?.source_target) === "repo_code" ||
+    readString(sourceTargetIntent?.target_source) === "repo_code"
+  );
+}
+
+export function buildRepoEvidenceRequiredBeforeAnswerObservation(input: {
+  turnId: string;
+  promptText: string;
+  payload: RecordLike;
+}): RecordLike {
+  const canonicalGoalFrame = readRecord(input.payload.canonical_goal_frame);
+  const corpusAnchors = readArray(canonicalGoalFrame?.corpus_anchors)
+    .map((entry) => readString(entry))
+    .filter(Boolean);
+  const concept = corpusAnchors[0] || readString(canonicalGoalFrame?.user_goal_summary) || input.promptText;
+  const artifactId = `repo_evidence_required_before_answer:${hashShort([
+    input.turnId,
+    concept,
+    input.promptText,
+  ])}`;
+  return {
+    schema: "helix.repo_evidence_required_before_answer.v1",
+    kind: "repo_evidence_required_before_answer",
+    artifact_id: artifactId,
+    turn_id: input.turnId,
+    reason: "repo_evidence_required_before_answer",
+    required_capability: "repo-code.search_concept",
+    concept,
+    query: input.promptText,
+    message:
+      "Project-internal concept answers require repo evidence before model.direct_answer can become terminal.",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
 const DIRECT_ANSWER_UNAVAILABLE_PATTERNS = [
   /direct_answer_unavailable/i,
   /model_only_answer_unavailable/i,

@@ -76,6 +76,12 @@ const primaryAllowsReceiptTerminal = (
   payload: RecordLike,
 ): boolean => {
   if (!isReceiptKind(terminalArtifactKind)) return false;
+  if (
+    (primaryIntent === "control_command" || primaryIntent === "status_question") &&
+    allowedTerminalProducts.includes(terminalArtifactKind)
+  ) {
+    return true;
+  }
   if (!receiptTerminalMatchesCanonicalGoal(payload, terminalArtifactKind)) return false;
   return (
     allowedTerminalProducts.includes(terminalArtifactKind) ||
@@ -125,6 +131,26 @@ const collectWorkspaceSourceEvidenceRefs = (input: {
   return [];
 };
 
+const collectRepoEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesRepoEvidence =
+    /repo_code_evidence_answer|repo_entity_definition/i.test(input.terminalArtifactKind) ||
+    /repo_code_evidence_answer|repo_entity_definition/i.test(input.finalAnswerSource);
+  if (!terminalUsesRepoEvidence) return [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => readString(entry.kind) === "repo_code_evidence_observation")
+    .map((entry) => readString(entry.artifact_id))
+    .filter(Boolean);
+};
+
 const collectReceiptRefs = (input: {
   payload: RecordLike;
   loopTrace: RecordLike | null;
@@ -162,6 +188,11 @@ export function buildEvidenceReentryGate(input: {
   const selectedEvidenceRefs = unique([
     ...readStringArray(loopTrace?.evidence_selected_for_answer),
     ...collectWorkspaceSourceEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectRepoEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

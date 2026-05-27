@@ -4,6 +4,7 @@ import {
   type HelixCapabilityFamily,
   type HelixCapabilityPlan,
 } from "@shared/helix-capability-plan";
+import { detectRepoConcept } from "./repo-concept-detector";
 
 type RecordLike = Record<string, unknown>;
 
@@ -93,7 +94,7 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
   if (family === "live_environment") return "query_live_environment";
   if (family === "visual_capture") return "review_current_visual_state";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
-  if (family === "repo_evidence") return "retrieve_repo_evidence";
+  if (family === "repo_evidence") return "repo-code.search_concept";
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
   return "diagnose_debug_or_runtime_evidence";
@@ -157,6 +158,9 @@ const admissionFor = (input: {
     return { status: "rejected", rejectionReason: "negative_user_constraint_blocks_mutating_capability" };
   }
   if (!allowedFamilyByToolAdmission(input.family, input.admittedFamilies)) {
+    if (input.family === "repo_evidence" && input.sourceTarget === "repo_code") {
+      return { status: "needs_evidence" };
+    }
     return { status: "rejected", rejectionReason: "capability_family_not_admitted_by_tool_policy" };
   }
   if (input.mutating && input.operatorCommandRequired && !input.operatorCommandPresent) {
@@ -189,7 +193,10 @@ export const buildCapabilityPlan = (input: {
   const toolCallAdmissionDecision = readRecord(input.toolCallAdmissionDecision);
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
   const instructionFrame = readRecord(input.instructionFrame);
+  const repoConceptDetection = detectRepoConcept(input.promptText);
+  const requiresRepoConceptEvidence = repoConceptDetection.require_repo_evidence === true;
   const sourceTarget =
+    (requiresRepoConceptEvidence ? "repo_code" : "") ||
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||
@@ -203,7 +210,9 @@ export const buildCapabilityPlan = (input: {
     targetKind,
     admittedFamilies,
   });
-  const family: HelixCapabilityFamily = canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
+  const family: HelixCapabilityFamily = requiresRepoConceptEvidence
+    ? "repo_evidence"
+    : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
     ? "workstation_action"
     : classifiedFamily;
   const rules = instructionRules(instructionFrame);
@@ -247,8 +256,12 @@ export const buildCapabilityPlan = (input: {
     operator_command_required: operatorCommandRequired,
     operator_command_present: operatorCommandPresent,
     source_target: sourceTarget,
-    goal_kind: canonicalGoalKind || "unknown",
-    required_terminal_kind: readString(canonicalGoalFrame?.required_terminal_kind) || null,
+    goal_kind: requiresRepoConceptEvidence
+      ? "repo_concept_explanation"
+      : canonicalGoalKind || "unknown",
+    required_terminal_kind: requiresRepoConceptEvidence
+      ? "repo_code_evidence_answer"
+      : readString(canonicalGoalFrame?.required_terminal_kind) || null,
     admission_status: admission.status,
     ...(admission.rejectionReason ? { rejection_reason: admission.rejectionReason } : {}),
     assistant_answer: false,

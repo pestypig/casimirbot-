@@ -1,3 +1,8 @@
+import {
+  detectRepoConceptDefinition,
+  resolveRepoConceptEntity,
+} from "./repo-concept-detector";
+
 export type HelixRepoCodeEvidenceIntent = {
   repoEvidenceRequested: boolean;
   strength: "none" | "soft" | "hard";
@@ -86,24 +91,6 @@ const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
   },
 ];
 
-const PROJECT_LOCAL_ENTITIES: Array<{ canonical: string; pattern: RegExp }> = [
-  { canonical: "StarSim", pattern: /\bstar\s*sim\b|\bstarsim\b/i },
-  { canonical: "NHM2", pattern: /\bnhm2\b/i },
-  { canonical: "Needle Hull", pattern: /\bneedle\s+hull\b/i },
-  { canonical: "deep mixing", pattern: /\bdeep\s+mixing\b/i },
-  { canonical: "Helix Ask", pattern: /\bhelix\s+ask\b/i },
-  { canonical: "Codex", pattern: /\bcodex\b/i },
-  { canonical: "agentic turn loop", pattern: /\bagentic\s+turn(?:-|\s+)based\s+system\b|\bagentic\s+(?:loop|turn|system)\b/i },
-  { canonical: "tool eligibility", pattern: /\btool\s+calls?\b|\brepo\s+grep\b|\btool\s+eligibility\b/i },
-  { canonical: "terminal authority", pattern: /\bterminal\s+authority\b/i },
-  { canonical: "source target intent", pattern: /\bsource_target_intent\b|\bsource[-_\s]?target\s+intent\b/i },
-  { canonical: "Stage0", pattern: /\bstage\s*0\b|\bstage0\b/i },
-  { canonical: "code lattice", pattern: /\bcode\s+lattice\b/i },
-];
-
-const PROJECT_ENTITY_DEFINITION_RE =
-  /\b(?:what\s+is|what\s+are|define|explain|describe|tell\s+me\s+about)\b/i;
-
 export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeEvidenceIntent {
   const prompt = promptText.trim();
   if (!prompt || NEGATIVE_MODEL_ONLY_RE.test(prompt)) {
@@ -149,16 +136,16 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       strength: "hard",
       reasons: unique(hardMatches.map((spec) => spec.reason)),
       requestedOutputs: unique(hardMatches.flatMap((spec) => spec.outputs)),
-      projectEntity: PROJECT_LOCAL_ENTITIES.find((entry) => entry.pattern.test(prompt))?.canonical ?? null,
+      projectEntity: resolveRepoConceptEntity(prompt),
     };
   }
 
-  const projectEntity = PROJECT_LOCAL_ENTITIES.find((entry) => entry.pattern.test(prompt)) ?? null;
-  if (projectEntity && PROJECT_ENTITY_DEFINITION_RE.test(prompt)) {
+  const projectEntity = detectRepoConceptDefinition(prompt);
+  if (projectEntity) {
     return {
       repoEvidenceRequested: true,
       strength: "soft",
-      reasons: ["project_local_entity_definition"],
+      reasons: [projectEntity.reason],
       requestedOutputs: ["repo_code", "file_path"],
       projectEntity: projectEntity.canonical,
     };

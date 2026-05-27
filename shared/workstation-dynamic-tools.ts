@@ -129,6 +129,14 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.set_live_commentary_policy",
   "situation-room-pipelines.request_agentic_review",
   "situation-room-pipelines.set_companion_policy",
+  "situation-room-pipelines.construct.create_from_recipe",
+  "situation-room-pipelines.construct.query",
+  "situation-room-pipelines.construct.explain",
+  "situation-room-pipelines.construct.detach",
+  "situation-room-pipelines.construct.activate",
+  "situation-room-pipelines.construct.attach_source",
+  "situation-room-pipelines.construct.bind_output",
+  "situation-room-pipelines.construct.list_recipes",
   "situation-room-pipelines.dottie.manifest",
   "situation-room-pipelines.observer.attach",
   "situation-room-pipelines.observer.detach",
@@ -616,6 +624,108 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
       "commentary_mode",
       "direct_address_names",
     ],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.create_from_recipe",
+    title: "Create Situation Construct",
+    description: "Create a visible Situation Room construct from a recipe.",
+    aliases: [
+      "create construct",
+      "build dottie",
+      "manifest dottie",
+      "start transcriber",
+      "create route watcher",
+      "make live agent",
+    ],
+    required_args: ["recipe_id"],
+    optional_args: [
+      "thread_id",
+      "room_id",
+      "source_ids",
+      "target_run_id",
+      "environment_id",
+      "mode",
+      "voice_mode",
+      "commentary_cadence",
+      "output",
+    ],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.list_recipes",
+    title: "List Construct Recipes",
+    description: "List available Situation Room construct recipes.",
+    aliases: ["list construct recipes", "show dottie recipe", "show transcriber recipe"],
+    required_args: [],
+    optional_args: ["recipe_id"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.query",
+    title: "Query Constructs",
+    description: "Query visible Situation Room constructs and recipe runs.",
+    aliases: ["show constructs", "query construct", "what constructs exist"],
+    required_args: [],
+    optional_args: ["thread_id", "room_id", "construct_id", "recipe_id", "type", "status"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.explain",
+    title: "Explain Construct",
+    description: "Explain a Situation Room construct using its evidence-only receipts and bindings.",
+    aliases: ["explain construct", "explain dottie construct", "why does this construct exist"],
+    required_args: ["construct_id"],
+    optional_args: ["thread_id", "room_id"],
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.detach",
+    title: "Detach Construct",
+    description: "Mark a Situation Room construct as detached without deleting its receipts.",
+    aliases: ["detach construct", "stop construct", "detach dottie construct"],
+    required_args: ["construct_id"],
+    optional_args: ["thread_id", "room_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.activate",
+    title: "Activate Construct",
+    description: "Mark a planned or receipt-only Situation Room construct as active.",
+    aliases: ["activate construct", "start construct", "activate dottie construct"],
+    required_args: ["construct_id"],
+    optional_args: ["thread_id", "room_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.attach_source",
+    title: "Attach Source To Construct",
+    description: "Attach a Situation Room source to an existing construct.",
+    aliases: ["attach source to construct", "add source to dottie", "bind source to transcriber"],
+    required_args: ["construct_id", "source_ids"],
+    optional_args: ["thread_id", "room_id"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "construct.bind_output",
+    title: "Bind Construct Output",
+    description: "Bind an output surface such as transcript stream, typed commentary, voice proposal, or live answer projection to a construct.",
+    aliases: ["bind construct output", "send construct to live answers", "bind dottie voice proposal"],
+    required_args: ["construct_id", "output"],
+    optional_args: ["thread_id", "room_id", "artifact_ref", "environment_id", "status"],
     risk: "medium",
     returns_artifact: true,
   },
@@ -1110,6 +1220,18 @@ function argSchema(arg: string): Record<string, unknown> {
     return { type: "boolean" };
   }
   if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline" || arg === "max_chars") return { type: "number" };
+  if (arg === "recipe_id") {
+    return {
+      enum: [
+        "auntie_dottie_witness",
+        "browser_audio_transcriber",
+        "minecraft_route_watcher",
+        "live_source_summarizer",
+        "translation_pair",
+        "source_health_watch",
+      ],
+    };
+  }
   if (arg === "kind") return { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] };
   if (arg === "intent") return { enum: ["translate_conversation", "monitor_conversation", "summarize_conversation"] };
   if (arg === "capture_preference") return { enum: ["existing_source", "browser_tab_audio", "display_audio", "mic", "unknown"] };
@@ -1126,9 +1248,21 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
   if (arg === "commentary_cadence") return { enum: ["milestones_only", "salience_only", "manual"] };
-  if (arg === "status") return { enum: ["active", "paused", "stopped"] };
+  if (arg === "status") return { enum: ["active", "paused", "stopped", "planned", "blocked", "detached", "receipt_only", "stale", "completed"] };
   if (arg === "voice_mode") return { enum: ["off", "propose_only", "on_confirm", "text_only", "voice_on_confirm", "critical_voice", "direct_address_only"] };
   if (arg === "observer_profile") return { enum: ["auntie_dottie", "dottie", "custom"] };
+  if (arg === "output") {
+    return {
+      enum: [
+        "live_answer_environment",
+        "transcript_stream",
+        "typed_commentary",
+        "voice_proposal",
+        "route_evidence_view",
+        "note",
+      ],
+    };
+  }
   if (arg === "framework") return { enum: ["zen", "mission_ethos", "custom"] };
   if (arg === "calculator_setup") {
     const physicalDimensionSchema = {
@@ -1245,6 +1379,14 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_companion_policy") return "companion_policy_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "construct.create_from_recipe") return "situation_construct_recipe_run";
+  if (panelId === "situation-room-pipelines" && actionId === "construct.list_recipes") return "situation_construct_recipe_registry";
+  if (panelId === "situation-room-pipelines" && actionId === "construct.query") return "situation_construct_query_result";
+  if (panelId === "situation-room-pipelines" && actionId === "construct.explain") return "situation_construct_explanation";
+  if (
+    panelId === "situation-room-pipelines" &&
+    ["construct.detach", "construct.activate", "construct.attach_source", "construct.bind_output"].includes(actionId)
+  ) return "situation_construct_update_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "dottie.manifest") return "dottie_manifest_preset_receipt";
   if (panelId === "situation-room-pipelines" && ["observer.attach", "observer.detach"].includes(actionId)) return "dottie_observer_subscription_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "observer.query") return "dottie_observer_query_receipt";

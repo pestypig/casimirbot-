@@ -22,6 +22,10 @@ import {
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import { resetLiveSituationRunsForTest } from "../services/situation-room/live-situation-run-store";
 import { resetLiveFieldWorkersForTest } from "../services/situation-room/live-field-worker-registry";
+import {
+  resetSituationConstructStoreForTest,
+  upsertSituationConstruct,
+} from "../services/situation-room/situation-construct-store";
 
 const resetAll = () => {
   resetLiveAnswerEnvironments();
@@ -30,6 +34,7 @@ const resetAll = () => {
   resetSituationSourceCapabilitiesForTest();
   resetLiveSituationRunsForTest();
   resetLiveFieldWorkersForTest();
+  resetSituationConstructStoreForTest();
 };
 
 const seedEnvironment = () => createLiveAnswerEnvironment({
@@ -71,6 +76,7 @@ describe("Helix Ask live environment agent loop", () => {
     expect(packet.context_role).toBe("tool_evidence");
     expect(packet.available_tools.map((tool) => tool.tool_id)).toEqual(expect.arrayContaining([
       "live_env.query_event_log",
+      "live_env.query_constructs",
       "live_env.query_navigation_state",
       "live_env.request_probe",
     ]));
@@ -196,6 +202,75 @@ describe("Helix Ask live environment agent loop", () => {
       raw_logs_included: false,
     });
     expect(events.at(-1)?.evidence_refs).toContain(commentary.at(-1)?.commentary_id);
+  });
+
+  it("queries Situation Room constructs as evidence-only live environment tool observations", () => {
+    const environment = seedEnvironment();
+    const construct = upsertSituationConstruct({
+      construct_id: "construct:dottie:test",
+      type: "observer",
+      name: "Auntie Dottie",
+      status: "active",
+      thread_id: environment.thread_id,
+      room_id: environment.room_id ?? "room:minecraft",
+      environment_id: environment.environment_id,
+      source_ids: ["source:minecraft"],
+      artifact_refs: ["dottie:observer:receipt"],
+      receipt_refs: ["dottie:observer:receipt"],
+      evidence_refs: ["agent_commentary:orientation"],
+      output_bindings: [
+        {
+          output_kind: "typed_commentary",
+          artifact_ref: "agent_commentary:orientation",
+          status: "active",
+        },
+      ],
+    });
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_constructs",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        room_id: environment.room_id,
+        type: "observer",
+        status: "active",
+        limit: 10,
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_constructs",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.observation).toMatchObject({
+      schema: "helix.situation_construct_query_result.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      constructs: expect.arrayContaining([
+        expect.objectContaining({
+          construct_id: construct.construct_id,
+          type: "observer",
+          status: "active",
+          safety: expect.objectContaining({
+            assistant_answer: false,
+            ask_context_policy: "evidence_only",
+          }),
+        }),
+      ]),
+    });
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      construct.construct_id,
+      "dottie:observer:receipt",
+      "agent_commentary:orientation",
+    ]));
   });
 
   it("admits live environment review as evidence-only capability authority", () => {

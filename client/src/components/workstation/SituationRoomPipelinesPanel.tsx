@@ -55,6 +55,10 @@ import {
 } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { buildSituationStandbyKey, useSituationStandbyStore } from "@/store/useSituationStandbyStore";
+import {
+  selectActiveLiveAnswerEnvironment,
+  useLiveAnswerEnvironmentStore,
+} from "@/store/useLiveAnswerEnvironmentStore";
 import { buildSituationEventSignal } from "@/lib/helix/situation-standby-signals";
 import { HELIX_GRAPH_CAPABILITIES } from "@shared/helix-graph-capability";
 import { HELIX_SITUATION_GRAPH_RECIPES } from "@shared/helix-situation-graph-recipes";
@@ -106,19 +110,64 @@ const STANDBY_MODE_OPTIONS: Array<{ value: SituationStandbyMode; label: string }
   { value: "research_assistant", label: "Research assistant" },
 ];
 
-type PipelinePanelPage = "setup" | "sources" | "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
-const PRIMARY_PIPELINE_PANEL_PAGES: PipelinePanelPage[] = ["setup", "sources", "output", "runtime"];
+type PipelinePanelPage = "setup" | "constructs" | "sources" | "graph" | "recipes" | "capabilities" | "runtime" | "inputs" | "jobs" | "output";
+const PRIMARY_PIPELINE_PANEL_PAGES: PipelinePanelPage[] = ["setup", "constructs", "sources", "jobs", "output", "runtime"];
 const PIPELINE_PANEL_PAGE_LABELS: Record<PipelinePanelPage, string> = {
-  setup: "Setup",
+  setup: "Build",
+  constructs: "Constructs",
   sources: "Sources",
-  output: "Output",
+  output: "Outputs",
   runtime: "Debug",
-  jobs: "Room Workflows",
+  jobs: "Runs",
   graph: "Graph",
   recipes: "Graph Recipes",
   capabilities: "Capabilities",
   inputs: "Inputs",
 };
+const CONSTRUCT_PURPOSE_OPTIONS = [
+  "Observe",
+  "Transcribe",
+  "Route-watch",
+  "Summarize",
+  "Translate",
+  "Voice-witness",
+] as const;
+const CONSTRUCT_SOURCE_OPTIONS = [
+  "Browser tab audio",
+  "Display audio",
+  "Mic",
+  "Visual",
+  "Minecraft",
+  "Manual feed",
+] as const;
+const CONSTRUCT_RECIPE_OPTIONS = [
+  { id: "auntie_dottie_witness", label: "Auntie Dottie witness", purpose: "Voice-witness" },
+  { id: "browser_audio_transcriber", label: "Browser audio transcriber", purpose: "Transcribe" },
+  { id: "minecraft_route_watcher", label: "Minecraft route watcher", purpose: "Route-watch" },
+  { id: "translation_pair", label: "Translation pair", purpose: "Translate" },
+  { id: "source_health_watch", label: "Source health watch", purpose: "Observe" },
+] as const;
+const CONSTRUCT_OUTPUT_OPTIONS = [
+  "Live Answer",
+  "Transcript stream",
+  "Typed commentary",
+  "Voice proposal",
+  "Route evidence view",
+  "Note",
+] as const;
+const CONSTRUCT_POLICY_OPTIONS = [
+  "Witness-only",
+  "Voice propose-only",
+  "Require confirmation",
+  "Bounded worker",
+  "No assistant answer",
+] as const;
+
+type ConstructBuilderPurpose = (typeof CONSTRUCT_PURPOSE_OPTIONS)[number];
+type ConstructBuilderSource = (typeof CONSTRUCT_SOURCE_OPTIONS)[number];
+type ConstructBuilderRecipeId = (typeof CONSTRUCT_RECIPE_OPTIONS)[number]["id"];
+type ConstructBuilderOutput = (typeof CONSTRUCT_OUTPUT_OPTIONS)[number];
+type ConstructBuilderPolicy = (typeof CONSTRUCT_POLICY_OPTIONS)[number];
 type PipelineSetupIntentKind = "live_answer_environment" | "live_workstation_pipeline" | "source_job" | "situation_graph";
 type PipelineSetupIntent = {
   id: string;
@@ -409,6 +458,37 @@ function jobTone(status: SituationRoomJob["status"]): string {
   }
 }
 
+function constructOutputArg(output: ConstructBuilderOutput): string {
+  switch (output) {
+    case "Live Answer":
+      return "live_answer_environment";
+    case "Transcript stream":
+      return "transcript_stream";
+    case "Typed commentary":
+      return "typed_commentary";
+    case "Voice proposal":
+      return "voice_proposal";
+    case "Route evidence view":
+      return "route_evidence_view";
+    case "Note":
+      return "note";
+    default:
+      return "typed_commentary";
+  }
+}
+
+function sourceLabelForConstruct(source: SituationRoomSource | undefined): string {
+  if (!source) return "whole room";
+  return `${source.label} / ${source.kind}`;
+}
+
+function constructTone(status: string): string {
+  if (status === "active") return "border-emerald-400/45 bg-emerald-500/10 text-emerald-100";
+  if (status === "receipt_only" || status === "planned") return "border-cyan-400/45 bg-cyan-500/10 text-cyan-100";
+  if (status === "blocked" || status === "stale") return "border-amber-400/45 bg-amber-500/10 text-amber-100";
+  return "border-slate-500/45 bg-slate-700/20 text-slate-300";
+}
+
 function JobCard({
   job,
   selected,
@@ -566,6 +646,22 @@ export default function SituationRoomPipelinesPanel() {
   const [threadBindings, setThreadBindings] = React.useState<SituationThreadBindingView[]>([]);
   const [worldSourcesSeen, setWorldSourcesSeen] = React.useState<MinecraftWorldSourceView[]>([]);
   const [bindingBusy, setBindingBusy] = React.useState(false);
+  const [constructPurpose, setConstructPurpose] = React.useState<ConstructBuilderPurpose>("Voice-witness");
+  const [constructSource, setConstructSource] = React.useState<ConstructBuilderSource>("Browser tab audio");
+  const [constructRecipeId, setConstructRecipeId] =
+    React.useState<ConstructBuilderRecipeId>("auntie_dottie_witness");
+  const [constructOutput, setConstructOutput] = React.useState<ConstructBuilderOutput>("Typed commentary");
+  const [constructPolicies, setConstructPolicies] = React.useState<Record<ConstructBuilderPolicy, boolean>>({
+    "Witness-only": true,
+    "Voice propose-only": true,
+    "Require confirmation": true,
+    "Bounded worker": false,
+    "No assistant answer": true,
+  });
+  const [constructBuilderStatus, setConstructBuilderStatus] = React.useState<string | null>(null);
+  const activeLiveAnswerEnvironment = useLiveAnswerEnvironmentStore((state) =>
+    selectActiveLiveAnswerEnvironment(state, bindingThreadId.trim() || "helix-ask:desktop"),
+  );
   const masterScrollRef = React.useRef<HTMLDivElement | null>(null);
   const masterScrollPinnedRef = React.useRef(true);
   const knownJobIdsRef = React.useRef<Set<string> | null>(null);
@@ -831,6 +927,72 @@ export default function SituationRoomPipelinesPanel() {
         .join("|"),
     [focusedMasterScroll],
   );
+  const constructSourceIds = React.useMemo(
+    () => (selectedSource ? [selectedSource.source_id] : activeSources.map((source) => source.source_id)),
+    [activeSources, selectedSource],
+  );
+  const activeLiveAnswerEnvironmentId = activeLiveAnswerEnvironment?.environment_id ?? null;
+  const liveAnswerBindingLabel = activeLiveAnswerEnvironmentId
+    ? `live_answer_environment:${activeLiveAnswerEnvironmentId}`
+    : "live_answer_environment:planned";
+  const constructCards = React.useMemo(() => {
+    const cards: Array<{
+      id: string;
+      title: string;
+      type: string;
+      status: string;
+      source: string;
+      output: string;
+      detail: string;
+      authority: string;
+    }> = [
+      {
+        id: "construct:dottie",
+        title: "Auntie Dottie",
+        type: "observer",
+        status: activeStandbyMode === "off" ? "receipt_only" : "active",
+        source: activeThreadBinding?.thread_id ? `Helix Ask ${activeThreadBinding.thread_id}` : "Helix Ask public commentary",
+        output: `typed_commentary + voice_proposal${activeLiveAnswerEnvironmentId ? " + live_answer_environment" : ""}`,
+        detail: `voice ${constructPolicies["Voice propose-only"] ? "propose_only" : "off"}`,
+        authority: "witness_only",
+      },
+    ];
+    activeJobs.forEach((job) => {
+      cards.push({
+        id: `construct:job:${job.job_id}`,
+        title: job.kind === "translate" ? "Translation Pair" : job.kind === "rolling_summary" ? "Live Source Summarizer" : job.title,
+        type: job.kind === "translate" ? "translation_pair" : "transcription_job",
+        status: job.status === "running" || job.status === "queued" ? "active" : job.status === "completed" ? "completed" : "planned",
+        source: job.source_ids.length ? job.source_ids.join(", ") : "whole room",
+        output: job.kind === "translate" ? "note + transcript_stream" : "transcript_stream",
+        detail: job.title,
+        authority: "evidence_only",
+      });
+    });
+    if (activeGraph) {
+      cards.push({
+        id: `construct:graph:${activeGraph.graph_id}`,
+        title: "Minecraft Route Watcher",
+        type: "route_evidence_view",
+        status: activeStandbyMode === "off" ? "planned" : "active",
+        source: detectedMinecraftSource?.source_id ?? minecraftSourceId,
+        output: `route_evidence_view + ${liveAnswerBindingLabel}`,
+        detail: `${activeGraph.nodes.length} nodes / ${activeGraph.edges.length} edges`,
+        authority: "evidence_only",
+      });
+    }
+    return cards;
+  }, [
+    activeGraph,
+    activeJobs,
+    activeStandbyMode,
+    activeThreadBinding?.thread_id,
+    activeLiveAnswerEnvironmentId,
+    constructPolicies,
+    detectedMinecraftSource?.source_id,
+    minecraftSourceId,
+    liveAnswerBindingLabel,
+  ]);
 
   React.useEffect(() => {
     if (!activeJobs.length || selectedJobId === ALL_OUTPUT_JOB_ID || (selectedJobId && jobs[selectedJobId])) return;
@@ -1291,6 +1453,48 @@ export default function SituationRoomPipelinesPanel() {
     setPanelPage(setupIntent.kind === "source_job" ? "jobs" : "output");
   }, [setupIntent, setupMissingFields, setupToolActions]);
 
+  const handleCreateConstruct = React.useCallback(() => {
+    if (!activeRoom) {
+      setConstructBuilderStatus("Choose or create a Situation Room before building a construct.");
+      return;
+    }
+    if (constructSourceIds.length === 0 && constructRecipeId !== "auntie_dottie_witness") {
+      setConstructBuilderStatus("Attach a source before building this construct recipe.");
+      return;
+    }
+    const action: HelixWorkstationAction = {
+      action: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "construct.create_from_recipe",
+      args: {
+        recipe_id: constructRecipeId,
+        thread_id: bindingThreadId.trim() || "helix-ask:desktop",
+        room_id: activeRoom.room_id,
+        source_ids: constructSourceIds,
+        target_run_id: "run:helix-ask:active",
+        mode: constructPurpose.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+        voice_mode: constructPolicies["Voice propose-only"] ? "propose_only" : "off",
+        commentary_cadence: "milestones_only",
+        output: constructOutputArg(constructOutput),
+        environment_id: constructOutputArg(constructOutput) === "live_answer_environment"
+          ? activeLiveAnswerEnvironmentId
+          : null,
+      },
+    };
+    dispatchHelixWorkstationActions([action]);
+    setConstructBuilderStatus(`Submitted ${CONSTRUCT_RECIPE_OPTIONS.find((recipe) => recipe.id === constructRecipeId)?.label ?? constructRecipeId}.`);
+    setPanelPage("constructs");
+  }, [
+    activeRoom,
+    activeLiveAnswerEnvironmentId,
+    bindingThreadId,
+    constructOutput,
+    constructPolicies,
+    constructPurpose,
+    constructRecipeId,
+    constructSourceIds,
+  ]);
+
   const persistCustomSetupIntents = React.useCallback((nextIntents: PipelineSetupIntent[]) => {
     setCustomSetupIntents(nextIntents);
     if (typeof window !== "undefined") {
@@ -1352,6 +1556,7 @@ export default function SituationRoomPipelinesPanel() {
   const goBack = () => {
     if (panelPage === "output") setPanelPage("sources");
     else if (panelPage === "jobs") setPanelPage("sources");
+    else if (panelPage === "constructs") setPanelPage("setup");
     else if (panelPage === "inputs") setPanelPage("recipes");
     else if (panelPage === "graph") setPanelPage("setup");
     else if (panelPage === "sources") setPanelPage("setup");
@@ -1362,11 +1567,13 @@ export default function SituationRoomPipelinesPanel() {
 
   const pageTitle =
     panelPage === "setup"
-      ? "Situation Room Setup"
+      ? "Build"
+      : panelPage === "constructs"
+        ? "Constructs"
       : panelPage === "sources"
         ? "Sources"
         : panelPage === "output"
-          ? "Output"
+          ? "Outputs"
       : panelPage === "graph"
       ? "Situation Graph"
       : panelPage === "recipes"
@@ -1377,11 +1584,11 @@ export default function SituationRoomPipelinesPanel() {
             ? "Debug Trace"
       : panelPage === "inputs"
         ? "Pipeline Inputs"
-        : panelPage === "jobs"
-          ? "Room Workflows"
+      : panelPage === "jobs"
+          ? "Runs"
           : "Output";
   const pageIcon =
-    panelPage === "setup" || panelPage === "sources" || panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
+    panelPage === "setup" || panelPage === "constructs" || panelPage === "sources" || panelPage === "graph" || panelPage === "recipes" || panelPage === "capabilities" || panelPage === "runtime" || panelPage === "inputs" ? <Workflow className="h-4 w-4 text-cyan-300" /> : panelPage === "jobs" ? <ListChecks className="h-4 w-4 text-cyan-300" /> : <ScrollText className="h-4 w-4 text-cyan-300" />;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950/95 text-slate-100">
@@ -1411,10 +1618,7 @@ export default function SituationRoomPipelinesPanel() {
             <button
               key={page}
               type="button"
-              onClick={() => {
-                if (page === "output" && !selectedJob) return;
-                setPanelPage(page);
-              }}
+              onClick={() => setPanelPage(page)}
               disabled={false}
               className={cn(
                 "rounded px-2 py-1 capitalize transition-colors disabled:cursor-not-allowed disabled:opacity-40",
@@ -1450,10 +1654,145 @@ export default function SituationRoomPipelinesPanel() {
       {panelPage === "setup" ? (
         <main className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="mx-auto max-w-5xl space-y-4">
+            <section className="rounded-lg border border-cyan-300/25 bg-slate-950/80 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Construct builder</p>
+                  <p className="mt-1 text-lg font-semibold text-white">
+                    Assemble a Situation Room construct
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {activeRoom?.title ?? "No active room"} / {sourceLabelForConstruct(selectedSource)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateConstruct}
+                  disabled={!activeRoom}
+                  className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create construct
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[0.85fr_1.15fr]">
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">Purpose</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {CONSTRUCT_PURPOSE_OPTIONS.map((purpose) => (
+                      <button
+                        key={purpose}
+                        type="button"
+                        onClick={() => {
+                          setConstructPurpose(purpose);
+                          const matchedRecipe = CONSTRUCT_RECIPE_OPTIONS.find((recipe) => recipe.purpose === purpose);
+                          if (matchedRecipe) setConstructRecipeId(matchedRecipe.id);
+                        }}
+                        className={cn(
+                          "rounded border px-2 py-2 text-left text-xs transition-colors",
+                          constructPurpose === purpose
+                            ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-100"
+                            : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10",
+                        )}
+                      >
+                        {purpose}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">Source class</span>
+                      <select
+                        value={constructSource}
+                        onChange={(event) => setConstructSource(event.target.value as ConstructBuilderSource)}
+                        className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-sm text-slate-100 outline-none"
+                      >
+                        {CONSTRUCT_SOURCE_OPTIONS.map((source) => (
+                          <option key={source} value={source}>{source}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">Recipe</span>
+                      <select
+                        value={constructRecipeId}
+                        onChange={(event) => setConstructRecipeId(event.target.value as ConstructBuilderRecipeId)}
+                        className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-sm text-slate-100 outline-none"
+                      >
+                        {CONSTRUCT_RECIPE_OPTIONS.map((recipe) => (
+                          <option key={recipe.id} value={recipe.id}>{recipe.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[10px] font-semibold uppercase text-slate-500">Output</span>
+                      <select
+                        value={constructOutput}
+                        onChange={(event) => setConstructOutput(event.target.value as ConstructBuilderOutput)}
+                        className="mt-2 w-full rounded border border-white/15 bg-slate-900 px-2 py-2 text-sm text-slate-100 outline-none"
+                      >
+                        {CONSTRUCT_OUTPUT_OPTIONS.map((output) => (
+                          <option key={output} value={output}>{output}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase text-slate-500">Selected evidence</p>
+                      <div className="mt-2 rounded border border-white/10 bg-slate-950/70 px-2 py-2">
+                        <p className="truncate text-sm text-slate-100">{selectedSource?.label ?? "Whole room"}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          {constructSourceIds.length} source{constructSourceIds.length === 1 ? "" : "s"} bound
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-[10px] font-semibold uppercase text-slate-500">Policies</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                      {CONSTRUCT_POLICY_OPTIONS.map((policy) => (
+                        <label
+                          key={policy}
+                          className={cn(
+                            "flex min-h-10 cursor-pointer items-center gap-2 rounded border px-2 py-2 text-xs",
+                            constructPolicies[policy]
+                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
+                              : "border-white/10 bg-white/[0.03] text-slate-400",
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={constructPolicies[policy]}
+                            onChange={(event) =>
+                              setConstructPolicies((current) => ({
+                                ...current,
+                                [policy]: event.target.checked,
+                              }))
+                            }
+                            className="h-3.5 w-3.5 accent-cyan-400"
+                          />
+                          <span>{policy}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {constructBuilderStatus ? (
+                <p className="mt-3 rounded border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
+                  {constructBuilderStatus}
+                </p>
+              ) : null}
+            </section>
+
             <section className="rounded-lg border border-cyan-300/20 bg-cyan-500/5 p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Setup console</p>
+                  <p className="text-[11px] font-semibold uppercase text-cyan-200">Route setup</p>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">
                     Tell Helix Ask what you want. This panel shows the current route, missing setup fields, and delegated tool receipts; live products move to Output once setup is running.
                   </p>
@@ -1861,6 +2200,82 @@ export default function SituationRoomPipelinesPanel() {
               </section>
               </div>
             </details>
+          </div>
+        </main>
+      ) : null}
+
+      {panelPage === "constructs" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="mx-auto max-w-6xl space-y-4">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-slate-500">Construct ledger</p>
+                  <p className="mt-1 text-lg font-semibold text-white">Visible Situation Room constructs</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {activeRoom?.title ?? "No active room"} / {constructCards.length} construct{constructCards.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelPage("setup")}
+                  className="inline-flex items-center gap-2 rounded border border-cyan-400/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/20"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Build
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {constructCards.map((construct) => (
+                  <article key={construct.id} className="rounded-lg border border-white/10 bg-slate-950/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{construct.title}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">{construct.type}</p>
+                      </div>
+                      <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px]", constructTone(construct.status))}>
+                        {construct.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">source</span>
+                        <span className="truncate text-slate-200">{construct.source}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">output</span>
+                        <span className="truncate text-slate-200">{construct.output}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-slate-500">authority</span>
+                        <span className="truncate text-slate-200">{construct.authority}</span>
+                      </div>
+                    </div>
+                    <p className="mt-3 truncate rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-400">
+                      {construct.detail}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Dottie</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{constructCards.some((card) => card.title === "Auntie Dottie") ? "available" : "not planned"}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Transcribers</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{activeJobs.length}</p>
+                </div>
+                <div className="rounded border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[10px] uppercase text-slate-500">Route evidence</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{activeGraph ? "planned" : "none"}</p>
+                </div>
+              </div>
+            </section>
           </div>
         </main>
       ) : null}
@@ -2659,7 +3074,7 @@ export default function SituationRoomPipelinesPanel() {
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-cyan-200">Live output</p>
                   <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">
-                    This is the product side of the Situation Room: live answer environments, pipeline outputs, and selected-room job results. Setup controls stay in Setup and source-specific workflow creation starts from Sources.
+                    This is the product side of the Situation Room: Live Answers renders construct evidence through output bindings, alongside pipeline outputs and selected-room job results. Setup controls stay in Setup and source-specific workflow creation starts from Sources.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2686,8 +3101,8 @@ export default function SituationRoomPipelinesPanel() {
                   <p className="mt-1 truncate text-sm font-semibold text-white">{activeRoom?.title ?? "No active room"}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
-                  <p className="text-[10px] uppercase text-slate-500">Active workflows</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{activeJobs.length}</p>
+                  <p className="text-[10px] uppercase text-slate-500">Live Answer binding</p>
+                  <p className="mt-1 truncate text-sm font-semibold text-white">{activeLiveAnswerEnvironmentId ?? "planned"}</p>
                 </div>
                 <div className="rounded border border-white/10 bg-slate-950/70 p-3">
                   <p className="text-[10px] uppercase text-slate-500">Selected source</p>

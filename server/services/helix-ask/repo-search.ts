@@ -611,7 +611,7 @@ export function buildRepoSearchPlan(input: {
   if (input.promptIngested && !explicit && mode !== "preflight") return null;
   if (input.promptIngested && mode === "preflight" && !explicit) return null;
   const domainOk = input.intentDomain === "repo" || input.intentDomain === "hybrid";
-  const fallbackOk = REPO_SEARCH_ON_EVIDENCE_FAIL && !input.evidenceGateOk;
+  const fallbackOk = REPO_SEARCH_ON_EVIDENCE_FAIL && (!input.evidenceGateOk || input.intentDomain === "repo");
   if (!explicit && mode === "fallback" && !fallbackOk) return null;
   if (!explicit && mode === "fallback" && !domainOk) return null;
   const terms = extractRepoSearchTerms(input.question, input.conceptMatch);
