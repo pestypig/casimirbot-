@@ -16,6 +16,11 @@ const createApp = (): express.Express => {
 const visibleAnswerText = (body: any): string =>
   String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? body?.finalAnswer ?? "");
 
+const runtimeCapabilities = (body: any): string[] =>
+  (body?.agent_runtime_loop?.iterations ?? [])
+    .map((iteration: any) => String(iteration?.chosen_capability ?? ""))
+    .filter(Boolean);
+
 const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
   text
     .split(/\r?\n\r?\n/)
@@ -380,6 +385,15 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.resolved_turn_summary?.resolved_route_label).not.toMatch(/typed_failure|unavailable/i);
     expect(visibleAnswerText(response.body)).not.toMatch(/required artifacts.*(?:doc_summary|doc_concept_explanation)/i);
     expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(runtimeCapabilities(response.body)).toContain("repo-code.search_concept");
+    expect(runtimeCapabilities(response.body)).toContain("model.synthesize_from_repo_evidence");
+    expect(runtimeCapabilities(response.body).slice(runtimeCapabilities(response.body).indexOf("repo-code.search_concept") + 1)).not.toContain("model.direct_answer");
+    expect(response.body?.final_answer_draft).toMatchObject({
+      model_step_capability: "model.synthesize_from_repo_evidence",
+    });
+    expect(response.body?.repo_code_evidence_answer).toMatchObject({
+      model_step_capability: "model.synthesize_from_repo_evidence",
+    });
     expect(response.body?.repo_answer_text_quality_gate).toMatchObject({ ok: true });
     expect(visibleAnswerText(response.body)).toMatch(/workstation control surface|situation room/i);
     expect(visibleAnswerText(response.body)).not.toMatch(/I found current repo evidence|Key evidence:/i);
@@ -442,6 +456,12 @@ describe("helix ask repo/code intent precedence", () => {
     expect(spanPaths).toMatch(evidencePath);
     expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
     expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(runtimeCapabilities(response.body)).toContain("repo-code.search_concept");
+    expect(runtimeCapabilities(response.body)).toContain("model.synthesize_from_repo_evidence");
+    expect(runtimeCapabilities(response.body).slice(runtimeCapabilities(response.body).indexOf("repo-code.search_concept") + 1)).not.toContain("model.direct_answer");
+    expect(response.body?.final_answer_draft).toMatchObject({
+      model_step_capability: "model.synthesize_from_repo_evidence",
+    });
     expect(response.body?.repo_answer_text_quality_gate).toMatchObject({ ok: true });
     expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
     expect(response.body?.final_answer_source).not.toBe("no_tool_direct");

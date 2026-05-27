@@ -6,6 +6,12 @@ export const HELIX_REPO_CODE_EVIDENCE_OBSERVATION_SCHEMA =
 export const HELIX_REPO_CODE_SEARCH_CONCEPT_CAPABILITY =
   "repo-code.search_concept" as const;
 
+export const HELIX_MODEL_SYNTHESIZE_FROM_REPO_EVIDENCE_CAPABILITY =
+  "model.synthesize_from_repo_evidence" as const;
+
+export const HELIX_REPO_SYNTHESIS_STEP_IDENTITY_REPAIR_SCHEMA =
+  "helix.repo_synthesis_step_identity_repair.v1" as const;
+
 export type HelixRepoCodeEvidenceObservation = {
   schema: typeof HELIX_REPO_CODE_EVIDENCE_OBSERVATION_SCHEMA;
   artifact_id: string;
@@ -69,6 +75,9 @@ export type HelixRepoCodeEvidenceAnswer = {
   turn_id: string;
   concept: string;
   answer_text: string;
+  final_answer_draft_ref?: string;
+  final_answer_draft_authority?: "llm_post_observation_composer" | "deterministic_receipt_fallback" | "typed_failure";
+  model_step_capability?: typeof HELIX_MODEL_SYNTHESIZE_FROM_REPO_EVIDENCE_CAPABILITY;
   model_authored?: boolean;
   synthesis_attempt_ref?: string;
   source_observation_refs?: string[];
@@ -91,6 +100,8 @@ export type HelixRepoEvidenceSynthesisAttempt = {
   produced_repo_code_evidence_answer_ref?: string;
   model_invoked: true;
   model_step_kind: "post_observation_synthesis";
+  model_step_capability?: typeof HELIX_MODEL_SYNTHESIZE_FROM_REPO_EVIDENCE_CAPABILITY;
+  required_terminal_kind?: "repo_code_evidence_answer";
   status:
     | "succeeded"
     | "empty"
@@ -99,6 +110,21 @@ export type HelixRepoEvidenceSynthesisAttempt = {
     | "renderer_hostile"
     | "unsupported_claims"
     | "failed";
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixRepoSynthesisStepIdentityRepair = {
+  schema: typeof HELIX_REPO_SYNTHESIS_STEP_IDENTITY_REPAIR_SCHEMA;
+  turn_id: string;
+  observation_id: string;
+  rejected_capability: "model.direct_answer";
+  required_capability: typeof HELIX_MODEL_SYNTHESIZE_FROM_REPO_EVIDENCE_CAPABILITY;
+  required_terminal_kind: "repo_code_evidence_answer";
+  reason:
+    | "repo_evidence_observation_present"
+    | "repo_code_terminal_required"
+    | "internal_concept_requires_repo_grounding";
   assistant_answer: false;
   raw_content_included: false;
 };

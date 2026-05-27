@@ -18,7 +18,7 @@ export const isModelDirectAnswerDecision = (
 ): boolean => {
   const nextStep = readString(decision?.next_step);
   const chosenCapability = readString(decision?.chosen_capability);
-  return nextStep === "answer" || chosenCapability === "model.direct_answer";
+  return chosenCapability === "model.direct_answer" || (nextStep === "answer" && !chosenCapability);
 };
 
 const isRepoCodeEvidenceObservationEntry = (entry: unknown): boolean => {

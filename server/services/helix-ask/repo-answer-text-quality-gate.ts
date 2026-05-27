@@ -12,6 +12,7 @@ export type HelixRepoAnswerTextQualityGate = {
     | "renderer_hostile_text"
     | "missing_support_refs"
     | "unsupported_repo_claim"
+    | "wrong_model_step_identity"
   >;
   repair_allowed: boolean;
   terminal_allowed: boolean;
@@ -88,11 +89,30 @@ const collectSupportRefs = (payload: RecordLike): string[] => {
   return unique([...directRefs, ...draftRefs, ...ledgerRefs]).slice(0, 12);
 };
 
+const REPO_SYNTHESIS_MODEL_STEP_CAPABILITY = "model.synthesize_from_repo_evidence";
+
+const hasRepoSynthesisStepIdentity = (payload: RecordLike): boolean => {
+  const answer = readRecord(payload.repo_code_evidence_answer);
+  const draft = readRecord(payload.final_answer_draft);
+  const attempts = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .map((entry) => readRecord(entry?.payload))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  return (
+    readString(answer?.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY ||
+    readString(draft?.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY ||
+    attempts.some((entry) =>
+      readString(entry.schema) === "helix.repo_evidence_synthesis_attempt.v1" &&
+      readString(entry.model_step_capability) === REPO_SYNTHESIS_MODEL_STEP_CAPABILITY
+    )
+  );
+};
+
 const hasModelSynthesis = (payload: RecordLike): boolean => {
   const answer = readRecord(payload.repo_code_evidence_answer);
-  if (answer?.model_authored === true && readString(answer.synthesis_attempt_ref)) return true;
+  if (answer?.model_authored === true && readString(answer.synthesis_attempt_ref) && hasRepoSynthesisStepIdentity(payload)) return true;
   const draft = readRecord(payload.final_answer_draft);
-  return readString(draft?.authority) === "llm_post_observation_composer";
+  return readString(draft?.authority) === "llm_post_observation_composer" && hasRepoSynthesisStepIdentity(payload);
 };
 
 export function evaluateRepoAnswerTextQualityGate(input: {
@@ -104,6 +124,7 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   const text = String(input.answerText ?? "").trim();
   const violations: HelixRepoAnswerTextQualityGate["violations"] = [];
   if (!hasModelSynthesis(input.payload)) violations.push("missing_model_synthesis");
+  if (!hasRepoSynthesisStepIdentity(input.payload)) violations.push("wrong_model_step_identity");
   if (!text) violations.push("empty_answer");
   if (isCannedFallbackText(text)) violations.push("canned_fallback_text");
   if (isMissingRepoEvidenceRefusalText(text)) violations.push("unsupported_repo_claim");

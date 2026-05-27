@@ -56,9 +56,11 @@ describe("repo evidence presentation sanitizer", () => {
       payload: {
         final_answer_draft: {
           authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_repo_evidence",
         },
         repo_code_evidence_answer: {
           model_authored: true,
+          model_step_capability: "model.synthesize_from_repo_evidence",
           synthesis_attempt_ref: "turn:repo-quality-ok:repo_evidence_synthesis_attempt",
           support_refs: [
             "client/src/components/workstation/SituationRoomPipelinesPanel.tsx:1",
@@ -73,6 +75,31 @@ describe("repo evidence presentation sanitizer", () => {
     expect(gate.terminal_allowed).toBe(true);
   });
 
+  it("rejects repo answers synthesized under the generic direct-answer identity", () => {
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId: "turn:repo-quality-wrong-step",
+      answerRef: "answer:repo",
+      answerText:
+        "Auntie Dottie is a witness-only Situation Room observer in this app. Sources: shared/helix-dottie-manifest-preset.ts.",
+      payload: {
+        final_answer_draft: {
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.direct_answer",
+        },
+        repo_code_evidence_answer: {
+          model_authored: true,
+          model_step_capability: "model.direct_answer",
+          synthesis_attempt_ref: "turn:repo-quality-wrong-step:repo_evidence_synthesis_attempt",
+          support_refs: ["shared/helix-dottie-manifest-preset.ts:1"],
+        },
+      },
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("wrong_model_step_identity");
+    expect(gate.terminal_allowed).toBe(false);
+  });
+
   it("rejects model-authored missing-evidence refusals when repo evidence is present", () => {
     const gate = evaluateRepoAnswerTextQualityGate({
       turnId: "turn:repo-quality-refusal",
@@ -82,9 +109,11 @@ describe("repo evidence presentation sanitizer", () => {
       payload: {
         final_answer_draft: {
           authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_repo_evidence",
         },
         repo_code_evidence_answer: {
           model_authored: true,
+          model_step_capability: "model.synthesize_from_repo_evidence",
           synthesis_attempt_ref: "turn:repo-quality-refusal:repo_evidence_synthesis_attempt",
           support_refs: ["client/src/components/workstation/SituationRoomPipelinesPanel.tsx:1"],
         },
