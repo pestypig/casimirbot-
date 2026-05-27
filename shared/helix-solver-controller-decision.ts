@@ -38,6 +38,9 @@ export type HelixSolverControllerDecision = {
   decision: "allow_terminal" | "continue" | "retry" | "request_user_input" | "typed_failure" | "fail_closed";
   blocking_reasons: HelixSolverControllerBlockingReason[];
   consumed_artifact_refs: string[];
+  superseded_blocking_reasons?: HelixSolverControllerBlockingReason[];
+  compound_prompt_coverage_gate_superseded_by_answer_artifact?: boolean;
+  compound_prompt_coverage_superseded_ref?: string | null;
   retry_policy_ref?: string;
   typed_failure_code?: string;
   assistant_answer: false;

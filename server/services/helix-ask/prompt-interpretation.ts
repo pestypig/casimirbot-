@@ -298,9 +298,9 @@ const extractCompoundRequirementTexts = (prompt: string): string[] => {
     .filter(Boolean);
   if (lineRequirements.length > 1) return uniqueBy(lineRequirements, (entry) => entry.toLowerCase());
   const sentenceRequirements = prompt
-    .split(/(?<=[.?])\s+(?=(?:Explain|Compare|Identify|Include|Propose|Write|Implement|Test|Diagnose|Analyze|Analyse|What|Why|How|Can|Should)\b)/i)
+    .split(/(?<=[.?])\s+(?=(?:Then|Explain|Compare|Identify|Include|Propose|Write|Implement|Test|Diagnose|Analyze|Analyse|What|Why|How|Can|Should)\b)/i)
     .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0 && /\b(?:explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse|what|why|how|can|should)\b/i.test(entry));
+    .filter((entry) => entry.length > 0 && /\b(?:then|give|explain|compare|identify|include|propose|write|implement|test|diagnose|analyze|analyse|what|why|how|can|should)\b/i.test(entry));
   return uniqueBy(sentenceRequirements, (entry) => entry.toLowerCase());
 };
 

@@ -561,11 +561,17 @@ export function evaluateAskTurnSolverHardGate(input: {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "route authority audit reported no_tool_direct for hard source-target");
   }
   const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate ?? trace?.compound_prompt_coverage_gate);
+  const modelOnlyCompoundCoverage = readRecord(input.payload.model_only_compound_coverage_from_answer ?? trace?.model_only_compound_coverage_from_answer);
   if (
     !typedFailureTerminal &&
     readString(compoundCoverageGate?.schema) === "helix.compound_prompt_coverage_gate.v1" &&
     compoundCoverageGate?.applies === true &&
-    compoundCoverageGate?.passed !== true
+    compoundCoverageGate?.passed !== true &&
+    !(
+      readString(modelOnlyCompoundCoverage?.schema) === "helix.model_only_compound_coverage_from_answer.v1" &&
+      modelOnlyCompoundCoverage?.passed === true &&
+      readString(modelOnlyCompoundCoverage?.route_scope) === "model_only_allowed"
+    )
   ) {
     pushHardFailure(
       details,

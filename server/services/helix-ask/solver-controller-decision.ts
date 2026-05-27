@@ -174,6 +174,15 @@ const hasIncompleteCompoundPromptCoverageGate = (payload: RecordLike): boolean =
   );
 };
 
+const hasModelOnlyCompoundAnswerCoverage = (payload: RecordLike): boolean => {
+  const coverage = readRecord(payload.model_only_compound_coverage_from_answer);
+  return (
+    readString(coverage?.schema) === "helix.model_only_compound_coverage_from_answer.v1" &&
+    coverage?.passed === true &&
+    readString(coverage?.route_scope) === "model_only_allowed"
+  );
+};
+
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
@@ -396,6 +405,7 @@ export function buildSolverControllerDecision(input: {
   const capabilityBindingMismatchObservation =
     readRecord(payload.capability_binding_mismatch_observation) ??
     buildCapabilityBindingMismatchObservation(payload);
+  const modelOnlyAnswerCoverageSupersedesCompoundGate = hasModelOnlyCompoundAnswerCoverage(payload);
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const consumedRefs: string[] = [
@@ -426,7 +436,12 @@ export function buildSolverControllerDecision(input: {
     if (disciplineGuardRequired && !hasRequiredArtifactContract(terminalContract)) {
       pushUnique(blockingReasons, "required_artifact_contract_missing");
     }
-    if (terminalArtifactKind && allowedTerminalKinds.length > 0 && !allowedTerminalKinds.includes(terminalArtifactKind)) {
+    if (
+      terminalArtifactKind &&
+      allowedTerminalKinds.length > 0 &&
+      !allowedTerminalKinds.includes(terminalArtifactKind) &&
+      !(modelOnlyAnswerCoverageSupersedesCompoundGate && terminalArtifactKind === "model_synthesized_answer")
+    ) {
       pushUnique(blockingReasons, "terminal_kind_not_required");
     }
     if (terminalArtifactKind && forbiddenTerminalKinds.includes(terminalArtifactKind)) {
@@ -473,7 +488,13 @@ export function buildSolverControllerDecision(input: {
       pushUnique(blockingReasons, "doc_retrieval_coverage_incomplete");
     }
     if (hasIncompleteCompoundPromptCoverageGate(payload)) {
+      if (modelOnlyAnswerCoverageSupersedesCompoundGate) {
+        payload.compound_prompt_coverage_gate_superseded_by_answer_artifact = true;
+        payload.compound_prompt_coverage_superseded_ref =
+          readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref);
+      } else {
       pushUnique(blockingReasons, "compound_prompt_coverage_incomplete");
+      }
     }
   }
 
@@ -692,6 +713,13 @@ export function buildSolverControllerDecision(input: {
     consumed_artifact_refs: capabilityBindingMismatchObservation
       ? [...consumedRefs, "capability_binding_mismatch_observation"]
       : consumedRefs,
+    superseded_blocking_reasons: modelOnlyAnswerCoverageSupersedesCompoundGate
+      ? ["compound_prompt_coverage_incomplete"]
+      : undefined,
+    compound_prompt_coverage_gate_superseded_by_answer_artifact: modelOnlyAnswerCoverageSupersedesCompoundGate || undefined,
+    compound_prompt_coverage_superseded_ref: modelOnlyAnswerCoverageSupersedesCompoundGate
+      ? readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref)
+      : undefined,
     retry_policy_ref: capabilityBindingMismatchObservation ? "capability_binding_mismatch_observation" : undefined,
     typed_failure_code: typedFailureCode,
     assistant_answer: false,

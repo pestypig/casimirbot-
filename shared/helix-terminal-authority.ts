@@ -45,7 +45,8 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "legacy_direct_writer_quarantined"
   | "lower_priority_than_selected_artifact"
   | "later_valid_final_answer_draft"
-  | "route_requires_synthesis";
+  | "route_requires_synthesis"
+  | "coverage_valid_model_only_answer_exists";
 
 export type HelixTerminalAuthoritySingleWriterResult = {
   schema: "helix.terminal_authority_single_writer_result.v1";

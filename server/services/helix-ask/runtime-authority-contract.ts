@@ -429,6 +429,26 @@ export function buildCapabilityBindingMismatchObservation(
 }
 
 export function hasPostObservationModelDecision(payload: Record<string, unknown>): boolean {
+  const topLevelDecision = readRecord(payload.agent_step_decision);
+  if (topLevelDecision) {
+    const timing = readString(topLevelDecision.decision_timing);
+    const sampling = readRecord(topLevelDecision.sampling);
+    const authority =
+      readString(topLevelDecision.decision_authority) ??
+      readString(topLevelDecision.sampling_mode) ??
+      readString(sampling?.mode);
+    const modelDecision = readRecord(topLevelDecision.model_decision);
+    const nextStep = readString(topLevelDecision.next_step) ?? readString(modelDecision?.next_step);
+    const chosenCapability = readString(topLevelDecision.chosen_capability) ?? readString(modelDecision?.chosen_capability);
+    const decisionAuthorityOk = /llm|model|deterministic_policy_fallback/i.test(authority ?? "");
+    if (
+      nextStep === "answer" &&
+      decisionAuthorityOk &&
+      (/post_observation|terminal_review/i.test(timing ?? "") || chosenCapability === "model.direct_answer")
+    ) {
+      return true;
+    }
+  }
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations);
   if (iterations.some((iteration) => {
@@ -510,18 +530,20 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
-  const requiresRuntimeLoop = runtimeBoundTurn && terminalKind !== "typed_failure";
+  const requiresRuntimeLoop = sourceCapabilityDiagnosticTurn && terminalKind !== "typed_failure";
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
     if (!checks.goal_satisfaction_allows_terminal) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
+    } else if (modelDirectAnswerTurn) {
+      if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
+      if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
+      if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
     } else {
       if (!checks.agent_runtime_loop) blockingReasons.push("agent_runtime_loop_missing");
       if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
-      if (modelDirectAnswerTurn) {
-        if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
-      } else if (!checks.selected_capability_observation) {
+      if (!checks.selected_capability_observation) {
         blockingReasons.push("selected_capability_observation_missing");
       }
       if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");

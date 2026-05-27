@@ -12,7 +12,7 @@ import {
 } from "../services/helix-ask/runtime-authority-contract";
 
 describe("helix ask runtime authority contract", () => {
-  it("requires model-only direct answers to pass through the runtime answer step", () => {
+  it("requires model-only direct answers to include a model answer step and answer draft", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "model_only_concept" },
       terminal_artifact_kind: "direct_answer_text",
@@ -20,15 +20,51 @@ describe("helix ask runtime authority contract", () => {
     });
 
     expect(report.source_capability_diagnostic_turn).toBe(true);
-    expect(report.requires_runtime_loop).toBe(true);
+    expect(report.requires_runtime_loop).toBe(false);
     expect(report.eligible).toBe(false);
     expect(report.blocking_reasons).toEqual(
       expect.arrayContaining([
-        "agent_runtime_loop_missing",
         "agent_step_decision_missing",
         "direct_answer_text_missing",
+        "post_observation_model_decision_missing",
       ]),
     );
+  });
+
+  it("allows model-only direct answers from a terminal-review model decision and answer artifact without a tool loop", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "model_only_concept" },
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "model_only_concept",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        decision_timing: "terminal_review",
+        sampling: { mode: "llm" },
+        model_decision: {
+          next_step: "answer",
+          chosen_capability: "model.direct_answer",
+        },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "direct-answer-1",
+          kind: "direct_answer_text",
+          payload: {
+            schema: "helix.direct_answer_text.v1",
+            text: "Electrons are negatively charged and much lighter than protons.",
+          },
+        },
+      ],
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.requires_runtime_loop).toBe(false);
+    expect(report.blocking_reasons).toEqual([]);
   });
 
   it("allows model-only direct answers after the loop records a model answer draft", () => {

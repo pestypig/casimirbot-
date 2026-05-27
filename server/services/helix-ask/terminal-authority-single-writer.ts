@@ -231,6 +231,21 @@ export function applyHelixTerminalAuthoritySingleWriter(
         : "legacy_direct_writer_quarantined",
     });
   }
+  const modelOnlyCompoundCoverage = readRecord(input.payload.model_only_compound_coverage_from_answer);
+  const coverageValidModelOnlyAnswerExists =
+    modelOnlyCompoundCoverage?.schema === "helix.model_only_compound_coverage_from_answer.v1" &&
+    modelOnlyCompoundCoverage?.passed === true &&
+    modelOnlyCompoundCoverage?.route_scope === "model_only_allowed";
+  if (
+    coverageValidModelOnlyAnswerExists &&
+    (readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
+      readString(input.payload.final_answer_source) === "typed_failure")
+  ) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "coverage_valid_model_only_answer_exists",
+    });
+  }
 
   let selectedArtifactRef: string | null = null;
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
