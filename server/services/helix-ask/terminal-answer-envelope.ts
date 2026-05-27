@@ -599,3 +599,37 @@ export function applyTerminalAnswerEnvelope(
 
   return envelope;
 }
+
+export function applyTerminalProjectionMissedInternalSuccessFailure(
+  payload: Record<string, unknown>,
+  options: { threadId?: string | null; turnId?: string | null } = {},
+): HelixTerminalAnswerEnvelope {
+  const diagnostic =
+    "The turn succeeded internally, but the terminal projection did not select the successful answer artifact.";
+  payload.terminal_failure_text = diagnostic;
+  payload.typed_failure = {
+    schema: "helix.typed_failure.v1",
+    error_code: "terminal_projection_missed_internal_success",
+    message: diagnostic,
+    text: diagnostic,
+    answer_text: diagnostic,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.terminal_error_code = "terminal_projection_missed_internal_success";
+  const envelope: HelixTerminalAnswerEnvelope = {
+    schema: "helix.terminal_answer_envelope.v1",
+    turn_id: readTurnId(payload, options.turnId),
+    thread_id: readThreadId(payload, options.threadId),
+    source_target: readSourceTarget(payload),
+    terminal_artifact_kind: "typed_failure",
+    final_answer_source: "typed_failure",
+    terminal_text: diagnostic,
+    terminal_text_hash: hashHelixTerminalText(diagnostic),
+    terminal_kind: "failure",
+    authority_origin: "typed_failure",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  return applyTerminalAnswerEnvelope(payload, envelope);
+}
