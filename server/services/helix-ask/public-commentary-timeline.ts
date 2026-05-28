@@ -320,8 +320,14 @@ export const buildHelixAskPublicCommentaryTimeline = (input: {
           },
           ...normalizedStepCommentaryRows,
         ];
-  const maxRows = asRecord(input.calculatorCompoundPlan) ? 12 : 8;
-  for (const [index, row] of rowDrafts.slice(0, Math.max(0, maxRows - 2)).entries()) {
+  const maxRows = asRecord(input.calculatorCompoundPlan) ? 14 : 8;
+  const maxStepRows = Math.max(0, maxRows - 2);
+  const cappedRowDrafts = rowDrafts.slice(0, maxStepRows);
+  const synthesisRow = rowDrafts.find((row) => /\bsynthesizing\b/i.test(row.text));
+  if (synthesisRow && !cappedRowDrafts.some((row) => row.text === synthesisRow.text) && cappedRowDrafts.length > 0) {
+    cappedRowDrafts[cappedRowDrafts.length - 1] = synthesisRow;
+  }
+  for (const [index, row] of cappedRowDrafts.entries()) {
     timeline.push(makeEvent({
       turnId: input.turnId,
       traceId,

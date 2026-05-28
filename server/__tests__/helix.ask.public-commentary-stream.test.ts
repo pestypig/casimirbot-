@@ -245,7 +245,7 @@ describe("helix ask public commentary stream", () => {
       priorResponse = await request(app)
         .post("/api/agi/ask/turn")
         .send({
-          question: photonCalculatorPrompt,
+          question: naturalCompoundCalculatorPrompt,
           mode: "read",
           sessionId,
           debug: true,
