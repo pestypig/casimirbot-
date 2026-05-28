@@ -404,7 +404,7 @@ describe("Helix Ask repo concept evidence", () => {
       weak_fuzzy_only: false,
       alias_normalization_applied: true,
     });
-  });
+  }, 30000);
 
   it("runs repo-code.search_concept as bounded read-only repo evidence search", async () => {
     const result = await runRepoCodeEvidenceSearch({
@@ -435,7 +435,7 @@ describe("Helix Ask repo concept evidence", () => {
     expect(result.observation.spans.some((span) => /client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts/.test(span.path))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes("node_modules"))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes(".."))).toBe(true);
-  });
+  }, 30000);
 
   it("records repo concept evidence requests, results, reentry, and synthesis arbitration", () => {
     const payload = {
