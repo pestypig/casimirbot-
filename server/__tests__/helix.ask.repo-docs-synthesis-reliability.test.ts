@@ -86,9 +86,73 @@ describe("repo/docs synthesis reliability", () => {
       required_terminal_kind: "repo_code_evidence_answer",
       must_not_emit_file_inventory: true,
     });
+    expect(packet.answer_depth_contract).toMatchObject({
+      depth_mode: "internal_concept_overview",
+      min_word_count: expect.any(Number),
+      required_coverage_points: expect.arrayContaining(["identity", "responsibilities", "workflow_or_surfaces"]),
+    });
     expect(packet.model_instruction).toMatch(/Explain what the evidence means/i);
+    expect(packet.model_instruction).toMatch(/internal concept overview/i);
     expect(packet.assistant_answer).toBe(false);
     expect(packet.raw_content_included).toBe(false);
+  });
+
+  it("prefers path-diverse compact evidence before repeated spans from the same file", () => {
+    const observation = {
+      ...dottieObservation,
+      evidence_refs: [
+        "server/services/helix-ask/workstation-tool-planner.ts:1-20",
+        "server/services/helix-ask/workstation-tool-planner.ts:21-40",
+        "server/services/helix-ask/workstation-tool-planner.ts:41-60",
+        "client/src/lib/workstation/panelActionAdapters.ts:1-30",
+      ],
+      spans: [
+        {
+          ref: "server/services/helix-ask/workstation-tool-planner.ts:1-20",
+          path: "server/services/helix-ask/workstation-tool-planner.ts",
+          sanitized_excerpt: "Dottie observer runtime planning behavior.",
+          reason: "first runtime span",
+          source_kind: "repo_code",
+        },
+        {
+          ref: "server/services/helix-ask/workstation-tool-planner.ts:21-40",
+          path: "server/services/helix-ask/workstation-tool-planner.ts",
+          sanitized_excerpt: "More Dottie observer runtime planning behavior.",
+          reason: "second runtime span",
+          source_kind: "repo_code",
+        },
+        {
+          ref: "server/services/helix-ask/workstation-tool-planner.ts:41-60",
+          path: "server/services/helix-ask/workstation-tool-planner.ts",
+          sanitized_excerpt: "More Dottie observer runtime planning behavior.",
+          reason: "third runtime span",
+          source_kind: "repo_code",
+        },
+        {
+          ref: "client/src/lib/workstation/panelActionAdapters.ts:1-30",
+          path: "client/src/lib/workstation/panelActionAdapters.ts",
+          sanitized_excerpt: "Dottie manifest panel action adapter capability.",
+          reason: "adapter capability span",
+          source_kind: "repo_code",
+        },
+      ],
+    };
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId,
+      promptText: "What is Auntie Dottie in this app?",
+      routeFamily: "repo_evidence",
+      artifactLedger: [
+        {
+          artifact_id: observation.artifact_id,
+          kind: "repo_code_evidence_observation",
+          payload: observation,
+        },
+      ],
+      maxEvidenceItems: 3,
+    });
+
+    expect(new Set(packet.compact_evidence.map((entry) => entry.path)).size).toBeGreaterThan(1);
+    expect(packet.compact_evidence.map((entry) => entry.path)).toContain("client/src/lib/workstation/panelActionAdapters.ts");
   });
 
   it("attaches support refs from the packet so valid prose can pass the repo quality gate", () => {
@@ -153,7 +217,7 @@ describe("repo/docs synthesis reliability", () => {
       artifactLedger: ledger,
     });
     const answerText = [
-      "Auntie Dottie in this app is a Dottie/Situation Room observer preset for public commentary and evidence. The repo evidence shows that it is meant to watch selected public streams, produce commentary artifacts under policy, and keep voice delivery on the proposal/confirmation path rather than treating speech or receipts as final-answer authority.",
+      "Auntie Dottie in this app is a Dottie/Situation Room observer preset for public commentary and evidence, not a separate assistant runtime. Its responsibility is to attach a witness profile to selected Helix Ask or Situation Room activity, watch eligible public traces, and package observer, commentary, and voice proposal receipts as evidence. The workflow crosses the manifest contract, workstation capability surface, and policy lane: Dottie can observe and propose voice output, but confirmation and terminal answer authority stay outside the receipt itself. That boundary matters because receipts support the model's later synthesis; they do not authorize the final visible answer.",
       "",
       "Sources:",
       "- shared/helix-dottie-manifest-preset.ts:111",
@@ -198,6 +262,57 @@ describe("repo/docs synthesis reliability", () => {
     expect(gate.ok).toBe(true);
     expect(gate.violations).not.toContain("excerpt_like_answer");
     expect(gate.violations).not.toContain("file_list_only");
+  });
+
+  it("rejects shallow broad-concept repo answers even when they have model synthesis and refs", () => {
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId,
+      promptText: "What is Auntie Dottie in this app?",
+      routeFamily: "repo_evidence",
+      artifactLedger: ledger,
+    });
+    const payload = {
+      repo_docs_synthesis_packet: packet,
+      repo_code_evidence_answer: {
+        schema: "helix.repo_code_evidence_answer.v1",
+        support_refs: packet.compact_evidence.map((entry) => entry.ref),
+        model_authored: true,
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        synthesis_attempt_ref: `${turnId}:repo_evidence_synthesis_attempt`,
+      },
+      final_answer_draft: {
+        authority: "llm_post_observation_composer",
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        artifact_refs: packet.compact_evidence.map((entry) => entry.ref),
+      },
+      current_turn_artifact_ledger: [
+        ...ledger,
+        {
+          artifact_id: `${turnId}:repo_evidence_synthesis_attempt`,
+          kind: "repo_evidence_synthesis_attempt",
+          payload: {
+            schema: "helix.repo_evidence_synthesis_attempt.v1",
+            model_step_capability: "model.synthesize_from_repo_evidence",
+          },
+        },
+      ],
+    };
+
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId,
+      answerRef: "candidate:shallow-dottie",
+      answerText: "Auntie Dottie is a witness-only observer preset for the Situation Room.",
+      payload,
+    });
+    const instruction = buildRepoDocsSynthesisRepairInstruction({
+      violations: gate.violations,
+      packet,
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("shallow_broad_concept_answer");
+    expect(instruction).toMatch(/too shallow for a broad repo concept/i);
+    expect(instruction).toMatch(/identity, responsibilities, workflow/i);
   });
 
   it("keeps file inventories and no-evidence refusals from passing the quality gate", () => {
