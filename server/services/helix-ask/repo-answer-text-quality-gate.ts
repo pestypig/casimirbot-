@@ -19,6 +19,9 @@ export type HelixRepoAnswerTextQualityGate = {
     | "exact_evidence_not_selected"
     | "codebase_anchor_ignored"
     | "alias_not_normalized"
+    | "shallow_broad_concept_answer"
+    | "missing_broad_concept_coverage"
+    | "insufficient_evidence_role_coverage"
   >;
   repair_allowed: boolean;
   terminal_allowed: boolean;
@@ -38,6 +41,9 @@ const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const wordCount = (text: string): number =>
+  text.replace(/[^\w\s'-]/g, " ").split(/\s+/).filter(Boolean).length;
 
 const hasRendererHostileText = (text: string): boolean =>
   /[\u200B-\u200D\uFEFF]/u.test(text) ||
@@ -105,6 +111,41 @@ const isPolicyClaimInversion = (text: string): boolean => {
   );
 };
 
+const compactEvidenceRoles = (packet: RecordLike | null): string[] =>
+  unique(
+    readArray(packet?.compact_evidence)
+      .map(readRecord)
+      .map((entry) => readString(entry?.role))
+      .filter(Boolean),
+  );
+
+const conceptMentioned = (text: string, concept: string): boolean => {
+  const normalized = text.toLowerCase();
+  const terms = unique([
+    concept,
+    ...concept.split(/\s+/).filter((part) => part.length >= 4),
+  ])
+    .map((term) => term.toLowerCase().replace(/[^\w]+/g, " ").trim())
+    .filter((term) => term.length >= 4);
+  return terms.some((term) => normalized.includes(term));
+};
+
+const coveragePointPresent = (point: string, text: string, concept: string): boolean => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  switch (point) {
+    case "identity":
+      return conceptMentioned(normalized, concept) || /\b(?:is|refers to|means|represents)\b/i.test(normalized);
+    case "responsibilities":
+      return /\b(?:responsib|manages?|coordinates?|provides?|exposes?|creates?|sets?\s+up|handles?|watches?|observes?|tracks?|connects?|routes?|supports?|used\s+to)\b/i.test(normalized);
+    case "workflow_or_surfaces":
+      return /\b(?:workflow|flow|step|panel|ui|surface|tool|capabilit|runtime|store|route|source|evidence|packet|preset|observer|environment)\b/i.test(normalized);
+    case "evidence_or_authority_boundary":
+      return /\b(?:authority|terminal|boundary|receipt|observation|evidence|support|not\s+(?:the|an)?\s*(?:answer|authority)|cannot|doesn't|does\s+not|uncertain|partial)\b/i.test(normalized);
+    default:
+      return false;
+  }
+};
+
 const collectSupportRefs = (payload: RecordLike): string[] => {
   const answer = readRecord(payload.repo_code_evidence_answer);
   const directRefs = readArray(answer?.support_refs).map(readString).filter(Boolean);
@@ -169,6 +210,22 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
   if (collectSupportRefs(input.payload).length === 0) violations.push("missing_support_refs");
+  const synthesisPacket = readRecord(input.payload.repo_docs_synthesis_packet);
+  const depthContract = readRecord(synthesisPacket?.answer_depth_contract);
+  if (readString(depthContract?.depth_mode) === "internal_concept_overview") {
+    const minWords = typeof depthContract?.min_word_count === "number" ? depthContract.min_word_count : 90;
+    const minRoles = typeof depthContract?.min_distinct_evidence_roles === "number"
+      ? depthContract.min_distinct_evidence_roles
+      : 2;
+    const roles = compactEvidenceRoles(synthesisPacket);
+    const concept = readString(synthesisPacket?.concept) || readString(readRecord(input.payload.repo_code_evidence_answer)?.concept) || "repo concept";
+    const missingCoverage = readArray(depthContract?.required_coverage_points)
+      .map(readString)
+      .filter((point) => point && !coveragePointPresent(point, text, concept));
+    if (wordCount(text) < minWords) violations.push("shallow_broad_concept_answer");
+    if (roles.length < minRoles) violations.push("insufficient_evidence_role_coverage");
+    if (missingCoverage.length > 0) violations.push("missing_broad_concept_coverage");
+  }
   const relevanceGate = readRecord(input.payload.repo_evidence_relevance_gate);
   const repoConceptDetection = readRecord(input.payload.repo_concept_detection);
   const conceptRequiresRepoEvidence = repoConceptDetection?.require_repo_evidence === true;

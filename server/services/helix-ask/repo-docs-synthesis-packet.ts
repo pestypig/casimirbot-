@@ -271,6 +271,9 @@ export function buildRepoDocsSynthesisPacket(input: {
     observationRecords.map((record) => readString(record.concept)).find(Boolean) ??
     readString(readRecord(input.artifactLedger.find(isRepoObservationArtifact)?.payload)?.concept) ??
     undefined;
+  const aliasEntry = findRepoConceptAliasEntry(concept ?? input.promptText);
+  const broadConcept = Boolean(aliasEntry?.broad_concept);
+  const requiredEvidenceRoles = aliasEntry?.required_evidence_roles ?? [];
   const requiredCapability = input.routeFamily === "repo_evidence"
     ? "model.synthesize_from_repo_evidence"
     : "model.synthesize_from_docs_evidence";
@@ -283,6 +286,12 @@ export function buildRepoDocsSynthesisPacket(input: {
   const dottieInstruction = isDottieConcept
     ? "For Auntie Dottie, answer the identity question first: explain that it is a Dottie/Situation Room observer or preset for public commentary/evidence, mention voice proposals require confirmation when supported, and do not present it as terminal-answer authority."
     : "";
+  const requiredCoveragePoints: HelixRepoDocsAnswerCoveragePoint[] = broadConcept
+    ? ["identity", "responsibilities", "workflow_or_surfaces", "evidence_or_authority_boundary"]
+    : ["identity"];
+  const answerDepthGuidance = broadConcept
+    ? "Write an internal concept overview, not a label definition: cover what it is, what responsibilities it has, how the UI/tool/runtime pieces connect, and what boundary or uncertainty the evidence establishes."
+    : "Write a concise direct answer from the evidence.";
 
   return {
     schema: HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA,
@@ -300,6 +309,14 @@ export function buildRepoDocsSynthesisPacket(input: {
       must_not_emit_file_inventory: true,
       must_not_claim_missing_evidence_when_observations_exist: true,
     },
+    answer_depth_contract: {
+      depth_mode: broadConcept ? "internal_concept_overview" : "concise_fact",
+      min_word_count: broadConcept ? 90 : 24,
+      min_distinct_evidence_roles: broadConcept ? Math.min(3, Math.max(2, requiredEvidenceRoles.length || 2)) : 1,
+      required_coverage_points: requiredCoveragePoints,
+      required_evidence_roles: requiredEvidenceRoles,
+      guidance: answerDepthGuidance,
+    },
     compact_evidence: compactEvidence,
     evidence_summary: {
       files_considered: files.length,
@@ -312,6 +329,10 @@ export function buildRepoDocsSynthesisPacket(input: {
       "Answer the user's question directly from the compact evidence.",
       "Explain what the evidence means; do not answer with a file list or raw excerpt dump.",
       "For broad internal concepts, synthesize across evidence roles: definition, UI/control surface, state model, tool/capability registry, runtime behavior, and authority boundaries when present.",
+      answerDepthGuidance,
+      broadConcept
+        ? "Use a compact structure with 3-5 short paragraphs or bullets: identity, responsibilities, workflow/surfaces, authority boundary, and sources."
+        : "",
       "Preserve authority claims exactly: receipts are observations/supporting artifacts, not final-answer authority.",
       "Do not claim evidence is missing when compact_evidence is non-empty.",
       "Use compact refs from compact_evidence as support_refs for terminal authority.",
@@ -373,6 +394,13 @@ export function classifyRepoDocsSynthesisAttemptStatus(input: {
   if (violations.has("renderer_hostile_text")) return "renderer_hostile";
   if (violations.has("unsupported_repo_claim")) return "unsupported_claims";
   if (violations.has("missing_support_refs")) return "missing_support_refs";
+  if (
+    violations.has("shallow_broad_concept_answer") ||
+    violations.has("missing_broad_concept_coverage") ||
+    violations.has("insufficient_evidence_role_coverage")
+  ) {
+    return "failed";
+  }
   if (violations.has("excerpt_like_answer") || violations.has("file_list_only")) return "excerpt_like";
   return "failed";
 }
@@ -408,6 +436,16 @@ export function buildRepoDocsSynthesisRepairInstruction(input: {
   if (violations.has("missing_support_refs")) {
     return `${prefix}${common}${evidenceSentence} The previous answer lacked support refs; attach refs from the synthesis packet.`;
   }
+  if (
+    violations.has("shallow_broad_concept_answer") ||
+    violations.has("missing_broad_concept_coverage") ||
+    violations.has("insufficient_evidence_role_coverage")
+  ) {
+    const depthGuidance = input.packet?.answer_depth_contract?.guidance
+      ? ` ${input.packet.answer_depth_contract.guidance}`
+      : "";
+    return `${prefix}${common}${depthGuidance}${evidenceSentence} The previous answer was too shallow for a broad repo concept; rewrite it as an internal concept overview that covers identity, responsibilities, workflow or UI/runtime surfaces, and authority boundaries or uncertainty.`;
+  }
   if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
     return `${prefix}${common}${evidenceSentence} The retry must be authored as the post-observation synthesis step for the repo/docs evidence.`;
   }
@@ -427,6 +465,13 @@ export function repoDocsSynthesisTerminalErrorCode(input: {
   }
   if (input.status === "unsupported_claims") return `repo_docs_synthesis_refusal_after_evidence${suffix}`;
   if (violations.has("policy_claim_inversion")) return `repo_docs_synthesis_policy_claim_inversion${suffix}`;
+  if (
+    violations.has("shallow_broad_concept_answer") ||
+    violations.has("missing_broad_concept_coverage") ||
+    violations.has("insufficient_evidence_role_coverage")
+  ) {
+    return `repo_docs_synthesis_depth_incomplete${suffix}`;
+  }
   if (input.status === "missing_support_refs") return `repo_docs_synthesis_missing_support_refs${suffix}`;
   if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
     return `repo_docs_synthesis_wrong_model_step${suffix}`;
