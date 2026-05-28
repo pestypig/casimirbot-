@@ -14,6 +14,7 @@ import {
   expandRepoCodeEvidenceTerms,
   runRepoCodeEvidenceSearch,
 } from "../services/helix-ask/retrieval/repo-code-evidence-search";
+import { evaluateRepoEvidenceRelevanceGate } from "../services/helix-ask/repo-evidence-relevance-gate";
 import { rankRepoCodeEvidenceHits } from "../services/helix-ask/retrieval/repo-code-evidence-ranker";
 import {
   HELIX_REPO_CODE_EVIDENCE_OBSERVATION_SCHEMA,
@@ -28,10 +29,19 @@ describe("Helix Ask repo concept evidence", () => {
       canonical: "Situation Room",
       reason: "project_local_entity_definition",
     });
+    expect(detectRepoConceptDefinition("What is the reasoning theater in helix ask?")).toMatchObject({
+      canonical: "Reasoning Theater",
+      reason: "project_local_entity_definition",
+    });
+    expect(detectRepoConceptDefinition("Do you know what the star simulations do in the codebase?")).toMatchObject({
+      canonical: "StarSim",
+      reason: "project_local_entity_definition",
+    });
     expect(detectRepoConceptDefinition("How does the docs panel work?")).toMatchObject({
       canonical: "docs panel",
     });
     expect(detectRepoConceptDefinition("What is an electron?")).toBeNull();
+    expect(detectRepoConceptDefinition("What is a star simulation generally?")).toBeNull();
   });
 
   it("returns a repo evidence decision for known Helix/workstation concepts", () => {
@@ -326,6 +336,74 @@ describe("Helix Ask repo concept evidence", () => {
       "panelActionAdapters",
       "doc_summary",
     ]));
+    expect(expandRepoCodeEvidenceTerms({
+      concept: "Reasoning Theater",
+      query: "What is the reasoning theater in Helix Ask?",
+    })).toEqual(expect.arrayContaining([
+      "Reasoning Theater",
+      "reasoning-theater",
+      "reasoning_theater",
+      "ReasoningTheater",
+    ]));
+    expect(expandRepoCodeEvidenceTerms({
+      concept: "StarSim",
+      query: "Do you know what the star simulations do in the codebase?",
+    })).toEqual(expect.arrayContaining([
+      "StarSim",
+      "starsim",
+      "star simulations",
+      "stellar simulations",
+    ]));
+  });
+
+  it("prefers exact Reasoning Theater and StarSim evidence over fuzzy neighbors", async () => {
+    const reasoningTheater = await runRepoCodeEvidenceSearch({
+      turnId: "turn:reasoning-theater-search",
+      callId: "call:reasoning-theater-search",
+      conceptMatch: "Reasoning Theater",
+      query: "What is the reasoning theater in helix ask?",
+      max_files: 8,
+      max_spans: 8,
+      context_lines: 1,
+    });
+    expect(reasoningTheater.observation.spans.map((span) => span.path).join("\n")).toMatch(
+      /server\/routes\/helix\/reasoning-theater\.ts|server\/services\/helix-ask\/surface\/reasoning-theater-state\.ts|server\/__tests__\/helix.*reasoning-theater/i,
+    );
+    const reasoningGate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:reasoning-theater-search",
+      concept: "Reasoning Theater",
+      query: "What is the reasoning theater in helix ask?",
+      observation: reasoningTheater.observation,
+    });
+    expect(reasoningGate).toMatchObject({
+      terminal_allowed: true,
+      weak_fuzzy_only: false,
+    });
+    expect(["adequate", "strong"]).toContain(reasoningGate.coverage);
+
+    const starSim = await runRepoCodeEvidenceSearch({
+      turnId: "turn:starsim-search",
+      callId: "call:starsim-search",
+      conceptMatch: "StarSim",
+      query: "Do you know what the star simulations do in the codebase?",
+      max_files: 8,
+      max_spans: 8,
+      context_lines: 1,
+    });
+    expect(starSim.observation.spans.map((span) => span.path).join("\n")).toMatch(
+      /server\/modules\/starsim\/|shared\/starsim-|tools\/starsim|client\/src\/components\/panels\/StellarEvolutionLens\.tsx/i,
+    );
+    const starSimGate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:starsim-search",
+      concept: "StarSim",
+      query: "Do you know what the star simulations do in the codebase?",
+      observation: starSim.observation,
+    });
+    expect(starSimGate).toMatchObject({
+      terminal_allowed: true,
+      weak_fuzzy_only: false,
+      alias_normalization_applied: true,
+    });
   });
 
   it("runs repo-code.search_concept as bounded read-only repo evidence search", async () => {

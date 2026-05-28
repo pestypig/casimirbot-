@@ -1,6 +1,11 @@
 import type { RepoSearchHit } from "../repo-search";
 import type { HelixRepoCodeEvidenceObservation } from "../../../../shared/helix-repo-code-evidence-observation";
 import { sanitizeRepoEvidenceExcerptForPresentation } from "../repo-evidence-presentation-sanitizer";
+import {
+  findRepoConceptAliasEntry,
+  repoConceptPathMatchesHint,
+  repoConceptPathMatchesPreferredPrefix,
+} from "../repo-concept-alias-registry";
 
 const INDEX_ONLY_PATHS = [
   /(?:^|\/)\.cache\//i,
@@ -67,6 +72,16 @@ const isDocsPanelQuery = (queryTokens: Set<string>, exactTerms: string[]): boole
 const isTerminalAuthorityQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
   const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
   return /terminal[\s_-]*authority|terminal[_-]?answer[_-]?authority|terminal-answer-envelope|runtime-authority-contract/.test(joined);
+};
+
+const isReasoningTheaterQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /reasoning[\s_-]*theat(?:er|re)|reasoningtheater/.test(joined);
+};
+
+const isStarSimQuery = (queryTokens: Set<string>, exactTerms: string[]): boolean => {
+  const joined = [...queryTokens, ...exactTerms].join(" ").toLowerCase();
+  return /\bstarsim\b|star[\s_-]*sim|stellar[\s_-]*sim/.test(joined);
 };
 
 const scoreSituationRoomPath = (filePath: string, text: string): number => {
@@ -152,6 +167,30 @@ const scoreTerminalAuthorityPath = (filePath: string, text: string): number => {
   return score;
 };
 
+const scoreReasoningTheaterPath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/server\/routes\/helix\/reasoning-theater\.ts$/.test(filePath)) score += 260;
+  if (/server\/services\/helix-ask\/surface\/reasoning-theater-state\.ts$/.test(filePath)) score += 250;
+  if (/server\/__tests__\/helix\.(?:ask\.turn\.)?reasoning-theater/.test(filePath)) score += 205;
+  if (/client\/src\/components\/helix\/helixaskpill\.tsx$/.test(filePath)) score += 145;
+  if (/reasoning[-_]?theater|reasoningtheater/.test(filePath)) score += 130;
+  if (/\b(?:reasoningTheater|ReasoningTheater|reasoning_theater|reasoning-theater|reasoning theater)\b/i.test(text)) score += 115;
+  if (/server\/services\/helix-ask/.test(filePath) && !/reasoning|surface/.test(filePath)) score -= 85;
+  return score;
+};
+
+const scoreStarSimPath = (filePath: string, text: string): number => {
+  let score = 0;
+  if (/server\/modules\/starsim\//.test(filePath)) score += 260;
+  if (/shared\/starsim-/.test(filePath)) score += 230;
+  if (/tools\/starsim/.test(filePath)) score += 210;
+  if (/client\/src\/components\/panels\/stellarevolutionlens\.tsx$/.test(filePath)) score += 180;
+  if (/client\/src\/components\/panels\/theorybadgegraphpanel\.tsx$/.test(filePath)) score += 140;
+  if (/starsim|stellar(?:evolution)?|star[-_]?sim/.test(filePath)) score += 130;
+  if (/\b(?:StarSim|starsim|stellarEvolution|StellarEvolution|starsimFusion|starsimSolar)\b/.test(text)) score += 120;
+  return score;
+};
+
 const isContractLikeLine = (hit: RepoSearchHit): boolean => {
   const filePath = normalize(hit.filePath);
   const text = hit.text;
@@ -175,6 +214,11 @@ const scoreHit = (
   const routeEvidenceQuery = isRouteEvidenceQuery(queryTokens, exactTerms);
   const docsPanelQuery = isDocsPanelQuery(queryTokens, exactTerms);
   const terminalAuthorityQuery = isTerminalAuthorityQuery(queryTokens, exactTerms);
+  const reasoningTheaterQuery = isReasoningTheaterQuery(queryTokens, exactTerms);
+  const starSimQuery = isStarSimQuery(queryTokens, exactTerms);
+  const aliasEntry = findRepoConceptAliasEntry(exactTerms.join(" "));
+  if (repoConceptPathMatchesHint(filePath, aliasEntry)) score += 260;
+  if (repoConceptPathMatchesPreferredPrefix(filePath, aliasEntry)) score += 90;
   for (const term of exactTerms) {
     const normalizedTerm = term.toLowerCase();
     if (!normalizedTerm) continue;
@@ -202,6 +246,15 @@ const scoreHit = (
   if (routeEvidenceQuery) score += scoreRouteEvidencePath(filePath, hit.text);
   if (docsPanelQuery) score += scoreDocsPanelPath(filePath, hit.text);
   if (terminalAuthorityQuery) score += scoreTerminalAuthorityPath(filePath, hit.text);
+  if (reasoningTheaterQuery) score += scoreReasoningTheaterPath(filePath, hit.text);
+  if (starSimQuery) score += scoreStarSimPath(filePath, hit.text);
+  if (
+    (reasoningTheaterQuery || starSimQuery) &&
+    /server\/services\/helix-ask\/(?:alignment-gate|ask-turn-solver|query)\.ts$/.test(filePath) &&
+    !/\b(?:reasoningTheater|ReasoningTheater|StarSim|starsim)\b/.test(hit.text)
+  ) {
+    score -= 120;
+  }
   if (GENERATED_OR_ARTIFACT_PATHS.some((pattern) => pattern.test(filePath))) score -= 40;
   if (INDEX_ONLY_PATHS.some((pattern) => pattern.test(filePath))) score -= 60;
   return score;

@@ -417,13 +417,13 @@ export function buildRouteProductContract(input: {
         "workstation_tool_evaluation",
         "tool_evaluation",
         "model_synthesized_answer",
-        "note_update_receipt",
         "note_context_pack",
         "source_binding_status",
         "source_binding_repair_candidate",
       ],
-      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "no_tool_direct", "model_only_concept"],
-      precedenceReason: "workstation_panel_source_target_allows_workspace_and_note_action_receipts",
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "note_update_receipt", "note_action_receipt", "note_create_receipt", "no_tool_direct", "model_only_concept"],
+      sideArtifactKindsAllowed: ["workspace_action_receipt", "note_update_receipt", "note_action_receipt", "note_create_receipt"],
+      precedenceReason: "workstation_panel_source_target_allows_workspace_and_note_action_side_artifacts",
     });
   }
 
@@ -444,13 +444,13 @@ export function buildRouteProductContract(input: {
         "workstation_tool_evaluation",
         "tool_evaluation",
         "model_synthesized_answer",
-        "note_update_receipt",
         "note_context_pack",
         "source_binding_status",
         "source_binding_repair_candidate",
       ],
-      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "no_tool_direct", "model_only_concept"],
-      precedenceReason: "note_mutation_prompt_allows_note_action_receipts",
+      forbiddenExtra: ["visual_frame_evidence", "doc_location_result", "note_update_receipt", "note_action_receipt", "note_create_receipt", "no_tool_direct", "model_only_concept"],
+      sideArtifactKindsAllowed: ["note_update_receipt", "note_action_receipt", "note_create_receipt", "workspace_action_receipt"],
+      precedenceReason: "note_mutation_prompt_requires_model_synthesized_terminal_after_note_receipt",
     });
   }
 

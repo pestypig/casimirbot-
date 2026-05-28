@@ -13,6 +13,7 @@ type ToolChainScenario = {
     | "docs_source"
     | "calculator_tool"
     | "mutating_guard"
+    | "note_mutation"
     | "situation_room"
     | "voice_policy"
     | "negated_tool"
@@ -49,6 +50,11 @@ const SCENARIOS: ToolChainScenario[] = [
     id: "note_delete_guard",
     category: "mutating_guard",
     prompt: "Delete my active note.",
+  },
+  {
+    id: "note_create_receipt_quarantine",
+    category: "note_mutation",
+    prompt: "Create a note titled Tool Chain Receipt Test with the text receipts stay side artifacts.",
   },
   {
     id: "dottie_minecraft_missing_source",
@@ -333,6 +339,22 @@ const classifyScenario = (input: {
     if (!/confirm|confirmation|need|cannot|could not|request|before/i.test(visibleText)) {
       warnings.push("mutating_guard_visible_text_does_not_request_or_explain_confirmation");
     }
+  }
+
+  if (scenario.category === "note_mutation") {
+    if (!includesAny(capabilities, /workstation-notes\.(create_note|append_to_note)|notes/i)) {
+      warnings.push("note_mutation_capability_not_seen");
+    }
+    if (/note_.*receipt|workspace_action_receipt/i.test(terminalKind)) {
+      failures.push("note_receipt_selected_as_terminal");
+    }
+    if (!/model_synthesized_answer|request_user_input|typed_failure/.test(terminalKind)) {
+      warnings.push(`unexpected_note_mutation_terminal_kind_${terminalKind || "missing"}`);
+    }
+    if (/\b(note_update_receipt|note action receipt|workspace action receipt)\b/i.test(visibleText)) {
+      failures.push("note_receipt_debug_name_visible");
+    }
+    if (receiptLeak(visibleText)) failures.push("note_receipt_framing_leaked_into_visible_answer");
   }
 
   if (scenario.category === "situation_room") {

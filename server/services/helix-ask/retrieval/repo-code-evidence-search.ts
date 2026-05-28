@@ -17,6 +17,13 @@ import {
   buildRepoCodeEvidenceSpans,
   rankRepoCodeEvidenceHits,
 } from "./repo-code-evidence-ranker";
+import {
+  findRepoConceptAliasEntry,
+  repoConceptAliasTerms,
+  repoConceptPathMatchesHint,
+  repoConceptPathMatchesPreferredPrefix,
+  type RepoConceptAliasEntry,
+} from "../repo-concept-alias-registry";
 
 const execFileAsync = promisify(execFile);
 
@@ -70,10 +77,12 @@ export const expandRepoCodeEvidenceTerms = (input: {
     input.query,
     ...(input.normalized_terms ?? []),
   ];
+  const aliasEntry = findRepoConceptAliasEntry([input.concept ?? "", input.query, ...(input.normalized_terms ?? [])].join(" "));
   const terms: string[] = [];
   for (const term of sourceTerms) {
     terms.push(...conceptVariants(term));
   }
+  terms.push(...repoConceptAliasTerms(aliasEntry));
 
   const joined = sourceTerms.join(" ").toLowerCase();
   if (/\bsituation\s+room\b/.test(joined)) {
@@ -297,6 +306,9 @@ const terminalAuthorityFileSearchPriority = (filePath: string): number | null =>
 
 const fileSearchPriority = (filePath: string, terms: string[]): number => {
   const normalized = normalizePath(filePath).toLowerCase();
+  const aliasEntry = findRepoConceptAliasEntry(terms.join(" "));
+  if (repoConceptPathMatchesHint(normalized, aliasEntry)) return -90;
+  if (repoConceptPathMatchesPreferredPrefix(normalized, aliasEntry)) return -35;
   if (isSituationRoomSearch(terms)) {
     const situationPriority = situationRoomFileSearchPriority(normalized);
     if (situationPriority !== null) return situationPriority;
@@ -409,6 +421,58 @@ const searchRepoFiles = async (input: {
   return { hits, truncated };
 };
 
+const firstUsefulLineIndex = (lines: string[], terms: string[]): number => {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (termMatchesLine(lines[index] ?? "", terms)) return index;
+  }
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/\b(?:export|type|interface|class|function|const|describe|it|test)\b/i.test(lines[index] ?? "")) return index;
+  }
+  return Math.max(0, lines.findIndex((line) => line.trim().length > 0));
+};
+
+const buildPathHintHits = async (input: {
+  repoRoot: string;
+  files: string[];
+  terms: string[];
+  aliasEntry: RepoConceptAliasEntry | null;
+  maxSpans: number;
+  contextLines: number;
+}): Promise<RepoSearchHit[]> => {
+  if (!input.aliasEntry) return [];
+  const hintFiles = input.files
+    .filter((filePath) => repoConceptPathMatchesHint(filePath, input.aliasEntry))
+    .slice(0, Math.max(1, Math.min(input.maxSpans, 12)));
+  const hits: RepoSearchHit[] = [];
+  for (const filePath of hintFiles) {
+    if (hits.length >= input.maxSpans) break;
+    const text = await readSearchableFile(input.repoRoot, filePath);
+    if (!text) continue;
+    const lines = text.split(/\r?\n/);
+    const lineIndex = firstUsefulLineIndex(lines, input.terms);
+    if (lineIndex < 0) continue;
+    hits.push({
+      filePath,
+      line: lineIndex + 1,
+      text: contextExcerpt(lines, lineIndex, input.contextLines),
+      term: termMatchesLine(lines[lineIndex] ?? "", input.terms) ?? input.aliasEntry.canonical_concept,
+    });
+  }
+  return hits;
+};
+
+const mergeSearchHits = (hits: RepoSearchHit[]): RepoSearchHit[] => {
+  const seen = new Set<string>();
+  const out: RepoSearchHit[] = [];
+  for (const hit of hits) {
+    const key = `${normalizePath(hit.filePath)}:${hit.line}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(hit);
+  }
+  return out;
+};
+
 export type HelixRepoCodeEvidenceSearchResult = {
   plan: RepoSearchPlan | null;
   rawResult: RepoSearchResult;
@@ -439,10 +503,19 @@ export async function runRepoCodeEvidenceSearch(input: {
     query: input.query,
     normalized_terms: input.normalized_terms,
   });
+  const aliasEntry = findRepoConceptAliasEntry([input.conceptMatch ?? "", input.query, ...terms].join(" "));
   const maxSpans = Math.max(1, Math.min(input.max_spans ?? input.maxHits ?? DEFAULT_MAX_SPANS, 80));
   const maxFiles = Math.max(1, Math.min(input.max_files ?? DEFAULT_MAX_FILES, 80));
   const contextLines = Math.max(0, Math.min(input.context_lines ?? DEFAULT_CONTEXT_LINES, 12));
   const files = prioritizeRepoFilesForSearch(await enumerateRepoFiles(repoRoot), terms);
+  const pathHintHits = await buildPathHintHits({
+    repoRoot,
+    files,
+    terms,
+    aliasEntry,
+    maxSpans,
+    contextLines,
+  });
   const rawResult = await searchRepoFiles({
     repoRoot,
     files,
@@ -451,6 +524,7 @@ export async function runRepoCodeEvidenceSearch(input: {
     maxSpans,
     contextLines,
   });
+  rawResult.hits = mergeSearchHits([...pathHintHits, ...rawResult.hits]);
   const rankedHits = rankRepoCodeEvidenceHits({
     hits: rawResult.hits,
     query: input.query,

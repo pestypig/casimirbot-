@@ -91,6 +91,9 @@ const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
   const kind = artifactKind(artifact);
   return (
     kind === "workspace_action_receipt" ||
+    kind === "note_update_receipt" ||
+    kind === "note_action_receipt" ||
+    kind === "note_create_receipt" ||
     kind === "agent_step_observation_packet" ||
     kind === "client_projection" ||
     kind === "live_pipeline_receipt" ||

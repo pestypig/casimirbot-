@@ -31,7 +31,7 @@ describe("helix ask E65 note receipt richness", () => {
       })
       .expect(200);
 
-    expect(response.body?.terminal_artifact_kind).toBe("note_update_receipt");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Updated|Created/i);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Source path:|Inserted:/i);
     const receipt = (response.body?.current_turn_artifact_ledger ?? []).find((artifact: any) => artifact?.kind === "note_update_receipt");

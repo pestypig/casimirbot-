@@ -192,6 +192,12 @@ const isProcedureReplayPrompt = (prompt: string): boolean =>
 const isProcedureMemoryPrompt = (prompt: string): boolean =>
   /\bprocedure\s+memory\b/i.test(prompt);
 
+const isCurrentVisualCaptureQuestion = (prompt: string): boolean => {
+  const text = prompt.trim();
+  if (!/\b(?:visual|screen|capture|frame|screenshot|current\s+window|my\s+screen)\b/i.test(text)) return false;
+  return /\b(?:what|review|describe|summarize|explain|happening|showing|visible|looking\s+at|right\s+now|current|now)\b/i.test(text);
+};
+
 const isComparisonPrompt = (prompt: string): boolean =>
   /\b(?:compare\s+this|compare\s+(?:this|the)\s+(?:file|image|picture|screen)|next\s+(?:one|file|image|picture|screen)|remember\s+this\s+as\s+the\s+first)\b/i.test(prompt);
 
@@ -1405,6 +1411,7 @@ export function routeSituationContextTurn(input: {
     threadId: input.threadId,
     promptText: input.promptText,
   });
+  const currentVisualCaptureQuestion = isCurrentVisualCaptureQuestion(input.promptText);
   const hardRecallRule = matchProcedureRecallPrompt(input.promptText);
   const useEarlyRecallRoute =
     Boolean(hardRecallRule && (hardRecallRule.mode !== "epoch_replay" || input.inputModality === "voice")) ||
@@ -1585,7 +1592,7 @@ export function routeSituationContextTurn(input: {
       binding_repair: null,
     };
   }
-  if (!initialReference.candidate_signal && !earlyVisualSceneQueryIntent) {
+  if (!initialReference.candidate_signal && !earlyVisualSceneQueryIntent && !currentVisualCaptureQuestion) {
     const selection = selectSituationEvidence({
       threadId: input.threadId,
       activeContext,
@@ -1639,8 +1646,10 @@ export function routeSituationContextTurn(input: {
         : "missing_context";
   const deicticReference = {
     ...initialReference,
-    candidate_signal: initialReference.candidate_signal || Boolean(earlyVisualSceneQueryIntent),
-    reference_type: earlyVisualSceneQueryIntent || isSceneEpochReplayPrompt(input.promptText)
+    candidate_signal: initialReference.candidate_signal || Boolean(earlyVisualSceneQueryIntent) || currentVisualCaptureQuestion,
+    reference_type: currentVisualCaptureQuestion
+      ? "current_screen" as const
+      : earlyVisualSceneQueryIntent || isSceneEpochReplayPrompt(input.promptText)
       ? "latest_epoch_change" as const
       : initialReference.reference_type,
     resolved_context_refs: [

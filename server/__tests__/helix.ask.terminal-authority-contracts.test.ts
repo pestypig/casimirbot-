@@ -632,4 +632,29 @@ describe("Helix Ask terminal authority contracts", () => {
     ]));
     expect(contract.side_artifact_kinds_allowed).toContain("repo_code_evidence_observation");
   });
+
+  it("keeps note mutation receipts as side evidence and requires synthesized terminal text", () => {
+    const contract = buildRouteProductContract({
+      turnId: "ask:test:note-mutation-terminal-contract",
+      threadId: "thread:test",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: "Create a note titled Tool Test with the text receipts are observations.",
+    });
+
+    expect(contract.allowed_terminal_artifact_kinds).toContain("model_synthesized_answer");
+    expect(contract.allowed_terminal_artifact_kinds).not.toContain("note_update_receipt");
+    expect(contract.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "note_update_receipt",
+      "note_action_receipt",
+      "note_create_receipt",
+    ]));
+    expect(contract.side_artifact_kinds_allowed).toEqual(expect.arrayContaining([
+      "note_update_receipt",
+      "note_action_receipt",
+      "note_create_receipt",
+    ]));
+  });
 });

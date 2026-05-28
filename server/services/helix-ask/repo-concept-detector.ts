@@ -1,4 +1,8 @@
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  findRepoConceptAliasMatch,
+  repoConceptAliasTerms,
+} from "./repo-concept-alias-registry";
 
 export type RepoConceptDetection = {
   applies: boolean;
@@ -38,9 +42,10 @@ const PROJECT_LOCAL_ENTITIES: ProjectLocalEntity[] = [
   { canonical: "source target", pattern: /\bsource\s+target\b|\bsource[-_\s]?target(?:\s+intent)?\b|\bsource_target_intent\b/i },
   { canonical: "procedure memory", pattern: /\bprocedure\s+memory\b/i },
   { canonical: "visual capture", pattern: /\bvisual\s+capture\b/i },
+  { canonical: "Reasoning Theater", pattern: /\breasoning[-_\s]+theat(?:er|re)\b/i },
 
   // Existing project-local concepts retained for compatibility with repo-evidence routing.
-  { canonical: "StarSim", pattern: /\bstar\s*sim\b|\bstarsim\b/i },
+  { canonical: "StarSim", pattern: /\bstar\s*sim(?:ulation|ulations|ulator)?\b|\bstellar\s+sim(?:ulation|ulations)?\b|\bstarsim\b/i },
   { canonical: "NHM2", pattern: /\bnhm2\b/i },
   { canonical: "Needle Hull", pattern: /\bneedle\s+hull\b/i },
   { canonical: "deep mixing", pattern: /\bdeep\s+mixing\b/i },
@@ -53,7 +58,7 @@ const PROJECT_LOCAL_ENTITIES: ProjectLocalEntity[] = [
 ];
 
 export const PROJECT_ENTITY_DEFINITION_RE =
-  /\b(?:what\s+is|what\s+are|what\s+does|how\s+does|how\s+do|where\s+is|where\s+are|define|explain|describe|tell\s+me\s+about|why\s+did)\b/i;
+  /\b(?:what\s+is|what\s+are|what\s+does|do\s+you\s+know\s+what|how\s+does|how\s+do|where\s+is|where\s+are|define|explain|describe|tell\s+me\s+about|why\s+did)\b/i;
 
 const PROJECT_ANCHOR_RE =
   /\b(?:in\s+helix|helix\s+ask|in\s+this\s+app|this\s+app|repo|repository|codebase|agent|workstation|casimirbot|casimir\s*bot)\b/i;
@@ -104,6 +109,7 @@ const extractProjectLikeConcept = (prompt: string): string | null => {
 const extractQuestionSubject = (prompt: string): string | null => {
   const patterns = [
     /\bwhat\s+is\s+(.+?)\s+supposed\s+to\s+do(?:\?|$)/i,
+    /\bdo\s+you\s+know\s+what\s+(.+?)\s+(?:does|do|is|are)\b/i,
     /\bwhat\s+is\s+(.+?)(?:\?|$)/i,
     /\bwhat\s+are\s+(.+?)(?:\?|$)/i,
     /\bwhat\s+does\s+(.+?)\s+mean(?:\?|$)/i,
@@ -148,8 +154,9 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
   }
 
   const isQuestionForm = PROJECT_ENTITY_DEFINITION_RE.test(prompt);
+  const aliasMatch = findRepoConceptAliasMatch(prompt);
   const entity = findProjectEntity(prompt);
-  const concept = entity?.canonical ?? extractProjectLikeConcept(prompt) ?? extractQuestionSubject(prompt);
+  const concept = aliasMatch?.entry.canonical_concept ?? entity?.canonical ?? extractProjectLikeConcept(prompt) ?? extractQuestionSubject(prompt);
   const normalizedTerms = termsForConcept(concept);
 
   if (WORKSTATION_ACTION_PROMPT_RE.test(prompt)) {
@@ -190,6 +197,30 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
 
   const projectAnchorPrompt = prompt.replace(NEGATIVE_TOOL_CONSTRAINT_ANCHOR_RE, " ");
   const hasPositiveProjectAnchor = PROJECT_ANCHOR_RE.test(projectAnchorPrompt);
+  if (aliasMatch && (!aliasMatch.project_anchor_required || hasPositiveProjectAnchor)) {
+    return {
+      applies: true,
+      confidence: "high",
+      concept: aliasMatch.entry.canonical_concept,
+      normalized_terms: repoConceptAliasTerms(aliasMatch.entry),
+      reason: hasPositiveProjectAnchor
+        ? "known_project_concept_alias_with_project_anchor"
+        : "known_project_concept_alias_question",
+      require_repo_evidence: true,
+      allow_model_direct_answer: false,
+    };
+  }
+  if (aliasMatch?.project_anchor_required && !hasPositiveProjectAnchor) {
+    return {
+      applies: true,
+      confidence: "low",
+      concept: aliasMatch.entry.canonical_concept,
+      normalized_terms: repoConceptAliasTerms(aliasMatch.entry),
+      reason: "generic_concept_without_project_anchor",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    };
+  }
   if (entity && LEGAL_TERMINAL_AUTHORITY_RE.test(prompt) && !hasPositiveProjectAnchor) {
     return {
       applies: true,
@@ -250,5 +281,5 @@ export function detectRepoConceptDefinition(promptText: string): HelixRepoConcep
 }
 
 export function resolveRepoConceptEntity(promptText: string): string | null {
-  return findProjectEntity(promptText)?.canonical ?? null;
+  return findRepoConceptAliasMatch(promptText)?.entry.canonical_concept ?? findProjectEntity(promptText)?.canonical ?? null;
 }

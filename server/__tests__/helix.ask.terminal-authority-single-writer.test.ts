@@ -78,6 +78,113 @@ describe("Helix terminal authority single writer", () => {
     expect((payload.debug as Record<string, unknown>).selected_final_answer).toBe("docs-viewer has been successfully opened.");
   });
 
+  it("quarantines note receipts as side evidence and selects the synthesized note answer", () => {
+    const turnId = "ask:test:note-receipt-quarantine";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:note_update_receipt`,
+        kind: "note_update_receipt",
+        payload: {
+          schema: "helix.note_update_receipt.v1",
+          kind: "note_update_receipt",
+          title: "Tool Test",
+          message: "Updated note Tool Test.",
+          text: "Updated note Tool Test.",
+        },
+      },
+      {
+        artifact_id: `${turnId}:obs`,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          turn_id: turnId,
+          status: "succeeded",
+          terminal_eligible: false,
+          post_tool_model_step_required: true,
+          capability_id: "workstation-notes.create_note",
+          produced_artifact_refs: [`${turnId}:note_update_receipt`],
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "I updated the Tool Test note with the requested text.",
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Create a note titled Tool Test with the text receipts are observations.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        thread_id: "thread:test",
+        source_target: "workstation_panel",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["note_update_receipt", "note_action_receipt", "note_create_receipt", "workspace_action_receipt"],
+        side_artifact_kinds_allowed: ["note_update_receipt"],
+        required_artifact_refs: [],
+        precedence_reason: "test",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "note_mutation",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "Updated note Tool Test.",
+      answer: "Updated note Tool Test.",
+      text: "Updated note Tool Test.",
+      terminal_artifact_kind: "note_update_receipt",
+      final_answer_source: "note_update_receipt",
+      agent_runtime_loop: {
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "next_action",
+            chosen_capability: "workstation-notes.create_note",
+            decision_authority: "llm",
+            observed_artifact_refs: [`${turnId}:obs`, `${turnId}:note_update_receipt`],
+          },
+          {
+            iteration: 2,
+            next_step: "answer",
+            chosen_capability: "model.answer",
+            decision_authority: "llm",
+            observation_role: "model_answer_draft",
+          },
+        ],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.visible_text).toBe("I updated the Tool Test note with the requested text.");
+    expect(result.integrity.receipt_visible_as_answer).toBe(false);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "note_update_receipt", reason: "receipt_or_projection" }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+  });
+
   it("fails closed when a required tool observation has no later answer draft", () => {
     const turnId = "ask:test:missing-post-tool-answer";
     const artifacts = [makePostToolObservation(turnId)];

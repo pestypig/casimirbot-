@@ -14,6 +14,11 @@ export type HelixRepoAnswerTextQualityGate = {
     | "unsupported_repo_claim"
     | "wrong_model_step_identity"
     | "policy_claim_inversion"
+    | "missing_repo_relevance_gate"
+    | "weak_repo_evidence"
+    | "exact_evidence_not_selected"
+    | "codebase_anchor_ignored"
+    | "alias_not_normalized"
   >;
   repair_allowed: boolean;
   terminal_allowed: boolean;
@@ -164,6 +169,17 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
   if (collectSupportRefs(input.payload).length === 0) violations.push("missing_support_refs");
+  const relevanceGate = readRecord(input.payload.repo_evidence_relevance_gate);
+  const repoConceptDetection = readRecord(input.payload.repo_concept_detection);
+  const conceptRequiresRepoEvidence = repoConceptDetection?.require_repo_evidence === true;
+  if (conceptRequiresRepoEvidence && !relevanceGate) violations.push("missing_repo_relevance_gate");
+  if (relevanceGate) {
+    if (relevanceGate.terminal_allowed !== true) violations.push("weak_repo_evidence");
+    const gateViolations = readArray(relevanceGate.violations).map(readString);
+    if (gateViolations.includes("exact_match_files_found_but_not_selected")) violations.push("exact_evidence_not_selected");
+    if (gateViolations.includes("codebase_anchor_ignored")) violations.push("codebase_anchor_ignored");
+    if (gateViolations.includes("alias_not_normalized")) violations.push("alias_not_normalized");
+  }
   const uniqueViolations = unique(violations);
   return {
     schema: "helix.repo_answer_text_quality_gate.v1",
