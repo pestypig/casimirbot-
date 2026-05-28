@@ -9471,6 +9471,41 @@ function parseTimestampMs(value: unknown): number | null {
   return null;
 }
 
+function buildAskLiveEventFromTurnTranscriptRecord(
+  record: Record<string, unknown>,
+  fallbackId: string,
+): AskLiveEventEntry | null {
+  const text = coerceText(record.text).trim();
+  if (!text) return null;
+  const type = coerceText(record.type).trim() || coerceText(record.source_event_type).trim() || "turn_transcript_event";
+  const sourceEventType = coerceText(record.source_event_type).trim();
+  const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
+  const ts = atMs ? new Date(atMs).toISOString() : undefined;
+  const seq = typeof record.seq === "number" && Number.isFinite(record.seq) ? Math.trunc(record.seq) : undefined;
+  return {
+    id: coerceText(record.id).trim() || fallbackId,
+    text: clipText(text, HELIX_ASK_LIVE_EVENT_MAX_CHARS),
+    tool: coerceText(record.role).trim() || "agent",
+    ts,
+    tsMs: atMs ?? parseTimestampMs(record.ts) ?? undefined,
+    seq,
+    durationMs:
+      typeof record.durationMs === "number" && Number.isFinite(record.durationMs)
+        ? Math.max(0, Math.round(record.durationMs))
+        : undefined,
+    meta: {
+      stage: type,
+      detail: coerceText(record.detail).trim() || null,
+      status: coerceText(record.status).trim() || null,
+      stepId: coerceText(record.step_id).trim() || null,
+      lane: coerceText(record.lane).trim() || null,
+      source_event_type: sourceEventType || type,
+      event_source: coerceText(record.event_source).trim() || "live",
+      stream_event: "turn_transcript_event",
+    },
+  };
+}
+
 function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null {
   if (typeof event.tsMs === "number" && Number.isFinite(event.tsMs)) {
     return event.tsMs;
@@ -9576,6 +9611,13 @@ function classifyAskLiveAgenticEventRow(event: AskLiveEventEntry): Pick<
 }
 
 function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
+  const meta = asObjectRecord(event.meta);
+  if (
+    String(meta?.stage ?? "").trim() === "public_commentary" ||
+    String(meta?.source_event_type ?? "").trim() === "public_commentary"
+  ) {
+    return clipText(event.text ?? "", 220);
+  }
   const { stage, detail, body } = resolveAskLiveEventStageParts(event);
   const combined = `${body} ${stage} ${detail} ${event.text ?? ""}`;
   const progressNotice = normalizeAskLiveProgressNotice(combined);
@@ -26546,53 +26588,46 @@ export function HelixAskPill({
         /\b(?:missing_artifacts|missing_required_artifacts|Need user input|Request input|final_failure)\b/i.test(combined)
       );
     };
-    const runtimeEvents = buildHelixRuntimeAskLiveEvents(reply);
-    if (runtimeEvents.length > 0) {
-      return runtimeEvents.filter((event) => !isStaleWorkstationEvent(event));
-    }
     const transcriptEvents = Array.isArray(reply.debug?.turn_transcript_events)
       ? reply.debug.turn_transcript_events
       : [];
-    if (transcriptEvents.length > 0) {
-      return transcriptEvents
-        .map((entry, index): AskLiveEventEntry | null => {
-          const record = readAgentLoopAuditRecord(entry);
-          if (!record) return null;
-          const stage = typeof record.type === "string" ? record.type : typeof record.source_event_type === "string" ? record.source_event_type : null;
-          const detail = typeof record.detail === "string" ? record.detail : null;
-          const status = typeof record.status === "string" ? record.status : null;
-          const traceId = typeof record.trace_id === "string" ? record.trace_id : typeof reply.debug?.trace_id === "string" ? reply.debug.trace_id : null;
-          const turnKey =
-            typeof record.turn_id === "string"
-              ? record.turn_id
-              : typeof record.turn_key === "string"
-                ? record.turn_key
-                : typeof reply.debug?.turn_id === "string"
-                  ? reply.debug.turn_id
-                  : null;
-          const text = String(record.text ?? record.summary ?? detail ?? stage ?? "Helix Ask update").trim();
-          return {
-            id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `${reply.id}-transcript-${index}`,
-            text,
-            tool: typeof record.role === "string" ? record.role : "agent",
-            tsMs: typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : undefined,
-            meta: {
-              stage,
-              detail,
-              status,
-              traceId,
-              turnKey,
-              stepId: typeof record.step_id === "string" ? record.step_id : null,
-              lane: typeof record.lane === "string" ? record.lane : null,
-              superseded_by_step_id:
-                typeof record.superseded_by_step_id === "string" ? record.superseded_by_step_id : null,
-              superseded_reason: typeof record.superseded_reason === "string" ? record.superseded_reason : null,
-              source_event_type: typeof record.source_event_type === "string" ? record.source_event_type : null,
-              event_source: typeof record.event_source === "string" ? record.event_source : null,
-            },
-          };
-        })
-        .filter((event): event is AskLiveEventEntry => event !== null && !isStaleWorkstationEvent(event));
+    const transcriptLiveEvents = transcriptEvents
+      .map((entry, index): AskLiveEventEntry | null => {
+        const record = readAgentLoopAuditRecord(entry);
+        if (!record) return null;
+        const event = buildAskLiveEventFromTurnTranscriptRecord(record, `${reply.id}-transcript-${index}`);
+        if (!event) return null;
+        event.meta = {
+          ...(event.meta ?? {}),
+          traceId: coerceText(record.trace_id).trim() || coerceText(reply.debug?.trace_id).trim() || null,
+          turnKey:
+            coerceText(record.turn_id).trim() ||
+            coerceText(record.turn_key).trim() ||
+            coerceText(reply.debug?.turn_id).trim() ||
+            null,
+          superseded_by_step_id: coerceText(record.superseded_by_step_id).trim() || null,
+          superseded_reason: coerceText(record.superseded_reason).trim() || null,
+        };
+        return event;
+      })
+      .filter((event): event is AskLiveEventEntry => event !== null && !isStaleWorkstationEvent(event));
+    const publicCommentaryEvents = transcriptLiveEvents.filter((event) => {
+      const meta = asObjectRecord(event.meta);
+      return meta?.stage === "public_commentary" || meta?.source_event_type === "public_commentary";
+    });
+    const runtimeEvents = buildHelixRuntimeAskLiveEvents(reply).filter((event) => !isStaleWorkstationEvent(event));
+    if (publicCommentaryEvents.length > 0) {
+      const supportingRuntimeEvents = runtimeEvents.filter((event) => {
+        const text = coerceText(event.text).trim();
+        return !/^(?:Starting Helix Ask turn\.|Observed artifacts:|Completed step model_only_reasoning\.|Observed reasoning result\.)$/i.test(text);
+      });
+      return [...publicCommentaryEvents, ...supportingRuntimeEvents].slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
+    }
+    if (runtimeEvents.length > 0) {
+      return runtimeEvents;
+    }
+    if (transcriptLiveEvents.length > 0) {
+      return transcriptLiveEvents;
     }
     if (reply.liveEvents && reply.liveEvents.length > 0) {
       return reply.liveEvents.filter((event) => !isStaleWorkstationEvent(event));
@@ -27769,9 +27804,25 @@ export function HelixAskPill({
             try {
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
                 const record = readAgentLoopAuditRecord(event.data);
-                const text = typeof record?.text === "string" ? record.text.trim() : "";
-                if (event.event === "turn_transcript_event" && text) {
-                  setAskStatus(text);
+                if (event.event === "turn_transcript_event" && record) {
+                  const sourceEventType =
+                    coerceText(record.source_event_type).trim() ||
+                    coerceText(record.type).trim() ||
+                    "turn_transcript_event";
+                  const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
+                    record,
+                    `stream:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || Date.now()}`,
+                  );
+                  if (liveEvent) {
+                    const isFinalAnswerEvent =
+                      sourceEventType === "terminal_answer" ||
+                      sourceEventType === "final_answer" ||
+                      coerceText(record.type).trim() === "final_answer";
+                    setAskStatus(isFinalAnswerEvent ? "Final answer ready." : liveEvent.text);
+                    if (!isFinalAnswerEvent) {
+                      appendSyntheticLiveEvent(liveEvent);
+                    }
+                  }
                 }
               });
             } catch (streamError) {

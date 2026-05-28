@@ -401,6 +401,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('type === "model_decision"');
     expect(source).toContain("Thinking");
     expect(source).toContain("turn_transcript_events");
+    expect(source).toContain("buildAskLiveEventFromTurnTranscriptRecord");
+    expect(source).toContain('source_event_type === "public_commentary"');
+    expect(source).toContain('stream_event: "turn_transcript_event"');
+    expect(source).toContain("appendSyntheticLiveEvent(liveEvent)");
     expect(source).toContain("turn_transcript_source");
     expect(source).toContain("visible_event_count");
     expect(source).toContain("backend_event_count");
