@@ -72,7 +72,9 @@ describe("helix ask E34 mutation continuation gate", () => {
 
     expect(answerText(response.body)).toMatch(/^Updated mixed audit scratch with the light crossing location\./);
     expect(answerText(response.body)).toMatch(/Location:\n- .+?, L\d+(?:-L\d+)?\n\s+Path: \/docs\/.+?:L\d+(?:-L\d+)?/i);
-    expect(response.body?.final_composer_source).toBe("note_update_receipt");
+    expect(response.body?.final_composer_source).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(response.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(response.body?.turn_runtime?.runtime_loop_stop_reason).toBe("terminal_artifact_satisfied");
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "doc_location_matches")).toBe(true);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);

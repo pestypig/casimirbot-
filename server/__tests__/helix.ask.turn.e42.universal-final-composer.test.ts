@@ -113,7 +113,7 @@ describe("helix ask E42 universal final composer", () => {
     ).toBe(true);
   }, 60000);
 
-  it("composes summary-to-note final answers from note update receipts", async () => {
+  it("composes summary-to-note final answers from synthesized answers backed by note update receipts", async () => {
     const app = createApp();
     const sessionId = `e42-summary-note-${Date.now()}`;
 
@@ -129,8 +129,9 @@ describe("helix ask E42 universal final composer", () => {
       .expect(200);
 
     expect(response.body?.final_answer_source).toBe("universal_composer");
-    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("note_update_receipt");
+    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("final_answer_draft");
     expect(response.body?.universal_final_composer?.consumed_artifacts).toContain("note_update_receipt");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(artifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === "e42 scratch")).toBe(true);
     expect(answerText(response.body)).toMatch(/Updated e42 scratch/i);
   }, 60000);

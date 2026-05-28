@@ -217,7 +217,9 @@ describe("helix ask turn e12 observation-driven continuation", () => {
     expect(runtime.terminal?.kind).not.toBe("final_failure");
     expect(answerText(response.body)).toMatch(/reminder|UI flow scratch|note/i);
     expect(answerText(response.body)).not.toMatch(/Completed reasoning for|Steps:/i);
-    expect(response.body?.final_composer_source).toBe("note_update_receipt");
+    expect(response.body?.final_composer_source).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(response.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(response.body?.final_composer_consumed_artifacts).toEqual(
       expect.arrayContaining(["doc_location_matches", "note_update_receipt"]),
     );

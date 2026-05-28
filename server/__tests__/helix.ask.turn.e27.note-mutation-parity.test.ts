@@ -73,7 +73,9 @@ describe("helix ask E27 note mutation parity", () => {
       })
       .expect(200);
     expect(answerText(create.body)).toBe(`Created note: ${noteTitle}.`);
-    expect(create.body?.final_composer_source).toBe("note_create_receipt");
+    expect(create.body?.final_composer_source).toBe("final_answer_draft");
+    expect(create.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(create.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(stepArtifacts(create.body).some((artifact) => artifact?.kind === "note_create_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(answerText(create.body)).not.toMatch(/could not produce a substantive final answer/i);
 
@@ -99,7 +101,9 @@ describe("helix ask E27 note mutation parity", () => {
       .expect(200);
 
     expect(answerText(appendSummary.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the document summary\\.`));
-    expect(appendSummary.body?.final_composer_source).toBe("note_update_receipt");
+    expect(appendSummary.body?.final_composer_source).toBe("final_answer_draft");
+    expect(appendSummary.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(appendSummary.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(stepArtifacts(appendSummary.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(actions(appendSummary.body).some((action) => action?.panel_id === "workstation-notes" && action?.action_id === "append_to_note")).toBe(true);
     expect(answerText(appendSummary.body)).not.toMatch(/could not produce a substantive final answer/i);
@@ -116,7 +120,9 @@ describe("helix ask E27 note mutation parity", () => {
 
     expect(answerText(locateAppend.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the centerline alpha location\\.`));
     expect(answerText(locateAppend.body)).toMatch(/Location:\s*\n- .+?, L\d+(?:-L\d+)?\n\s+Path: \/docs\/.+?:L\d+(?:-L\d+)?/i);
-    expect(locateAppend.body?.final_composer_source).toBe("note_update_receipt");
+    expect(locateAppend.body?.final_composer_source).toBe("final_answer_draft");
+    expect(locateAppend.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(locateAppend.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(stepArtifacts(locateAppend.body).some((artifact) => artifact?.kind === "doc_location_matches")).toBe(true);
     expect(stepArtifacts(locateAppend.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(answerText(locateAppend.body)).not.toMatch(/could not produce a substantive final answer|Reminder: Review/i);

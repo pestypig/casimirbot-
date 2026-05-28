@@ -60,7 +60,8 @@ describe("helix ask E36 summary-to-existing-note", () => {
     expect(answerText(response.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the document summary\\.`));
     expect(answerText(response.body)).not.toMatch(/could not map|known capability|which note/i);
     expect(response.body?.final_answer_source).toBe("universal_composer");
-    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("note_update_receipt");
+    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "doc_summary")).toBe(true);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(actions(response.body).some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "summarize_doc")).toBe(true);

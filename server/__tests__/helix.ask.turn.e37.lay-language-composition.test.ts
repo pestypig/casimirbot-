@@ -56,7 +56,8 @@ describe("helix ask E37 lay-language composition", () => {
     expect(answerText(response.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the document summary\\.`));
     expect(answerText(response.body)).not.toMatch(/normal words and put the takeaway/i);
     expect(response.body?.final_answer_source).toBe("universal_composer");
-    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("note_update_receipt");
+    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "doc_summary")).toBe(true);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(actions(response.body).some((action) => action?.panel_id === "workstation-notes" && action?.action_id === "append_to_note" && action?.args?.title === noteTitle)).toBe(true);
@@ -115,7 +116,8 @@ describe("helix ask E37 lay-language composition", () => {
     expect(answerText(response.body)).toMatch(new RegExp(`^Updated ${noteTitle}`));
     expect(answerText(response.body)).not.toMatch(/retrieval recovery|could not summarize/i);
     expect(response.body?.final_answer_source).toBe("universal_composer");
-    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("note_update_receipt");
+    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
   }, 60000);
 
   it("routes active-doc usefulness questions through workspace-context summary instead of retrieval recovery", async () => {

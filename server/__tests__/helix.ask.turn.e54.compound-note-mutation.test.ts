@@ -34,6 +34,7 @@ describe("helix ask E54 compound note mutation", () => {
 
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).not.toBe("note_update_receipt");
     expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(response.body?.final_answer_source).not.toMatch(/note_.*receipt/);
     expect(response.body?.terminal_consistency_check?.violations ?? []).not.toContain("terminal_consistency_violation");
     expect(response.body?.selected_final_answer ?? response.body?.text).toMatch(/E54 scientist smoke test/i);
     expect(JSON.stringify(response.body?.current_turn_artifact_ledger ?? [])).toContain("note_update_receipt");
