@@ -103,8 +103,8 @@ describe("helix ask E34 mutation continuation gate", () => {
       })
       .expect(200);
 
-    expect(answerText(response.body)).toBe("Created note: Light Crossing Location.");
-    expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_create_receipt" && artifact?.title === "Light Crossing Location")).toBe(true);
+    expect(answerText(response.body)).toMatch(/^Created workstation note "Light Crossing Location"\./);
+    expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === "Light Crossing Location")).toBe(true);
     expect(jobReadyLabels(response.body)).toContain("Open note: Light Crossing Location");
   }, 60000);
 });

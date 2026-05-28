@@ -142,6 +142,7 @@ const promoteRequestUserInputTerminal = (
   payload.terminal_artifact_kind = "request_user_input";
   payload.final_answer_source = "request_user_input";
   payload.selected_final_answer = text;
+  payload.assistant_answer = text;
   payload.answer = text;
   payload.text = text;
   payload.finalAnswer = text;
@@ -635,6 +636,7 @@ export function applyTerminalAnswerEnvelope(
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
   payload.selected_final_answer = envelope.terminal_text;
+  payload.assistant_answer = envelope.terminal_text;
   payload.answer = envelope.terminal_text;
   payload.text = envelope.terminal_text;
   payload.finalAnswer = envelope.terminal_text;

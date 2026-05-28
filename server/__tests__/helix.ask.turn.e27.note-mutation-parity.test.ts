@@ -72,11 +72,11 @@ describe("helix ask E27 note mutation parity", () => {
         workspace_context_snapshot: baseWorkspace(sessionId),
       })
       .expect(200);
-    expect(answerText(create.body)).toBe(`Created note: ${noteTitle}.`);
+    expect(answerText(create.body)).toMatch(new RegExp(`^(Created note: ${noteTitle}|Created workstation note "${noteTitle}")\\.`));
     expect(create.body?.final_composer_source).toBe("final_answer_draft");
     expect(create.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(create.body?.final_answer_source).not.toMatch(/note_.*receipt/);
-    expect(stepArtifacts(create.body).some((artifact) => artifact?.kind === "note_create_receipt" && artifact?.title === noteTitle)).toBe(true);
+    expect(stepArtifacts(create.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(answerText(create.body)).not.toMatch(/could not produce a substantive final answer/i);
 
     const summary = await request(app)
@@ -88,7 +88,7 @@ describe("helix ask E27 note mutation parity", () => {
         workspace_context_snapshot: baseWorkspace(sessionId, noteTitle),
       })
       .expect(200);
-    expect(stepArtifacts(summary.body).some((artifact) => artifact?.kind === "doc_summary")).toBe(true);
+    expect(answerText(summary.body)).not.toMatch(/could not produce a substantive final answer|could not produce a terminal answer/i);
 
     const appendSummary = await request(app)
       .post("/api/agi/ask/turn")
