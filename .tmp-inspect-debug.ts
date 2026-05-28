@@ -1,0 +1,14 @@
+import express from "express";
+import request from "supertest";
+import { planRouter } from "./server/routes/agi.plan";
+console.log("NODE_ENV", process.env.NODE_ENV);
+const app = express();
+app.use(express.json());
+app.use("/api/agi", planRouter);
+const sessionId = `debug-inspect-testenv-${Date.now()}`;
+const prompt = "Use calculator compute frequency from 500 nm then energy J then eV";
+const prior = await request(app).post("/api/agi/ask/turn").send({ question: prompt, mode: "read", sessionId, debug: true });
+console.log("status", prior.status);
+console.log("body receipts", prior.body.calculator_subgoal_receipts?.map((r:any)=>[r.subgoal_id,r.result_text,r.result_unit]));
+const summary = await request(app).post("/api/agi/ask/turn").send({ question: "Inspect the last Helix Ask turn and summarize route tool receipt final source", mode: "observe", sessionId, debug: true });
+console.log(summary.body.text);

@@ -247,6 +247,25 @@ describe("helix ask public commentary stream", () => {
       .expect(200);
     expect(priorResponse.body?.public_commentary_timeline?.length).toBeGreaterThanOrEqual(6);
 
+    const turnResponse = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Inspect the last Helix Ask turn and summarize route tool receipt final source",
+        mode: "observe",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+    expect(turnResponse.body?.text).toMatch(/Previous Ask turn summary/i);
+    expect(turnResponse.body?.text).toMatch(/Receipts:/i);
+    expect(turnResponse.body?.text).toMatch(/compute frequency: 6e\+14 Hz/i);
+    expect(turnResponse.body?.text).toMatch(/compute energy in joules: 3\.975642e-19 J/i);
+    expect(turnResponse.body?.text).toMatch(/convert energy to eV: 2\.48140061815 eV/i);
+    expect(turnResponse.body?.text).toMatch(/Validation: 3 validation checks passed/i);
+    expect(turnResponse.body?.text).not.toMatch(/Mission interface blocked|preflight gate|runtime authority checks failed/i);
+    expect(turnResponse.body?.final_answer_source).toBe("ask_debug_history_summary");
+    expect(turnResponse.body?.terminal_artifact_kind).toBe("ask_debug_history_summary");
+
     const response = await request(app)
       .post("/api/agi/ask")
       .send({
@@ -261,7 +280,10 @@ describe("helix ask public commentary stream", () => {
     expect(response.body?.text).toMatch(/Route:/i);
     expect(response.body?.text).toMatch(/Tool\/action:/i);
     expect(response.body?.text).toMatch(/Receipts:/i);
-    expect(response.body?.text).toMatch(/Hz|joule|eV/i);
+    expect(response.body?.text).toMatch(/compute frequency: 6e\+14 Hz/i);
+    expect(response.body?.text).toMatch(/compute energy in joules: 3\.975642e-19 J/i);
+    expect(response.body?.text).toMatch(/convert energy to eV: 2\.48140061815 eV/i);
+    expect(response.body?.text).toMatch(/Validation: 3 validation checks passed/i);
     expect(response.body?.text).toMatch(/Final source:/i);
     expect(response.body?.text).not.toMatch(/Mission interface blocked|preflight gate/i);
     expect(response.body?.final_answer_source).toBe("ask_debug_history_summary");

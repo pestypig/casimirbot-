@@ -3,6 +3,11 @@ import {
   buildRecentTurnsFromConversationHistory,
 } from "../conversation-history";
 import {
+  buildHelixConversationMemoryDebug,
+  buildHelixConversationMemoryPacket,
+  renderHelixConversationMemoryForModel,
+} from "../conversation-memory-selector";
+import {
   getHelixThreadSessionMemory,
   recordHelixThreadCarryForward,
 } from "../../helix-thread/carry-forward";
@@ -198,6 +203,23 @@ export const executeHelixConversationTurn = async (args: {
         excludeTurnId: turnId,
       });
     })();
+  const conversationMemoryPacket =
+    process.env.HELIX_ASK_CONVERSATION_MEMORY_PACKET === "0"
+      ? null
+      : buildHelixConversationMemoryPacket({
+          threadId,
+          currentTurnId: turnId,
+          sessionId: sessionId ?? null,
+          promptText: transcript,
+          allowsPriorArtifacts: false,
+          maxTurns: deps.conversationRecentTurnsLimit,
+        });
+  const conversationMemoryRendered = conversationMemoryPacket
+    ? renderHelixConversationMemoryForModel(conversationMemoryPacket)
+    : null;
+  const modelRecentTurns = conversationMemoryRendered
+    ? [...recentTurns, conversationMemoryRendered].slice(-deps.conversationRecentTurnsLimit - 1)
+    : recentTurns;
   const model = deps.getConversationModel();
   const requestStartedAt = Date.now();
   let sourceLanguage = deps.normalizeLanguageTag(request.sourceLanguage ?? null) ?? null;
@@ -380,6 +402,10 @@ export const executeHelixConversationTurn = async (args: {
     meta: {
       recent_turn_count: recentTurns.length,
       recent_turn_seed_source: providedRecentTurns !== null ? "request" : "history",
+      conversation_memory_packet: conversationMemoryPacket,
+      conversation_memory_selector: conversationMemoryPacket
+        ? buildHelixConversationMemoryDebug(conversationMemoryPacket)
+        : null,
     },
   });
   const appendConversationLog = (entry: ConversationLogArgs): void => {
@@ -415,7 +441,7 @@ export const executeHelixConversationTurn = async (args: {
   const classifyStartedAt = Date.now();
   const classifierPrompt = deps.buildConversationClassifierPrompt({
     transcript: routingTranscript,
-    recentTurns,
+    recentTurns: modelRecentTurns,
   });
   try {
     const classifierResult = await deps.llmLocalHandler(
@@ -538,7 +564,7 @@ export const executeHelixConversationTurn = async (args: {
     transcript: routingTranscript,
     classification,
     routeReasonCode: routeDecision.routeReasonCode,
-    recentTurns,
+    recentTurns: modelRecentTurns,
     responseLanguage,
   });
   try {
@@ -579,7 +605,8 @@ export const executeHelixConversationTurn = async (args: {
       transcript: routingTranscript,
       classification,
       routeReasonCode: routeDecision.routeReasonCode,
-      recentTurns,
+      recentTurns: modelRecentTurns,
+      conversationMemoryPacket,
       priorRawBrief: rawBrief,
       failureReason: briefFailReason,
       responseLanguage,
@@ -855,6 +882,18 @@ export const executeHelixConversationTurn = async (args: {
       exploration_turn: routeDecision.explorationTurn,
       clarifier_policy: routeDecision.clarifierPolicy,
       exploration_packet: routeDecision.explorationPacket,
+      conversation_memory_packet: conversationMemoryPacket,
+      debug: conversationMemoryPacket
+        ? {
+            conversation_memory_packet: conversationMemoryPacket,
+            conversation_memory_admission: {
+              allowed_for_current_goal: conversationMemoryPacket.allowed_for_current_goal,
+              allowed_reason: conversationMemoryPacket.allowed_reason,
+              allowed_use: conversationMemoryPacket.allowed_use,
+            },
+            conversation_memory_selector: buildHelixConversationMemoryDebug(conversationMemoryPacket),
+          }
+        : undefined,
       fail_reason: failReason,
       durationMs: Math.max(0, Date.now() - requestStartedAt),
     },
