@@ -233,6 +233,54 @@ describe("helix ask public commentary stream", () => {
     expect(String(response.body?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_synth/i);
   }, 20_000);
 
+  it("summarizes the previous Ask turn debug trace through the local Ask route without mission preflight", async () => {
+    const app = createApp();
+    const sessionId = `public-commentary-history-${Date.now()}`;
+    const priorResponse = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: naturalCompoundCalculatorPrompt,
+        mode: "read",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+    expect(priorResponse.body?.public_commentary_timeline?.length).toBeGreaterThanOrEqual(6);
+
+    const response = await request(app)
+      .post("/api/agi/ask")
+      .send({
+        question: "Inspect the last Helix Ask turn and summarize route tool receipt final source",
+        mode: "observe",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.text).toMatch(/Previous Ask turn summary/i);
+    expect(response.body?.text).toMatch(/Route:/i);
+    expect(response.body?.text).toMatch(/Tool\/action:/i);
+    expect(response.body?.text).toMatch(/Receipts:/i);
+    expect(response.body?.text).toMatch(/Hz|joule|eV/i);
+    expect(response.body?.text).toMatch(/Final source:/i);
+    expect(response.body?.text).not.toMatch(/Mission interface blocked|preflight gate/i);
+    expect(response.body?.final_answer_source).toBe("ask_debug_history_summary");
+    expect(response.body?.terminal_artifact_kind).toBe("ask_debug_history_summary");
+    expect(response.body?.debug?.ask_debug_history_summary).toMatchObject({
+      schema: "helix.ask_debug_history_summary.v1",
+      inspected_turn_id: priorResponse.body?.turn_id,
+      assistant_answer: false,
+      raw_reasoning_included: false,
+    });
+    const timeline = Array.isArray(response.body?.public_commentary_timeline)
+      ? response.body.public_commentary_timeline
+      : [];
+    expect(timeline.some((event: any) => /prior Ask debug envelope/i.test(event?.text))).toBe(true);
+    expect(timeline.map((event: any) => event?.text).join("\n")).not.toMatch(
+      /turn_purpose|why_this_capability|observation_summary/i,
+    );
+  }, 20_000);
+
   it("projects document evidence turns as public commentary before generic lifecycle rows", async () => {
     const app = createApp();
     const sessionId = `public-commentary-docs-${Date.now()}`;
