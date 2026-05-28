@@ -10,6 +10,7 @@ export type HelixWorkstationToolPlanIntent =
   | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
+  | "physics_calculation_context"
   | "direct_answer";
 
 export type HelixWorkstationToolPlanStepKind =

@@ -117,15 +117,51 @@ describe("helix ask public commentary stream", () => {
 
   it("streams compound calculator commentary across plan, receipt, validation, and synthesis", async () => {
     const app = createApp();
-    const response = await request(app)
-      .post("/api/agi/ask/turn/stream")
-      .send({
-        question: photonCalculatorPrompt,
-        mode: "read",
-        sessionId: `public-commentary-calculator-${Date.now()}`,
-        debug: true,
-      })
-      .expect(200);
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "calculate_frequency",
+          label: "Calculate the frequency of the photon",
+          expression: "3e8/(500e-9)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "f = c / lambda",
+        },
+        {
+          id: "calculate_photon_energy_joules",
+          label: "Calculate the photon energy in joules",
+          expression: "6.62607015e-34*(3e8/(500e-9))",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "E = h f",
+          depends_on: ["calculate_frequency"],
+        },
+        {
+          id: "calculate_photon_energy_ev",
+          label: "Convert photon energy to eV",
+          expression: "(6.62607015e-34*(3e8/(500e-9)))/(1.602176634e-19)",
+          expected_quantity: "energy",
+          expected_unit: "eV",
+          depends_on: ["calculate_photon_energy_joules"],
+        },
+      ],
+    });
+    let response: any;
+    try {
+      response = await request(app)
+        .post("/api/agi/ask/turn/stream")
+        .send({
+          question: photonCalculatorPrompt,
+          mode: "read",
+          sessionId: `public-commentary-calculator-${Date.now()}`,
+          debug: true,
+        })
+        .expect(200);
+    } finally {
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+    }
 
     const events = parseSseEvents(response.text ?? "");
     const transcriptRows = events
@@ -139,12 +175,14 @@ describe("helix ask public commentary stream", () => {
     const timelineText = timeline.map((event: any) => event?.text).join("\n");
 
     expect(commentaryRows.length).toBeGreaterThanOrEqual(5);
+    expect(commentaryRows[0]?.text).toMatch(/calculator-backed/i);
     expect(timeline.length).toBeGreaterThanOrEqual(5);
     expect(timelineText).toMatch(/calculator-backed|calculator subgoal|numeric/i);
     expect(timelineText).toMatch(/photon energy|joule/i);
     expect(timelineText).toMatch(/eV|electronvolt/i);
     expect(timelineText).toMatch(/receipt|validation|unit/i);
     expect(timelineText).toMatch(/synthesizing|explanation/i);
+    expect(timelineText).not.toMatch(/6e\+14 m|checking that it is length/i);
     expect(timelineText).not.toMatch(/turn_purpose|why_this_capability|expected_artifacts|observation_summary/i);
     expect(timeline.some((event: any) =>
       Array.isArray(event?.evidence_refs) &&

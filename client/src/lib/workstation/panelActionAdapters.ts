@@ -61,6 +61,11 @@ import {
   buildTheoryCalculatorLoadout,
 } from "@shared/theory/theory-calculator-loadout";
 import {
+  HELIX_PHYSICS_CALCULATION_INTENTS,
+  type HelixPhysicsCalculationIntent,
+} from "@shared/contracts/helix-physics-calculation-context-plan.v1";
+import { planHelixPhysicsCalculationContext } from "@shared/theory/helix-physics-calculation-context-planner";
+import {
   isTheoryCalculatorLoadoutV1,
   type TheoryCalculatorLoadoutV1,
   type TheoryCalculatorObjectContextV1,
@@ -1342,6 +1347,14 @@ function asPhysicsAtlasBlockIds(...values: unknown[]): PhysicsAtlasBlockId[] {
       ),
     ),
   );
+}
+
+function asPhysicsCalculationIntent(value: unknown): HelixPhysicsCalculationIntent {
+  const text = asNonEmptyString(value);
+  if (text && HELIX_PHYSICS_CALCULATION_INTENTS.includes(text as HelixPhysicsCalculationIntent)) {
+    return text as HelixPhysicsCalculationIntent;
+  }
+  return "locate_only";
 }
 
 function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>): TheoryCalculatorLoadoutV1 {
@@ -4695,6 +4708,72 @@ export function executeHelixPanelAction(
           artifact_v1: atlas,
           graph_id: graph.graphId,
           blocks: compactBlocks,
+        },
+      };
+    }
+
+    if (actionId === "plan_calculation_context") {
+      const query = asNonEmptyString(args.query ?? args.prompt ?? args.text);
+      if (!query) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.plan_calculation_context requires a query or prompt.",
+        };
+      }
+      const atlas = buildHelixPhysicsAtlasV1({ graph });
+      const atlasBlockIds = asPhysicsAtlasBlockIds(
+        args.atlas_block_ids ?? args.atlasBlockIds,
+        args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId,
+      );
+      const objectContext = asTheoryCalculatorObjectContext(args.object_context ?? args.objectContext);
+      const plan = planHelixPhysicsCalculationContext({
+        graph,
+        atlas,
+        query,
+        intent: asPhysicsCalculationIntent(args.intent),
+        atlasBlockIds,
+        subjects: asStringArray(args.subjects),
+        symbols: asStringArray(args.symbols),
+        unitSignatures: asStringArray(args.unit_signatures ?? args.unitSignatures),
+        equationFamilies: asStringArray(args.equation_families ?? args.equationFamilies),
+        simulationOwners: asStringArray(args.simulation_owners ?? args.simulationOwners),
+        objectContext,
+        variableBindings: asVariableBindings(args.variable_bindings ?? args.variableBindings),
+        limit: asNumber(args.limit) ?? undefined,
+      });
+      if (asBoolean(args.overlay) ?? true) {
+        const highlightedBadgeIds = Array.from(new Set([
+          ...plan.selectedBadgeIds,
+          ...plan.atlasLenses.flatMap((lens) => lens.highlightedBadgeIds),
+        ]));
+        const highlightedEdgeIds = Array.from(new Set(plan.atlasLenses.flatMap((lens) => lens.highlightedEdgeIds)));
+        useTheoryMapOverlayStore.getState().setSelectionOverlay({
+          selectedBadgeIds: plan.selectedBadgeIds,
+          highlightedBadgeIds,
+          highlightedEdgeIds,
+          claimBoundaryNotes: plan.claimBoundaryNotes,
+        });
+        if (atlasBlockIds[0]) useTheoryBadgeGraphPanelStore.getState().setActiveAtlasLensId(atlasBlockIds[0]);
+        context.openPanel(panelId, undefined);
+        context.focusPanel(panelId, undefined);
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "helix_physics_calculation_context_plan",
+          schemaVersion: plan.schemaVersion,
+          artifact_v1: plan,
+          graph_id: graph.graphId,
+          located_badges: plan.locatedBadges,
+          selected_badge_ids: plan.selectedBadgeIds,
+          next_actions: plan.nextActions,
+          commentary_events_preview: plan.commentaryEventsPreview,
+          claim_boundary_notes: plan.claimBoundaryNotes,
+          warnings: plan.warnings,
         },
       };
     }

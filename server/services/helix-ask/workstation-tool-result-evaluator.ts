@@ -63,6 +63,13 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "deterministic_reducer",
     };
   }
+  if (intent === "physics_calculation_context") {
+    return {
+      source_family: "calculator",
+      category: "equation_result",
+      produced_by: "deterministic_reducer",
+    };
+  }
   return {
     source_family: "unknown",
     category: "evidence",
@@ -116,6 +123,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Compare the motive against compact ideology/Zen framework evidence."
       : input.plan.intent === "dottie_observer"
         ? "Attach or inspect Auntie Dottie as a witness-only Situation Room observer."
+      : input.plan.intent === "physics_calculation_context"
+        ? "Locate the physics prompt on the theory atlas and plan calculator/runtime evidence."
       : "Evaluate workstation tool result.";
 
   const supportValue = input.supports_goal ?? (receiptIds.length > 0 || lastActionStep ? true : "unknown");

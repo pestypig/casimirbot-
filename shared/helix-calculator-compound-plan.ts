@@ -9,9 +9,11 @@ export type HelixCalculatorCompoundQuantity =
   | "speed"
   | "acceleration"
   | "time"
+  | "frequency"
   | "mass"
   | "force"
   | "momentum"
+  | "power"
   | "dimensionless";
 
 export type HelixCalculatorCompoundSubgoalStatus = "pending" | "running" | "satisfied" | "failed";

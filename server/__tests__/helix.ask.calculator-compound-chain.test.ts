@@ -165,4 +165,51 @@ describe("Helix Ask calculator compound chain", () => {
 
     expect(chain).toBeNull();
   });
+
+  it("corrects model-authored photon frequency quantity and unit metadata", () => {
+    const chain = runCalculatorModelAuthoredChain({
+      prompt: "Use the scientific calculator to compute photon energy for 500 nm light in joules and eV.",
+      threadId: "thread:test",
+      turnId: "turn:test",
+      subgoals: [
+        {
+          id: "calculate_frequency",
+          label: "Calculate the frequency of the photon",
+          expression: "3e8/(500e-9)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "f = c / lambda",
+        },
+        {
+          id: "calculate_photon_energy_joules",
+          label: "Calculate photon energy in joules",
+          expression: "6.62607015e-34*(3e8/(500e-9))",
+          expected_quantity: "energy",
+          expected_unit: "J",
+          equation: "E = h f",
+          depends_on: ["calculate_frequency"],
+        },
+        {
+          id: "calculate_photon_energy_ev",
+          label: "Convert photon energy to eV",
+          expression: "(6.62607015e-34*(3e8/(500e-9)))/(1.602176634e-19)",
+          expected_quantity: "energy",
+          expected_unit: "eV",
+          equation: "E_eV = E_J / e",
+          depends_on: ["calculate_photon_energy_joules"],
+        },
+      ],
+    });
+
+    expect(chain).not.toBeNull();
+    const frequencyReceipt = chain?.receipts.find((receipt) => receipt.subgoal_id === "calculate_frequency");
+    const frequencyValidation = chain?.validations.find((validation) => validation.subgoal_id === "calculate_frequency");
+    expect(frequencyReceipt?.result_unit).toBe("Hz");
+    expect(frequencyReceipt?.result_quantity).toBe("frequency");
+    expect(frequencyValidation).toMatchObject({
+      expected_quantity: "frequency",
+      expected_unit: "Hz",
+      satisfied: true,
+    });
+  });
 });

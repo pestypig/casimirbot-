@@ -297,11 +297,13 @@ const validateReceipt = (
 ): HelixCalculatorResultValidation => {
   const resultNumeric = typeof receipt.result_value === "number" && Number.isFinite(receipt.result_value);
   const actualUnit = receipt.result_unit ?? null;
-  const actualQuantity = receipt.result_quantity ?? null;
+  const setupQuantity = receipt.calculator_setup?.result_quantity ?? null;
+  const actualQuantity = receipt.result_quantity ?? setupQuantity;
   const unitOk = !subgoal.expected_unit || actualUnit === subgoal.expected_unit;
   const quantityOk = !subgoal.expected_quantity || actualQuantity === subgoal.expected_quantity;
+  const setupQuantityOk = !setupQuantity || setupQuantity === actualQuantity;
   const semanticCheck = validateCalculatorReceiptSemanticConsistency(prompt, subgoal, receipt);
-  const satisfied = resultNumeric && unitOk && quantityOk && receipt.status === "completed" && semanticCheck.ok;
+  const satisfied = resultNumeric && unitOk && quantityOk && setupQuantityOk && receipt.status === "completed" && semanticCheck.ok;
   const failureReason = satisfied
     ? null
     : !resultNumeric
@@ -310,6 +312,8 @@ const validateReceipt = (
         ? "unit_mismatch"
         : !quantityOk
           ? "quantity_mismatch"
+          : !setupQuantityOk
+            ? "setup_quantity_mismatch"
           : !semanticCheck.ok
             ? semanticCheck.reason
             : "receipt_failed";
@@ -1102,13 +1106,27 @@ const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[])
     if (!expression) return [];
     const value = evaluateNumericExpression(expression);
     if (value === null) return [];
-    const expectedUnit = subgoal.expected_unit
-      ? String(subgoal.expected_unit).trim()
-      : subgoal.expected_quantity === "momentum"
+    const subgoalCue = normalizePrompt([
+      subgoal.id,
+      subgoal.label,
+      subgoal.equation,
+      expression,
+      subgoal.expected_quantity,
+      subgoal.expected_unit,
+    ].filter(Boolean).join(" ")).toLowerCase();
+    let normalizedExpectedQuantity = subgoal.expected_quantity ? String(subgoal.expected_quantity).trim() : null;
+    let normalizedExpectedUnit = subgoal.expected_unit ? String(subgoal.expected_unit).trim() : null;
+    if (/\bfrequency\b|\bf\s*=|\bhz\b|\bhertz\b/.test(subgoalCue)) {
+      normalizedExpectedQuantity = "frequency";
+      normalizedExpectedUnit = "Hz";
+    }
+    const expectedUnit = normalizedExpectedUnit
+      ? normalizedExpectedUnit
+      : normalizedExpectedQuantity === "momentum"
         ? "kg*m/s"
         : null;
     const unitQuantity = expectedUnit ? findHelixUnitDefinition(expectedUnit)?.quantity ?? null : null;
-    const expectedQuantity = subgoal.expected_quantity ? String(subgoal.expected_quantity).trim() : unitQuantity ?? "dimensionless";
+    const expectedQuantity = normalizedExpectedQuantity ?? unitQuantity ?? "dimensionless";
     const id = sanitizeId(String(subgoal.id ?? subgoal.label ?? expectedQuantity), `calculator_subgoal_${index + 1}`);
     const label = normalizePrompt(String(subgoal.label ?? subgoal.equation ?? `Compute ${expectedQuantity}`));
     return [{

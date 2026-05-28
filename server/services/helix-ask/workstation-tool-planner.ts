@@ -28,6 +28,7 @@ export type WorkstationToolIntent =
   | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
+  | "physics_calculation_context"
   | "direct_answer";
 
 export type WorkstationToolPlannerAction = {
@@ -639,6 +640,29 @@ function isCompoundCalculatorPlanningPrompt(prompt: string): boolean {
   return requestedQuantities >= 2;
 }
 
+function isPhysicsCalculationContextPrompt(prompt: string): boolean {
+  if (isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  return /\b(?:theory\s+(?:map|badge|atlas)|physics\s+atlas|badge\s+graph|first\s+principles|unit\s+signature|dimension(?:al)?\s+consistency|curvature|collapse|qei|stress[-\s]?energy|starsim|stellar|fusion\s+channel|solar\s+spectrum|h[-\s]?alpha|doppler|redshift|blueshift|casimir|cavity|tokamak|plasma|nhm2|warp|general\s+relativity|\bgr\b|galactic|cosmic\s+distance|cepheid|hubble|zeeman)\b/i.test(
+    prompt,
+  );
+}
+
+function inferPhysicsCalculationIntent(prompt: string): "locate_only" | "load_calculator" | "solve_scalar" | "solve_scalar_and_runtime" {
+  if (/\b(?:where\s+(?:does|do)|what\s+theory|which\s+theory|locate|context|map|nearest|overlap)\b/i.test(prompt)) {
+    return "locate_only";
+  }
+  if (/\b(?:load|put|send)\b[\s\S]{0,80}\b(?:calculator|scientific\s+calculator)\b/i.test(prompt)) {
+    return "load_calculator";
+  }
+  if (/\b(?:runtime|simulation|classify|classification|fusion\s+channel|starsim|run\s+star)\b/i.test(prompt)) {
+    return "solve_scalar_and_runtime";
+  }
+  if (/\b(?:calculate|compute|solve|estimate|evaluate|check)\b/i.test(prompt)) {
+    return "solve_scalar";
+  }
+  return "locate_only";
+}
+
 export function planWorkstationToolUse(
   prompt: string,
   options: PlanWorkstationToolUseOptions = {},
@@ -921,6 +945,63 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isPhysicsCalculationContextPrompt(normalized)) {
+    const physicsIntent = inferPhysicsCalculationIntent(normalized);
+    const args = {
+      query: normalized,
+      intent: physicsIntent,
+      overlay: true,
+    };
+    pushScore({
+      affordance_id: "theory-badge-graph.plan_calculation_context",
+      panel_id: "theory-badge-graph",
+      action_id: "plan_calculation_context",
+      score: physicsIntent === "locate_only" ? 0.84 : 0.91,
+      reason: "physics prompt can be located on the theory atlas before calculator/runtime execution",
+      required_args_missing: [],
+    });
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "physics_calculation_context",
+      missing: [],
+      options,
+      steps: [
+        makeOpenStep("theory-badge-graph"),
+        {
+          step_id: "plan_physics_calculation_context",
+          kind: "run_panel_action",
+          panel_id: "theory-badge-graph",
+          action_id: "plan_calculation_context",
+          args,
+          depends_on: ["open_theory_badge_graph"],
+          expected_receipt_kind: "helix_physics_calculation_context_plan",
+          expected_state_change: { store: "theory-map-overlay", proof_key: "selectedBadgeIds" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_physics_context_plan",
+          kind: "evaluate_result",
+          depends_on: ["plan_physics_calculation_context"],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    });
+    return {
+      intent: "physics_calculation_context",
+      action: {
+        panel_id: "theory-badge-graph",
+        action_id: "plan_calculation_context",
+        args,
+      },
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt mentions a mapped physics domain; plan theory context before final answer.",
+      missing_required_args: [],
     };
   }
 

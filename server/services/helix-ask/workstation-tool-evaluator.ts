@@ -63,6 +63,31 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
     summary = ok
       ? `Note action stored reference material without injecting raw text into Ask.`
       : `Note action failed or did not return a receipt.`;
+  } else if (panelId === "theory-badge-graph") {
+    const kind = getString(artifact?.kind);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Theory badge graph action did not produce a usable receipt.";
+    } else if (kind === "helix_physics_calculation_context_plan") {
+      const nextActions = Array.isArray(artifact?.next_actions) ? artifact.next_actions.length : 0;
+      result = nextActions > 0 ? "needs_followup_tool" : "supports_subgoal";
+      summary =
+        nextActions > 0
+          ? "Physics context plan located theory badges and proposed follow-up workstation actions."
+          : "Physics context plan located theory badges and claim boundaries.";
+    } else if (kind === "theory_badge_locator") {
+      result = "supports_subgoal";
+      summary = "Theory locator matched relevant badges and claim boundaries.";
+    } else if (kind === "theory_calculator_loadout_loaded") {
+      result = "needs_followup_tool";
+      summary = "Theory calculator loadout was loaded but not solved.";
+    } else if (kind === "theory_calculator_loadout_solve" || kind === "theory_calculator_loadout_solved") {
+      result = "supports_subgoal";
+      summary = "Theory calculator loadout returned scalar traces and context rows.";
+    } else if (kind === "starsim_runtime_receipt") {
+      result = "supports_subgoal";
+      summary = "StarSim runtime receipt returned classification context and claim boundaries.";
+    }
   } else if (String(receipt.receipt_kind ?? "").includes("live_source")) {
     const status = getString(artifact?.status);
     result = status === "active" || artifact?.latest_tick ? "supports_subgoal" : "needs_followup_tool";

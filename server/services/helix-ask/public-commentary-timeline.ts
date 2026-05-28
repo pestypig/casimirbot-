@@ -82,6 +82,12 @@ const turnStartText = (input: {
   promptInterpretation?: RecordLike | null;
   compoundPromptContract?: RecordLike | null;
 }): string => {
+  if (/\b(?:scientific\s+calculator|calculator|compute|calculate|solve|evaluate)\b/i.test(input.prompt)) {
+    if (/\b(?:photon|joules?|ev|electronvolts?|energy|wavelength|frequency)\b/i.test(input.prompt)) {
+      return "I'm treating this as a calculator-backed physics problem with numeric receipts and an explanation.";
+    }
+    return "I'm treating this as a calculator-backed problem with a checked numeric result.";
+  }
   const concepts = conceptsFromPrompt(input.prompt);
   if (concepts.length >= 3) {
     const last = concepts[concepts.length - 1];
