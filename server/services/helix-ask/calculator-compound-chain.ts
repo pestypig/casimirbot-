@@ -596,31 +596,62 @@ const buildPhotonFrequencyDraft = (prompt: string, frequency: number, includeEv:
   return subgoals;
 };
 
-const buildPhotonWavelengthDraft = (wavelength: { meters: number; label: string }): DraftSubgoal[] => {
+const buildPhotonWavelengthDraft = (wavelength: { meters: number; label: string }, includeFrequency = false): DraftSubgoal[] => {
+  const frequency = C / wavelength.meters;
   const energyJ = (H * C) / wavelength.meters;
   const energyEv = energyJ / EV_J;
-  return [
-    {
-      id: "photon_energy_j",
-      label: "Compute photon energy in joules from wavelength",
-      expression: `(6.62607015e-34*3e8)/${formatNumber(wavelength.meters)}`,
-      expected_quantity: "energy",
-      expected_unit: "J",
+  const subgoals: DraftSubgoal[] = [];
+  if (includeFrequency) {
+    subgoals.push({
+      id: "photon_frequency",
+      label: "Compute frequency from wavelength",
+      expression: `3e8/${formatNumber(wavelength.meters)}`,
+      expected_quantity: "frequency",
+      expected_unit: "Hz",
       depends_on: [],
-      value: energyJ,
-      result_text: formatNumber(energyJ),
+      value: frequency,
+      result_text: formatNumber(frequency),
       setup: unitSetup({
-        expression: `(6.62607015e-34*3e8)/${formatNumber(wavelength.meters)}`,
-        domain: "photon_energy",
-        subgoal: "Compute photon energy from E = hc/lambda.",
-        equation: "E = h c / lambda",
-        resultUnit: "J",
+        expression: `3e8/${formatNumber(wavelength.meters)}`,
+        domain: "photon_frequency",
+        subgoal: "Compute frequency from f = c / lambda.",
+        equation: "f = c / lambda",
+        resultUnit: "Hz",
         variables: [
-          { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
           { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light" },
           { symbol: "lambda", value: wavelength.label, unit: "m", meaning: "wavelength" },
         ],
         assumptions: ["Wavelength is interpreted in SI meters before evaluation."],
+      }),
+    });
+  }
+  subgoals.push(
+    {
+      id: "photon_energy_j",
+      label: includeFrequency ? "Compute photon energy in joules from frequency" : "Compute photon energy in joules from wavelength",
+      expression: includeFrequency ? `6.62607015e-34*${formatNumber(frequency)}` : `(6.62607015e-34*3e8)/${formatNumber(wavelength.meters)}`,
+      expected_quantity: "energy",
+      expected_unit: "J",
+      depends_on: includeFrequency ? ["photon_frequency"] : [],
+      value: energyJ,
+      result_text: formatNumber(energyJ),
+      setup: unitSetup({
+        expression: includeFrequency ? `6.62607015e-34*${formatNumber(frequency)}` : `(6.62607015e-34*3e8)/${formatNumber(wavelength.meters)}`,
+        domain: "photon_energy",
+        subgoal: includeFrequency ? "Compute photon energy from E = hf." : "Compute photon energy from E = hc/lambda.",
+        equation: includeFrequency ? "E = h f" : "E = h c / lambda",
+        resultUnit: "J",
+        variables: includeFrequency
+          ? [
+              { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
+              { symbol: "f", value: formatNumber(frequency), unit: "Hz", meaning: "frequency" },
+            ]
+          : [
+              { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
+              { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light" },
+              { symbol: "lambda", value: wavelength.label, unit: "m", meaning: "wavelength" },
+            ],
+        assumptions: includeFrequency ? ["Planck relation E = hf."] : ["Wavelength is interpreted in SI meters before evaluation."],
       }),
     },
     {
@@ -642,7 +673,8 @@ const buildPhotonWavelengthDraft = (wavelength: { meters: number; label: string 
         assumptions: ["1 eV = 1.602176634e-19 J."],
       }),
     },
-  ];
+  );
+  return subgoals;
 };
 
 const buildKineticDoubleDraft = (massSpeed: { mass: number; speed: number }): DraftSubgoal[] => {
@@ -781,6 +813,14 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
     const frequency = extractFrequency(normalized);
     if (frequency) return { subgoals: buildPhotonFrequencyDraft(normalized, frequency, /\bev\b/i.test(normalized)), answerKind: "photon_frequency_chain" };
   }
+  if (
+    /\bfrequency\b/i.test(normalized) &&
+    /\b(?:nm|nanometer|nanometre)\b/i.test(normalized) &&
+    /\b(?:energy|joules?|j\b|ev\b)\b/i.test(normalized)
+  ) {
+    const wavelength = extractWavelengthMeters(normalized);
+    if (wavelength) return { subgoals: buildPhotonWavelengthDraft(wavelength, true), answerKind: `photon_wavelength_frequency_chain:${colorRangeForWavelength(wavelength.meters)}` };
+  }
   if (/\bphoton\b/i.test(normalized) && /\bev\b/i.test(normalized) && /\b(?:nm|nanometer|nanometre)\b/i.test(normalized)) {
     const wavelength = extractWavelengthMeters(normalized);
     if (wavelength) return { subgoals: buildPhotonWavelengthDraft(wavelength), answerKind: `photon_wavelength_chain:${colorRangeForWavelength(wavelength.meters)}` };
@@ -819,6 +859,17 @@ const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCal
       `Photon energy: ${byId.get("photon_energy_ev")?.result_text} eV.`,
       `Color range: ${color}.`,
       "Interpretation: the joule result was converted to electronvolts after the photon-energy subgoal was validated.",
+    ].join("\n");
+  }
+  if (answerKind.startsWith("photon_wavelength_frequency_chain:")) {
+    const color = answerKind.split(":").slice(1).join(":");
+    return [
+      "Calculator compound plan completed.",
+      `Frequency: ${byId.get("photon_frequency")?.result_text} Hz.`,
+      `Photon energy: ${byId.get("photon_energy_j")?.result_text} J.`,
+      `Photon energy: ${byId.get("photon_energy_ev")?.result_text} eV.`,
+      `Color range: ${color}.`,
+      "Interpretation: the chain computed frequency from wavelength, used that validated frequency in E = hf, then converted the joule result to electronvolts.",
     ].join("\n");
   }
   if (answerKind === "kinetic_double_chain") {

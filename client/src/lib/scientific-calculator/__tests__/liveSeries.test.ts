@@ -90,4 +90,12 @@ describe("scientific calculator live prime series", () => {
     expect(result.result_text).toBe("3.313035e-19");
     expect(result.result_text).not.toBe("0.000000000000000000");
   });
+
+  it("evaluates scientific-notation ratios without treating e as a symbol", () => {
+    const result = runScientificSolve("(656.35e-9-656.28e-9)/656.28e-9", false);
+
+    expect(result.ok).toBe(true);
+    expect(Number(result.result_text)).toBeCloseTo(0.00010666178, 10);
+    expect(result.result_text).not.toBe("65628");
+  });
 });

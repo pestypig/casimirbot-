@@ -53,6 +53,28 @@ describe("Helix Ask calculator compound chain", () => {
     expect(chain?.answer_text).toContain("No electronvolt conversion was required");
   });
 
+  it("plans frequency from wavelength before joule and eV conversion for natural compound prompts", () => {
+    const chain = runCalculatorCompoundChain({
+      prompt: "Use calculator compute frequency from 500 nm then energy J then eV",
+      threadId: "thread:test",
+      turnId: "turn:test",
+    });
+
+    expect(chain).not.toBeNull();
+    expect(chain?.plan.subgoals.map((subgoal) => subgoal.id)).toEqual([
+      "photon_frequency",
+      "photon_energy_j",
+      "photon_energy_ev",
+    ]);
+    expect(chain?.receipts[0]).toMatchObject({
+      result_unit: "Hz",
+      result_quantity: "frequency",
+    });
+    expect(chain?.validations.every((validation) => validation.satisfied)).toBe(true);
+    expect(chain?.answer_text).toContain("Frequency:");
+    expect(chain?.answer_text).toContain("Photon energy:");
+  });
+
   it("chains kinetic energy calculations before comparing doubled speed", () => {
     const chain = runCalculatorCompoundChain({
       prompt: "A 2 kg object moves at 15 m/s, then doubles speed. Use the calculator to compute both kinetic energies and compare them.",

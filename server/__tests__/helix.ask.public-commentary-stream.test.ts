@@ -17,6 +17,9 @@ const grRefractionPrompt =
 const photonCalculatorPrompt =
   "Use the scientific calculator to compute photon energy for 500 nm light in joules and eV, and explain what the result means.";
 
+const naturalCompoundCalculatorPrompt =
+  "Use calculator compute frequency from 500 nm then energy J then eV";
+
 const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
   text
     .split(/\r?\n\r?\n/)
@@ -191,6 +194,44 @@ describe("helix ask public commentary stream", () => {
     expect(["workstation_tool_evaluation", "model_synthesized_answer"]).toContain(finalPacket?.terminal_artifact_kind);
     expect(String(finalPacket?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_synth/i);
   });
+
+  it("keeps non-stream debug and transcript commentary aligned for natural compound calculator prompts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: naturalCompoundCalculatorPrompt,
+        mode: "read",
+        sessionId: `public-commentary-natural-calculator-${Date.now()}`,
+        debug: true,
+      })
+      .expect(200);
+
+    const timeline = Array.isArray(response.body?.public_commentary_timeline)
+      ? response.body.public_commentary_timeline
+      : [];
+    const transcriptRows = Array.isArray(response.body?.turn_transcript_events)
+      ? response.body.turn_transcript_events
+      : [];
+    const commentaryRows = transcriptRows.filter((row: any) => row?.type === "public_commentary");
+    const timelineText = timeline.map((event: any) => event?.text).join("\n");
+    const transcriptText = commentaryRows.map((event: any) => event?.text).join("\n");
+
+    expect(timeline.length).toBeGreaterThanOrEqual(6);
+    expect(response.body?.debug?.public_commentary_timeline).toEqual(timeline);
+    expect(commentaryRows.length).toBeGreaterThanOrEqual(6);
+    expect(commentaryRows[0]?.text).toMatch(/calculator-backed/i);
+    expect(timelineText).toMatch(/planned 3 calculator subgoals/i);
+    expect(timelineText).toMatch(/frequency/i);
+    expect(timelineText).toMatch(/Hz/i);
+    expect(timelineText).toMatch(/joules?|J/i);
+    expect(timelineText).toMatch(/eV|electronvolt/i);
+    expect(timelineText).toMatch(/receipts passed|validation/i);
+    expect(timelineText).toMatch(/synthesizing/i);
+    expect(`${timelineText}\n${transcriptText}`).not.toMatch(/Blocked:|fail_closed|cannot safely present/i);
+    expect(["workstation_tool_evaluation", "model_synthesized_answer"]).toContain(response.body?.terminal_artifact_kind);
+    expect(String(response.body?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_synth/i);
+  }, 20_000);
 
   it("projects document evidence turns as public commentary before generic lifecycle rows", async () => {
     const app = createApp();
