@@ -7445,6 +7445,60 @@ type HelixTurnTranscriptRow = {
   status: string;
 };
 
+function readHelixPublicCommentaryEvents(reply: HelixAskReply): Record<string, unknown>[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const candidates = [
+    replyRecord?.public_commentary_timeline,
+    debugRecord?.public_commentary_timeline,
+    readAgentLoopAuditRecord(debugRecord?.debug_export)?.public_commentary_timeline,
+  ];
+  const events = candidates.find(Array.isArray);
+  if (!Array.isArray(events)) return [];
+  const seen = new Set<string>();
+  return events
+    .map((entry) => readAgentLoopAuditRecord(entry))
+    .filter((event): event is Record<string, unknown> => {
+      if (!event) return false;
+      if (event.schema !== "helix.ask_public_commentary_event.v1") return false;
+      if (event.assistant_answer !== false || event.raw_reasoning_included !== false) return false;
+      const text = coerceText(event.text).trim();
+      if (!text || /^[{[]/.test(text)) return false;
+      if (/\b(?:turn_purpose|why_this_capability|expected_artifacts|observation_summary|next_step_reason)\b/i.test(text)) return false;
+      const id = coerceText(event.event_id).trim() || text;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+}
+
+function buildHelixPublicCommentaryTranscriptRows(reply: HelixAskReply): HelixTurnTranscriptRow[] {
+  return readHelixPublicCommentaryEvents(reply).map((event, index) => {
+    const timing = coerceText(event.timing).trim();
+    const certainty = coerceText(event.certainty_class).trim();
+    const expected = coerceText(event.expected_artifact).trim();
+    const status = coerceText(event.status).trim() || "thinking";
+    const label =
+      timing === "final_ready"
+        ? "Ready"
+        : timing === "after_step"
+          ? "Checked"
+          : timing === "fail_closed"
+            ? "Blocked"
+            : timing === "before_step"
+              ? "Thinking"
+              : "Orienting";
+    return {
+      key: `${reply.id}-public-commentary-${coerceText(event.event_id).trim() || index}`,
+      role: "agent",
+      label,
+      text: coerceText(event.text).trim(),
+      meta: [timing, certainty, expected].filter(Boolean).join(" | "),
+      status,
+    };
+  });
+}
+
 function readHelixCausalTurnTimeline(reply: HelixAskReply): HelixCausalTurnTimeline | null {
   const debugRecord = readAgentLoopAuditRecord(reply.debug);
   const timelineRecord =
@@ -7572,12 +7626,15 @@ function readHelixCausalTraceRowClass(row: HelixTurnTranscriptRow): string {
 }
 
 export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTranscriptRow[] {
+  const publicCommentaryRows = buildHelixPublicCommentaryTranscriptRows(reply);
   const transcriptEvents = resolveHelixTurnTranscriptEvents(reply);
   if (transcriptEvents.length > 0) {
-    return transcriptEvents
+    const lifecycleRows = transcriptEvents
       .filter((event) => {
         const type = String(event.type ?? "");
         const status = String(event.status ?? "");
+        if (publicCommentaryRows.length > 0 && (type === "turn_completed" || type === "work_delta")) return false;
+        if (publicCommentaryRows.length > 0 && type === "step_started") return false;
         return type !== "question" && type !== "turn_completed" && status !== "superseded";
       })
       .slice(-14)
@@ -7592,7 +7649,9 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTra
             ? `${actionLabel}: ${eventText || type}`
             : eventText;
         const label =
-          type === "plan"
+          type === "public_commentary"
+            ? "Thinking"
+          : type === "plan"
             ? "Plan"
             : type === "model_decision"
               ? status === "running"
@@ -7624,7 +7683,15 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTra
           status,
         };
       });
+    if (publicCommentaryRows.length > 0) {
+      const lifecycleWithoutGenericCompletions = lifecycleRows.filter((row) =>
+        !/^Completed step\b/i.test(row.text),
+      );
+      return [...publicCommentaryRows, ...lifecycleWithoutGenericCompletions].slice(-14);
+    }
+    return lifecycleRows;
   }
+  if (publicCommentaryRows.length > 0) return publicCommentaryRows.slice(-14);
   const plannerContract = readAgentLoopAuditRecord(reply.debug?.planner_contract);
   const runtimeSummary = readAgentLoopAuditRecord(reply.debug?.turn_runtime);
   const planItems = Array.isArray(plannerContract?.plan_items) ? plannerContract.plan_items : [];

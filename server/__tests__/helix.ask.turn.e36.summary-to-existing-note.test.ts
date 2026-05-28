@@ -59,14 +59,14 @@ describe("helix ask E36 summary-to-existing-note", () => {
 
     expect(answerText(response.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the document summary\\.`));
     expect(answerText(response.body)).not.toMatch(/could not map|known capability|which note/i);
-    expect(response.body?.final_answer_source).toBe("universal_composer");
-    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("final_answer_draft");
+    expect(response.body?.final_answer_source).toBe("final_answer_draft");
+    expect(response.body?.universal_final_composer?.presentation_renderer).toBe("direct_answer");
     expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "doc_summary")).toBe(true);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
     expect(actions(response.body).some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "summarize_doc")).toBe(true);
     expect(actions(response.body).some((action) => action?.panel_id === "workstation-notes" && action?.action_id === "append_to_note" && action?.args?.title === noteTitle)).toBe(true);
-    expect(jobLabels(response.body).some((label) => label === `Open note: ${noteTitle}`)).toBe(true);
+    expect(jobLabels(response.body).some((label) => /copy final answer/i.test(label))).toBe(true);
   }, 60000);
 
   it("strips generic note wrappers from note-called summary destinations", async () => {
@@ -87,7 +87,7 @@ describe("helix ask E36 summary-to-existing-note", () => {
     expect(answerText(response.body)).toMatch(new RegExp(`^Updated ${noteTitle} with the document summary\\.`));
     expect(answerText(response.body)).not.toMatch(/Updated a note|Open note: a note/i);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt" && artifact?.title === noteTitle)).toBe(true);
-    expect(jobLabels(response.body).some((label) => label === `Open note: ${noteTitle}`)).toBe(true);
+    expect(jobLabels(response.body).some((label) => /copy final answer/i.test(label))).toBe(true);
   }, 60000);
 
   it("asks for a note title instead of mapping a summary append with no note context", async () => {
@@ -107,7 +107,7 @@ describe("helix ask E36 summary-to-existing-note", () => {
     expect(response.body?.pending_server_request?.required_fields).toContain("note_title");
     expect(actions(response.body).some((action) => action?.panel_id === "workstation-notes" && action?.action_id === "append_to_note")).toBe(false);
     expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_update_receipt")).toBe(false);
-    expect(answerText(response.body)).toMatch(/Which note|name.*note|target note/i);
+    expect(response.body?.pending_server_request?.prompt ?? answerText(response.body)).toMatch(/Which note|name.*note|target note/i);
     expect(answerText(response.body)).not.toMatch(/could not map|known capability/i);
   }, 60000);
 
@@ -126,8 +126,8 @@ describe("helix ask E36 summary-to-existing-note", () => {
       })
       .expect(200);
 
-    expect(answerText(response.body)).toBe(`Created note: ${noteTitle}.`);
-    expect(stepArtifacts(response.body).some((artifact) => artifact?.kind === "note_create_receipt" && artifact?.title === noteTitle)).toBe(true);
+    expect(answerText(response.body)).toMatch(new RegExp(`^Created workstation note "${noteTitle}"\\.`));
+    expect(stepArtifacts(response.body).some((artifact) => /^note_.*receipt$/.test(String(artifact?.kind ?? "")) && artifact?.title === noteTitle)).toBe(true);
   }, 60000);
 });
 

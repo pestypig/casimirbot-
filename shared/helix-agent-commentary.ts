@@ -1,6 +1,8 @@
 export const HELIX_AGENT_COMMENTARY_SCHEMA = "helix.agent_commentary.v1" as const;
 export const HELIX_DOTTIE_OBSERVER_SUBSCRIPTION_SCHEMA = "helix.dottie_observer_subscription.v1" as const;
 export const HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA = "helix.dottie_voice_receipt.v1" as const;
+export const HELIX_ASK_PUBLIC_COMMENTARY_EVENT_SCHEMA =
+  "helix.ask_public_commentary_event.v1" as const;
 
 export type HelixAgentCommentaryPhase =
   | "orientation"
@@ -15,6 +17,39 @@ export type HelixAgentCommentaryCertaintyClass =
   | "hypothesis"
   | "reasoned"
   | "confirmed";
+
+export type HelixAskPublicCommentaryTiming =
+  | "turn_start"
+  | "before_step"
+  | "after_step"
+  | "final_ready"
+  | "fail_closed";
+
+export type HelixAskPublicCommentaryStatus =
+  | "thinking"
+  | "checking"
+  | "using_tool"
+  | "repairing"
+  | "done";
+
+export type HelixAskPublicCommentaryEventV1 = {
+  schema: typeof HELIX_ASK_PUBLIC_COMMENTARY_EVENT_SCHEMA;
+  event_id: string;
+  turn_id: string;
+  trace_id: string;
+  iteration?: number;
+  decision_id?: string;
+  capability_key?: string;
+  timing: HelixAskPublicCommentaryTiming;
+  status: HelixAskPublicCommentaryStatus;
+  text: string;
+  expected_artifact?: string;
+  done_condition?: string;
+  evidence_refs: string[];
+  certainty_class: HelixAgentCommentaryCertaintyClass;
+  assistant_answer: false;
+  raw_reasoning_included: false;
+};
 
 export type HelixAgentCommentaryV1 = {
   schema: typeof HELIX_AGENT_COMMENTARY_SCHEMA;

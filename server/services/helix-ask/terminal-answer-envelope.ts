@@ -91,7 +91,9 @@ const shouldPromoteRequestUserInputTerminal = (payload: Record<string, unknown>)
   const goal = readRecord(payload.goal_satisfaction_evaluation);
   const solver = readRecord(payload.solver_controller_decision);
   const postToolBridge = readRecord(payload.post_tool_authority_bridge);
+  const pendingRequest = readRecord(payload.pending_server_request) ?? readRecord(payload.request_user_input) ?? readRecord(payload.pending_request);
   return (
+    readString(pendingRequest?.status) === "pending" ||
     readString(goal?.next_decision) === "request_user_input" ||
     readString(solver?.decision) === "request_user_input" ||
     readString(postToolBridge?.required_terminal_kind) === "request_user_input" ||
@@ -107,6 +109,29 @@ const promoteRequestUserInputTerminal = (
   payload: Record<string, unknown>,
   turnId: string,
 ): void => {
+  const priorPendingRequest =
+    readRecord(payload.pending_server_request) ??
+    readRecord(payload.request_user_input) ??
+    readRecord(payload.pending_request);
+  const goalFrame = readRecord(payload.universal_goal_frame);
+  const requestedOutputs = readArray(goalFrame?.requested_outputs).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const mutationTargets = readArray(goalFrame?.mutation_targets).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const pendingNeedsNoteTitle =
+    requestedOutputs.some((entry) => readString(entry.kind) === "note_update") &&
+    mutationTargets.some((entry) => readString(entry.kind) === "note" && readString(entry.resolution) === "missing");
+  if (priorPendingRequest) {
+    const promotedPendingRequest = pendingNeedsNoteTitle
+      ? {
+        ...priorPendingRequest,
+        prompt: "Which note should I update with the current document summary?",
+        required_fields: ["note_title"],
+        unresolved_fields: ["note_title"],
+        reason: "missing_note_title",
+      }
+      : priorPendingRequest;
+    payload.pending_server_request = promotedPendingRequest;
+    payload.pending_request = promotedPendingRequest;
+  }
   const text = requestUserInputText(payload);
   const priorTerminalArtifactKind = readString(payload.terminal_artifact_kind);
   const priorFinalAnswerSource = readString(payload.final_answer_source);

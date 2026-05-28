@@ -495,6 +495,51 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(rows.some((row) => row.label === "Final" && /final_answer_draft/i.test(row.text))).toBe(false);
   });
 
+  it("renders public commentary rows before generic lifecycle rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-public-commentary",
+      question: "GR light cones and refraction",
+      content: "Final answer",
+      debug: {
+        public_commentary_timeline: [
+          {
+            schema: "helix.ask_public_commentary_event.v1",
+            event_id: "public-commentary-1",
+            turn_id: "turn-public-commentary",
+            trace_id: "turn-public-commentary",
+            timing: "turn_start",
+            status: "thinking",
+            text: "I'm separating this into GR light cones, material refraction, and spacetime geometry.",
+            evidence_refs: ["turn-public-commentary:prompt_interpretation"],
+            certainty_class: "hypothesis",
+            assistant_answer: false,
+            raw_reasoning_included: false,
+          },
+        ],
+        turn_transcript_events: [
+          {
+            role: "agent",
+            type: "work_delta",
+            status: "running",
+            text: "Starting Helix Ask turn.",
+          },
+          {
+            role: "system",
+            type: "turn_completed",
+            status: "completed",
+            step_id: "model_only_reasoning",
+            text: "Completed step model_only_reasoning.",
+          },
+        ],
+      },
+    } as never);
+
+    expect(rows[0]?.text).toContain("GR light cones");
+    expect(rows.map((row) => row.text).join("\n")).not.toContain("Starting Helix Ask turn");
+    expect(rows.map((row) => row.text).join("\n")).not.toContain("Completed step model_only_reasoning");
+    expect(rows.map((row) => row.text).join("\n")).not.toMatch(/turn_purpose|why_this_capability|observation_summary/);
+  });
+
   it("renders causal timeline events as public transparency rows without raw answer content", () => {
     const rows = buildHelixCausalTurnTraceRows({
       id: "reply-causal",
