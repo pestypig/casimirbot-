@@ -95,6 +95,147 @@ Useful docs:
 
 Helix Ask is the agentic layer around the cockpit. It supports routed prompts, audited reasoning packets, regression sweeps, math routing evidence, prompt-quality probes, and decision bundles.
 
+#### Compound Reasoning And Tool Commentary
+
+Helix Ask compound reasoning is a typed, receipt-backed agent loop. The model-facing path decomposes a prompt, admits the correct route and source target, selects an allowed workstation capability, executes the tool, converts the result into observations and receipts, checks goal satisfaction, synthesizes from accepted evidence, and then lets terminal authority choose the visible answer.
+
+The intended loop shape is:
+
+```text
+interpret prompt -> admit route/source target -> choose capability -> call tool -> observe receipt -> validate coverage -> synthesize answer -> terminal authority
+```
+
+This keeps the agent loop explicit without turning Helix into a private Codex runtime. Codex-style concerns such as generic model sampling, sandboxing, approvals, retries, session lifecycle, and terminal completion stay outside Helix policy. Helix keeps ownership of prompt interpretation, source-target admission, tool admission, evidence identity, provenance, proof gates, route/product contracts, debug traces, and terminal eligibility.
+
+#### Tool Calls And Terminal Authority
+
+The current Helix Ask tool-call model treats tools as evidence producers, not answer writers. A tool can open a panel, read a document, search repo evidence, solve a calculator expression, update a note, propose voice delivery, or create a Situation Room setup artifact. The result of that action is recorded as a typed observation or receipt, then the solver decides whether the goal is satisfied, needs user input, or failed.
+
+The target lifecycle is:
+
+```text
+user goal
+-> route/source classification
+-> model-visible capability surface
+-> model selects a capability or answers directly
+-> runtime validates the selected tool call
+-> tool executes
+-> tool result becomes a structured observation or receipt
+-> observation re-enters the model/solver
+-> model/solver produces a final_answer_draft, request_user_input, or typed_failure
+-> terminal authority selects one eligible terminal artifact
+-> visible UI mirrors that selected artifact
+```
+
+The key rule is:
+
+```text
+Receipts are observations, not final answers.
+```
+
+For example, `docs-viewer.open`, `docs-viewer.locate_in_doc`, `workstation-notes.append_to_note`, `scientific-calculator.solve_expression`, `repo-code.search_concept`, and `voice_delivery.propose_from_trace` can prove that work happened. They should not independently write the user-visible terminal answer. Instead, their output feeds a later synthesis, pending-input decision, or precise typed failure.
+
+The main failure class this design addresses is internal success / visible failure drift:
+
+```text
+tool call succeeded
+observation packet exists
+post-tool answer draft exists
+but stale fallback, receipt text, or typed failure becomes visible
+```
+
+Terminal authority is the boundary that prevents that drift. It should select exactly one route-eligible terminal artifact, write every visible answer field from that artifact, and record why lower-priority candidates were rejected. Old route branches may still create candidates, receipts, projections, and diagnostics, but they should not directly write `payload.text`, `payload.answer`, `payload.assistant_answer`, `payload.selected_final_answer`, or `terminal_presentation.concise_text`.
+
+Representative successful shapes:
+
+```text
+Open the docs viewer.
+-> docs-viewer.open
+-> agent_step_observation_packet: succeeded, terminal_eligible=false
+-> post-tool model answer
+-> final_answer_draft
+-> model_synthesized_answer
+-> visible answer: The docs viewer has been successfully opened.
+```
+
+```text
+What is Auntie Dottie in this app?
+-> repo-code.search_concept
+-> repo_code_evidence_observation
+-> compact repo/docs synthesis packet
+-> model.synthesize_from_repo_evidence
+-> final_answer_draft
+-> repo_code_evidence_answer
+-> visible answer grounded in repo evidence
+```
+
+```text
+put that centerline alpha location into the note
+-> docs-viewer.locate_in_doc
+-> doc_location_matches
+-> workstation-notes.append_to_note
+-> note_update_receipt
+-> final_answer_draft / model_synthesized_answer
+-> visible answer confirms the note update and cites the document location
+```
+
+Helix Ask also records a causal turn timeline for debugging. The timeline is an operational flight recorder, not hidden chain-of-thought. It should make the turn inspectable in chronological order:
+
+```text
+prompt received
+goal classified
+tool surface built
+model step decided
+runtime tool call validated
+tool dispatched
+observation created
+answer draft created
+coverage and quality gates evaluated
+solver controller decided
+terminal artifact selected
+visible response written
+```
+
+This makes it possible to distinguish routing bugs, tool-call bugs, evidence synthesis failures, terminal-authority failures, and UI projection mismatches without guessing from the final prose alone.
+
+For compound tool turns, useful artifacts include:
+
+- `agent_step_decision`
+- `workspace_action_receipt`
+- `calculator_receipt`
+- `calculator_subgoal_receipt`
+- `calculator_result_trace`
+- `workstation_tool_evaluation`
+- `agent_step_observation_packet`
+- `goal_satisfaction_evaluation`
+- `final_answer_draft`
+- `terminal_authority_single_writer`
+
+The current calculator compound path can route prompts such as photon-energy unit conversions through `calculator_solve / calculator_compound_chain`, build a calculator plan, execute `scientific-calculator.solve_expression`, validate units, and synthesize a final answer from the resulting receipts. The next maturity step is live public commentary at shared loop boundaries so the user can see the work as it happens.
+
+Public commentary should be emitted from common loop phases, not hand-wired into every tool:
+
+- route selected
+- compound plan created
+- before tool/action execution
+- after receipt or observation
+- after validation or coverage check
+- before final synthesis
+- final ready after terminal authority
+
+The commentary must stay short, natural, and public-safe. It should describe observable progress, never expose hidden chain-of-thought, and never treat a receipt or debug artifact as the final answer. Debug fields such as `turn_purpose`, `why_this_capability`, `expected_artifacts`, and `observation_summary` remain audit-only.
+
+Workstation commentary should use the affordance family rather than one-off tool code. Important families include `calculation`, `documents`, `live_source`, `live_answer_environment`, `situation_room`, `history`, `notes`, `clipboard`, and `ideology`.
+
+Example target trace for a compound calculator turn:
+
+```text
+I'm treating this as a calculator-backed physics problem with an explanation and numeric conversion.
+I'm evaluating photon energy from wavelength using E = hc/lambda.
+The calculator returned the joule value; I'm validating the unit before converting to eV.
+The numeric receipts are complete, so I'm synthesizing the equation setup, result, and physical meaning.
+```
+
 Representative scripts:
 
 ```bash
@@ -111,6 +252,173 @@ Useful docs:
 - `docs/helix-ask-flow.md`
 - `docs/architecture/helix-ask-proof-packet-rfc.md`
 - `docs/architecture/helix-ask-math-router-contract.md`
+
+#### Retrieval Tool: Repo And Docs Evidence Lane
+
+Helix Ask retrieval is shaped as a model-driven tool loop, not a deterministic
+answer shortcut. The retrieval tool's job is to find evidence, package it as an
+observation, and hand it back to the solver. The model still owns the final
+synthesis step, and terminal authority still decides whether the synthesized
+answer is eligible to become visible.
+
+The repo/docs retrieval loop is:
+
+```text
+user asks an internal concept or source-backed question
+-> detector/admission decides whether repo/docs evidence is required
+-> model-visible capability menu includes the retrieval tool
+-> model selects repo-code.search_concept or a docs-viewer capability
+-> retrieval runs as read-only evidence collection
+-> tool result becomes a non-terminal observation packet
+-> observation re-enters the solver/model context
+-> model.synthesize_from_repo_evidence writes the answer draft
+-> quality, relevance, support, and terminal gates validate the draft
+-> terminal authority publishes repo_code_evidence_answer or fails closed
+```
+
+The important distinction is between the retrieval tool and the answer step:
+
+```text
+repo-code.search_concept
+-> repo_code_evidence_observation
+-> model.synthesize_from_repo_evidence
+-> repo_code_evidence_answer
+```
+
+`model.direct_answer` remains valid for general knowledge questions such as
+`What is an electron?`, but it is not valid after a repo-grounded concept has
+required evidence. Project-internal questions such as `What is the Situation
+Room?`, `What is Auntie Dottie in this app?`, `What is Route Evidence?`, or
+`How does terminal authority work in Helix Ask?` should use repo evidence first
+and only then synthesize.
+
+Retrieval outputs use the same non-terminal evidence posture as other tool
+receipts:
+
+```text
+assistant_answer: false
+terminal_eligible: false
+raw_content_included: false
+```
+
+The model-facing packet is compact on purpose. Raw spans, large debug payloads,
+and full receipt bodies stay in debug. The model receives a curated evidence
+packet with:
+
+- what was found
+- why it matters
+- compact file or document refs
+- selected excerpts
+- evidence roles such as UI surface, state model, capability registry, runtime
+  behavior, terminal authority, test contract, or supporting context
+- missing evidence or uncertainty when applicable
+
+The retrieval lane also includes deterministic guardrails before model
+synthesis:
+
+- Concept alias detection maps natural names such as `reasoning theater`,
+  `star simulations`, `Auntie Dottie`, and `Situation Room` to canonical repo
+  concepts.
+- Exact path, symbol, and alias matches are preferred before fuzzy neighboring
+  files.
+- The relevance gate blocks weak fuzzy-only packets when exact concept files
+  exist.
+- Broad concepts require multi-role evidence, not one file or one store shape
+  repeated several times.
+- Compact packet selection prefers path diversity before repeated spans from the
+  same file.
+
+After the model writes from the retrieved evidence, the answer quality gate
+checks that the answer is not a raw grep dump, file inventory, canned fallback,
+unsupported refusal, stale direct answer, or renderer-hostile excerpt. Broad
+internal concepts also carry an answer-depth contract. Those answers should
+cover identity, responsibilities, workflow or UI/runtime surfaces, and authority
+or uncertainty boundaries before they can pass terminal authority.
+
+Current successful traces should look like:
+
+```text
+What is the Situation Room?
+-> repo-code.search_concept
+-> repo_code_evidence_observation
+-> model.synthesize_from_repo_evidence
+-> repo_docs_synthesis_packet
+-> repo_answer_text_quality_gate: ok
+-> repo_code_evidence_answer
+```
+
+The failure mode should be a typed failure or repair observation, not a generic
+answer. This is the Codex-style discipline being preserved: tools produce
+observations, observations re-enter the model turn, the model composes from
+them, and terminal authority is the single writer of the visible final answer.
+
+#### Agent Context, Commentary, And Current-Thread Memory
+
+Helix Ask follows a Codex-aligned agent boundary without trying to recreate the
+generic Codex runtime. Codex owns model sampling, generic tool execution,
+tool-result re-entry, retries, approvals, sandboxing, compaction, session
+lifecycle, subagent orchestration, and terminal completion. Helix Ask owns the
+policy layer around the cockpit: prompt interpretation, intent arbitration,
+source-target admission, tool admission, evidence identity, provenance,
+route/product contracts, terminal authority, and debug traces.
+
+The current agent loop is:
+
+```text
+user prompt
+-> prompt interpretation
+-> source/tool admission
+-> tool or retrieval execution, when admitted
+-> compact non-terminal observations
+-> model synthesis from curated evidence
+-> route/product and terminal authority
+-> one final visible answer
+-> compact current-thread memory for follow-up turns
+```
+
+Context handling is intentionally a context-economy problem, not just a bigger
+context-window problem. The local runtime still has bounded context, and larger
+provider windows only help after model-facing prompt lanes are clean. Helix Ask
+therefore keeps raw spans, receipts, route/debug ledgers, and bulky control
+contracts out of final synthesis by default. Tool and retrieval outputs are
+converted into compact observation packets that say what was found, why it
+matters, what it proves, supporting refs, and what remains missing or uncertain.
+
+Tool observations and memory packets are evidence, not answers:
+
+```text
+terminal_eligible: false
+assistant_answer: false
+raw_content_included: false
+```
+
+Public commentary is also kept separate from reasoning context. Commentary may
+describe what the agent is doing, but it should not carry raw evidence, debug
+payloads, or tool output. Evidence belongs in compact observation packets;
+developer detail belongs in debug exports; commentary stays small so it does not
+compete with synthesis context.
+
+Current-thread memory now gives Helix Ask continuity for follow-ups such as
+`continue`, `explain that more simply`, `what was the last answer?`, and
+`use the previous repo result`. The memory selector reads the active thread,
+builds a compact non-terminal memory packet, applies an admission gate, and only
+then exposes continuity context to the model. Prior assistant answers can support
+conversation continuity, but they are not factual authority unless admitted
+evidence refs are available.
+
+Live `/ask/turn` and desktop chat verification confirmed this behavior:
+
+```text
+User: Open the docs viewer.
+Assistant: The docs viewer has been successfully opened.
+
+User: What was the last answer?
+Assistant: The last answer was: The docs viewer has been successfully opened.
+```
+
+This is current-thread continuity only. It does not add cross-chat memory,
+multi-chat selection, provider-side conversation state, long-session compaction,
+or a private Codex-like runtime loop.
 
 ### NHM2 Full-Solve Campaigns
 
