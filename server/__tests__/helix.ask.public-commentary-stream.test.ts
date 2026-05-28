@@ -20,6 +20,36 @@ const photonCalculatorPrompt =
 const naturalCompoundCalculatorPrompt =
   "Use calculator compute frequency from 500 nm then energy J then eV";
 
+const photonCalculatorPlannerFixture = {
+  subgoals: [
+    {
+      id: "calculate_frequency",
+      label: "Calculate the frequency of the photon",
+      expression: "3e8/(500e-9)",
+      expected_quantity: "frequency",
+      expected_unit: "Hz",
+      equation: "f = c / lambda",
+    },
+    {
+      id: "calculate_photon_energy_joules",
+      label: "Calculate the photon energy in joules",
+      expression: "6.62607015e-34*(3e8/(500e-9))",
+      expected_quantity: "energy",
+      expected_unit: "J",
+      equation: "E = h f",
+      depends_on: ["calculate_frequency"],
+    },
+    {
+      id: "calculate_photon_energy_ev",
+      label: "Convert photon energy to eV",
+      expression: "(6.62607015e-34*(3e8/(500e-9)))/(1.602176634e-19)",
+      expected_quantity: "energy",
+      expected_unit: "eV",
+      depends_on: ["calculate_photon_energy_joules"],
+    },
+  ],
+};
+
 const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
   text
     .split(/\r?\n\r?\n/)
@@ -121,35 +151,7 @@ describe("helix ask public commentary stream", () => {
   it("streams compound calculator commentary across plan, receipt, validation, and synthesis", async () => {
     const app = createApp();
     const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
-    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
-      subgoals: [
-        {
-          id: "calculate_frequency",
-          label: "Calculate the frequency of the photon",
-          expression: "3e8/(500e-9)",
-          expected_quantity: "length",
-          expected_unit: "m",
-          equation: "f = c / lambda",
-        },
-        {
-          id: "calculate_photon_energy_joules",
-          label: "Calculate the photon energy in joules",
-          expression: "6.62607015e-34*(3e8/(500e-9))",
-          expected_quantity: "energy",
-          expected_unit: "J",
-          equation: "E = h f",
-          depends_on: ["calculate_frequency"],
-        },
-        {
-          id: "calculate_photon_energy_ev",
-          label: "Convert photon energy to eV",
-          expression: "(6.62607015e-34*(3e8/(500e-9)))/(1.602176634e-19)",
-          expected_quantity: "energy",
-          expected_unit: "eV",
-          depends_on: ["calculate_photon_energy_joules"],
-        },
-      ],
-    });
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify(photonCalculatorPlannerFixture);
     let response: any;
     try {
       response = await request(app)
@@ -236,15 +238,23 @@ describe("helix ask public commentary stream", () => {
   it("summarizes the previous Ask turn debug trace through the local Ask route without mission preflight", async () => {
     const app = createApp();
     const sessionId = `public-commentary-history-${Date.now()}`;
-    const priorResponse = await request(app)
-      .post("/api/agi/ask/turn")
-      .send({
-        question: naturalCompoundCalculatorPrompt,
-        mode: "read",
-        sessionId,
-        debug: true,
-      })
-      .expect(200);
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify(photonCalculatorPlannerFixture);
+    let priorResponse: request.Response;
+    try {
+      priorResponse = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: photonCalculatorPrompt,
+          mode: "read",
+          sessionId,
+          debug: true,
+        })
+        .expect(200);
+    } finally {
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+    }
     expect(priorResponse.body?.public_commentary_timeline?.length).toBeGreaterThanOrEqual(6);
 
     const turnResponse = await request(app)
