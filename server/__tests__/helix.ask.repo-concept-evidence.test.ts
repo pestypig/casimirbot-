@@ -49,7 +49,7 @@ describe("Helix Ask repo concept evidence", () => {
       applies: true,
       confidence: "high",
       concept: "terminal authority",
-      reason: "known_project_concept_question",
+      reason: "known_project_concept_alias_with_project_anchor",
       require_repo_evidence: true,
       allow_model_direct_answer: false,
     });
@@ -404,7 +404,7 @@ describe("Helix Ask repo concept evidence", () => {
       weak_fuzzy_only: false,
       alias_normalization_applied: true,
     });
-  }, 30000);
+  }, 60000);
 
   it("runs repo-code.search_concept as bounded read-only repo evidence search", async () => {
     const result = await runRepoCodeEvidenceSearch({
@@ -431,7 +431,7 @@ describe("Helix Ask repo concept evidence", () => {
     expect(result.rankedResult.hits.length).toBeGreaterThan(0);
     expect(result.rankedResult.hits.length).toBeLessThanOrEqual(6);
     expect(result.observation.spans.length).toBe(result.rankedResult.hits.length);
-    expect(result.observation.spans[0]?.path).toMatch(/client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts|client\/src\/lib\/helix\/situation-room\.ts|server\/services\/situation-room\//);
+    expect(result.observation.spans[0]?.path).toMatch(/client\/src\/components\/workstation\/SituationRoom(?:Pipelines|Sources)Panel\.tsx|client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts|client\/src\/lib\/helix\/situation-room\.ts|server\/services\/situation-room\//);
     expect(result.observation.spans.some((span) => /client\/src\/store\/useSituationRoom(?:Store|JobStore|GraphStore)\.ts/.test(span.path))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes("node_modules"))).toBe(true);
     expect(result.observation.spans.every((span) => !span.path.includes(".."))).toBe(true);

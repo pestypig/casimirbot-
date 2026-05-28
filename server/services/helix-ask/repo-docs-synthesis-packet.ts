@@ -60,6 +60,7 @@ export type HelixRepoDocsSynthesisPacket = {
     role:
       | "definition"
       | "ui_surface"
+      | "state_model"
       | "tool_registry"
       | "runtime_behavior"
       | "terminal_authority"
@@ -113,10 +114,47 @@ const evidenceRoleForPath = (path: string, excerpt: string): HelixRepoDocsSynthe
   if (/test|spec|__tests__/.test(haystack)) return "test_contract";
   if (/terminal|authority|receipt|final[_-]?answer|voice_delivery|confirm_speak/.test(haystack)) return "terminal_authority";
   if (/workstation-dynamic-tools|panelcapabilities|panelactionadapters|tool[_-]?registry|capability/.test(haystack)) return "tool_registry";
+  if (/client\/src\/store\/|use.*store\.ts$|store\.ts$|createRoom|appendSituationEvent|situationroomstore/.test(haystack)) return "state_model";
   if (/component|panel|ui|client\/src/.test(haystack)) return "ui_surface";
-  if (/runtime|observer|pipeline|situation-room|dottie|voice|commentary|manifest/.test(haystack)) return "runtime_behavior";
+  if (/server\/(?:modules|routes)\//.test(haystack) || /runtime|observer|pipeline|situation-room|dottie|voice|commentary|manifest/.test(haystack)) return "runtime_behavior";
   if (/docs|readme|architecture|contract|manifest|preset|definition/.test(haystack)) return "definition";
   return "supporting_context";
+};
+
+const selectRoleDiverseEvidence = (
+  entries: HelixRepoDocsSynthesisPacket["compact_evidence"],
+  maxEvidenceItems: number,
+): HelixRepoDocsSynthesisPacket["compact_evidence"] => {
+  const rolePriority: Record<HelixRepoDocsSynthesisPacket["compact_evidence"][number]["role"], number> = {
+    definition: 0,
+    runtime_behavior: 1,
+    tool_registry: 2,
+    terminal_authority: 3,
+    ui_surface: 4,
+    state_model: 5,
+    test_contract: 6,
+    supporting_context: 7,
+  };
+  const sorted = [...entries].sort((left, right) =>
+    rolePriority[left.role] - rolePriority[right.role] || left.path.localeCompare(right.path) || left.ref.localeCompare(right.ref),
+  );
+  const selected: HelixRepoDocsSynthesisPacket["compact_evidence"] = [];
+  const selectedRefs = new Set<string>();
+  const roles = Array.from(new Set(sorted.map((entry) => entry.role)));
+  for (const role of roles) {
+    const roleEntry = sorted.find((entry) => entry.role === role && !selectedRefs.has(entry.ref));
+    if (!roleEntry) continue;
+    selected.push(roleEntry);
+    selectedRefs.add(roleEntry.ref);
+    if (selected.length >= maxEvidenceItems) return selected;
+  }
+  for (const entry of sorted) {
+    if (selectedRefs.has(entry.ref)) continue;
+    selected.push(entry);
+    selectedRefs.add(entry.ref);
+    if (selected.length >= maxEvidenceItems) break;
+  }
+  return selected;
 };
 
 const sourceKindForPath = (
@@ -183,18 +221,7 @@ export function buildRepoDocsSynthesisPacket(input: {
       if (!byRef.has(evidence.ref)) byRef.set(evidence.ref, evidence);
     }
   }
-  const rolePriority: Record<HelixRepoDocsSynthesisPacket["compact_evidence"][number]["role"], number> = {
-    definition: 0,
-    runtime_behavior: 1,
-    tool_registry: 2,
-    terminal_authority: 3,
-    ui_surface: 4,
-    test_contract: 5,
-    supporting_context: 6,
-  };
-  const compactEvidence = Array.from(byRef.values())
-    .sort((left, right) => rolePriority[left.role] - rolePriority[right.role] || left.path.localeCompare(right.path))
-    .slice(0, maxEvidenceItems);
+  const compactEvidence = selectRoleDiverseEvidence(Array.from(byRef.values()), maxEvidenceItems);
   const files = unique(compactEvidence.map((entry) => entry.path));
   const hasCodeEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_code" || /\.(?:ts|tsx|js|jsx|py)$/i.test(entry.path));
   const hasDocEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_doc" || /\.(?:md|mdx|txt)$/i.test(entry.path));
@@ -243,6 +270,7 @@ export function buildRepoDocsSynthesisPacket(input: {
     model_instruction: [
       "Answer the user's question directly from the compact evidence.",
       "Explain what the evidence means; do not answer with a file list or raw excerpt dump.",
+      "For broad internal concepts, synthesize across evidence roles: definition, UI/control surface, state model, tool/capability registry, runtime behavior, and authority boundaries when present.",
       "Preserve authority claims exactly: receipts are observations/supporting artifacts, not final-answer authority.",
       "Do not claim evidence is missing when compact_evidence is non-empty.",
       "Use compact refs from compact_evidence as support_refs for terminal authority.",

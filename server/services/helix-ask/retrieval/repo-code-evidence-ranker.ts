@@ -279,7 +279,28 @@ export function rankRepoCodeEvidenceHits(input: {
       return { hit, score: scoreHit(hit, queryTokens, exactTerms), index };
     });
   scored.sort((a, b) => b.score - a.score || a.index - b.index);
-  return scored.slice(0, maxHits).map((entry) => entry.hit);
+  const selected: typeof scored = [];
+  const selectedKeys = new Set<string>();
+  const selectedFiles = new Set<string>();
+  for (const entry of scored) {
+    const normalizedPath = normalize(entry.hit.filePath);
+    const key = `${normalizedPath}:${entry.hit.line}`;
+    if (selectedFiles.has(normalizedPath) || selectedKeys.has(key)) continue;
+    selected.push(entry);
+    selectedKeys.add(key);
+    selectedFiles.add(normalizedPath);
+    if (selected.length >= maxHits) break;
+  }
+  for (const entry of scored) {
+    if (selected.length >= maxHits) break;
+    const normalizedPath = normalize(entry.hit.filePath);
+    const key = `${normalizedPath}:${entry.hit.line}`;
+    if (selectedKeys.has(key)) continue;
+    selected.push(entry);
+    selectedKeys.add(key);
+    selectedFiles.add(normalizedPath);
+  }
+  return selected.map((entry) => entry.hit);
 }
 
 export function buildRepoCodeEvidenceSpans(input: {

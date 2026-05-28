@@ -6,6 +6,7 @@ import {
   repoConceptAliasTerms,
   repoConceptPathMatchesHint,
   repoConceptPathMatchesPreferredPrefix,
+  type RepoConceptEvidenceRole,
 } from "./repo-concept-alias-registry";
 
 export type RepoEvidenceRelevanceGate = {
@@ -17,6 +18,9 @@ export type RepoEvidenceRelevanceGate = {
   exact_match_files_found: boolean;
   exact_match_files_selected: boolean;
   selected_files_cover_concept: boolean;
+  selected_evidence_roles: RepoConceptEvidenceRole[];
+  missing_required_roles: RepoConceptEvidenceRole[];
+  single_role_only: boolean;
   weak_fuzzy_only: boolean;
   alias_normalization_applied: boolean;
   expected_path_hints: string[];
@@ -30,6 +34,8 @@ export type RepoEvidenceRelevanceGate = {
     | "codebase_anchor_ignored"
     | "selected_evidence_missing_concept_terms"
     | "docs_only_for_codebase_question"
+    | "single_role_only"
+    | "missing_required_evidence_roles"
   >;
   repair_required: boolean;
   terminal_allowed: boolean;
@@ -69,6 +75,27 @@ const selectedPathContainsAlias = (selectedPath: string, aliases: string[]): boo
   });
 };
 
+const evidenceRoleForPath = (selectedPath: string): RepoConceptEvidenceRole | null => {
+  const normalized = normalizePath(selectedPath).toLowerCase();
+  if (/(?:^|\/)__tests__\/|(?:\.test|\.spec)\.[tj]sx?$/.test(normalized)) return "test_contract";
+  if (/terminal|authority|terminal-answer-envelope|runtime-authority-contract|solver-controller|route-product-contract/.test(normalized)) {
+    return "terminal_authority";
+  }
+  if (/workstation-dynamic-tools|panelcapabilities|panelactionadapters|tool[_-]?registry|capabilit/.test(normalized)) {
+    return "capability_registry";
+  }
+  if (/client\/src\/store\/|use.*store\.ts$|store\.ts$/.test(normalized)) return "state_model";
+  if (/client\/src\/components\/|(?:panel|pill)\.tsx$/.test(normalized)) return "ui_surface";
+  if (/server\/(?:services|routes)\/|server\/modules\/|client\/src\/lib\/helix\/|shared\/(?:helix|situation|workstation|starsim)/.test(normalized)) {
+    return "runtime_contract";
+  }
+  if (/docs\/|readme|architecture|contract|manifest|preset/.test(normalized)) return "definition";
+  return null;
+};
+
+const rolesForSelectedPaths = (selectedPaths: string[]): RepoConceptEvidenceRole[] =>
+  unique(selectedPaths.map(evidenceRoleForPath).filter((entry): entry is RepoConceptEvidenceRole => Boolean(entry)));
+
 export function evaluateRepoEvidenceRelevanceGate(input: {
   turnId: string;
   concept: string;
@@ -94,6 +121,10 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
       exactMatchFilesSelected ||
       preferredSelected
     : selectedPaths.length > 0;
+  const selectedEvidenceRoles = rolesForSelectedPaths(selectedPaths);
+  const requiredRoles = aliasEntry?.broad_concept ? aliasEntry.required_evidence_roles ?? [] : [];
+  const missingRequiredRoles = requiredRoles.filter((role) => !selectedEvidenceRoles.includes(role));
+  const singleRoleOnly = Boolean(aliasEntry?.broad_concept && selectedPaths.length > 1 && selectedEvidenceRoles.length <= 1);
   const selectedDocsOnly = selectedPaths.length > 0 && selectedPaths.every((entry) => entry.startsWith("docs/"));
   const weakFuzzyOnly = Boolean(aliasEntry && exactMatchFilesFound && !exactMatchFilesSelected && !preferredSelected);
   const missingExpectedPathHints = existingHints.filter((hint) =>
@@ -109,6 +140,8 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   if (weakFuzzyOnly) violations.push("weak_fuzzy_only");
   if (aliasEntry && input.observation.concept !== aliasEntry.canonical_concept) violations.push("alias_not_normalized");
   if (aliasEntry && !selectedFilesCoverConcept) violations.push("selected_evidence_missing_concept_terms");
+  if (singleRoleOnly) violations.push("single_role_only");
+  if (missingRequiredRoles.length > 0 && selectedPaths.length > 0) violations.push("missing_required_evidence_roles");
   if (selectedDocsOnly && /\b(?:codebase|repo|repository|source|implementation|helix ask|this app)\b/i.test(input.query)) {
     violations.push("docs_only_for_codebase_question");
   }
@@ -130,6 +163,9 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
     exact_match_files_found: exactMatchFilesFound,
     exact_match_files_selected: exactMatchFilesSelected,
     selected_files_cover_concept: selectedFilesCoverConcept,
+    selected_evidence_roles: selectedEvidenceRoles,
+    missing_required_roles: missingRequiredRoles,
+    single_role_only: singleRoleOnly,
     weak_fuzzy_only: weakFuzzyOnly,
     alias_normalization_applied: Boolean(aliasEntry && input.concept === aliasEntry.canonical_concept),
     expected_path_hints: expectedPathHints,

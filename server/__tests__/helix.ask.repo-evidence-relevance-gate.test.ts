@@ -6,7 +6,7 @@ import {
   type HelixRepoCodeEvidenceObservation,
 } from "../../shared/helix-repo-code-evidence-observation";
 
-const observationWithPath = (concept: string, path: string): HelixRepoCodeEvidenceObservation => ({
+const observationWithPaths = (concept: string, paths: string[]): HelixRepoCodeEvidenceObservation => ({
   schema: HELIX_REPO_CODE_EVIDENCE_OBSERVATION_SCHEMA,
   artifact_id: "artifact:repo-observation",
   turn_id: "turn:repo-relevance",
@@ -16,12 +16,12 @@ const observationWithPath = (concept: string, path: string): HelixRepoCodeEviden
   search_strategy: {
     exact_terms: [concept],
     symbol_terms: [concept.replace(/\s+/g, "")],
-    path_globs_considered: [path.split("/").slice(0, 3).join("/")],
+    path_globs_considered: paths.map((path) => path.split("/").slice(0, 3).join("/")),
     max_spans: 4,
   },
-  evidence_refs: [`${path}:1`],
+  evidence_refs: paths.map((path) => `${path}:1`),
   observations: [],
-  spans: [{
+  spans: paths.map((path) => ({
     ref: `${path}:1`,
     path,
     start_line: 1,
@@ -30,11 +30,14 @@ const observationWithPath = (concept: string, path: string): HelixRepoCodeEviden
     reason: "test",
     source_kind: path.startsWith("docs/") ? "repo_doc" : "repo_code",
     score: 1,
-  }],
+  })),
   selected_for_answer: true,
   assistant_answer: false,
   raw_content_included: false,
 });
+
+const observationWithPath = (concept: string, path: string): HelixRepoCodeEvidenceObservation =>
+  observationWithPaths(concept, [path]);
 
 describe("repo evidence relevance gate", () => {
   it("blocks fuzzy-only Reasoning Theater evidence when exact concept files exist", () => {
@@ -53,16 +56,56 @@ describe("repo evidence relevance gate", () => {
     ]));
   });
 
-  it("allows exact Reasoning Theater evidence", () => {
+  it("requires role coverage for broad exact Reasoning Theater evidence", () => {
     const gate = evaluateRepoEvidenceRelevanceGate({
       turnId: "turn:repo-relevance",
       concept: "Reasoning Theater",
       query: "What is the reasoning theater in helix ask?",
-      observation: observationWithPath("Reasoning Theater", "server/services/helix-ask/surface/reasoning-theater-state.ts"),
+      observation: observationWithPaths("Reasoning Theater", [
+        "server/routes/helix/reasoning-theater.ts",
+        "server/services/helix-ask/surface/reasoning-theater-state.ts",
+        "client/src/components/helix/HelixAskPill.tsx",
+        "server/__tests__/helix.reasoning-theater.topology.test.ts",
+      ]),
     });
 
     expect(gate.terminal_allowed).toBe(true);
     expect(gate.coverage).toBe("strong");
+    expect(gate.violations).toEqual([]);
+    expect(gate.selected_evidence_roles).toEqual(expect.arrayContaining(["runtime_contract", "test_contract"]));
+  });
+
+  it("blocks store-only Situation Room evidence for broad concept answers", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Situation Room",
+      query: "What is the Situation Room?",
+      observation: observationWithPath("Situation Room", "client/src/store/useSituationRoomStore.ts"),
+    });
+
+    expect(gate.terminal_allowed).toBe(false);
+    expect(gate.repair_required).toBe(true);
+    expect(gate.selected_evidence_roles).toEqual(["state_model"]);
+    expect(gate.missing_required_roles).toEqual(expect.arrayContaining(["ui_surface", "capability_registry"]));
+    expect(gate.violations).toEqual(expect.arrayContaining(["missing_required_evidence_roles"]));
+  });
+
+  it("allows multi-role Situation Room evidence", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Situation Room",
+      query: "What is the Situation Room?",
+      observation: observationWithPaths("Situation Room", [
+        "client/src/components/workstation/SituationRoomPipelinesPanel.tsx",
+        "shared/workstation-dynamic-tools.ts",
+        "client/src/store/useSituationRoomStore.ts",
+        "server/services/helix-ask/situation-context-turn-router.ts",
+      ]),
+    });
+
+    expect(gate.terminal_allowed).toBe(true);
+    expect(["adequate", "strong"]).toContain(gate.coverage);
+    expect(gate.selected_evidence_roles).toEqual(expect.arrayContaining(["ui_surface", "capability_registry", "state_model"]));
     expect(gate.violations).toEqual([]);
   });
 

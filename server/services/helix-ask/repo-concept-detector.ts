@@ -197,6 +197,17 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
 
   const projectAnchorPrompt = prompt.replace(NEGATIVE_TOOL_CONSTRAINT_ANCHOR_RE, " ");
   const hasPositiveProjectAnchor = PROJECT_ANCHOR_RE.test(projectAnchorPrompt);
+  if (entity && LEGAL_TERMINAL_AUTHORITY_RE.test(prompt) && !hasPositiveProjectAnchor) {
+    return {
+      applies: true,
+      confidence: "low",
+      concept: entity.canonical,
+      normalized_terms: termsForConcept(entity.canonical),
+      reason: "domain_context_not_project_repo",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    };
+  }
   if (aliasMatch && (!aliasMatch.project_anchor_required || hasPositiveProjectAnchor)) {
     return {
       applies: true,
@@ -221,18 +232,6 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
       allow_model_direct_answer: true,
     };
   }
-  if (entity && LEGAL_TERMINAL_AUTHORITY_RE.test(prompt) && !hasPositiveProjectAnchor) {
-    return {
-      applies: true,
-      confidence: "low",
-      concept: entity.canonical,
-      normalized_terms: termsForConcept(entity.canonical),
-      reason: "domain_context_not_project_repo",
-      require_repo_evidence: false,
-      allow_model_direct_answer: true,
-    };
-  }
-
   if (entity) {
     return {
       applies: true,
