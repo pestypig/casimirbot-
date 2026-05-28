@@ -56,7 +56,9 @@ const artifactKind = (artifact: ArtifactLike): string =>
   readString(artifact.kind) ?? readString(artifactPayload(artifact)?.kind) ?? "unknown";
 
 const artifactId = (artifact: ArtifactLike): string | null =>
-  readString(artifact.artifact_id) ?? readString(artifactPayload(artifact)?.artifact_id);
+  readString(artifact.artifact_id) ??
+  readString((artifact as Record<string, unknown>).artifact_ref) ??
+  readString(artifactPayload(artifact)?.artifact_id);
 
 const artifactText = (artifact: ArtifactLike): string | null => {
   const payload = artifactPayload(artifact);
@@ -100,6 +102,56 @@ const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
     kind === "voice_delivery_proposal" ||
     kind === "legacy_terminal_candidate"
   );
+};
+
+const isVisualSituationTerminalKind = (kind: string): kind is
+  | "situation_context_pack"
+  | "visual_context_pack"
+  | "visual_frame_evidence" =>
+  kind === "situation_context_pack" ||
+  kind === "visual_context_pack" ||
+  kind === "visual_frame_evidence";
+
+const findGoalSatisfyingVisualSituationArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: "situation_context_pack" | "visual_context_pack" | "visual_frame_evidence"; text: string; ref: string | null } | null => {
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  if (readString(goal?.next_decision) !== "allow_terminal" || readString(goal?.satisfaction) !== "satisfied") {
+    return null;
+  }
+  const supportedRefs = Array.isArray(goal?.observed_results)
+    ? (goal.observed_results as unknown[])
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> =>
+        Boolean(entry?.supports_goal === true && isVisualSituationTerminalKind(readString(entry.kind) ?? "")))
+      .map((entry) => readString(entry.ref))
+      .filter((entry): entry is string => Boolean(entry))
+    : [];
+  if (supportedRefs.length === 0) return null;
+  for (const ref of supportedRefs) {
+    const artifact = artifacts.find((entry) => artifactId(entry) === ref);
+    if (!artifact) continue;
+    const kind = artifactKind(artifact);
+    if (!isVisualSituationTerminalKind(kind)) continue;
+    const text = artifactText(artifact);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return { artifact, kind, text, ref };
+  }
+  return null;
+};
+
+const quarantineStaleRequestUserInput = (payload: Record<string, unknown>): void => {
+  const staleRequest =
+    readRecord(payload.request_user_input) ??
+    readRecord(payload.pending_server_request) ??
+    readRecord(payload.pending_request);
+  if (staleRequest && !readRecord(payload.stale_pending_server_request)) {
+    payload.stale_pending_server_request = staleRequest;
+  }
+  delete payload.request_user_input;
+  delete payload.pending_server_request;
+  delete payload.pending_request;
 };
 
 const findSelectedDraftAfterRequiredObservation = (
@@ -201,6 +253,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
   }
   const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);
+  const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isPostToolObservation(artifact) ? index : latest, -1);
 
@@ -254,7 +307,32 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (draftMaterialization?.ok) {
+  if (selectedGoalArtifact) {
+    selectedArtifactRef = selectedGoalArtifact.ref;
+    selectedArtifactKind = selectedGoalArtifact.kind;
+    selectedSource = selectedGoalArtifact.kind;
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.terminal_artifact_kind = selectedGoalArtifact.kind;
+    input.payload.final_answer_source = selectedGoalArtifact.kind;
+    input.payload.selected_final_answer = selectedGoalArtifact.text;
+    input.payload.answer = selectedGoalArtifact.text;
+    input.payload.text = selectedGoalArtifact.text;
+    input.payload.assistant_answer = selectedGoalArtifact.text;
+    input.payload.terminal_artifact_id = selectedGoalArtifact.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: selectedGoalArtifact.kind,
+      concise_text: selectedGoalArtifact.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+  } else if (draftMaterialization?.ok) {
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
     const text = latestDraft?.text ?? readString(input.payload.selected_final_answer) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;

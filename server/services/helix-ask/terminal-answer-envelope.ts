@@ -19,6 +19,7 @@ export type HelixTerminalAnswerEnvelope = {
   terminal_kind: HelixTerminalAuthority["terminal_kind"];
   authority_origin:
     | "terminal_presentation"
+    | "repo_code_evidence_answer"
     | "selected_final_answer"
     | "request_user_input"
     | "typed_failure";
@@ -54,6 +55,14 @@ const readTerminalArtifactKind = (payload: Record<string, unknown>): string =>
 
 const readFinalAnswerSource = (payload: Record<string, unknown>): string =>
   readString(payload.final_answer_source) ?? readTerminalArtifactKind(payload);
+
+const readValidRepoEvidenceAnswerText = (payload: Record<string, unknown>): string | null => {
+  if (readTerminalArtifactKind(payload) !== "repo_code_evidence_answer") return null;
+  const answer = readRecord(payload.repo_code_evidence_answer);
+  const qualityGate = readRecord(payload.repo_answer_text_quality_gate);
+  if (qualityGate?.ok !== true) return null;
+  return readString(answer?.answer_text);
+};
 
 const readTurnId = (payload: Record<string, unknown>, fallback?: string | null): string =>
   readString(payload.turn_id) ?? readString(fallback) ?? "unknown-turn";
@@ -313,6 +322,11 @@ export function resolveTerminalAnswerEnvelope(
   } else if (terminalArtifactKind === "request_user_input") {
     terminalText = requestUserInputText(payload);
     authorityOrigin = "request_user_input";
+  } else if (terminalArtifactKind === "repo_code_evidence_answer") {
+    terminalText = readValidRepoEvidenceAnswerText(payload) ?? readTerminalPresentationText(payload);
+    authorityOrigin = terminalText === readValidRepoEvidenceAnswerText(payload)
+      ? "repo_code_evidence_answer"
+      : "terminal_presentation";
   } else {
     terminalText = readTerminalPresentationText(payload);
   }

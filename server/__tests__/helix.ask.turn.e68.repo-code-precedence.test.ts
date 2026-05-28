@@ -407,6 +407,63 @@ describe("helix ask repo/code intent precedence", () => {
 
   it.each([
     {
+      prompt: "What is the reasoning theater in helix ask?",
+      answer:
+        "The Reasoning Theater is a Helix Ask surface for exposing turn-state/topology around model reasoning and UI presentation, backed by route and state files rather than generic prose. Sources: server/routes/helix/reasoning-theater.ts; server/services/helix-ask/surface/reasoning-theater-state.ts.",
+      expectedPath:
+        /server\/routes\/helix\/reasoning-theater\.ts|server\/services\/helix-ask\/surface\/reasoning-theater-state\.ts|server\/__tests__\/helix.*reasoning-theater/i,
+    },
+    {
+      prompt: "Do you know what the star simulations do in the codebase?",
+      answer:
+        "StarSim is represented in the codebase by the StellarEvolutionLens panel and server/modules/starsim import/runtime modules. The retrieved evidence includes StarSimStellarEvolutionStage imports in the panel and StarSim accordion import files under server/modules/starsim. Sources: client/src/components/panels/StellarEvolutionLens.tsx; server/modules/starsim/accordion/gaia-structure-import.ts; server/modules/starsim/accordion/sparc-rotation-import.ts.",
+      expectedPath:
+        /server\/modules\/starsim\/|shared\/starsim-|tools\/starsim|client\/src\/components\/panels\/StellarEvolutionLens\.tsx/i,
+    },
+  ])("routes exact repo concept alias prompt through relevant repo evidence: $prompt", async ({ prompt, answer, expectedPath }) => {
+    const app = createApp();
+    const response = await withRepoSynthesisResponse(
+      answer,
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: prompt,
+          mode: "read",
+          debug: true,
+          sessionId: `repo-concept-alias-${Date.now()}`,
+        })
+        .expect(200),
+    );
+
+    const repoObservation = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "repo_code_evidence_observation" &&
+      artifact?.payload?.schema === "helix.repo_code_evidence_observation.v1"
+    );
+    const spanPaths = String((repoObservation?.payload?.spans ?? []).map((span: any) => span?.path).join("\n"));
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toMatch(/repo_(?:entity_definition|code_evidence_question)/);
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(runtimeCapabilities(response.body)).toContain("repo-code.search_concept");
+    expect(runtimeCapabilities(response.body)).toContain("model.synthesize_from_repo_evidence");
+    expect(runtimeCapabilities(response.body).slice(runtimeCapabilities(response.body).indexOf("repo-code.search_concept") + 1)).not.toContain("model.direct_answer");
+    expect(spanPaths).toMatch(expectedPath);
+    expect(response.body?.repo_evidence_relevance_gate).toMatchObject({
+      terminal_allowed: true,
+      weak_fuzzy_only: false,
+    });
+    expect(["adequate", "strong"]).toContain(response.body?.repo_evidence_relevance_gate?.coverage);
+    expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(response.body?.repo_answer_text_quality_gate).toMatchObject({ ok: true });
+  }, 90000);
+
+  it.each([
+    {
       prompt: "What is Auntie Dottie in this app?",
       entity: "Auntie Dottie",
       evidencePath:

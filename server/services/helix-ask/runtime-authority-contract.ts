@@ -218,6 +218,28 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
   });
 };
 
+const hasGoalSatisfyingVisualSituationEvidence = (payload: Record<string, unknown>): boolean => {
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  if (
+    terminalKind !== "situation_context_pack" &&
+    terminalKind !== "visual_context_pack" &&
+    terminalKind !== "visual_frame_evidence"
+  ) {
+    return false;
+  }
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  if (readString(goal?.satisfaction) !== "satisfied" || readString(goal?.next_decision) !== "allow_terminal") {
+    return false;
+  }
+  return readArray(goal?.observed_results)
+    .map(readRecord)
+    .some((entry) =>
+      Boolean(
+        entry?.supports_goal === true &&
+        /^(?:situation_context_pack|visual_context_pack|visual_frame_evidence)$/.test(readString(entry.kind) ?? ""),
+      ));
+};
+
 const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): string[] => {
   const toolObservation = readRecord(iteration.tool_observation);
   return Array.from(new Set([
@@ -299,6 +321,7 @@ export function hasAgentRuntimeLoopDecisionChain(payload: Record<string, unknown
 }
 
 export function hasSelectedCapabilityObservation(payload: Record<string, unknown>): boolean {
+  if (hasGoalSatisfyingVisualSituationEvidence(payload)) return true;
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations);
   const agentStepLoop = readRecord(payload.agent_step_loop);

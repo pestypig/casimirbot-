@@ -49,6 +49,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
     expected: {
       source_target: "visual_capture",
       target_kind: "visual_capture",
+      terminal_artifact_kind: "situation_context_pack",
       forbidden_routes: ["live_pipeline_control", "process_graph_overview", "no_tool_direct"],
       forbidden_terminal_artifacts: ["live_pipeline_receipt", "client_projection", "process_graph_overview"],
       required_trace_flags_absent: ["receipt_promoted_to_answer", "tool_called_without_admission"],
@@ -170,6 +171,7 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
     expected: {
       source_target: "visual_capture",
       target_kind: "visual_capture",
+      terminal_artifact_kind: "situation_context_pack",
       forbidden_terminal_artifacts: ["live_pipeline_receipt", "process_graph_overview", "no_tool_direct"],
       live_source_identity_diagnosis: "ok",
       live_source_identity_ok: true,
