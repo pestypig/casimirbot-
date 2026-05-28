@@ -1,4 +1,8 @@
 import type { HelixRepoCodeEvidenceObservation } from "@shared/helix-repo-code-evidence-observation";
+import {
+  findRepoConceptAliasEntry,
+  type RepoConceptEvidenceRole,
+} from "./repo-concept-alias-registry";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -31,7 +35,16 @@ export type HelixRepoDocsSynthesisViolation =
   | "missing_support_refs"
   | "unsupported_repo_claim"
   | "wrong_model_step_identity"
-  | "policy_claim_inversion";
+  | "policy_claim_inversion"
+  | "shallow_broad_concept_answer"
+  | "missing_broad_concept_coverage"
+  | "insufficient_evidence_role_coverage";
+
+export type HelixRepoDocsAnswerCoveragePoint =
+  | "identity"
+  | "responsibilities"
+  | "workflow_or_surfaces"
+  | "evidence_or_authority_boundary";
 
 export type HelixRepoDocsSynthesisPacket = {
   schema: typeof HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA;
@@ -52,6 +65,14 @@ export type HelixRepoDocsSynthesisPacket = {
     must_include_compact_refs: true;
     must_not_emit_file_inventory: true;
     must_not_claim_missing_evidence_when_observations_exist: true;
+  };
+  answer_depth_contract: {
+    depth_mode: "internal_concept_overview" | "concise_fact";
+    min_word_count: number;
+    min_distinct_evidence_roles: number;
+    required_coverage_points: HelixRepoDocsAnswerCoveragePoint[];
+    required_evidence_roles: RepoConceptEvidenceRole[];
+    guidance: string;
   };
   compact_evidence: Array<{
     ref: string;
@@ -140,18 +161,38 @@ const selectRoleDiverseEvidence = (
   );
   const selected: HelixRepoDocsSynthesisPacket["compact_evidence"] = [];
   const selectedRefs = new Set<string>();
+  const selectedPaths = new Set<string>();
+  const pathCounts = new Map<string, number>();
+  const add = (entry: HelixRepoDocsSynthesisPacket["compact_evidence"][number]): boolean => {
+    if (selected.length >= maxEvidenceItems || selectedRefs.has(entry.ref)) return false;
+    selected.push(entry);
+    selectedRefs.add(entry.ref);
+    selectedPaths.add(entry.path);
+    pathCounts.set(entry.path, (pathCounts.get(entry.path) ?? 0) + 1);
+    return true;
+  };
   const roles = Array.from(new Set(sorted.map((entry) => entry.role)));
   for (const role of roles) {
-    const roleEntry = sorted.find((entry) => entry.role === role && !selectedRefs.has(entry.ref));
+    const roleEntry =
+      sorted.find((entry) => entry.role === role && !selectedRefs.has(entry.ref) && !selectedPaths.has(entry.path)) ??
+      sorted.find((entry) => entry.role === role && !selectedRefs.has(entry.ref));
     if (!roleEntry) continue;
-    selected.push(roleEntry);
-    selectedRefs.add(roleEntry.ref);
+    add(roleEntry);
     if (selected.length >= maxEvidenceItems) return selected;
   }
   for (const entry of sorted) {
+    if (selected.length >= maxEvidenceItems) break;
+    if (selectedRefs.has(entry.ref) || selectedPaths.has(entry.path)) continue;
+    add(entry);
+  }
+  for (const entry of sorted) {
+    if (selected.length >= maxEvidenceItems) break;
+    if (selectedRefs.has(entry.ref) || (pathCounts.get(entry.path) ?? 0) >= 2) continue;
+    add(entry);
+  }
+  for (const entry of sorted) {
     if (selectedRefs.has(entry.ref)) continue;
-    selected.push(entry);
-    selectedRefs.add(entry.ref);
+    add(entry);
     if (selected.length >= maxEvidenceItems) break;
   }
   return selected;
