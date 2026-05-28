@@ -14,6 +14,9 @@ const createApp = (): express.Express => {
 const grRefractionPrompt =
   'In general relativity, do light cones at each point in space time deal with refraction indexes of materials, and if e=hf as Penrose puts it "mass clock" does the super position of matter have impact on refraction of light and what does this mean for the expanding light cone at the points representing the matter in space and time geometry hyper surface?';
 
+const photonCalculatorPrompt =
+  "Use the scientific calculator to compute photon energy for 500 nm light in joules and eV, and explain what the result means.";
+
 const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
   text
     .split(/\r?\n\r?\n/)
@@ -110,5 +113,79 @@ describe("helix ask public commentary stream", () => {
       : [];
     expect(timeline.length).toBeGreaterThan(0);
     expect(timeline.some((event: any) => event?.text === commentary?.text)).toBe(true);
+  });
+
+  it("streams compound calculator commentary across plan, receipt, validation, and synthesis", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: photonCalculatorPrompt,
+        mode: "read",
+        sessionId: `public-commentary-calculator-${Date.now()}`,
+        debug: true,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const transcriptRows = events
+      .filter((event) => event.event === "turn_transcript_event")
+      .map((event) => event.data);
+    const commentaryRows = transcriptRows.filter((row) => row?.type === "public_commentary");
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+    const timeline = Array.isArray(finalPacket?.public_commentary_timeline)
+      ? finalPacket.public_commentary_timeline
+      : [];
+    const timelineText = timeline.map((event: any) => event?.text).join("\n");
+
+    expect(commentaryRows.length).toBeGreaterThanOrEqual(5);
+    expect(timeline.length).toBeGreaterThanOrEqual(5);
+    expect(timelineText).toMatch(/calculator-backed|calculator subgoal|numeric/i);
+    expect(timelineText).toMatch(/photon energy|joule/i);
+    expect(timelineText).toMatch(/eV|electronvolt/i);
+    expect(timelineText).toMatch(/receipt|validation|unit/i);
+    expect(timelineText).toMatch(/synthesizing|explanation/i);
+    expect(timelineText).not.toMatch(/turn_purpose|why_this_capability|expected_artifacts|observation_summary/i);
+    expect(timeline.some((event: any) =>
+      Array.isArray(event?.evidence_refs) &&
+      event.evidence_refs.some((ref: string) => /receipt|validation|workstation_tool_evaluation/i.test(ref)),
+    )).toBe(true);
+    expect(["workstation_tool_evaluation", "model_synthesized_answer"]).toContain(finalPacket?.terminal_artifact_kind);
+    expect(String(finalPacket?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_synth/i);
+  });
+
+  it("projects document evidence turns as public commentary before generic lifecycle rows", async () => {
+    const app = createApp();
+    const sessionId = `public-commentary-docs-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: "What is this doc about?",
+        mode: "read",
+        sessionId,
+        debug: true,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          activeDocPath: "/docs/research/example.md",
+          hasDocContext: true,
+        },
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const transcriptRows = events
+      .filter((event) => event.event === "turn_transcript_event")
+      .map((event) => event.data);
+    const firstVisible = transcriptRows[0];
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+    const timelineText = (finalPacket?.public_commentary_timeline ?? [])
+      .map((event: any) => event?.text)
+      .join("\n");
+
+    expect(firstVisible?.type).toBe("public_commentary");
+    expect(timelineText).toMatch(/document tool|document evidence|docs/i);
+    expect(timelineText).toMatch(/evidence|summary|covers/i);
+    expect(firstVisible?.text).not.toMatch(/Starting Helix Ask turn|Completed step/i);
   });
 });

@@ -7,6 +7,12 @@ import {
   type HelixAgentCommentaryCertaintyClass,
 } from "@shared/helix-agent-commentary";
 import { interpretHelixAskPrompt } from "./prompt-interpretation";
+import {
+  buildCalculatorCompoundCommentaryRows,
+  buildToolReceiptCommentaryRows,
+  buildWorkstationFamilyCommentaryRows,
+  type HelixAskPublicCommentaryRowDraft,
+} from "./workstation-public-commentary";
 
 type RecordLike = Record<string, unknown>;
 
@@ -195,6 +201,16 @@ export const buildHelixAskPublicCommentaryTimeline = (input: {
   agentStepDecision?: unknown;
   initialAgentStepDecision?: unknown;
   agentStepCommentaries?: unknown[] | null;
+  currentTurnArtifactLedger?: unknown[] | null;
+  agentRuntimeLoop?: unknown;
+  workstationToolPlan?: unknown;
+  workstationAffordances?: unknown[] | null;
+  calculatorCompoundPlan?: unknown;
+  calculatorSubgoalReceipts?: unknown[] | null;
+  calculatorResultValidations?: unknown[] | null;
+  workstationToolEvaluation?: unknown;
+  toolObservationContinuation?: unknown;
+  reasoningContinuationResult?: unknown;
   goalSatisfactionEvaluation?: unknown;
   terminalAuthority?: unknown;
   finalStatus?: string | null;
@@ -233,44 +249,88 @@ export const buildHelixAskPublicCommentaryTimeline = (input: {
   const primaryDecision = decisions[decisions.length - 1] ?? null;
   const decisionId = readString(primaryDecision?.decision_id);
   const capability = readString(primaryDecision?.chosen_capability ?? asRecord(primaryDecision?.model_decision)?.chosen_capability);
-  timeline.push(makeEvent({
-    turnId: input.turnId,
-    traceId,
-    iteration: 1,
-    decisionId,
-    capabilityKey: capability,
-    timing: "before_step",
-    status: capability && !/^model\./.test(capability) ? "using_tool" : "checking",
-    text: beforeStepText(primaryDecision, input.prompt),
-    expectedArtifact: firstExpectedArtifact(primaryDecision),
-    doneCondition: normalizeSentence(decisionCommentary(primaryDecision)?.what_would_make_this_done, 150) ?? undefined,
-    evidenceRefs: decisionId ? [decisionId] : [],
-    certaintyClass: "hypothesis",
-  }));
-
   const toolOrResultEvent = [...events].reverse().find((event) =>
     event.type === "tool_result" || event.type === "observation_recorded" || event.type === "item_completed",
   );
-  timeline.push(makeEvent({
-    turnId: input.turnId,
-    traceId,
-    iteration: 1,
-    decisionId,
-    capabilityKey: capability,
-    timing: terminalFailed ? "fail_closed" : "after_step",
-    status: terminalFailed ? "repairing" : "checking",
-    text: afterStepText({
-      event: toolOrResultEvent,
-      decision: primaryDecision,
-      prompt: input.prompt,
+  const workstationRows = [
+    ...buildWorkstationFamilyCommentaryRows({
+      workstationToolPlan: input.workstationToolPlan,
+      workstationAffordances: input.workstationAffordances,
+      currentTurnArtifactLedger: input.currentTurnArtifactLedger,
+      calculatorCompoundPlan: input.calculatorCompoundPlan,
     }),
-    expectedArtifact: firstExpectedArtifact(primaryDecision),
-    evidenceRefs: [
-      ...(decisionId ? [decisionId] : []),
-      ...readArray(toolOrResultEvent?.actual_artifacts).map(readString).filter(Boolean) as string[],
-    ],
-    certaintyClass: "reasoned",
-  }));
+    ...buildCalculatorCompoundCommentaryRows({
+      calculatorCompoundPlan: input.calculatorCompoundPlan,
+      calculatorSubgoalReceipts: input.calculatorSubgoalReceipts,
+      calculatorResultValidations: input.calculatorResultValidations,
+      workstationToolEvaluation: input.workstationToolEvaluation,
+      toolObservationContinuation: input.toolObservationContinuation,
+      reasoningContinuationResult: input.reasoningContinuationResult,
+    }),
+    ...buildToolReceiptCommentaryRows({
+      currentTurnArtifactLedger: input.currentTurnArtifactLedger,
+    }),
+  ];
+  const normalizedStepCommentaryRows: HelixAskPublicCommentaryRowDraft[] = readArray(input.agentStepCommentaries)
+    .map(asRecord)
+    .map((commentary) => normalizeSentence(commentary?.public_summary ?? commentary?.text, 170))
+    .filter((text): text is string => Boolean(text))
+    .slice(0, 2)
+    .map((text) => ({
+      timing: "after_step",
+      status: "checking",
+      text,
+      evidenceRefs: decisionId ? [decisionId] : [],
+      certaintyClass: "reasoned",
+    }));
+
+  const rowDrafts: HelixAskPublicCommentaryRowDraft[] =
+    workstationRows.length > 0
+      ? [...workstationRows, ...normalizedStepCommentaryRows]
+      : [
+          {
+            timing: "before_step",
+            status: capability && !/^model\./.test(capability) ? "using_tool" : "checking",
+            text: beforeStepText(primaryDecision, input.prompt),
+            expectedArtifact: firstExpectedArtifact(primaryDecision),
+            doneCondition: normalizeSentence(decisionCommentary(primaryDecision)?.what_would_make_this_done, 150) ?? undefined,
+            evidenceRefs: decisionId ? [decisionId] : [],
+            certaintyClass: "hypothesis",
+          },
+          {
+            timing: terminalFailed ? "fail_closed" : "after_step",
+            status: terminalFailed ? "repairing" : "checking",
+            text: afterStepText({
+              event: toolOrResultEvent,
+              decision: primaryDecision,
+              prompt: input.prompt,
+            }),
+            expectedArtifact: firstExpectedArtifact(primaryDecision),
+            evidenceRefs: [
+              ...(decisionId ? [decisionId] : []),
+              ...readArray(toolOrResultEvent?.actual_artifacts).map(readString).filter(Boolean) as string[],
+            ],
+            certaintyClass: "reasoned",
+          },
+          ...normalizedStepCommentaryRows,
+        ];
+  const maxRows = asRecord(input.calculatorCompoundPlan) ? 12 : 8;
+  for (const [index, row] of rowDrafts.slice(0, Math.max(0, maxRows - 2)).entries()) {
+    timeline.push(makeEvent({
+      turnId: input.turnId,
+      traceId,
+      iteration: index + 1,
+      decisionId,
+      capabilityKey: row.capabilityKey ?? capability,
+      timing: row.timing,
+      status: terminalFailed && row.timing !== "turn_start" ? "repairing" : row.status,
+      text: row.text,
+      expectedArtifact: row.expectedArtifact ?? firstExpectedArtifact(primaryDecision),
+      doneCondition: row.doneCondition,
+      evidenceRefs: row.evidenceRefs ?? [],
+      certaintyClass: row.certaintyClass,
+    }));
+  }
 
   timeline.push(makeEvent({
     turnId: input.turnId,

@@ -544,6 +544,77 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(rows.map((row) => row.text).join("\n")).not.toMatch(/turn_purpose|why_this_capability|observation_summary/);
   });
 
+  it("renders compound calculator public commentary before stale procedural rows", () => {
+    const rows = buildHelixTurnTranscriptRows({
+      id: "reply-public-commentary-calculator",
+      question: "compute photon energy for 500 nm in joules and eV",
+      content: "Final answer",
+      debug: {
+        public_commentary_timeline: [
+          {
+            schema: "helix.ask_public_commentary_event.v1",
+            event_id: "public-commentary-calc-plan",
+            turn_id: "turn-public-commentary-calculator",
+            trace_id: "turn-public-commentary-calculator",
+            timing: "before_step",
+            status: "using_tool",
+            text: "I'm treating this as a calculator-backed problem with numeric receipts and an explanation.",
+            evidence_refs: ["turn-public-commentary-calculator:calculator_compound_plan"],
+            certainty_class: "hypothesis",
+            assistant_answer: false,
+            raw_reasoning_included: false,
+          },
+          {
+            schema: "helix.ask_public_commentary_event.v1",
+            event_id: "public-commentary-calc-validation",
+            turn_id: "turn-public-commentary-calculator",
+            trace_id: "turn-public-commentary-calculator",
+            timing: "after_step",
+            status: "checking",
+            text: "The calculator receipts passed quantity and unit validation.",
+            evidence_refs: ["calculator_result_validation:photon_energy_ev"],
+            certainty_class: "reasoned",
+            assistant_answer: false,
+            raw_reasoning_included: false,
+          },
+        ],
+        turn_transcript_events: [
+          {
+            role: "agent",
+            type: "work_delta",
+            status: "running",
+            text: "Starting Helix Ask turn.",
+          },
+          {
+            role: "system",
+            type: "turn_completed",
+            status: "completed",
+            step_id: "calculator_compound_3_calculator_subgoal_receipt",
+            text: "Completed step calculator_compound_3_calculator_subgoal_receipt.",
+          },
+        ],
+        agent_runtime_loop: {
+          schema: "helix.agent_runtime_loop.v1",
+          iterations: [
+            {
+              next_step: "next_action",
+              chosen_capability: "scientific-calculator.solve_expression",
+              decision_authority: "llm",
+              observed_artifact_refs: ["calculator_subgoal_receipt:photon_energy_j"],
+            },
+          ],
+        },
+      },
+    } as never);
+    const text = rows.map((row) => row.text).join("\n");
+
+    expect(rows[0]?.text).toContain("calculator-backed");
+    expect(text).toContain("quantity and unit validation");
+    expect(text).not.toContain("Starting Helix Ask turn");
+    expect(text).not.toContain("Completed step calculator_compound_3_calculator_subgoal_receipt");
+    expect(text).not.toMatch(/calculator_subgoal_receipt:photon_energy_j|calculator_result_validation:photon_energy_ev/);
+  });
+
   it("renders causal timeline events as public transparency rows without raw answer content", () => {
     const rows = buildHelixCausalTurnTraceRows({
       id: "reply-causal",
