@@ -95,6 +95,17 @@ const isCalculatorSolvePrompt = (prompt: string): boolean =>
   /\b(?:scientific\s+)?calculator\b/i.test(prompt) &&
   /\b(?:solve|evaluate|compute|calculate|check|verify)\b[\s\S]{0,160}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bequation\b|\bexpression\b|\bformula\b)/i.test(prompt);
 
+const isLiveAnswerEnvironmentStatePrompt = (prompt: string): boolean => {
+  const mentionsLiveAnswer =
+    /\b(?:live\s+(?:answer\s+)?environment|live\s+answer\s+card|live\s+card|active\s+live\s+(?:answer\s+)?(?:environment|source|job)|live\s+calculator\s+(?:source|job|environment)|calculator\s+live\s+(?:source|job|environment))\b/i.test(
+      prompt,
+    );
+  if (!mentionsLiveAnswer) return false;
+  return /\b(?:latest|current|result|value|equation|line|quiet|silent|threshold|cross(?:ed|es|ing)?|changed|state|status|why)\b/i.test(
+    prompt,
+  );
+};
+
 const isGenericSceneEpochPhrase = (prompt: string): boolean =>
   /\b(?:scene\s+epoch|visual\s+epoch|screen\s+epoch|live\s+epoch|last\s+(?:seen\s+|situation\s+|scene\s+|visual\s+|screen\s+|live\s+)?epoch|previous\s+(?:scene|frame|visual|screen|capture)|last\s+(?:scene|frame|visual|screen|capture))\b/i.test(prompt);
 
@@ -558,6 +569,35 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
       precedenceReason: "calculator_tool_source_target",
       confidence: 0.95,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isLiveAnswerEnvironmentStatePrompt(prompt)) {
+    const calculatorLiveState = /\b(?:calculator|equation|result|threshold|cross(?:ed|es|ing)?)\b/i.test(prompt);
+    const target = calculatorLiveState ? "calculator_stream" : "live_pipeline";
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target,
+      targetKind: target,
+      strength: "hard",
+      explicitCues: ["live_answer_environment_state"],
+      reasons: ["live_answer_environment_state_source_target"],
+      requestedOutputs: ["tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "repo_code_evidence_question",
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "live_answer_environment_state_source_target",
+      confidence: 0.96,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

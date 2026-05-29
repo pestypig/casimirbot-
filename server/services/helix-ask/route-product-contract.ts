@@ -12,6 +12,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "procedure_epoch_replay",
   "visual_scene_comparison_result",
   "live_environment_binding_diagnosis",
+  "live_environment_tool_observation",
   "live_pipeline_receipt",
   "doc_location_result",
   "repo_code_evidence_answer",
@@ -180,6 +181,17 @@ const isSituationRoomDottieActionPrompt = (promptText: string): boolean =>
   /\bsituation-room-pipelines\.(?:dottie|observer|voice_delivery)\./i.test(promptText) ||
   /\b(?:dottie\.manifest|observer\.(?:attach|detach|query)|voice_delivery\.propose_from_trace)\b/i.test(promptText);
 
+const isLiveAnswerEnvironmentStatePrompt = (promptText: string): boolean => {
+  const mentionsLiveAnswer =
+    /\b(?:live\s+(?:answer\s+)?environment|live\s+answer\s+card|live\s+card|active\s+live\s+(?:answer\s+)?(?:environment|source|job)|live\s+calculator\s+(?:source|job|environment)|calculator\s+live\s+(?:source|job|environment))\b/i.test(
+      promptText,
+    );
+  if (!mentionsLiveAnswer) return false;
+  return /\b(?:latest|current|result|value|equation|line|quiet|silent|threshold|cross(?:ed|es|ing)?|changed|state|status|why)\b/i.test(
+    promptText,
+  );
+};
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -193,7 +205,11 @@ export function buildRouteProductContract(input: {
       ? "active_doc"
       : isSituationRoomDottieActionPrompt(promptText)
         ? "workstation_panel"
-        : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
+        : isLiveAnswerEnvironmentStatePrompt(promptText)
+          ? /\b(?:calculator|equation|result|threshold|cross(?:ed|es|ing)?)\b/i.test(promptText)
+            ? "calculator_stream"
+            : "live_pipeline"
+          : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
   const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
   const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
     ? sourceTargetRecord.requested_outputs
@@ -483,7 +499,7 @@ export function buildRouteProductContract(input: {
       turnId: input.turnId,
       threadId: input.threadId,
       sourceTarget: "calculator_stream",
-      allowedCore: ["situation_context_pack", "workspace_action_receipt", "workstation_tool_evaluation"],
+      allowedCore: ["situation_context_pack", "live_environment_tool_observation", "workspace_action_receipt", "workstation_tool_evaluation"],
       allowedExtra: [
         "calculator_receipt",
         "calculator_result_trace",

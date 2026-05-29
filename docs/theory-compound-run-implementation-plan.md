@@ -2,6 +2,16 @@
 
 This document defines the phased plan for a unified Scientific Calculator Theory Run workbench. The goal is to let Theory Badge Graph presets load scalar calculator rows, tensor/runtime trace rows, evidence references, gates, and claim boundaries into one visible compound run without changing the existing scalar calculator behavior.
 
+## Developer Docs
+
+The implementation is split across these developer references:
+
+- [Theory Compound Run Workbench](./theory-compound-run-workbench.md)
+- [Theory Runtime Entrypoints](./theory-runtime-entrypoints.md)
+- [Theory Sweep Runs](./theory-sweep-runs.md)
+- [Theory Claim Boundaries](./theory-claim-boundaries.md)
+- [Long Runtime Execution Safety](./theory-long-runtime-execution-safety.md)
+
 ## Operating Model
 
 The system keeps the current separation of responsibility, but presents the work in one Scientific Calculator page.

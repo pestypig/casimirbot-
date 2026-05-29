@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { Button } from "@/components/ui/button";
@@ -11,15 +11,34 @@ import {
 } from "@/lib/scientific-calculator/events";
 import { formatScientificCalculatorDebugLog } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve, type ScientificSolveTrace } from "@/lib/scientific-calculator/solver";
+import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
+import {
+  selectActiveTheoryRunRow,
+  selectRuntimeTheoryRunRows,
+  selectScalarTheoryRunRows,
+  useTheoryCompoundRunStore,
+} from "@/store/useTheoryCompoundRunStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
 import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry } from "@/store/useScientificCalculatorStore";
 import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
+import type { TheoryRuntimeScalarCutV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
+
+type ScientificCalculatorWorkbenchSection = "scalar" | "runtime" | "theory";
+
+const WORKBENCH_SECTIONS: Array<{
+  id: ScientificCalculatorWorkbenchSection;
+  label: string;
+}> = [
+  { id: "scalar", label: "Scalar Workbench" },
+  { id: "runtime", label: "Tensor / Runtime Workbench" },
+  { id: "theory", label: "Theory Run" },
+];
 
 function isLiveRegisterSummary(value: string | null | undefined): boolean {
   const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -93,6 +112,18 @@ function setupUnitOptionText(option: { symbol: string; quantity: string; si_fact
   return option.si_factor === 1 ? option.symbol : `${option.symbol} -> SI x ${option.si_factor}`;
 }
 
+function theoryRunRowTone(kind: string, status: string): string {
+  if (status === "failed" || status === "blocked") return "border-rose-800/70 bg-rose-950/20";
+  if (kind === "scalar") return "border-cyan-900/60 bg-cyan-950/20";
+  if (kind === "tensor" || kind === "runtime") return "border-violet-900/60 bg-violet-950/20";
+  if (kind === "gate" || kind === "boundary") return "border-amber-900/60 bg-amber-950/20";
+  return "border-slate-800 bg-slate-950/60";
+}
+
+function scalarCutExpression(cut: TheoryRuntimeScalarCutV1): string {
+  return cut.expression || cut.displayLatex;
+}
+
 function formatArtifactStepsMarkdown(artifact: ScientificCalculatorStepTraceArtifactV1): string {
   const lines = [
     "# Scientific Calculator Steps",
@@ -112,6 +143,13 @@ function formatArtifactStepsMarkdown(artifact: ScientificCalculatorStepTraceArti
     lines.push("");
   }
   return lines.join("\n").trimEnd();
+}
+
+function formatSweepNumber(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "n/a";
+  const abs = Math.abs(value);
+  if ((abs > 0 && abs < 0.001) || abs >= 1_000_000) return value.toExponential(4);
+  return Number(value.toFixed(6)).toString();
 }
 
 export function resolveScientificCalculatorVisibleDebugEvents(
@@ -152,13 +190,27 @@ export function resolveScientificCalculatorVisibleHistory(
 export default function ScientificCalculatorPanel() {
   const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, loadTheoryLoadoutItem, recordDebugEvent, clear } =
     useScientificCalculatorStore();
+  const {
+    activeTheoryRun,
+    activeRuntimeTrace,
+    selectedTheoryRunRowId,
+    theoryRunStatus,
+    loadTheoryRun,
+    selectTheoryRunRow,
+    setTheoryRunStatus,
+  } = useTheoryCompoundRunStore();
+  const activeTheoryRunRow = useTheoryCompoundRunStore(selectActiveTheoryRunRow);
+  const scalarTheoryRunRows = useTheoryCompoundRunStore(selectScalarTheoryRunRows);
+  const runtimeTheoryRunRows = useTheoryCompoundRunStore(selectRuntimeTheoryRunRows);
   const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const readDraft = useWorkstationSessionMemoryStore((state) => state.readDraft);
   const clearDraft = useWorkstationSessionMemoryStore((state) => state.clearDraft);
   const [input, setInput] = useState(() =>
     resolveInitialCalculatorInput(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY), currentLatex),
   );
+  const [activeSection, setActiveSection] = useState<ScientificCalculatorWorkbenchSection>("scalar");
   const lastStoredLatexRef = useRef(currentLatex);
+  const lastTheoryRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isLiveRegisterSummary(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY))) {
@@ -177,6 +229,19 @@ export default function ScientificCalculatorPanel() {
       clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
     }
   }, [clearDraft, currentLatex, rememberDraft]);
+
+  useEffect(() => {
+    const nextRunId = activeTheoryRun?.runId ?? null;
+    if (!nextRunId) {
+      lastTheoryRunIdRef.current = null;
+      setActiveSection("scalar");
+      return;
+    }
+    if (lastTheoryRunIdRef.current !== nextRunId) {
+      lastTheoryRunIdRef.current = nextRunId;
+      setActiveSection("theory");
+    }
+  }, [activeTheoryRun?.runId]);
 
   useEffect(() => {
     const onPicked = (event: Event) => {
@@ -229,6 +294,36 @@ export default function ScientificCalculatorPanel() {
       setInput(item.solveExpression);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, item.solveExpression);
     }
+  };
+
+  const handleLoadScalarCut = (cut: TheoryRuntimeScalarCutV1, stepId: string) => {
+    if (!activeRuntimeTrace) return;
+    const expression = scalarCutExpression(cut);
+    ingestLatex(expression, {
+      sourcePath: `theory-runtime://${activeRuntimeTrace.traceId}/${stepId}/${cut.id}`,
+      anchor: cut.id,
+      source: "workstation_action",
+      compoundRunId: activeTheoryRun?.runId ?? null,
+      compoundSubgoalId: cut.id,
+    });
+    setInput(expression);
+    rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, expression);
+    setActiveSection("scalar");
+  };
+
+  const handleRunTheoryCompoundRun = (scope: TheoryCompoundRunSolveScope) => {
+    if (!activeTheoryRun) return;
+    setTheoryRunStatus("running");
+    const solvedRun = runTheoryCompoundRunNow({
+      run: activeTheoryRun,
+      scope,
+      onRow: (_row, partialRun) => {
+        loadTheoryRun(partialRun);
+        setTheoryRunStatus("running");
+      },
+    });
+    loadTheoryRun(solvedRun);
+    setTheoryRunStatus(solvedRun.summary.failedCount > 0 ? "failed" : "complete");
   };
 
   const handleSolveTheoryLoadout = () => {
@@ -399,6 +494,299 @@ export default function ScientificCalculatorPanel() {
         <div className="text-xs uppercase tracking-wide text-cyan-300">Scientific Calculator</div>
         <div className="text-sm text-slate-300">Paste or click equations from Docs, then solve with step traces.</div>
       </div>
+
+      <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Scientific calculator workbench sections">
+        {WORKBENCH_SECTIONS.map((section) => (
+          <Button
+            key={section.id}
+            type="button"
+            size="sm"
+            variant={activeSection === section.id ? "secondary" : "outline"}
+            onClick={() => setActiveSection(section.id)}
+            role="tab"
+            aria-selected={activeSection === section.id}
+          >
+            {section.label}
+          </Button>
+        ))}
+      </div>
+
+      {activeSection === "theory" ? (
+        <div className="mb-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3" data-testid="scientific-calculator-theory-run-section">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-cyan-300">Theory Run</div>
+              <div className="text-xs text-slate-300">
+                {activeTheoryRun
+                  ? `${activeTheoryRun.summary.rowCount} rows / ${activeTheoryRun.summary.scalarCount} scalar / ${activeTheoryRun.summary.tensorCount} tensor / status ${theoryRunStatus}`
+                  : "No compound theory run loaded."}
+              </div>
+            </div>
+            {activeTheoryRunRow ? (
+              <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                selected: {activeTheoryRunRow.index}
+              </Badge>
+            ) : null}
+          </div>
+          {activeTheoryRun ? (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => handleRunTheoryCompoundRun("scalar_only")}>
+                Solve Scalar Rows
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("runtime_trace_only")}>
+                Build Runtime Traces
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("all_available")}>
+                Solve Available
+              </Button>
+            </div>
+          ) : null}
+          {activeTheoryRun ? (
+            <div className="space-y-2">
+              {activeTheoryRun.rows
+                .slice()
+                .sort((left, right) => left.index - right.index)
+                .map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    onClick={() => selectTheoryRunRow(row.id)}
+                    className={`w-full rounded border p-2 text-left text-xs ${theoryRunRowTone(row.kind, row.status)} ${
+                      selectedTheoryRunRowId === row.id ? "ring-1 ring-cyan-300" : ""
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="border-slate-600 text-slate-200">
+                        {row.index}
+                      </Badge>
+                      <span className="font-semibold text-slate-100">{row.badgeTitle}</span>
+                      <Badge variant="outline" className="border-slate-600 text-[10px] text-slate-200">
+                        {row.kind}
+                      </Badge>
+                      <Badge variant="outline" className="border-slate-600 text-[10px] text-slate-200">
+                        {row.status}
+                      </Badge>
+                      <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                        {row.solver}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 break-all font-mono text-slate-100">
+                      {row.displayLatex ?? row.expression ?? "context row"}
+                    </div>
+                    {row.evidenceRefs && row.evidenceRefs.length > 0 ? (
+                      <div className="mt-2 rounded border border-slate-800 bg-slate-950/50 p-2 text-[11px] text-slate-300">
+                        <div className="mb-1 font-semibold uppercase tracking-wide text-slate-400">Evidence refs</div>
+                        <div className="space-y-1">
+                          {row.evidenceRefs.slice(0, 4).map((ref, index) => (
+                            <div key={`${row.id}:evidence:${index}`} className="truncate" title={ref.path}>
+                              {ref.kind}: {ref.path}
+                              {ref.note ? ` - ${ref.note}` : ""}
+                            </div>
+                          ))}
+                          {row.evidenceRefs.length > 4 ? (
+                            <div className="text-slate-500">+{row.evidenceRefs.length - 4} more refs</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    {row.runtimeReceiptV1 ? (
+                      <div className="mt-2 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">Runtime receipt</span>
+                          <Badge variant="outline" className="border-violet-700/70 text-violet-100">
+                            {row.runtimeReceiptV1.status}
+                          </Badge>
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">
+                            {row.runtimeReceiptV1.runtimeId}
+                          </Badge>
+                        </div>
+                        <div className="grid gap-1 md:grid-cols-2">
+                          <div>artifacts: {row.runtimeReceiptV1.outputs.artifacts.length}</div>
+                          <div>missing signals: {row.runtimeReceiptV1.outputs.missingSignals.length}</div>
+                          <div>gates: {Object.keys(row.runtimeReceiptV1.outputs.gates).length}</div>
+                          <div>promotion: {row.runtimeReceiptV1.claimBoundary.promotionAllowed ? "allowed" : "blocked"}</div>
+                        </div>
+                        {row.runtimeReceiptV1.outputs.artifacts.length > 0 ? (
+                          <div className="mt-2 space-y-1">
+                            {row.runtimeReceiptV1.outputs.artifacts.slice(0, 3).map((artifact) => (
+                              <div key={`${row.id}:artifact:${artifact}`} className="truncate" title={artifact}>
+                                artifact: {artifact}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {row.runtimeReceiptV1.outputs.warnings.length > 0 ? (
+                          <div className="mt-2 text-amber-100">
+                            {row.runtimeReceiptV1.outputs.warnings.slice(0, 3).join("; ")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {row.runtimeRunRequestV1 ? (
+                      <div className="mt-2 rounded border border-indigo-900/60 bg-indigo-950/20 p-2 text-[11px] text-indigo-100">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">Runtime request</span>
+                          <Badge variant="outline" className="border-indigo-700/70 text-indigo-100">
+                            {row.runtimeRunRequestV1.status === "created" ? "manifest created" : row.runtimeRunRequestV1.status}
+                          </Badge>
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">
+                            {row.runtimeRunRequestV1.runtimeId}
+                          </Badge>
+                        </div>
+                        <div className="grid gap-1 md:grid-cols-2">
+                          <div>scope: {row.runtimeRunRequestV1.requestedScope}</div>
+                          <div>stage: {row.runtimeRunRequestV1.heartbeat.stage ?? "n/a"}</div>
+                          <div>artifacts expected: {row.runtimeRunRequestV1.outputArtifactGlobs.length}</div>
+                          <div>promotion: {row.runtimeRunRequestV1.claimBoundary.promotionAllowed ? "allowed" : "blocked"}</div>
+                        </div>
+                        {row.runtimeRunRequestV1.heartbeat.message ? (
+                          <div className="mt-2 text-amber-100">{row.runtimeRunRequestV1.heartbeat.message}</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {row.sweepRunV1 ? (
+                      <div className="mt-2 rounded border border-emerald-900/60 bg-emerald-950/20 p-2 text-[11px] text-emerald-100">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">Sweep summary</span>
+                          <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
+                            {row.sweepRunV1.samplePolicy.kind}
+                          </Badge>
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">
+                            ok: {row.sweepRunV1.aggregate.okCount}
+                          </Badge>
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">
+                            failed: {row.sweepRunV1.aggregate.failedCount}
+                          </Badge>
+                        </div>
+                        <div className="grid gap-1 md:grid-cols-3">
+                          <div>mean: {formatSweepNumber(row.sweepRunV1.aggregate.mean)}</div>
+                          <div>median: {formatSweepNumber(row.sweepRunV1.aggregate.median)}</div>
+                          <div>range: {formatSweepNumber(row.sweepRunV1.aggregate.min)} to {formatSweepNumber(row.sweepRunV1.aggregate.max)}</div>
+                          <div>p05: {formatSweepNumber(row.sweepRunV1.aggregate.p05)}</div>
+                          <div>p95: {formatSweepNumber(row.sweepRunV1.aggregate.p95)}</div>
+                          <div>samples: {row.sweepRunV1.samples.length}</div>
+                        </div>
+                        {row.sweepRunV1.rateProjections.length > 0 ? (
+                          <div className="mt-2 space-y-1">
+                            {row.sweepRunV1.rateProjections.map((projection) => (
+                              <div key={`${row.id}:projection:${projection.kind}:${projection.outputSymbol}`}>
+                                {projection.kind}: {projection.outputSymbol} mean {formatSweepNumber(projection.aggregate.mean)}
+                                {projection.unit ? ` ${projection.unit}` : ""}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {row.sweepRunV1.claimBoundary.notes.length > 0 ? (
+                          <div className="mt-2 text-amber-100">
+                            {row.sweepRunV1.claimBoundary.notes.slice(0, 3).join("; ")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {row.claimBoundaryNotes.length > 0 ? (
+                      <div className="mt-2 space-y-1 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+                        {row.claimBoundaryNotes.slice(0, 4).map((note, index) => (
+                          <div key={`${row.id}:claim:${index}`}>{note}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {row.warnings.length > 0 ? (
+                      <div className="mt-2 space-y-1 text-[11px] text-amber-200">
+                        {row.warnings.map((warning, index) => (
+                          <div key={`${row.id}:warning:${index}`}>{warning}</div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </button>
+                ))}
+            </div>
+          ) : (
+            <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
+              Theory Badge Graph presets can load scalar, tensor/runtime, evidence, gate, and boundary rows here.
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {activeSection === "runtime" ? (
+        <div className="mb-3 rounded-md border border-violet-900/60 bg-violet-950/20 p-3" data-testid="scientific-calculator-runtime-section">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-violet-300">Tensor / Runtime Workbench</div>
+              <div className="text-xs text-slate-300">
+                {activeRuntimeTrace
+                  ? `${activeRuntimeTrace.summary.stepCount} static/reference steps / ${activeRuntimeTrace.summary.scalarCutCount} scalar cuts`
+                  : activeTheoryRun
+                    ? `${runtimeTheoryRunRows.length} tensor/runtime rows available. Select a row with a runtime trace.`
+                    : "No runtime trace loaded."}
+              </div>
+            </div>
+            {scalarTheoryRunRows.length > 0 ? (
+              <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                {scalarTheoryRunRows.length} scalar rows
+              </Badge>
+            ) : null}
+          </div>
+          {activeRuntimeTrace ? (
+            <div className="space-y-2">
+              <div className="rounded border border-violet-900/50 bg-slate-950/60 p-2 text-xs">
+                <div className="font-mono text-violet-100">{activeRuntimeTrace.traceId}</div>
+                <div className="mt-1 text-slate-400">{activeRuntimeTrace.request.target}</div>
+                {activeRuntimeTrace.summary.claimBoundaryNotes.length > 0 ? (
+                  <div className="mt-2 text-[11px] text-amber-100">
+                    {activeRuntimeTrace.summary.claimBoundaryNotes.join("; ")}
+                  </div>
+                ) : null}
+              </div>
+              {activeRuntimeTrace.steps.map((step) => (
+                <div key={step.id} className="rounded border border-slate-800 bg-slate-950/60 p-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="border-violet-700/70 text-violet-100">
+                      {step.index}
+                    </Badge>
+                    <span className="font-semibold text-slate-100">{step.title}</span>
+                    <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                      {step.operatorKind}
+                    </Badge>
+                    <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                      {step.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 break-all font-mono text-slate-200">
+                    {step.displayLatex ?? step.expression ?? "reference step"}
+                  </div>
+                  {step.scalarCuts.length > 0 ? (
+                    <div className="mt-2 space-y-2">
+                      {step.scalarCuts.map((cut) => (
+                        <div key={cut.id} className="rounded border border-cyan-900/50 bg-cyan-950/20 p-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="font-semibold text-cyan-100">{cut.label}</div>
+                              <div className="mt-1 break-all font-mono text-cyan-50">
+                                {scalarCutExpression(cut)}
+                              </div>
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => handleLoadScalarCut(cut, step.id)}>
+                              Load Scalar Cut
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {step.warnings.length > 0 ? (
+                    <div className="mt-2 text-[11px] text-amber-200">{step.warnings.join("; ")}</div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
+              Tensor/runtime traces appear here as static/reference traces until a later runtime adapter provides receipts.
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="space-y-3 rounded-md border border-slate-800 bg-slate-900/50 p-3">
         <Label className="text-xs text-slate-300">LaTeX / Expression Input</Label>

@@ -64,6 +64,11 @@ const readValidRepoEvidenceAnswerText = (payload: Record<string, unknown>): stri
   return readString(answer?.answer_text);
 };
 
+const readFinalAnswerDraftText = (payload: Record<string, unknown>): string | null => {
+  const draft = readRecord(payload.final_answer_draft);
+  return readString(draft?.text) ?? readString(draft?.answer_text);
+};
+
 const readTurnId = (payload: Record<string, unknown>, fallback?: string | null): string =>
   readString(payload.turn_id) ?? readString(fallback) ?? "unknown-turn";
 
@@ -352,6 +357,11 @@ export function resolveTerminalAnswerEnvelope(
     terminalText = readValidRepoEvidenceAnswerText(payload) ?? readTerminalPresentationText(payload);
     authorityOrigin = terminalText === readValidRepoEvidenceAnswerText(payload)
       ? "repo_code_evidence_answer"
+      : "terminal_presentation";
+  } else if (terminalArtifactKind === "live_environment_tool_observation") {
+    terminalText = readFinalAnswerDraftText(payload) ?? readString(payload.selected_final_answer) ?? readTerminalPresentationText(payload);
+    authorityOrigin = terminalText === readFinalAnswerDraftText(payload) || terminalText === readString(payload.selected_final_answer)
+      ? "selected_final_answer"
       : "terminal_presentation";
   } else {
     terminalText = readTerminalPresentationText(payload);

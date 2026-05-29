@@ -548,6 +548,62 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "build_compound_theory_run",
+        title: "Build Compound Theory Run",
+        description:
+          "Build a unified theory run artifact with scalar calculator rows, tensor/runtime trace rows, evidence refs, gates, and claim boundaries without mutating panels.",
+        risk: "low",
+        optional_args: [
+          "badge_ids",
+          "badge_id",
+          "target_badge_id",
+          "atlas_block_id",
+          "mode",
+          "include_scalar",
+          "include_runtime",
+          "include_evidence",
+          "include_boundaries",
+          "run",
+        ],
+        returns_artifact: true,
+      },
+      {
+        id: "load_compound_theory_run",
+        title: "Load Compound Theory Run",
+        description:
+          "Load a compound theory run into the Scientific Calculator Theory Run workbench without solving scalar or runtime rows.",
+        risk: "low",
+        optional_args: ["run", "run_id", "badge_ids", "badge_id", "target_badge_id", "atlas_block_id", "mode"],
+        returns_artifact: true,
+      },
+      {
+        id: "solve_compound_theory_run",
+        title: "Solve Compound Theory Run",
+        description:
+          "Solve available scalar calculator rows and validate static tensor/runtime trace rows in a compound theory run; does not execute long backend jobs.",
+        risk: "low",
+        optional_args: ["run", "run_id", "badge_ids", "badge_id", "target_badge_id", "atlas_block_id", "mode", "solve_scope", "scope"],
+        returns_artifact: true,
+      },
+      {
+        id: "get_runtime_math_trace",
+        title: "Get Runtime Math Trace",
+        description:
+          "Return a static/reference tensor or runtime math trace for a badge or runtime family; no backend runtime is executed.",
+        risk: "low",
+        optional_args: ["badge_id", "runtime_family", "family", "trace_id"],
+        returns_artifact: true,
+      },
+      {
+        id: "load_scalar_cut_to_calculator",
+        title: "Load Scalar Cut To Calculator",
+        description:
+          "Load a scalar cut from a tensor/runtime trace into the existing Scientific Calculator scalar workbench without solving.",
+        risk: "low",
+        optional_args: ["scalar_cut", "expression", "latex", "display_latex", "source_path", "anchor", "run_id"],
+        returns_artifact: true,
+      },
+      {
         id: "run_runtime_badge",
         title: "Run Runtime Badge",
         description: "Run a StarSim runtime badge against an object context and return a typed runtime receipt.",

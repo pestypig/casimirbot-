@@ -9,6 +9,7 @@ import {
 } from "@/lib/scientific-calculator/debugLog";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
+import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { runStarSimRuntimeBadge } from "@shared/theory/starsim-runtime-adapter";
@@ -17,6 +18,7 @@ import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
+import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import {
   useSituationRoomStore,
@@ -60,6 +62,7 @@ import { buildCurvatureCollapseObjectBindings } from "@shared/theory/curvature-c
 import {
   buildTheoryCalculatorLoadout,
 } from "@shared/theory/theory-calculator-loadout";
+import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
 import {
   HELIX_PHYSICS_CALCULATION_INTENTS,
   type HelixPhysicsCalculationIntent,
@@ -71,6 +74,14 @@ import {
   type TheoryCalculatorObjectContextV1,
 } from "@shared/contracts/theory-calculator-loadout.v1";
 import {
+  isTheoryCompoundRunV1,
+  type TheoryCompoundRunV1,
+} from "@shared/contracts/theory-compound-run.v1";
+import {
+  isTheoryRuntimeMathTraceV1,
+  type TheoryRuntimeMathTraceV1,
+} from "@shared/contracts/theory-runtime-math-trace.v1";
+import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
 } from "@shared/theory/theory-badge-overlap-locator";
@@ -81,6 +92,11 @@ import {
 } from "@shared/contracts/physics-atlas.v1";
 import { buildHelixPhysicsAtlasV1, PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
+import {
+  buildStaticCasimirRuntimeTraceV1,
+  buildStaticGrTensorTraceV1,
+  buildStaticSolarRuntimeTraceV1,
+} from "@shared/theory/runtime-traces";
 import {
   buildDottieVoiceReceipt,
   HELIX_AGENT_COMMENTARY_SCHEMA,
@@ -1391,6 +1407,123 @@ function buildTheoryLoadoutFromActionArgs(args: Record<string, unknown>, graph: 
     atlasBlockId: atlasBlockId ?? undefined,
     includeContextItems: asBoolean(args.include_context_items ?? args.includeContextItems) ?? true,
   });
+}
+
+function asTheoryCompoundRunSolveScope(value: unknown): TheoryCompoundRunSolveScope {
+  const text = asNonEmptyString(value);
+  if (
+    text === "scalar_only" ||
+    text === "runtime_trace_only" ||
+    text === "scalar_and_runtime" ||
+    text === "all_available"
+  ) {
+    return text;
+  }
+  if (text === "all_scalar") return "scalar_only";
+  if (text === "all_scalar_and_runtime") return "scalar_and_runtime";
+  return "all_available";
+}
+
+function compoundRunBadgeIdsFromActionArgs(
+  args: Record<string, unknown>,
+  graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>,
+): string[] {
+  const targetBadgeId = asNonEmptyString(args.target_badge_id ?? args.targetBadgeId ?? args.badge_id ?? args.badgeId);
+  const badgeIds = asStringArray(args.badge_ids ?? args.badgeIds ?? args.ids);
+  if (badgeIds.length > 0) return badgeIds;
+  if (targetBadgeId) return [targetBadgeId];
+
+  const atlasBlockId = asPhysicsAtlasBlockId(args.atlas_block_id ?? args.atlasBlockId ?? args.block_id ?? args.blockId);
+  const atlasBlock = atlasBlockId
+    ? PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) => block.id === atlasBlockId)
+    : null;
+  if (!atlasBlock) return [];
+  return atlasBlock.primaryBadgeIds.filter((badgeId: string) =>
+    graph.badges.some((badge: TheoryBadgeV1) => badge.id === badgeId),
+  );
+}
+
+function buildTheoryCompoundRunFromActionArgs(
+  args: Record<string, unknown>,
+  graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>,
+): TheoryCompoundRunV1 | null {
+  const existingRun =
+    asRecord(args.run) ??
+    asRecord(args.compound_run) ??
+    asRecord(args.compoundRun) ??
+    asRecord(args.artifact_v1) ??
+    asRecord(args.artifactV1);
+  if (existingRun && isTheoryCompoundRunV1(existingRun)) return existingRun;
+
+  const runId = asNonEmptyString(args.run_id ?? args.runId);
+  const activeRun = useTheoryCompoundRunStore.getState().activeTheoryRun;
+  if (runId && activeRun?.runId === runId) return activeRun;
+
+  const badgeIds = compoundRunBadgeIdsFromActionArgs(args, graph);
+  if (badgeIds.length === 0) return null;
+  const requestedMode = asNonEmptyString(args.mode);
+  const mode =
+    requestedMode === "dependency_path"
+      ? "dependency_path"
+      : requestedMode === "locator_matches"
+        ? "locator_matches"
+        : "selected_badges";
+  return buildTheoryCompoundRun({
+    graph,
+    badgeIds,
+    mode,
+    source: "workstation_action",
+    includeScalar: asBoolean(args.include_scalar ?? args.includeScalar) ?? true,
+    includeRuntime: asBoolean(args.include_runtime ?? args.includeRuntime) ?? true,
+    includeEvidence: asBoolean(args.include_evidence ?? args.includeEvidence) ?? true,
+    includeBoundaries: asBoolean(args.include_boundaries ?? args.includeBoundaries) ?? true,
+  });
+}
+
+function badgeLooksLikeCasimir(badge: TheoryBadgeV1 | null): boolean {
+  return Boolean(badge?.id.startsWith("casimir.") || badge?.subjects.includes("casimir"));
+}
+
+function badgeLooksLikeSolar(badge: TheoryBadgeV1 | null): boolean {
+  return Boolean(badge?.id.startsWith("solar.") || badge?.subjects.includes("solar"));
+}
+
+function buildRuntimeMathTraceFromActionArgs(
+  args: Record<string, unknown>,
+  graph: ReturnType<typeof buildNhm2TheoryBadgeGraphV1>,
+): TheoryRuntimeMathTraceV1 | null {
+  const existingTrace = asRecord(args.trace) ?? asRecord(args.runtime_math_trace) ?? asRecord(args.runtimeMathTrace);
+  if (existingTrace && isTheoryRuntimeMathTraceV1(existingTrace)) return existingTrace;
+
+  const badgeId = asNonEmptyString(args.badge_id ?? args.badgeId) ?? graph.badges[0]?.id;
+  const badge = badgeId ? graph.badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId) ?? null : null;
+  const family = asNonEmptyString(args.runtime_family ?? args.runtimeFamily ?? args.family);
+  const traceInput = {
+    graphId: graph.graphId,
+    badgeIds: badge ? [badge.id] : badgeId ? [badgeId] : [],
+    traceId: asNonEmptyString(args.trace_id ?? args.traceId) ?? undefined,
+  };
+
+  if (family === "casimir_field" || badgeLooksLikeCasimir(badge)) return buildStaticCasimirRuntimeTraceV1(traceInput);
+  if (family === "solar_spectrum" || badgeLooksLikeSolar(badge)) return buildStaticSolarRuntimeTraceV1(traceInput);
+  if (family === "gr_tensor" || family === "warp_full_solve" || badge) return buildStaticGrTensorTraceV1(traceInput);
+  return null;
+}
+
+function scalarCutExpressionFromActionArgs(args: Record<string, unknown>): {
+  expression: string | null;
+  sourcePath: string | null;
+  anchor: string | null;
+} {
+  const scalarCut = asRecord(args.scalar_cut ?? args.scalarCut);
+  const expression =
+    asNonEmptyString(args.expression ?? args.latex ?? args.display_latex ?? args.displayLatex) ??
+    asNonEmptyString(scalarCut?.expression ?? scalarCut?.displayLatex ?? scalarCut?.display_latex);
+  return {
+    expression,
+    sourcePath: asNonEmptyString(args.source_path ?? args.sourcePath),
+    anchor: asNonEmptyString(args.anchor ?? args.scalar_cut_id ?? args.scalarCutId ?? scalarCut?.id),
+  };
 }
 
 function claimBoundaryNotesForBadges(
@@ -5129,6 +5262,145 @@ export function executeHelixPanelAction(
           runtime_receipt_count: finalLoadout.summary.runtimeReceiptCount,
           failed_count: finalLoadout.summary.failedCount,
           claim_boundary_notes: finalLoadout.claimBoundaryNotes,
+          calculator_focused: true,
+        },
+      };
+    }
+
+    if (actionId === "build_compound_theory_run") {
+      const run = buildTheoryCompoundRunFromActionArgs(args, graph);
+      if (!run) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.build_compound_theory_run requires badge_ids, badge_id, target_badge_id, atlas_block_id, or a valid run.",
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_compound_run",
+          schemaVersion: run.schemaVersion,
+          artifact_v1: run,
+          graph_id: graph.graphId,
+          row_count: run.summary.rowCount,
+          scalar_count: run.summary.scalarCount,
+          tensor_count: run.summary.tensorCount,
+          runtime_count: run.summary.runtimeCount,
+          boundary_count: run.summary.boundaryCount,
+          claim_boundary_notes: Array.from(new Set(run.rows.flatMap((row) => row.claimBoundaryNotes))),
+        },
+      };
+    }
+
+    if (actionId === "load_compound_theory_run" || actionId === "solve_compound_theory_run") {
+      const run = buildTheoryCompoundRunFromActionArgs(args, graph);
+      if (!run) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: `theory-badge-graph.${actionId} requires a valid theory_compound_run/v1 payload or badge selection.`,
+        };
+      }
+      const finalRun =
+        actionId === "solve_compound_theory_run"
+          ? runTheoryCompoundRunNow({
+              run,
+              scope: asTheoryCompoundRunSolveScope(args.solve_scope ?? args.solveScope ?? args.scope),
+            })
+          : run;
+      useTheoryCompoundRunStore.getState().loadTheoryRun(finalRun);
+      useTheoryCompoundRunStore.getState().setTheoryRunStatus(
+        actionId === "solve_compound_theory_run"
+          ? finalRun.summary.failedCount > 0
+            ? "failed"
+            : "complete"
+          : "loaded",
+      );
+      context.openPanel("scientific-calculator", undefined);
+      context.focusPanel("scientific-calculator", undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: actionId === "solve_compound_theory_run" ? "theory_compound_run_solved" : "theory_compound_run_loaded",
+          schemaVersion: finalRun.schemaVersion,
+          artifact_v1: finalRun,
+          graph_id: graph.graphId,
+          row_count: finalRun.summary.rowCount,
+          scalar_count: finalRun.summary.scalarCount,
+          solved_count: finalRun.summary.solvedCount,
+          computed_count: finalRun.summary.computedCount,
+          blocked_count: finalRun.summary.blockedCount,
+          failed_count: finalRun.summary.failedCount,
+          claim_boundary_notes: Array.from(new Set(finalRun.rows.flatMap((row) => row.claimBoundaryNotes))),
+          calculator_focused: true,
+        },
+      };
+    }
+
+    if (actionId === "get_runtime_math_trace") {
+      const trace = buildRuntimeMathTraceFromActionArgs(args, graph);
+      if (!trace) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.get_runtime_math_trace requires a recognized runtime family or badge.",
+        };
+      }
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_runtime_math_trace",
+          schemaVersion: trace.schemaVersion,
+          artifact_v1: trace,
+          graph_id: graph.graphId,
+          runtime_id: trace.runtimeId,
+          family: trace.request.family,
+          step_count: trace.summary.stepCount,
+          scalar_cut_count: trace.summary.scalarCutCount,
+          claim_boundary_notes: trace.summary.claimBoundaryNotes,
+          warnings: Array.from(new Set(trace.steps.flatMap((step) => step.warnings))),
+        },
+      };
+    }
+
+    if (actionId === "load_scalar_cut_to_calculator") {
+      const scalarCut = scalarCutExpressionFromActionArgs(args);
+      if (!scalarCut.expression) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.load_scalar_cut_to_calculator requires a scalar cut expression.",
+        };
+      }
+      useScientificCalculatorStore.getState().ingestLatex(scalarCut.expression, {
+        sourcePath: scalarCut.sourcePath ?? "theory-runtime://scalar-cut",
+        anchor: scalarCut.anchor,
+        source: "workstation_action",
+        compoundRunId: asNonEmptyString(args.compound_run_id ?? args.compoundRunId ?? args.run_id ?? args.runId),
+        compoundSubgoalId: scalarCut.anchor,
+      });
+      context.openPanel("scientific-calculator", undefined);
+      context.focusPanel("scientific-calculator", undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_scalar_cut_loaded",
+          expression: scalarCut.expression,
+          source_path: scalarCut.sourcePath ?? "theory-runtime://scalar-cut",
+          anchor: scalarCut.anchor,
           calculator_focused: true,
         },
       };

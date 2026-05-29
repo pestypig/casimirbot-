@@ -1433,6 +1433,43 @@ describe("helix ask universal answer plan shadow", () => {
     expect(budget.override).toBe(true);
   });
 
+  it("separates final answer output budgets from context budgets", () => {
+    const standard = __testHelixAskReliabilityGuards.resolveHelixFinalAnswerOutputBudget({
+      prompt: "What does the rolling context packet do?",
+      compactObservationCount: 1,
+    });
+    const long = __testHelixAskReliabilityGuards.resolveHelixFinalAnswerOutputBudget({
+      prompt:
+        "Write a comprehensive README section comparing context windows, rolling session compaction, tool observations, and final answer behavior.",
+      compactObservationCount: 8,
+      contextEconomyReport: {
+        schema: "helix.model_context_economy_report.v1",
+        estimated_input_tokens_by_section: {
+          user_goal: 200,
+          compact_observations: 2200,
+        },
+        dropped_sections: [],
+        selected_observation_refs: [],
+        raw_debug_excluded_from_model_context: true,
+        raw_span_refs_available: [],
+        exact_excerpt_refs_included: [],
+        section_char_caps: {},
+      },
+    });
+    const concise = __testHelixAskReliabilityGuards.resolveHelixFinalAnswerOutputBudget({
+      prompt: "Keep it short: what does rolling context do?",
+      compactObservationCount: 8,
+    });
+
+    expect(standard.schema).toBe("helix.final_answer_output_budget.v1");
+    expect(standard.mode).toBe("standard");
+    expect(long.mode).toBe("long");
+    expect(long.max_tokens).toBeGreaterThan(standard.max_tokens);
+    expect(long.reasons).toContain("prompt_long_form_cue");
+    expect(concise.mode).toBe("concise");
+    expect(concise.max_tokens).toBeLessThanOrEqual(standard.max_tokens);
+  });
+
   it("forces direct concept answers for short general definitions with a strong concept match", () => {
     expect(
       __testHelixAskReliabilityGuards.shouldForceHelixAskShortDefinitionConceptAnswer({

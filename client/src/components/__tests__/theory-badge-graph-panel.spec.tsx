@@ -25,20 +25,20 @@ function renderPanel() {
 }
 
 afterEach(() => {
+  useScientificCalculatorStore.setState({
+    currentLatex: "",
+    lastTheoryLoadout: null,
+    activeTheoryLoadoutItemIndex: null,
+  });
   cleanup();
 });
 
 describe("TheoryBadgeGraphPanel", () => {
-  it("renders graph inspection surfaces and loads a payload into the scientific calculator", async () => {
+  it("renders the achievement map and loads a payload into the scientific calculator", async () => {
     renderPanel();
 
-    expect(await screen.findByText("Theory Badge Graph")).toBeTruthy();
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     fireEvent.click(await screen.findByRole("button", { name: "Energy density proxy" }));
-
-    expect(await screen.findByText("Assumptions")).toBeTruthy();
-    expect(screen.getByText("Units")).toBeTruthy();
-
-    fireEvent.click(await screen.findByRole("button", { name: /Load to Calculator/i }));
 
     await waitFor(() => {
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("\\rho = \\frac{E}{V}");

@@ -7,6 +7,7 @@ import TheoryBadgeGraphPanel from "../panels/TheoryBadgeGraphPanel";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore";
+import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
 
@@ -29,6 +30,7 @@ function renderPanel() {
 
 afterEach(() => {
   useTheoryBadgePlaybackStore.getState().clearPlayback();
+  useTheoryCompoundRunStore.getState().clearTheoryRun();
   useTheoryBadgeGraphPanelStore.getState().resetPanelMemory();
   useTheoryMapOverlayStore.getState().clearOverlay();
   useScientificCalculatorStore.setState({
@@ -44,6 +46,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
 
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load Theory Run" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
 
     expect(screen.queryByText(/Selected: Rest Energy/)).toBeNull();
@@ -54,6 +57,68 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     await waitFor(() => {
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("E_0=mc^2");
+    });
+  });
+
+  it("loads a selected badge dependency path as a compound theory run", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Load Theory Run" }));
+
+    await waitFor(() => {
+      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
+      expect(run?.source.kind).toBe("theory_badge_graph");
+      expect(run?.targetBadgeIds).toEqual(["physics.gr.einstein_field_equation"]);
+      expect(run?.rows.some((row) => row.kind === "tensor" || row.kind === "reference")).toBe(true);
+      expect(run?.rows.some((row) => row.runtimeMathTraceV1)).toBe(true);
+    });
+  });
+
+  it("shows execution and evidence overlays without replacing the achievement map", async () => {
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Execution Map" }));
+    expect(await screen.findByText(/Execution overlay:/)).toBeTruthy();
+    expect(screen.getByText(/blocked/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Evidence Map" }));
+    expect(await screen.findByText(/Evidence overlay:/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Load Theory Run" }));
+    await waitFor(() => {
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.rows.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("loads the active atlas block primary badges as a compound theory run", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Solar Surface & Spectrum atlas lens" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Load Atlas Block Theory Run" }));
+
+    await waitFor(() => {
+      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
+      expect(run?.targetBadgeIds).toContain("solar.spectrum.photon_energy");
+      expect(run?.rows.some((row) => row.kind === "scalar")).toBe(true);
+      expect(run?.rows.some((row) => row.runtimeMathTraceV1?.request.family === "solar_spectrum")).toBe(true);
+    });
+  });
+
+  it("includes claim boundary rows when a claim boundary badge is loaded as a theory run", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Diagnostic-only claim boundary" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Load Theory Run" }));
+
+    await waitFor(() => {
+      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
+      expect(run?.rows.some((row) => row.kind === "boundary")).toBe(true);
+      expect(run?.rows.some((row) => row.claimBoundaryNotes.some((note) => /validation claim not allowed/i.test(note)))).toBe(
+        true,
+      );
     });
   });
 

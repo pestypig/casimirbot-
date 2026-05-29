@@ -97,7 +97,11 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const procedureEpochComparison =
     /\b(?:what\s+changed|changed\s+since|compare|compared|difference|different)\b/.test(text) &&
     /\b(?:last|previous|prior)\s+(?:seen\s+)?(?:scene|epoch|frame|visual|screen|capture)|\bscene\s+epoch\b|\bvisual\s+epoch\b/.test(text);
+  const liveAnswerStateRead =
+    /\b(?:live\s+answer\s+(?:panel|environment|card)|live\s+card|active\s+live\s+(?:answer\s+)?(?:environment|source|job)|calculator\s+live\s+(?:source|job|environment))\b/.test(text) &&
+    /\b(?:latest|current|result|value|equation|line|threshold|cross(?:ed|es|ing)?|changed|state|status)\b/.test(text);
   const explicitBindingDiagnosis =
+    !liveAnswerStateRead &&
     /\b(?:worker\s+lanes?|lanes?|field\s+evaluations?|interpretations?|live\s+cognition|live\s+answer\s+(?:panel|environment|card)|no\s+active\s+live\s+answer\s+environment|producer\s+stale|capture\s+(?:health|bound|binding|adopted|adoption)|client\s+adoption|scene_procedure_ready|live_card_ready)\b/.test(text) &&
     /\b(?:visual|screen|capture|live\s+answer|live\s+source|scene|frame|updating|bound|binding|attach|environment|producer|adopted|adoption|ready|readiness|stale)\b/.test(text);
   const mentionsLiveSurface =

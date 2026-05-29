@@ -4,6 +4,8 @@ import {
 } from "./scientific-calculator-step-schema.v1";
 import { isTheoryRuntimeMathTraceV1, type TheoryRuntimeMathTraceV1 } from "./theory-runtime-math-trace.v1";
 import { isTheoryRuntimeReceiptV1, type TheoryRuntimeReceiptV1 } from "./theory-runtime-receipt.v1";
+import { isTheoryRuntimeRunRequestV1, type TheoryRuntimeRunRequestV1 } from "./theory-runtime-run-request.v1";
+import { isTheorySweepRunV1, type TheorySweepRunV1 } from "./theory-sweep-run.v1";
 
 export const THEORY_COMPOUND_RUN_ARTIFACT_ID = "theory_compound_run" as const;
 export const THEORY_COMPOUND_RUN_SCHEMA_VERSION = "theory_compound_run/v1" as const;
@@ -74,6 +76,8 @@ export type TheoryCompoundRunRowV1 = {
   calculatorArtifactV1?: ScientificCalculatorStepTraceArtifactV1 | null;
   runtimeMathTraceV1?: TheoryRuntimeMathTraceV1 | null;
   runtimeReceiptV1?: TheoryRuntimeReceiptV1 | null;
+  runtimeRunRequestV1?: TheoryRuntimeRunRequestV1 | null;
+  sweepRunV1?: TheorySweepRunV1 | null;
   evidenceRefs?: TheoryCompoundRunEvidenceRefV1[];
   claimBoundaryNotes: string[];
   warnings: string[];
@@ -264,6 +268,20 @@ export function validateTheoryCompoundRunV1(value: unknown): string[] {
       !isTheoryRuntimeReceiptV1(rawRow.runtimeReceiptV1)
     ) {
       issues.push(`${prefix}.runtimeReceiptV1 is invalid`);
+    }
+    if (
+      rawRow.runtimeRunRequestV1 !== undefined &&
+      rawRow.runtimeRunRequestV1 !== null &&
+      !isTheoryRuntimeRunRequestV1(rawRow.runtimeRunRequestV1)
+    ) {
+      issues.push(`${prefix}.runtimeRunRequestV1 is invalid`);
+    }
+    if (
+      rawRow.sweepRunV1 !== undefined &&
+      rawRow.sweepRunV1 !== null &&
+      !isTheorySweepRunV1(rawRow.sweepRunV1)
+    ) {
+      issues.push(`${prefix}.sweepRunV1 is invalid`);
     }
     validateEvidenceRefs(`${prefix}.evidenceRefs`, rawRow.evidenceRefs, issues);
     if (!isStringArray(rawRow.claimBoundaryNotes)) issues.push(`${prefix}.claimBoundaryNotes must be an array of strings`);

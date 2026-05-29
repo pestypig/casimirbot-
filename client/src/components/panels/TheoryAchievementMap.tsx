@@ -23,6 +23,11 @@ type TheoryAchievementMapProps = {
   failedBadgeIds: string[];
   rippleBadgeIds: string[];
   heatByBadgeId: Record<string, number>;
+  routeBadgeLabels?: Record<string, {
+    label: string;
+    tone: "cyan" | "emerald" | "amber" | "rose" | "slate";
+    title: string;
+  }>;
   activeAtlasLensId: PhysicsAtlasBlockId | null;
   onSelectBadge: (badgeId: string) => void;
   onToggleBadgeSelection: (badgeId: string) => void;
@@ -128,6 +133,7 @@ function badgeClass(args: {
   foundation: boolean;
   claimBoundary: boolean;
   plannedDomain: boolean;
+  routeBlocked: boolean;
 }) {
   const classes = [
     "absolute flex h-11 w-11 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
@@ -143,6 +149,7 @@ function badgeClass(args: {
   if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
   if (args.foundation) classes.push("shadow-[0_0_16px_rgba(148,163,184,0.28)]");
   if (args.claimBoundary) classes.push("border-amber-300 bg-gradient-to-br from-amber-100 via-zinc-400 to-rose-900");
+  if (args.routeBlocked) classes.push("ring-4 ring-rose-500/80 shadow-rose-500/40");
   if (args.plannedDomain) classes.push("opacity-55 saturate-50");
   if (args.hasFocus && !args.highlighted && !args.multiSelected) classes.push("opacity-30 grayscale");
   return classes.join(" ");
@@ -159,6 +166,7 @@ export default function TheoryAchievementMap({
   failedBadgeIds,
   rippleBadgeIds,
   heatByBadgeId,
+  routeBadgeLabels = {},
   activeAtlasLensId,
   onSelectBadge,
   onToggleBadgeSelection,
@@ -261,6 +269,17 @@ export default function TheoryAchievementMap({
           const plannedDomain = Boolean(
             activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
           );
+          const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
+          const routeLabelClass =
+            routeLabel?.tone === "rose"
+              ? "border-rose-300 bg-rose-950 text-rose-100"
+              : routeLabel?.tone === "amber"
+                ? "border-amber-300 bg-amber-950 text-amber-100"
+                : routeLabel?.tone === "emerald"
+                  ? "border-emerald-300 bg-emerald-950 text-emerald-100"
+                  : routeLabel?.tone === "cyan"
+                    ? "border-cyan-300 bg-cyan-950 text-cyan-100"
+                    : "border-zinc-400 bg-zinc-950 text-zinc-100";
           const glowShadow = [
             heat > 0
               ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
@@ -286,6 +305,7 @@ export default function TheoryAchievementMap({
                 foundation,
                 claimBoundary,
                 plannedDomain,
+                routeBlocked: routeLabel?.tone === "rose",
               })}
               style={{
                 left: node.x,
@@ -319,6 +339,14 @@ export default function TheoryAchievementMap({
               ) : null}
               {claimBoundary ? (
                 <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
+              ) : null}
+              {routeLabel ? (
+                <span
+                  className={`pointer-events-none absolute left-1/2 top-full mt-1 max-w-28 -translate-x-1/2 truncate border px-1 py-0.5 text-[9px] normal-case shadow ${routeLabelClass}`}
+                  title={routeLabel.title}
+                >
+                  {routeLabel.label}
+                </span>
               ) : null}
             </button>
           );

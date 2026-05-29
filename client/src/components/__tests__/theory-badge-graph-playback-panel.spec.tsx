@@ -30,14 +30,10 @@ afterEach(() => {
 });
 
 describe("TheoryBadgeGraphPanel playback", () => {
-  it("runs a badge path and renders solved and skipped playback rows", async () => {
+  it("runs a badge path from the achievement map", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }));
-    fireEvent.click(await screen.findByRole("button", { name: /Run Path to Badge/i }));
-
-    expect(await screen.findByText("Path Playback")).toBeTruthy();
-    expect(screen.getByText("Copy Playback JSON")).toBeTruthy();
+    fireEvent.doubleClick(await screen.findByRole("button", { name: "QEI sampling window" }));
 
     await waitFor(
       () => {
@@ -46,8 +42,8 @@ describe("TheoryBadgeGraphPanel playback", () => {
       { timeout: 8000 },
     );
 
-    expect((await screen.findAllByText("solved")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("skipped").length).toBeGreaterThan(0);
-    expect(screen.getByText("Copy Playback Markdown")).toBeTruthy();
+    const run = useTheoryBadgePlaybackStore.getState().activeRun;
+    expect(run?.summary.solvedCount).toBeGreaterThan(0);
+    expect(run?.summary.skippedCount).toBeGreaterThan(0);
   });
 });

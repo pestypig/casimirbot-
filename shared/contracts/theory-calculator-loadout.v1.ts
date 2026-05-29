@@ -32,6 +32,7 @@ export type TheoryCalculatorObjectContextV1 = {
     | "nhm2_diagnostic_object"
     | "tokamak_plasma_object"
     | "galactic_dynamics_object"
+    | "curvature_collapse_object"
     | "generic_physics_object"
     | "manual_symbol_bindings";
   objectId: string | null;
