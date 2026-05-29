@@ -60,86 +60,93 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
-  it("loads a selected badge dependency path as a compound theory run", async () => {
+  it("does not put theory-run controls directly on the badge graph", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Load Theory Run" }));
+
+    expect(screen.queryByRole("button", { name: "Load Theory Run" })).toBeNull();
+    expect(screen.queryByText("Concept Map")).toBeNull();
+    expect(screen.queryByText("Execution Map")).toBeNull();
+    expect(screen.queryByText("Evidence Map")).toBeNull();
+  });
+
+  it("loads tensor reference badges as compound theory runs", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
 
     await waitFor(() => {
-      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
-      expect(run?.source.kind).toBe("theory_badge_graph");
-      expect(run?.targetBadgeIds).toEqual(["physics.gr.einstein_field_equation"]);
-      expect(run?.rows.some((row) => row.kind === "tensor" || row.kind === "reference")).toBe(true);
-      expect(run?.rows.some((row) => row.runtimeMathTraceV1)).toBe(true);
+      const runState = useTheoryCompoundRunStore.getState();
+      expect(runState.activeTheoryRun?.targetBadgeIds).toContain("physics.gr.einstein_field_equation");
+      expect(runState.activeRuntimeTrace?.request.family).toBe("gr_tensor");
+      expect(runState.selectedTheoryRunRowId).toBeTruthy();
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
     });
   });
 
-  it("shows execution and evidence overlays without replacing the achievement map", async () => {
+  it("keeps route metadata in hover text instead of visible graph labels", async () => {
     renderPanel();
 
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Execution Map" }));
-    expect(await screen.findByText(/Execution overlay:/)).toBeTruthy();
-    expect(screen.getByText(/blocked/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Evidence Map" }));
-    expect(await screen.findByText(/Evidence overlay:/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Load Theory Run" }));
     await waitFor(() => {
-      expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.rows.length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "Einstein field equation" }).getAttribute("title")).toMatch(
+        /reference|tensor|gate|boundary|scalar/i,
+      );
     });
+    expect(screen.queryByText("reference")).toBeNull();
+    expect(screen.queryByText("scalar")).toBeNull();
   });
 
-  it("loads the active atlas block primary badges as a compound theory run", async () => {
+  it("keeps atlas block settings visual without a graph-level load button", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Solar Surface & Spectrum atlas lens" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Load Atlas Block Theory Run" }));
 
     await waitFor(() => {
-      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
-      expect(run?.targetBadgeIds).toContain("solar.spectrum.photon_energy");
-      expect(run?.rows.some((row) => row.kind === "scalar")).toBe(true);
-      expect(run?.rows.some((row) => row.runtimeMathTraceV1?.request.family === "solar_spectrum")).toBe(true);
+      expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toContain("solar.spectrum.photon_energy");
     });
+    expect(screen.queryByRole("button", { name: "Load Atlas Block Theory Run" })).toBeNull();
   });
 
-  it("includes claim boundary rows when a claim boundary badge is loaded as a theory run", async () => {
+  it("clears selected badges when clicking empty graph space", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Diagnostic-only claim boundary" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Load Theory Run" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }), { altKey: true });
 
     await waitFor(() => {
-      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
-      expect(run?.rows.some((row) => row.kind === "boundary")).toBe(true);
-      expect(run?.rows.some((row) => row.claimBoundaryNotes.some((note) => /validation claim not allowed/i.test(note)))).toBe(
-        true,
-      );
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([
+        "physics.relativity.rest_energy",
+        "nhm2.qei.sampling_window",
+      ]);
+    });
+
+    fireEvent.click(screen.getByTestId("theory-achievement-map-scrollport").firstElementChild as Element);
+
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([]);
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeId).toBeNull();
     });
   });
 
-  it("supports multi-select tracing and path playback controls", async () => {
+  it("supports multi-select path highlighting without extra trace controls", async () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { ctrlKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }), { ctrlKey: true });
 
-    expect(await screen.findByText("Trace Selected Badges")).toBeTruthy();
-    expect(screen.getByText(/Shared ancestors:/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Run Selected Trace/i })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: /Run Selected Trace/i }));
-
-    await waitFor(
-      () => {
-        expect(useTheoryBadgePlaybackStore.getState().status).toBe("complete");
-      },
-      { timeout: 8000 },
-    );
+    expect(screen.queryByText("Trace Selected Badges")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Run Selected Trace/i })).toBeNull();
+    await waitFor(() => {
+      expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([
+        "physics.relativity.rest_energy",
+        "nhm2.qei.sampling_window",
+      ]);
+    });
+    expect(screen.getByRole("button", { name: "QEI sampling window" }).className).toContain("ring");
   });
 
   it("uses the StarSim stellar evolution lens to light mapped badges and load scalar formulas", async () => {
@@ -393,6 +400,11 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
       );
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("kappa_body = 6.217e-27*1000");
     });
+    expect(screen.getByRole("button", { name: "Body Curvature Proxy" }).style.boxShadow).toContain(
+      "rgba(16, 185, 129",
+    );
+
+    expect(screen.queryByRole("button", { name: "Load Atlas Block Theory Run" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Curvature / Collapse atlas lens" }));
 
@@ -485,7 +497,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     firstRender.unmount();
     renderPanel();
 
-    expect(await screen.findByText("Trace Selected Badges")).toBeTruthy();
+    expect(screen.queryByText("Trace Selected Badges")).toBeNull();
     expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeId).toBe("nhm2.qei.sampling_window");
   });
 });

@@ -106,10 +106,21 @@ const LEVEL_ORDER = [
   "claim_boundary",
 ] as const satisfies readonly TheoryBadgeLevel[];
 
-type TheoryGraphMapMode = "concept" | "execution" | "evidence";
-
 function labelize(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function hasRuntimeReferenceEquation(badge: TheoryBadgeV1): boolean {
+  return badge.equations.some((equation: TheoryBadgeEquationV1) =>
+    [
+      "tensor_component",
+      "field_sample",
+      "region_aggregate",
+      "worldline_integral",
+      "gate_status",
+      "noncomputable_reference",
+    ].includes(equation.operatorKind),
+  );
 }
 
 function uniqueSorted(values: string[]): string[] {
@@ -581,7 +592,6 @@ function Inspector({
 
 export default function TheoryBadgeGraphPanel() {
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
-  const [mapMode, setMapMode] = useState<TheoryGraphMapMode>("concept");
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("all");
   const [level, setLevel] = useState("all");
@@ -1108,6 +1118,40 @@ export default function TheoryBadgeGraphPanel() {
     return buildHelixPhysicsAtlasV1({ graph }).blocks.find((block) => block.id === activeLensId) ?? null;
   }, [activeLensId, graph]);
 
+  const rememberedAtlasLensId = useMemo<TheoryAtlasLensId | null>(() => {
+    if (activeLensId) return activeLensId;
+    if (selectedEvolutionStageId || selectedObjectBindingId) return "stellar_evolution";
+    if (selectedCosmicRungId || selectedCosmicObjectBindingId) return "cosmic_distance_ladder";
+    if (selectedSolarGroupId || selectedSolarObjectBindingId) return "solar_surface_spectrum";
+    if (selectedCasimirGroupId || selectedCasimirObjectBindingId) return "casimir_cavity_modes";
+    if (selectedWarpGroupId || selectedWarpObjectBindingId) return "warp_gr_nhm2";
+    if (selectedQeiGroupId || selectedQeiObjectBindingId) return "qei_stress_energy";
+    if (selectedTokamakGroupId || selectedTokamakObjectBindingId) return "tokamak_plasma";
+    if (selectedGalacticGroupId || selectedGalacticObjectBindingId) return "galactic_dynamics";
+    if (selectedCurvatureGroupId || selectedCurvatureObjectBindingId) return "curvature_collapse";
+    return null;
+  }, [
+    activeLensId,
+    selectedCasimirGroupId,
+    selectedCasimirObjectBindingId,
+    selectedCosmicObjectBindingId,
+    selectedCosmicRungId,
+    selectedCurvatureGroupId,
+    selectedCurvatureObjectBindingId,
+    selectedEvolutionStageId,
+    selectedGalacticGroupId,
+    selectedGalacticObjectBindingId,
+    selectedObjectBindingId,
+    selectedQeiGroupId,
+    selectedQeiObjectBindingId,
+    selectedSolarGroupId,
+    selectedSolarObjectBindingId,
+    selectedTokamakGroupId,
+    selectedTokamakObjectBindingId,
+    selectedWarpGroupId,
+    selectedWarpObjectBindingId,
+  ]);
+
   const highlightedBadgeIds =
     multiTrace?.connectingBadgeIds ??
     singlePlaybackPlan?.orderedBadgeIds ??
@@ -1124,7 +1168,7 @@ export default function TheoryBadgeGraphPanel() {
   }, [atlasLens, graph, highlightedBadgeIds, mapOverlay.highlightedEdgeIds, multiTrace, singlePlaybackPlan]);
 
   const routeEligibility = useMemo(() => {
-    if (!graph || mapMode === "concept") return null;
+    if (!graph) return null;
     const startBadgeIds =
       selectedBadgeIds.length > 0
         ? selectedBadgeIds
@@ -1133,32 +1177,20 @@ export default function TheoryBadgeGraphPanel() {
           : atlasLens?.centerBadgeIds.length
             ? atlasLens.centerBadgeIds
             : highlightedBadgeIds.slice(0, 12);
+    if (startBadgeIds.length === 0) return null;
     return resolveTheoryRouteEligibility({
       graph,
       startBadgeIds,
-      allowedClaimLevel: mapMode === "evidence" ? "CL4" : "CL3",
-      allowProxyEdges: mapMode !== "evidence",
-      requireEvidence: mapMode === "evidence",
+      allowedClaimLevel: "CL3",
+      allowProxyEdges: true,
+      requireEvidence: false,
     });
-  }, [atlasLens?.centerBadgeIds, graph, highlightedBadgeIds, mapMode, selectedBadgeIds, selectedId]);
+  }, [atlasLens?.centerBadgeIds, graph, highlightedBadgeIds, selectedBadgeIds, selectedId]);
 
   const routeBadgeLabels = useMemo(
-    () => routeBadgeLabelsForMode(routeEligibility, mapMode),
-    [mapMode, routeEligibility],
-  );
-
-  const blockedRouteItems = useMemo(
-    () => routeEligibility?.badges.filter((badge) => badge.decision === "blocked").slice(0, 5) ?? [],
+    () => routeBadgeLabelsForMode(routeEligibility, "execution"),
     [routeEligibility],
   );
-
-  const overlayTheoryRunBadgeIds = useMemo(() => {
-    if (!routeEligibility) return [];
-    const preferred = routeEligibility.badges
-      .filter((badge) => badge.decision === "allowed" && routeBadgeLabels[badge.badgeId])
-      .map((badge) => badge.badgeId);
-    return preferred.length > 0 ? preferred.slice(0, 16) : highlightedBadgeIds.slice(0, 16);
-  }, [highlightedBadgeIds, routeBadgeLabels, routeEligibility]);
 
   const activePlayback =
     playbackStore.activeTargetBadgeId === selectedBadge?.id || playbackStore.activeTargetBadgeId
@@ -1175,6 +1207,7 @@ export default function TheoryBadgeGraphPanel() {
       .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
 
   const selectBadge = (badgeId: string) => {
+    const badge = graph?.badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId) ?? null;
     setSelectedBadgeId(badgeId);
     setSelectedBadgeIds([]);
     setSelectedEvolutionStageId(null);
@@ -1196,6 +1229,27 @@ export default function TheoryBadgeGraphPanel() {
     clearGalacticDynamicsObjectBinding();
     clearCurvatureCollapseObjectBinding();
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
+    const shouldLoadRuntimeRun = graph && badge && badge.calculatorPayloads.length === 0 && hasRuntimeReferenceEquation(badge);
+    if (shouldLoadRuntimeRun) {
+      const run = buildTheoryCompoundRun({
+        graph,
+        badgeIds: [badge.id],
+        mode: "dependency_path",
+        source: "theory_badge_graph",
+        includeScalar: true,
+        includeRuntime: true,
+        includeEvidence: true,
+        includeBoundaries: true,
+      });
+      const runStore = useTheoryCompoundRunStore.getState();
+      runStore.loadTheoryRun(run);
+      const runtimeRow =
+        run.rows.find((row) => row.badgeId === badge.id && row.runtimeMathTraceV1) ??
+        run.rows.find((row) => row.runtimeMathTraceV1);
+      if (runtimeRow) runStore.selectTheoryRunRow(runtimeRow.id);
+    } else {
+      useTheoryCompoundRunStore.getState().clearTheoryRun();
+    }
   };
 
   const toggleBadgeSelection = (badgeId: string) => {
@@ -1209,6 +1263,7 @@ export default function TheoryBadgeGraphPanel() {
     );
     if (!badge || !payload) return;
     if (graph) {
+      useTheoryCompoundRunStore.getState().clearTheoryRun();
       const loadout = buildTheoryCalculatorLoadout({
         graph,
         badgeIds: [badge.id],
@@ -2013,15 +2068,6 @@ export default function TheoryBadgeGraphPanel() {
     loadTheoryRunForBadgeIds([selectedBadge.id]);
   };
 
-  const loadAtlasBlockTheoryRun = () => {
-    if (!activeAtlasBlock) return;
-    loadTheoryRunForBadgeIds(activeAtlasBlock.primaryBadgeIds);
-  };
-
-  const loadOverlayTheoryRun = () => {
-    loadTheoryRunForBadgeIds(overlayTheoryRunBadgeIds);
-  };
-
   const selectAtlasLens = (lensId: TheoryAtlasLensId) => {
     if (activeLensId === lensId) {
       setActiveAtlasLensId(null);
@@ -2226,119 +2272,18 @@ export default function TheoryBadgeGraphPanel() {
                   rippleBadgeIds={mapOverlay.rippleBadgeIds}
                   heatByBadgeId={mapOverlay.heatByBadgeId}
                   routeBadgeLabels={routeBadgeLabels}
-                  activeAtlasLensId={activeLensId}
+                  activeAtlasLensId={rememberedAtlasLensId}
                   onSelectBadge={selectBadge}
                   onToggleBadgeSelection={toggleBadgeSelection}
+                  onClearSelection={() => {
+                    setSelectedBadgeId(null);
+                    setSelectedBadgeIds([]);
+                  }}
                   onRunPath={runPathToBadge}
                   onLoadCalculatorPayload={loadCalculatorPayload}
                   viewport={viewport}
                   onViewportChange={rememberViewport}
                 />
-                <div className="absolute left-12 top-3 z-20 max-w-[min(520px,calc(100%-5rem))] border-2 border-zinc-950 bg-zinc-200 p-2 text-zinc-950 shadow-2xl">
-                  <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Theory map mode">
-                    {(["concept", "execution", "evidence"] as const).map((mode) => (
-                      <Button
-                        key={mode}
-                        type="button"
-                        size="sm"
-                        variant={mapMode === mode ? "default" : "secondary"}
-                        onClick={() => setMapMode(mode)}
-                        className="h-7 px-2 text-[11px]"
-                      >
-                        {mode === "concept" ? "Concept Map" : mode === "execution" ? "Execution Map" : "Evidence Map"}
-                      </Button>
-                    ))}
-                    {mapMode !== "concept" && overlayTheoryRunBadgeIds.length > 0 ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={loadOverlayTheoryRun}
-                        className="h-7 px-2 text-[11px]"
-                      >
-                        Load Theory Run
-                      </Button>
-                    ) : null}
-                  </div>
-                  {mapMode !== "concept" && routeEligibility ? (
-                    <div className="mt-2 text-[11px]" aria-label={`${mapMode} overlay status`}>
-                      <div className="font-bold">
-                        {mapMode === "execution" ? "Execution overlay" : "Evidence overlay"}:{" "}
-                        {routeEligibility.summary.allowedBadgeCount} allowed / {routeEligibility.summary.blockedBadgeCount} blocked
-                      </div>
-                      {blockedRouteItems.length > 0 ? (
-                        <div className="mt-1 space-y-0.5 text-rose-900">
-                          {blockedRouteItems.map((item) => (
-                            <div key={item.badgeId} className="truncate" title={item.details.join("; ")}>
-                              {item.badgeId}: {labelize(item.reason)}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-                {selectedBadge ? (
-                  <div className="absolute right-3 top-3 z-20 border-2 border-zinc-950 bg-zinc-200 p-2 shadow-2xl">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={loadSelectedTheoryRun}
-                      className="gap-2"
-                    >
-                      <Calculator className="h-4 w-4" />
-                      Load Theory Run
-                    </Button>
-                  </div>
-                ) : null}
-                {activeAtlasBlock && activeAtlasBlock.primaryBadgeIds.length > 0 ? (
-                  <div className="absolute bottom-3 left-12 z-20 border-2 border-zinc-950 bg-zinc-200 p-2 shadow-2xl">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={loadAtlasBlockTheoryRun}
-                      className="gap-2"
-                    >
-                      <Calculator className="h-4 w-4" />
-                      Load Atlas Block Theory Run
-                    </Button>
-                  </div>
-                ) : null}
-                {multiTrace ? (
-                  <div className="absolute bottom-3 left-3 right-3 border-2 border-zinc-950 bg-zinc-200 p-3 text-sm shadow-2xl">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-bold">Trace Selected Badges</div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            const target = selectedBadgeIds[selectedBadgeIds.length - 1];
-                            if (target) runPathToBadge(target);
-                          }}
-                        >
-                          Run Selected Trace
-                        </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => setSelectedBadgeIds([])}>
-                          Clear Selection
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-2 grid gap-2 text-xs md:grid-cols-3">
-                      <div>Shared ancestors: {multiTrace.sharedAncestorIds.slice(0, 4).join(", ") || "-"}</div>
-                      <div>Shared symbols: {multiTrace.sharedSymbols.join(", ") || "-"}</div>
-                      <div>Shared units: {multiTrace.sharedUnitSignatures.join(", ") || "-"}</div>
-                    </div>
-                    {multiTrace.claimBoundaryNotes.length > 0 ? (
-                      <div className="mt-2 text-xs text-amber-800">
-                        {multiTrace.claimBoundaryNotes.slice(0, 3).join("; ")}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
               </>
             ) : null}
           </div>

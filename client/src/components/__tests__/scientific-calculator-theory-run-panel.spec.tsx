@@ -8,6 +8,7 @@ import ScientificCalculatorPanel from "@/components/panels/ScientificCalculatorP
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
 import { buildTheoryRuntimeReceiptV1 } from "@shared/contracts/theory-runtime-receipt.v1";
 import { buildTheoryCompoundRunV1, type TheoryCompoundRunRowV1 } from "@shared/contracts/theory-compound-run.v1";
@@ -201,6 +202,33 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(within(theorySection).getByRole("button", { name: "Solve Scalar Rows" })).toBeInTheDocument();
     expect(within(theorySection).getByRole("button", { name: "Build Runtime Traces" })).toBeInTheDocument();
     expect(within(theorySection).getByRole("button", { name: "Solve Available" })).toBeInTheDocument();
+  });
+
+  it("organizes a badge calculator loadout under the Theory Run section", async () => {
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: ["nhm2.source.energy_density_proxy"],
+      mode: "selected_badges",
+      variableBindings: {
+        E: 12,
+        V: 3,
+      },
+      includeContextItems: true,
+    });
+    const scientificState = useScientificCalculatorStore.getState();
+    scientificState.setTheoryLoadout(loadout);
+    scientificState.loadTheoryLoadoutItem(1);
+
+    render(<ScientificCalculatorPanel />);
+
+    const theorySection = await screen.findByTestId("scientific-calculator-theory-run-section");
+    expect(screen.getByRole("tab", { name: "Theory Run" })).toHaveAttribute("aria-selected", "true");
+    expect(within(theorySection).getByText(/scalar rows/i)).toBeInTheDocument();
+    expect(within(theorySection).getByText("Energy density proxy")).toBeInTheDocument();
+    expect(within(theorySection).getByText("rho = 12 / 3")).toBeInTheDocument();
+    expect(screen.queryByText("Theory Loadout")).not.toBeInTheDocument();
+    expect(screen.getByText(/source:/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/Energy density proxy/)).toBeInTheDocument();
   });
 
   it("solves scalar rows in the loaded theory run", async () => {

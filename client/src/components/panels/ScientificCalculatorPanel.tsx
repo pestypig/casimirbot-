@@ -211,6 +211,7 @@ export default function ScientificCalculatorPanel() {
   const [activeSection, setActiveSection] = useState<ScientificCalculatorWorkbenchSection>("scalar");
   const lastStoredLatexRef = useRef(currentLatex);
   const lastTheoryRunIdRef = useRef<string | null>(null);
+  const lastTheoryLoadoutIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isLiveRegisterSummary(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY))) {
@@ -234,14 +235,27 @@ export default function ScientificCalculatorPanel() {
     const nextRunId = activeTheoryRun?.runId ?? null;
     if (!nextRunId) {
       lastTheoryRunIdRef.current = null;
-      setActiveSection("scalar");
+      if (!lastTheoryLoadout) setActiveSection("scalar");
       return;
     }
     if (lastTheoryRunIdRef.current !== nextRunId) {
       lastTheoryRunIdRef.current = nextRunId;
       setActiveSection("theory");
     }
-  }, [activeTheoryRun?.runId]);
+  }, [activeTheoryRun?.runId, lastTheoryLoadout]);
+
+  useEffect(() => {
+    if (activeTheoryRun) return;
+    const nextLoadoutId = lastTheoryLoadout?.loadoutId ?? null;
+    if (!nextLoadoutId) {
+      lastTheoryLoadoutIdRef.current = null;
+      return;
+    }
+    if (lastTheoryLoadoutIdRef.current !== nextLoadoutId) {
+      lastTheoryLoadoutIdRef.current = nextLoadoutId;
+      setActiveSection("theory");
+    }
+  }, [activeTheoryRun, lastTheoryLoadout?.loadoutId]);
 
   useEffect(() => {
     const onPicked = (event: Event) => {
@@ -487,6 +501,28 @@ export default function ScientificCalculatorPanel() {
     () => resolveScientificCalculatorVisibleHistory(history, visibleDebugState.currentCompoundRunId),
     [history, visibleDebugState.currentCompoundRunId],
   );
+  const activeTheoryLoadoutItem = useMemo(
+    () => lastTheoryLoadout?.items.find((item) => item.index === activeTheoryLoadoutItemIndex) ?? null,
+    [activeTheoryLoadoutItemIndex, lastTheoryLoadout],
+  );
+  const activeInputSource = useMemo(() => {
+    if (activeTheoryLoadoutItem?.solveExpression && input.trim() === activeTheoryLoadoutItem.solveExpression.trim()) {
+      return {
+        label: `${activeTheoryLoadoutItem.badgeTitle} / ${activeTheoryLoadoutItem.payloadId ?? "context"}`,
+        stale: false,
+      };
+    }
+    if (lastSetup?.subgoal && input.trim()) {
+      return {
+        label: lastSetup.subgoal,
+        stale: Boolean(activeTheoryLoadoutItem?.solveExpression),
+      };
+    }
+    return {
+      label: input.trim() ? "Manual or previous calculator input" : "No scalar row loaded",
+      stale: Boolean(activeTheoryLoadoutItem?.solveExpression && input.trim()),
+    };
+  }, [activeTheoryLoadoutItem, input, lastSetup?.subgoal]);
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
@@ -519,7 +555,9 @@ export default function ScientificCalculatorPanel() {
               <div className="text-xs text-slate-300">
                 {activeTheoryRun
                   ? `${activeTheoryRun.summary.rowCount} rows / ${activeTheoryRun.summary.scalarCount} scalar / ${activeTheoryRun.summary.tensorCount} tensor / status ${theoryRunStatus}`
-                  : "No compound theory run loaded."}
+                  : lastTheoryLoadout
+                    ? `${lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode} / ${lastTheoryLoadout.summary.scalarCount} scalar rows / ${lastTheoryLoadout.summary.contextCount} context rows`
+                    : "No theory run or loadout loaded."}
               </div>
             </div>
             {activeTheoryRunRow ? (
@@ -538,6 +576,16 @@ export default function ScientificCalculatorPanel() {
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("all_available")}>
                 Solve Available
+              </Button>
+            </div>
+          ) : null}
+          {!activeTheoryRun && lastTheoryLoadout ? (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={handleSolveTheoryLoadout}>
+                Solve All Scalar
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
+                Solve + Runtime
               </Button>
             </div>
           ) : null}
@@ -700,6 +748,74 @@ export default function ScientificCalculatorPanel() {
                   </button>
                 ))}
             </div>
+          ) : lastTheoryLoadout ? (
+            <div className="space-y-2">
+              {lastTheoryLoadout.items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleLoadTheoryLoadoutItem(item.index)}
+                  className={`w-full rounded border p-2 text-left text-xs ${
+                    activeTheoryLoadoutItemIndex === item.index
+                      ? "border-cyan-400 bg-cyan-950/50"
+                      : "border-slate-800 bg-slate-950/60 hover:border-slate-600"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
+                      {item.index}
+                    </Badge>
+                    <span className="font-semibold text-slate-100">{item.badgeTitle}</span>
+                    <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                      {item.kind}
+                    </Badge>
+                    {item.calculatorArtifactV1 ? (
+                      <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
+                        solved
+                      </Badge>
+                    ) : null}
+                    {item.runtimeReceiptV1 ? (
+                      <Badge variant="outline" className="border-violet-700/70 text-violet-100">
+                        runtime completed
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {item.solveExpression ? (
+                    <div className="mt-2 break-all font-mono text-cyan-100">{item.solveExpression}</div>
+                  ) : (
+                    <div className="mt-2 break-all font-mono text-slate-500">{item.displayLatex ?? "context row"}</div>
+                  )}
+                  {Object.keys(item.usedBindings).length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {Object.entries(item.usedBindings).map(([symbol, value]) => (
+                        <Badge key={`${item.id}:${symbol}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
+                          {symbol}={String(value)}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                  {item.resultText ? <div className="mt-2 font-mono text-slate-200">result: {item.resultText}</div> : null}
+                  {item.runtimeReceiptV1 ? (
+                    <div className="mt-2 grid gap-1 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100 md:grid-cols-2">
+                      <div>channel: {item.runtimeReceiptV1.outputSummary.dominantFusionChannel ?? "-"}</div>
+                      <div>fusion zone: {item.runtimeReceiptV1.outputSummary.fusionZoneMode ?? "-"}</div>
+                      <div>active: {String(item.runtimeReceiptV1.outputSummary.fusionActive ?? "-")}</div>
+                      <div>tunneling: {String(item.runtimeReceiptV1.outputSummary.tunnelingRequired ?? "-")}</div>
+                      <div>qst: {item.runtimeReceiptV1.outputSummary.qstRole ?? "-"}</div>
+                      <div>boundary: {item.runtimeReceiptV1.outputSummary.spacetimeCL ?? "proxy_only"}</div>
+                    </div>
+                  ) : null}
+                  {item.warnings.length > 0 ? (
+                    <div className="mt-2 text-[11px] text-amber-200">{item.warnings.join("; ")}</div>
+                  ) : null}
+                </button>
+              ))}
+              {lastTheoryLoadout.claimBoundaryNotes.length > 0 ? (
+                <div className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+                  {lastTheoryLoadout.claimBoundaryNotes.slice(0, 4).join("; ")}
+                </div>
+              ) : null}
+            </div>
           ) : (
             <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
               Theory Badge Graph presets can load scalar, tensor/runtime, evidence, gate, and boundary rows here.
@@ -789,7 +905,31 @@ export default function ScientificCalculatorPanel() {
       ) : null}
 
       <div className="space-y-3 rounded-md border border-slate-800 bg-slate-900/50 p-3">
-        <Label className="text-xs text-slate-300">LaTeX / Expression Input</Label>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-cyan-300">Scalar Workbench</div>
+            <Label className="text-xs text-slate-300">LaTeX / Expression Input</Label>
+          </div>
+          <div className="flex max-w-full flex-wrap items-center gap-2 text-[11px] text-slate-400">
+            <span>source:</span>
+            <Badge
+              variant="outline"
+              className={
+                activeInputSource.stale
+                  ? "max-w-[34rem] truncate border-amber-700/70 text-amber-100"
+                  : "max-w-[34rem] truncate border-slate-700 text-slate-200"
+              }
+              title={activeInputSource.label}
+            >
+              {activeInputSource.label}
+            </Badge>
+          </div>
+        </div>
+        {activeInputSource.stale ? (
+          <div className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+            The scalar input is not the selected theory row. Pick a row in Theory Run, or solve this as a manual/previous expression.
+          </div>
+        ) : null}
         <Textarea
           className="min-h-[130px] border-slate-700 bg-slate-900/70 font-mono text-xs text-slate-100"
           value={input}
@@ -917,94 +1057,6 @@ export default function ScientificCalculatorPanel() {
 
       <ScientificCalculatorLiveSourceControls currentEquation={input} />
 
-      {lastTheoryLoadout ? (
-        <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-cyan-300">Theory Loadout</div>
-              <div className="text-xs text-slate-300">
-                {lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode} / {lastTheoryLoadout.summary.scalarCount} scalar rows / {lastTheoryLoadout.summary.contextCount} context rows
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadout}>
-                Solve All Scalar
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
-                Solve + Runtime
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {lastTheoryLoadout.items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleLoadTheoryLoadoutItem(item.index)}
-                className={`w-full rounded border p-2 text-left text-xs ${
-                  activeTheoryLoadoutItemIndex === item.index
-                    ? "border-cyan-400 bg-cyan-950/50"
-                    : "border-slate-800 bg-slate-950/60 hover:border-slate-600"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
-                    {item.index}
-                  </Badge>
-                  <span className="font-semibold text-slate-100">{item.badgeTitle}</span>
-                  <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-                    {item.kind}
-                  </Badge>
-                  {item.calculatorArtifactV1 ? (
-                    <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
-                      solved
-                    </Badge>
-                  ) : null}
-                  {item.runtimeReceiptV1 ? (
-                    <Badge variant="outline" className="border-violet-700/70 text-violet-100">
-                      runtime completed
-                    </Badge>
-                  ) : null}
-                </div>
-                {item.solveExpression ? (
-                  <div className="mt-2 break-all font-mono text-cyan-100">{item.solveExpression}</div>
-                ) : (
-                  <div className="mt-2 break-all font-mono text-slate-500">{item.displayLatex ?? "context row"}</div>
-                )}
-                {Object.keys(item.usedBindings).length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {Object.entries(item.usedBindings).map(([symbol, value]) => (
-                      <Badge key={`${item.id}:${symbol}`} variant="outline" className="border-slate-700 text-[10px] text-slate-300">
-                        {symbol}={String(value)}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                {item.resultText ? <div className="mt-2 font-mono text-slate-200">result: {item.resultText}</div> : null}
-                {item.runtimeReceiptV1 ? (
-                  <div className="mt-2 grid gap-1 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100 md:grid-cols-2">
-                    <div>channel: {item.runtimeReceiptV1.outputSummary.dominantFusionChannel ?? "-"}</div>
-                    <div>fusion zone: {item.runtimeReceiptV1.outputSummary.fusionZoneMode ?? "-"}</div>
-                    <div>active: {String(item.runtimeReceiptV1.outputSummary.fusionActive ?? "-")}</div>
-                    <div>tunneling: {String(item.runtimeReceiptV1.outputSummary.tunnelingRequired ?? "-")}</div>
-                    <div>qst: {item.runtimeReceiptV1.outputSummary.qstRole ?? "-"}</div>
-                    <div>boundary: {item.runtimeReceiptV1.outputSummary.spacetimeCL ?? "proxy_only"}</div>
-                  </div>
-                ) : null}
-                {item.warnings.length > 0 ? (
-                  <div className="mt-2 text-[11px] text-amber-200">{item.warnings.join("; ")}</div>
-                ) : null}
-              </button>
-            ))}
-          </div>
-          {lastTheoryLoadout.claimBoundaryNotes.length > 0 ? (
-            <div className="mt-3 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
-              {lastTheoryLoadout.claimBoundaryNotes.slice(0, 4).join("; ")}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       {compoundSolveEvents.length >= 2 ? (
         <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
           <div className="mb-2 text-[10px] uppercase tracking-wide text-cyan-300">Compound Solve Trace</div>
@@ -1101,13 +1153,16 @@ export default function ScientificCalculatorPanel() {
               ) : null}
             </div>
             {lastArtifactV1 ? (
-              <div className="space-y-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-[10px] uppercase tracking-wide text-cyan-300">Schema Trace</div>
-                  <Button size="sm" variant="outline" onClick={handleCopyStepsMarkdown}>
+              <details className="space-y-3 rounded-md border border-slate-800 bg-slate-950/50 p-3 text-xs">
+                <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-400">
+                  <span>Evidence / Schema Trace</span>
+                  <Button size="sm" variant="outline" onClick={(event) => {
+                    event.preventDefault();
+                    handleCopyStepsMarkdown();
+                  }}>
                     Copy Steps Markdown
                   </Button>
-                </div>
+                </summary>
                 <div className="grid gap-2 lg:grid-cols-2">
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
                     <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Method</div>
@@ -1155,7 +1210,7 @@ export default function ScientificCalculatorPanel() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
             ) : stepItems.length > 0 ? (
               <div className="space-y-2">
                 <div className="text-[10px] uppercase tracking-wide text-slate-500">Steps</div>

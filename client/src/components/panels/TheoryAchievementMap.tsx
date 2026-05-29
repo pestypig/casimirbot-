@@ -31,6 +31,7 @@ type TheoryAchievementMapProps = {
   activeAtlasLensId: PhysicsAtlasBlockId | null;
   onSelectBadge: (badgeId: string) => void;
   onToggleBadgeSelection: (badgeId: string) => void;
+  onClearSelection: () => void;
   onRunPath: (badgeId: string) => void;
   onLoadCalculatorPayload: (badgeId: string, payloadId: string) => void;
   viewport: {
@@ -170,6 +171,7 @@ export default function TheoryAchievementMap({
   activeAtlasLensId,
   onSelectBadge,
   onToggleBadgeSelection,
+  onClearSelection,
   onRunPath,
   onLoadCalculatorPayload,
   viewport,
@@ -219,6 +221,9 @@ export default function TheoryAchievementMap({
     >
       <div
         className="relative"
+        onClick={(event: React.MouseEvent<HTMLDivElement>) => {
+          if (event.target === event.currentTarget) onClearSelection();
+        }}
         style={{
           width: layout.width,
           height: layout.height,
@@ -259,7 +264,13 @@ export default function TheoryAchievementMap({
           const badge = badgesById.get(node.badgeId);
           if (!badge) return null;
           const expression = primaryExpression(badge);
-          const title = expression ? `${badge.title}\n${expression}` : badge.title;
+          const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
+          const titleParts = [
+            badge.title,
+            expression,
+            routeLabel ? `${routeLabel.label}: ${routeLabel.title}` : null,
+          ].filter(Boolean);
+          const title = titleParts.join("\n");
           const heat = heatByBadgeId[node.badgeId] ?? 0;
           const ripple = rippleSet.has(node.badgeId);
           const badgeBlockId = badgeAtlasBlockId(badge);
@@ -269,17 +280,6 @@ export default function TheoryAchievementMap({
           const plannedDomain = Boolean(
             activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
           );
-          const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
-          const routeLabelClass =
-            routeLabel?.tone === "rose"
-              ? "border-rose-300 bg-rose-950 text-rose-100"
-              : routeLabel?.tone === "amber"
-                ? "border-amber-300 bg-amber-950 text-amber-100"
-                : routeLabel?.tone === "emerald"
-                  ? "border-emerald-300 bg-emerald-950 text-emerald-100"
-                  : routeLabel?.tone === "cyan"
-                    ? "border-cyan-300 bg-cyan-950 text-cyan-100"
-                    : "border-zinc-400 bg-zinc-950 text-zinc-100";
           const glowShadow = [
             heat > 0
               ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
@@ -315,7 +315,8 @@ export default function TheoryAchievementMap({
               title={title}
               aria-label={badge.title}
               onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-                if (event.ctrlKey || event.metaKey) {
+                event.stopPropagation();
+                if (event.ctrlKey || event.metaKey || event.altKey) {
                   onToggleBadgeSelection(node.badgeId);
                 } else {
                   onSelectBadge(node.badgeId);
@@ -339,14 +340,6 @@ export default function TheoryAchievementMap({
               ) : null}
               {claimBoundary ? (
                 <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
-              ) : null}
-              {routeLabel ? (
-                <span
-                  className={`pointer-events-none absolute left-1/2 top-full mt-1 max-w-28 -translate-x-1/2 truncate border px-1 py-0.5 text-[9px] normal-case shadow ${routeLabelClass}`}
-                  title={routeLabel.title}
-                >
-                  {routeLabel.label}
-                </span>
               ) : null}
             </button>
           );

@@ -198,6 +198,14 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).not.toContain("Reasoning Attempts");
   });
 
+  it("keeps the prompt textarea below the controls at full composer width", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('className="flex flex-col gap-2 px-4 py-3"');
+    expect(source).toContain('className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2"');
+    expect(source).toContain("helix-ask-textarea w-full min-w-0 resize-none");
+    expect(source).toContain("const HELIX_ASK_MAX_PROMPT_LINES = 10;");
+  });
+
   it("interrupts read-aloud playback when speech is detected", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     const evaluateBlock = /const evaluateMicLevel = useCallback\(\(\) => \{[\s\S]+?\n  \}, \[/.exec(source);

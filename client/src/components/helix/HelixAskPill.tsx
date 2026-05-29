@@ -8983,7 +8983,7 @@ const HELIX_ASK_MAX_RENDER_CHARS = clampNumber(
   1200,
   24000,
 );
-const HELIX_ASK_MAX_PROMPT_LINES = 4;
+const HELIX_ASK_MAX_PROMPT_LINES = 10;
 const HELIX_ASK_LIVE_EVENT_LIMIT = 28;
 const HELIX_ASK_QUEUE_LIMIT = 12;
 const HELIX_ASK_LIVE_EVENT_MAX_CHARS = clampNumber(
@@ -30031,116 +30031,122 @@ export function HelixAskPill({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div
-                className={`flex h-12 w-12 items-center justify-center rounded-full border ${moodPalette.aura}`}
-              >
+            <div className="flex flex-col gap-2 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-full bg-black/45 ring-1 ring-inset ${moodRingClass}`}
+                  className={`flex h-12 w-12 items-center justify-center rounded-full border ${moodPalette.aura}`}
                 >
-                  {moodSrc ? (
-                    <img
-                      src={moodSrc}
-                      alt={`${moodLabel} mood`}
-                      className="h-9 w-9 object-contain"
-                      loading="lazy"
-                      onError={() => setAskMoodBroken(true)}
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-full bg-black/45 ring-1 ring-inset ${moodRingClass}`}
+                  >
+                    {moodSrc ? (
+                      <img
+                        src={moodSrc}
+                        alt={`${moodLabel} mood`}
+                        className="h-9 w-9 object-contain"
+                        loading="lazy"
+                        onError={() => setAskMoodBroken(true)}
+                      />
+                    ) : (
+                      <BrainCircuit
+                        className="h-5 w-5 text-slate-100/90"
+                        strokeWidth={2.25}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+                  <input
+                    ref={askImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAskImageSelect}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Attach image"
+                    title="Attach image"
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                      askImageAttachmentCommitCheck?.can_submit
+                        ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
+                        : askImageAttachment
+                          ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
+                          : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                    }`}
+                    onClick={() => askImageInputRef.current?.click()}
+                    disabled={askBusy}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
+                    aria-pressed={micArmState === "on"}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                      micArmState === "on"
+                        ? voiceInputState === "transcribing"
+                          ? "border-cyan-300/45 bg-cyan-400/12 text-cyan-100"
+                          : "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
+                        : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                    }`}
+                    onClick={handleVoiceInputToggle}
+                  >
+                    <Mic
+                      className={`h-4 w-4 ${
+                        micArmState === "on" || voiceInputState === "transcribing" ? "animate-pulse" : ""
+                      }`}
                     />
-                  ) : (
-                    <BrainCircuit
-                      className="h-5 w-5 text-slate-100/90"
-                      strokeWidth={2.25}
-                      aria-hidden
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Capture visual source for Situation Room"
+                    aria-pressed={visualSituationSourceStatus === "active"}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                      visualSituationSourceStatus === "active"
+                        ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
+                        : visualSituationSourceStatus === "requesting"
+                          ? "border-amber-300/45 bg-amber-400/12 text-amber-100"
+                          : visualSituationSourceStatus === "error"
+                            ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
+                            : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                    }`}
+                    onClick={handleVisualSituationSourceCapture}
+                  >
+                    <ImageIcon
+                      className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`}
                     />
-                  )}
+                  </button>
+                  <button
+                    aria-label={askBusy ? "Stop generation" : "Submit prompt"}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
+                    onClick={askBusy ? handleStop : undefined}
+                    type={askBusy ? "button" : "submit"}
+                  >
+                    {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
-            <input
-              ref={askImageInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAskImageSelect}
-            />
-            <button
-              type="button"
-              aria-label="Attach image"
-              title="Attach image"
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                askImageAttachmentCommitCheck?.can_submit
-                  ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
-                  : askImageAttachment
-                    ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
-                  : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-              }`}
-              onClick={() => askImageInputRef.current?.click()}
-              disabled={askBusy}
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
-              aria-pressed={micArmState === "on"}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                micArmState === "on"
-                  ? voiceInputState === "transcribing"
-                    ? "border-cyan-300/45 bg-cyan-400/12 text-cyan-100"
-                    : "border-emerald-300/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20"
-                  : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-              }`}
-              onClick={handleVoiceInputToggle}
-            >
-              <Mic
-                className={`h-4 w-4 ${
-                  micArmState === "on" || voiceInputState === "transcribing" ? "animate-pulse" : ""
-                }`}
-              />
-            </button>
-            <button
-              type="button"
-              aria-label="Capture visual source for Situation Room"
-              aria-pressed={visualSituationSourceStatus === "active"}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                visualSituationSourceStatus === "active"
-                  ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
-                  : visualSituationSourceStatus === "requesting"
-                    ? "border-amber-300/45 bg-amber-400/12 text-amber-100"
-                    : visualSituationSourceStatus === "error"
-                      ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
-                    : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-              }`}
-              onClick={handleVisualSituationSourceCapture}
-            >
-              <ImageIcon className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`} />
-            </button>
-            <textarea
-              aria-label="Ask Helix"
-              aria-disabled={askBusy}
-              className="flex-1 resize-none bg-transparent text-[16px] leading-6 text-slate-100 placeholder:text-slate-500 focus:outline-none sm:text-sm"
-              ref={askInputRef}
-              placeholder={currentPlaceholder}
-              rows={1}
-              onInput={(event) =>
-                syncAskDraftValue(event.currentTarget.value, {
-                  target: event.currentTarget,
-                })
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  (event.currentTarget.form as HTMLFormElement | null)?.requestSubmit?.();
+              <textarea
+                aria-label="Ask Helix"
+                aria-disabled={askBusy}
+                className="helix-ask-textarea w-full min-w-0 resize-none bg-transparent text-[16px] leading-6 text-slate-100 placeholder:text-slate-500 focus:outline-none sm:text-sm"
+                ref={askInputRef}
+                placeholder={currentPlaceholder}
+                rows={1}
+                onInput={(event) =>
+                  syncAskDraftValue(event.currentTarget.value, {
+                    target: event.currentTarget,
+                  })
                 }
-              }}
-            />
-            <button
-              aria-label={askBusy ? "Stop generation" : "Submit prompt"}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
-              onClick={askBusy ? handleStop : undefined}
-              type={askBusy ? "button" : "submit"}
-            >
-              {askBusy ? <Square className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-            </button>
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    (event.currentTarget.form as HTMLFormElement | null)?.requestSubmit?.();
+                  }
+                }}
+              />
           </div>
             {askImageAttachment ? (
               <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
