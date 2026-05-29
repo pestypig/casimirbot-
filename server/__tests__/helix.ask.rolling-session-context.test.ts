@@ -1,0 +1,135 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import crypto from "node:crypto";
+import { buildHelixRollingSessionContextPacket } from "../services/helix-ask/rolling-session-context";
+import { appendHelixThreadCompletedItemLifecycle } from "../services/helix-ask/runtime/request-context";
+import {
+  __resetHelixThreadLedgerStore,
+  appendHelixTurnEvent,
+} from "../services/helix-thread/ledger";
+
+let threadId = "thread-rolling-context-test";
+let sessionId = "session-rolling-context-test";
+
+const completeTurn = (args: {
+  turnId: string;
+  user: string;
+  answer: string;
+}) => {
+  appendHelixTurnEvent({
+    thread_id: threadId,
+    route: "/ask",
+    event_type: "turn_started",
+    turn_id: args.turnId,
+    session_id: sessionId,
+    turn_kind: "ask",
+    thread_status: "active",
+    user_text: args.user,
+  });
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId: args.turnId,
+    route: "/ask",
+    sessionId,
+    turnKind: "ask",
+    itemType: "userMessage",
+    text: args.user,
+    userText: args.user,
+  });
+  appendHelixThreadCompletedItemLifecycle({
+    threadId,
+    turnId: args.turnId,
+    route: "/ask",
+    sessionId,
+    turnKind: "ask",
+    itemType: "answer",
+    itemStream: "answer",
+    text: args.answer,
+    assistantText: args.answer,
+  });
+  appendHelixTurnEvent({
+    thread_id: threadId,
+    route: "/ask",
+    event_type: "turn_completed",
+    turn_id: args.turnId,
+    session_id: sessionId,
+    turn_kind: "ask",
+    thread_status: "idle",
+    user_text: args.user,
+    assistant_text: args.answer,
+  });
+};
+
+describe("Helix Ask rolling session context packet", () => {
+  beforeEach(() => {
+    __resetHelixThreadLedgerStore();
+    threadId = `thread-rolling-context-test-${crypto.randomUUID()}`;
+    sessionId = `session-rolling-context-test-${crypto.randomUUID()}`;
+  });
+
+  it("accounts for current prompt, prior turns, and non-terminal invariants", () => {
+    completeTurn({
+      turnId: "turn-1",
+      user: "Open the docs viewer.",
+      answer: "The docs viewer has been successfully opened.",
+    });
+
+    const packet = buildHelixRollingSessionContextPacket({
+      threadId,
+      currentTurnId: "turn-2",
+      sessionId,
+      promptText: "What was the last answer?",
+      modelContextWindowTokens: 4096,
+    });
+
+    expect(packet).toMatchObject({
+      schema: "helix.rolling_session_context_packet.v1",
+      context_scope: "current_thread",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(packet.estimated_tokens.current_user_prompt).toBeGreaterThan(0);
+    expect(packet.estimated_tokens.prior_thread_turns).toBeGreaterThan(0);
+    expect(packet.retained_turn_ids).toEqual(["turn-1"]);
+    expect(packet.model_visible_summary).toContain("docs viewer");
+  });
+
+  it("compacts older turns into a summary while retaining recent turns", () => {
+    for (let index = 1; index <= 10; index += 1) {
+      completeTurn({
+        turnId: `turn-${index}`,
+        user: `User asks about topic ${index} with several extra words for token accounting.`,
+        answer: `Assistant answer for topic ${index} with enough detail to count in rolling context.`,
+      });
+    }
+
+    const packet = buildHelixRollingSessionContextPacket({
+      threadId,
+      currentTurnId: "turn-11",
+      sessionId,
+      promptText: "Continue from the latest result.",
+      modelContextWindowTokens: 300,
+      maxRetainedTurns: 3,
+    });
+
+    expect(packet.compaction_mode).not.toBe("none");
+    expect(packet.retained_turn_ids).toEqual(["turn-8", "turn-9", "turn-10"]);
+    expect(packet.compacted_turn_ids).toContain("turn-1");
+    expect(packet.compacted_context_summary).toContain("turn turn-1");
+    expect(JSON.stringify(packet)).not.toContain("raw_content_included\":true");
+  });
+
+  it("returns a blocked empty packet without an active thread", () => {
+    const packet = buildHelixRollingSessionContextPacket({
+      threadId: "",
+      currentTurnId: "turn-1",
+      sessionId,
+      promptText: "Continue.",
+      modelContextWindowTokens: 4096,
+    });
+
+    expect(packet.compaction_mode).toBe("none");
+    expect(packet.retained_turn_ids).toEqual([]);
+    expect(packet.missing_or_uncertain[0]).toMatch(/no active thread/i);
+  });
+});

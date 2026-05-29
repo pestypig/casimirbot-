@@ -8,6 +8,11 @@ import {
   renderHelixConversationMemoryForModel,
 } from "../conversation-memory-selector";
 import {
+  buildHelixRollingSessionContextDebug,
+  buildHelixRollingSessionContextPacket,
+  renderHelixRollingSessionContextForModel,
+} from "../rolling-session-context";
+import {
   getHelixThreadSessionMemory,
   recordHelixThreadCarryForward,
 } from "../../helix-thread/carry-forward";
@@ -217,8 +222,26 @@ export const executeHelixConversationTurn = async (args: {
   const conversationMemoryRendered = conversationMemoryPacket
     ? renderHelixConversationMemoryForModel(conversationMemoryPacket)
     : null;
-  const modelRecentTurns = conversationMemoryRendered
-    ? [...recentTurns, conversationMemoryRendered].slice(-deps.conversationRecentTurnsLimit - 1)
+  const rollingSessionContextPacket =
+    process.env.HELIX_ASK_ROLLING_SESSION_CONTEXT === "0"
+      ? null
+      : buildHelixRollingSessionContextPacket({
+          threadId,
+          currentTurnId: turnId,
+          sessionId: sessionId ?? null,
+          promptText: transcript,
+          conversationMemoryPacket,
+          maxRetainedTurns: deps.conversationRecentTurnsLimit,
+        });
+  const rollingSessionContextRendered = rollingSessionContextPacket
+    ? renderHelixRollingSessionContextForModel(rollingSessionContextPacket)
+    : null;
+  const modelRecentTurns = conversationMemoryRendered || rollingSessionContextRendered
+    ? [
+        ...recentTurns,
+        ...(conversationMemoryRendered ? [conversationMemoryRendered] : []),
+        ...(rollingSessionContextRendered ? [rollingSessionContextRendered] : []),
+      ].slice(-deps.conversationRecentTurnsLimit - 2)
     : recentTurns;
   const model = deps.getConversationModel();
   const requestStartedAt = Date.now();
@@ -405,6 +428,10 @@ export const executeHelixConversationTurn = async (args: {
       conversation_memory_packet: conversationMemoryPacket,
       conversation_memory_selector: conversationMemoryPacket
         ? buildHelixConversationMemoryDebug(conversationMemoryPacket)
+        : null,
+      rolling_session_context_packet: rollingSessionContextPacket,
+      rolling_session_context_selector: rollingSessionContextPacket
+        ? buildHelixRollingSessionContextDebug(rollingSessionContextPacket)
         : null,
     },
   });
@@ -883,15 +910,24 @@ export const executeHelixConversationTurn = async (args: {
       clarifier_policy: routeDecision.clarifierPolicy,
       exploration_packet: routeDecision.explorationPacket,
       conversation_memory_packet: conversationMemoryPacket,
-      debug: conversationMemoryPacket
+      rolling_session_context_packet: rollingSessionContextPacket,
+      debug: conversationMemoryPacket || rollingSessionContextPacket
         ? {
             conversation_memory_packet: conversationMemoryPacket,
-            conversation_memory_admission: {
-              allowed_for_current_goal: conversationMemoryPacket.allowed_for_current_goal,
-              allowed_reason: conversationMemoryPacket.allowed_reason,
-              allowed_use: conversationMemoryPacket.allowed_use,
-            },
-            conversation_memory_selector: buildHelixConversationMemoryDebug(conversationMemoryPacket),
+            conversation_memory_admission: conversationMemoryPacket
+              ? {
+                  allowed_for_current_goal: conversationMemoryPacket.allowed_for_current_goal,
+                  allowed_reason: conversationMemoryPacket.allowed_reason,
+                  allowed_use: conversationMemoryPacket.allowed_use,
+                }
+              : null,
+            conversation_memory_selector: conversationMemoryPacket
+              ? buildHelixConversationMemoryDebug(conversationMemoryPacket)
+              : null,
+            rolling_session_context_packet: rollingSessionContextPacket,
+            rolling_session_context_selector: rollingSessionContextPacket
+              ? buildHelixRollingSessionContextDebug(rollingSessionContextPacket)
+              : null,
           }
         : undefined,
       fail_reason: failReason,

@@ -1,0 +1,48 @@
+export const HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA =
+  "helix.rolling_session_context_packet.v1" as const;
+
+export type HelixRollingSessionCompactionMode =
+  | "none"
+  | "recommended"
+  | "required";
+
+export type HelixRollingSessionContextPacket = {
+  schema: typeof HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA;
+
+  thread_id: string;
+  current_turn_id: string;
+  session_id?: string | null;
+
+  context_scope: "current_thread";
+  accounting_version: "v1";
+
+  model_context_window_tokens: number;
+  auto_compact_token_limit: number;
+
+  estimated_tokens: {
+    current_user_prompt: number;
+    prior_thread_turns: number;
+    retained_turns: number;
+    compacted_summary: number;
+    conversation_memory_packet: number;
+    active_context_total: number;
+  };
+
+  compaction_mode: HelixRollingSessionCompactionMode;
+  compaction_reason: string;
+  full_context_window_limit_reached: boolean;
+
+  retained_turn_ids: string[];
+  compacted_turn_ids: string[];
+  dropped_turn_ids: string[];
+
+  retained_context_summary: string;
+  compacted_context_summary: string;
+  model_visible_summary: string;
+
+  missing_or_uncertain: string[];
+
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
