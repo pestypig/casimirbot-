@@ -3,6 +3,7 @@ import {
   findRepoConceptAliasMatch,
   repoConceptAliasTerms,
 } from "./repo-concept-alias-registry";
+import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
 
 export type RepoConceptDetection = {
   applies: boolean;
@@ -148,6 +149,18 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
       concept: null,
       normalized_terms: [],
       reason: "contextual_tool_reference_suppressed",
+      require_repo_evidence: false,
+      allow_model_direct_answer: true,
+    };
+  }
+  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
+  if (generalScienceConcept.should_prefer_model_only_concept) {
+    return {
+      applies: true,
+      confidence: "high",
+      concept: generalScienceConcept.concept_terms[0] ?? null,
+      normalized_terms: generalScienceConcept.concept_terms,
+      reason: "general_science_concept_model_only",
       require_repo_evidence: false,
       allow_model_direct_answer: true,
     };

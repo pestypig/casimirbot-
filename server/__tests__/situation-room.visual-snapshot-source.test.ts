@@ -3,6 +3,12 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import {
+  analyzeVisualFrame,
+  recordVisualFrame,
+  startVisualSnapshotSource,
+} from "../services/situation-room/visual-snapshot-store";
+import { getVisualEvidenceHealth } from "../services/situation-room/visual-evidence-health";
+import {
   buildSituationSourceCapabilities,
   resetSituationSourceCapabilitiesForTest,
 } from "../services/situation-room/situation-source-capability-store";
@@ -326,24 +332,30 @@ describe("visual snapshot source routes", () => {
   }, 10000);
 
   it("does not treat visible UI unavailable text as visual analysis failure", async () => {
-    const app = await createApp();
-    await request(app)
-      .post("/api/agi/situation/visual-frame/analyze")
-      .send({
-        thread_id: threadId,
-        source_id: "source:visual:ui-unavailable-copy",
-        image_base64:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
-        summary: "The Helix Ask UI is visible, and voice input is currently unavailable.",
-        detected_objects: ["Helix Ask UI", "voice input status"],
-      })
-      .expect(200);
+    startVisualSnapshotSource({
+      thread_id: threadId,
+      source_id: "source:visual:ui-unavailable-copy",
+      source_surface: "desktop_window",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      thread_id: threadId,
+      source_id: "source:visual:ui-unavailable-copy",
+      image_ref: "ephemeral://frame/ui-unavailable-copy",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      summary: "The Helix Ask UI is visible, and voice input is currently unavailable.",
+      detected_objects: ["Helix Ask UI", "voice input status"],
+    });
 
-    const latest = await request(app)
-      .get(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}&source_id=${encodeURIComponent("source:visual:ui-unavailable-copy")}`)
-      .expect(200);
+    const health = getVisualEvidenceHealth({
+      threadId,
+      sourceId: "source:visual:ui-unavailable-copy",
+    });
 
-    expect(latest.body.visual_evidence_health).toMatchObject({
+    expect(health).toMatchObject({
       status: "analysis_ready",
       next_required_action: null,
       assistant_answer: false,

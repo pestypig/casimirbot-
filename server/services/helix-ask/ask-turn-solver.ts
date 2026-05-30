@@ -971,7 +971,7 @@ export function buildAskTurnSolverTrace(input: {
     (routeAuthorityOk || canonicalTerminalAllowed) &&
     poisonAuditOk &&
     terminalAuthorityOk &&
-    (liveSourceIdentityOk || liveSourceIdentityTerminalAllowed) &&
+    liveSourceIdentityOk &&
     evidenceReentryGate.completed &&
     followupReasoningGate.completed &&
     solverRiskFlags.length === 0;

@@ -95,6 +95,32 @@ describe("helix ask turn input integrity audit", () => {
     );
   });
 
+  it("does not require image input for figurative science picture prompts", () => {
+    const requestBody = {
+      question:
+        "How should I understand the popular vacuum-fluctuation picture in quantum field theory, and why is that picture only an analogy?",
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:figurative-picture",
+    });
+
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        text_input_count: 1,
+        image_input_count: 0,
+        evidence_ref_count: 0,
+      }),
+    );
+  });
+
   it("normalizer prefers full raw prompt over extracted question labels", () => {
     const fullPrompt = [
       "Question: diagnose Helix Ask large prompt behavior",

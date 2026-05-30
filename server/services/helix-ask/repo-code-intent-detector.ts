@@ -3,6 +3,7 @@ import {
   resolveRepoConceptEntity,
 } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
 
 export type HelixRepoCodeEvidenceIntent = {
   repoEvidenceRequested: boolean;
@@ -109,6 +110,16 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       repoEvidenceRequested: false,
       strength: "none",
       reasons: NEGATIVE_MODEL_ONLY_RE.test(prompt) ? ["negative_scope:model_only"] : [],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
+  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
+  if (generalScienceConcept.should_prefer_model_only_concept) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["general_science_concept_model_only"],
       requestedOutputs: [],
       projectEntity: null,
     };

@@ -7,6 +7,7 @@ import {
   detectRichModelOnlyConceptPrompt,
   isSimpleElectronDefinitionPrompt,
 } from "../services/helix-ask/model-only-rich-concept";
+import { detectGeneralScienceConceptPrompt } from "../services/helix-ask/general-science-concept-guard";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -59,6 +60,30 @@ describe("Helix Ask rich model-only concept prompts", () => {
   it("keeps simple electron definition prompts eligible for the short fallback", () => {
     expect(isSimpleElectronDefinitionPrompt("What is an electron?")).toBe(true);
     expect(detectRichModelOnlyConceptPrompt("What is an electron?").applies).toBe(false);
+  });
+
+  it("treats ordinary deep physics prompts as model-only concepts, not repo or visual source targets", () => {
+    const prompt =
+      "How should I understand the popular vacuum-fluctuation picture in quantum field theory? People say virtual particles pop in and out of existence, but that sounds like a literal source of energy. Explain what the picture gets right and where it becomes misleading.";
+
+    const generalSignal = detectGeneralScienceConceptPrompt(prompt);
+    const richSignal = detectRichModelOnlyConceptPrompt(prompt);
+
+    expect(generalSignal).toMatchObject({
+      applies: true,
+      explicit_project_source_request: false,
+      explicit_visual_input_request: false,
+      should_prefer_model_only_concept: true,
+    });
+    expect(generalSignal.reason_codes).toEqual(expect.arrayContaining(["figurative_picture_reference"]));
+    expect(generalSignal.concept_terms).toEqual(
+      expect.arrayContaining(["picture", "source", "qft", "virtual_particle", "vacuum_fluctuation"]),
+    );
+    expect(richSignal).toMatchObject({
+      applies: true,
+      should_use_long_form_composer: true,
+      should_block_generic_fallback: true,
+    });
   });
 
   it("routes rich model-only concept prompts through a long final draft", async () => {

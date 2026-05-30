@@ -231,6 +231,21 @@ const hasGoalSatisfyingVisualSituationEvidence = (payload: Record<string, unknow
   if (readString(goal?.satisfaction) !== "satisfied" || readString(goal?.next_decision) !== "allow_terminal") {
     return false;
   }
+  const requiredEvidence = readArray(goal?.required_evidence)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const visualObservationSatisfied = requiredEvidence.some((entry) =>
+    readString(entry.kind) === "visual_observation" && entry.satisfied === true,
+  );
+  const fieldEvaluationSatisfied = requiredEvidence.some((entry) =>
+    readString(entry.kind) === "field_evaluation" && entry.satisfied === true,
+  );
+  const situationContextPackSatisfied = requiredEvidence.some((entry) =>
+    readString(entry.kind) === "situation_context_pack" && entry.satisfied === true,
+  );
+  if ((visualObservationSatisfied && fieldEvaluationSatisfied) || situationContextPackSatisfied) {
+    return true;
+  }
   return readArray(goal?.observed_results)
     .map(readRecord)
     .some((entry) =>

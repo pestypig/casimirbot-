@@ -21,6 +21,7 @@ import {
   isLiveSourceCadenceControlPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -112,6 +113,8 @@ const isGenericSceneEpochPhrase = (prompt: string): boolean =>
 const isLiveCaptureContentPrompt = (prompt: string): boolean =>
   /\b(?:describe|review|explain|summari[sz]e|what\s+(?:do\s+you\s+)?see|what\s+is\s+(?:happening|visible|shown|showing))\b[\s\S]{0,140}\blive\s+(?:capture|screen|visual)\b/i.test(prompt) ||
   /\blive\s+(?:capture|screen|visual)\b[\s\S]{0,140}\b(?:visible|shown|showing|see|happening)\b/i.test(prompt) ||
+  /\b(?:describe|review|explain|summari[sz]e|what\s+(?:do\s+you\s+)?see|what\s+is\s+(?:happening|visible|shown|showing))\b[\s\S]{0,140}\bvisual\s+capture\b/i.test(prompt) ||
+  /\bvisual\s+capture\b[\s\S]{0,140}\b(?:visible|shown|showing|see|seeing|happening)\b/i.test(prompt) ||
   (
     /\b(?:active|current|latest)\s+visual\s+(?:screen\s+)?capture\b/i.test(prompt) &&
     /\b(?:what|visible|shown|showing|happening|evidence|missing|describe|review|explain|summari[sz]e)\b/i.test(prompt)
@@ -471,6 +474,41 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isLiveCaptureContentPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "visual_capture",
+      targetKind: "visual_capture",
+      strength: "hard",
+      explicitCues: ["live_capture_content"],
+      reasons: ["explicit_live_capture_content_source_target", "live_capture_content"],
+      requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs", "typed_failure"],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best", "live_pipeline_control", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_live_capture_content_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
+  if (generalScienceConcept.should_prefer_model_only_concept) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "model_only",
+      targetKind: "general_background",
+      strength: "soft",
+      explicitCues: generalScienceConcept.reason_codes,
+      reasons: ["general_science_concept_model_only", ...generalScienceConcept.reason_codes],
+      requestedOutputs: [],
+      suppressedRoutes: ["repo_code_evidence_question", "visual_deictic", "visual_frame_evidence", "visual_capture_describe"],
+      precedenceReason: "general_science_concept_model_only",
+      confidence: 0.84,
+      allowClientShortcut: false,
+      allowNoToolDirect: true,
+    });
+  }
   if (isExplicitModelOnlyPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

@@ -128,7 +128,29 @@ const findGoalSatisfyingVisualSituationArtifact = (
       .map((entry) => readString(entry.ref))
       .filter((entry): entry is string => Boolean(entry))
     : [];
-  if (supportedRefs.length === 0) return null;
+  if (supportedRefs.length === 0) {
+    const requiredEvidence = Array.isArray(goal?.required_evidence)
+      ? (goal.required_evidence as unknown[]).map(readRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      : [];
+    const visualObservationSatisfied = requiredEvidence.some((entry) =>
+      readString(entry.kind) === "visual_observation" && entry.satisfied === true,
+    );
+    const fieldEvaluationSatisfied = requiredEvidence.some((entry) =>
+      readString(entry.kind) === "field_evaluation" && entry.satisfied === true,
+    );
+    const situationContextPackSatisfied = requiredEvidence.some((entry) =>
+      readString(entry.kind) === "situation_context_pack" && entry.satisfied === true,
+    );
+    if (!(visualObservationSatisfied && fieldEvaluationSatisfied) && !situationContextPackSatisfied) return null;
+    for (const artifact of artifacts) {
+      const kind = artifactKind(artifact);
+      if (!isVisualSituationTerminalKind(kind)) continue;
+      const text = artifactText(artifact);
+      if (!text || isStaleWorkspaceFailureText(text)) continue;
+      return { artifact, kind, text, ref: artifactId(artifact) };
+    }
+    return null;
+  }
   for (const ref of supportedRefs) {
     const artifact = artifacts.find((entry) => artifactId(entry) === ref);
     if (!artifact) continue;

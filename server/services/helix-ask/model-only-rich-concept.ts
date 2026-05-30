@@ -1,3 +1,5 @@
+import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
+
 export type HelixRichModelOnlyConceptSignal = {
   schema: "helix.rich_model_only_concept_signal.v1";
   applies: boolean;
@@ -27,6 +29,26 @@ const physicsConceptTerms: ConceptPattern[] = [
   { term: "existence", pattern: /\bexist(?:s|ence|ent|ing)?\b/i },
   { term: "qft", pattern: /\bquantum\s+field\s+theory\b|\bQFT\b/i },
   { term: "theory_concept_badge", pattern: /\btheory\s+concept\s+badge\b/i },
+  { term: "spacetime", pattern: /\bspace[-\s]?time|spacetime\b/i },
+  { term: "curvature", pattern: /\bcurvature|curved\b/i },
+  { term: "gravity", pattern: /\bgravity|gravitational\b/i },
+  { term: "geodesic", pattern: /\bgeodesic(?:s)?\b/i },
+  { term: "inertial_frame", pattern: /\binertial\s+frames?\b/i },
+  { term: "tidal_force", pattern: /\btidal\s+forces?\b/i },
+  { term: "virtual_particle", pattern: /\bvirtual\s+particles?\b/i },
+  { term: "vacuum_fluctuation", pattern: /\bvacuum[-\s]+fluctuation(?:s)?\b/i },
+  { term: "entropy", pattern: /\bentropy\b/i },
+  { term: "arrow_of_time", pattern: /\barrow\s+of\s+time\b/i },
+  { term: "statistical_mechanics", pattern: /\bstatistical\s+mechanics\b/i },
+  { term: "measurement_problem", pattern: /\bmeasurement\s+problem\b/i },
+  { term: "observer", pattern: /\bobservers?\b/i },
+  { term: "measurement", pattern: /\bmeasurement(?:s)?\b/i },
+  { term: "wavefunction", pattern: /\bwave\s*function|wavefunction\b/i },
+  { term: "collapse", pattern: /\bcollapse\b/i },
+  { term: "decoherence", pattern: /\bdecoherence\b/i },
+  { term: "many_worlds", pattern: /\bmany[-\s]?worlds\b/i },
+  { term: "energy_momentum", pattern: /\benergy[-\s]?momentum\b/i },
+  { term: "rest_mass", pattern: /\brest\s+mass\b/i },
 ];
 
 const compoundConceptCues: RegExp[] = [
@@ -59,10 +81,14 @@ const unique = (values: string[]): string[] => Array.from(new Set(values));
 
 export function detectRichModelOnlyConceptPrompt(promptText: string): HelixRichModelOnlyConceptSignal {
   const prompt = normalizePrompt(promptText);
+  const generalScienceSignal = detectGeneralScienceConceptPrompt(prompt);
   const conceptTerms = unique(
-    physicsConceptTerms
+    [
+      ...physicsConceptTerms
       .filter((entry) => entry.pattern.test(prompt))
       .map((entry) => entry.term),
+      ...generalScienceSignal.concept_terms,
+    ],
   );
   const hasConceptQuestion = compoundConceptCues.some((pattern) => pattern.test(prompt));
   const hasMultiplePhysicsTerms = conceptTerms.filter((term) => term !== "theory_concept_badge").length >= 2;
@@ -73,11 +99,12 @@ export function detectRichModelOnlyConceptPrompt(promptText: string): HelixRichM
   const wantsConcise = explicitConciseCues.some((pattern) => pattern.test(prompt));
   const applies =
     !wantsConcise &&
-    hasConceptQuestion &&
+    (hasConceptQuestion || generalScienceSignal.applies) &&
     (hasMultiplePhysicsTerms || isLongish || hasCompoundContractLikeShape);
   const reasonCodes: string[] = [];
   if (hasConceptQuestion) reasonCodes.push("compound_concept_prompt");
   if (hasMultiplePhysicsTerms) reasonCodes.push("physics_field_particle_terms");
+  if (generalScienceSignal.applies) reasonCodes.push("general_science_concept_prompt");
   if (isLongish || hasCompoundContractLikeShape) reasonCodes.push("long_form_explanation_expected");
   if (applies) reasonCodes.push("generic_definition_fallback_forbidden");
   if (wantsConcise) reasonCodes.push("explicit_concise_cue");
