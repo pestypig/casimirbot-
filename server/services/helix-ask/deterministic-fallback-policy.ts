@@ -16,9 +16,9 @@ export type HelixDeterministicFallbackPolicy = {
   raw_content_included: false;
 };
 
-export type HelixFallbackDemotedObservation = {
-  schema: "helix.fallback_demoted_observation.v1";
-  kind: "fallback_demoted_observation";
+export type HelixDeterministicFallbackObservation = {
+  schema: "helix.deterministic_fallback_observation.v1";
+  kind: "deterministic_fallback_observation";
   fallback_id?: string;
   fallback_text?: string;
   terminal_allowed: false;
@@ -106,11 +106,13 @@ export function classifyDeterministicFallbackUse(input: {
   };
 }
 
-export function buildFallbackDemotedObservation(policy: HelixDeterministicFallbackPolicy): HelixFallbackDemotedObservation | null {
+export function buildDeterministicFallbackObservation(
+  policy: HelixDeterministicFallbackPolicy,
+): HelixDeterministicFallbackObservation | null {
   if (!policy.demote_to_observation) return null;
   return {
-    schema: "helix.fallback_demoted_observation.v1",
-    kind: "fallback_demoted_observation",
+    schema: "helix.deterministic_fallback_observation.v1",
+    kind: "deterministic_fallback_observation",
     fallback_id: policy.fallback_id,
     fallback_text: policy.fallback_text,
     terminal_allowed: false,
@@ -120,6 +122,8 @@ export function buildFallbackDemotedObservation(policy: HelixDeterministicFallba
     raw_content_included: false,
   };
 }
+
+export const buildFallbackDemotedObservation = buildDeterministicFallbackObservation;
 
 export function canDeterministicFallbackBeTerminal(input: {
   promptText: string;

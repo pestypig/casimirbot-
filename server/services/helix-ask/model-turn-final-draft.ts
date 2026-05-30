@@ -25,12 +25,6 @@ export function applyModelTurnAssistantMessageAsFinalDraft(input: {
   };
   input.payload.final_answer_draft = finalDraft;
   input.payload.output_budget = input.payload.output_budget ?? input.outputBudget;
-  input.payload.selected_final_answer = input.text;
-  input.payload.answer = input.text;
-  input.payload.text = input.text;
-  input.payload.assistant_answer = input.text;
-  input.payload.final_answer_source = "final_answer_draft";
-  input.payload.terminal_artifact_kind = "model_synthesized_answer";
   const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
     ? input.payload.current_turn_artifact_ledger
     : [];

@@ -31,6 +31,87 @@ describe("Helix Ask model turn packet", () => {
     expect(packet.loop_policy.require_model_authored_terminal).toBe(true);
   });
 
+  it("derives tool allowance from model-visible capabilities and source-target policy", () => {
+    const modelOnlyPacket = buildHelixModelTurnPacket({
+      turnId: "turn-tools-1",
+      promptText: "Explain fields conceptually, not from repo or code.",
+      payload: {
+        source_target_intent: {
+          target_source: "model_only",
+          allow_no_tool_direct: true,
+          must_enter_backend_ask: false,
+        },
+      },
+      artifactLedger: [
+        {
+          artifact_id: "turn-tools-1:tool_surface_packet",
+          kind: "tool_surface_packet",
+          payload: { summary: "Tool menu was visible." },
+        },
+      ],
+      availableCapabilities: [
+        {
+          capability_key: "model.direct_answer",
+          requires_action: false,
+          goal_fit: "primary",
+        },
+      ],
+    });
+    const toolBackedPacket = buildHelixModelTurnPacket({
+      turnId: "turn-tools-2",
+      promptText: "Find the equation source, then explain it.",
+      payload: {
+        source_target_intent: {
+          target_source: "repo_code",
+          allow_no_tool_direct: false,
+          must_enter_backend_ask: true,
+        },
+      },
+      artifactLedger: [],
+      availableCapabilities: [
+        {
+          capability_key: "repo-code.search_concept",
+          requires_action: true,
+          goal_fit: "primary",
+        },
+      ],
+    });
+
+    expect(modelOnlyPacket.loop_policy.allow_tools).toBe(false);
+    expect(modelOnlyPacket.artifact_refs).toEqual(["turn-tools-1:tool_surface_packet"]);
+    expect(toolBackedPacket.loop_policy.allow_tools).toBe(true);
+  });
+
+  it("feeds demoted deterministic fallback observations into model-visible context", () => {
+    const packet = buildHelixModelTurnPacket({
+      turnId: "turn-fallback-1",
+      promptText: richPrompt,
+      payload: {},
+      artifactLedger: [
+        {
+          artifact_id: "turn-fallback-1:deterministic_fallback_observation:electron",
+          kind: "deterministic_fallback_observation",
+          payload: {
+            schema: "helix.deterministic_fallback_observation.v1",
+            kind: "deterministic_fallback_observation",
+            fallback_id: "model_only_fallback.generic_electron",
+            fallback_text: "An electron is a fundamental subatomic particle.",
+            terminal_allowed: false,
+            reason: "fallback_demoted_requires_model_turn",
+          },
+        },
+      ],
+    });
+
+    expect(packet.artifact_refs).toEqual([
+      "turn-fallback-1:deterministic_fallback_observation:electron",
+    ]);
+    expect(packet.model_visible_artifacts[0]).toMatchObject({
+      kind: "deterministic_fallback_observation",
+      text: "An electron is a fundamental subatomic particle.",
+    });
+  });
+
   it("materializes model turn assistant messages as final_answer_draft", () => {
     const packet = buildHelixModelTurnPacket({
       turnId: "turn-2",
@@ -57,6 +138,9 @@ describe("Helix Ask model turn packet", () => {
       modelTurnResult,
       outputBudget: packet.output_budget,
     });
+    const outputBudget =
+      payloadAfter.output_budget ??
+      (payloadAfter.final_answer_draft as Record<string, unknown> | undefined)?.output_budget;
 
     expect(payloadAfter.final_answer_draft).toMatchObject({
       schema: "helix.final_answer_draft.v1",
@@ -66,6 +150,12 @@ describe("Helix Ask model turn packet", () => {
         schema: "helix.final_answer_output_budget.v1",
         mode: "long",
       },
+    });
+    expect(payloadAfter.output_budget).toEqual((payloadAfter.final_answer_draft as Record<string, unknown>).output_budget);
+    expect(outputBudget).toMatchObject({
+      schema: "helix.final_answer_output_budget.v1",
+      mode: "long",
+      max_tokens: 4096,
     });
   });
 });

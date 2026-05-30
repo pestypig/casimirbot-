@@ -34,9 +34,21 @@ const readRecord = (value: unknown): RecordLike | undefined =>
 const readString = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+const readBoolean = (value: unknown): boolean | undefined =>
+  typeof value === "boolean" ? value : undefined;
+
 const clip = (value: string | undefined, max = 1200): string | undefined => {
   if (!value) return undefined;
   return value.length > max ? `${value.slice(0, max)}...` : value;
+};
+
+const capabilityAllowsToolUse = (capability: unknown): boolean => {
+  const record = readRecord(capability);
+  if (!record) return false;
+  if (readBoolean(record.requires_action) !== true) return false;
+  if (readString(record.goal_fit) === "forbidden") return false;
+  if (readString(record.availability) === "not_available") return false;
+  return true;
 };
 
 export function buildHelixModelTurnPacket(input: {
@@ -62,19 +74,32 @@ export function buildHelixModelTurnPacket(input: {
         artifact_id: artifactId,
         kind,
         summary: clip(readString(payload?.summary) ?? readString(payload?.reason) ?? readString(payload?.message), 600),
-        text: clip(readString(payload?.text) ?? readString(payload?.answer_text) ?? readString(payload?.visible_text), 1200),
+        text: clip(
+          readString(payload?.text) ??
+            readString(payload?.answer_text) ??
+            readString(payload?.visible_text) ??
+            readString(payload?.fallback_text),
+          1200,
+        ),
       };
     })
     .filter((entry): entry is HelixModelTurnPacket["model_visible_artifacts"][number] => Boolean(entry))
     .slice(-16);
   const artifactRefs = modelVisibleArtifacts.map((artifact) => artifact.artifact_id);
+  const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const sourceTargetAllowsToolUse =
+    sourceTargetIntent?.must_enter_backend_ask === true ||
+    sourceTargetIntent?.allow_no_tool_direct === false ||
+    (readString(sourceTargetIntent?.target_source) !== undefined &&
+      readString(sourceTargetIntent?.target_source) !== "model_only");
+  const hasAvailableToolCapability = (input.availableCapabilities ?? []).some(capabilityAllowsToolUse);
   return {
     schema: "helix.model_turn_packet.v1",
     turn_id: input.turnId,
     prompt_text: input.promptText,
     route_reason_code: readString(input.payload.route_reason_code) ?? readString(input.payload.route),
     canonical_goal_frame: readRecord(input.payload.canonical_goal_frame),
-    source_target_intent: readRecord(input.payload.source_target_intent),
+    source_target_intent: sourceTargetIntent,
     route_product_contract: readRecord(input.payload.route_product_contract),
     compound_prompt_contract: compoundPromptContract,
     available_capabilities: input.availableCapabilities ?? [],
@@ -83,7 +108,7 @@ export function buildHelixModelTurnPacket(input: {
     output_budget: input.outputBudget,
     loop_policy: {
       max_model_steps: 2,
-      allow_tools: artifactRefs.some((ref) => /capability|tool|observation/i.test(ref)),
+      allow_tools: hasAvailableToolCapability || sourceTargetAllowsToolUse,
       require_model_authored_terminal: true,
       deterministic_fallback_terminal_allowed: false,
     },

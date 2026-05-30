@@ -83,7 +83,7 @@ export async function runHelixModelTurn(input: {
   payload: RecordLike;
   testResponseOverride?: string | RecordLike;
 }): Promise<HelixModelTurnResult> {
-  if (input.testResponseOverride) {
+  if (input.testResponseOverride !== undefined) {
     return coerceTestOverrideToModelTurnResult({
       packet: input.packet,
       override: input.testResponseOverride,

@@ -18,6 +18,28 @@ const artifactText = (artifact: RecordLike): string | null =>
   readString(artifactPayload(artifact)?.answer_text) ??
   readString(artifact.text);
 
+const modelAuthoredDraftAuthorities = new Set([
+  "model_turn_assistant_message",
+  "llm_model_only_concept_composer",
+  "llm_post_observation_composer",
+]);
+
+const promptTextFromPayload = (payload: RecordLike): string =>
+  readString(payload.active_prompt) ?? readString(payload.question) ?? readString(payload.prompt) ?? "";
+
+const isAssistantModelTurn = (modelTurn: RecordLike | null): boolean =>
+  readString(modelTurn?.status) === "assistant_message" &&
+  Boolean(readString(modelTurn?.assistant_message_text));
+
+const isKnownDeterministicFallbackText = (text: string, fallbackId: string | null): boolean =>
+  /model_only_fallback|legacy_fallback|no_tool_direct|deterministic/i.test(fallbackId ?? "") ||
+  /^An electron is a fundamental subatomic particle/i.test(text) ||
+  /^Proper time is the time measured by a clock moving along a particular worldline/i.test(text) ||
+  /^The Doppler effect is the apparent change in a wave's frequency/i.test(text) ||
+  /^Extrinsic curvature describes how a slice or surface is bending/i.test(text) ||
+  /^A document summary is a shortened explanation of a document's main purpose/i.test(text) ||
+  /^Momentum is conserved in an isolated two-object collision/i.test(text);
+
 export function enforceModelAuthoredTerminalInvariant(input: {
   turnId: string;
   payload: RecordLike;
@@ -34,12 +56,26 @@ export function enforceModelAuthoredTerminalInvariant(input: {
   const modelTurn = readRecord(input.payload.model_turn_result);
   const finalDraft = readRecord(input.payload.final_answer_draft);
   const finalDraftAuthority = readString(finalDraft?.authority);
-  const hasModelAuthoredDraft =
-    finalDraftAuthority === "model_turn_assistant_message" ||
-    finalDraftAuthority === "llm_model_only_concept_composer" ||
-    finalDraftAuthority === "llm_post_observation_composer";
-  if ((terminalKind === "direct_answer_text" || terminalKind === "model_synthesized_answer") && !modelTurn && !hasModelAuthoredDraft) {
+  const hasModelAuthoredDraft = Boolean(finalDraftAuthority && modelAuthoredDraftAuthorities.has(finalDraftAuthority));
+  const hasModelAuthoredTerminalEvidence = isAssistantModelTurn(modelTurn) || hasModelAuthoredDraft;
+  if (
+    (terminalKind === "direct_answer_text" || terminalKind === "model_synthesized_answer") &&
+    !hasModelAuthoredTerminalEvidence
+  ) {
     violations.push("model_answer_terminal_without_model_turn_or_draft");
+  }
+  const selectedFallbackId =
+    readString(input.payload.fallback_id) ?? readString(input.payload.final_answer_source) ?? null;
+  if (selected && isKnownDeterministicFallbackText(selected, selectedFallbackId)) {
+    const directSelectedPolicy = classifyDeterministicFallbackUse({
+      promptText: promptTextFromPayload(input.payload),
+      payload: input.payload,
+      fallbackId: selectedFallbackId ?? undefined,
+      fallbackText: selected,
+    });
+    if (!directSelectedPolicy.terminal_allowed) {
+      violations.push("selected_answer_matches_nonterminal_fallback");
+    }
   }
   const fallbackArtifacts = input.artifactLedger.filter((artifact) =>
     artifactKind(artifact) === "deterministic_fallback_observation" ||
@@ -50,7 +86,7 @@ export function enforceModelAuthoredTerminalInvariant(input: {
     const fallbackId = readString(payload?.fallback_id);
     if (!fallbackText || !selected || fallbackText.trim() !== selected.trim()) continue;
     const policy = classifyDeterministicFallbackUse({
-      promptText: readString(input.payload.active_prompt) ?? readString(input.payload.question) ?? "",
+      promptText: promptTextFromPayload(input.payload),
       payload: input.payload,
       fallbackId,
       fallbackText,
@@ -62,7 +98,7 @@ export function enforceModelAuthoredTerminalInvariant(input: {
   const finalDraftText = readString(finalDraft?.text) ?? readString(finalDraft?.answer_text);
   if (directText && finalDraftText && directText.trim() === finalDraftText.trim()) {
     const policy = classifyDeterministicFallbackUse({
-      promptText: readString(input.payload.active_prompt) ?? readString(input.payload.question) ?? "",
+      promptText: promptTextFromPayload(input.payload),
       payload: input.payload,
       fallbackId: readString(artifactPayload(directAnswer)?.fallback_id) ?? "direct_answer_text",
       fallbackText: directText,

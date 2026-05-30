@@ -23,7 +23,9 @@ describe("Helix Ask deterministic fallback demotion", () => {
     expect(policy.demote_to_observation).toBe(true);
     expect(policy.reason_codes).toEqual(expect.arrayContaining(["rich_model_only_concept_signal"]));
     expect(buildFallbackDemotedObservation(policy)).toMatchObject({
-      schema: "helix.fallback_demoted_observation.v1",
+      schema: "helix.deterministic_fallback_observation.v1",
+      kind: "deterministic_fallback_observation",
+      reason: "fallback_demoted_requires_model_turn",
       terminal_allowed: false,
       assistant_answer: false,
       raw_content_included: false,
