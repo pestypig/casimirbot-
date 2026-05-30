@@ -113,6 +113,44 @@ describe("helix ask backend live visual test harness", () => {
     expect(JSON.stringify(payload)).not.toContain("raw_image_included\":true");
   }, 60_000);
 
+  it("prefers active visual capture evidence over Situation Room repo concept retrieval", async () => {
+    const app = createApp();
+    const seed = await request(app)
+      .post("/api/agi/situation/test-harness/live-visual-source")
+      .send({
+        thread_id: "helix-ask:desktop",
+        source_id: "visual_source:active-screen-capture",
+        scene_text: "A live visual capture shows the Helix Ask desktop with voice input unavailable.",
+        activity: "Inspecting the live Ask workspace.",
+        objects: "Helix Ask panel, input level meter, unavailable voice status.",
+        confidence: 0.82,
+      })
+      .expect(200);
+
+    const ask = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:desktop",
+        question: "Using the active visual screen capture in Situation Room, what is visible right now and what evidence is missing?",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(ask.body?.source_target_intent).toMatchObject({
+      target_source: "visual_capture",
+      target_kind: "visual_capture",
+      strength: "hard",
+      precedence_reason: "explicit_live_capture_content_source_target",
+    });
+    expect(ask.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(ask.body?.active_situation_context?.situation_run_id).toBe(seed.body.situation_run_id);
+    expect(ask.body?.situation_evidence_selection?.selected_observation_refs).toContain(seed.body.observation_ref);
+    expect(String(ask.body?.selected_final_answer ?? ask.body?.answer ?? "")).toMatch(/Helix Ask desktop|voice input unavailable/i);
+    expect(ask.body?.terminal_artifact_kind).not.toBe("repo_code_evidence_answer");
+    expect(JSON.stringify(ask.body)).not.toContain("repo_code_evidence_observation");
+  }, 60_000);
+
   it("reproduces the UI source-switch topology from a backend-only top-level Ask turn", async () => {
     const app = createApp();
     const seed = await request(app)

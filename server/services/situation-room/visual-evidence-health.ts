@@ -12,7 +12,7 @@ import {
 import { buildSituationSourceCapabilities } from "./situation-source-capability-store";
 
 const isAnalysisFailureSummary = (summary: string): boolean =>
-  /\b(?:no configured vision provider|provider returned|vision provider|analysis failed|timed out|timeout|unavailable)\b/i.test(summary);
+  /\b(?:no configured vision provider|provider returned|vision provider (?:failed|unavailable|returned)|analysis failed|analysis timed out|timed out|timeout)\b/i.test(summary);
 
 const providerStatus = (): HelixVisualProviderStatus => {
   const health = getVisionProviderHealth();

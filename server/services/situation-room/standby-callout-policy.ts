@@ -7,6 +7,7 @@ import {
   type StandbyCalloutPriority,
   type StandbyCalloutProposal,
 } from "@shared/helix-standby-callout";
+import type { VoiceSpeakAuthorityRef } from "@shared/voice-proposal";
 
 export type StandbyCalloutPolicyInput = {
   mode: StandbyCalloutMode;
@@ -27,6 +28,7 @@ export type StandbyCalloutPolicyInput = {
   reasoningWorkId?: string | null;
   text: string;
   evidenceRefs: string[];
+  speakAuthority?: VoiceSpeakAuthorityRef | null;
 };
 
 const cooldownByKey = new Map<string, number>();
@@ -59,6 +61,7 @@ export function buildStandbyCalloutProposal(input: StandbyCalloutPolicyInput): S
     text: input.text,
     voice_text: input.text,
     evidence_refs: input.evidenceRefs,
+    speak_authority: input.speakAuthority ?? null,
     dedupe_key: input.dedupeKey,
     cooldown_ms: cooldownMs,
     created_at: new Date(input.nowMs).toISOString(),
@@ -66,6 +69,7 @@ export function buildStandbyCalloutProposal(input: StandbyCalloutPolicyInput): S
 
   const projectionOnly =
     input.salienceReason === "projection_only" || input.salienceReason === "routine_location_sample";
+  const hasSpeakAuthority = Boolean(input.speakAuthority);
   if (
     input.mode === "off" ||
     projectionOnly ||
@@ -87,12 +91,23 @@ export function buildStandbyCalloutProposal(input: StandbyCalloutPolicyInput): S
   if (input.mode === "voice_on_confirm") {
     return {
       ...base,
-      decision: isCalloutPriority(input.priority) ? "speak_on_confirm" : "suppress",
-      requires_confirmation: isCalloutPriority(input.priority),
+      decision: isCalloutPriority(input.priority)
+        ? hasSpeakAuthority
+          ? "speak_on_confirm"
+          : "show_text"
+        : "suppress",
+      requires_confirmation: isCalloutPriority(input.priority) && hasSpeakAuthority,
     };
   }
   if (input.mode === "critical_voice") {
     if (isVoicePriority(input.priority)) {
+      if (!hasSpeakAuthority) {
+        return {
+          ...base,
+          decision: "show_text",
+          requires_confirmation: false,
+        };
+      }
       return {
         ...base,
         decision: input.voiceOutputGranted ? "speak_now" : "speak_on_confirm",
@@ -126,6 +141,7 @@ export function deliverStandbyCalloutProposal(input: {
     thread_id: proposal.thread_id ?? null,
     audio_event_id: null,
     evidence_refs: proposal.evidence_refs,
+    speak_authority: proposal.speak_authority ?? null,
     ts: new Date(input.nowMs).toISOString(),
   } satisfies Omit<StandbyCalloutDeliveryReceipt, "delivered" | "channel" | "reason">;
 
@@ -139,9 +155,15 @@ export function deliverStandbyCalloutProposal(input: {
     return { ...base, delivered: false, channel: "none", reason: "suppressed_cooldown" };
   }
   if (proposal.decision === "speak_on_confirm") {
+    if (!proposal.speak_authority) {
+      return { ...base, delivered: true, channel: "ui_text", reason: "delivered" };
+    }
     return { ...base, delivered: false, channel: "voice_on_confirm", reason: "awaiting_confirmation" };
   }
   if (proposal.decision === "speak_now") {
+    if (!proposal.speak_authority) {
+      return { ...base, delivered: true, channel: "ui_text", reason: "delivered" };
+    }
     if (!input.voiceOutputGranted) {
       return { ...base, delivered: false, channel: "none", reason: "voice_not_enabled" };
     }

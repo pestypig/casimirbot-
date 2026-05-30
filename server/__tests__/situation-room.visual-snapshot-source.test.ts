@@ -325,6 +325,32 @@ describe("visual snapshot source routes", () => {
     }
   }, 10000);
 
+  it("does not treat visible UI unavailable text as visual analysis failure", async () => {
+    const app = await createApp();
+    await request(app)
+      .post("/api/agi/situation/visual-frame/analyze")
+      .send({
+        thread_id: threadId,
+        source_id: "source:visual:ui-unavailable-copy",
+        image_base64:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6f5VQAAAAASUVORK5CYII=",
+        summary: "The Helix Ask UI is visible, and voice input is currently unavailable.",
+        detected_objects: ["Helix Ask UI", "voice input status"],
+      })
+      .expect(200);
+
+    const latest = await request(app)
+      .get(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(threadId)}&source_id=${encodeURIComponent("source:visual:ui-unavailable-copy")}`)
+      .expect(200);
+
+    expect(latest.body.visual_evidence_health).toMatchObject({
+      status: "analysis_ready",
+      next_required_action: null,
+      assistant_answer: false,
+      raw_image_included: false,
+    });
+  }, 10000);
+
   it("derives a generic visual line schema from first frame evidence", async () => {
     const app = await createApp();
     const environmentResponse = await request(app)

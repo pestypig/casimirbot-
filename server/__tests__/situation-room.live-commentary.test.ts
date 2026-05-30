@@ -204,7 +204,7 @@ describe("live commentary for live answer environments", () => {
     expect(ledgerEvents.every((event) => !event.assistant_text)).toBe(true);
   });
 
-  it("uses voice confirmation receipts when the environment voice policy requires confirmation", () => {
+  it("downgrades voice confirmation commentary to text when speak authority is missing", () => {
     const { environment } = createLiveAnswerEnvironment({
       thread_id: "helix-ask:commentary-voice",
       created_turn_id: "turn:prime",
@@ -238,11 +238,69 @@ describe("live commentary for live answer environments", () => {
       evidence_refs: ["calculator:prime:13"],
     });
 
-    expect(result.live_commentary?.proposal.decision).toBe("voice_on_confirm");
+    expect(result.live_commentary?.proposal).toMatchObject({
+      decision: "show_text",
+      speak_authority: null,
+    });
+    expect(result.live_commentary?.delivery).toMatchObject({
+      delivered: true,
+      channel: "ui_text",
+      reason: "delivered",
+      speak_authority: null,
+    });
+  });
+
+  it("uses voice confirmation receipts only when speak authority is present", () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "helix-ask:commentary-voice-authorized",
+      created_turn_id: "turn:prime",
+      objective: "Set up a live prime number generator.",
+      source_ids: ["source:calculator-prime-stream"],
+      preset: "calculator_prime_stream",
+      mode: "voice_on_confirm",
+      now: "2026-05-12T12:00:00.000Z",
+    });
+    upsertLiveCommentarySession({ environment, cadence: "milestones_only", status: "active" });
+    upsertCompanionPolicy({
+      thread_id: "helix-ask:commentary-voice-authorized",
+      voice_output_enabled: true,
+      companion_mode: "active_companion",
+    });
+    const speakAuthority = {
+      kind: "operator_callout_v1" as const,
+      artifact_ref: "operator_callout:prime-13",
+      evidence_refs: ["calculator:prime:13"],
+    };
+
+    const result = ingestWorkstationLiveSourceEvent({
+      source_id: "source:calculator-prime-stream",
+      environment_id: environment.environment_id,
+      kind: "calculator_series",
+      event_type: "prime_found",
+      seq: 7,
+      ts: "2026-05-12T12:00:07.000Z",
+      payload: {
+        candidate: 13,
+        is_prime: true,
+        latest_prime: 13,
+        prime_count: 6,
+        gap: 2,
+      },
+      evidence_refs: ["calculator:prime:13"],
+      liveCommentary: {
+        speakAuthority,
+      },
+    });
+
+    expect(result.live_commentary?.proposal).toMatchObject({
+      decision: "voice_on_confirm",
+      speak_authority: speakAuthority,
+    });
     expect(result.live_commentary?.delivery).toMatchObject({
       delivered: false,
       channel: "voice_on_confirm",
       reason: "awaiting_confirmation",
+      speak_authority: speakAuthority,
     });
   });
 
@@ -262,6 +320,11 @@ describe("live commentary for live answer environments", () => {
       voice_output_enabled: false,
       companion_mode: "active_companion",
     });
+    const speakAuthority = {
+      kind: "operator_callout_v1" as const,
+      artifact_ref: "operator_callout:prime-17",
+      evidence_refs: ["calculator:prime:17"],
+    };
 
     const result = ingestWorkstationLiveSourceEvent({
       source_id: "source:calculator-prime-stream",
@@ -278,6 +341,9 @@ describe("live commentary for live answer environments", () => {
         gap: 4,
       },
       evidence_refs: ["calculator:prime:17"],
+      liveCommentary: {
+        speakAuthority,
+      },
     });
 
     expect(result.live_commentary?.proposal.decision).toBe("voice_on_confirm");
@@ -285,6 +351,7 @@ describe("live commentary for live answer environments", () => {
       delivered: true,
       channel: "ui_text",
       reason: "delivered",
+      speak_authority: speakAuthority,
     });
   });
 });

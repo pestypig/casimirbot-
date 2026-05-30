@@ -111,7 +111,11 @@ const isGenericSceneEpochPhrase = (prompt: string): boolean =>
 
 const isLiveCaptureContentPrompt = (prompt: string): boolean =>
   /\b(?:describe|review|explain|summari[sz]e|what\s+(?:do\s+you\s+)?see|what\s+is\s+(?:happening|visible|shown|showing))\b[\s\S]{0,140}\blive\s+(?:capture|screen|visual)\b/i.test(prompt) ||
-  /\blive\s+(?:capture|screen|visual)\b[\s\S]{0,140}\b(?:visible|shown|showing|see|happening)\b/i.test(prompt);
+  /\blive\s+(?:capture|screen|visual)\b[\s\S]{0,140}\b(?:visible|shown|showing|see|happening)\b/i.test(prompt) ||
+  (
+    /\b(?:active|current|latest)\s+visual\s+(?:screen\s+)?capture\b/i.test(prompt) &&
+    /\b(?:what|visible|shown|showing|happening|evidence|missing|describe|review|explain|summari[sz]e)\b/i.test(prompt)
+  );
 
 const rules: CueRule[] = [
   {

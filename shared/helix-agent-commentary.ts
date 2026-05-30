@@ -1,3 +1,5 @@
+import type { VoiceSpeakAuthorityRef } from "./voice-proposal";
+
 export const HELIX_AGENT_COMMENTARY_SCHEMA = "helix.agent_commentary.v1" as const;
 export const HELIX_DOTTIE_OBSERVER_SUBSCRIPTION_SCHEMA = "helix.dottie_observer_subscription.v1" as const;
 export const HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA = "helix.dottie_voice_receipt.v1" as const;
@@ -100,6 +102,7 @@ export type HelixDottieVoiceReceiptV1 = {
   certainty_parity_ok: boolean;
   evidence_parity_ok: boolean;
   spoken: boolean;
+  speak_authority: VoiceSpeakAuthorityRef | null;
   assistant_answer: false;
   authority: "witness_only";
   raw_reasoning_included: false;
@@ -158,9 +161,15 @@ export function buildDottieVoiceReceipt(input: {
   source_text: string;
   max_chars?: number | null;
   spoken?: boolean;
+  speak_authority?: VoiceSpeakAuthorityRef | null;
 }): HelixDottieVoiceReceiptV1 {
   const maxChars = Math.max(24, Math.min(500, Math.floor(input.max_chars ?? DEFAULT_DOTTIE_MAX_CHARS)));
   const spokenText = clipDottieVoiceText(input.source_text, maxChars);
+  const speakAuthority = input.speak_authority ?? {
+    kind: "operator_callout_v1" as const,
+    artifact_ref: input.source_event_id,
+    evidence_refs: [input.source_event_id],
+  };
   return {
     schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
     observer_id: input.observer_id?.trim() || "observer:dottie:unassigned",
@@ -179,6 +188,7 @@ export function buildDottieVoiceReceipt(input: {
     certainty_parity_ok: true,
     evidence_parity_ok: true,
     spoken: input.spoken ?? false,
+    speak_authority: speakAuthority,
     assistant_answer: false,
     authority: "witness_only",
     raw_reasoning_included: false,

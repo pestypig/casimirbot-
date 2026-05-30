@@ -94,7 +94,7 @@ const requestSchema = z.object({
   utteranceId: z.string().trim().max(200).optional(),
   chunkIndex: z.number().int().nonnegative().max(4096).optional(),
   chunkCount: z.number().int().positive().max(4096).optional(),
-  chunkKind: z.enum(["brief", "final", "tool_receipt", "manual_read_aloud"]).optional(),
+  chunkKind: z.enum(["brief", "final", "tool_receipt", "manual_read_aloud", "translation_relay"]).optional(),
   turnKey: z.string().trim().max(200).optional(),
   textCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
   voiceCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),

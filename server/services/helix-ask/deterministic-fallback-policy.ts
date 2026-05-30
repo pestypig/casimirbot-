@@ -77,7 +77,10 @@ export function classifyDeterministicFallbackUse(input: {
     /^(?:what(?:'s| is)|define|briefly explain)\s+[\w -]+\??$/i.test(input.promptText.trim());
   if (richSignal.applies) reasonCodes.push("rich_model_only_concept_signal");
   if (hasCompoundContract(input.payload)) reasonCodes.push("compound_contract_present");
-  if (/[?].+\b(?:and|also|then|because|since|compare|relate|connect|explain)\b/i.test(input.promptText)) {
+  if (
+    /[?？]/.test(input.promptText) &&
+    /\b(?:and|also|then|because|since|compare|relate|connect|explain)\b/i.test(input.promptText)
+  ) {
     reasonCodes.push("compound_prompt_shape");
   }
   if (isSourceTargeted(input.payload)) reasonCodes.push("source_targeted_prompt");

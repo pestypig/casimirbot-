@@ -49,7 +49,7 @@ STT runtime policy controls:
 - `mode` enum: `callout|briefing|debrief`.
 - `priority` enum: `info|warn|critical|action`.
 - Optional chunk metadata for low-latency playback orchestration:
-  - `utteranceId`, `turnKey`, `chunkKind` (`brief|final`), `chunkIndex`, `chunkCount`
+  - `utteranceId`, `turnKey`, `chunkKind` (`brief|final|tool_receipt|manual_read_aloud|translation_relay`), `chunkIndex`, `chunkCount`
 - `consent_asserted` required for any reference-audio or custom profile route.
 - `traceId` recommended for replay/audit linkage.
 - `missionId` and `eventId` optional but recommended for Go Board linkage.

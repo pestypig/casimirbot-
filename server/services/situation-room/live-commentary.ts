@@ -21,6 +21,7 @@ import {
   type LiveCommentaryTraceStep,
   type LiveCommentaryTraceStepKind,
 } from "@shared/helix-live-commentary";
+import type { VoiceSpeakAuthorityRef } from "@shared/voice-proposal";
 import { appendHelixThreadEvent } from "../helix-thread/ledger";
 import { getCompanionPolicy } from "./companion-policy-engine";
 import { decideVoiceOutputAction } from "./voice-lane-decision-center";
@@ -220,25 +221,30 @@ const buildDeliveryReceipt = (proposal: LiveCommentaryProposal): LiveCommentaryD
   });
   const isVoiceConfirm = outputDecision.action === "voice_on_confirm";
   const isText = outputDecision.action === "show_text" || proposal.decision === "show_text";
-  const isVoiceNow = outputDecision.action === "voice_now";
+  const hasSpeakAuthority = Boolean(proposal.speak_authority);
+  const isVoiceNow = outputDecision.action === "voice_now" && hasSpeakAuthority;
+  const voiceConfirmAllowed = isVoiceConfirm && hasSpeakAuthority;
   return {
     schema: HELIX_LIVE_COMMENTARY_DELIVERY_RECEIPT_SCHEMA,
     delivery_id: `live_commentary_delivery:${hashShort([proposal.proposal_id, proposal.decision, proposal.ts], 18)}`,
     proposal_id: proposal.proposal_id,
     thread_id: proposal.thread_id,
     environment_id: proposal.environment_id,
-    delivered: isText || isVoiceNow,
-    channel: isVoiceNow ? "voice" : isText ? "ui_text" : isVoiceConfirm ? "voice_on_confirm" : "none",
+    delivered: isText || isVoiceNow || (isVoiceConfirm && !hasSpeakAuthority),
+    channel: isVoiceNow ? "voice" : isText || (isVoiceConfirm && !hasSpeakAuthority) ? "ui_text" : voiceConfirmAllowed ? "voice_on_confirm" : "none",
     reason: isText
       ? "delivered"
       : isVoiceNow
         ? "delivered"
-      : isVoiceConfirm
+      : voiceConfirmAllowed
         ? "awaiting_confirmation"
+      : isVoiceConfirm && !hasSpeakAuthority
+        ? "delivered"
         : outputDecision.reason === "voice_output_disabled"
           ? "voice_not_enabled"
         : "silent_keep_in_context",
     evidence_refs: proposal.evidence_refs,
+    speak_authority: proposal.speak_authority ?? null,
     audio_event_id: null,
     ts: proposal.ts,
   };
@@ -388,6 +394,7 @@ export function buildLiveCommentaryProposal(input: {
   delta: LiveAnswerEnvironmentDelta;
   cadence?: string | null;
   now?: string;
+  speakAuthority?: VoiceSpeakAuthorityRef | null;
 }): { session: LiveCommentarySession; proposal: LiveCommentaryProposal } {
   const now = input.now ?? input.delta.ts;
   const environment = input.delta.environment_snapshot;
@@ -411,7 +418,7 @@ export function buildLiveCommentaryProposal(input: {
   const decision: LiveCommentaryDecision =
     !shouldSurface
       ? "silent_keep_in_context"
-      : environment.mode === "voice_on_confirm"
+      : environment.mode === "voice_on_confirm" && input.speakAuthority
         ? "voice_on_confirm"
         : "show_text";
   const userVisible = decision === "show_text" || decision === "voice_on_confirm";
@@ -419,7 +426,7 @@ export function buildLiveCommentaryProposal(input: {
   const candidateDecision: LiveCommentaryCandidateDecision =
     !shouldSurface
       ? "suppress"
-      : environment.mode === "voice_on_confirm"
+      : environment.mode === "voice_on_confirm" && input.speakAuthority
         ? "voice_on_confirm"
         : "show_text";
   const candidate: LiveCommentaryCandidate = {
@@ -479,6 +486,7 @@ export function buildLiveCommentaryProposal(input: {
     reason: shouldSurface && classification.routine ? "continuous_debug" : classification.reason,
     cadence,
     evidence_refs: uniqueStrings(input.delta.evidence_refs).slice(-24),
+    speak_authority: input.speakAuthority ?? null,
     dedupe_key: `live_commentary:${session.environment_id}:${classification.reason}:${hashShort(classification.text, 8)}`,
     cooldown_ms: classification.routine ? 5000 : 15000,
     model_invoked: false,
@@ -650,6 +658,7 @@ export function recordLiveCommentaryForDelta(input: {
   appendThread?: boolean;
   sessionId?: string | null;
   traceId?: string | null;
+  speakAuthority?: VoiceSpeakAuthorityRef | null;
 }): {
   session: LiveCommentarySession;
   proposal: LiveCommentaryProposal;
@@ -659,6 +668,7 @@ export function recordLiveCommentaryForDelta(input: {
   const { session, proposal } = buildLiveCommentaryProposal({
     delta: input.delta,
     cadence: input.cadence,
+    speakAuthority: input.speakAuthority,
   });
   const delivery = storeDeliveryReceipt(buildDeliveryReceipt(proposal));
   const shouldAppendThread = input.appendThread !== false && (proposal.user_visible || proposal.cadence === "continuous_debug");

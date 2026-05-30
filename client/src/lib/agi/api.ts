@@ -1010,7 +1010,7 @@ export type VoiceSpeakPayload = {
   utteranceId?: string;
   chunkIndex?: number;
   chunkCount?: number;
-  chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud";
+  chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay";
   turnKey?: string;
   dedupe_key?: string;
 };

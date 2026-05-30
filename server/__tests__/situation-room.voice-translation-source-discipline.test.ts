@@ -136,12 +136,20 @@ describe("voice and translation live-source discipline", () => {
       speaker_confidence: 1,
       translation_confidence: 0.88,
       dispatch_state: "confirm",
+      engine: "openai_realtime_translate",
+      realtime_session_id: "rt-translate:braid",
+      chunk_index: 3,
+      latency_ms: 240,
       evidence_refs: ["translation:braid:guest-ambient"],
     });
     expect(translation).toMatchObject({
       schema: "helix.translation_observation.v1",
       speaker_role: "guest",
       speaker_authority: "transcribe_only",
+      engine: "openai_realtime_translate",
+      realtime_session_id: "rt-translate:braid",
+      chunk_index: 3,
+      latency_ms: 240,
       content_role: "observation_not_assistant_answer",
       assistant_answer: false,
       raw_audio_included: false,
@@ -198,6 +206,7 @@ describe("voice and translation live-source discipline", () => {
     });
     expect(relayGate).toMatchObject({
       allowed: false,
+      speak_authority: null,
       reason: "procedure_voice_disabled",
       assistant_answer: false,
       raw_audio_included: false,
@@ -286,6 +295,83 @@ describe("voice and translation live-source discipline", () => {
     expect(events.some((event) => event.item_type === "answer")).toBe(false);
     expect(events.every((event) => !event.assistant_text)).toBe(true);
   }, 60_000);
+
+  it("allows translation relay voice only as an operator callout with speak authority", () => {
+    const procedure = createLiveTranslationProcedure({
+      thread_id: "helix-ask:relay",
+      room_id: "room:relay",
+      source_bindings: [
+        {
+          source_id: "discord:relay:voice",
+          source_surface: "discord_user_stream",
+          speaker_id: "discord:owner-user",
+          display_name: "Owner",
+          role: "owner",
+          authority: "command_allowed",
+          input_language: "es",
+          output_language: "en",
+          consent_state: "granted",
+        },
+      ],
+      speak_translation: true,
+      voice_profile: "dottie_translation_en",
+      evidence_refs: ["translation:relay:setup"],
+    });
+    const observation = recordTranslationObservation({
+      procedure_id: procedure.procedure_id,
+      source_id: "discord:relay:voice",
+      speaker_id: "discord:owner-user",
+      source_language: "es",
+      target_language: "en",
+      source_text: "La compuerta esta lista.",
+      translated_text: "The gate is ready.",
+      transcript_confidence: 0.93,
+      language_confidence: 0.94,
+      speaker_confidence: 0.97,
+      translation_confidence: 0.91,
+      dispatch_state: "auto",
+      engine: "openai_realtime_translate",
+      realtime_session_id: "rt-translate:relay",
+      chunk_index: 4,
+      latency_ms: 180,
+      evidence_refs: ["translation:relay:chunk:4"],
+    });
+    const relayGate = evaluateTranslationVoiceRelayGate({
+      procedure,
+      observation,
+      outputDecision: {
+        schema: "helix.voice_output_decision.v1",
+        action: "voice_now",
+        reason: "direct_address",
+        speakable: true,
+        requires_confirmation: false,
+        assistant_answer: false,
+        raw_audio_included: false,
+        raw_transcript_included: false,
+        context_policy: "compact_context_pack_only",
+      },
+    });
+
+    expect(relayGate).toMatchObject({
+      allowed: true,
+      reason: "allowed",
+      speak_authority: {
+        kind: "operator_callout_v1",
+        artifact_ref: observation.observation_id,
+        evidence_refs: [observation.observation_id, "translation:relay:chunk:4"],
+      },
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+    });
+    expect(observation).toMatchObject({
+      assistant_answer: false,
+      raw_audio_included: false,
+      raw_transcript_included: false,
+      content_role: "observation_not_assistant_answer",
+    });
+    expect(getHelixThreadLedgerEvents({ threadId: "helix-ask:relay" })).toHaveLength(0);
+  });
 
   it("blocks ambient translation activation but allows commander-requested activation with text relay defaults", async () => {
     const app = createApp();

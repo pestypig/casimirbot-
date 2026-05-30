@@ -4126,17 +4126,18 @@ export function executeHelixPanelAction(
       }
       const sourceText = asNonEmptyString(args.source_text ?? args.sourceText);
       const observerId = asNonEmptyString(args.observer_id ?? args.observerId) ?? "observer:dottie:unassigned";
-      if (!sourceText) {
-        const suppressedReceipt = {
-          kind: "dottie_voice_receipt",
-          schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
+        if (!sourceText) {
+          const suppressedReceipt = {
+            kind: "dottie_voice_receipt",
+            schema: HELIX_DOTTIE_VOICE_RECEIPT_SCHEMA,
           observer_id: observerId,
           source_event_id: sourceEventId,
           source_event_schema: asNonEmptyString(args.source_event_schema ?? args.sourceEventSchema) ?? HELIX_AGENT_COMMENTARY_SCHEMA,
-          spoken: false,
-          assistant_answer: false,
-          authority: "witness_only",
-          suppression_reason: "missing_source_text",
+            spoken: false,
+            speak_authority: null,
+            assistant_answer: false,
+            authority: "witness_only",
+            suppression_reason: "missing_source_text",
           deterministic_content_role: "observation_not_assistant_answer",
           raw_reasoning_included: false,
         };
@@ -4482,19 +4483,29 @@ export function executeHelixPanelAction(
       };
     }
 
-    if (actionId === "voice_delivery.confirm_speak") {
-      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
-      const spokenText = asNonEmptyString(args.spoken_text ?? args.spokenText ?? args.text) ?? "";
-      const receipt = {
-        kind: "standby_callout_delivery_receipt",
-        schema: "helix.voice_delivery_confirm_speak_receipt.v1",
+      if (actionId === "voice_delivery.confirm_speak") {
+        const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+        const spokenText = asNonEmptyString(args.spoken_text ?? args.spokenText ?? args.text) ?? "";
+        const sourceEventId = asNonEmptyString(args.source_event_id ?? args.sourceEventId);
+        const proposalId = asNonEmptyString(args.proposal_id ?? args.proposalId);
+        const authorityArtifactRef = proposalId ?? sourceEventId ?? `voice_confirm_speak:${Date.now()}`;
+        const authorityEvidenceRefs = [proposalId, sourceEventId].filter((entry): entry is string => Boolean(entry));
+        const speakAuthority = {
+          kind: "operator_callout_v1" as const,
+          artifact_ref: authorityArtifactRef,
+          evidence_refs: authorityEvidenceRefs.length ? authorityEvidenceRefs : [authorityArtifactRef],
+        };
+        const receipt = {
+          kind: "standby_callout_delivery_receipt",
+          schema: "helix.voice_delivery_confirm_speak_receipt.v1",
         ok: true,
         thread_id: threadId,
         request: args,
         spoken: true,
-        confirm_speak_receipt_present: true,
-        output_authority: "confirmed_spoken",
-        spoken_text: spokenText,
+          confirm_speak_receipt_present: true,
+          output_authority: "confirmed_spoken",
+          speak_authority: speakAuthority,
+          spoken_text: spokenText,
         command_lane_enabled: false,
         minecraft_actions_enabled: false,
         assistant_answer: false,

@@ -1,3 +1,5 @@
+import type { VoiceSpeakAuthorityRef } from "./voice-proposal";
+
 export const HELIX_STANDBY_CALLOUT_PROPOSAL_SCHEMA =
   "helix.standby_callout_proposal.v1" as const;
 export const HELIX_STANDBY_CALLOUT_DELIVERY_RECEIPT_SCHEMA =
@@ -29,6 +31,7 @@ export type StandbyCalloutProposal = {
   voice_text?: string | null;
   requires_confirmation: boolean;
   evidence_refs: string[];
+  speak_authority?: VoiceSpeakAuthorityRef | null;
   dedupe_key: string;
   cooldown_ms: number;
   created_at: string;
@@ -51,5 +54,6 @@ export type StandbyCalloutDeliveryReceipt = {
   thread_id?: string | null;
   audio_event_id?: string | null;
   evidence_refs: string[];
+  speak_authority?: VoiceSpeakAuthorityRef | null;
   ts: string;
 };

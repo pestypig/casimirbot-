@@ -98,5 +98,47 @@ describe("Helix Ask rich model-only concept prompts", () => {
     expect(outputBudget?.schema).toBe("helix.final_answer_output_budget.v1");
     expect(outputBudget?.mode).toBe("long");
     expect(outputBudget?.max_tokens).toBeGreaterThanOrEqual(3000);
+
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(body.turn_id))}/debug-export`)
+      .expect(200);
+    const debugPayload = debug.body?.payload;
+
+    expect(debugPayload?.selected_final_answer).toBe(answer);
+    expect(debugPayload?.terminal_answer_authority).toMatchObject({
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_kind: "answer",
+      server_authoritative: true,
+    });
+    expect(debugPayload?.terminal_answer_authority?.terminal_text_preview).toBe(answer);
+    expect(debugPayload?.resolved_turn_summary?.terminal_artifact_kind).toBe("model_synthesized_answer");
+  }, 60000);
+
+  it("fails closed instead of returning the rich-concept placeholder when synthesis is unavailable", async () => {
+    process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE =
+      "Rich model-only concept prompt requires final synthesis.";
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Yea but what exactly is a field anyways? Both electrons and photons are considered zero-dimensional point particles without physical volume, radius, or a hard surface. Do fields emerge from electron movement, and is this known as a probability in a sphere?",
+        mode: "read",
+        debug: true,
+        sessionId: `rich-model-only-concept-placeholder-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const answer = String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "");
+
+    expect(body?.rich_model_only_concept_signal?.applies).toBe(true);
+    expect(body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(body?.final_answer_source).toBe("typed_failure");
+    expect(body?.terminal_error_code).toBe("model_only_concept_final_synthesis_unavailable");
+    expect(answer).not.toBe("Rich model-only concept prompt requires final synthesis.");
+    expect(answer).toMatch(/could not produce/i);
   }, 60000);
 });

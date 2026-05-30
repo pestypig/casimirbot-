@@ -249,6 +249,10 @@ export function recordTranslationObservation(input: {
   target_language: string;
   source_text: string;
   translated_text: string;
+  engine?: HelixTranslationObservation["engine"] | null;
+  realtime_session_id?: string | null;
+  chunk_index?: number | null;
+  latency_ms?: number | null;
   transcript_confidence?: number | null;
   language_confidence?: number | null;
   speaker_confidence?: number | null;
@@ -288,10 +292,20 @@ export function recordTranslationObservation(input: {
     target_language: input.target_language,
     speaker_role: sourceBinding?.role ?? "unknown",
     speaker_authority: sourceBinding?.authority ?? "transcribe_only",
-    consent_state: sourceBinding?.consent_state ?? "requested",
-    source_text: input.source_text,
-    translated_text: input.translated_text,
-    transcript_confidence: clampConfidence(input.transcript_confidence),
+      consent_state: sourceBinding?.consent_state ?? "requested",
+      source_text: input.source_text,
+      translated_text: input.translated_text,
+      engine: input.engine ?? null,
+      realtime_session_id: input.realtime_session_id ?? null,
+      chunk_index:
+        typeof input.chunk_index === "number" && Number.isFinite(input.chunk_index)
+          ? Math.max(0, Math.trunc(input.chunk_index))
+          : null,
+      latency_ms:
+        typeof input.latency_ms === "number" && Number.isFinite(input.latency_ms)
+          ? Math.max(0, Math.trunc(input.latency_ms))
+          : null,
+      transcript_confidence: clampConfidence(input.transcript_confidence),
     language_confidence: clampConfidence(input.language_confidence),
     speaker_confidence: clampConfidence(input.speaker_confidence),
     translation_confidence: clampConfidence(input.translation_confidence),
@@ -378,14 +392,24 @@ export function evaluateTranslationVoiceRelayGate(input: {
         : input.observation.dispatch_state === "blocked"
           ? "translation_blocked"
           : input.observation.speaker_authority === "ignored"
-            ? "speaker_not_authorized"
-            : "allowed";
-  return {
-    schema: "helix.translation_voice_relay_gate.v1",
-    procedure_id: input.procedure.procedure_id,
-    observation_id: input.observation.observation_id,
-    allowed: reason === "allowed",
-    reason,
+              ? "speaker_not_authorized"
+              : "allowed";
+    const allowed = reason === "allowed";
+    return {
+      schema: "helix.translation_voice_relay_gate.v1",
+      procedure_id: input.procedure.procedure_id,
+      observation_id: input.observation.observation_id,
+      allowed,
+      speak_authority: allowed
+        ? {
+            kind: "operator_callout_v1",
+            artifact_ref: input.observation.observation_id,
+            evidence_refs: Array.from(
+              new Set([input.observation.observation_id, ...input.observation.evidence_refs]),
+            ),
+          }
+        : null,
+      reason,
     assistant_answer: false,
     raw_audio_included: false,
     raw_transcript_included: false,

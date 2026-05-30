@@ -1,5 +1,6 @@
 import type { HelixEvidenceObservation } from "./helix-evidence-observation";
 import type { HelixVoiceSourceSurface } from "./helix-voice-lane-event";
+import type { VoiceSpeakAuthorityRef } from "./voice-proposal";
 
 export const HELIX_LIVE_TRANSLATION_PROCEDURE_SCHEMA =
   "helix.live_translation_procedure.v1" as const;
@@ -30,6 +31,11 @@ export type HelixTranslationConsentState =
   | "granted"
   | "revoked"
   | "not_required";
+
+export type HelixTranslationEngine =
+  | "openai_realtime_translate"
+  | "whisper_http_translate"
+  | "manual";
 
 export type HelixLiveTranslationSourceBinding = {
   source_id: string;
@@ -83,6 +89,10 @@ export type HelixTranslationObservation = {
   consent_state: HelixTranslationConsentState;
   source_text: string;
   translated_text: string;
+  engine?: HelixTranslationEngine | null;
+  realtime_session_id?: string | null;
+  chunk_index?: number | null;
+  latency_ms?: number | null;
   transcript_confidence: number;
   language_confidence: number;
   speaker_confidence: number;
@@ -102,6 +112,7 @@ export type HelixTranslationVoiceRelayGate = {
   procedure_id: string;
   observation_id: string;
   allowed: boolean;
+  speak_authority: VoiceSpeakAuthorityRef | null;
   reason:
     | "allowed"
     | "procedure_voice_disabled"

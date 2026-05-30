@@ -42,6 +42,21 @@ describe("Helix Ask deterministic fallback demotion", () => {
     expect(policy.demote_to_observation).toBe(false);
   });
 
+  it("demotes non-electron keyword fallbacks on compound prompts", () => {
+    const policy = classifyDeterministicFallbackUse({
+      promptText:
+        "Can you explain proper time and coordinate time, and connect that to whether dimensions are physically real?",
+      fallbackId: "model_only_fallback.proper_time_coordinate_time",
+      fallbackText:
+        "Proper time is the time measured by a clock moving along a particular worldline. Coordinate time is the time label assigned by a chosen reference frame.",
+      payload: {},
+    });
+
+    expect(policy.terminal_allowed).toBe(false);
+    expect(policy.demote_to_observation).toBe(true);
+    expect(policy.reason_codes).toEqual(expect.arrayContaining(["compound_prompt_shape"]));
+  });
+
   it("blocks final drafts cloned from nonterminal fallback text", () => {
     const fallbackText = "An electron is a fundamental subatomic particle.";
     const result = enforceModelAuthoredTerminalInvariant({

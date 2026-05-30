@@ -1,4 +1,5 @@
 import type { LiveAnswerEnvironmentMode } from "./helix-live-answer-environment";
+import type { VoiceSpeakAuthorityRef } from "./voice-proposal";
 
 export const HELIX_LIVE_COMMENTARY_SESSION_SCHEMA =
   "helix.live_commentary_session.v1" as const;
@@ -130,6 +131,7 @@ export type LiveCommentaryProposal = {
     | "suppressed_routine";
   cadence: LiveCommentaryCadence;
   evidence_refs: string[];
+  speak_authority?: VoiceSpeakAuthorityRef | null;
   dedupe_key: string;
   cooldown_ms: number;
   model_invoked: boolean;
@@ -157,6 +159,7 @@ export type LiveCommentaryDeliveryReceipt = {
     | "voice_not_enabled"
     | "silent_keep_in_context";
   evidence_refs: string[];
+  speak_authority?: VoiceSpeakAuthorityRef | null;
   audio_event_id?: string | null;
   ts: string;
 };

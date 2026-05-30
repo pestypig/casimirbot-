@@ -24,6 +24,12 @@ const baseInput = {
   evidenceRefs: ["mc:damage"],
 };
 
+const speakAuthority = {
+  kind: "accepted_arbitration_candidate" as const,
+  artifact_ref: "candidate:risk-detected",
+  evidence_refs: ["mc:damage"],
+};
+
 describe("standby callout policy", () => {
   beforeEach(() => resetStandbyCalloutPolicyState());
 
@@ -55,11 +61,13 @@ describe("standby callout policy", () => {
     const proposal = buildStandbyCalloutProposal({
       ...baseInput,
       mode: "voice_on_confirm",
+      speakAuthority,
     });
 
     expect(proposal).toMatchObject({
       decision: "speak_on_confirm",
       requires_confirmation: true,
+      speak_authority: speakAuthority,
     });
     expect(
       deliverStandbyCalloutProposal({
@@ -72,6 +80,33 @@ describe("standby callout policy", () => {
       delivered: false,
       channel: "voice_on_confirm",
       reason: "awaiting_confirmation",
+      speak_authority: speakAuthority,
+    });
+  });
+
+  it("downgrades voice-on-confirm mode to text without speak authority", () => {
+    const proposal = buildStandbyCalloutProposal({
+      ...baseInput,
+      mode: "voice_on_confirm",
+    });
+
+    expect(proposal).toMatchObject({
+      decision: "show_text",
+      requires_confirmation: false,
+      speak_authority: null,
+    });
+    expect(
+      deliverStandbyCalloutProposal({
+        proposal,
+        mode: "voice_on_confirm",
+        voiceOutputGranted: true,
+        nowMs: baseInput.nowMs,
+      }),
+    ).toMatchObject({
+      delivered: true,
+      channel: "ui_text",
+      reason: "delivered",
+      speak_authority: null,
     });
   });
 
@@ -81,11 +116,13 @@ describe("standby callout policy", () => {
       mode: "critical_voice",
       priority: "critical",
       voiceOutputGranted: true,
+      speakAuthority,
     });
 
     expect(proposal).toMatchObject({
       decision: "speak_now",
       requires_confirmation: false,
+      speak_authority: speakAuthority,
     });
     expect(
       deliverStandbyCalloutProposal({
@@ -98,6 +135,22 @@ describe("standby callout policy", () => {
       delivered: true,
       channel: "voice",
       reason: "delivered",
+      speak_authority: speakAuthority,
+    });
+  });
+
+  it("downgrades critical voice to text without speak authority", () => {
+    const proposal = buildStandbyCalloutProposal({
+      ...baseInput,
+      mode: "critical_voice",
+      priority: "critical",
+      voiceOutputGranted: true,
+    });
+
+    expect(proposal).toMatchObject({
+      decision: "show_text",
+      requires_confirmation: false,
+      speak_authority: null,
     });
   });
 

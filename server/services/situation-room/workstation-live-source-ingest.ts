@@ -31,6 +31,7 @@ import type {
   LiveCommentaryProposal,
   LiveCommentarySession,
 } from "@shared/helix-live-commentary";
+import type { VoiceSpeakAuthorityRef } from "@shared/voice-proposal";
 
 const sources = new Map<string, WorkstationLiveSource>();
 const eventsBySource = new Map<string, WorkstationLiveSourceEvent[]>();
@@ -205,6 +206,9 @@ export function ingestWorkstationLiveSourceEvent(input: {
   thread_id?: string | null;
   trace?: Record<string, unknown> | null;
   evidence_refs?: string[];
+  liveCommentary?: {
+    speakAuthority?: VoiceSpeakAuthorityRef | null;
+  } | null;
 }): {
   ok: boolean;
   source: WorkstationLiveSource;
@@ -322,6 +326,7 @@ export function ingestWorkstationLiveSourceEvent(input: {
     ? recordLiveCommentaryForDelta({
         delta: reduction.delta,
         appendThread: reduction.delta.environment_snapshot.status === "active",
+        speakAuthority: input.liveCommentary?.speakAuthority ?? null,
       })
     : null;
   const pipelineResults = listLiveWorkstationPipelinesForSource(source.source_id).map((pipeline) => {

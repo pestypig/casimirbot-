@@ -1,4 +1,4 @@
-export type VoicePlaybackUtteranceKind = "brief" | "final" | "tool_receipt" | "manual_read_aloud";
+export type VoicePlaybackUtteranceKind = "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay";
 
 export type VoicePlaybackIntentAuthority =
   | "provisional"

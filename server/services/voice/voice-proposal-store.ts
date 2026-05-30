@@ -39,6 +39,7 @@ export function createVoiceProposalFromPolicyObservation(input: {
     spoken: false,
     confirm_speak_receipt_present: false,
     output_authority: "proposal",
+    speak_authority: null,
     assistant_answer: false,
     raw_content_included: false,
   };
