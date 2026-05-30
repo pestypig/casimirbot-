@@ -19,6 +19,7 @@ import {
 } from "./profile-ingress-store";
 
 let activeSession: HelixAccountSession | null = null;
+const sessionsById = new Map<string, HelixAccountSession>();
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -50,7 +51,7 @@ function buildUsageSummary(): HelixAccountUsageSummary {
   };
 }
 
-function buildLinkedAccounts(): HelixAccountLinkedAccount[] {
+function buildLinkedAccounts(session: HelixAccountSession | null): HelixAccountLinkedAccount[] {
   const discordAccounts = listDiscordVoiceSessions()
     .filter((session) => session.commander_discord_user_id || session.status === "link_pending")
     .map<HelixAccountLinkedAccount>((session) => ({
@@ -64,28 +65,40 @@ function buildLinkedAccounts(): HelixAccountLinkedAccount[] {
       authority: session.commander_discord_user_id ? "commander" : "viewer",
       linked_at: session.updated_at,
     }));
-  return activeSession
+  const profileAccount: HelixAccountLinkedAccount | null = session
+    ? {
+        provider: session.profile.provider === "google" ? "google" : "local",
+        external_id: session.profile.provider_subject ?? session.profile.profile_id,
+        display_name: session.profile.display_name,
+        status: "linked",
+        authority: "owner",
+        linked_at: session.created_at,
+      }
+    : null;
+  return profileAccount
     ? [
-        {
-          provider: "local",
-          external_id: activeSession.profile.profile_id,
-          display_name: activeSession.profile.display_name,
-          status: "linked",
-          authority: "owner",
-          linked_at: activeSession.created_at,
-        },
+        profileAccount,
         ...discordAccounts,
       ]
     : discordAccounts;
 }
 
-export function getAccountSessionStatus(): HelixAccountSessionStatus {
-  const profileId = activeSession?.profile.profile_id ?? null;
+export function getAccountSessionById(sessionId?: string | null): HelixAccountSession | null {
+  const normalized = normalize(sessionId);
+  if (normalized) {
+    return sessionsById.get(normalized) ?? null;
+  }
+  return null;
+}
+
+export function getAccountSessionStatus(sessionId?: string | null): HelixAccountSessionStatus {
+  const session = getAccountSessionById(sessionId) ?? activeSession;
+  const profileId = session?.profile.profile_id ?? null;
   return {
     schema: HELIX_ACCOUNT_SESSION_STATUS_SCHEMA,
     ok: true,
-    session: activeSession,
-    linked_accounts: buildLinkedAccounts(),
+    session,
+    linked_accounts: buildLinkedAccounts(session),
     profile_ingress_tokens: listProfileIngressTokens(profileId),
     profile_ingress_usage: getProfileIngressUsage(profileId),
     usage: buildUsageSummary(),
@@ -96,6 +109,12 @@ export function getAccountSessionStatus(): HelixAccountSessionStatus {
       recommended_flow: "web_auth_or_oauth_link",
     },
   };
+}
+
+function rememberSession(session: HelixAccountSession): HelixAccountSession {
+  sessionsById.set(session.session_id, session);
+  activeSession = session;
+  return session;
 }
 
 export function signInLocalAccountSession(input: {
@@ -116,7 +135,7 @@ export function signInLocalAccountSession(input: {
     };
   }
   const now = nowIso();
-  activeSession = {
+  const session: HelixAccountSession = {
     schema: HELIX_ACCOUNT_SESSION_SCHEMA,
     session_id: `account_session:${crypto.randomUUID()}`,
     profile: {
@@ -124,6 +143,9 @@ export function signInLocalAccountSession(input: {
       display_name: normalize(input.display_name) || profileId,
       email: normalize(input.email) || null,
       auth_mode: "local_dev_profile",
+      provider: "local",
+      provider_subject: profileId,
+      picture_url: null,
       created_at: now,
       updated_at: now,
     },
@@ -132,10 +154,11 @@ export function signInLocalAccountSession(input: {
     created_at: now,
     updated_at: now,
   };
+  rememberSession(session);
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
-    session: activeSession,
+    session,
     message: "Local workstation profile session started. Production auth should use web/OAuth handoff.",
     error: null,
     raw_password_stored: false,
@@ -143,9 +166,67 @@ export function signInLocalAccountSession(input: {
   };
 }
 
-export function signOutAccountSession(): HelixAccountSessionReceipt {
-  const previous = activeSession;
-  activeSession = null;
+export function signInWebAccountSession(input: {
+  provider: "google";
+  provider_subject?: string | null;
+  display_name?: string | null;
+  email?: string | null;
+  picture_url?: string | null;
+}): HelixAccountSessionReceipt {
+  const providerSubject = normalize(input.provider_subject);
+  if (!providerSubject) {
+    return {
+      schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
+      ok: false,
+      session: null,
+      message: "A verified provider subject is required to start a web account session.",
+      error: "missing_provider_subject",
+      raw_password_stored: false,
+      credential_collection_allowed_in_agents: false,
+    };
+  }
+  const now = nowIso();
+  const profileId = `${input.provider}:${providerSubject}`;
+  const session: HelixAccountSession = {
+    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
+    session_id: `account_session:${crypto.randomUUID()}`,
+    profile: {
+      profile_id: profileId,
+      display_name: normalize(input.display_name) || normalize(input.email) || "Google user",
+      email: normalize(input.email) || null,
+      auth_mode: "web_auth",
+      provider: input.provider,
+      provider_subject: providerSubject,
+      picture_url: normalize(input.picture_url) || null,
+      created_at: now,
+      updated_at: now,
+    },
+    status: "active",
+    memory_scope: "profile",
+    created_at: now,
+    updated_at: now,
+  };
+  rememberSession(session);
+  return {
+    schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
+    ok: true,
+    session,
+    message: "Signed in with Google.",
+    error: null,
+    raw_password_stored: false,
+    credential_collection_allowed_in_agents: false,
+  };
+}
+
+export function signOutAccountSession(sessionId?: string | null): HelixAccountSessionReceipt {
+  const normalized = normalize(sessionId);
+  const previous = normalized ? sessionsById.get(normalized) ?? null : activeSession;
+  if (normalized) {
+    sessionsById.delete(normalized);
+  }
+  if (!normalized || activeSession?.session_id === normalized) {
+    activeSession = null;
+  }
   return {
     schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
     ok: true,
@@ -159,4 +240,5 @@ export function signOutAccountSession(): HelixAccountSessionReceipt {
 
 export function resetAccountSessionStore(): void {
   activeSession = null;
+  sessionsById.clear();
 }

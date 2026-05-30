@@ -7,7 +7,7 @@ import {
   detectRichModelOnlyConceptPrompt,
   isSimpleElectronDefinitionPrompt,
 } from "../services/helix-ask/model-only-rich-concept";
-import { detectGeneralScienceConceptPrompt } from "../services/helix-ask/general-science-concept-guard";
+import { detectModelOnlyConceptSourceSignal } from "../services/helix-ask/model-only-concept-source-guard";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -66,7 +66,7 @@ describe("Helix Ask rich model-only concept prompts", () => {
     const prompt =
       "How should I understand the popular vacuum-fluctuation picture in quantum field theory? People say virtual particles pop in and out of existence, but that sounds like a literal source of energy. Explain what the picture gets right and where it becomes misleading.";
 
-    const generalSignal = detectGeneralScienceConceptPrompt(prompt);
+    const generalSignal = detectModelOnlyConceptSourceSignal(prompt);
     const richSignal = detectRichModelOnlyConceptPrompt(prompt);
 
     expect(generalSignal).toMatchObject({

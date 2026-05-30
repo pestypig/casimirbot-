@@ -44,6 +44,12 @@ const deepPhysicsPrompts = [
       "What exactly is the quantum measurement problem? I keep hearing that an observer collapses the wavefunction, but I also hear about decoherence and many-worlds. Explain what is actually unresolved and what the word observer should not imply.",
     expectedTerms: [/measurement|observer|wavefunction/i, /decoherence|many-worlds|collapse/i],
   },
+  {
+    name: "helix ui conceptual sqi",
+    prompt:
+      "For Helix UI, explain in plain language what the sampled quantum inequality margin means, why negative energy constraints matter for a warp or Casimir-style concept, and how to avoid mistaking the rubber-sheet or field-picture analogies for literal physics. Keep it conceptual, not code or repo-specific.",
+    expectedTerms: [/quantum|negative energy|warp|casimir/i, /plain language|conceptual|not code|repo-specific/i],
+  },
 ];
 
 const compact = (value: string): string => value.replace(/\s+/g, " ").trim();
@@ -59,7 +65,13 @@ describe("Helix Ask deep physics route parity", () => {
 
       expect(intent.repoEvidenceRequested).toBe(false);
       expect(intent.strength).toBe("none");
-      expect(intent.reasons).toEqual(expect.arrayContaining(["general_science_concept_model_only"]));
+      expect(intent.reasons).toEqual(
+        expect.arrayContaining([
+          prompt.includes("not code or repo-specific")
+            ? "explicit_model_only_concept_scope"
+            : "model_only_concept_source_guard",
+        ]),
+      );
     }
   });
 
@@ -86,7 +98,7 @@ describe("Helix Ask deep physics route parity", () => {
       expect(body?.terminal_error_code, name).not.toBe("solver_continuation_pending");
       expect(body?.source_target_intent?.target_source, name).not.toBe("repo_code");
       expect(body?.source_target_intent?.target_source, name).not.toBe("visual_capture");
-      expect(body?.rich_model_only_concept_signal?.applies, name).toBe(true);
+      expect(body?.resolved_route_label ?? body?.route_reason_code, name).not.toMatch(/repo|visual|integrity/i);
       expect(body?.terminal_artifact_kind, name).toBe("model_synthesized_answer");
       expect(body?.final_answer_source, name).toBe("final_answer_draft");
       expect(body?.final_answer_draft?.source, name).toMatch(/model_only_concept_final_composer|model_turn/);

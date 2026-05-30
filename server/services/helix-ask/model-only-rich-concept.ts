@@ -1,4 +1,4 @@
-import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
+import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
 
 export type HelixRichModelOnlyConceptSignal = {
   schema: "helix.rich_model_only_concept_signal.v1";
@@ -81,13 +81,13 @@ const unique = (values: string[]): string[] => Array.from(new Set(values));
 
 export function detectRichModelOnlyConceptPrompt(promptText: string): HelixRichModelOnlyConceptSignal {
   const prompt = normalizePrompt(promptText);
-  const generalScienceSignal = detectGeneralScienceConceptPrompt(prompt);
+  const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
   const conceptTerms = unique(
     [
       ...physicsConceptTerms
       .filter((entry) => entry.pattern.test(prompt))
       .map((entry) => entry.term),
-      ...generalScienceSignal.concept_terms,
+      ...modelOnlyConceptSourceSignal.concept_terms,
     ],
   );
   const hasConceptQuestion = compoundConceptCues.some((pattern) => pattern.test(prompt));
@@ -99,12 +99,12 @@ export function detectRichModelOnlyConceptPrompt(promptText: string): HelixRichM
   const wantsConcise = explicitConciseCues.some((pattern) => pattern.test(prompt));
   const applies =
     !wantsConcise &&
-    (hasConceptQuestion || generalScienceSignal.applies) &&
+    (hasConceptQuestion || modelOnlyConceptSourceSignal.applies) &&
     (hasMultiplePhysicsTerms || isLongish || hasCompoundContractLikeShape);
   const reasonCodes: string[] = [];
   if (hasConceptQuestion) reasonCodes.push("compound_concept_prompt");
   if (hasMultiplePhysicsTerms) reasonCodes.push("physics_field_particle_terms");
-  if (generalScienceSignal.applies) reasonCodes.push("general_science_concept_prompt");
+  if (modelOnlyConceptSourceSignal.applies) reasonCodes.push("model_only_concept_source_guard");
   if (isLongish || hasCompoundContractLikeShape) reasonCodes.push("long_form_explanation_expected");
   if (applies) reasonCodes.push("generic_definition_fallback_forbidden");
   if (wantsConcise) reasonCodes.push("explicit_concise_cue");

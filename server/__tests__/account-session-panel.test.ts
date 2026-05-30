@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { accountSessionRouter } from "../routes/account-session";
 import { discordRouter } from "../routes/discord";
 import { profileIngressRouter } from "../routes/profile-ingress";
-import { resetAccountSessionStore } from "../services/helix-account/account-session-store";
+import {
+  resetAccountSessionStore,
+  signInWebAccountSession,
+} from "../services/helix-account/account-session-store";
 import { resetProfileIngressStore } from "../services/helix-account/profile-ingress-store";
 import { resetDiscordSessionStore } from "../services/situation-room/discord-session-store";
 import {
@@ -54,6 +57,35 @@ describe("account session panel API", () => {
       },
     });
     expect(JSON.stringify(signIn.body).toLowerCase()).not.toContain("should-not-be-read");
+  });
+
+  it("starts a Google web-auth profile session keyed by provider subject", () => {
+    const receipt = signInWebAccountSession({
+      provider: "google",
+      provider_subject: "google-sub-123",
+      display_name: "DatDamPig",
+      email: "dan@example.com",
+      picture_url: "https://example.com/avatar.png",
+    });
+
+    expect(receipt).toMatchObject({
+      ok: true,
+      raw_password_stored: false,
+      credential_collection_allowed_in_agents: false,
+      session: {
+        profile: {
+          profile_id: "google:google-sub-123",
+          display_name: "DatDamPig",
+          email: "dan@example.com",
+          auth_mode: "web_auth",
+          provider: "google",
+          provider_subject: "google-sub-123",
+          picture_url: "https://example.com/avatar.png",
+        },
+        memory_scope: "profile",
+      },
+    });
+    expect(receipt.session?.profile.profile_id).not.toBe("dan@example.com");
   });
 
   it("reports usage from the thread ledger and linked Discord commander sessions", async () => {

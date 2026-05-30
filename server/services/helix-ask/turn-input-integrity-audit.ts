@@ -1,9 +1,9 @@
 import type { HelixMultimodalTurnContext } from "@shared/helix-multimodal-turn-context";
 import {
-  detectGeneralScienceConceptPrompt,
+  detectModelOnlyConceptSourceSignal,
   isExplicitVisualInputRequest,
   isFigurativePicturePrompt,
-} from "./general-science-concept-guard";
+} from "./model-only-concept-source-guard";
 
 export type HelixTurnInputIntegrityAuditViolationKind =
   | "visual_prompt_without_visual_input"
@@ -44,7 +44,7 @@ export const helixTurnInputLooksVisual = (text: string): boolean =>
 
 export const helixTurnInputRequiresCommittedVisual = (text: string): boolean =>
   !isFigurativePicturePrompt(text) &&
-  !detectGeneralScienceConceptPrompt(text).should_prefer_model_only_concept &&
+  !detectModelOnlyConceptSourceSignal(text).should_prefer_model_only_concept &&
   isExplicitVisualInputRequest(text) &&
   (ATTACHED_VISUAL_PATTERN.test(text) || COMMITTED_VISUAL_REFERENCE_PATTERN.test(text));
 

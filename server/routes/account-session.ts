@@ -5,14 +5,19 @@ import {
   signOutAccountSession,
 } from "../services/helix-account/account-session-store";
 import {
+  clearHelixSessionCookie,
+  readHelixSessionCookie,
+  setHelixSessionCookie,
+} from "../services/helix-account/session-cookie";
+import {
   createProfileIngressToken,
   revokeProfileIngressToken,
 } from "../services/helix-account/profile-ingress-store";
 
 export const accountSessionRouter = Router();
 
-accountSessionRouter.get("/session", (_req, res) => {
-  res.json(getAccountSessionStatus());
+accountSessionRouter.get("/session", (req, res) => {
+  res.json(getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie)));
 });
 
 accountSessionRouter.post("/session/sign-in", (req, res) => {
@@ -21,15 +26,19 @@ accountSessionRouter.post("/session/sign-in", (req, res) => {
     display_name: typeof req.body?.display_name === "string" ? req.body.display_name : null,
     email: typeof req.body?.email === "string" ? req.body.email : null,
   });
+  if (receipt.session) {
+    setHelixSessionCookie(res, receipt.session.session_id);
+  }
   res.status(receipt.ok ? 200 : 400).json(receipt);
 });
 
-accountSessionRouter.post("/session/sign-out", (_req, res) => {
-  res.json(signOutAccountSession());
+accountSessionRouter.post("/session/sign-out", (req, res) => {
+  clearHelixSessionCookie(res);
+  res.json(signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
 });
 
 accountSessionRouter.post("/profile-ingress/token", (req, res) => {
-  const status = getAccountSessionStatus();
+  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
   const profileId =
     typeof req.body?.profile_id === "string"
       ? req.body.profile_id

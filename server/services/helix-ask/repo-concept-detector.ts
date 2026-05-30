@@ -3,7 +3,7 @@ import {
   findRepoConceptAliasMatch,
   repoConceptAliasTerms,
 } from "./repo-concept-alias-registry";
-import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
+import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
 
 export type RepoConceptDetection = {
   applies: boolean;
@@ -153,14 +153,14 @@ export function detectRepoConcept(promptText: string): RepoConceptDetection {
       allow_model_direct_answer: true,
     };
   }
-  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
-  if (generalScienceConcept.should_prefer_model_only_concept) {
+  const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
+  if (modelOnlyConceptSourceSignal.should_prefer_model_only_concept) {
     return {
       applies: true,
       confidence: "high",
-      concept: generalScienceConcept.concept_terms[0] ?? null,
-      normalized_terms: generalScienceConcept.concept_terms,
-      reason: "general_science_concept_model_only",
+      concept: modelOnlyConceptSourceSignal.concept_terms[0] ?? null,
+      normalized_terms: modelOnlyConceptSourceSignal.concept_terms,
+      reason: "model_only_concept_source_guard",
       require_repo_evidence: false,
       allow_model_direct_answer: true,
     };

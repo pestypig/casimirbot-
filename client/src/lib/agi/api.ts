@@ -1779,6 +1779,54 @@ export async function runAskTurn(payload: RunAskTurnPayload): Promise<LocalAskRe
   return normalizeLocalAskResponse(await asJson<unknown>(response));
 }
 
+const readAskTurnStreamText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
+const readAskTurnStreamRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const askTurnStreamRetryableFailureCode = (response: LocalAskResponse): string | null => {
+  const record = response as unknown as Record<string, unknown>;
+  const debug = readAskTurnStreamRecord(record.debug);
+  const richSignal =
+    readAskTurnStreamRecord(record.rich_model_only_concept_signal) ??
+    readAskTurnStreamRecord(debug?.rich_model_only_concept_signal);
+  const sourceTarget =
+    readAskTurnStreamRecord(record.source_target_intent) ??
+    readAskTurnStreamRecord(debug?.source_target_intent);
+  const sourceTargetName = readAskTurnStreamText(sourceTarget?.target_source);
+  const terminalErrorCode = readAskTurnStreamText(
+    record.terminal_error_code ?? record.error ?? record.fail_reason ?? debug?.terminal_error_code,
+  );
+  const responseType = readAskTurnStreamText(record.response_type ?? record.final_status ?? debug?.response_type);
+  const terminalKind = readAskTurnStreamText(record.terminal_artifact_kind ?? debug?.terminal_artifact_kind);
+  const finalSource = readAskTurnStreamText(record.final_answer_source ?? debug?.final_answer_source);
+  const selectedText = readAskTurnStreamText(
+    record.selected_final_answer ?? record.answer ?? record.text ?? record.message,
+  );
+  const isFinalFailure =
+    response.ok === false ||
+    responseType === "final_failure" ||
+    terminalKind === "typed_failure" ||
+    finalSource === "typed_failure";
+  if (!isFinalFailure) return null;
+
+  const retryableCode =
+    /^(?:model_only_answer_unavailable|model_only_concept_final_synthesis_unavailable|model_only_direct_answer_timeout|solver_continuation_pending|solver_controller_blocked_terminal|terminal_equivalence_missing|terminal_equivalence_failed)$/i.test(
+      terminalErrorCode,
+    );
+  const solverControllerText = /solver controller blocked terminal answer/i.test(selectedText);
+  const modelOnlyContext =
+    sourceTargetName === "model_only" ||
+    sourceTargetName === "general_background" ||
+    richSignal?.applies === true ||
+    richSignal?.should_use_long_form_composer === true;
+
+  if ((retryableCode || solverControllerText) && modelOnlyContext) {
+    return terminalErrorCode || "retryable_model_only_stream_failure";
+  }
+  return null;
+};
+
 export async function runAskTurnStream(
   payload: RunAskTurnPayload,
   onEvent?: (event: HelixAskTurnStreamEvent) => void,
@@ -1839,6 +1887,10 @@ export async function runAskTurnStream(
     stream_used: true,
     stream_fallback_reason: null,
   };
+  const retryableFailureCode = askTurnStreamRetryableFailureCode(normalized);
+  if (retryableFailureCode) {
+    throw new Error(`ask_turn_stream_retryable_final:${retryableFailureCode}`);
+  }
   return normalized;
 }
 

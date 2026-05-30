@@ -203,7 +203,9 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");
+  const { googleAuthRouter } = await import("./routes/google-auth");
   const { profileIngressRouter } = await import("./routes/profile-ingress");
+  app.use("/api/auth", googleAuthRouter);
   app.use("/api/account", accountSessionRouter);
   app.use("/api/profile-ingress", profileIngressRouter);
   app.use("/api/mission-board", missionBoardRouter);

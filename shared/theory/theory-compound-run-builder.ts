@@ -19,6 +19,10 @@ import {
   buildStaticGrTensorTraceV1,
   buildStaticSolarRuntimeTraceV1,
 } from "./runtime-traces";
+import {
+  getNhm2RuntimeFieldBinding,
+  type Nhm2RuntimeFieldBinding,
+} from "./nhm2-runtime-field-map";
 
 const EXECUTABLE_RELATIONS = new Set([
   "derives",
@@ -35,6 +39,8 @@ const STATIC_REFERENCE_WARNING = "Static reference trace only; no backend runtim
 const SCALAR_PENDING_WARNING = "Scalar row is loadable by the scientific calculator but has not been solved.";
 const GATE_BLOCKED_WARNING = "Gate row blocked until runtime evidence provides a recognized gate status.";
 const EVIDENCE_REFERENCE_WARNING = "Evidence reference row only; artifact resolution is not executed in this phase.";
+const RUNTIME_BOUND_WARNING =
+  "Runtime-bound badge: values must come from a runtime receipt or artifact reader before interpretation.";
 
 type BuildTheoryCompoundRunMode = "selected_badges" | "dependency_path" | "locator_matches";
 
@@ -90,12 +96,50 @@ function sourceRefPath(ref: TheoryBadgeSourceRefV1, fallback: string): string {
 }
 
 function evidenceRefsForBadge(graph: TheoryBadgeGraphV1, badge: TheoryBadgeV1): TheoryCompoundRunEvidenceRefV1[] {
-  return badge.sourceRefs.map((ref, index) => ({
+  const sourceRefs = badge.sourceRefs.map((ref, index) => ({
     kind: ref.kind,
     path: sourceRefPath(ref, `theory://${graph.graphId}/${badge.id}/source-ref/${index + 1}`),
     id: ref.id ?? null,
     note: ref.note ?? null,
   }));
+  const runtimeBinding = getNhm2RuntimeFieldBinding(badge.id);
+  if (!runtimeBinding) return sourceRefs;
+
+  return [
+    ...sourceRefs,
+    {
+      kind: "runtime_field_map",
+      path: `theory-runtime://${runtimeBinding.runtimeId}/${badge.id}`,
+      id: runtimeBinding.runtimeId,
+      note: `Runtime fields: ${runtimeBinding.artifactFields.join(", ")}`,
+    },
+    ...runtimeBinding.gates.map((gate) => ({
+      kind: "runtime_gate",
+      path: `theory-runtime://${runtimeBinding.runtimeId}/${badge.id}/gate/${gate}`,
+      id: gate,
+      note: "Gate status must come from runtime evidence; missing status fails closed.",
+    })),
+    ...runtimeBinding.requiredEvidence.map((evidence) => ({
+      kind: "required_evidence",
+      path: `theory-runtime://${runtimeBinding.runtimeId}/${badge.id}/required-evidence/${evidence}`,
+      id: evidence,
+      note: "Required evidence for interpreting this runtime-bound badge.",
+    })),
+  ];
+}
+
+function runtimeBoundWarnings(binding: Nhm2RuntimeFieldBinding | null): string[] {
+  if (!binding) return [];
+  return [
+    RUNTIME_BOUND_WARNING,
+    `Runtime owner: ${binding.runtimeId}`,
+    `Runtime-bound fields: ${binding.artifactFields.join(", ") || "none"}`,
+    `Required evidence: ${binding.requiredEvidence.join(", ") || "none"}`,
+  ];
+}
+
+function claimBoundaryNotesForRuntimeBinding(binding: Nhm2RuntimeFieldBinding | null): string[] {
+  return binding?.claimBoundaryNotes ?? [];
 }
 
 function isGrOrNhm2Badge(badge: TheoryBadgeV1): boolean {
@@ -219,8 +263,13 @@ export function buildTheoryCompoundRun(args: {
   for (const badgeId of orderedBadgeIds) {
     const badge = badgesById.get(badgeId);
     if (!badge) continue;
-    const claimBoundaryNotes = claimBoundaryNotesForBadge(badge);
+    const runtimeBinding = getNhm2RuntimeFieldBinding(badge.id);
+    const claimBoundaryNotes = unique([
+      ...claimBoundaryNotesForBadge(badge),
+      ...claimBoundaryNotesForRuntimeBinding(runtimeBinding),
+    ]);
     const evidenceRefs = includeEvidence ? evidenceRefsForBadge(args.graph, badge) : undefined;
+    const bindingWarnings = runtimeBoundWarnings(runtimeBinding);
     let previousRowIdForBadge: string | null = null;
     let rowIndexWithinBadge = 0;
 
@@ -253,7 +302,7 @@ export function buildTheoryCompoundRun(args: {
           sweepRunV1: null,
           evidenceRefs,
           claimBoundaryNotes,
-          warnings: [SCALAR_PENDING_WARNING],
+          warnings: [...bindingWarnings, SCALAR_PENDING_WARNING],
         });
         rowIndexWithinBadge += 1;
       }
@@ -293,7 +342,7 @@ export function buildTheoryCompoundRun(args: {
           sweepRunV1: null,
           evidenceRefs,
           claimBoundaryNotes,
-          warnings: [...staticWarnings, ...gateWarnings],
+          warnings: [...bindingWarnings, ...staticWarnings, ...gateWarnings],
         });
         rowIndexWithinBadge += 1;
       }
@@ -318,7 +367,7 @@ export function buildTheoryCompoundRun(args: {
         sweepRunV1: null,
         evidenceRefs,
         claimBoundaryNotes,
-        warnings: [EVIDENCE_REFERENCE_WARNING],
+        warnings: [...bindingWarnings, EVIDENCE_REFERENCE_WARNING],
       });
       rowIndexWithinBadge += 1;
     }
@@ -342,7 +391,10 @@ export function buildTheoryCompoundRun(args: {
         sweepRunV1: null,
         evidenceRefs,
         claimBoundaryNotes,
-        warnings: ["Claim boundary row; promotion is not allowed without a later policy adapter."],
+        warnings: [
+          ...bindingWarnings,
+          "Claim boundary row; promotion is not allowed without a later policy adapter.",
+        ],
       });
       rowIndexWithinBadge += 1;
     }

@@ -1,5 +1,6 @@
 import React from "react";
 import { Archive, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 
@@ -180,7 +181,11 @@ export default function AccountSessionPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/account/session/sign-out", { method: "POST" });
+      const activeAuthMode = status.session?.profile.auth_mode;
+      const response = await fetch(
+        activeAuthMode === "web_auth" ? "/api/auth/google/sign-out" : "/api/account/session/sign-out",
+        { method: "POST" },
+      );
       if (!response.ok) throw new Error(`sign-out ${response.status}`);
       await refresh();
     } catch (err) {
@@ -188,7 +193,7 @@ export default function AccountSessionPanel() {
     } finally {
       setLoading(false);
     }
-  }, [refresh]);
+  }, [refresh, status.session?.profile.auth_mode]);
 
   const createIngressToken = React.useCallback(async () => {
     setLoading(true);
@@ -233,6 +238,7 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
+  const showLocalDevSignIn = import.meta.env.DEV;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-slate-950 text-slate-100">
@@ -269,10 +275,14 @@ export default function AccountSessionPanel() {
               <div className="mt-3 space-y-2 text-sm">
                 <p className="font-medium text-white">{session.profile.display_name}</p>
                 <p className="break-all text-xs text-slate-400">{session.profile.profile_id}</p>
+                {session.profile.email ? <p className="break-all text-xs text-slate-500">{session.profile.email}</p> : null}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span className="rounded bg-white/5 px-2 py-1">status {session.status}</span>
                   <span className="rounded bg-white/5 px-2 py-1">memory {session.memory_scope}</span>
                   <span className="rounded bg-white/5 px-2 py-1">auth {session.profile.auth_mode}</span>
+                  <span className="rounded bg-white/5 px-2 py-1">
+                    provider {session.profile.provider ?? "local"}
+                  </span>
                   <span className="rounded bg-white/5 px-2 py-1">agent passwords off</span>
                 </div>
                 <button
@@ -284,7 +294,7 @@ export default function AccountSessionPanel() {
                   Sign out
                 </button>
               </div>
-            ) : (
+            ) : showLocalDevSignIn ? (
               <div className="mt-3 space-y-3">
                 <label className="block text-xs text-slate-300">
                   Profile ID
@@ -310,6 +320,29 @@ export default function AccountSessionPanel() {
                   <LogIn className="h-3.5 w-3.5" />
                   Start local session
                 </button>
+                <p className="text-[11px] text-slate-500">
+                  Development-only local profile. Production sign-in uses Google below.
+                </p>
+                <div className="border-t border-white/10 pt-3">
+                  <p className="mb-2 text-xs text-slate-400">
+                    Use Google when you want this workstation profile and remembered procedures attached to your account.
+                  </p>
+                  <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-slate-400">
+                  No profile session is active. You can keep using the workstation as a guest; sign in only when you want
+                  profile-scoped memory and remembered procedures.
+                </p>
+                <div className="rounded border border-cyan-400/20 bg-cyan-500/10 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-cyan-100">
+                    <LogIn className="h-3.5 w-3.5" />
+                    Save to your CasimirBot profile
+                  </div>
+                  <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
+                </div>
               </div>
             )}
           </section>

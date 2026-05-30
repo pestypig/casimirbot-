@@ -3,7 +3,10 @@ import {
   resolveRepoConceptEntity,
 } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
-import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
+import {
+  detectModelOnlyConceptSourceSignal,
+  hasExplicitModelOnlyConceptScope,
+} from "./model-only-concept-source-guard";
 
 export type HelixRepoCodeEvidenceIntent = {
   repoEvidenceRequested: boolean;
@@ -33,7 +36,7 @@ type RepoCodeIntentSpec = {
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
 const NEGATIVE_MODEL_ONLY_RE =
-  /\b(?:background\s+only|background\s+mode|concept\s+background\s+only|concept\s+check\s+only|general\s+concept\s+only|general\s+reasoning|general\s+explanation\s+only|just\s+answer\s+from\s+general\s+reasoning|no\s+workspace\s+lookup|do\s+not\s+use\s+(?:the\s+)?(?:repo|repository|code|source|workspace))\b/i;
+  /\b(?:background\s+only|background\s+mode|concept\s+background\s+only|concept\s+check\s+only|general\s+concept\s+only|general\s+reasoning|general\s+explanation\s+only|just\s+answer\s+from\s+general\s+reasoning|no\s+workspace\s+lookup|do\s+not\s+use\s+(?:the\s+)?(?:repo|repository|code|source|workspace)|not\s+(?:code|repo|repository|source|implementation)[-\s]?(?:specific|based|grounded|level)?)\b/i;
 
 const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
   {
@@ -105,21 +108,26 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       projectEntity: null,
     };
   }
-  if (!prompt || NEGATIVE_MODEL_ONLY_RE.test(prompt)) {
+  const explicitModelOnlyScope = hasExplicitModelOnlyConceptScope(prompt);
+  if (!prompt || NEGATIVE_MODEL_ONLY_RE.test(prompt) || explicitModelOnlyScope) {
     return {
       repoEvidenceRequested: false,
       strength: "none",
-      reasons: NEGATIVE_MODEL_ONLY_RE.test(prompt) ? ["negative_scope:model_only"] : [],
+      reasons: explicitModelOnlyScope
+        ? ["explicit_model_only_concept_scope"]
+        : NEGATIVE_MODEL_ONLY_RE.test(prompt)
+          ? ["negative_scope:model_only"]
+          : [],
       requestedOutputs: [],
       projectEntity: null,
     };
   }
-  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
-  if (generalScienceConcept.should_prefer_model_only_concept) {
+  const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
+  if (modelOnlyConceptSourceSignal.should_prefer_model_only_concept) {
     return {
       repoEvidenceRequested: false,
       strength: "none",
-      reasons: ["general_science_concept_model_only"],
+      reasons: ["model_only_concept_source_guard"],
       requestedOutputs: [],
       projectEntity: null,
     };

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import {
   DndContext,
   DragEndEvent,
@@ -12,8 +12,6 @@ import { AlertTriangle, FolderOpen, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { DualTopLists } from "@/components/noise-gens/DualTopLists";
 import {
   CoverCreator,
@@ -56,15 +54,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocalSession } from "@/hooks/useLocalSession";
 import { useNoisegenUiMode } from "@/hooks/useNoisegenUiMode";
 import { useIsMobileViewport } from "@/hooks/useIsMobileViewport";
-import type { SessionUser } from "@/lib/auth/session";
 import type { KnowledgeFileRecord } from "@/lib/agi/knowledge-store";
 import { useKnowledgeProjectsStore, type ProjectWithStats } from "@/store/useKnowledgeProjectsStore";
 import { fetchCoverJob, requestGeneration } from "@/lib/api/noiseGens";
-import {
-  DEMO_PASSWORD,
-  DEMO_USERNAME,
-  validateDemoCredentials,
-} from "@/lib/auth/demoCredentials";
 
 const HELIX_PACKET_STORAGE_KEY = "helix:lastPacket";
 
@@ -277,13 +269,12 @@ export default function HelixNoiseGensPage() {
   const [helixPacket, setHelixPacket] = useState<HelixPacket | null>(() => readHelixPacket());
   const [sessionTempo, setSessionTempo] = useState<TempoMeta | null>(null);
   const [externalProjectSlug, setExternalProjectSlug] = useState<string | undefined>(undefined);
-  const [inlineSignInOpen, setInlineSignInOpen] = useState(false);
   const [libraryInitialProjectId, setLibraryInitialProjectId] = useState<string | undefined>(undefined);
   const [originalAvailabilityVersion, bumpOriginalAvailabilityVersion] = useReducer(
     (value) => value + 1,
     0,
   );
-  const { user, signOut, signIn } = useLocalSession();
+  const { user, signOut } = useLocalSession();
   const [currentLocation, setLocation] = useLocation();
   const isDesktopContext = currentLocation?.startsWith("/desktop");
   const { uiMode, setUiMode, modeLabels, modes, showAdvanced, setShowAdvanced } =
@@ -912,18 +903,6 @@ export default function HelixNoiseGensPage() {
   }, []);
 
   useEffect(() => {
-    if (!isDesktopContext && inlineSignInOpen) {
-      setInlineSignInOpen(false);
-    }
-  }, [inlineSignInOpen, isDesktopContext]);
-
-  useEffect(() => {
-    if (user && inlineSignInOpen) {
-      setInlineSignInOpen(false);
-    }
-  }, [inlineSignInOpen, user]);
-
-  useEffect(() => {
     if (showRemix) setRemixMounted(true);
   }, [showRemix]);
 
@@ -980,16 +959,21 @@ export default function HelixNoiseGensPage() {
   );
 
   const handleRequestSignIn = useCallback(() => {
+    try {
+      window.localStorage.setItem("helix:pending-panel", "account-session");
+    } catch {
+      // ignore storage failures; the profile panel can still be opened from the workstation.
+    }
     toast({
-      title: "Sign in required",
-      description: "Please sign in through Helix Bridge to upload originals.",
+      title: "Profile sign-in is optional",
+      description: "Open Account & Sessions when you want uploads and procedures remembered on your profile.",
     });
-    if (isDesktopContext) {
-      setInlineSignInOpen(true);
+    if (!isDesktopContext) {
+      setLocation("/desktop");
       return;
     }
-    setLocation("/sign-in?redirect=/helix-noise-gens");
-  }, [isDesktopContext, setInlineSignInOpen, setLocation, toast]);
+    window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "account-session" } }));
+  }, [isDesktopContext, setLocation, toast]);
 
   const handleSignOut = useCallback(() => {
     signOut();
@@ -1040,14 +1024,6 @@ export default function HelixNoiseGensPage() {
   const handlePickTrack = useCallback(() => {
     setUiMode("listener");
   }, [setUiMode]);
-
-  const handleInlineSignInComplete = useCallback(
-    (session: SessionUser) => {
-      signIn(session);
-      setInlineSignInOpen(false);
-    },
-    [signIn],
-  );
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -1133,25 +1109,14 @@ export default function HelixNoiseGensPage() {
                     Sign out
                   </Button>
                 </div>
-              ) : isDesktopContext ? (
+              ) : (
                 <Button
                   variant="outline"
                   className="gap-2 border-white/20 text-slate-100 hover:bg-white/10"
-                  onClick={() => setInlineSignInOpen(true)}
+                  onClick={handleRequestSignIn}
                 >
                   <User className="h-4 w-4" aria-hidden />
                   Sign in
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  variant="outline"
-                  className="gap-2 border-white/20 text-slate-100 hover:bg-white/10"
-                >
-                  <Link href="/sign-in?redirect=/helix-noise-gens">
-                    <User className="h-4 w-4" aria-hidden />
-                    Sign in
-                  </Link>
                 </Button>
               )}
             </div>
@@ -1310,12 +1275,6 @@ export default function HelixNoiseGensPage() {
           </div>
         </main>
 
-        {isDesktopContext && inlineSignInOpen ? (
-          <InlineSignInOverlay
-            onClose={() => setInlineSignInOpen(false)}
-            onSignIn={handleInlineSignInComplete}
-          />
-        ) : null}
       </div>
 
       {showStudio ? (
@@ -1341,12 +1300,6 @@ export default function HelixNoiseGensPage() {
     </DndContext>
   );
 }
-
-type InlineSignInOverlayProps = {
-  onClose: () => void;
-  onSignIn: (session: SessionUser) => void;
-};
-
 function RenderInProgressCard({ job }: { job: RenderHistoryEntry }) {
   const isError = job.status === "error";
   const toneClasses = isError
@@ -1439,93 +1392,5 @@ function RenderHistoryPanel({ entries }: { entries: RenderHistoryEntry[] }) {
         })}
       </div>
     </section>
-  );
-}
-
-function InlineSignInOverlay({ onClose, onSignIn }: InlineSignInOverlayProps) {
-  const { toast } = useToast();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const session = validateDemoCredentials(username, password);
-    if (session) {
-      onSignIn(session);
-      toast({
-        title: "Signed in",
-        description: "Demo access granted. You can now upload originals.",
-      });
-      return;
-    }
-    const message = `Invalid credentials. Use ${DEMO_USERNAME}/${DEMO_PASSWORD} for the demo account.`;
-    setError(message);
-    toast({
-      title: "Sign in failed",
-      description: message,
-      variant: "destructive",
-    });
-  };
-
-  return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-slate-950/95 px-4 py-10">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/85 p-8 text-slate-100 shadow-[0_25px_80px_-40px_rgba(56,189,248,0.7)]">
-        <div>
-          <p className="text-xs uppercase tracking-[0.45em] text-sky-300">Helix Bridge</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Sign in to continue</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Use the demo credentials{" "}
-            <span className="font-semibold text-slate-200">
-              {DEMO_USERNAME}/{DEMO_PASSWORD}
-            </span>{" "}
-            to enable uploads without leaving the desktop shell.
-          </p>
-        </div>
-
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <Label htmlFor="inline-demo-username">Username</Label>
-            <Input
-              id="inline-demo-username"
-              autoComplete="username"
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                setError(null);
-              }}
-              placeholder={DEMO_USERNAME}
-              className="mt-1 bg-slate-900/60"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="inline-demo-password">Password</Label>
-            <Input
-              id="inline-demo-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                setError(null);
-              }}
-              placeholder={DEMO_PASSWORD}
-              className="mt-1 bg-slate-900/60"
-              required
-            />
-          </div>
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="ghost" className="w-28" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" className="flex-1">
-              Enter Helix
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }

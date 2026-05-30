@@ -14,12 +14,15 @@ export type HelixAccountSessionProfile = {
   display_name: string;
   email?: string | null;
   auth_mode: "web_auth" | "local_dev_profile";
+  provider?: "google" | "local" | null;
+  provider_subject?: string | null;
+  picture_url?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export type HelixAccountLinkedAccount = {
-  provider: "discord" | "minehut" | "browser" | "local";
+  provider: "discord" | "minehut" | "browser" | "local" | "google";
   external_id: string;
   display_name?: string | null;
   status: "linked" | "pending" | "revoked";

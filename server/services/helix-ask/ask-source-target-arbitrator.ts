@@ -21,7 +21,7 @@ import {
   isLiveSourceCadenceControlPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
-import { detectGeneralScienceConceptPrompt } from "./general-science-concept-guard";
+import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -491,19 +491,19 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  const generalScienceConcept = detectGeneralScienceConceptPrompt(prompt);
-  if (generalScienceConcept.should_prefer_model_only_concept) {
+  const modelOnlyConceptSourceSignal = detectModelOnlyConceptSourceSignal(prompt);
+  if (modelOnlyConceptSourceSignal.should_prefer_model_only_concept) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
       target: "model_only",
       targetKind: "general_background",
       strength: "soft",
-      explicitCues: generalScienceConcept.reason_codes,
-      reasons: ["general_science_concept_model_only", ...generalScienceConcept.reason_codes],
+      explicitCues: modelOnlyConceptSourceSignal.reason_codes,
+      reasons: ["model_only_concept_source_guard", ...modelOnlyConceptSourceSignal.reason_codes],
       requestedOutputs: [],
       suppressedRoutes: ["repo_code_evidence_question", "visual_deictic", "visual_frame_evidence", "visual_capture_describe"],
-      precedenceReason: "general_science_concept_model_only",
+      precedenceReason: "model_only_concept_source_guard",
       confidence: 0.84,
       allowClientShortcut: false,
       allowNoToolDirect: true,
