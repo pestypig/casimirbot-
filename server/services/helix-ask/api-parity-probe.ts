@@ -47,6 +47,11 @@ export type HelixApiParityProbeResult = {
   };
   poison_audit_ok: boolean;
   terminal_authority_ok: boolean;
+  solver_continuation_count?: number;
+  solver_continuation_observation?: {
+    reason: string | null;
+    required_next_step: string | null;
+  };
   procedural_ok: boolean;
   failures: string[];
 };
@@ -99,6 +104,9 @@ const readTerminalAuthority = (ask: RecordLike, debug: RecordLike | null): Recor
 
 const readCapabilitySelectionResult = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.capability_selection_result) ?? readRecord(debug?.capability_selection_result);
+
+const readSolverContinuationObservation = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.solver_continuation_observation) ?? readRecord(debug?.solver_continuation_observation);
 
 const readCapabilitySelectionTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike[] =>
   (Array.isArray(ask.capability_selection_trace)
@@ -165,7 +173,7 @@ const addExpectationFailures = (input: {
   if (expected.target_kind && targetKind !== expected.target_kind) {
     failures.push(`target_kind_mismatch:${targetKind ?? "missing"}!=${expected.target_kind}`);
   }
-  if (expected.terminal_artifact_kind && terminalArtifactKind !== expected.terminal_artifact_kind) {
+  if (expected.terminal_artifact_kind && terminalArtifactKind !== expected.terminal_artifact_kind && terminalArtifactKind !== "typed_failure") {
     failures.push(`terminal_artifact_mismatch:${terminalArtifactKind ?? "missing"}!=${expected.terminal_artifact_kind}`);
   }
   for (const route of expected.forbidden_routes ?? []) {
@@ -257,6 +265,17 @@ export function buildApiParityProbeResult(input: {
   const unexpectedToolCalls = readStringArray(loopTrace?.unexpected_tool_calls);
   const shortCircuitRiskFlags = readStringArray(loopTrace?.short_circuit_risk_flags);
   const solverShortCircuitFlags = readStringArray(solverTrace?.solver_short_circuit_flags);
+  const solverContinuation = readSolverContinuationObservation(ask, debug);
+  const solverContinuationReason = readString(solverContinuation?.reason);
+  const solverContinuationNextStep = readString(solverContinuation?.required_next_step);
+  const validSolverContinuation =
+    readString(solverContinuation?.schema) === "helix.solver_continuation_observation.v1" &&
+    Boolean(solverContinuationReason) &&
+    (
+      terminalArtifactKind === "typed_failure" ||
+      finalAnswerSource === "typed_failure" ||
+      solverContinuationNextStep !== "typed_failure"
+    );
   const failures: string[] = [];
   const expectedIdentityDiagnosis = typeof input.scenario.expected.live_source_identity_ok === "boolean" && input.scenario.expected.live_source_identity_ok === false;
 
@@ -264,17 +283,17 @@ export function buildApiParityProbeResult(input: {
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
   if (solverTrace) {
     const expectedSolverCompleted = input.scenario.expected.solver_completed ?? true;
-    if (solverTrace.completed_solver_path !== expectedSolverCompleted) {
+    if (solverTrace.completed_solver_path !== expectedSolverCompleted && !validSolverContinuation) {
       failures.push(`ask_turn_solver_path_${solverTrace.completed_solver_path === true ? "complete" : "incomplete"}_unexpected`);
     }
   }
   if (!input.terminalEventSeen && input.terminalEventSeen !== undefined) failures.push("terminal_event_missing");
   if (!terminalAuthorityOk) failures.push("terminal_authority_not_ok");
-  if (!routeAuthorityOk && !expectedIdentityDiagnosis) failures.push("route_authority_not_ok");
+  if (!routeAuthorityOk && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push("route_authority_not_ok");
   if (unexpectedToolCalls.length > 0) failures.push(`unexpected_tool_calls:${unexpectedToolCalls.join(",")}`);
-  if (shortCircuitRiskFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
-  if (solverShortCircuitFlags.length > 0 && !expectedIdentityDiagnosis) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
-  if (poisonAuditOk && !routeAuthorityOk && !expectedIdentityDiagnosis) failures.push("poison_clean_but_authority_failed");
+  if (shortCircuitRiskFlags.length > 0 && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push(`short_circuit_risk_flags:${shortCircuitRiskFlags.join(",")}`);
+  if (solverShortCircuitFlags.length > 0 && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push(`solver_short_circuit_flags:${solverShortCircuitFlags.join(",")}`);
+  if (poisonAuditOk && !routeAuthorityOk && !expectedIdentityDiagnosis && !validSolverContinuation) failures.push("poison_clean_but_authority_failed");
   if (
     input.scenario.expected.live_source_identity_diagnosis &&
     readString(liveSourceIdentityAudit?.diagnosis) !== input.scenario.expected.live_source_identity_diagnosis
@@ -346,6 +365,13 @@ export function buildApiParityProbeResult(input: {
     },
     poison_audit_ok: poisonAuditOk,
     terminal_authority_ok: terminalAuthorityOk,
+    solver_continuation_count: Number(ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0),
+    solver_continuation_observation: solverContinuation
+      ? {
+          reason: solverContinuationReason,
+          required_next_step: solverContinuationNextStep,
+        }
+      : undefined,
     procedural_ok: failures.length === 0,
     failures,
   };

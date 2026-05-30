@@ -220,6 +220,24 @@ export function applyHelixTerminalAuthoritySingleWriter(
   };
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] = [];
+  const solverContinuationPending =
+    readRecord(input.payload.solver_continuation_observation)?.schema === "helix.solver_continuation_observation.v1" &&
+    readString(readRecord(input.payload.solver_continuation_observation)?.required_next_step) !== "typed_failure";
+  if (solverContinuationPending) {
+    const pendingText =
+      "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
+    rejectedCandidates.push({
+      kind: readString(input.payload.terminal_artifact_kind) ?? "direct_answer_text",
+      reason: "solver_continuation_pending",
+    });
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = "solver_continuation_pending";
+    input.payload.selected_final_answer = pendingText;
+    input.payload.answer = pendingText;
+    input.payload.text = pendingText;
+    input.payload.assistant_answer = pendingText;
+  }
   const draftMaterialization = materializeFinalAnswerDraftTerminal({
     turnId: input.turnId,
     payload: input.payload,
@@ -307,7 +325,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (selectedGoalArtifact) {
+  if (!solverContinuationPending && selectedGoalArtifact) {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;
     selectedSource = selectedGoalArtifact.kind;
@@ -332,7 +350,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       raw_content_included: false,
     };
     delete input.payload.terminal_error_code;
-  } else if (draftMaterialization?.ok) {
+  } else if (!solverContinuationPending && draftMaterialization?.ok) {
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
     const text = latestDraft?.text ?? readString(input.payload.selected_final_answer) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;
@@ -362,7 +380,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         reason: "later_valid_final_answer_draft",
       });
     }
-  } else if (selectedDraft) {
+  } else if (!solverContinuationPending && selectedDraft) {
     const text = artifactText(selectedDraft.artifact) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = artifactId(selectedDraft.artifact);
     selectedArtifactKind = "model_synthesized_answer";
@@ -382,7 +400,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
-  } else if (latestRequiredObservationSequence >= 0) {
+  } else if (!solverContinuationPending && latestRequiredObservationSequence >= 0) {
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
     input.payload.terminal_error_code = "post_tool_model_step_missing";

@@ -83,6 +83,8 @@ let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill"
 let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
 let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPill").buildHelixCausalTurnTraceRows;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
+let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
+let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
@@ -167,12 +169,25 @@ beforeAll(async () => {
     buildHelixTurnTranscriptRows,
     buildHelixCausalTurnTraceRows,
     readReasoningTheaterHardFailureSignals,
+    HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
+    HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
 
 describe("HelixAskPill mic-first surface contract", () => {
+  it("keeps voice turns ordered behind unified Ask by default", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG).toBe(true);
+    expect(HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG).toBe(false);
+    expect(source).toContain("if (runAskUnified) {");
+    expect(source).toContain("suppressed:voice_unified_ask_unavailable");
+    expect(source).toContain("legacy voice-side routing is disabled");
+    expect(source).toContain("HELIX_VOICE_LEGACY_DISPATCH_FALLBACK");
+    expect(source).not.toContain("env?.HELIX_E6_ASK_TURN_VOICE_PARITY");
+  });
+
   it("keeps removed operator controls out of the primary composer markup", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).not.toContain("Dot context");

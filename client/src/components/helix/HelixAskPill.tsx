@@ -628,9 +628,11 @@ export const HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG =
     .trim()
     .toLowerCase() !== "0";
 export const HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG =
-  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_E6_ASK_TURN_VOICE_PARITY ?? "1")
+  true;
+export const HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG =
+  String((import.meta as { env?: Record<string, string | boolean | undefined> }).env?.HELIX_VOICE_LEGACY_DISPATCH_FALLBACK ?? "0")
     .trim()
-    .toLowerCase() !== "0";
+    .toLowerCase() === "1";
 
 function hasExplicitWorkspaceThenReasoningCue(question: string): boolean {
   const text = question.trim().toLowerCase();
@@ -22823,7 +22825,7 @@ export function HelixAskPill({
       rememberConversationTurn(`user: ${recordedText}`);
       const sessionId = getHelixAskSessionId() ?? undefined;
       const runAskUnified = runAskRef.current;
-      if (HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG && runAskUnified) {
+      if (runAskUnified) {
         updateVoiceDecisionBrief({
           baseBrief: "Planning this turn through the unified ask lane.",
           lifecycle: "queued",
@@ -22849,6 +22851,33 @@ export function HelixAskPill({
         );
         patchVoiceSegmentAttempt(input.segmentId, { dispatch: "queued" });
         void runAskUnified(transcript);
+        return;
+      }
+      if (!HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG) {
+        updateVoiceDecisionBrief({
+          baseBrief: "Voice transcript captured; unified Ask runner is unavailable.",
+          lifecycle: "suppressed",
+          mode: "observe",
+          routeReasonCode: "suppressed:voice_unified_ask_unavailable",
+          traceId: input.traceId,
+          meta: {
+            dispatchHint: false,
+            classifierSource: "fallback",
+            classifierConfidence: null,
+            classifierReason: "voice_unified_ask_unavailable",
+            routeReasonCode: "suppressed:voice_unified_ask_unavailable",
+            confidence: input.confidence,
+            confidenceReason: input.confidenceReason,
+            transcript,
+            briefSource: "none",
+          },
+        });
+        markVoiceCheckpoint(
+          "dispatch_suppressed",
+          "warn",
+          "Unified Ask runner unavailable; legacy voice-side routing is disabled.",
+        );
+        patchVoiceSegmentAttempt(input.segmentId, { dispatch: "none" });
         return;
       }
       const explicitPanelCommand = /^\s*\/open\b/i.test(transcript);

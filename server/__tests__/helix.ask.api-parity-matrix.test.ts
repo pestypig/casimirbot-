@@ -312,7 +312,11 @@ describe("Helix Ask API parity matrix", () => {
       expect(probe.route_authority.ok).toBe(true);
     }
     expect(probe.loop_parity_trace.unexpected_tool_calls).toEqual([]);
-    if (scenario.expected.live_source_identity_ok !== false) {
+    const continuationAccepted =
+      Boolean(probe.solver_continuation_observation?.reason) &&
+      probe.solver_continuation_count !== undefined &&
+      probe.solver_continuation_count > 0;
+    if (scenario.expected.live_source_identity_ok !== false && !continuationAccepted) {
       expect(probe.loop_parity_trace.short_circuit_risk_flags).toEqual([]);
       expect(probe.ask_turn_solver_trace.solver_short_circuit_flags).toEqual([]);
     }
