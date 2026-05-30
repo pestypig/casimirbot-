@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import request from "supertest";
 import { spawnSync } from "node:child_process";
+import { hashDotVoiceSourceText } from "../../shared/helix-dot-voice-authority";
 
 const parseBinary = (
   res: NodeJS.ReadableStream & { setEncoding(encoding: BufferEncoding): void },
@@ -113,6 +114,52 @@ describe("voice routes normalization", () => {
         providerConfigured: false,
         provider: "local-chatterbox",
       },
+    });
+  });
+
+  it("accepts translation relay chunk metadata without making it answer authority", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "The gate is ready.",
+        mode: "callout",
+        priority: "info",
+        format: "wav",
+        chunkKind: "translation_relay",
+        utteranceId: "translation-relay:1",
+        eventId: "translation_obs:relay:1",
+        evidenceRefs: ["translation_obs:relay:1"],
+        voiceAuthorityState: "callout_voice",
+        accepted_arbitration_candidate: {
+          schema: "helix.accepted_arbitration_candidate.v1",
+          candidate_id: "candidate:translation-relay:1",
+          arbiter_id: "translation_voice_relay_gate:1",
+          accepted_at: "2026-05-30T00:00:00.000Z",
+          status: "accepted",
+          voice_authority_state: "callout_voice",
+          source_kind: "operator_callout_v1",
+          source_event_ids: ["translation_obs:relay:1"],
+          evidence_refs: ["translation_obs:relay:1"],
+          text_certainty: "reasoned",
+          voice_certainty: "reasoned",
+          text_hash: hashDotVoiceSourceText("The gate is ready."),
+          normalized_text_preview: "The gate is ready.",
+          server_authoritative: true,
+        },
+        repoAttributed: false,
+      })
+      .expect(200);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.body).toMatchObject({
+      ok: true,
+      dryRun: true,
+      provider: "dry-run",
     });
   });
 

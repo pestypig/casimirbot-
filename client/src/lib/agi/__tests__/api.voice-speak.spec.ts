@@ -38,6 +38,7 @@ describe("speakVoice", () => {
       contextTier: "tier1",
       sessionState: "active",
       voiceMode: "normal",
+      chunkKind: "translation_relay",
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -56,6 +57,7 @@ describe("speakVoice", () => {
       contextTier: "tier1",
       sessionState: "active",
       voiceMode: "normal",
+      chunkKind: "translation_relay",
     });
     expect(res.kind).toBe("json");
     const calls = getVoiceCallDiagnosticsSnapshot();
