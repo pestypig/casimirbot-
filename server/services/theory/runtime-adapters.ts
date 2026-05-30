@@ -117,7 +117,7 @@ function claimBoundaryForRuntime(runtimeId: string) {
       ...(entrypoint?.claimBoundary.promotionRequires ?? []),
       "runtime_receipt_requires_human_review",
     ],
-  } as const;
+  };
 }
 
 function failedReceipt(input: TheoryRuntimeAdapterInput & {

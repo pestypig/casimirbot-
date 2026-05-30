@@ -1,0 +1,102 @@
+import express from "express";
+import request from "supertest";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { planRouter } from "../routes/agi.plan";
+import {
+  detectRichModelOnlyConceptPrompt,
+  isSimpleElectronDefinitionPrompt,
+} from "../services/helix-ask/model-only-rich-concept";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+const richConceptPrompt =
+  'Can you relate to the theory concept badge ? "Yea but what exactly is a field anyways? Both electrons and photons are considered zero-dimensional point particles without physical volume, radius, or a hard surface. Since we are all made of these invisible building blocks we actually do not exist in the physical sense! dimension are mathematical representations of reality and that notation is also not real fields emerge from electron movement and this is known as a probability in a sphere "';
+
+const composedRichAnswer = [
+  "A field is a physical quantity or quantum system spread through space, not just a force made after particles move.",
+  "Electrons and photons are modeled as pointlike quanta or excitations in their fields, which means current experiments do not resolve a hard surface.",
+  "That does not mean we do not exist; solidity is an emergent effect of electromagnetic interaction and quantum rules.",
+  "Dimensions and notation are mathematical structure used to model physical reality, not proof that reality is only notation.",
+  "The probability sphere is closer to an orbital or probability cloud for finding an electron than the source of the electron field.",
+].join("\n\n");
+
+afterEach(() => {
+  delete process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE;
+});
+
+describe("Helix Ask rich model-only concept prompts", () => {
+  it("flags the field/electron/photon prompt and blocks generic electron fallback", () => {
+    const signal = detectRichModelOnlyConceptPrompt(richConceptPrompt);
+
+    expect(signal).toMatchObject({
+      schema: "helix.rich_model_only_concept_signal.v1",
+      applies: true,
+      should_block_generic_fallback: true,
+      should_use_long_form_composer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(signal.reason_codes).toEqual(
+      expect.arrayContaining([
+        "compound_concept_prompt",
+        "physics_field_particle_terms",
+        "long_form_explanation_expected",
+        "generic_definition_fallback_forbidden",
+      ]),
+    );
+    expect(signal.concept_terms).toEqual(
+      expect.arrayContaining(["field", "electron", "photon", "dimension", "probability"]),
+    );
+    expect(isSimpleElectronDefinitionPrompt(richConceptPrompt)).toBe(false);
+  });
+
+  it("keeps simple electron definition prompts eligible for the short fallback", () => {
+    expect(isSimpleElectronDefinitionPrompt("What is an electron?")).toBe(true);
+    expect(detectRichModelOnlyConceptPrompt("What is an electron?").applies).toBe(false);
+  });
+
+  it("routes rich model-only concept prompts through a long final draft", async () => {
+    process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE = composedRichAnswer;
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: richConceptPrompt,
+        mode: "read",
+        debug: true,
+        sessionId: `rich-model-only-concept-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const answer = String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "");
+    const outputBudget = body?.output_budget ?? body?.final_answer_draft?.output_budget;
+
+    expect(body?.rich_model_only_concept_signal?.applies).toBe(true);
+    expect(body?.rich_model_only_concept_signal?.should_block_generic_fallback).toBe(true);
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.final_answer_draft?.text).toContain("field");
+    expect(body?.final_answer_draft?.text).toContain("pointlike");
+    expect(body?.final_answer_draft?.text).toContain("probability");
+    expect(answer).not.toMatch(/^An electron is a fundamental subatomic particle/i);
+    expect(answer).toMatch(/field/i);
+    expect(answer).toMatch(/electron|photon/i);
+    expect(answer).toMatch(/pointlike|zero-dimensional|point/i);
+    expect(answer).toMatch(/dimension|mathematical/i);
+    expect(answer).toMatch(/exist|solid|reality/i);
+    expect(answer).toMatch(/probability|orbital|cloud/i);
+
+    expect(outputBudget).toBeTruthy();
+    expect(outputBudget?.schema).toBe("helix.final_answer_output_budget.v1");
+    expect(outputBudget?.mode).toBe("long");
+    expect(outputBudget?.max_tokens).toBeGreaterThanOrEqual(3000);
+  }, 60000);
+});

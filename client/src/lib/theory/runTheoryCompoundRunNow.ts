@@ -3,7 +3,11 @@ import {
   type TheoryCompoundRunRowV1,
   type TheoryCompoundRunV1,
 } from "@shared/contracts/theory-compound-run.v1";
-import { buildTheoryRuntimeReceiptV1 } from "@shared/contracts/theory-runtime-receipt.v1";
+import {
+  buildTheoryRuntimeReceiptV1,
+  type TheoryRuntimeGateStatus,
+  type TheoryRuntimeReceiptV1,
+} from "@shared/contracts/theory-runtime-receipt.v1";
 import { isTheoryRuntimeMathTraceV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
 import { isTheorySweepRunV1 } from "@shared/contracts/theory-sweep-run.v1";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
@@ -24,11 +28,13 @@ const SCALAR_MISSING_EXPRESSION_WARNING = "Scalar row has no expression; calcula
 const RUNTIME_TRACE_MISSING_WARNING = "Runtime trace missing; no backend runtime executed.";
 const RUNTIME_TRACE_INVALID_WARNING = "Runtime trace failed validation; no backend runtime executed.";
 const STATIC_REFERENCE_TRACE_WARNING = "Static reference trace only; no backend runtime executed.";
+const ARTIFACT_BACKED_TRACE_WARNING = "Artifact-backed runtime context; no backend runtime executed during this load.";
 const GATE_BLOCKED_WARNING = "Gate row remains blocked until explicit evidence provides a recognized gate status.";
 const BOUNDARY_VISIBLE_WARNING = "Boundary row preserved for claim limits; no validation claim is promoted.";
 const EVIDENCE_RESOLVER_NOT_RUN_WARNING = "Evidence artifact resolver has not run; evidence status is fail-closed.";
 const SWEEP_MISSING_WARNING = "Sweep row has no sweep artifact; scalar sweep not run.";
 const SWEEP_INVALID_WARNING = "Sweep artifact failed validation; sweep row remains failed closed.";
+const NON_BLOCKING_GATE_STATUSES = new Set<TheoryRuntimeGateStatus>(["pass", "not_applicable"]);
 
 function uniqueWarnings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
@@ -51,6 +57,19 @@ function rebuildRun(run: TheoryCompoundRunV1, rows: TheoryCompoundRunRowV1[]): T
     rows,
     generatedAt: run.generatedAt,
   });
+}
+
+function hasBlockingGate(receipt: TheoryRuntimeReceiptV1): boolean {
+  return Object.entries(receipt.outputs.gates).some(([key, status]) => {
+    if (/claim[_-]?boundary/i.test(key)) return false;
+    return !NON_BLOCKING_GATE_STATUSES.has(status);
+  });
+}
+
+function statusFromRuntimeReceipt(receipt: TheoryRuntimeReceiptV1): TheoryCompoundRunRowV1["status"] {
+  if (receipt.status === "failed" || receipt.status === "timeout") return "failed";
+  if (receipt.status === "completed" && !hasBlockingGate(receipt)) return "computed";
+  return "blocked";
 }
 
 function solveScalarRow(row: TheoryCompoundRunRowV1): TheoryCompoundRunRowV1 {
@@ -77,6 +96,17 @@ function solveScalarRow(row: TheoryCompoundRunRowV1): TheoryCompoundRunRowV1 {
 }
 
 function computeRuntimeTraceRow(row: TheoryCompoundRunRowV1): TheoryCompoundRunRowV1 {
+  if (row.runtimeReceiptV1) {
+    return {
+      ...row,
+      status: statusFromRuntimeReceipt(row.runtimeReceiptV1),
+      warnings: uniqueWarnings([
+        ...row.warnings.filter((warning) => warning !== STATIC_REFERENCE_TRACE_WARNING),
+        ...row.runtimeReceiptV1.outputs.warnings,
+        row.runtimeReceiptV1.outputs.artifacts.length > 0 ? ARTIFACT_BACKED_TRACE_WARNING : "",
+      ]),
+    };
+  }
   if (!row.runtimeMathTraceV1) {
     return {
       ...row,

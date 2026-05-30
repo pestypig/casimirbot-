@@ -25,6 +25,7 @@ import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLi
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
 import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry } from "@/store/useScientificCalculatorStore";
 import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
+import type { TheoryCompoundRunRowV1 } from "@shared/contracts/theory-compound-run.v1";
 import type { TheoryRuntimeScalarCutV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
 
 const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
@@ -118,6 +119,23 @@ function theoryRunRowTone(kind: string, status: string): string {
   if (kind === "tensor" || kind === "runtime") return "border-violet-900/60 bg-violet-950/20";
   if (kind === "gate" || kind === "boundary") return "border-amber-900/60 bg-amber-950/20";
   return "border-slate-800 bg-slate-950/60";
+}
+
+function theoryRunExecutionLabels(row: TheoryCompoundRunRowV1): string[] {
+  const labels: string[] = [];
+  if (row.runtimeRunRequestV1) labels.push("Manifest only");
+  if (row.runtimeReceiptV1?.command) labels.push("Runtime executed");
+  if (row.runtimeReceiptV1 && row.runtimeReceiptV1.outputs.artifacts.length > 0 && !row.runtimeReceiptV1.command) {
+    labels.push("Artifact backed");
+  }
+  if (row.runtimeMathTraceV1 && !row.runtimeReceiptV1) labels.push("Static reference");
+  if (
+    row.status === "blocked" &&
+    (row.runtimeReceiptV1?.outputs.missingSignals.length || row.warnings.some((warning) => /missing evidence/i.test(warning)))
+  ) {
+    labels.push("Blocked by missing evidence");
+  }
+  return Array.from(new Set(labels));
 }
 
 function scalarCutExpression(cut: TheoryRuntimeScalarCutV1): string {
@@ -617,6 +635,11 @@ export default function ScientificCalculatorPanel() {
                       <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
                         {row.solver}
                       </Badge>
+                      {theoryRunExecutionLabels(row).map((label) => (
+                        <Badge key={`${row.id}:execution-label:${label}`} variant="outline" className="border-emerald-800/70 text-[10px] text-emerald-100">
+                          {label}
+                        </Badge>
+                      ))}
                     </div>
                     <div className="mt-2 break-all font-mono text-slate-100">
                       {row.displayLatex ?? row.expression ?? "context row"}

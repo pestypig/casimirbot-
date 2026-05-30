@@ -11,6 +11,7 @@ import type {
   TheoryBadgeUnitV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
+import { isTheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
 import type {
   TheoryBadgePlaybackArtifactV1,
   TheoryBadgePlaybackStepV1,
@@ -106,20 +107,24 @@ const LEVEL_ORDER = [
   "claim_boundary",
 ] as const satisfies readonly TheoryBadgeLevel[];
 
+type TheoryGraphMapMode = "concept" | "execution" | "evidence";
+
+const RUNTIME_REFERENCE_OPERATOR_KINDS = [
+  "tensor_component",
+  "field_sample",
+  "region_aggregate",
+  "worldline_integral",
+  "gate_status",
+  "noncomputable_reference",
+] as const;
+
 function labelize(value: string) {
   return value.replace(/_/g, " ");
 }
 
 function hasRuntimeReferenceEquation(badge: TheoryBadgeV1): boolean {
   return badge.equations.some((equation: TheoryBadgeEquationV1) =>
-    [
-      "tensor_component",
-      "field_sample",
-      "region_aggregate",
-      "worldline_integral",
-      "gate_status",
-      "noncomputable_reference",
-    ].includes(equation.operatorKind),
+    RUNTIME_REFERENCE_OPERATOR_KINDS.some((operatorKind) => operatorKind === equation.operatorKind),
   );
 }
 
@@ -1206,6 +1211,44 @@ export default function TheoryBadgeGraphPanel() {
       .filter((step: TheoryBadgePlaybackStepV1) => step.status === "failed")
       .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
 
+  const loadArtifactBackedTheoryRun = async (badgeIds: string[], expectedSelectedBadgeId?: string) => {
+    if (badgeIds.length === 0) return;
+    try {
+      const response = await fetch("/api/helix/theory/compound-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          badgeIds,
+          mode: "dependency_path",
+          source: "theory_badge_graph",
+          includeScalar: true,
+          includeRuntime: true,
+          includeEvidence: true,
+          includeBoundaries: true,
+          runQuick: false,
+        }),
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as { artifact_v1?: unknown };
+      const artifact = payload.artifact_v1;
+      if (!isTheoryCompoundRunV1(artifact)) return;
+      if (
+        expectedSelectedBadgeId &&
+        useTheoryBadgeGraphPanelStore.getState().selectedBadgeId !== expectedSelectedBadgeId
+      ) {
+        return;
+      }
+      const runStore = useTheoryCompoundRunStore.getState();
+      runStore.loadTheoryRun(artifact);
+      const runtimeRow =
+        artifact.rows.find((row) => row.badgeId === expectedSelectedBadgeId && row.runtimeMathTraceV1) ??
+        artifact.rows.find((row) => row.runtimeMathTraceV1);
+      if (runtimeRow) runStore.selectTheoryRunRow(runtimeRow.id);
+    } catch {
+      // Static/reference run remains loaded when server-side artifact enrichment is unavailable.
+    }
+  };
+
   const selectBadge = (badgeId: string) => {
     const badge = graph?.badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId) ?? null;
     setSelectedBadgeId(badgeId);
@@ -1247,6 +1290,7 @@ export default function TheoryBadgeGraphPanel() {
         run.rows.find((row) => row.badgeId === badge.id && row.runtimeMathTraceV1) ??
         run.rows.find((row) => row.runtimeMathTraceV1);
       if (runtimeRow) runStore.selectTheoryRunRow(runtimeRow.id);
+      void loadArtifactBackedTheoryRun([badge.id], badge.id);
     } else {
       useTheoryCompoundRunStore.getState().clearTheoryRun();
     }
@@ -2060,6 +2104,7 @@ export default function TheoryBadgeGraphPanel() {
       includeBoundaries: true,
     });
     useTheoryCompoundRunStore.getState().loadTheoryRun(run);
+    void loadArtifactBackedTheoryRun(badgeIds);
     useWorkstationLayoutStore.getState().openPanelInActiveGroup("scientific-calculator");
   };
 

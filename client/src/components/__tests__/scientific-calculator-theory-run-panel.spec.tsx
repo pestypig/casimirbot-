@@ -255,6 +255,7 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
       expect(run?.summary.computedCount).toBeGreaterThan(0);
       expect(run?.rows.some((row) => /no backend runtime executed/i.test(row.warnings.join(" ")))).toBe(true);
     });
+    expect(screen.getAllByText("Static reference").length).toBeGreaterThan(0);
   });
 
   it("shows tensor trace steps in the Tensor / Runtime Workbench", async () => {
@@ -309,6 +310,7 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     const evidenceRow = run.rows.find((row) => row.evidenceRefs && row.evidenceRefs.length > 0);
     expect(evidenceRow).toBeTruthy();
     if (evidenceRow) {
+      evidenceRow.status = "blocked";
       evidenceRow.runtimeReceiptV1 = buildTheoryRuntimeReceiptV1({
         generatedAt: "2026-05-29T00:00:00.000Z",
         receiptId: "receipt:test",
@@ -349,6 +351,8 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     const theorySection = await screen.findByTestId("scientific-calculator-theory-run-section");
     expect(within(theorySection).getAllByText("Evidence refs").length).toBeGreaterThan(0);
     expect(within(theorySection).getByText("Runtime receipt")).toBeInTheDocument();
+    expect(within(theorySection).getByText("Artifact backed")).toBeInTheDocument();
+    expect(within(theorySection).getByText("Blocked by missing evidence")).toBeInTheDocument();
     expect(within(theorySection).getByText("warp.full_solve.campaign")).toBeInTheDocument();
     expect(within(theorySection).getByText(/artifact: artifacts\/research\/full-solve\/run\.json/)).toBeInTheDocument();
     expect(within(theorySection).getByText(/fail-closed/)).toBeInTheDocument();

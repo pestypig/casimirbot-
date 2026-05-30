@@ -85,6 +85,25 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
+  it("clears a stale runtime theory run when a scalar badge is selected", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Einstein field equation" }));
+
+    await waitFor(() => {
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.targetBadgeIds).toContain(
+        "physics.gr.einstein_field_equation",
+      );
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }));
+
+    await waitFor(() => {
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun).toBeNull();
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("E_0=mc^2");
+    });
+  });
+
   it("keeps route metadata in hover text instead of visible graph labels", async () => {
     renderPanel();
 
