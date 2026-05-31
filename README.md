@@ -95,6 +95,52 @@ Useful docs:
 
 Helix Ask is the agentic layer around the cockpit. It supports routed prompts, audited reasoning packets, regression sweeps, math routing evidence, prompt-quality probes, and decision bundles.
 
+#### Solver Shape Rule Of Thumb
+
+Helix Ask should preserve the Codex-style turn shape without becoming a private
+Codex runtime. The model-facing loop should keep the user's prompt and context
+alive, admit tools only when the route contract justifies them, feed tool
+results back as observations, and publish only a terminal artifact that passed
+solver authority.
+
+The rule of thumb for every Ask route and every workstation panel is:
+
+```text
+Routes are proposed procedures.
+Classifiers are hypotheses.
+Receipts are observations.
+Only the completed solver path can answer.
+```
+
+In practical terms, the intended shape is:
+
+```text
+prompt + conversation context
+-> prompt interpretation and intent arbitration
+-> source/tool admission
+-> capability or panel action, when admitted
+-> typed receipt or observation
+-> evidence re-entry into the model-facing turn
+-> model-authored final_answer_draft / model_synthesized_answer
+-> goal satisfaction, route authority, poison audit, and terminal authority
+-> one visible final answer, request_user_input, or typed_failure
+```
+
+This mirrors the part of Codex we want to preserve: the model sees context and
+available tools, requests a capability when needed, receives tool results back
+into the next model step, and completes the turn with an assistant message. In
+Helix, panels such as Scientific Calculator, Docs Viewer, Notes, repo evidence,
+voice, and Situation Room are evidence producers. Their receipts may prove work
+happened, but they should not bypass synthesis or write the visible answer
+directly unless the route product contract explicitly allows a receipt terminal.
+
+This principle is a guardrail for panel development. A panel-specific shortcut
+may feel useful for one use case, but if it writes answer text before evidence
+re-entry and terminal authority, it can poison the agentic loop by hiding the
+prompt, context, tool observations, or final model synthesis. Prefer small,
+typed observations plus a shared final-draft path over route-specific answer
+shortcuts.
+
 #### Compound Reasoning And Tool Commentary
 
 Helix Ask compound reasoning is a typed, receipt-backed agent loop. The model-facing path decomposes a prompt, admits the correct route and source target, selects an allowed workstation capability, executes the tool, converts the result into observations and receipts, checks goal satisfaction, synthesizes from accepted evidence, and then lets terminal authority choose the visible answer.
