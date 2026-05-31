@@ -28138,6 +28138,11 @@ export function HelixAskPill({
                   ? localResponseRecord.open_doc_terminal_contract_fail_reason
                   : null,
               terminal_artifact: readAgentLoopAuditRecord(localResponseRecord.terminal_artifact),
+              terminal_answer_authority: readAgentLoopAuditRecord(localResponseRecord.terminal_answer_authority) ?? null,
+              terminal_answer_envelope: readAgentLoopAuditRecord(localResponseRecord.terminal_answer_envelope) ?? null,
+              terminal_authority_single_writer:
+                readAgentLoopAuditRecord(localResponseRecord.terminal_authority_single_writer) ?? null,
+              terminal_presentation: readAgentLoopAuditRecord(localResponseRecord.terminal_presentation) ?? null,
               ui_terminal_source: terminalResolution.source,
               ui_backend_terminal_answer: terminalResolution.backendTerminalText,
             };

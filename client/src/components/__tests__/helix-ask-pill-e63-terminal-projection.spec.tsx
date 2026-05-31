@@ -124,6 +124,40 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(chooseVisibleFinalText(reply as never)).toBe("authoritative envelope answer");
   });
 
+  it("keeps debug-exported doc open receipts authoritative in the visible UI", () => {
+    const receiptText =
+      "Opened document:\nDocument: NHM2 Current Status in `pestypig/casimirbot-` as Implemented Today\nPath: /docs/research/nhm2-current-status-whitepaper-2026-04-03.md\nReason: best matching document for the request";
+    const reply = {
+      id: "turn-e63-doc-open-debug-authority",
+      turn_id: "turn-e63-doc-open-debug-authority",
+      content: receiptText,
+      debug: {
+        selected_final_answer: receiptText,
+        final_answer_source: "artifact_synthesis",
+        terminal_artifact_kind: "doc_open_receipt",
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_text_preview: receiptText,
+          terminal_artifact_kind: "doc_open_receipt",
+          final_answer_source: "artifact_synthesis",
+        },
+        resolved_turn_summary: {
+          final_status: "final_answer",
+          terminal_artifact_kind: "doc_open_receipt",
+          resolved_route_label: "doc_open_best / artifact_synthesis",
+        },
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+
+    expect(visible.terminal_error_code).toBeNull();
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(chooseVisibleFinalText(reply as never)).toContain("Opened document:");
+    expect(chooseVisibleFinalText(reply as never)).not.toContain("terminal_authority_missing");
+  });
+
   it("prefers terminal single-writer text over stale selected_final_answer", () => {
     const reply = {
       id: "turn-e63-single-writer",

@@ -467,8 +467,12 @@ export function evaluateAskTurnSolverHardGate(input: {
   const allowedPureReceipt = pureControlOrStatusReceiptAllowed(trace, input.payload);
   const canonicalGoalKind = readString(readRecord(input.payload.canonical_goal_frame)?.goal_kind);
   const goalSatisfaction = readRecord(input.payload.goal_satisfaction_evaluation);
+  const routeContractApprovedReceiptGoal =
+    canonicalGoalKind === "note_mutation" ||
+    canonicalGoalKind === "doc_open_best" ||
+    canonicalGoalKind === "latest_doc_navigation";
   const goalSatisfactionReceiptAllowed =
-    canonicalGoalKind === "note_mutation" &&
+    routeContractApprovedReceiptGoal &&
     readString(goalSatisfaction?.satisfaction) === "satisfied" &&
     (
       terminalMatchesCanonicalGoalContract(input.payload, traceTerminalArtifactKind) ||

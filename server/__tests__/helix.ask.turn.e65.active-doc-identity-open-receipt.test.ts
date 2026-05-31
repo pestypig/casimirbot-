@@ -327,6 +327,16 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_open_receipt");
     expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
     expect(response.body?.terminal_error_code ?? null).not.toBe("terminal_boundary_ineligible");
+    expect(response.body?.terminal_answer_authority).toMatchObject({
+      schema: "helix.turn_terminal_authority.v1",
+      server_authoritative: true,
+      terminal_artifact_kind: "doc_open_receipt",
+    });
+    expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.ask_turn_solver_trace).toBeTruthy();
+    expect(response.body?.agent_runtime_loop).toBeTruthy();
+    expect(response.body?.agent_step_decision).toBeTruthy();
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opened document:|Path:/i);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/nhm2/i);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/whitepaper|white paper/i);
