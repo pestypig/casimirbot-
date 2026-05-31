@@ -274,7 +274,7 @@ describe("Helix Ask rich model-only concept prompts", () => {
     expect(String(finalPacket?.terminal_answer_authority?.terminal_text_preview ?? "").replace(/\s+/g, " ").trim()).toBe(
       answer.replace(/\s+/g, " ").trim(),
     );
-    expect(finalPacket?.terminal_equivalence_harness_result?.ok).toBe(true);
     expect(finalPacket?.terminal_equivalence_harness_result?.failure_codes ?? []).toEqual([]);
+    expect(finalPacket?.terminal_equivalence_harness_result?.ok).toBe(true);
   }, 60000);
 });
