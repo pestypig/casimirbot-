@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { appendConversationHistoryEvent } from "../services/helix-ask/conversation-history";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -1445,6 +1446,56 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Minimum momentum uncertainty|minimum momentum uncertainty/i);
     expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Minimum kinetic energy|kinetic energy/i);
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Delta x Delta p >= hbar/2");
+  }, 60000);
+
+  it("lets explicit calculator follow-ups outrank prior-answer memory recall while preserving context", async () => {
+    const app = createApp();
+    const sessionId = `e52-calculator-memory-followup-${Date.now()}`;
+    appendConversationHistoryEvent({
+      route: "/api/agi/ask/turn",
+      event_type: "ask_completed",
+      turn_id: `${sessionId}:seed`,
+      session_id: sessionId,
+      user_text:
+        "Can you explain conceptually why quantum fields, particle localization, and the uncertainty principle are connected?",
+      assistant_text:
+        "Quantum fields are spread-through-space systems; localized particles can be modeled as wave packets, and uncertainty links localization to momentum spread.",
+      classifier_result: {
+        mode: "read",
+        confidence: 0.99,
+        dispatch_hint: false,
+        clarify_needed: false,
+        reason: "seed prior conceptual answer for follow-up calculator routing",
+        source: "test_seed",
+      },
+      route_reason: "conversation:simple",
+      brief_status: "ready",
+      final_gate_outcome: "final_answer",
+    });
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Now show the math for this using the calculator panel. Use the context from the previous answer: take a wave packet localized to dx = 2.0e-10 m, use dx dp >= hbar/2 to calculate minimum dp, then use p^2/(2*m_e) to estimate the electron kinetic energy in J and eV. Show the equations, calculator expressions, numeric results, and connect the math back to the concept.",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(response.body?.route_reason_code).toBe("calculator_solve / calculator_compound_chain");
+    expect(response.body?.route_reason_code).not.toBe("conversation_memory_recall");
+    expect(response.body?.conversation_memory_packet?.latest_answer_summary).toContain("Quantum fields");
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
+      "minimum_momentum_uncertainty",
+      "minimum_kinetic_energy_j",
+      "minimum_kinetic_energy_ev",
+    ]);
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/solver_path_incomplete_before_terminal/i);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Delta x Delta p >= hbar\/2|minimum momentum uncertainty/i);
   }, 60000);
 
   it("uses the generic calculator planner for broader force prompts", async () => {

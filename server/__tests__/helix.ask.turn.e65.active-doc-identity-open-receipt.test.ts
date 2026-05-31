@@ -310,6 +310,29 @@ describe("helix ask E65 active document and open receipt terminals", () => {
     expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/^Active doc:/i);
   }, 90000);
 
+  it("treats short go-to NHM2 white-paper wording as document open, not evidence-location search", async () => {
+    const app = createApp();
+    const sessionId = `e65-go-to-nhm2-whitepaper-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Go to an NHM2 white paper.",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_open_best");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_open_receipt");
+    expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+    expect(response.body?.terminal_error_code ?? null).not.toBe("terminal_boundary_ineligible");
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Opened document:|Path:/i);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/nhm2/i);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/whitepaper|white paper/i);
+    expect(String(response.body?.selected_final_answer ?? "")).not.toMatch(/goal_satisfaction_not_terminal|source\/capability answer before the agent runtime loop/i);
+  }, 90000);
+
   it("opens the named NHM2 deeper reformulation decision memo instead of the ambient active doc", async () => {
     const app = createApp();
     const sessionId = `e65-open-deeper-reformulation-${Date.now()}`;

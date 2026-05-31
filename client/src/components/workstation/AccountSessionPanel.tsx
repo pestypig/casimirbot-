@@ -1,5 +1,5 @@
 import React from "react";
-import { Archive, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, ChevronDown, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
@@ -347,8 +347,14 @@ export default function AccountSessionPanel() {
             )}
           </section>
 
-          <section className="rounded-lg border border-white/10 bg-black/20 p-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Usage</div>
+          <details className="group rounded-lg border border-white/10 bg-black/20 p-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <span>Usage</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+                aria-hidden
+              />
+            </summary>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
               <Metric label="Threads" value={usage.thread_count} />
               <Metric label="Items" value={usage.item_count} />
@@ -359,7 +365,7 @@ export default function AccountSessionPanel() {
             <div className="mt-4 text-xs text-slate-400">
               Window: {usage.window_started_at || "none"} {"->"} {usage.window_ended_at || "none"}
             </div>
-          </section>
+          </details>
         </div>
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
