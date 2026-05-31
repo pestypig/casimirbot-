@@ -56,6 +56,7 @@ const compact = (value: string): string => value.replace(/\s+/g, " ").trim();
 
 afterEach(() => {
   delete process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE;
+  delete process.env.HELIX_MODEL_TURN_TEST_RESPONSE;
 });
 
 describe("Helix Ask deep physics route parity", () => {
@@ -101,7 +102,17 @@ describe("Helix Ask deep physics route parity", () => {
       expect(body?.resolved_route_label ?? body?.route_reason_code, name).not.toMatch(/repo|visual|integrity/i);
       expect(body?.terminal_artifact_kind, name).toBe("model_synthesized_answer");
       expect(body?.final_answer_source, name).toBe("final_answer_draft");
-      expect(body?.final_answer_draft?.source, name).toMatch(/model_only_concept_final_composer|model_turn/);
+      expect(body?.model_turn_packet?.loop_policy?.allow_tools, name).toBe(false);
+      expect(body?.model_turn_result?.status, name).toBe("assistant_message");
+      expect(body?.final_answer_draft?.source, name).toBe("model_turn");
+      expect(
+        body?.available_capabilities?.capabilities?.some(
+          (capability: Record<string, unknown>) =>
+            capability.capability_key === "repo-code.search_concept" &&
+            capability.goal_fit !== "forbidden",
+        ),
+        name,
+      ).toBe(false);
       expect(compact(answer), name).toBe(compact(conceptAnswer));
       expect(answer, name).not.toMatch(/I do not have the image|An electron is a fundamental subatomic particle/i);
       for (const pattern of expectedTerms) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { HelixModelTurnPacket } from "../services/helix-ask/model-turn-packet";
 import {
+  coerceRuntimeAdapterToModelTurnResult,
   coerceTestOverrideToModelTurnResult,
   runHelixModelTurn,
 } from "../services/helix-ask/model-turn-executor";
@@ -86,6 +87,64 @@ describe("Helix Ask model turn executor", () => {
     expect(result.status).toBe("assistant_message");
     expect(result.assistant_message_text).toBe("");
     expect(result.model_step_capability).toBe("model.turn.test_override");
+  });
+
+  it("coerces runtime adapter assistant messages without terminal authority", async () => {
+    const result = await runHelixModelTurn({
+      packet,
+      payload: {},
+      runtimeAdapter: async () => ({
+        status: "assistant_message",
+        text: "A runtime-authored assistant message.",
+        model_step_capability: "model.turn.runtime_adapter",
+      }),
+    });
+
+    expect(result).toMatchObject({
+      schema: "helix.model_turn_result.v1",
+      turn_id: packet.turn_id,
+      status: "assistant_message",
+      assistant_message_text: "A runtime-authored assistant message.",
+      model_step_capability: "model.turn.runtime_adapter",
+      consumed_packet_ref: `${packet.turn_id}:model_turn_packet`,
+      output_budget: packet.output_budget,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(result).not.toHaveProperty("terminal_artifact_kind");
+    expect(result).not.toHaveProperty("selected_final_answer");
+  });
+
+  it("turns runtime adapter failures into typed model-turn failures", async () => {
+    const result = await runHelixModelTurn({
+      packet,
+      payload: {},
+      runtimeAdapter: async () => {
+        throw new Error("runtime unavailable");
+      },
+    });
+
+    expect(result).toMatchObject({
+      schema: "helix.model_turn_result.v1",
+      status: "typed_failure",
+      assistant_message_text: "runtime unavailable",
+      model_step_capability: "model.turn.runtime_adapter_failed",
+      output_budget: packet.output_budget,
+    });
+  });
+
+  it("coerces runtime adapter records through the same model-turn result shape", () => {
+    const result = coerceRuntimeAdapterToModelTurnResult({
+      packet,
+      adapterResult: {
+        status: "assistant_message",
+        assistant_message_text: "Adapter text.",
+      },
+    });
+
+    expect(result.status).toBe("assistant_message");
+    expect(result.assistant_message_text).toBe("Adapter text.");
+    expect(result.output_budget).toBe(packet.output_budget);
   });
 
   it("returns a typed failure when no shared runtime adapter or test override is provided", async () => {

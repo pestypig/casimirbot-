@@ -27,8 +27,24 @@ const composedRichAnswer = [
   "The probability sphere is closer to an orbital or probability cloud for finding an electron than the source of the electron field.",
 ].join("\n\n");
 
+const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\r?\n\r?\n/)
+    .map((block) => {
+      const lines = block.split(/\r?\n/);
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+      const data = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (!event || !data) return null;
+      return { event, data: JSON.parse(data) };
+    })
+    .filter(Boolean) as Array<{ event: string; data: any }>;
+
 afterEach(() => {
   delete process.env.HELIX_MODEL_ONLY_CONCEPT_FINAL_ANSWER_TEST_RESPONSE;
+  delete process.env.HELIX_MODEL_TURN_TEST_RESPONSE;
 });
 
 describe("Helix Ask rich model-only concept prompts", () => {
@@ -106,8 +122,12 @@ describe("Helix Ask rich model-only concept prompts", () => {
 
     expect(body?.rich_model_only_concept_signal?.applies).toBe(true);
     expect(body?.rich_model_only_concept_signal?.should_block_generic_fallback).toBe(true);
+    expect(body?.model_turn_packet).toBeTruthy();
+    expect(body?.model_turn_result?.status).toBe("assistant_message");
+    expect(body?.model_turn_result?.model_step_capability).toMatch(/model\.turn/);
     expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.final_answer_draft?.source).toBe("model_turn");
     expect(body?.final_answer_draft?.text).toContain("field");
     expect(body?.final_answer_draft?.text).toContain("pointlike");
     expect(body?.final_answer_draft?.text).toContain("probability");
@@ -123,21 +143,44 @@ describe("Helix Ask rich model-only concept prompts", () => {
     expect(outputBudget?.schema).toBe("helix.final_answer_output_budget.v1");
     expect(outputBudget?.mode).toBe("long");
     expect(outputBudget?.max_tokens).toBeGreaterThanOrEqual(3000);
+    expect(body?.model_turn_packet?.loop_policy?.allow_tools).toBe(false);
+    const ledger = Array.isArray(body?.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
+    expect(
+      ledger.some((artifact: Record<string, unknown>) => {
+        const payload = artifact.payload as Record<string, unknown> | undefined;
+        return (
+          artifact.kind === "runtime_tool_call" &&
+          String(payload?.capability_key ?? payload?.capability ?? payload?.chosen_capability ?? "").includes("repo-code.search_concept")
+        );
+      }),
+    ).toBe(false);
+    expect(
+      body?.available_capabilities?.capabilities?.some(
+        (capability: Record<string, unknown>) =>
+          capability.capability_key === "repo-code.search_concept" &&
+          capability.goal_fit !== "forbidden",
+      ),
+    ).toBe(false);
 
     const debug = await request(app)
       .get(`/api/agi/ask/turn/${encodeURIComponent(String(body.turn_id))}/debug-export`)
       .expect(200);
     const debugPayload = debug.body?.payload;
 
-    expect(debugPayload?.selected_final_answer).toBe(answer);
+    expect(String(debugPayload?.selected_final_answer ?? "").replace(/\s+/g, " ").trim()).toBe(
+      answer.replace(/\s+/g, " ").trim(),
+    );
     expect(debugPayload?.terminal_answer_authority).toMatchObject({
       final_answer_source: "final_answer_draft",
       terminal_artifact_kind: "model_synthesized_answer",
       terminal_kind: "answer",
       server_authoritative: true,
     });
-    expect(debugPayload?.terminal_answer_authority?.terminal_text_preview).toBe(answer);
+    expect(String(debugPayload?.terminal_answer_authority?.terminal_text_preview ?? "").replace(/\s+/g, " ").trim()).toBe(
+      answer.replace(/\s+/g, " ").trim(),
+    );
     expect(debugPayload?.resolved_turn_summary?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(debugPayload?.model_turn_result?.status).toBe("assistant_message");
   }, 60000);
 
   it("fails closed instead of returning the rich-concept placeholder when synthesis is unavailable", async () => {
@@ -165,5 +208,62 @@ describe("Helix Ask rich model-only concept prompts", () => {
     expect(body?.terminal_error_code).toBe("model_only_concept_final_synthesis_unavailable");
     expect(answer).not.toBe("Rich model-only concept prompt requires final synthesis.");
     expect(answer).toMatch(/could not produce/i);
+  }, 60000);
+
+  it("uses the model-turn final draft on the streaming UI projection path", async () => {
+    process.env.HELIX_MODEL_TURN_TEST_RESPONSE = composedRichAnswer;
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        question: richConceptPrompt,
+        mode: "read",
+        debug: true,
+        sessionId: `rich-model-only-concept-stream-${Date.now()}`,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text);
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+    const answer = String(finalPacket?.selected_final_answer ?? finalPacket?.answer ?? finalPacket?.text ?? "");
+    const outputBudget = finalPacket?.output_budget ?? finalPacket?.final_answer_draft?.output_budget;
+
+    expect(finalPacket?.rich_model_only_concept_signal?.applies).toBe(true);
+    expect(finalPacket?.model_turn_packet).toBeTruthy();
+    expect(finalPacket?.model_turn_result?.status).toBe("assistant_message");
+    expect(finalPacket?.model_turn_result?.model_step_capability).toMatch(/model\.turn/);
+    expect(finalPacket?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(finalPacket?.final_answer_source).toBe("final_answer_draft");
+    expect(finalPacket?.final_answer_draft?.source).toBe("model_turn");
+    expect(answer.replace(/\s+/g, " ").trim()).toBe(composedRichAnswer.replace(/\s+/g, " ").trim());
+    expect(answer).not.toMatch(/^An electron is a fundamental subatomic particle/i);
+    expect(answer).toMatch(/field/i);
+    expect(answer).toMatch(/electron|photon/i);
+    expect(answer).toMatch(/pointlike|zero-dimensional|point/i);
+    expect(answer).toMatch(/dimension|mathematical/i);
+    expect(answer).toMatch(/exist|solid|reality/i);
+    expect(answer).toMatch(/probability|orbital|cloud/i);
+    expect(outputBudget?.schema).toBe("helix.final_answer_output_budget.v1");
+    expect(outputBudget?.mode).toBe("long");
+    expect(outputBudget?.max_tokens).toBeGreaterThanOrEqual(3000);
+    expect(finalPacket?.model_turn_packet?.loop_policy?.allow_tools).toBe(false);
+    expect(
+      finalPacket?.available_capabilities?.capabilities?.some(
+        (capability: Record<string, unknown>) =>
+          capability.capability_key === "repo-code.search_concept" &&
+          capability.goal_fit !== "forbidden",
+      ),
+    ).toBe(false);
+
+    const debug = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(finalPacket.turn_id))}/debug-export`)
+      .expect(200);
+    const debugPayload = debug.body?.payload;
+
+    expect(debugPayload?.model_turn_result?.status).toBe("assistant_message");
+    expect(debugPayload?.final_answer_draft?.source).toBe("model_turn");
+    expect(debugPayload?.output_budget?.mode ?? debugPayload?.final_answer_draft?.output_budget?.mode).toBe("long");
   }, 60000);
 });

@@ -40,12 +40,15 @@ public record HelixSensorConfig(
         boolean includeNearbyContainerRefs,
         boolean includeCrops,
         boolean includeLocalMap,
+        boolean includeChunkSnapshotSummary,
         int nearbyEntityRadius,
         int cropRadius,
         int localMapRadius,
+        int chunkSnapshotRadiusChunks,
         int maxEntities,
         int maxCrops,
         int maxLocalBlocks,
+        int maxChunkSnapshotCells,
         int maxInventoryStacks
     ) {}
 
@@ -107,12 +110,15 @@ public record HelixSensorConfig(
                 config.getBoolean("snapshot.include_nearby_container_refs", true),
                 config.getBoolean("snapshot.include_crops", true),
                 config.getBoolean("snapshot.include_local_map", true),
+                config.getBoolean("snapshot.include_chunk_snapshot_summary", false),
                 positive(config.getInt("snapshot.nearby_entity_radius", 16), 16),
                 positive(config.getInt("snapshot.crop_radius", 16), 16),
                 positive(config.getInt("snapshot.local_map_radius", 8), 8),
+                Math.max(0, config.getInt("snapshot.chunk_snapshot_radius_chunks", 0)),
                 positive(config.getInt("snapshot.max_entities", 24), 24),
                 positive(config.getInt("snapshot.max_crops", 48), 48),
                 positive(config.getInt("snapshot.max_local_blocks", 128), 128),
+                positive(config.getInt("snapshot.max_chunk_snapshot_cells", 48), 48),
                 positive(config.getInt("snapshot.max_inventory_stacks", 64), 64)
             ),
             new ProbeOptions(

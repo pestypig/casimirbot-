@@ -121,6 +121,32 @@ describe("helix ask turn input integrity audit", () => {
     );
   });
 
+  it("does not require image input for rubber-sheet relativity picture prompts", () => {
+    const requestBody = {
+      question:
+        "In relativity, spacetime curvature is often pictured as a rubber sheet, but that picture seems misleading because it uses gravity to explain gravity and ignores time. What does curvature really mean mathematically and physically?",
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:rubber-sheet-picture",
+    });
+
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        text_input_count: 1,
+        image_input_count: 0,
+        evidence_ref_count: 0,
+      }),
+    );
+  });
+
   it("normalizer prefers full raw prompt over extracted question labels", () => {
     const fullPrompt = [
       "Question: diagnose Helix Ask large prompt behavior",

@@ -67,6 +67,11 @@ describe("Helix Ask model-only concept source guard", () => {
         "Explain the philosophical picture where identity is a process rather than a fixed object.",
       ),
     ).toBe(false);
+    expect(
+      isExplicitVisualInputRequest(
+        "In relativity, spacetime curvature is often pictured as a rubber sheet, but that picture seems misleading.",
+      ),
+    ).toBe(false);
     expect(isExplicitVisualInputRequest("Please describe this picture I attached.")).toBe(true);
   });
 

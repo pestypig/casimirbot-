@@ -3,6 +3,7 @@ import {
   type HelixArtifactPromotionAudit,
   type HelixAskIntentFamily,
 } from "@shared/helix-artifact-promotion-audit";
+import { isExplicitVisualInputRequest } from "./model-only-concept-source-guard";
 
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
@@ -34,10 +35,11 @@ export function classifyHelixAskTurnIntentFamily(prompt: string): HelixAskIntent
   if (SOURCE_DIAGNOSTIC_RE.test(text) && !VISUAL_DESCRIPTION_RE.test(text)) {
     return "source_diagnostic";
   }
-  if (VISUAL_DESCRIPTION_RE.test(text) && VISUAL_REFERENCE_RE.test(text)) {
+  const explicitVisualInputRequest = isExplicitVisualInputRequest(text);
+  if (VISUAL_DESCRIPTION_RE.test(text) && VISUAL_REFERENCE_RE.test(text) && explicitVisualInputRequest) {
     return "visual_description";
   }
-  if (VISUAL_REFERENCE_RE.test(text)) return "visual_question";
+  if (VISUAL_REFERENCE_RE.test(text) && explicitVisualInputRequest) return "visual_question";
   return "normal_ask";
 }
 

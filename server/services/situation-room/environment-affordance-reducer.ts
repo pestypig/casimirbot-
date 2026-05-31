@@ -33,6 +33,16 @@ export function reduceEnvironmentAffordances(snapshot: HelixEnvironmentStateSnap
     ...(snapshot.inventory_state?.selected_item?.item_type ? [snapshot.inventory_state.selected_item.item_type] : []),
     ...(snapshot.object_state?.nearby_containers ?? []).filter((entry) => entry.contents_known).map((entry) => entry.container_type),
   ];
+  const traversableCells = [
+    ...(snapshot.local_map?.salient_cells ?? []),
+    ...(snapshot.chunk_snapshot_summary?.surface_cells ?? []),
+  ];
+  const hazards = [
+    ...(snapshot.object_state?.hazards ?? []).map((entry) => `${entry.severity}:${entry.hazard_type}`),
+    ...traversableCells
+      .filter((cell) => cell.tags?.some((tag) => tag.startsWith("hazard_") || tag.includes("void") || tag.includes("drop_risk")))
+      .map((cell) => cell.cell_type),
+  ];
   return {
     schema: "helix.environment_affordance_context.v1",
     context_id: `environment_affordance:${snapshot.snapshot_id}`,
@@ -42,8 +52,10 @@ export function reduceEnvironmentAffordances(snapshot: HelixEnvironmentStateSnap
     visible: Array.from(new Set(visible)).slice(0, 16),
     reachable: Array.from(new Set(focusReachable)).slice(0, 12),
     usable: Array.from(new Set(usable)).slice(0, 12),
-    traversable: snapshot.local_map?.salient_cells?.filter((cell) => cell.tags?.includes("traversable")).map((cell) => cell.cell_type).slice(0, 12) ?? [],
-    hazards: (snapshot.object_state?.hazards ?? []).map((entry) => `${entry.severity}:${entry.hazard_type}`).slice(0, 12),
+    traversable: Array.from(new Set(
+      traversableCells.filter((cell) => cell.tags?.includes("traversable")).map((cell) => cell.cell_type),
+    )).slice(0, 12),
+    hazards: Array.from(new Set(hazards)).slice(0, 12),
     evidence_refs: snapshot.evidence_refs,
     deterministic: true,
     model_invoked: false,

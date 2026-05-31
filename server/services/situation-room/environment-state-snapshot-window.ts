@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,
+  type EnvironmentCellSummary,
   type EnvironmentContainerSummary,
   type EnvironmentHazardSummary,
   type EnvironmentItemSummary,
@@ -186,6 +187,21 @@ const normalizeHazard = (value: unknown): EnvironmentHazardSummary | null => {
   };
 };
 
+const normalizeCell = (value: unknown): EnvironmentCellSummary | null => {
+  const record = asRecord(value);
+  const cellType = cleanString(record?.cell_type ?? record?.type);
+  const cellRef = cleanString(record?.cell_ref ?? record?.id) ?? cellType;
+  if (!record || !cellType || !cellRef) return null;
+  return {
+    cell_ref: cellRef,
+    cell_type: cellType,
+    position: normalizePosition(record.position),
+    tags: cleanStrings(record.tags),
+    state: asRecord(record.state) ?? undefined,
+    sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
+  };
+};
+
 export function normalizeEnvironmentStateSnapshot(input: {
   snapshot: unknown;
   event?: HelixWorldEvent | null;
@@ -202,7 +218,10 @@ export function normalizeEnvironmentStateSnapshot(input: {
   const actorState = asRecord(record.actor_state);
   const inventoryState = asRecord(record.inventory_state);
   const objectState = asRecord(record.object_state);
+  const localMap = asRecord(record.local_map);
+  const chunkSnapshotSummary = asRecord(record.chunk_snapshot_summary);
   const focus = asRecord(record.focus);
+  const routeState = asRecord(record.route_state);
   const domainSpecific = asRecord(record.domain_specific);
   const snapshot: HelixEnvironmentStateSnapshot = {
     schema: HELIX_ENVIRONMENT_STATE_SNAPSHOT_SCHEMA,
@@ -251,6 +270,29 @@ export function normalizeEnvironmentStateSnapshot(input: {
         ? objectState.hazards.map(normalizeHazard).filter((entry): entry is EnvironmentHazardSummary => Boolean(entry))
         : [],
     } : undefined,
+    local_map: localMap ? {
+      sensor_scope: normalizeScope(localMap.sensor_scope, "sensor_observable"),
+      radius: numberOrNull(localMap.radius),
+      salient_cells: Array.isArray(localMap.salient_cells)
+        ? localMap.salient_cells.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      map_hash: cleanString(localMap.map_hash) ?? null,
+      changed_since_last_snapshot: localMap.changed_since_last_snapshot === true,
+    } : undefined,
+    chunk_snapshot_summary: chunkSnapshotSummary ? {
+      sensor_scope: normalizeScope(chunkSnapshotSummary.sensor_scope, "sensor_observable"),
+      sampled_radius_chunks: numberOrNull(chunkSnapshotSummary.sampled_radius_chunks),
+      loaded_chunks_sampled: numberOrNull(chunkSnapshotSummary.loaded_chunks_sampled),
+      surface_cells: Array.isArray(chunkSnapshotSummary.surface_cells)
+        ? chunkSnapshotSummary.surface_cells.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      map_hash: cleanString(chunkSnapshotSummary.map_hash) ?? null,
+      changed_since_last_snapshot: chunkSnapshotSummary.changed_since_last_snapshot === true,
+      evidence_trust: cleanString(chunkSnapshotSummary.evidence_trust) ?? undefined,
+      instruction_authority: chunkSnapshotSummary.instruction_authority === "none" ? "none" : undefined,
+      ask_context_policy: cleanString(chunkSnapshotSummary.ask_context_policy) ?? undefined,
+      raw_chunk_included: false,
+    } : undefined,
     focus: focus ? {
       sensor_scope: normalizeScope(focus.sensor_scope, "player_observable"),
       target_kind: focus.target_kind === "object" || focus.target_kind === "entity" || focus.target_kind === "block" || focus.target_kind === "ui" || focus.target_kind === "empty"
@@ -261,6 +303,19 @@ export function normalizeEnvironmentStateSnapshot(input: {
       distance: numberOrNull(focus.distance),
       line_of_sight: typeof focus.line_of_sight === "boolean" ? focus.line_of_sight : null,
       reachable: typeof focus.reachable === "boolean" ? focus.reachable : null,
+    } : undefined,
+    route_state: routeState ? {
+      active_objective_id: cleanString(routeState.active_objective_id) ?? null,
+      latest_rehearsal_id: cleanString(routeState.latest_rehearsal_id) ?? null,
+      latest_drift_event_id: cleanString(routeState.latest_drift_event_id) ?? null,
+      route_status: cleanString(routeState.route_status) ?? null,
+      policy_surface_status: cleanString(routeState.policy_surface_status) ?? null,
+      current_stage_label: cleanString(routeState.current_stage_label) ?? null,
+      updated_at: cleanString(routeState.updated_at) ?? null,
+      evidence_refs: cleanStrings(routeState.evidence_refs),
+      instruction_authority: routeState.instruction_authority === "none" ? "none" : undefined,
+      ask_context_policy: cleanString(routeState.ask_context_policy) ?? undefined,
+      raw_content_included: false,
     } : undefined,
     section_hashes: asRecord(record.section_hashes) as Record<string, string> ?? {},
     changed_sections: cleanStrings(record.changed_sections),

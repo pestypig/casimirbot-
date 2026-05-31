@@ -9,6 +9,7 @@ import {
   resetMinecraftPluginSnapshotNormalizerForTest,
 } from "../services/situation-room/minecraft-plugin-snapshot-normalizer";
 import { auditEnvironmentSourceContract } from "../services/situation-room/environment-source-contract-validator";
+import { reduceEnvironmentAffordances } from "../services/situation-room/environment-affordance-reducer";
 import { resetEnvironmentStateSnapshotWindowsForTest } from "../services/situation-room/environment-state-snapshot-window";
 
 describe("Minecraft plugin snapshot normalizer", () => {
@@ -90,5 +91,117 @@ describe("Minecraft plugin snapshot normalizer", () => {
     expect(entity?.instruction_authority).toBe("none");
     expect(entity?.ask_context_policy).toBe("evidence_only");
     expect(entity?.raw_nbt_included).toBe(false);
+  });
+
+  it("preserves traversability local-map cells", () => {
+    const snapshot = normalizeMinecraftPluginSnapshot({
+      snapshot: {
+        ...playerOpened,
+        local_map: {
+          sensor_scope: "sensor_observable",
+          radius: 4,
+          salient_cells: [
+            {
+              cell_ref: "cell:minecraft:overworld:1:63:1",
+              cell_type: "minecraft:end_stone",
+              position: { x: 1, y: 63, z: 1 },
+              tags: ["traversability_sample", "walkable", "adjacent_column"],
+              state: {
+                walkable: true,
+                step_up_candidate: false,
+                blocked: false,
+                floor_type: "minecraft:end_stone",
+                feet_type: "minecraft:air",
+                head_type: "minecraft:air",
+              },
+              sensor_scope: "sensor_observable",
+            },
+          ],
+          map_hash: "hash",
+          changed_since_last_snapshot: true,
+        },
+      },
+    });
+
+    const cell = snapshot?.local_map?.salient_cells?.[0];
+    expect(snapshot?.local_map?.radius).toBe(4);
+    expect(cell?.tags).toContain("walkable");
+    expect(cell?.state?.walkable).toBe(true);
+    expect(cell?.state?.floor_type).toBe("minecraft:end_stone");
+  });
+
+  it("preserves chunk snapshot summaries as server observation evidence", () => {
+    const snapshot = normalizeMinecraftPluginSnapshot({
+      snapshot: {
+        ...playerOpened,
+        chunk_snapshot_summary: {
+          sensor_scope: "sensor_observable",
+          sampled_radius_chunks: 0,
+          loaded_chunks_sampled: 1,
+          surface_cells: [
+            {
+              cell_ref: "chunk_cell:minecraft:the_end:12:64:12",
+              cell_type: "minecraft:end_stone",
+              position: { x: 12, y: 64, z: 12 },
+              tags: ["chunk_surface_sample", "walkable", "traversable", "bridge_like"],
+              state: {
+                walkable: true,
+                bridge_like: true,
+                surface_type: "minecraft:end_stone",
+                above_type: "minecraft:air",
+                below_type: "minecraft:air",
+              },
+              sensor_scope: "sensor_observable",
+            },
+          ],
+          map_hash: "chunk-hash",
+          changed_since_last_snapshot: true,
+          evidence_trust: "server_observation",
+          instruction_authority: "none",
+          ask_context_policy: "evidence_only",
+          raw_chunk_included: false,
+        },
+      },
+    });
+
+    const summary = snapshot?.chunk_snapshot_summary;
+    const cell = summary?.surface_cells?.[0];
+    expect(summary?.sampled_radius_chunks).toBe(0);
+    expect(summary?.loaded_chunks_sampled).toBe(1);
+    expect(summary?.instruction_authority).toBe("none");
+    expect(summary?.ask_context_policy).toBe("evidence_only");
+    expect(summary?.raw_chunk_included).toBe(false);
+    expect(cell?.tags).toContain("bridge_like");
+    expect(cell?.state?.surface_type).toBe("minecraft:end_stone");
+
+    const affordances = reduceEnvironmentAffordances(snapshot!);
+    expect(affordances.traversable).toContain("minecraft:end_stone");
+  });
+
+  it("preserves route-state pointers without granting instruction authority", () => {
+    const snapshot = normalizeMinecraftPluginSnapshot({
+      snapshot: {
+        ...playerOpened,
+        route_state: {
+          active_objective_id: "objective:return-home",
+          latest_rehearsal_id: "rehearsal:end-return",
+          latest_drift_event_id: "drift:west",
+          route_status: "wrong_direction_candidate",
+          policy_surface_status: "not_candidate",
+          updated_at: "2026-05-19T18:35:00.000Z",
+          evidence_refs: ["rehearsal:end-return", "drift:west"],
+          instruction_authority: "none",
+          ask_context_policy: "evidence_only",
+          raw_content_included: false,
+        },
+      },
+    });
+
+    expect(snapshot?.route_state?.active_objective_id).toBe("objective:return-home");
+    expect(snapshot?.route_state?.latest_rehearsal_id).toBe("rehearsal:end-return");
+    expect(snapshot?.route_state?.route_status).toBe("wrong_direction_candidate");
+    expect(snapshot?.route_state?.instruction_authority).toBe("none");
+    expect(snapshot?.route_state?.ask_context_policy).toBe("evidence_only");
+    expect(snapshot?.route_state?.raw_content_included).toBe(false);
   });
 });

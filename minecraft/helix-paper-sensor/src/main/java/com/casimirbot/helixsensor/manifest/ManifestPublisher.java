@@ -49,6 +49,7 @@ public final class ManifestPublisher {
                 "inventory_state",
                 "object_state",
                 "local_map",
+                "chunk_snapshot_summary",
                 "focus",
                 "affordances",
                 "domain_specific"

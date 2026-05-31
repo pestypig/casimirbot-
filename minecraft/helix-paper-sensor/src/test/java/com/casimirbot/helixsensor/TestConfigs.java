@@ -31,7 +31,7 @@ public final class TestConfigs {
             false,
             false,
             new HelixSensorConfig.SeedMapOptions(64, "village", true, 1, true, true),
-            new HelixSensorConfig.SnapshotOptions(true, true, true, true, true, true, true, true, 16, 16, 8, 24, 48, 128, 64),
+            new HelixSensorConfig.SnapshotOptions(true, true, true, true, true, true, true, true, false, 16, 16, 8, 0, 24, 48, 128, 48, 64),
             new HelixSensorConfig.ProbeOptions(64, 250, 10000)
         );
     }

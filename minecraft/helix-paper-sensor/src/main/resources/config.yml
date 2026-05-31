@@ -41,12 +41,15 @@ snapshot:
   include_nearby_container_refs: true
   include_crops: true
   include_local_map: true
+  include_chunk_snapshot_summary: false
   nearby_entity_radius: 16
   crop_radius: 16
   local_map_radius: 8
+  chunk_snapshot_radius_chunks: 0
   max_entities: 24
   max_crops: 48
   max_local_blocks: 128
+  max_chunk_snapshot_cells: 48
   max_inventory_stacks: 64
 
 probe:

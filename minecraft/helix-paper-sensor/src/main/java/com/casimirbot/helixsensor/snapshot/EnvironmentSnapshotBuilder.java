@@ -3,6 +3,7 @@ package com.casimirbot.helixsensor.snapshot;
 import com.casimirbot.helixsensor.HelixSensorConfig;
 import com.casimirbot.helixsensor.snapshot.adapters.ActorStateAdapter;
 import com.casimirbot.helixsensor.snapshot.adapters.AffordanceSummaryAdapter;
+import com.casimirbot.helixsensor.snapshot.adapters.ChunkSnapshotSummaryAdapter;
 import com.casimirbot.helixsensor.snapshot.adapters.ContainerStateAdapter;
 import com.casimirbot.helixsensor.snapshot.adapters.CropResourceAdapter;
 import com.casimirbot.helixsensor.snapshot.adapters.EntityStateAdapter;
@@ -27,6 +28,7 @@ public final class EnvironmentSnapshotBuilder {
     private final CropResourceAdapter cropResourceAdapter;
     private final RayFocusAdapter rayFocusAdapter = new RayFocusAdapter();
     private final LocalMapAdapter localMapAdapter;
+    private final ChunkSnapshotSummaryAdapter chunkSnapshotSummaryAdapter;
     private final AffordanceSummaryAdapter affordanceSummaryAdapter = new AffordanceSummaryAdapter();
     private final Map<String, Map<String, String>> previousHashesByActor = new LinkedHashMap<>();
     private int snapshotCounter = 0;
@@ -38,6 +40,7 @@ public final class EnvironmentSnapshotBuilder {
         this.containerStateAdapter = new ContainerStateAdapter(config);
         this.cropResourceAdapter = new CropResourceAdapter(config);
         this.localMapAdapter = new LocalMapAdapter(config);
+        this.chunkSnapshotSummaryAdapter = new ChunkSnapshotSummaryAdapter(config);
     }
 
     public List<Map<String, Object>> buildForOnlinePlayers(boolean forceFullRefresh) {
@@ -71,6 +74,7 @@ public final class EnvironmentSnapshotBuilder {
         );
         Map<String, Object> focus = Map.of("target_kind", "none", "sensor_scope", "unknown");
         Map<String, Object> localMap = Map.of("sensor_scope", "unknown", "cells", List.of());
+        Map<String, Object> chunkSnapshotSummary = Map.of("sensor_scope", "unknown", "surface_cells", List.of());
         Map<String, Object> affordances = Map.of("sensor_scope", "sensor_observable", "summary", List.of("server source alive"));
         Map<String, Object> sections = new LinkedHashMap<>();
         sections.put("actor_state", actorState);
@@ -78,6 +82,7 @@ public final class EnvironmentSnapshotBuilder {
         sections.put("object_state", objectState);
         sections.put("focus", focus);
         sections.put("local_map", localMap);
+        sections.put("chunk_snapshot_summary", chunkSnapshotSummary);
         sections.put("affordances", affordances);
         Map<String, String> hashes = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : sections.entrySet()) hashes.put(entry.getKey(), SectionHasher.hash(entry.getValue()));
@@ -105,6 +110,7 @@ public final class EnvironmentSnapshotBuilder {
         putSection(snapshot, "object_state", objectState, hashes, previous, fullRefresh);
         putSection(snapshot, "focus", focus, hashes, previous, fullRefresh);
         putSection(snapshot, "local_map", localMap, hashes, previous, fullRefresh);
+        putSection(snapshot, "chunk_snapshot_summary", chunkSnapshotSummary, hashes, previous, fullRefresh);
         snapshot.put("affordances", fullRefresh || changed.contains("affordances")
             ? affordances
             : Map.of("unchanged", true, "hash", hashes.get("affordances"), "sensor_scope", "sensor_observable"));
@@ -129,6 +135,7 @@ public final class EnvironmentSnapshotBuilder {
         List<Map<String, Object>> containers = containerStateAdapter.build(player);
         List<Map<String, Object>> resources = cropResourceAdapter.build(player);
         Map<String, Object> localMap = localMapAdapter.build(player);
+        Map<String, Object> chunkSnapshotSummary = chunkSnapshotSummaryAdapter.build(player);
         Map<String, Object> affordances = affordanceSummaryAdapter.build(focus, containers, resources);
         Map<String, Object> objectState = new LinkedHashMap<>();
         objectState.put("sensor_scope", "sensor_observable");
@@ -143,6 +150,7 @@ public final class EnvironmentSnapshotBuilder {
         sections.put("object_state", objectState);
         sections.put("focus", focus);
         sections.put("local_map", localMap);
+        sections.put("chunk_snapshot_summary", chunkSnapshotSummary);
         sections.put("affordances", affordances);
 
         Map<String, String> hashes = new LinkedHashMap<>();
@@ -183,6 +191,7 @@ public final class EnvironmentSnapshotBuilder {
         putSection(snapshot, "object_state", objectState, hashes, previous, fullRefresh);
         putSection(snapshot, "focus", focus, hashes, previous, fullRefresh);
         putSection(snapshot, "local_map", localMap, hashes, previous, fullRefresh);
+        putSection(snapshot, "chunk_snapshot_summary", chunkSnapshotSummary, hashes, previous, fullRefresh);
         snapshot.put("affordances", fullRefresh || changed.contains("affordances")
             ? affordances
             : Map.of("unchanged", true, "hash", hashes.get("affordances"), "sensor_scope", "sensor_observable"));
@@ -190,7 +199,7 @@ public final class EnvironmentSnapshotBuilder {
         snapshot.put("changed_sections", changed);
         snapshot.put("domain_specific", Map.of("minecraft", Map.of(
             "raw_nbt_included", false,
-            "paper_api_fields_seen", List.of("Player", "Inventory", "World#getNearbyEntities", "World#rayTraceBlocks")
+            "paper_api_fields_seen", List.of("Player", "Inventory", "World#getNearbyEntities", "World#rayTraceBlocks", "Chunk#getChunkSnapshot")
         )));
         snapshot.put("evidence_refs", List.of("minecraft:snapshot:server_tick:" + Bukkit.getCurrentTick()));
         snapshot.put("deterministic", true);

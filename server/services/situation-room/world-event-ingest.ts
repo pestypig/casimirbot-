@@ -124,13 +124,14 @@ import {
   type MinecraftSpatialGraph,
 } from "./minecraft-spatial-graph";
 import { rehearseMinecraftRoute } from "./minecraft-route-rehearsal";
-import { reduceMinecraftWorldDeltaOverlay } from "./minecraft-world-delta-overlay";
+import { persistMinecraftWorldDeltaOverlay, reduceMinecraftWorldDeltaOverlay } from "./minecraft-world-delta-overlay";
 import {
   reduceMinecraftRouteDrift,
   resetMinecraftRouteDriftStateForTest,
 } from "./minecraft-route-drift";
 import {
   recordMinecraftNavigationEvidence,
+  queryMinecraftNavigationState,
   resetMinecraftNavigationStateStoreForTest,
 } from "./minecraft-navigation-state-store";
 import {
@@ -878,7 +879,9 @@ export const ingestWorldEvent = async (
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
   const spatialResult = ingestMinecraftSpatialWorldEvent(event);
   const worldSenseResult = ingestMinecraftWorldSenseEvent(event);
-  const minecraftWorldDeltaOverlay = reduceMinecraftWorldDeltaOverlay(spatialResult.spatial_event);
+  const minecraftWorldDeltaOverlay = persistMinecraftWorldDeltaOverlay(
+    reduceMinecraftWorldDeltaOverlay(spatialResult.spatial_event),
+  );
   const seedMapQuery = buildMinecraftSeedMapQueryFromWorldEvent({
     event,
     spatialEvent: spatialResult.spatial_event,
@@ -1179,7 +1182,29 @@ export const ingestWorldEvent = async (
       : null;
   const environmentStateSnapshot = extractEnvironmentStateSnapshotFromWorldEvent(event);
   if (environmentStateSnapshot) {
-    ingestEnvironmentStateSnapshot(environmentStateSnapshot);
+    const navigationQuery = queryMinecraftNavigationState({
+      roomId: environmentStateSnapshot.room_id,
+      worldId: environmentStateSnapshot.world_id ?? event.world_id,
+      actorLabel: environmentStateSnapshot.actor_label ?? event.actor_label ?? null,
+      limit: 1,
+    });
+    ingestEnvironmentStateSnapshot(navigationQuery.navigation_state
+      ? {
+          ...environmentStateSnapshot,
+          route_state: {
+            active_objective_id: navigationQuery.navigation_state.latest_objective_id,
+            latest_rehearsal_id: navigationQuery.navigation_state.latest_rehearsal_id,
+            latest_drift_event_id: navigationQuery.navigation_state.latest_drift_event_id,
+            route_status: navigationQuery.navigation_state.route_status,
+            policy_surface_status: navigationQuery.navigation_state.policy_surface_status,
+            updated_at: navigationQuery.navigation_state.updated_at,
+            evidence_refs: navigationQuery.navigation_state.evidence_refs,
+            instruction_authority: "none",
+            ask_context_policy: "evidence_only",
+            raw_content_included: false,
+          },
+        }
+      : environmentStateSnapshot);
   }
   const liveArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId

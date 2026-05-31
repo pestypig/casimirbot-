@@ -9,10 +9,19 @@ const stableJson = (value: unknown): string => JSON.stringify(value);
 const hashShort = (value: unknown, size = 12): string =>
   crypto.createHash("sha256").update(stableJson(value)).digest("hex").slice(0, size);
 
+const MAX_DELTAS_PER_CHUNK = 512;
+const overlaysByChunk = new Map<string, HelixMinecraftWorldDeltaOverlay>();
+
 const chunkFor = (position: { x: number; z: number }): { x: number; z: number } => ({
   x: Math.floor(position.x / 16),
   z: Math.floor(position.z / 16),
 });
+
+const overlayKey = (overlay: Pick<HelixMinecraftWorldDeltaOverlay, "room_id" | "world_id" | "dimension" | "chunk">): string =>
+  `${overlay.room_id}:${overlay.world_id}:${overlay.dimension}:${overlay.chunk.x}:${overlay.chunk.z}`;
+
+const persistedOverlayId = (overlay: Pick<HelixMinecraftWorldDeltaOverlay, "room_id" | "world_id" | "dimension" | "chunk">): string =>
+  `minecraft_world_delta_overlay:${hashShort([overlay.room_id, overlay.world_id, overlay.dimension, overlay.chunk], 18)}`;
 
 const traversalHintFor = (
   event: HelixMinecraftSpatialEvent,
@@ -68,4 +77,49 @@ export function reduceMinecraftWorldDeltaOverlay(
     model_invoked: false,
     ts: spatialEvent.ts,
   };
+}
+
+export function persistMinecraftWorldDeltaOverlay(
+  overlay?: HelixMinecraftWorldDeltaOverlay | null,
+): HelixMinecraftWorldDeltaOverlay | null {
+  if (!overlay) return null;
+  const key = overlayKey(overlay);
+  const previous = overlaysByChunk.get(key);
+  const blockDeltas = [
+    ...(previous?.block_deltas ?? []),
+    ...overlay.block_deltas,
+  ]
+    .sort((a, b) => a.ts.localeCompare(b.ts))
+    .slice(-MAX_DELTAS_PER_CHUNK);
+  const next: HelixMinecraftWorldDeltaOverlay = {
+    ...overlay,
+    overlay_id: persistedOverlayId(overlay),
+    block_deltas: blockDeltas,
+    evidence_refs: Array.from(new Set([
+      ...(previous?.evidence_refs ?? []),
+      ...overlay.evidence_refs,
+    ])).slice(-MAX_DELTAS_PER_CHUNK),
+    ts: blockDeltas.at(-1)?.ts ?? overlay.ts,
+  };
+  overlaysByChunk.set(key, next);
+  return next;
+}
+
+export function getMinecraftWorldDeltaOverlay(input: {
+  roomId: string;
+  worldId: string;
+  dimension: string;
+  chunk: { x: number; z: number };
+}): HelixMinecraftWorldDeltaOverlay | null {
+  return overlaysByChunk.get(`${input.roomId}:${input.worldId}:${input.dimension}:${input.chunk.x}:${input.chunk.z}`) ?? null;
+}
+
+export function listMinecraftWorldDeltaOverlaysForRoom(roomId: string): HelixMinecraftWorldDeltaOverlay[] {
+  return Array.from(overlaysByChunk.values())
+    .filter((overlay) => overlay.room_id === roomId)
+    .sort((a, b) => a.ts.localeCompare(b.ts) || a.overlay_id.localeCompare(b.overlay_id));
+}
+
+export function resetMinecraftWorldDeltaOverlaysForTest(): void {
+  overlaysByChunk.clear();
 }

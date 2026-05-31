@@ -89,6 +89,7 @@ export type EnvironmentCellSummary = {
   cell_type: string;
   position?: EnvironmentPosition;
   tags?: string[];
+  state?: Record<string, unknown>;
   sensor_scope?: HelixEnvironmentSensorScope;
 };
 
@@ -146,6 +147,18 @@ export type HelixEnvironmentStateSnapshot = {
     map_hash?: string | null;
     changed_since_last_snapshot?: boolean;
   };
+  chunk_snapshot_summary?: {
+    sensor_scope?: HelixEnvironmentSensorScope;
+    sampled_radius_chunks?: number | null;
+    loaded_chunks_sampled?: number | null;
+    surface_cells?: EnvironmentCellSummary[];
+    map_hash?: string | null;
+    changed_since_last_snapshot?: boolean;
+    evidence_trust?: "server_observation" | string;
+    instruction_authority?: "none";
+    ask_context_policy?: "evidence_only" | string;
+    raw_chunk_included?: false;
+  };
   focus?: {
     sensor_scope?: HelixEnvironmentSensorScope;
     target_kind: "object" | "entity" | "block" | "ui" | "empty" | "unknown";
@@ -154,6 +167,19 @@ export type HelixEnvironmentStateSnapshot = {
     distance?: number | null;
     line_of_sight?: boolean | null;
     reachable?: boolean | null;
+  };
+  route_state?: {
+    active_objective_id?: string | null;
+    latest_rehearsal_id?: string | null;
+    latest_drift_event_id?: string | null;
+    route_status?: string | null;
+    policy_surface_status?: string | null;
+    current_stage_label?: string | null;
+    updated_at?: string | null;
+    evidence_refs?: string[];
+    instruction_authority?: "none";
+    ask_context_policy?: "evidence_only" | string;
+    raw_content_included?: false;
   };
   section_hashes: Record<string, string>;
   changed_sections: string[];

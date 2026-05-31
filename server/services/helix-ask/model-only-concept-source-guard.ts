@@ -109,8 +109,11 @@ const explicitVisualInputPatterns: RegExp[] = [
 const figurativePicturePatterns: RegExp[] = [
   /\b(?:popular|standard|usual|common|classical|physical|conceptual|mental|intuitive|big)\s+picture\b/i,
   /\b(?:vacuum[-\s]?fluctuation|field|quantum|geometric|statistical|historical|economic|philosophical|biological)\s+picture\b/i,
+  /\b(?:rubber[-\s]?sheet|spacetime|curvature|relativity|gravity|geodesic|observer|measurement|decoherence|wavefunction|collapse)\s+picture\b/i,
+  /\bpictured\s+as\b/i,
   /\bpicture\s+of\s+(?:reality|the\s+world|how|what|why)\b/i,
-  /\bpicture\s+(?:is|says|suggests|where|that|gets|becomes)\b/i,
+  /\bpicture\s+(?:is|says|suggests|where|that|gets|becomes|uses|ignores|seems|sounds)\b/i,
+  /\bthat\s+picture\s+(?:is|says|suggests|uses|ignores|seems|sounds|gets|becomes)\b/i,
 ];
 
 const normalizePrompt = (promptText: string): string => promptText.trim().replace(/\s+/g, " ");
