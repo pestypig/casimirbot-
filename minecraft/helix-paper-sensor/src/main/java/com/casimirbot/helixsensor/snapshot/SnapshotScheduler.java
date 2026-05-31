@@ -96,6 +96,9 @@ public final class SnapshotScheduler {
             return;
         }
         List<Map<String, Object>> events = new ArrayList<>();
+        for (Map<String, Object> eventFact : burstController.drainPendingEventFacts()) {
+            events.add(worldEventForCompactFact(eventFact));
+        }
         for (Map<String, Object> snapshot : snapshots) {
             String actorKey = String.valueOf(snapshot.get("actor_id"));
             long previousTick = latestSourceTickByActor.getOrDefault(actorKey, -1L);
@@ -133,7 +136,7 @@ public final class SnapshotScheduler {
         Map<String, Object> first = snapshots.get(0);
         Object changed = first.get("changed_sections");
         Object localMap = first.get("local_map");
-        int localCells = localMap instanceof Map<?, ?> map && map.get("cells") instanceof List<?> cells ? cells.size() : 0;
+        int localCells = localMapCellCount(localMap);
         Object objectState = first.get("object_state");
         int entities = objectState instanceof Map<?, ?> objectMap && objectMap.get("nearby_entities") instanceof List<?> list ? list.size() : 0;
         return "actor_state " + mark(first, "actor_state") +
@@ -142,6 +145,12 @@ public final class SnapshotScheduler {
             " object_state " + entities + " entities" +
             " local_map " + localCells + " cells" +
             " raw_nbt false changed_sections " + changed;
+    }
+
+    static int localMapCellCount(Object localMap) {
+        if (!(localMap instanceof Map<?, ?> map)) return 0;
+        Object cellsValue = map.containsKey("salient_cells") ? map.get("salient_cells") : map.get("cells");
+        return cellsValue instanceof List<?> cells ? cells.size() : 0;
     }
 
     private String mark(Map<String, Object> snapshot, String key) {
@@ -166,6 +175,33 @@ public final class SnapshotScheduler {
                 "domain", "minecraft",
                 "domain_adapter", config.domainAdapter(),
                 "snapshot", snapshot
+            )
+        );
+    }
+
+    private Map<String, Object> worldEventForCompactFact(Map<String, Object> fact) {
+        String eventType = String.valueOf(fact.getOrDefault("event_type", "minecraft_compact_event"));
+        Object actorId = fact.getOrDefault("actor_id", "minecraft:unknown");
+        Object actorLabel = fact.getOrDefault("actor_label", "unknown");
+        Object ts = fact.getOrDefault("ts", java.time.Instant.now().toString());
+        Object evidenceRefs = fact.getOrDefault("evidence_refs", List.of("minecraft:event:" + eventType));
+        return Map.of(
+            "schema", "helix.world_event.v1",
+            "world_id", config.worldId(),
+            "room_id", config.roomId(),
+            "source_id", config.sourceId(),
+            "actor_id", actorId,
+            "actor_label", actorLabel,
+            "ts", ts,
+            "event_type", eventType,
+            "evidence_refs", evidenceRefs,
+            "meta", Map.of(
+                "domain", "minecraft",
+                "domain_adapter", config.domainAdapter(),
+                "compact_event", fact,
+                "raw_nbt_included", false,
+                "instruction_authority", "none",
+                "ask_context_policy", "evidence_only"
             )
         );
     }

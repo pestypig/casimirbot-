@@ -30,10 +30,26 @@ export type EnvironmentObjectSummary = {
   object_ref: string;
   object_type: string;
   position?: EnvironmentPosition;
+  velocity?: EnvironmentPosition | null;
+  facing?: string | null;
+  yaw?: number | null;
+  pitch?: number | null;
   distance?: number | null;
   relative_direction?: string | null;
+  bounding_box?: {
+    min: EnvironmentPosition;
+    max: EnvironmentPosition;
+  } | null;
+  classification?: string[];
   tags?: string[];
   state?: Record<string, unknown>;
+  living?: Record<string, unknown> | null;
+  mob_ai?: Record<string, unknown> | null;
+  threat?: Record<string, unknown> | null;
+  evidence_trust?: "server_observation" | string;
+  instruction_authority?: "none";
+  ask_context_policy?: "evidence_only" | string;
+  raw_nbt_included?: false;
   sensor_scope?: HelixEnvironmentSensorScope;
 };
 

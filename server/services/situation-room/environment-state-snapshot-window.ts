@@ -100,12 +100,32 @@ const normalizeObject = (value: unknown): EnvironmentObjectSummary | null => {
     object_ref: objectRef,
     object_type: objectType,
     position: normalizePosition(record.position),
+    velocity: normalizePosition(record.velocity) ?? null,
+    facing: cleanString(record.facing) ?? null,
+    yaw: numberOrNull(record.yaw),
+    pitch: numberOrNull(record.pitch),
     distance: numberOrNull(record.distance),
     relative_direction: cleanString(record.relative_direction) ?? null,
+    bounding_box: normalizeBoundingBox(record.bounding_box),
+    classification: cleanStrings(record.classification),
     tags: cleanStrings(record.tags),
     state: asRecord(record.state) ?? undefined,
+    living: asRecord(record.living) ?? null,
+    mob_ai: asRecord(record.mob_ai) ?? null,
+    threat: asRecord(record.threat) ?? null,
+    evidence_trust: cleanString(record.evidence_trust) ?? undefined,
+    instruction_authority: record.instruction_authority === "none" ? "none" : undefined,
+    ask_context_policy: cleanString(record.ask_context_policy) ?? undefined,
+    raw_nbt_included: false,
     sensor_scope: normalizeScope(record.sensor_scope, "unknown"),
   };
+};
+
+const normalizeBoundingBox = (value: unknown): { min: EnvironmentPosition; max: EnvironmentPosition } | null => {
+  const record = asRecord(value);
+  const min = normalizePosition(record?.min);
+  const max = normalizePosition(record?.max);
+  return min && max ? { min, max } : null;
 };
 
 const normalizeContainer = (value: unknown): EnvironmentContainerSummary | null => {
