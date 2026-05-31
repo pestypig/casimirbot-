@@ -265,5 +265,16 @@ describe("Helix Ask rich model-only concept prompts", () => {
     expect(debugPayload?.model_turn_result?.status).toBe("assistant_message");
     expect(debugPayload?.final_answer_draft?.source).toBe("model_turn");
     expect(debugPayload?.output_budget?.mode ?? debugPayload?.final_answer_draft?.output_budget?.mode).toBe("long");
+    expect(finalPacket?.terminal_answer_authority).toMatchObject({
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_kind: "answer",
+      server_authoritative: true,
+    });
+    expect(String(finalPacket?.terminal_answer_authority?.terminal_text_preview ?? "").replace(/\s+/g, " ").trim()).toBe(
+      answer.replace(/\s+/g, " ").trim(),
+    );
+    expect(finalPacket?.terminal_equivalence_harness_result?.ok).toBe(true);
+    expect(finalPacket?.terminal_equivalence_harness_result?.failure_codes ?? []).toEqual([]);
   }, 60000);
 });
