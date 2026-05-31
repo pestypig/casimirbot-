@@ -1799,6 +1799,61 @@ describe("panelActionAdapters", () => {
       expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
     });
 
+    it("returns reflection recommended actions without executing them", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: {
+            prompt: "Map Einstein tensor source residual and QEI margin before any solve.",
+            mentioned_equations: [
+              "G_mu_nu = 8*pi*G*T_mu_nu/c^4",
+              "R_source = source_required - source_available",
+            ],
+            mentioned_symbols: ["G_mu_nu", "R_source", "qei_margin"],
+            mentioned_domains: ["warp_gr_nhm2", "qei_stress_energy"],
+            overlay: false,
+            open_panel: false,
+          },
+        },
+        actionContext(),
+      );
+      const reflection = result.artifact?.artifact_v1;
+      const actions = isTheoryContextReflectionV1(reflection)
+        ? reflection.evidenceForAsk.recommendedNextActions
+        : [];
+
+      expect(result.ok).toBe(true);
+      expect(actions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            actionId: "theory-badge-graph.build_compound_theory_run",
+            mutatesCalculator: false,
+            solves: false,
+            args: expect.objectContaining({
+              mode: "dependency_path",
+              include_scalar: true,
+              include_runtime: true,
+              include_evidence: true,
+              include_boundaries: true,
+            }),
+          }),
+          expect.objectContaining({
+            actionId: "theory-badge-graph.get_runtime_math_trace",
+            mutatesCalculator: false,
+            solves: false,
+            args: expect.objectContaining({
+              badge_id: expect.any(String),
+            }),
+          }),
+        ]),
+      );
+      expect(actions.every((action) => action.solves === false)).toBe(true);
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
+    });
+
     it("does not open the theory panel when reflection open_panel is false", () => {
       const openPanel = vi.fn();
       const focusPanel = vi.fn();

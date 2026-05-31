@@ -192,11 +192,15 @@ function hasScalarRows(matches: TheoryBadgeLookupMatch[]): boolean {
   return matches.some((match) => match.calculatorPayloadIds.length > 0);
 }
 
-function hasRuntimeRows(graph: TheoryBadgeGraphV1, badgeIds: string[]): boolean {
+function firstScalarBadgeId(matches: TheoryBadgeLookupMatch[]): string | null {
+  return matches.find((match) => match.calculatorPayloadIds.length > 0)?.badgeId ?? null;
+}
+
+function firstRuntimeBadgeId(graph: TheoryBadgeGraphV1, badgeIds: string[]): string | null {
   const badges = badgeById(graph);
-  return badgeIds.some((id) => {
+  for (const id of badgeIds) {
     const badge = badges.get(id);
-    return Boolean(
+    if (
       badge?.equations.some((equation) =>
         typeof equation.operatorKind === "string" &&
         [
@@ -207,9 +211,16 @@ function hasRuntimeRows(graph: TheoryBadgeGraphV1, badgeIds: string[]): boolean 
           "gate_status",
           "noncomputable_reference",
         ].includes(equation.operatorKind),
-      ),
-    );
-  });
+      )
+    ) {
+      return id;
+    }
+  }
+  return null;
+}
+
+function hasRuntimeRows(graph: TheoryBadgeGraphV1, badgeIds: string[]): boolean {
+  return firstRuntimeBadgeId(graph, badgeIds) !== null;
 }
 
 function recommendedActions(args: {
@@ -217,13 +228,17 @@ function recommendedActions(args: {
   selectedBadgeIds: string[];
   matches: TheoryBadgeLookupMatch[];
 }): TheoryContextReflectionRecommendedActionV1[] {
+  const selectedBadgeIds = unique(args.selectedBadgeIds);
+  if (selectedBadgeIds.length === 0) return [];
+  const scalarBadgeId = firstScalarBadgeId(args.matches);
+  const runtimeBadgeId = firstRuntimeBadgeId(args.graph, selectedBadgeIds);
   const actions: TheoryContextReflectionRecommendedActionV1[] = [
     {
       actionId: "theory-badge-graph.build_compound_theory_run",
       label: "Build compound theory run",
       panelId: "theory-badge-graph" as const,
       args: {
-        badge_ids: args.selectedBadgeIds,
+        badge_ids: selectedBadgeIds,
         mode: "dependency_path",
         include_scalar: true,
         include_runtime: true,
@@ -238,7 +253,7 @@ function recommendedActions(args: {
       label: "Load compound theory run",
       panelId: "theory-badge-graph" as const,
       args: {
-        badge_ids: args.selectedBadgeIds,
+        badge_ids: selectedBadgeIds,
         mode: "dependency_path",
       },
       mutatesCalculator: true,
@@ -252,20 +267,20 @@ function recommendedActions(args: {
       label: "Load scalar payloads",
       panelId: "theory-badge-graph",
       args: {
-        badge_ids: args.selectedBadgeIds,
+        ...(scalarBadgeId ? { badge_id: scalarBadgeId } : {}),
       },
       mutatesCalculator: true,
       solves: false,
     });
   }
 
-  if (hasRuntimeRows(args.graph, args.selectedBadgeIds)) {
+  if (runtimeBadgeId) {
     actions.push({
       actionId: "theory-badge-graph.get_runtime_math_trace",
       label: "Get runtime math trace",
       panelId: "theory-badge-graph",
       args: {
-        badge_ids: args.selectedBadgeIds,
+        badge_id: runtimeBadgeId,
       },
       mutatesCalculator: false,
       solves: false,

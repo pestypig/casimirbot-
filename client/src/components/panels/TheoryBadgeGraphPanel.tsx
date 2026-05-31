@@ -13,6 +13,11 @@ import type {
 } from "@shared/contracts/theory-badge-graph.v1";
 import { isTheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
 import type {
+  TheoryContextReflectionV1,
+  TheoryContextReflectionRecommendedActionV1,
+  TheoryContextReflectionDomainV1,
+} from "@shared/contracts/theory-context-reflection.v1";
+import type {
   TheoryBadgePlaybackArtifactV1,
   TheoryBadgePlaybackStepV1,
 } from "@shared/contracts/theory-badge-playback.v1";
@@ -592,6 +597,145 @@ function Inspector({
         </section>
       </CardContent>
     </Card>
+  );
+}
+
+function DiscussionZoneLegend({
+  exactCount,
+  likelyCount,
+  boundaryCount,
+}: {
+  exactCount: number;
+  likelyCount: number;
+  boundaryCount: number;
+}) {
+  return (
+    <div
+      data-testid="discussion-zone-legend"
+      className="pointer-events-none absolute right-4 top-4 z-20 w-56 rounded-md border border-emerald-500/30 bg-slate-950/90 p-3 text-xs text-slate-200 shadow-xl backdrop-blur"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-emerald-100">Discussion zone</div>
+        <Badge variant="outline" className="border-emerald-500/40 text-[10px] text-emerald-100">
+          Soft locator; not proof
+        </Badge>
+      </div>
+      <div className="mt-3 grid gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full border border-cyan-300 bg-emerald-300" />
+            Exact matches
+          </span>
+          <span>{exactCount}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full border border-emerald-400 bg-emerald-900" />
+            Likely matches
+          </span>
+          <span>{likelyCount}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full border border-amber-300 bg-amber-900" />
+            Claim boundaries
+          </span>
+          <span>{boundaryCount}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReflectionReceiptInspector({ artifact }: { artifact: TheoryContextReflectionV1 | null }) {
+  if (!artifact) return null;
+  const exactCount = artifact.overlay.exactBadgeIds.length;
+  const likelyCount = artifact.overlay.likelyBadgeIds.length;
+  const claimBoundaries = artifact.evidenceForAsk.claimBoundaries;
+  const recommendedActions = artifact.evidenceForAsk.recommendedNextActions;
+  return (
+    <aside
+      data-testid="reflection-receipt-inspector"
+      className="max-h-full w-80 overflow-y-auto border-r border-emerald-900/60 bg-slate-950/95 p-4 text-slate-100 shadow-2xl"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">Discussion zone</div>
+          <h3 className="mt-1 text-base font-semibold text-slate-50">Reflection receipt</h3>
+          <p className="mt-1 text-xs text-slate-400">Soft locator; not proof</p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => copyText(JSON.stringify(artifact, null, 2))}
+          className="h-8 gap-2 border-slate-700 text-xs text-slate-200 hover:bg-slate-900"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          Copy JSON
+        </Button>
+      </div>
+
+      <section className="mt-4 rounded-md border border-slate-800 bg-slate-900/50 p-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Summary</div>
+        <p className="mt-2 text-sm text-slate-200">{artifact.evidenceForAsk.summary}</p>
+      </section>
+
+      <section className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-md border border-cyan-800/60 bg-cyan-950/30 p-2">
+          <div className="font-semibold text-cyan-100">Exact matches</div>
+          <div className="mt-1 text-lg font-semibold text-cyan-50">{exactCount}</div>
+        </div>
+        <div className="rounded-md border border-emerald-800/60 bg-emerald-950/30 p-2">
+          <div className="font-semibold text-emerald-100">Likely matches</div>
+          <div className="mt-1 text-lg font-semibold text-emerald-50">{likelyCount}</div>
+        </div>
+      </section>
+
+      {artifact.inferredDomains.length > 0 ? (
+        <section className="mt-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Inferred domains</div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {artifact.inferredDomains.map((domain: TheoryContextReflectionDomainV1) => (
+              <Badge key={domain.atlasBlockId} variant="outline" className="border-emerald-700 text-emerald-100">
+                {domain.title}
+              </Badge>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {claimBoundaries.length > 0 ? (
+        <section className="mt-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Claim boundaries</div>
+          <ul className="mt-2 space-y-2">
+            {claimBoundaries.map((note: string) => (
+              <li key={note} className="rounded-md border border-amber-900/60 bg-amber-950/20 p-2 text-xs text-amber-100">
+                {note}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {recommendedActions.length > 0 ? (
+        <section className="mt-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Recommended next actions</div>
+          <div className="mt-2 space-y-2">
+            {recommendedActions.map((action: TheoryContextReflectionRecommendedActionV1) => (
+              <div key={`${action.panelId}:${action.actionId}:${action.label}`} className="rounded-md border border-slate-800 bg-slate-900/50 p-2">
+                <div className="text-xs font-semibold text-slate-100">{action.label}</div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  {action.panelId}.{action.actionId}
+                  {action.solves ? " | solves" : ""}
+                  {action.mutatesCalculator ? " | mutates calculator" : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </aside>
   );
 }
 
@@ -2296,6 +2440,9 @@ export default function TheoryBadgeGraphPanel() {
             onLoadPayload={loadCalculatorPayload}
           />
         ) : null}
+        {mapOverlay.lastReflectionArtifact ? (
+          <ReflectionReceiptInspector artifact={mapOverlay.lastReflectionArtifact} />
+        ) : null}
         </div>
         <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
           <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
@@ -2332,6 +2479,13 @@ export default function TheoryBadgeGraphPanel() {
                   viewport={viewport}
                   onViewportChange={rememberViewport}
                 />
+                {mapOverlay.source === "discussion_reflection" && mapOverlay.lastReflectionArtifact ? (
+                  <DiscussionZoneLegend
+                    exactCount={mapOverlay.exactBadgeIds.length}
+                    likelyCount={mapOverlay.likelyBadgeIds.length}
+                    boundaryCount={mapOverlay.claimBoundaryNotes.length}
+                  />
+                ) : null}
               </>
             ) : null}
           </div>

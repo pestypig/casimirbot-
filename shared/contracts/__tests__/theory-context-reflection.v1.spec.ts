@@ -103,6 +103,7 @@ describe("theory context reflection v1", () => {
     expect(reflection.panel_generated_answer).toBe(false);
     expect(reflection.context_role).toBe("tool_evidence");
     expect(reflection.ask_context_policy).toBe("evidence_only");
+    expect(reflection.deterministic_content_role).toBe("observation_not_assistant_answer");
   });
 
   it("rejects terminal eligible receipts", () => {
@@ -121,6 +122,17 @@ describe("theory context reflection v1", () => {
     };
 
     expect(validateTheoryContextReflectionV1(reflection)).toContain("assistant_answer must be false");
+  });
+
+  it("rejects receipts with the wrong deterministic content role", () => {
+    const reflection = {
+      ...baseReflection(),
+      deterministic_content_role: "assistant_answer",
+    };
+
+    expect(validateTheoryContextReflectionV1(reflection)).toContain(
+      "deterministic_content_role must be observation_not_assistant_answer",
+    );
   });
 
   it("rejects soft regions without badge ids", () => {

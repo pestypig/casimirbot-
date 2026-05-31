@@ -100,6 +100,113 @@ describe("theory context reflector", () => {
     ).toBe(false);
   });
 
+  it("recommends building a compound run for NHM2/QEI reflection clusters", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Map source residual and QEI margin on the badge graph.",
+      mentionedEquations: ["R_source = source_required - source_available"],
+      mentionedSymbols: ["R_source", "qei_margin"],
+      mentionedDomains: ["warp_gr_nhm2", "qei_stress_energy"],
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:compound-run-recommendation",
+    });
+    const buildAction = reflection.evidenceForAsk.recommendedNextActions.find(
+      (action) => action.actionId === "theory-badge-graph.build_compound_theory_run",
+    );
+
+    expect(buildAction).toBeTruthy();
+    expect(buildAction?.args).toEqual(expect.objectContaining({
+      mode: "dependency_path",
+      include_scalar: true,
+      include_runtime: true,
+      include_evidence: true,
+      include_boundaries: true,
+    }));
+    expect(buildAction?.args.badge_ids).toEqual(expect.arrayContaining([
+      expect.stringMatching(/nhm2|physics\.gr/),
+    ]));
+    expect(buildAction?.mutatesCalculator).toBe(false);
+    expect(buildAction?.solves).toBe(false);
+  });
+
+  it("recommends loading scalar payloads only when scalar payloads exist", () => {
+    const fullGraph = buildNhm2TheoryBadgeGraphV1();
+    const scalarReflection = buildTheoryContextReflection({
+      graph: fullGraph,
+      prompt: "Where does E=hf photon energy fit in the theory graph?",
+      mentionedEquations: ["E = h*f"],
+      mentionedSymbols: ["E", "h", "f"],
+      mentionedDomains: ["solar_surface_spectrum"],
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:scalar-recommendation",
+    });
+    const tensorOnlyBadge = fullGraph.badges.find((badge) => badge.id === "physics.gr.einstein_field_equation");
+    if (!tensorOnlyBadge) throw new Error("missing Einstein field equation badge fixture");
+    const tensorOnlyGraph = {
+      ...fullGraph,
+      badges: [tensorOnlyBadge],
+      edges: [],
+      summary: {
+        ...fullGraph.summary,
+        badgeCount: 1,
+        edgeCount: 0,
+        calculatorLoadableCount: 0,
+      },
+    };
+    const tensorReflection = buildTheoryContextReflection({
+      graph: tensorOnlyGraph,
+      prompt: "Locate the Einstein field equation tensor reference.",
+      mentionedEquations: ["G_mu_nu = 8*pi*G*T_mu_nu/c^4"],
+      mentionedSymbols: ["G_mu_nu", "T_mu_nu"],
+      mentionedDomains: ["warp_gr_nhm2"],
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:tensor-no-scalar-recommendation",
+    });
+    const scalarAction = scalarReflection.evidenceForAsk.recommendedNextActions.find(
+      (action) => action.actionId === "theory-badge-graph.load_payloads_to_calculator",
+    );
+
+    expect(scalarAction).toBeTruthy();
+    expect(scalarAction?.args.badge_id).toBeTruthy();
+    expect(tensorReflection.evidenceForAsk.recommendedNextActions.some(
+      (action) => action.actionId === "theory-badge-graph.load_payloads_to_calculator",
+    )).toBe(false);
+  });
+
+  it("recommends runtime math trace for tensor/reference badges", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Locate the Einstein tensor and GR stress-energy reference chain.",
+      mentionedEquations: ["G_mu_nu = 8*pi*G*T_mu_nu/c^4"],
+      mentionedSymbols: ["G_mu_nu", "T_mu_nu"],
+      mentionedDomains: ["warp_gr_nhm2"],
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:runtime-trace-recommendation",
+    });
+    const runtimeAction = reflection.evidenceForAsk.recommendedNextActions.find(
+      (action) => action.actionId === "theory-badge-graph.get_runtime_math_trace",
+    );
+
+    expect(runtimeAction).toBeTruthy();
+    expect(runtimeAction?.args.badge_id).toBeTruthy();
+    expect(runtimeAction?.mutatesCalculator).toBe(false);
+    expect(runtimeAction?.solves).toBe(false);
+  });
+
+  it("does not mark any reflection recommendation as a solve action by default", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Solve later, but first map source residual and QEI margin on the graph.",
+      mentionedSymbols: ["R_source", "qei_margin"],
+      mentionedDomains: ["warp_gr_nhm2"],
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:no-default-solve-action",
+    });
+
+    expect(reflection.evidenceForAsk.recommendedNextActions.length).toBeGreaterThan(0);
+    expect(reflection.evidenceForAsk.recommendedNextActions.every((action) => action.solves === false)).toBe(true);
+  });
+
   it("strict mode omits soft region when there are no high-confidence matches", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),

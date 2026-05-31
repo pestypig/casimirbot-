@@ -1,7 +1,7 @@
 import { extractCalculatorExpression } from "./workstation-tool-planner";
-import type { HelixWorkstationToolPlan } from "../../../shared/helix-workstation-tool-plan";
+import type { HelixWorkstationToolPlan, HelixWorkstationToolPlanStep } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixWorkstationToolEvaluation } from "../../../shared/helix-workstation-tool-evaluation";
-import type { HelixCalculatorSetupContext } from "../../../shared/helix-calculator-setup-context";
+import type { HelixCalculatorSetupContext, HelixCalculatorSetupVariable } from "../../../shared/helix-calculator-setup-context";
 
 export type SynthesizeWorkstationAnswerInput = {
   prompt: string;
@@ -72,7 +72,7 @@ function solveSimpleArithmeticExpression(expression: string): string | null {
 
 function calculatorTraceSource(plan: HelixWorkstationToolPlan): string {
   const solveStep = plan.steps.find(
-    (step) =>
+    (step: HelixWorkstationToolPlanStep) =>
       step.panel_id === "scientific-calculator" &&
       (step.action_id === "solve_expression" ||
         step.action_id === "solve_with_steps" ||
@@ -86,7 +86,7 @@ function calculatorTraceSource(plan: HelixWorkstationToolPlan): string {
 
 function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculatorSetupContext | null {
   const solveStep = plan.steps.find(
-    (step) =>
+    (step: HelixWorkstationToolPlanStep) =>
       step.panel_id === "scientific-calculator" &&
       (step.action_id === "solve_expression" ||
         step.action_id === "solve_with_steps" ||
@@ -171,7 +171,7 @@ function synthesizeCompoundCalculatorAnswer(prompt: string, plan: HelixWorkstati
   }
   if (/\bkinetic\s+energy\b|\bke\s*=|\b1\/2\s*m\s*v/i.test(prompt)) {
     const variables = observation.setup?.variables?.length
-      ? ` Variables: ${observation.setup.variables.map((entry) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
+      ? ` Variables: ${observation.setup.variables.map((entry: HelixCalculatorSetupVariable) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
       : "";
     return [
       "Kinetic energy is the energy an object has because of its motion. In the standard non-relativistic form, KE = 1/2 mv^2.",
@@ -183,7 +183,7 @@ function synthesizeCompoundCalculatorAnswer(prompt: string, plan: HelixWorkstati
   }
   if (/\bwavelength\b|\blambda\b|\\lambda|c\s*\/\s*f/i.test(prompt)) {
     const variables = observation.setup?.variables?.length
-      ? ` Variables: ${observation.setup.variables.map((entry) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
+      ? ` Variables: ${observation.setup.variables.map((entry: HelixCalculatorSetupVariable) => `${entry.symbol}=${entry.value}${entry.unit ? ` ${entry.unit}` : ""}`).join(", ")}.`
       : "";
     return [
       "For light, wavelength and frequency are related by lambda = c/f, where c is the speed of light.",
@@ -203,19 +203,19 @@ function synthesizeCompoundCalculatorAnswer(prompt: string, plan: HelixWorkstati
 }
 
 function noteTitleFromPlan(plan: HelixWorkstationToolPlan): string {
-  const create = plan.steps.find((step) => step.panel_id === "workstation-notes" && step.action_id === "create_note");
+  const create = plan.steps.find((step: HelixWorkstationToolPlanStep) => step.panel_id === "workstation-notes" && step.action_id === "create_note");
   const title = create?.args?.title;
   return typeof title === "string" && title.trim() ? title.trim() : "Untitled note";
 }
 
 function ideologyMotiveFromPlan(plan: HelixWorkstationToolPlan): string {
-  const compare = plan.steps.find((step) => step.panel_id === "mission-ethos" && step.action_id === "compare_motive_to_zen");
+  const compare = plan.steps.find((step: HelixWorkstationToolPlanStep) => step.panel_id === "mission-ethos" && step.action_id === "compare_motive_to_zen");
   const motive = compare?.args?.motive;
   return typeof motive === "string" && motive.trim() ? motive.trim() : "the provided motive";
 }
 
 function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
-  const attach = plan.steps.find((step) => step.panel_id === "situation-room-pipelines" && step.action_id === "observer.attach");
+  const attach = plan.steps.find((step: HelixWorkstationToolPlanStep) => step.panel_id === "situation-room-pipelines" && step.action_id === "observer.attach");
   const target = attach?.args?.target_run_id ?? attach?.args?.target_turn_id;
   return typeof target === "string" && target.trim() ? target.trim() : "the selected Helix Ask run";
 }
@@ -241,7 +241,35 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
   ].join("\n");
 }
 
+function hasTheoryReflectionAndCalculatorSolve(plan: HelixWorkstationToolPlan): boolean {
+  const hasReflection = plan.steps.some(
+    (step: HelixWorkstationToolPlanStep) => step.panel_id === "theory-badge-graph" && step.action_id === "reflect_discussion_context",
+  );
+  const hasCalculatorSolve = plan.steps.some(
+    (step: HelixWorkstationToolPlanStep) =>
+      step.panel_id === "scientific-calculator" &&
+      (step.action_id === "solve_expression" || step.action_id === "solve_with_steps"),
+  );
+  return hasReflection && hasCalculatorSolve;
+}
+
+function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  const needsPhysicsSynthesis =
+    isCompoundCalculatorReasoningPrompt(input.prompt) || /\b(?:photon|e\s*=\s*h\s*f)\b/i.test(input.prompt);
+  const calculatorAnswer = needsPhysicsSynthesis
+    ? synthesizeCompoundCalculatorAnswer(input.prompt, input.plan)
+    : calculatorResultText(input.prompt, input.plan);
+  return [
+    "I first located the equation in the Theory Badge Graph as context evidence, then used the Scientific Calculator for the scalar numeric step.",
+    "The theory reflection is a non-terminal context locator, not the numeric solve.",
+    calculatorAnswer,
+  ].join("\n");
+}
+
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  if (hasTheoryReflectionAndCalculatorSolve(input.plan)) {
+    return synthesizeTheoryReflectionCalculatorAnswer(input);
+  }
   if (input.plan.intent === "calculator_live_source") {
     const observation = buildCalculatorObservation(input.prompt, input.plan);
     return [

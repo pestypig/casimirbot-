@@ -129,4 +129,18 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).toContain("3.313035e-19 J");
     expect(answer).not.toContain("Solar Spectrum context");
   });
+
+  it("synthesizes from both theory reflection context and calculator solve receipts", () => {
+    const prompt = "Calculate photon energy for f=5e14 Hz and show where E=hf fits in the theory graph.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({ prompt, plan: plan! });
+
+    expect(answer).toContain("I first located the equation in the Theory Badge Graph as context evidence");
+    expect(answer).toContain("The theory reflection is a non-terminal context locator, not the numeric solve.");
+    expect(answer).toContain("Calculator subgoal");
+    expect(answer).toContain("3.313035e-19 J");
+    expect(answer).toContain("Trace source: scientific-calculator.solve_expression.");
+  });
 });

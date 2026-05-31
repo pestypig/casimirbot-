@@ -5097,6 +5097,7 @@ export function executeHelixPanelAction(
           panel_generated_answer: false,
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
+          deterministic_content_role: "observation_not_assistant_answer",
         },
       };
     }

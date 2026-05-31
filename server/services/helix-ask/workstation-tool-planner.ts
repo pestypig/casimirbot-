@@ -697,6 +697,14 @@ function isTheoryContextReflectionPrompt(prompt: string): boolean {
   return false;
 }
 
+function isTheoryReflectionCalculatorChainPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  if (!isCalculatorPrompt(prompt)) return false;
+  if (!extractCalculatorExpression(prompt)) return false;
+  return hasReflectionCue(prompt) && hasTheoryReflectionDomain(prompt);
+}
+
 function inferPhysicsCalculationIntent(prompt: string): "locate_only" | "load_calculator" | "solve_scalar" | "solve_scalar_and_runtime" {
   if (/\b(?:where\s+(?:does|do)|what\s+theory|which\s+theory|locate|context|map|nearest|overlap)\b/i.test(prompt)) {
     return "locate_only";
@@ -997,6 +1005,98 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isTheoryReflectionCalculatorChainPrompt(normalized)) {
+    const latex = extractCalculatorExpression(normalized);
+    const calculatorSetup = buildCalculatorSetupContext(normalized, latex);
+    const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
+    const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";
+    const reflectArgs = {
+      prompt: normalized,
+      overlay: true,
+      open_panel: true,
+    };
+    const solveArgs = calculatorArgs(latex, calculatorSetup);
+    pushScore({
+      affordance_id: "theory-badge-graph.reflect_discussion_context",
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+      score: 0.9,
+      reason: "physics calculation prompt also asks to locate the equation in theory graph space",
+      required_args_missing: [],
+    });
+    pushScore({
+      affordance_id: `scientific-calculator.${actionId}`,
+      panel_id: "scientific-calculator",
+      action_id: actionId,
+      score: 0.94,
+      reason: "physics calculation prompt includes a concrete scalar expression after theory reflection",
+      required_args_missing: [],
+    });
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "physics_calculation_context",
+      missing: [],
+      options,
+      steps: [
+        makeOpenStep("theory-badge-graph"),
+        {
+          step_id: "reflect_discussion_context",
+          kind: "run_panel_action",
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: reflectArgs,
+          depends_on: ["open_theory_badge_graph"],
+          expected_receipt_kind: "theory_context_reflection",
+          expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+          required: true,
+        },
+        makeOpenStep("scientific-calculator", ["reflect_discussion_context"]),
+        {
+          step_id: "ingest_expression",
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "ingest_latex",
+          args: solveArgs,
+          depends_on: ["open_scientific_calculator"],
+          expected_receipt_kind: "workspace_action_receipt",
+          expected_state_change: { store: "scientific-calculator", proof_key: "input_latex" },
+          required: true,
+        },
+        {
+          step_id: actionId,
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: actionId,
+          args: solveArgs,
+          depends_on: ["ingest_expression"],
+          expected_receipt_kind: "calculator_receipt",
+          expected_state_change: { store: "scientific-calculator", proof_key: "result_text" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_reflection_and_calculator",
+          kind: "evaluate_result",
+          depends_on: ["reflect_discussion_context", actionId],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    });
+    return {
+      intent: "physics_calculation_context",
+      action: {
+        panel_id: "scientific-calculator",
+        action_id: actionId,
+        args: solveArgs,
+      },
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt asks for mapped theory context and a scalar calculation; reflect context before calculator solve.",
+      missing_required_args: [],
     };
   }
 

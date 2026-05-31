@@ -48,6 +48,84 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
+    expect(screen.queryByTestId("discussion-zone-legend")).toBeNull();
+  });
+
+  it("shows discussion-zone legend and reflection receipt inspector when reflection overlay is active", async () => {
+    const artifact = buildTheoryContextReflectionV1({
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:inspector-test",
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        prompt: "Where does source residual and QEI fit?",
+        conversationContext: null,
+        mentionedEquations: [],
+        mentionedSymbols: ["qei_margin", "R_source"],
+        mentionedDomains: ["warp_gr_nhm2"],
+        source: "helix_ask",
+        confidenceMode: "soft_locator",
+      },
+      exactMatches: [],
+      likelyMatches: [],
+      inferredDomains: [
+        {
+          atlasBlockId: "warp_gr_nhm2",
+          title: "Warp / GR / NHM2",
+          score: 0.91,
+          reasons: ["domain term match"],
+        },
+      ],
+      overlay: {
+        centerBadgeIds: ["nhm2.qei.sampling_window"],
+        highlightedBadgeIds: ["nhm2.qei.sampling_window", "nhm2.closure.source_residual"],
+        highlightedEdgeIds: [],
+        heatByBadgeId: {
+          "nhm2.qei.sampling_window": 1,
+          "nhm2.closure.source_residual": 0.7,
+        },
+        exactBadgeIds: ["nhm2.qei.sampling_window"],
+        likelyBadgeIds: ["nhm2.closure.source_residual"],
+        softRegion: {
+          id: "discussion-zone:inspector-test",
+          label: "Current discussion zone",
+          badgeIds: ["nhm2.qei.sampling_window", "nhm2.closure.source_residual"],
+          confidence: 0.8,
+          tone: "green",
+          meaning: "discussion_context_not_proof",
+        },
+      },
+      evidenceForAsk: {
+        summary: "The discussion appears near QEI and source residual.",
+        claimBoundaries: ["Diagnostic-only context."],
+        recommendedNextActions: [
+          {
+            actionId: "theory-badge-graph.build_compound_theory_run",
+            label: "Build compound theory run",
+            panelId: "theory-badge-graph",
+            args: {},
+            mutatesCalculator: false,
+            solves: false,
+          },
+        ],
+      },
+    });
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(artifact);
+
+    renderPanel();
+
+    expect(await screen.findByTestId("discussion-zone-legend")).toBeTruthy();
+    expect(screen.getAllByText("Discussion zone").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Soft locator; not proof").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Exact matches").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Likely matches").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Claim boundaries").length).toBeGreaterThan(0);
+
+    expect(screen.getByTestId("reflection-receipt-inspector")).toBeTruthy();
+    expect(screen.getByText("The discussion appears near QEI and source residual.")).toBeTruthy();
+    expect(screen.getByText("Warp / GR / NHM2")).toBeTruthy();
+    expect(screen.getByText("Diagnostic-only context.")).toBeTruthy();
+    expect(screen.getByText("Build compound theory run")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy JSON" })).toBeTruthy();
   });
 
   it("renders discussion soft region and exact/likely badge markers", async () => {

@@ -93,6 +93,7 @@ export type TheoryContextReflectionV1 = {
   panel_generated_answer: false;
   context_role: "tool_evidence";
   ask_context_policy: "evidence_only";
+  deterministic_content_role: "observation_not_assistant_answer";
 };
 
 type BuildTheoryContextReflectionInput = Omit<
@@ -107,6 +108,7 @@ type BuildTheoryContextReflectionInput = Omit<
   | "panel_generated_answer"
   | "context_role"
   | "ask_context_policy"
+  | "deterministic_content_role"
 > & {
   generatedAt?: string;
   reflectionId?: string;
@@ -293,6 +295,7 @@ export function buildTheoryContextReflectionV1(
     panel_generated_answer: false,
     context_role: "tool_evidence",
     ask_context_policy: "evidence_only",
+    deterministic_content_role: "observation_not_assistant_answer",
   };
 }
 
@@ -347,6 +350,9 @@ export function validateTheoryContextReflectionV1(value: unknown): string[] {
   if (value.context_role !== "tool_evidence") issues.push("context_role must be tool_evidence");
   if (value.ask_context_policy !== "evidence_only") {
     issues.push("ask_context_policy must be evidence_only");
+  }
+  if (value.deterministic_content_role !== "observation_not_assistant_answer") {
+    issues.push("deterministic_content_role must be observation_not_assistant_answer");
   }
 
   const text = JSON.stringify(value);

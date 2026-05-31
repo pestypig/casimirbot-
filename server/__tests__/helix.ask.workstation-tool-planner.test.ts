@@ -387,6 +387,59 @@ describe("Helix Ask workstation tool planner", () => {
     }));
   });
 
+  it("chains theory reflection before calculator solves for mapped physics calculations", () => {
+    const plan = planWorkstationToolUse("Calculate photon energy for f=5e14 Hz and show where E=hf fits in the theory graph.");
+
+    expect(plan.intent).toBe("physics_calculation_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.reason).toBe(
+      "Prompt asks for mapped theory context and a scalar calculation; reflect context before calculator solve.",
+    );
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "open_theory_badge_graph",
+      "reflect_discussion_context",
+      "open_scientific_calculator",
+      "ingest_expression",
+      "solve_expression",
+      "evaluate_reflection_and_calculator",
+    ]);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_discussion_context");
+    expect(reflectStep).toEqual(expect.objectContaining({
+      expected_receipt_kind: "theory_context_reflection",
+      expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+    }));
+    const solveStep = plan.tool_plan?.steps.find((step) => step.step_id === "solve_expression");
+    expect(solveStep).toEqual(expect.objectContaining({
+      panel_id: "scientific-calculator",
+      action_id: "solve_expression",
+      expected_receipt_kind: "calculator_receipt",
+      args: expect.objectContaining({ latex: "6.62607015e-34*5e14" }),
+    }));
+    expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
+      kind: "evaluate_result",
+      depends_on: ["reflect_discussion_context", "solve_expression"],
+    }));
+  });
+
+  it("does not fabricate calculator solves for tensor mapping prompts without scalar cuts", () => {
+    const plan = planWorkstationToolUse("Map Einstein tensor source residual and QEI margin in the theory graph.");
+
+    expect(plan.intent).toBe("theory_context_reflection");
+    expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
+    expect(plan.tool_plan?.steps.map((step) => step.action_id)).toContain("reflect_discussion_context");
+  });
+
+  it("still reflects mapped theory prompts when no calculator expression is available", () => {
+    const plan = planWorkstationToolUse("Show where photon energy fits in the theory graph and calculate the value.");
+
+    expect(plan.intent).toBe("theory_context_reflection");
+    expect(plan.action).toEqual(expect.objectContaining({
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+    }));
+    expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
+  });
+
   it("honors explicit requests not to open tools for theory prompts", () => {
     const plan = planWorkstationToolUse("Do not open panels or tools; where does QEI fit in the theory graph?");
 
