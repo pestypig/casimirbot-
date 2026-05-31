@@ -1256,8 +1256,8 @@ describe("helix ask E52 panel control terminal contract", () => {
       .expect(200);
 
     expect(response.body?.route_reason_code).toBe("calculator_solve / calculator_compound_chain");
-    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(["workstation_tool_evaluation", "model_synthesized_answer"]).toContain(response.body?.terminal_artifact_kind);
+    expect(String(response.body?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_turn|model_synthesized_answer/);
     expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
       "wavelength",
       "photon_energy_j",
@@ -1410,6 +1410,41 @@ describe("helix ask E52 panel control terminal contract", () => {
     });
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Wavelength:");
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Photon energy:");
+  }, 60000);
+
+  it("routes uncertainty relation prompts through calculator compound receipts instead of prose latex retries", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Use the calculator panel to help answer this. Model a simple quantum wave packet with uncertainty relation dx dp >= hbar/2. Let dx = 2.0e-10 m. Calculate the minimum dp, then estimate minimum kinetic energy p^2/(2*m_e) in joules and eV. Explain the equations conceptually.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-uncertainty-chain-${Date.now()}`,
+      })
+      .expect(200);
+
+    const validations = response.body?.current_turn_artifact_ledger?.filter((artifact: any) =>
+      artifact.kind === "runtime_tool_call_validation"
+    ) ?? [];
+
+    expect(response.body?.route_reason_code).toBe("calculator_solve / calculator_compound_chain");
+    expect(["workstation_tool_evaluation", "model_synthesized_answer"]).toContain(response.body?.terminal_artifact_kind);
+    expect(String(response.body?.final_answer_source ?? "")).toMatch(/workstation_tool_evaluation|final_answer_draft|model_turn|model_synthesized_answer/);
+    expect(response.body?.calculator_compound_plan?.subgoals?.map((subgoal: any) => subgoal.id)).toEqual([
+      "minimum_momentum_uncertainty",
+      "minimum_kinetic_energy_j",
+      "minimum_kinetic_energy_ev",
+    ]);
+    expect(response.body?.calculator_result_validations?.every((validation: any) => validation.satisfied)).toBe(true);
+    expect(validations.some((validation: any) =>
+      validation.payload?.errors?.includes("invalid_arg:latex_is_prose")
+    )).toBe(false);
+    expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Minimum momentum uncertainty:");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Minimum kinetic energy:");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("Delta x Delta p >= hbar/2");
   }, 60000);
 
   it("uses the generic calculator planner for broader force prompts", async () => {

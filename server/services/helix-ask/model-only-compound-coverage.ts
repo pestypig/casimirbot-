@@ -44,6 +44,22 @@ const readRecord = (value: unknown): RecordLike | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+const readEvidenceBackedAnswerTextFromArtifacts = (artifactLedger: ArtifactLike[]): string | null => {
+  for (const preferredKind of ["reasoning_continuation_result", "turn_final_text", "final_answer_draft", "model_synthesized_answer"]) {
+    for (const artifact of [...artifactLedger].reverse()) {
+      const kind = readString(artifact.kind);
+      if (kind !== preferredKind) continue;
+      const payload = readRecord(artifact.payload);
+      const text =
+        readString(payload?.text) ??
+        readString(payload?.answer_text) ??
+        readString(payload?.final_answer_text);
+      if (text) return text;
+    }
+  }
+  return null;
+};
+
 export function evaluateModelOnlyCompoundCoverageFromAnswer(input: {
   turnId: string;
   payload: RecordLike;
@@ -148,6 +164,7 @@ export function evaluateCompoundPromptCoverageGateFromAnswerArtifacts(input: {
   selected_answer_source: "final_answer_draft" | "direct_answer_text" | "provided_final_answer_text" | "none";
   model_only_compound_coverage_from_answer: HelixModelOnlyCompoundCoverageFromAnswer;
 } {
+  const evidenceBackedAnswerText = readEvidenceBackedAnswerTextFromArtifacts(input.artifactLedger);
   const coverage = input.routeScope === "model_only"
     ? evaluateModelOnlyCompoundCoverageFromAnswer({
         turnId: input.turnId,
@@ -186,11 +203,12 @@ export function evaluateCompoundPromptCoverageGateFromAnswerArtifacts(input: {
       contract: input.contract,
       promptText: input.promptText,
       finalAnswerText:
+        evidenceBackedAnswerText ??
         readString(input.payload.selected_final_answer) ??
         readString(input.payload.answer) ??
         readString(input.payload.text),
-      terminalArtifactKind: readString(input.payload.terminal_artifact_kind),
-      finalAnswerSource: readString(input.payload.final_answer_source),
+      terminalArtifactKind: evidenceBackedAnswerText ? "model_synthesized_answer" : readString(input.payload.terminal_artifact_kind),
+      finalAnswerSource: evidenceBackedAnswerText ? "evidence_backed_answer_artifact" : readString(input.payload.final_answer_source),
     }),
     selected_answer_source: "provided_final_answer_text",
     model_only_compound_coverage_from_answer: coverage,

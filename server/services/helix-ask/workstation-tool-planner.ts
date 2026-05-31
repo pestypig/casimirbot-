@@ -208,6 +208,17 @@ function extractKineticEnergyExpression(value: string): string | null {
   return `0.5*${mass}*${speed}^2`;
 }
 
+function extractUncertaintyMomentumExpression(value: string): string | null {
+  if (!/\b(?:uncertainty|hbar|Î”x|delta\s*x|dx|position\s+uncertainty)\b/i.test(value)) return null;
+  const dx =
+    value.match(/\b(?:dx|delta\s*x|position\s+uncertainty)\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*(?:m|meters?|metres?)\b/i)?.[1] ??
+    null;
+  if (!dx) return null;
+  const dxValue = Number(dx);
+  if (!Number.isFinite(dxValue) || dxValue <= 0) return null;
+  return `1.054571817e-34/(2*${dx})`;
+}
+
 function parseKineticEnergyVariables(expression: string): HelixCalculatorSetupVariable[] {
   const normalized = expression.replace(/\s+/g, "");
   const match = normalized.match(/^0\.5\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\^2$/i);
@@ -364,6 +375,8 @@ export function extractCalculatorExpression(prompt: string): string | null {
   if (isWorkstationToolDiagnosticPrompt(normalized)) return null;
   const photonEnergyExpression = extractPhotonEnergyExpression(normalized);
   if (photonEnergyExpression) return photonEnergyExpression;
+  const uncertaintyMomentumExpression = extractUncertaintyMomentumExpression(normalized);
+  if (uncertaintyMomentumExpression) return uncertaintyMomentumExpression;
   const kineticEnergyExpression = extractKineticEnergyExpression(normalized);
   if (kineticEnergyExpression) return kineticEnergyExpression;
 
@@ -378,7 +391,7 @@ export function extractCalculatorExpression(prompt: string): string | null {
     if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
     const arithmetic = extractArithmeticCandidate(candidate);
     if (arithmetic) return arithmetic;
-    if (/[=+\-*/^]|\\frac|\\sqrt/.test(candidate)) return stripOuterPunctuation(candidate);
+    if (/[=+\-*/^]|\\frac|\\sqrt/.test(candidate) && !/\s/.test(candidate)) return stripOuterPunctuation(candidate);
   }
 
   const quoted = extractQuoted(normalized);
@@ -391,7 +404,7 @@ export function extractCalculatorExpression(prompt: string): string | null {
     if (inlineMath) return stripCalculatorInstructionTail(inlineMath);
     const arithmetic = extractArithmeticCandidate(cleaned);
     if (arithmetic) return arithmetic;
-    if (/[=+\-*/^]|\\frac|\\sqrt/.test(cleaned)) {
+    if (/[=+\-*/^]|\\frac|\\sqrt/.test(cleaned) && !/\s/.test(cleaned)) {
       return stripOuterPunctuation(cleaned);
     }
   }

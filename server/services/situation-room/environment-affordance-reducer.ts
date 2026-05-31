@@ -36,9 +36,11 @@ export function reduceEnvironmentAffordances(snapshot: HelixEnvironmentStateSnap
   const traversableCells = [
     ...(snapshot.local_map?.salient_cells ?? []),
     ...(snapshot.chunk_snapshot_summary?.surface_cells ?? []),
+    ...(snapshot.chunk_snapshot_summary?.route_corridor_cells ?? []),
   ];
   const hazards = [
     ...(snapshot.object_state?.hazards ?? []).map((entry) => `${entry.severity}:${entry.hazard_type}`),
+    ...(snapshot.chunk_snapshot_summary?.hazard_cells ?? []).map((cell) => cell.cell_type),
     ...traversableCells
       .filter((cell) => cell.tags?.some((tag) => tag.startsWith("hazard_") || tag.includes("void") || tag.includes("drop_risk")))
       .map((cell) => cell.cell_type),

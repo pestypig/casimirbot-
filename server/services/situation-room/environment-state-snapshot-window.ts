@@ -237,6 +237,13 @@ export function normalizeEnvironmentStateSnapshot(input: {
     source_tick: numberOrNull(record.source_tick),
     actor_state: actorState ? {
       sensor_scope: normalizeScope(actorState.sensor_scope, "player_observable"),
+      pose: asRecord(actorState.pose) ? {
+        position: normalizePosition(asRecord(actorState.pose)?.position),
+        eye: normalizePosition(asRecord(actorState.pose)?.eye),
+        yaw: numberOrNull(asRecord(actorState.pose)?.yaw),
+        pitch: numberOrNull(asRecord(actorState.pose)?.pitch),
+        facing: cleanString(asRecord(actorState.pose)?.facing) ?? null,
+      } : undefined,
       health: numberOrNull(actorState.health),
       food_level: numberOrNull(actorState.food_level),
       saturation: numberOrNull(actorState.saturation),
@@ -285,6 +292,18 @@ export function normalizeEnvironmentStateSnapshot(input: {
       loaded_chunks_sampled: numberOrNull(chunkSnapshotSummary.loaded_chunks_sampled),
       surface_cells: Array.isArray(chunkSnapshotSummary.surface_cells)
         ? chunkSnapshotSummary.surface_cells.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      route_corridor_cells: Array.isArray(chunkSnapshotSummary.route_corridor_cells)
+        ? chunkSnapshotSummary.route_corridor_cells.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      gateway_blocks: Array.isArray(chunkSnapshotSummary.gateway_blocks)
+        ? chunkSnapshotSummary.gateway_blocks.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      bridge_like_blocks: Array.isArray(chunkSnapshotSummary.bridge_like_blocks)
+        ? chunkSnapshotSummary.bridge_like_blocks.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
+        : [],
+      hazard_cells: Array.isArray(chunkSnapshotSummary.hazard_cells)
+        ? chunkSnapshotSummary.hazard_cells.map(normalizeCell).filter((entry): entry is EnvironmentCellSummary => Boolean(entry))
         : [],
       map_hash: cleanString(chunkSnapshotSummary.map_hash) ?? null,
       changed_since_last_snapshot: chunkSnapshotSummary.changed_since_last_snapshot === true,

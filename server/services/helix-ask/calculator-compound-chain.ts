@@ -28,9 +28,11 @@ import {
 } from "../../../shared/helix-physical-units";
 
 const H = 6.62607015e-34;
+const HBAR = 1.054571817e-34;
 const C = 3e8;
 const EV_J = 1.602176634e-19;
 const G0 = 9.80665;
+const ELECTRON_MASS_KG = 9.1093837015e-31;
 
 export type CalculatorCompoundChainArtifact = {
   kind: string;
@@ -748,6 +750,88 @@ const buildKineticDoubleDraft = (massSpeed: { mass: number; speed: number }): Dr
   ];
 };
 
+const extractPositionUncertaintyMeters = (prompt: string): number | null => {
+  const match =
+    prompt.match(new RegExp(`\\b(?:dx|delta\\s*x|position\\s+uncertainty)\\s*(?:=|is|of)?\\s*(${numberPattern})\\s*(?:m|meters?|metres?)\\b`, "i")) ??
+    prompt.match(new RegExp(`\\b(${numberPattern})\\s*(?:m|meters?|metres?)\\b[\\s\\S]{0,80}\\b(?:dx|delta\\s*x|position\\s+uncertainty)\\b`, "i"));
+  const value = Number(match?.[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+};
+
+const buildUncertaintyMomentumDraft = (dxMeters: number): DraftSubgoal[] => {
+  const dp = HBAR / (2 * dxMeters);
+  const kineticEnergyJ = (dp ** 2) / (2 * ELECTRON_MASS_KG);
+  const kineticEnergyEv = kineticEnergyJ / EV_J;
+  return [
+    {
+      id: "minimum_momentum_uncertainty",
+      label: "Compute minimum momentum uncertainty from Delta x Delta p >= hbar/2",
+      expression: `1.054571817e-34/(2*${formatNumber(dxMeters)})`,
+      expected_quantity: "momentum",
+      expected_unit: null,
+      depends_on: [],
+      value: dp,
+      result_text: formatNumber(dp),
+      setup: unitSetup({
+        expression: `1.054571817e-34/(2*${formatNumber(dxMeters)})`,
+        domain: "generic",
+        subgoal: "Compute the minimum momentum uncertainty from Delta p_min = hbar / (2 Delta x).",
+        equation: "Delta p_min = hbar / (2 Delta x)",
+        resultUnit: null,
+        variables: [
+          { symbol: "hbar", value: "1.054571817e-34", unit: "J*s", meaning: "reduced Planck constant" },
+          { symbol: "Delta x", value: formatNumber(dxMeters), unit: "m", meaning: "position uncertainty" },
+        ],
+        assumptions: ["Saturates the Heisenberg lower bound for an estimate."],
+      }),
+    },
+    {
+      id: "minimum_kinetic_energy_j",
+      label: "Estimate minimum kinetic energy in joules from p^2/(2 m_e)",
+      expression: `${formatNumber(dp)}^2/(2*9.1093837015e-31)`,
+      expected_quantity: "energy",
+      expected_unit: "J",
+      depends_on: ["minimum_momentum_uncertainty"],
+      value: kineticEnergyJ,
+      result_text: formatNumber(kineticEnergyJ),
+      setup: unitSetup({
+        expression: `${formatNumber(dp)}^2/(2*9.1093837015e-31)`,
+        domain: "kinetic_energy",
+        subgoal: "Estimate non-relativistic kinetic energy from the minimum momentum uncertainty.",
+        equation: "K_min = (Delta p_min)^2 / (2 m_e)",
+        resultUnit: "J",
+        variables: [
+          { symbol: "Delta p_min", value: formatNumber(dp), unit: "kg*m/s", meaning: "minimum momentum uncertainty" },
+          { symbol: "m_e", value: "9.1093837015e-31", unit: "kg", meaning: "electron mass" },
+        ],
+        assumptions: ["Non-relativistic kinetic-energy estimate."],
+      }),
+    },
+    {
+      id: "minimum_kinetic_energy_ev",
+      label: "Convert minimum kinetic energy from joules to electronvolts",
+      expression: `${formatNumber(kineticEnergyJ)}/1.602176634e-19`,
+      expected_quantity: "energy",
+      expected_unit: "eV",
+      depends_on: ["minimum_kinetic_energy_j"],
+      value: kineticEnergyEv,
+      result_text: formatNumber(kineticEnergyEv),
+      setup: unitSetup({
+        expression: `${formatNumber(kineticEnergyJ)}/1.602176634e-19`,
+        domain: "generic",
+        subgoal: "Convert the kinetic-energy estimate from joules to electronvolts.",
+        equation: "K_eV = K_J / (1.602176634e-19)",
+        resultUnit: "eV",
+        variables: [
+          { symbol: "K_J", value: formatNumber(kineticEnergyJ), unit: "J", meaning: "minimum kinetic energy" },
+          { symbol: "e", value: "1.602176634e-19", unit: "J/eV", meaning: "joules per electronvolt" },
+        ],
+        assumptions: ["1 eV = 1.602176634e-19 J."],
+      }),
+    },
+  ];
+};
+
 const buildRootEvaluationDraft = (): DraftSubgoal[] => [
   {
     id: "solve_roots",
@@ -829,6 +913,10 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
     const massSpeed = extractMassSpeed(normalized);
     if (massSpeed) return { subgoals: buildKineticDoubleDraft(massSpeed), answerKind: "kinetic_double_chain" };
   }
+  if (/\b(?:uncertainty|hbar|delta\s*x|dx|delta\s*p|dp|position\s+uncertainty)\b/i.test(normalized) && /\b(?:kinetic\s+energy|electronvolts?|ev|p\^2\s*\/\s*\(?2\s*\*?\s*m_?e)\b/i.test(normalized)) {
+    const dxMeters = extractPositionUncertaintyMeters(normalized);
+    if (dxMeters) return { subgoals: buildUncertaintyMomentumDraft(dxMeters), answerKind: "uncertainty_momentum_chain" };
+  }
   if (/x\^2\s*-\s*4\s*=\s*0/i.test(normalizedExpressionText) && /x\^2\s*\+\s*3/i.test(normalizedExpressionText)) {
     return { subgoals: buildRootEvaluationDraft(), answerKind: "root_evaluation_chain" };
   }
@@ -879,6 +967,18 @@ const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCal
       `Kinetic energy after speed doubles: ${byId.get("kinetic_energy_doubled_speed")?.result_text} J.`,
       `Ratio: ${byId.get("kinetic_energy_ratio")?.result_text}.`,
       "Interpretation: doubling speed quadruples kinetic energy because velocity is squared in KE = 1/2 m v^2.",
+    ].join("\n");
+  }
+  if (answerKind === "uncertainty_momentum_chain") {
+    return [
+      "Calculator compound plan completed.",
+      `Minimum momentum uncertainty: ${byId.get("minimum_momentum_uncertainty")?.result_text} kg*m/s.`,
+      `Minimum kinetic energy: ${byId.get("minimum_kinetic_energy_j")?.result_text} J.`,
+      `Minimum kinetic energy: ${byId.get("minimum_kinetic_energy_ev")?.result_text} eV.`,
+      "Interpretation: the chain saturated Delta x Delta p >= hbar/2 for the requested estimate, then used the non-relativistic electron kinetic-energy relation K = p^2/(2 m_e).",
+      "The equations conceptually connect localization to momentum spread and then translate that spread into an energy scale.",
+      "Conceptually, Delta x Delta p >= hbar/2 says a state cannot be prepared with arbitrarily sharp position and momentum at the same time; this is a wave-state bandwidth relation, not a mystical claim that consciousness creates the result.",
+      "In field language, the electron is described by a quantum field state whose probability amplitude can be localized into a wave packet; tighter localization requires a broader spread of momentum components, which is why the calculator result leads to a minimum kinetic-energy scale.",
     ].join("\n");
   }
   if (answerKind === "root_evaluation_chain") {

@@ -179,6 +179,14 @@ describe("Helix Ask workstation tool planner", () => {
     expect(extractCalculatorExpression("Use calculator what is the mass of 2 kg in this example")).toBeNull();
   });
 
+  it("extracts uncertainty calculator expressions instead of prose formula tails", () => {
+    const prompt =
+      "Use the calculator panel to help answer this. Model a simple quantum wave packet with uncertainty relation dx dp >= hbar/2. Let dx = 2.0e-10 m. Calculate the minimum dp, then estimate minimum kinetic energy p^2/(2*m_e) in joules and eV.";
+
+    expect(extractCalculatorExpression(prompt)).toBe("1.054571817e-34/(2*2.0e-10)");
+    expect(extractCalculatorExpression(prompt)).not.toContain("then estimate");
+  });
+
   it("does not force calculator for conceptual no-numeric physics explanations", () => {
     const prompt =
       "Explain why kinetic energy depends on velocity squared instead of velocity directly. I want a conceptual explanation connected to work, force over distance, and what changes when speed doubles. Do not calculate a specific numeric case unless it helps the explanation.";

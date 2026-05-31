@@ -17,7 +17,9 @@ It must not secretly tell Helix Ask what to say.
 - Route lifecycle receipts for death, stale-route, and End-to-Overworld completion
 - Ask evidence-pack safety filtering
 - Schema-allowlisted Ask evidence filtering for route objective, rehearsal, drift, lifecycle, visual, and thin cross-domain evidence contracts
+- Schema-allowlisted Ask evidence filtering for environment snapshots, route-state pointers, chunk/local cells, container memory, and risk/resource ledgers
 - Operator referral isolation
+- D.O.T/operator referral enrichment for player death, stale route, missing gateway/home evidence, void-risk routes, low confidence, identity binding, and wrong-direction drift
 - Ambient transcript does not create Ask turns
 - Route drift contains no `surface_text`
 - Recommendation remains policy-gated
@@ -37,7 +39,9 @@ It must not secretly tell Helix Ask what to say.
 - Live-loop safety validator
 - Poisoning regression tests
 - Ask-pack sanitizer coverage for route lifecycle receipts
+- Ask-pack sanitizer coverage for environment state snapshots, container memory, and risk/resource ledgers
 - World-event ingest wiring for risk/resource ledger updates
+- Minecraft route-assist referral reason selection with operator-only Ask policy
 
 ## Not Implemented Yet
 

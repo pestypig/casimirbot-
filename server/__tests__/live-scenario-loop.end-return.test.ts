@@ -126,6 +126,15 @@ describe("live scenario loop End-return evidence integration", () => {
       route_lifecycle_status: "stale",
       route_intent_status: "cancelled",
     });
+    expect(result.referral).toMatchObject({
+      referral_type: "minecraft_route_assist",
+      reason_code: "player_death_route_invalidated",
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "operator_referral",
+      creates_ask_turn: false,
+      turn_triggered: false,
+    });
     expect(result.ask_pack.items).toEqual(expect.arrayContaining([
       expect.objectContaining({
         schema: "helix.minecraft_route_lifecycle_receipt.v1",

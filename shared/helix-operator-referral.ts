@@ -105,7 +105,10 @@ export function buildMinecraftRouteAssistReferral(
       | "return_route_unknown_gateway"
       | "void_risk_on_route"
       | "identity_binding_missing"
-      | "home_binding_missing";
+      | "home_binding_missing"
+      | "stale_route_objective"
+      | "player_death_route_invalidated"
+      | "route_confidence_low";
     operator_action?: OperatorAction;
   },
 ): HelixOperatorReferral {

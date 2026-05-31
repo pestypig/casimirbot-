@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
 import { z } from "zod";
 import type { HelixWorldEvent } from "@shared/helix-world-event";
+import type {
+  EnvironmentCellSummary,
+  EnvironmentPosition,
+  HelixEnvironmentStateSnapshot,
+} from "@shared/helix-environment-state-snapshot";
 import {
   HELIX_SITUATION_GOAL_HYPOTHESIS_SCHEMA,
   HELIX_SITUATION_INTERJECTION_PROPOSAL_SCHEMA,
@@ -379,6 +384,61 @@ const readString = (value: unknown, key: string): string | null => {
 
 const readBooleanMeta = (event: HelixWorldEvent, key: string): boolean =>
   Boolean(event.meta && typeof event.meta === "object" && event.meta[key] === true);
+
+const cellHasTag = (cell: EnvironmentCellSummary, pattern: RegExp): boolean =>
+  (cell.tags ?? []).some((tag) => pattern.test(tag)) || pattern.test(cell.cell_type);
+
+const distanceToSegment2d = (
+  point: EnvironmentPosition,
+  start: EnvironmentPosition,
+  end: { x?: number | null; z?: number | null },
+): number => {
+  if (end.x === undefined || end.x === null || end.z === undefined || end.z === null) return Number.POSITIVE_INFINITY;
+  const px = point.x;
+  const pz = point.z ?? 0;
+  const sx = start.x;
+  const sz = start.z ?? 0;
+  const ex = end.x;
+  const ez = end.z;
+  const dx = ex - sx;
+  const dz = ez - sz;
+  const len2 = dx * dx + dz * dz;
+  if (len2 === 0) return Math.hypot(px - sx, pz - sz);
+  const t = Math.max(0, Math.min(1, ((px - sx) * dx + (pz - sz) * dz) / len2));
+  return Math.hypot(px - (sx + t * dx), pz - (sz + t * dz));
+};
+
+const enrichChunkSummaryForRouteCorridor = (
+  snapshot: HelixEnvironmentStateSnapshot,
+  navigation: ReturnType<typeof queryMinecraftNavigationState>,
+): HelixEnvironmentStateSnapshot => {
+  const summary = snapshot.chunk_snapshot_summary;
+  const surfaceCells = summary?.surface_cells ?? [];
+  if (!summary || surfaceCells.length === 0) return snapshot;
+
+  const start = snapshot.actor_state?.pose?.position;
+  const waypoint = navigation.latest_rehearsal?.candidate_next_waypoint ?? null;
+  const routeCorridorCells = start && waypoint
+    ? surfaceCells.filter((cell) =>
+        cell.position && distanceToSegment2d(cell.position, start, waypoint) <= 8,
+      )
+    : [];
+  const corridorOrSurface = routeCorridorCells.length ? routeCorridorCells : surfaceCells;
+  const gatewayBlocks = corridorOrSurface.filter((cell) => cellHasTag(cell, /portal|gateway/i));
+  const bridgeLikeBlocks = corridorOrSurface.filter((cell) => cellHasTag(cell, /bridge_like|traversable/i));
+  const hazardCells = corridorOrSurface.filter((cell) => cellHasTag(cell, /hazard|void|drop_risk|lava/i));
+
+  return {
+    ...snapshot,
+    chunk_snapshot_summary: {
+      ...summary,
+      route_corridor_cells: routeCorridorCells,
+      gateway_blocks: gatewayBlocks,
+      bridge_like_blocks: bridgeLikeBlocks,
+      hazard_cells: hazardCells,
+    },
+  };
+};
 
 export type ResetWorldEventIngestStateOptions = {
   preserveEventJournal?: boolean;
@@ -1204,7 +1264,7 @@ export const ingestWorldEvent = async (
       actorLabel: environmentStateSnapshot.actor_label ?? event.actor_label ?? null,
       limit: 1,
     });
-    const enrichedSnapshot = navigationQuery.navigation_state
+    const routeStateSnapshot = navigationQuery.navigation_state
       ? {
           ...environmentStateSnapshot,
           route_state: {
@@ -1224,6 +1284,7 @@ export const ingestWorldEvent = async (
           },
         }
       : environmentStateSnapshot;
+    const enrichedSnapshot = enrichChunkSummaryForRouteCorridor(routeStateSnapshot, navigationQuery);
     ingestEnvironmentStateSnapshot(enrichedSnapshot);
     environmentRiskResourceLedger = updateEnvironmentRiskResourceLedgerFromSnapshot(enrichedSnapshot);
   }

@@ -93,6 +93,31 @@ describe("Helix Ask calculator compound chain", () => {
     expect(chain?.answer_text).toContain("Ratio: 4.");
   });
 
+  it("chains uncertainty momentum and electron kinetic-energy estimates", () => {
+    const chain = runCalculatorCompoundChain({
+      prompt:
+        "Use the calculator panel to solve this uncertainty relation. Let dx = 2.0e-10 m. Calculate minimum dp from dx dp >= hbar/2, then estimate electron kinetic energy p^2/(2*m_e) in joules and eV.",
+      threadId: "thread:test",
+      turnId: "turn:test",
+    });
+
+    expect(chain).not.toBeNull();
+    expect(chain?.plan.subgoals.map((subgoal) => subgoal.id)).toEqual([
+      "minimum_momentum_uncertainty",
+      "minimum_kinetic_energy_j",
+      "minimum_kinetic_energy_ev",
+    ]);
+    expect(chain?.plan.subgoals.map((subgoal) => subgoal.expression)).toEqual([
+      "1.054571817e-34/(2*2e-10)",
+      expect.stringContaining("^2/(2*9.1093837015e-31)"),
+      expect.stringContaining("/1.602176634e-19"),
+    ]);
+    expect(chain?.validations.every((validation) => validation.satisfied)).toBe(true);
+    expect(chain?.answer_text).toContain("Minimum momentum uncertainty:");
+    expect(chain?.answer_text).toContain("Minimum kinetic energy:");
+    expect(chain?.answer_text).toContain("Delta x Delta p >= hbar/2");
+  });
+
   it("normalizes spoken quadratic wording before planning dependent evaluations", () => {
     const chain = runCalculatorCompoundChain({
       prompt: "Solve x squared minus 4 equals 0 then use scientific calculator to evaluate x squared plus 3 for each root",

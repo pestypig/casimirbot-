@@ -154,6 +154,43 @@ describe("Minecraft plugin snapshot normalizer", () => {
               sensor_scope: "sensor_observable",
             },
           ],
+          route_corridor_cells: [
+            {
+              cell_ref: "chunk_cell:minecraft:the_end:16:64:16",
+              cell_type: "minecraft:cobblestone",
+              position: { x: 16, y: 64, z: 16 },
+              tags: ["chunk_surface_sample", "route_corridor", "bridge_like", "traversable"],
+              state: { bridge_like: true },
+              sensor_scope: "sensor_observable",
+            },
+          ],
+          gateway_blocks: [
+            {
+              cell_ref: "chunk_cell:minecraft:the_end:20:75:20",
+              cell_type: "minecraft:end_gateway",
+              position: { x: 20, y: 75, z: 20 },
+              tags: ["portal_or_gateway"],
+              sensor_scope: "sensor_observable",
+            },
+          ],
+          bridge_like_blocks: [
+            {
+              cell_ref: "chunk_cell:minecraft:the_end:16:64:16",
+              cell_type: "minecraft:cobblestone",
+              position: { x: 16, y: 64, z: 16 },
+              tags: ["bridge_like"],
+              sensor_scope: "sensor_observable",
+            },
+          ],
+          hazard_cells: [
+            {
+              cell_ref: "chunk_cell:minecraft:the_end:18:64:18",
+              cell_type: "minecraft:air",
+              position: { x: 18, y: 64, z: 18 },
+              tags: ["void_or_drop_risk"],
+              sensor_scope: "sensor_observable",
+            },
+          ],
           map_hash: "chunk-hash",
           changed_since_last_snapshot: true,
           evidence_trust: "server_observation",
@@ -173,6 +210,10 @@ describe("Minecraft plugin snapshot normalizer", () => {
     expect(summary?.raw_chunk_included).toBe(false);
     expect(cell?.tags).toContain("bridge_like");
     expect(cell?.state?.surface_type).toBe("minecraft:end_stone");
+    expect(summary?.route_corridor_cells?.[0]?.tags).toContain("route_corridor");
+    expect(summary?.gateway_blocks?.[0]?.cell_type).toBe("minecraft:end_gateway");
+    expect(summary?.bridge_like_blocks?.[0]?.cell_type).toBe("minecraft:cobblestone");
+    expect(summary?.hazard_cells?.[0]?.tags).toContain("void_or_drop_risk");
 
     const affordances = reduceEnvironmentAffordances(snapshot!);
     expect(affordances.traversable).toContain("minecraft:end_stone");

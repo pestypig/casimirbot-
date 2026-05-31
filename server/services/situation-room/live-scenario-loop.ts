@@ -177,6 +177,7 @@ export function runLiveScenarioLoop(input: {
           objective,
           rehearsal,
           drift,
+          lifecycle_receipts: lifecycleReceipts,
           salience_decision_id: "loop_salience",
         })
       : null;

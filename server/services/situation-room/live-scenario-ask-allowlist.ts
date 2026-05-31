@@ -37,6 +37,9 @@ export const ASK_EVIDENCE_SCHEMA_ALLOWLIST: Record<string, AskEvidenceSanitizer>
   "helix.minecraft_route_drift_event.v1": sanitizeMinecraftRouteDriftEvent,
   "helix.minecraft_route_lifecycle_receipt.v1": sanitizeMinecraftRouteLifecycleReceipt,
   "helix.minecraft_visual_observation.v1": sanitizeMinecraftVisualObservation,
+  "helix.environment_state_snapshot.v1": sanitizeEnvironmentStateSnapshot,
+  "helix.environment_memory_ledger.v1": sanitizeEnvironmentMemoryLedger,
+  "helix.environment_risk_resource_ledger.v1": sanitizeEnvironmentRiskResourceLedger,
   "helix.live_translation_turn.v1": sanitizeLiveTranslationTurn,
   "helix.browser_claim_evidence.v1": sanitizeBrowserClaimEvidence,
   "helix.workstation_process_evidence.v1": sanitizeWorkstationProcessEvidence,
@@ -219,6 +222,105 @@ function sanitizeMinecraftVisualObservation(input: unknown): SanitizedAskEvidenc
   });
 }
 
+function sanitizeEnvironmentStateSnapshot(input: unknown): SanitizedAskEvidenceItem | null {
+  if (!hasSafeEnvironmentSnapshotEnvelope(input)) {
+    return null;
+  }
+
+  const itemId = readStringField(input, "snapshot_id");
+  if (!itemId) {
+    return null;
+  }
+
+  const localMap = readPlainObject(input, "local_map");
+  const chunkSummary = readPlainObject(input, "chunk_snapshot_summary");
+
+  return sanitizedItem(input, {
+    item_id: itemId,
+    scenario_kind: readStringField(input, "domain") === "minecraft"
+      ? "minecraft_route_monitor"
+      : "support_procedure_monitor",
+    fields: {
+      domain: readStringField(input, "domain"),
+      domain_adapter: readStringField(input, "domain_adapter"),
+      room_id: readStringField(input, "room_id"),
+      world_id: readStringField(input, "world_id"),
+      source_id: readStringField(input, "source_id"),
+      actor_label: readStringField(input, "actor_label"),
+      ts: readStringField(input, "ts"),
+      route_state: sanitizeRouteState(readPlainObject(input, "route_state")),
+      local_map: localMap
+        ? {
+            radius: readNumberField(localMap, "radius"),
+            sensor_scope: readStringField(localMap, "sensor_scope"),
+            salient_cells: sanitizeEnvironmentCells(readArrayFromRecord(localMap, "salient_cells")),
+          }
+        : null,
+      chunk_snapshot_summary: chunkSummary
+        ? {
+            sampled_radius_chunks: readNumberField(chunkSummary, "sampled_radius_chunks"),
+            loaded_chunks_sampled: readNumberField(chunkSummary, "loaded_chunks_sampled"),
+            sensor_scope: readStringField(chunkSummary, "sensor_scope"),
+            surface_cells: sanitizeEnvironmentCells(readArrayFromRecord(chunkSummary, "surface_cells")),
+            route_corridor_cells: sanitizeEnvironmentCells(readArrayFromRecord(chunkSummary, "route_corridor_cells")),
+            gateway_blocks: sanitizeEnvironmentCells(readArrayFromRecord(chunkSummary, "gateway_blocks")),
+            bridge_like_blocks: sanitizeEnvironmentCells(readArrayFromRecord(chunkSummary, "bridge_like_blocks")),
+            hazard_cells: sanitizeEnvironmentCells(readArrayFromRecord(chunkSummary, "hazard_cells")),
+            evidence_trust: readStringField(chunkSummary, "evidence_trust"),
+            instruction_authority: readStringField(chunkSummary, "instruction_authority"),
+            ask_context_policy: readStringField(chunkSummary, "ask_context_policy"),
+          }
+        : null,
+    },
+  });
+}
+
+function sanitizeEnvironmentMemoryLedger(input: unknown): SanitizedAskEvidenceItem | null {
+  if (!hasSafeLedgerEnvelope(input)) {
+    return null;
+  }
+
+  const roomId = readStringField(input, "room_id");
+  if (!roomId) {
+    return null;
+  }
+
+  return sanitizedItem(input, {
+    item_id: `environment_memory_ledger:${roomId}:${readStringField(input, "updated_at") ?? "unknown"}`,
+    scenario_kind: "minecraft_route_monitor",
+    fields: {
+      room_id: roomId,
+      world_id: readStringField(input, "world_id"),
+      updated_at: readStringField(input, "updated_at"),
+      known_containers: sanitizeContainerMemoryEntries(readArrayField(input, "known_containers")),
+    },
+  });
+}
+
+function sanitizeEnvironmentRiskResourceLedger(input: unknown): SanitizedAskEvidenceItem | null {
+  if (!hasSafeLedgerEnvelope(input)) {
+    return null;
+  }
+
+  const roomId = readStringField(input, "room_id");
+  if (!roomId) {
+    return null;
+  }
+
+  return sanitizedItem(input, {
+    item_id: `environment_risk_resource_ledger:${roomId}:${readStringField(input, "updated_at") ?? "unknown"}`,
+    scenario_kind: "minecraft_route_monitor",
+    fields: {
+      room_id: roomId,
+      world_id: readStringField(input, "world_id"),
+      updated_at: readStringField(input, "updated_at"),
+      known_hazards: sanitizeHazardEntries(readArrayField(input, "known_hazards")),
+      known_resources: sanitizeResourceEntries(readArrayField(input, "known_resources")),
+      inventory_transitions: sanitizeInventoryTransitionEntries(readArrayField(input, "inventory_transitions")),
+    },
+  });
+}
+
 function sanitizeLiveTranslationTurn(input: unknown): SanitizedAskEvidenceItem | null {
   if (!hasSafeEnvelope(input)) {
     return null;
@@ -365,6 +467,43 @@ function hasSafeEnvelope(input: unknown): boolean {
   );
 }
 
+function hasSafeLedgerEnvelope(input: unknown): boolean {
+  if (!isPlainObject(input)) {
+    return false;
+  }
+
+  return (
+    input.assistant_answer === false &&
+    input.raw_content_included === false &&
+    input.context_policy === "compact_context_pack_only" &&
+    rawIncludedIsFalse(input, "raw_transcript_included") &&
+    rawIncludedIsFalse(input, "raw_image_included") &&
+    rawIncludedIsFalse(input, "raw_audio_included") &&
+    rawIncludedIsFalse(input, "raw_logs_included") &&
+    rawIncludedIsFalse(input, "raw_user_text_included")
+  );
+}
+
+function hasSafeEnvironmentSnapshotEnvelope(input: unknown): boolean {
+  if (!isPlainObject(input)) {
+    return false;
+  }
+  const minecraft = readPlainObject(readPlainObject(input, "domain_specific"), "minecraft");
+  return (
+    input.assistant_answer === false &&
+    input.model_invoked === false &&
+    input.raw_payload_included === false &&
+    input.context_policy === "compact_context_pack_only" &&
+    rawIncludedIsFalse(input, "raw_content_included") &&
+    rawIncludedIsFalse(input, "raw_transcript_included") &&
+    rawIncludedIsFalse(input, "raw_image_included") &&
+    rawIncludedIsFalse(input, "raw_audio_included") &&
+    rawIncludedIsFalse(input, "raw_logs_included") &&
+    rawIncludedIsFalse(input, "raw_user_text_included") &&
+    minecraft?.raw_nbt_included !== true
+  );
+}
+
 function rawIncludedIsFalse(input: Record<string, unknown>, field: string): boolean {
   return input[field] === undefined || input[field] === false;
 }
@@ -437,6 +576,163 @@ function sanitizeVisualFacts(value: unknown[]): unknown[] {
         "y",
         "z",
         "confidence",
+      ]),
+    );
+}
+
+function sanitizeRouteState(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!value) return null;
+  if (
+    value.instruction_authority !== undefined &&
+    value.instruction_authority !== "none"
+  ) return null;
+  return sanitizePlainFields(value, [
+    "active_objective_id",
+    "latest_rehearsal_id",
+    "latest_drift_event_id",
+    "route_status",
+    "policy_surface_status",
+    "latest_lifecycle_receipt_id",
+    "route_lifecycle_status",
+    "route_intent_status",
+    "current_stage_label",
+    "updated_at",
+    "instruction_authority",
+    "ask_context_policy",
+    "raw_content_included",
+  ]);
+}
+
+function sanitizeEnvironmentCells(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .slice(0, 96)
+    .map((entry) => ({
+      ...sanitizePlainFields(entry, [
+        "cell_ref",
+        "cell_type",
+        "tags",
+        "sensor_scope",
+      ]),
+      position: sanitizePosition(readPlainObject(entry, "position")),
+    }));
+}
+
+function sanitizePosition(value: Record<string, unknown> | null): Record<string, unknown> | null {
+  return sanitizePlainFields(value, ["x", "y", "z"]);
+}
+
+function sanitizeContainerMemoryEntries(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .filter((entry) =>
+      entry.instruction_authority === "none" &&
+      entry.ask_context_policy === "evidence_only" &&
+      entry.raw_content_included === false
+    )
+    .map((entry) => ({
+      ...sanitizePlainFields(entry, [
+        "container_ref",
+        "container_type",
+        "contents_known",
+        "contents_hash",
+        "last_verified_at",
+        "sensor_scope",
+        "requires_caveat",
+        "first_seen_at",
+        "last_seen_at",
+        "contents_last_verified_at",
+        "memory_status",
+      ]),
+      contents_summary: sanitizeItemSummaries(readArrayFromRecord(entry, "contents_summary")),
+    }));
+}
+
+function sanitizeHazardEntries(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .filter((entry) =>
+      entry.instruction_authority === "none" &&
+      entry.ask_context_policy === "evidence_only" &&
+      entry.raw_content_included === false
+    )
+    .map((entry) =>
+      sanitizePlainFields(entry, [
+        "hazard_ref",
+        "hazard_type",
+        "severity",
+        "sensor_scope",
+        "first_seen_at",
+        "last_seen_at",
+        "observation_count",
+        "peak_severity",
+      ]),
+    );
+}
+
+function sanitizeResourceEntries(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .filter((entry) =>
+      entry.instruction_authority === "none" &&
+      entry.ask_context_policy === "evidence_only" &&
+      entry.raw_content_included === false
+    )
+    .map((entry) =>
+      sanitizePlainFields(entry, [
+        "resource_ref",
+        "resource_type",
+        "state",
+        "amount",
+        "sensor_scope",
+        "first_seen_at",
+        "last_seen_at",
+        "observation_count",
+        "last_known_state",
+      ]),
+    );
+}
+
+function sanitizeInventoryTransitionEntries(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .filter((entry) =>
+      entry.instruction_authority === "none" &&
+      entry.ask_context_policy === "evidence_only" &&
+      entry.creates_ask_turn === false &&
+      entry.turn_triggered === false &&
+      entry.raw_user_text_included === false &&
+      entry.raw_content_included === false
+    )
+    .map((entry) =>
+      sanitizePlainFields(entry, [
+        "transition_id",
+        "event_type",
+        "room_id",
+        "world_id",
+        "actor_id",
+        "actor_label",
+        "item_type",
+        "count",
+        "container_ref",
+        "container_type",
+        "status",
+        "ts",
+      ]),
+    );
+}
+
+function sanitizeItemSummaries(value: unknown[]): unknown[] {
+  return value
+    .filter(isPlainObject)
+    .map((entry) =>
+      sanitizePlainFields(entry, [
+        "item_ref",
+        "item_type",
+        "count",
+        "slot",
+        "display_name",
+        "sensor_scope",
       ]),
     );
 }
@@ -518,6 +814,11 @@ function readArrayField(input: unknown, field: string): unknown[] {
     return [];
   }
 
+  const value = input[field];
+  return Array.isArray(value) ? value : [];
+}
+
+function readArrayFromRecord(input: Record<string, unknown>, field: string): unknown[] {
   const value = input[field];
   return Array.isArray(value) ? value : [];
 }

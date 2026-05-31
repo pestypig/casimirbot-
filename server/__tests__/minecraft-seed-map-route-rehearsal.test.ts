@@ -23,6 +23,8 @@ import {
   ingestWorldEvent,
   resetWorldEventIngestState,
 } from "../services/situation-room/world-event-ingest";
+import { getLatestEnvironmentStateSnapshot } from "../services/situation-room/environment-state-snapshot-window";
+import { recordMinecraftNavigationEvidence } from "../services/situation-room/minecraft-navigation-state-store";
 import { resetSituationThreadBindings } from "../services/situation-room/thread-binding-store";
 
 const locationEvent = (): HelixWorldEvent => ({
@@ -230,6 +232,155 @@ describe("Minecraft seed map route rehearsal", () => {
       creates_ask_turn: false,
       turn_triggered: false,
     });
+  });
+
+  it("derives route-corridor chunk facts from active navigation state", async () => {
+    recordMinecraftNavigationEvidence({
+      routeRehearsal: {
+        schema: "helix.minecraft_route_rehearsal.v1",
+        rehearsal_id: "route_rehearsal:corridor",
+        objective_id: "objective:corridor",
+        room_id: "room:minecraft-seed-map",
+        world_id: "minecraft:seeded-local",
+        actor_label: "DatDamPig",
+        route_kind: "return_home_from_end",
+        from: { dimension: "minecraft:overworld", x: 0, y: 68, z: 0 },
+        to: { x: 20, y: 68, z: 20 },
+        target_label: "gateway candidate",
+        target_claim: null,
+        route_summary: "Candidate route",
+        steps: [],
+        stages: [],
+        candidate_next_waypoint: {
+          label: "gateway candidate",
+          dimension: "minecraft:overworld",
+          x: 20,
+          y: 68,
+          z: 20,
+          confidence: 0.7,
+        },
+        route_confidence: 0.7,
+        reachable_confidence: 0.7,
+        route_basis: ["observed_current_world"],
+        missing_evidence: [],
+        evidence_refs: ["route:corridor"],
+        evidence_trust: "route_math",
+        instruction_authority: "none",
+        ask_context_policy: "evidence_only",
+        creates_ask_turn: false,
+        turn_triggered: false,
+        ask_instruction_authority: "none",
+        context_role: "tool_evidence",
+        raw_user_text_included: false,
+        derived_by_deterministic_reducer: true,
+        normalized_by_deterministic_reducer: true,
+        deterministic: true,
+        model_invoked: false,
+        model_invoked_by_helix: false,
+        raw_logs_included: false,
+        context_policy: "compact_context_pack_only",
+        ts: "2026-05-20T12:00:00.000Z",
+      } as any,
+      now: "2026-05-20T12:00:00.000Z",
+    });
+
+    await ingestWorldEvent({
+      schema: "helix.world_event.v1",
+      world_id: "minecraft:seeded-local",
+      room_id: "room:minecraft-seed-map",
+      source_id: "source:minecraft-server",
+      ts: "2026-05-20T12:00:01.000Z",
+      actor_id: "player:datdampig",
+      actor_label: "DatDamPig",
+      event_type: "environment_state_snapshot",
+      evidence_refs: ["mc:event:environment-snapshot"],
+      meta: {
+        snapshot: {
+          schema: "helix.environment_state_snapshot.v1",
+          snapshot_id: "environment_snapshot:route-corridor",
+          domain: "minecraft",
+          domain_adapter: "minecraft.paper_plugin.v1",
+          room_id: "room:minecraft-seed-map",
+          world_id: "minecraft:seeded-local",
+          source_id: "source:minecraft-server",
+          actor_id: "player:datdampig",
+          actor_label: "DatDamPig",
+          ts: "2026-05-20T12:00:01.000Z",
+          actor_state: {
+            sensor_scope: "player_observable",
+            pose: {
+              position: { x: 0, y: 68, z: 0 },
+              yaw: 0,
+              pitch: 0,
+              facing: "south",
+            },
+          },
+          chunk_snapshot_summary: {
+            sensor_scope: "sensor_observable",
+            sampled_radius_chunks: 1,
+            loaded_chunks_sampled: 1,
+            surface_cells: [
+              {
+                cell_ref: "chunk_cell:minecraft:overworld:8:68:8",
+                cell_type: "minecraft:cobblestone",
+                position: { x: 8, y: 68, z: 8 },
+                tags: ["chunk_surface_sample", "traversable", "bridge_like"],
+                sensor_scope: "sensor_observable",
+              },
+              {
+                cell_ref: "chunk_cell:minecraft:overworld:16:68:16",
+                cell_type: "minecraft:end_gateway",
+                position: { x: 16, y: 68, z: 16 },
+                tags: ["portal_or_gateway"],
+                sensor_scope: "sensor_observable",
+              },
+              {
+                cell_ref: "chunk_cell:minecraft:overworld:20:68:18",
+                cell_type: "minecraft:air",
+                position: { x: 20, y: 68, z: 18 },
+                tags: ["void_or_drop_risk"],
+                sensor_scope: "sensor_observable",
+              },
+              {
+                cell_ref: "chunk_cell:minecraft:overworld:80:68:-80",
+                cell_type: "minecraft:dirt",
+                position: { x: 80, y: 68, z: -80 },
+                tags: ["traversable"],
+                sensor_scope: "sensor_observable",
+              },
+            ],
+            map_hash: "chunk-hash",
+            changed_since_last_snapshot: true,
+            evidence_trust: "server_observation",
+            instruction_authority: "none",
+            ask_context_policy: "evidence_only",
+            raw_chunk_included: false,
+          },
+          section_hashes: {},
+          changed_sections: ["chunk_snapshot_summary"],
+          domain_specific: { minecraft: { raw_nbt_included: false } },
+          evidence_refs: ["snapshot:route-corridor"],
+          deterministic: true,
+          model_invoked: false,
+          assistant_answer: false,
+          raw_payload_included: false,
+          context_policy: "compact_context_pack_only",
+        },
+      },
+    }, { appendToThread: false });
+
+    const latest = getLatestEnvironmentStateSnapshot("room:minecraft-seed-map");
+    const summary = latest?.chunk_snapshot_summary;
+
+    expect(summary?.route_corridor_cells?.map((cell) => cell.cell_ref)).toEqual(expect.arrayContaining([
+      "chunk_cell:minecraft:overworld:8:68:8",
+      "chunk_cell:minecraft:overworld:16:68:16",
+      "chunk_cell:minecraft:overworld:20:68:18",
+    ]));
+    expect(summary?.route_corridor_cells?.map((cell) => cell.cell_ref)).not.toContain("chunk_cell:minecraft:overworld:80:68:-80");
+    expect(summary?.gateway_blocks?.[0]?.cell_type).toBe("minecraft:end_gateway");
+    expect(summary?.bridge_like_blocks?.some((cell) => cell.cell_type === "minecraft:cobblestone")).toBe(true);
+    expect(summary?.hazard_cells?.some((cell) => cell.cell_type === "minecraft:air")).toBe(true);
   });
 
   it("keeps block delta overlay separate from seed forecasts", () => {

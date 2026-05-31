@@ -107,7 +107,11 @@ const isCapabilityTerminalKind = (terminalArtifactKind: string | null): boolean 
   );
 
 const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
-  if (terminalArtifactKind !== "workstation_tool_evaluation" && terminalArtifactKind !== "tool_evaluation") return false;
+  if (
+    terminalArtifactKind !== "workstation_tool_evaluation" &&
+    terminalArtifactKind !== "tool_evaluation" &&
+    terminalArtifactKind !== "model_synthesized_answer"
+  ) return false;
   const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
   if (
     readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
@@ -118,6 +122,10 @@ const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArti
   const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
   const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
   if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalArtifactKind)) return false;
+  if (
+    terminalArtifactKind === "model_synthesized_answer" &&
+    !requiredTerminalKinds.includes("workstation_tool_evaluation")
+  ) return false;
   const observationReview = readRecord(payload.observation_review);
   if (observationReview && readBoolean(observationReview.does_it_satisfy_goal) !== true) return false;
   return readArray(payload.current_turn_artifact_ledger).some((entry) => {

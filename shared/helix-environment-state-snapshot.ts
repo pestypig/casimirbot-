@@ -152,6 +152,10 @@ export type HelixEnvironmentStateSnapshot = {
     sampled_radius_chunks?: number | null;
     loaded_chunks_sampled?: number | null;
     surface_cells?: EnvironmentCellSummary[];
+    route_corridor_cells?: EnvironmentCellSummary[];
+    gateway_blocks?: EnvironmentCellSummary[];
+    bridge_like_blocks?: EnvironmentCellSummary[];
+    hazard_cells?: EnvironmentCellSummary[];
     map_hash?: string | null;
     changed_since_last_snapshot?: boolean;
     evidence_trust?: "server_observation" | string;
