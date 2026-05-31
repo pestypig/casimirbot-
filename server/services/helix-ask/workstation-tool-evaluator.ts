@@ -26,9 +26,40 @@ function getString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function getBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 function includesExpected(value: string | null, expected: string | null | undefined): boolean {
   if (!value || !expected) return false;
   return value.toLowerCase().includes(expected.toLowerCase());
+}
+
+const THEORY_REFLECTION_FORBIDDEN_PATTERNS = [
+  /validated propulsion/i,
+  /working warp drive/i,
+  /physical mechanism confirmed/i,
+  /QEI passed/i,
+  /proven warp/i,
+  /certified transport solution/i,
+];
+
+function containsForbiddenTheoryReflectionClaim(value: unknown): boolean {
+  const text = JSON.stringify(value ?? "");
+  return THEORY_REFLECTION_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function theoryReflectionAuthorityIssues(artifact: Record<string, unknown>): string[] {
+  const artifactV1 = asRecord(artifact.artifact_v1);
+  const authoritySources = [artifact, artifactV1].filter(Boolean) as Record<string, unknown>[];
+  const issues: string[] = [];
+  for (const source of authoritySources) {
+    if (getBoolean(source.assistant_answer) !== false) issues.push("assistant_answer_not_false");
+    if (getBoolean(source.raw_content_included) !== false) issues.push("raw_content_included_not_false");
+    if (getBoolean(source.terminal_eligible) !== false) issues.push("terminal_eligible_not_false");
+  }
+  if (containsForbiddenTheoryReflectionClaim(artifact)) issues.push("forbidden_claim_phrase");
+  return Array.from(new Set(issues));
 }
 
 export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolReceiptInput): WorkstationToolEvaluation {
@@ -75,6 +106,20 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
         nextActions > 0
           ? "Physics context plan located theory badges and proposed follow-up workstation actions."
           : "Physics context plan located theory badges and claim boundaries.";
+    } else if (kind === "theory_context_reflection") {
+      const theoryArtifact = artifact ?? {};
+      const issues = theoryReflectionAuthorityIssues(theoryArtifact);
+      if (issues.length > 0) {
+        result = "insufficient";
+        summary = `Theory context reflection rejected as terminal evidence: ${issues.join(", ")}.`;
+      } else {
+        const evidenceForAsk = asRecord(theoryArtifact.evidence_for_ask) ?? asRecord(asRecord(theoryArtifact.artifact_v1)?.evidenceForAsk);
+        const reflectionSummary = getString(evidenceForAsk?.summary);
+        result = "supports_subgoal";
+        summary = reflectionSummary
+          ? `Theory reflection located discussion context as evidence only: ${reflectionSummary}`
+          : "Theory reflection located discussion context as evidence only.";
+      }
     } else if (kind === "theory_badge_locator") {
       result = "supports_subgoal";
       summary = "Theory locator matched relevant badges and claim boundaries.";

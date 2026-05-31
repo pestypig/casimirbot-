@@ -320,6 +320,81 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan).toBeNull();
   });
 
+  it("admits theory context reflection for energy-frequency theory graph prompts", () => {
+    const plan = planWorkstationToolUse("Where does E=hf fit in the theory graph?");
+
+    expect(plan.intent).toBe("theory_context_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.reason).toBe(
+      "Prompt discusses mapped theory/physics concepts; reflect discussion context as evidence before final answer.",
+    );
+    expect(plan.action).toEqual({
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+      args: expect.objectContaining({
+        prompt: "Where does E=hf fit in the theory graph?",
+        overlay: true,
+        open_panel: true,
+      }),
+    });
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "open_theory_badge_graph",
+      "reflect_discussion_context",
+      "evaluate_theory_context_reflection",
+    ]);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_discussion_context");
+    expect(reflectStep).toEqual(expect.objectContaining({
+      expected_receipt_kind: "theory_context_reflection",
+      expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+    }));
+    expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
+      kind: "evaluate_result",
+      depends_on: ["reflect_discussion_context"],
+    }));
+  });
+
+  it("admits theory context reflection for source residual and QEI mapping prompts", () => {
+    const plan = planWorkstationToolUse("Map source residual and QEI margin on the badge graph.");
+
+    expect(plan.intent).toBe("theory_context_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toEqual(expect.objectContaining({
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+    }));
+  });
+
+  it("does not admit theory reflection for pure arithmetic", () => {
+    const plan = planWorkstationToolUse("Calculate 2+2");
+
+    expect(plan.intent).toBe("calculator_solve");
+    expect(plan.action).toEqual(expect.objectContaining({
+      panel_id: "scientific-calculator",
+    }));
+    expect(plan.action?.action_id).not.toBe("reflect_discussion_context");
+  });
+
+  it("keeps concrete photon energy calculations on the calculator route", () => {
+    const plan = planWorkstationToolUse("Calculate photon energy for f=5e14 Hz.");
+
+    expect(plan.intent).toBe("calculator_solve");
+    expect(plan.action).toEqual(expect.objectContaining({
+      panel_id: "scientific-calculator",
+      action_id: "solve_expression",
+    }));
+    expect(plan.action?.args).toEqual(expect.objectContaining({
+      latex: "6.62607015e-34*5e14",
+    }));
+  });
+
+  it("honors explicit requests not to open tools for theory prompts", () => {
+    const plan = planWorkstationToolUse("Do not open panels or tools; where does QEI fit in the theory graph?");
+
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.action).toBeNull();
+  });
+
   it("routes motive/Zen comparisons through mission ethos affordances", () => {
     const plan = planWorkstationToolUse("Compare this motive to Zen: I am gathering resources to survive.");
 

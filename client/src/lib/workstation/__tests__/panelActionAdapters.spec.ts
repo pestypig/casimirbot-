@@ -15,6 +15,8 @@ import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelS
 import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
+import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
+import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -1754,6 +1756,105 @@ describe("panelActionAdapters", () => {
       expect(useTheoryMapOverlayStore.getState().rippleBadgeIds).toContain("nhm2.qei.sampling_window");
     expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
   });
+
+    it("reflects discussion context as non-terminal tool evidence", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: {
+            prompt: "Discuss Einstein tensor source residual and QEI margin.",
+            conversation_context: "We are setting up a diagnostic NHM2 warp-bubble demo.",
+            mentioned_equations: [
+              "R_source = source_required - source_available",
+              "qei_margin = qei_bound - qei_sample",
+            ],
+            mentioned_symbols: ["G_mu_nu", "R_source", "qei_margin"],
+            mentioned_domains: ["warp_gr_nhm2", "qei_stress_energy"],
+            overlay: true,
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_context_reflection");
+      expect(result.artifact?.schemaVersion).toBe("theory_context_reflection/v1");
+      expect(isTheoryContextReflectionV1(result.artifact?.artifact_v1)).toBe(true);
+      expect(result.artifact).toMatchObject({
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+        panel_generated_answer: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      });
+      expect(result.artifact?.exact_badge_ids).toEqual(
+        expect.arrayContaining(["nhm2.closure.source_residual", "nhm2.qei.sampling_window"]),
+      );
+      expect(useTheoryMapOverlayStore.getState().source).toBe("discussion_reflection");
+      expect(useTheoryMapOverlayStore.getState().softRegions.length).toBeGreaterThan(0);
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
+    });
+
+    it("does not open the theory panel when reflection open_panel is false", () => {
+      const openPanel = vi.fn();
+      const focusPanel = vi.fn();
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: {
+            prompt: "Discuss source residual.",
+            open_panel: false,
+          },
+        },
+        {
+          openPanel,
+          focusPanel,
+          closePanel: () => undefined,
+          openSettings: () => undefined,
+        },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(openPanel).not.toHaveBeenCalled();
+      expect(focusPanel).not.toHaveBeenCalled();
+    });
+
+    it("does not update the overlay store when reflection overlay is false", () => {
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: {
+            prompt: "Discuss source residual.",
+            overlay: false,
+            open_panel: false,
+          },
+        },
+        actionContext(),
+      );
+
+      expect(result.ok).toBe(true);
+      expect(useTheoryMapOverlayStore.getState().source).toBe("none");
+      expect(useTheoryMapOverlayStore.getState().lastReflectionArtifact).toBeNull();
+    });
+
+    it("declares reflect_discussion_context as a low-risk artifact action", () => {
+      const capabilities = WORKSTATION_V1_PANEL_CAPABILITIES["theory-badge-graph"];
+      const action = capabilities.actions.find((candidate) => candidate.id === "reflect_discussion_context");
+
+      expect(action).toMatchObject({
+        title: "Reflect Discussion Context",
+        risk: "low",
+        returns_artifact: true,
+      });
+      expect(capabilities.safe_actions).toContain("reflect_discussion_context");
+      expect(capabilities.returns_artifact_actions).toContain("reflect_discussion_context");
+    });
 
     it("exposes physics atlas blocks and can select the solar lens", () => {
       const atlasResult = executeHelixPanelAction(

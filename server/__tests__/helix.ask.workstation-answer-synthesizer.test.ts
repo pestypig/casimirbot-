@@ -73,4 +73,60 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).toContain("Result: x = -3");
     expect(answer).not.toContain("available in the calculator receipt");
   });
+
+  it("synthesizes a model-authored answer from theory reflection evidence", () => {
+    const prompt = "Where does E=hf fit in the theory graph?";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+    const rawSummary = "The discussion appears near quantum energy and Solar Spectrum.";
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:test",
+        thread_id: "thread:test",
+        tool_receipt_id: "receipt:test",
+        result: "supports_subgoal",
+        summary: `Theory reflection located discussion context as evidence only: ${rawSummary}`,
+        evidence_refs: ["workstation:theory-badge-graph.reflect_discussion_context"],
+        model_invoked: false,
+        deterministic_gate: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(answer).toContain("I located this discussion in the Theory Badge Graph as context evidence.");
+    expect(answer).toContain("The graph reflection suggests:");
+    expect(answer).toContain("This is a context locator, not a solve.");
+    expect(answer).not.toBe(rawSummary);
+  });
+
+  it("keeps calculator numeric authority separate from theory reflection context", () => {
+    const prompt = "Explain photon energy using E=hf and calculate it for f=5e14 Hz.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:test",
+        thread_id: "thread:test",
+        tool_receipt_id: "receipt:test",
+        result: "supports_subgoal",
+        summary: "Theory reflection located discussion context as evidence only: Solar Spectrum context.",
+        evidence_refs: ["workstation:theory-badge-graph.reflect_discussion_context"],
+        model_invoked: false,
+        deterministic_gate: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(answer).toContain("Calculator subgoal");
+    expect(answer).toContain("3.313035e-19 J");
+    expect(answer).not.toContain("Solar Spectrum context");
+  });
 });

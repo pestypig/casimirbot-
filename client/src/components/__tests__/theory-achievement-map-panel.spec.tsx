@@ -10,6 +10,7 @@ import { useTheoryBadgePlaybackStore } from "@/store/useTheoryBadgePlaybackStore
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
+import { buildTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
 
 function renderPanel() {
   const queryClient = new QueryClient({
@@ -42,6 +43,120 @@ afterEach(() => {
 });
 
 describe("TheoryBadgeGraphPanel achievement map", () => {
+  it("renders no discussion soft region when reflection overlay is empty", async () => {
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+    expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
+  });
+
+  it("renders discussion soft region and exact/likely badge markers", async () => {
+    const artifact = buildTheoryContextReflectionV1({
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:map-test",
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        prompt: "Discuss QEI margin and source residual.",
+        conversationContext: null,
+        mentionedEquations: [],
+        mentionedSymbols: ["qei_margin", "R_source"],
+        mentionedDomains: ["warp_gr_nhm2"],
+        source: "helix_ask",
+        confidenceMode: "soft_locator",
+      },
+      exactMatches: [],
+      likelyMatches: [],
+      inferredDomains: [],
+      overlay: {
+        centerBadgeIds: ["nhm2.qei.sampling_window"],
+        highlightedBadgeIds: ["nhm2.qei.sampling_window", "nhm2.closure.source_residual"],
+        highlightedEdgeIds: [],
+        heatByBadgeId: {
+          "nhm2.qei.sampling_window": 1,
+          "nhm2.closure.source_residual": 0.7,
+        },
+        exactBadgeIds: ["nhm2.qei.sampling_window"],
+        likelyBadgeIds: ["nhm2.closure.source_residual"],
+        softRegion: {
+          id: "discussion-zone:map-test",
+          label: "Current discussion zone",
+          badgeIds: ["nhm2.qei.sampling_window", "nhm2.closure.source_residual"],
+          confidence: 0.8,
+          tone: "green",
+          meaning: "discussion_context_not_proof",
+        },
+      },
+      evidenceForAsk: {
+        summary: "The discussion appears near QEI and source residual.",
+        claimBoundaries: ["Diagnostic-only context."],
+        recommendedNextActions: [],
+      },
+    });
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(artifact);
+
+    renderPanel();
+
+    expect(await screen.findByTestId("discussion-soft-region")).toBeTruthy();
+    expect(screen.getByText("Current discussion zone")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "QEI sampling window" })).toHaveAttribute(
+      "data-discussion-match",
+      "exact",
+    );
+    expect(screen.getByRole("button", { name: "Source residual" })).toHaveAttribute(
+      "data-discussion-match",
+      "likely",
+    );
+  });
+
+  it("keeps claim-boundary badge styling above discussion exact markers", async () => {
+    const artifact = buildTheoryContextReflectionV1({
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:boundary-test",
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        prompt: "Discuss diagnostic-only claim boundary.",
+        conversationContext: null,
+        mentionedEquations: [],
+        mentionedSymbols: [],
+        mentionedDomains: ["warp_gr_nhm2"],
+        source: "helix_ask",
+        confidenceMode: "soft_locator",
+      },
+      exactMatches: [],
+      likelyMatches: [],
+      inferredDomains: [],
+      overlay: {
+        centerBadgeIds: ["nhm2.claim_boundary.diagnostic_only"],
+        highlightedBadgeIds: ["nhm2.claim_boundary.diagnostic_only"],
+        highlightedEdgeIds: [],
+        heatByBadgeId: { "nhm2.claim_boundary.diagnostic_only": 1 },
+        exactBadgeIds: ["nhm2.claim_boundary.diagnostic_only"],
+        likelyBadgeIds: [],
+        softRegion: {
+          id: "discussion-zone:boundary-test",
+          label: "Current discussion zone",
+          badgeIds: ["nhm2.claim_boundary.diagnostic_only"],
+          confidence: 0.9,
+          tone: "green",
+          meaning: "discussion_context_not_proof",
+        },
+      },
+      evidenceForAsk: {
+        summary: "The discussion appears near the NHM2 claim boundary.",
+        claimBoundaries: ["Diagnostic-only context."],
+        recommendedNextActions: [],
+      },
+    });
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(artifact);
+
+    renderPanel();
+    const boundary = await screen.findByRole("button", { name: "Diagnostic-only claim boundary" });
+
+    expect(boundary).toHaveAttribute("data-discussion-match", "exact");
+    expect(boundary.className).toMatch(/border-amber-300/);
+    expect(boundary.className).not.toMatch(/ring-emerald/);
+  });
+
   it("loads a badge equation to the calculator without opening an inspector popup", async () => {
     renderPanel();
 

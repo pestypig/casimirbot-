@@ -85,6 +85,11 @@ import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
 } from "@shared/theory/theory-badge-overlap-locator";
+import { buildTheoryContextReflection } from "@shared/theory/theory-context-reflector";
+import type {
+  TheoryContextReflectionConfidenceMode,
+  TheoryContextReflectionSource,
+} from "@shared/contracts/theory-context-reflection.v1";
 import {
   PHYSICS_ATLAS_BLOCK_IDS,
   type PhysicsAtlasBlockId,
@@ -168,6 +173,24 @@ function asNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function asTheoryContextReflectionSource(value: unknown): TheoryContextReflectionSource {
+  const source = asNonEmptyString(value);
+  if (
+    source === "helix_ask" ||
+    source === "manual" ||
+    source === "scientific_calculator" ||
+    source === "workstation_action"
+  ) {
+    return source;
+  }
+  return "helix_ask";
+}
+
+function asTheoryContextReflectionConfidenceMode(value: unknown): TheoryContextReflectionConfidenceMode {
+  const mode = asNonEmptyString(value);
+  return mode === "strict_badge_match" ? "strict_badge_match" : "soft_locator";
 }
 
 function parensBalanced(value: string): boolean {
@@ -5019,6 +5042,61 @@ export function executeHelixPanelAction(
           overlay: locator.overlay,
           recommended_actions: locator.recommendedActions,
           claim_boundary_notes: locator.claimBoundaryNotes,
+        },
+      };
+    }
+
+    if (actionId === "reflect_discussion_context") {
+      const prompt = asNonEmptyString(args.prompt ?? args.query ?? args.text);
+      if (!prompt) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "theory-badge-graph.reflect_discussion_context requires a prompt, query, or text.",
+        };
+      }
+
+      const reflection = buildTheoryContextReflection({
+        graph,
+        prompt,
+        conversationContext: asNonEmptyString(args.conversation_context ?? args.conversationContext),
+        mentionedEquations: asStringArray(args.mentioned_equations ?? args.mentionedEquations),
+        mentionedSymbols: asStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+        mentionedDomains: asStringArray(args.mentioned_domains ?? args.mentionedDomains),
+        confidenceMode: asTheoryContextReflectionConfidenceMode(args.confidence_mode ?? args.confidenceMode),
+        source: asTheoryContextReflectionSource(args.source),
+        limit: asNumber(args.limit) ?? undefined,
+      });
+
+      if (asBoolean(args.overlay) ?? true) {
+        useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
+      }
+      if (asBoolean(args.open_panel ?? args.openPanel) ?? true) {
+        context.openPanel(panelId, undefined);
+        context.focusPanel(panelId, undefined);
+      }
+
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_context_reflection",
+          schemaVersion: reflection.schemaVersion,
+          artifact_v1: reflection,
+          graph_id: graph.graphId,
+          exact_badge_ids: reflection.overlay.exactBadgeIds,
+          likely_badge_ids: reflection.overlay.likelyBadgeIds,
+          soft_region: reflection.overlay.softRegion,
+          evidence_for_ask: reflection.evidenceForAsk,
+          claim_boundary_notes: reflection.evidenceForAsk.claimBoundaries,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
         },
       };
     }

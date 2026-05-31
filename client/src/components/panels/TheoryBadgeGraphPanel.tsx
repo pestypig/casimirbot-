@@ -2311,6 +2311,9 @@ export default function TheoryBadgeGraphPanel() {
                   selectedBadgeIds={selectedBadgeIds}
                   highlightedBadgeIds={highlightedBadgeIds}
                   highlightedEdgeIds={highlightedEdgeIds}
+                  exactBadgeIds={mapOverlay.exactBadgeIds}
+                  likelyBadgeIds={mapOverlay.likelyBadgeIds}
+                  softRegions={mapOverlay.softRegions}
                   playbackBadgeIds={playbackBadgeIds}
                   solvedBadgeIds={solvedBadgeIds}
                   failedBadgeIds={failedBadgeIds}

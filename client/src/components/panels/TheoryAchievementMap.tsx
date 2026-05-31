@@ -18,6 +18,16 @@ type TheoryAchievementMapProps = {
   selectedBadgeIds: string[];
   highlightedBadgeIds: string[];
   highlightedEdgeIds: string[];
+  exactBadgeIds: string[];
+  likelyBadgeIds: string[];
+  softRegions: Array<{
+    id: string;
+    label: string;
+    badgeIds: string[];
+    confidence: number;
+    tone: "green";
+    meaning: "discussion_context_not_proof";
+  }>;
   playbackBadgeIds: string[];
   solvedBadgeIds: string[];
   failedBadgeIds: string[];
@@ -135,6 +145,8 @@ function badgeClass(args: {
   claimBoundary: boolean;
   plannedDomain: boolean;
   routeBlocked: boolean;
+  exactDiscussion: boolean;
+  likelyDiscussion: boolean;
 }) {
   const classes = [
     "absolute flex h-11 w-11 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
@@ -151,9 +163,57 @@ function badgeClass(args: {
   if (args.foundation) classes.push("shadow-[0_0_16px_rgba(148,163,184,0.28)]");
   if (args.claimBoundary) classes.push("border-amber-300 bg-gradient-to-br from-amber-100 via-zinc-400 to-rose-900");
   if (args.routeBlocked) classes.push("ring-4 ring-rose-500/80 shadow-rose-500/40");
+  if (!args.claimBoundary && args.exactDiscussion) {
+    classes.push("ring-4 ring-emerald-300/90 shadow-emerald-300/50");
+  } else if (!args.claimBoundary && args.likelyDiscussion) {
+    classes.push("ring-2 ring-emerald-400/70 shadow-emerald-500/30");
+  }
   if (args.plannedDomain) classes.push("opacity-55 saturate-50");
   if (args.hasFocus && !args.highlighted && !args.multiSelected) classes.push("opacity-30 grayscale");
   return classes.join(" ");
+}
+
+function softRegionGeometry(
+  region: TheoryAchievementMapProps["softRegions"][number],
+  nodesById: Map<string, TheoryAchievementLayoutNode>,
+) {
+  const centers = region.badgeIds
+    .map((badgeId) => nodesById.get(badgeId))
+    .filter((node): node is TheoryAchievementLayoutNode => Boolean(node))
+    .map((node) => ({ x: node.x + 22, y: node.y + 22 }));
+  if (centers.length === 0) return null;
+
+  if (centers.length === 1) {
+    const [center] = centers;
+    return {
+      cx: center.x,
+      cy: center.y,
+      rx: 88,
+      ry: 88,
+      labelX: center.x - 78,
+      labelY: center.y - 92,
+    };
+  }
+
+  const xs = centers.map((center) => center.x);
+  const ys = centers.map((center) => center.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const padding = 88;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = Math.max(88, (maxX - minX) / 2 + padding);
+  const ry = Math.max(88, (maxY - minY) / 2 + padding);
+  return {
+    cx,
+    cy,
+    rx,
+    ry,
+    labelX: cx - rx + 14,
+    labelY: cy - ry - 10,
+  };
 }
 
 export default function TheoryAchievementMap({
@@ -162,6 +222,9 @@ export default function TheoryAchievementMap({
   selectedBadgeIds,
   highlightedBadgeIds,
   highlightedEdgeIds,
+  exactBadgeIds,
+  likelyBadgeIds,
+  softRegions,
   playbackBadgeIds,
   solvedBadgeIds,
   failedBadgeIds,
@@ -180,6 +243,10 @@ export default function TheoryAchievementMap({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const restoredRef = useRef(false);
   const layout = useMemo(() => layoutTheoryAchievementMap(graph), [graph]);
+  const nodesById = useMemo(
+    () => new Map<string, TheoryAchievementLayoutNode>(layout.nodes.map((node) => [node.badgeId, node])),
+    [layout.nodes],
+  );
   const badgesById = useMemo(
     () => new Map<string, TheoryBadgeV1>(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge])),
     [graph.badges],
@@ -187,6 +254,8 @@ export default function TheoryAchievementMap({
   const selectedSet = new Set(selectedBadgeIds);
   const highlightedSet = new Set(highlightedBadgeIds);
   const edgeHighlightSet = new Set(highlightedEdgeIds);
+  const exactBadgeSet = new Set(exactBadgeIds);
+  const likelyBadgeSet = new Set(likelyBadgeIds);
   const playbackSet = new Set(playbackBadgeIds);
   const solvedSet = new Set(solvedBadgeIds);
   const failedSet = new Set(failedBadgeIds);
@@ -246,6 +315,40 @@ export default function TheoryAchievementMap({
               <path d="M 0 0 L 7 3.5 L 0 7 z" fill="rgb(161 161 170)" />
             </marker>
           </defs>
+          {softRegions.map((region) => {
+            const geometry = softRegionGeometry(region, nodesById);
+            if (!geometry) return null;
+            const alpha = Math.max(0.12, Math.min(0.22, 0.12 + region.confidence * 0.1));
+            return (
+              <g
+                key={region.id}
+                data-testid="discussion-soft-region"
+                aria-label="Discussion context zone, not proof"
+              >
+                <title>Discussion context zone, not proof</title>
+                <ellipse
+                  cx={geometry.cx}
+                  cy={geometry.cy}
+                  rx={geometry.rx}
+                  ry={geometry.ry}
+                  fill={`rgba(22, 163, 74, ${alpha})`}
+                  stroke="rgba(74, 222, 128, 0.45)"
+                  strokeWidth={2}
+                  strokeDasharray="10 8"
+                />
+                <text
+                  x={geometry.labelX}
+                  y={geometry.labelY}
+                  fill="rgba(187, 247, 208, 0.86)"
+                  fontSize={12}
+                  fontWeight={700}
+                  letterSpacing={0}
+                >
+                  {region.label}
+                </text>
+              </g>
+            );
+          })}
           {layout.edges.map((edge: TheoryAchievementLayoutEdge) => (
             <path
               key={edge.edgeId}
@@ -306,7 +409,16 @@ export default function TheoryAchievementMap({
                 claimBoundary,
                 plannedDomain,
                 routeBlocked: routeLabel?.tone === "rose",
+                exactDiscussion: exactBadgeSet.has(node.badgeId),
+                likelyDiscussion: !exactBadgeSet.has(node.badgeId) && likelyBadgeSet.has(node.badgeId),
               })}
+              data-discussion-match={
+                exactBadgeSet.has(node.badgeId)
+                  ? "exact"
+                  : likelyBadgeSet.has(node.badgeId)
+                    ? "likely"
+                    : undefined
+              }
               style={{
                 left: node.x,
                 top: node.y,

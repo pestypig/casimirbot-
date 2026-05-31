@@ -28,6 +28,7 @@ export type WorkstationToolIntent =
   | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
+  | "theory_context_reflection"
   | "physics_calculation_context"
   | "direct_answer";
 
@@ -244,7 +245,7 @@ function defaultAssumptionsForCalculatorSetup(setup: HelixCalculatorSetupContext
 }
 
 function enrichCalculatorSetupUnits(setup: HelixCalculatorSetupContext): HelixCalculatorSetupContext {
-  const variables = (setup.variables ?? []).map((variable) => {
+  const variables = (setup.variables ?? []).map((variable: HelixCalculatorSetupVariable) => {
     const unitDefinition = findHelixUnitDefinition(variable.unit);
     const dimension = variable.dimension ?? unitDefinition?.dimension ?? null;
     return {
@@ -256,8 +257,8 @@ function enrichCalculatorSetupUnits(setup: HelixCalculatorSetupContext): HelixCa
   });
   const inputUnits = Object.fromEntries(
     variables
-      .filter((variable) => variable.unit)
-      .map((variable) => [variable.symbol, variable.unit as string]),
+      .filter((variable: HelixCalculatorSetupVariable) => variable.unit)
+      .map((variable: HelixCalculatorSetupVariable) => [variable.symbol, variable.unit as string]),
   );
   const resultQuantity =
     setup.result_quantity ??
@@ -272,7 +273,7 @@ function enrichCalculatorSetupUnits(setup: HelixCalculatorSetupContext): HelixCa
     ...setup,
     variables,
     quantity: setup.quantity ?? resultQuantity,
-    unit_system: setup.unit_system ?? (setup.result_unit || variables.some((variable) => variable.unit) ? "SI" : null),
+    unit_system: setup.unit_system ?? (setup.result_unit || variables.some((variable: HelixCalculatorSetupVariable) => variable.unit) ? "SI" : null),
     input_units: setup.input_units ?? (Object.keys(inputUnits).length ? inputUnits : undefined),
     result_quantity: resultQuantity,
     result_dimension: resultDimension,
@@ -655,9 +656,45 @@ function isCompoundCalculatorPlanningPrompt(prompt: string): boolean {
 
 function isPhysicsCalculationContextPrompt(prompt: string): boolean {
   if (isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
   return /\b(?:theory\s+(?:map|badge|atlas)|physics\s+atlas|badge\s+graph|first\s+principles|unit\s+signature|dimension(?:al)?\s+consistency|curvature|collapse|qei|stress[-\s]?energy|starsim|stellar|fusion\s+channel|solar\s+spectrum|h[-\s]?alpha|doppler|redshift|blueshift|casimir|cavity|tokamak|plasma|nhm2|warp|general\s+relativity|\bgr\b|galactic|cosmic\s+distance|cepheid|hubble|zeeman)\b/i.test(
     prompt,
   );
+}
+
+function userExplicitlyDisallowsPanelsOrTools(prompt: string): boolean {
+  return /\b(?:do\s+not|don't|without|no)\s+(?:open|use|call|run)\b[\s\S]{0,60}\b(?:panel|panels|tool|tools|workstation|calculator|theory\s+(?:map|graph)|badge\s+graph)\b/i.test(
+    prompt,
+  );
+}
+
+function hasReflectionCue(prompt: string): boolean {
+  return /\b(?:where\s+(?:does|do)\s+(?:this|that|it|e\s*=\s*h\s*f)?\s*fit|map\s+this|plot\s+this|show\s+where\s+we\s+are|theory\s+space|theory\s+graph|theory\s+(?:map|badge|atlas)|physics\s+atlas|badge\s+graph|toe|current\s+discussion|discussion\s+zone)\b/i.test(
+    prompt,
+  );
+}
+
+function hasTheoryReflectionDomain(prompt: string): boolean {
+  return /\b(?:gr|einstein|tensor|stress[-\s]?energy|source\s+closure|qei|casimir|starsim|solar\s+spectrum|photon|planck|adm|lapse|shift|curvature|plasma|tokamak|equation|first\s+principles|theory\s+graph|badge\s+graph|nhm2|warp|redshift|doppler|zeeman)\b/i.test(
+    prompt,
+  );
+}
+
+function hasInlineEquationWithPhysicsDomain(prompt: string): boolean {
+  return !!extractInlineMathExpression(prompt) && hasTheoryReflectionDomain(prompt);
+}
+
+function isTheoryContextReflectionPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  if (hasReflectionCue(prompt)) return true;
+  if (hasInlineEquationWithPhysicsDomain(prompt) && !/\b(?:calculate|compute|solve|evaluate|verify|check)\b/i.test(prompt)) {
+    return true;
+  }
+  if (hasTheoryReflectionDomain(prompt) && /\b(?:discuss|explain|connect|locate|context|relationship|overlap)\b/i.test(prompt)) {
+    return !hasConcreteCalculatorExpression(prompt);
+  }
+  return false;
 }
 
 function inferPhysicsCalculationIntent(prompt: string): "locate_only" | "load_calculator" | "solve_scalar" | "solve_scalar_and_runtime" {
@@ -771,7 +808,7 @@ export function planWorkstationToolUse(
         panel_id: "situation-room-pipelines",
         action_id: "voice_delivery.propose_from_trace",
         args: voiceArgs,
-        depends_on: steps.some((step) => step.step_id === "attach_dottie_observer")
+        depends_on: steps.some((step: HelixWorkstationToolPlanStep) => step.step_id === "attach_dottie_observer")
           ? ["attach_dottie_observer"]
           : ["open_situation_room_pipelines"],
         expected_receipt_kind: "dottie_voice_receipt",
@@ -793,9 +830,9 @@ export function planWorkstationToolUse(
         panel_id: "situation-room-pipelines",
         action_id: "observer.query",
         args: queryArgs,
-        depends_on: steps.some((step) => step.step_id === "propose_dottie_voice_from_trace")
+        depends_on: steps.some((step: HelixWorkstationToolPlanStep) => step.step_id === "propose_dottie_voice_from_trace")
           ? ["propose_dottie_voice_from_trace"]
-          : steps.some((step) => step.step_id === "attach_dottie_observer")
+          : steps.some((step: HelixWorkstationToolPlanStep) => step.step_id === "attach_dottie_observer")
             ? ["attach_dottie_observer"]
             : ["open_situation_room_pipelines"],
         expected_receipt_kind: "dottie_observer_query_receipt",
@@ -806,7 +843,9 @@ export function planWorkstationToolUse(
     steps.push({
       step_id: "evaluate_dottie_observer_receipts",
       kind: "evaluate_result",
-      depends_on: steps.filter((step) => step.kind === "run_panel_action").map((step) => step.step_id),
+      depends_on: steps
+        .filter((step: HelixWorkstationToolPlanStep) => step.kind === "run_panel_action")
+        .map((step: HelixWorkstationToolPlanStep) => step.step_id),
       expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
       required: true,
     });
@@ -958,6 +997,62 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isTheoryContextReflectionPrompt(normalized)) {
+    const args = {
+      prompt: normalized,
+      overlay: true,
+      open_panel: true,
+    };
+    pushScore({
+      affordance_id: "theory-badge-graph.reflect_discussion_context",
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+      score: 0.88,
+      reason: "mapped physics/theory prompt can be reflected into the badge graph as non-terminal evidence",
+      required_args_missing: [],
+    });
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "theory_context_reflection",
+      missing: [],
+      options,
+      steps: [
+        makeOpenStep("theory-badge-graph"),
+        {
+          step_id: "reflect_discussion_context",
+          kind: "run_panel_action",
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args,
+          depends_on: ["open_theory_badge_graph"],
+          expected_receipt_kind: "theory_context_reflection",
+          expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_theory_context_reflection",
+          kind: "evaluate_result",
+          depends_on: ["reflect_discussion_context"],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    });
+    return {
+      intent: "theory_context_reflection",
+      action: {
+        panel_id: "theory-badge-graph",
+        action_id: "reflect_discussion_context",
+        args,
+      },
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt discusses mapped theory/physics concepts; reflect discussion context as evidence before final answer.",
+      missing_required_args: [],
     };
   }
 

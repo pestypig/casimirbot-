@@ -431,6 +431,25 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "reflect_discussion_context",
+        title: "Reflect Discussion Context",
+        description:
+          "Locate the current prompt/conversation in theory badge graph space and show a soft discussion-zone overlay. Returns evidence only; does not solve or mutate calculator state.",
+        risk: "low",
+        optional_args: [
+          "prompt",
+          "conversation_context",
+          "mentioned_equations",
+          "mentioned_symbols",
+          "mentioned_domains",
+          "confidence_mode",
+          "overlay",
+          "open_panel",
+          "limit",
+        ],
+        returns_artifact: true,
+      },
+      {
         id: "plan_calculation_context",
         title: "Plan Physics Calculation Context",
         description:

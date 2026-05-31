@@ -220,6 +220,27 @@ function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
   return typeof target === "string" && target.trim() ? target.trim() : "the selected Helix Ask run";
 }
 
+function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  const summary = input.evaluation?.summary ?? "The graph reflection returned a non-terminal context observation.";
+  const evaluationResult = (input.evaluation as { result?: string } | null | undefined)?.result ?? null;
+  const cleanSummary = summary
+    .replace(/^Theory reflection located discussion context as evidence only:\s*/i, "")
+    .replace(/^Theory reflection located discussion context as evidence only\.\s*/i, "")
+    .trim();
+  if (evaluationResult === "insufficient") {
+    return [
+      "The theory reflection receipt was not accepted as final-answer evidence.",
+      cleanSummary || "The receipt failed route-authority checks.",
+      "I should answer from the prompt directly or rerun the reflection with a valid non-terminal receipt before using it as context.",
+    ].join("\n");
+  }
+  return [
+    "I located this discussion in the Theory Badge Graph as context evidence.",
+    `The graph reflection suggests: ${cleanSummary || "the prompt overlaps mapped theory badges and claim-boundary context."}`,
+    "This is a context locator, not a solve. Any numeric result still has to come from calculator traces, runtime receipts, or another completed solver path.",
+  ].join("\n");
+}
+
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
   if (input.plan.intent === "calculator_live_source") {
     const observation = buildCalculatorObservation(input.prompt, input.plan);
@@ -254,6 +275,9 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
       `Prepared Auntie Dottie as a witness-only observer for ${dottieTargetFromPlan(input.plan)}.`,
       "Voice delivery remains a receipt-backed projection of public commentary; no audio is spoken unless a confirm-speak action is explicitly run.",
     ].join("\n");
+  }
+  if (input.plan.intent === "theory_context_reflection") {
+    return synthesizeTheoryContextReflectionAnswer(input);
   }
   return input.evaluation?.summary ?? "Completed workstation tool evaluation.";
 }
