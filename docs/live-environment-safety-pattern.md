@@ -24,6 +24,7 @@ It must not secretly tell Helix Ask what to say.
 - Route drift contains no `surface_text`
 - Recommendation remains policy-gated
 - Paper plugin snapshot enrichment for compact entity state, local traversability cells, chunk snapshot summaries, block-event bursts, and container memory
+- Backend route-corridor chunk fact enrichment from active navigation state and bounded chunk snapshot summaries
 - Current-world block delta overlay persistence
 - Durable risk/resource ledger for snapshot hazards, resources, damage events, and inventory/container transitions
 
@@ -42,6 +43,7 @@ It must not secretly tell Helix Ask what to say.
 - Ask-pack sanitizer coverage for environment state snapshots, container memory, and risk/resource ledgers
 - World-event ingest wiring for risk/resource ledger updates
 - Minecraft route-assist referral reason selection with operator-only Ask policy
+- Route-corridor classification for gateway, bridge-like, and hazard cells derived from observed chunk summary cells
 
 ## Not Implemented Yet
 
@@ -55,5 +57,5 @@ It must not secretly tell Helix Ask what to say.
 - Support procedure reducer
 - Domain-specific anomaly monitors
 - Domain-specific policy renderers
-- Route-corridor-specific chunk sampling beyond bounded local chunk summaries
+- Plugin-side route-corridor chunk capture beyond bounded local chunk summaries
 - Full Paper plugin compile/runtime verification in this workspace

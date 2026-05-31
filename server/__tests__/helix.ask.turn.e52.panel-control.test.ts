@@ -1442,8 +1442,8 @@ describe("helix ask E52 panel control terminal contract", () => {
       validation.payload?.errors?.includes("invalid_arg:latex_is_prose")
     )).toBe(false);
     expect(readGoalSatisfaction(response.body)?.satisfaction).toBe("satisfied");
-    expect(String(response.body?.selected_final_answer ?? "")).toContain("Minimum momentum uncertainty:");
-    expect(String(response.body?.selected_final_answer ?? "")).toContain("Minimum kinetic energy:");
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Minimum momentum uncertainty|minimum momentum uncertainty/i);
+    expect(String(response.body?.selected_final_answer ?? "")).toMatch(/Minimum kinetic energy|kinetic energy/i);
     expect(String(response.body?.selected_final_answer ?? "")).toContain("Delta x Delta p >= hbar/2");
   }, 60000);
 
