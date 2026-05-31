@@ -464,6 +464,8 @@ export type HelixMinecraftNavigationState = {
     | "wrong_direction_candidate"
     | "policy_approved_surface"
     | "blocked"
+    | "stale_route"
+    | "completed"
     | "unknown";
   policy_surface_status:
     | "not_candidate"
@@ -474,6 +476,10 @@ export type HelixMinecraftNavigationState = {
   provider_observation_refs: string[];
   route_rehearsal_refs: string[];
   route_drift_refs: string[];
+  route_lifecycle_refs?: string[];
+  route_lifecycle_status?: "active" | "stale" | "cancelled" | "completed" | "unknown";
+  route_intent_status?: "hypothesized" | "confirmed" | "direct_request" | "completed" | "cancelled" | "unknown";
+  latest_lifecycle_receipt_id?: string | null;
   evidence_refs: string[];
   missing_evidence: string[];
   instruction_authority: "none";

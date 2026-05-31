@@ -150,6 +150,40 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(chooseVisibleFinalText(reply as never)).toBe("docs-viewer has been successfully opened.");
   });
 
+  it("keeps backend selected_final_answer as visible truth for model-synthesized final drafts", () => {
+    const longSelected =
+      "Long model-authored synthesis: curvature is encoded by the metric and Riemann tensor, matter enters through stress-energy, and free fall follows geodesics while tidal forces reveal curvature.";
+    const reply = {
+      id: "turn-e63-model-synth",
+      turn_id: "turn-e63-model-synth",
+      content: "Short projection.",
+      text: "Short projection.",
+      selected_final_answer: longSelected,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_presentation: {
+        concise_text: "Short projection.",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: "Short projection.",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        resolved_route_label: "model_only_concept / model_synthesized_answer",
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+
+    expect(visible.selected_final_answer).toBe(longSelected);
+    expect(chooseVisibleFinalText(reply as never)).toBe(longSelected);
+  });
+
   it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {
     const reply = {
       id: "turn-e63-source-no-authority",

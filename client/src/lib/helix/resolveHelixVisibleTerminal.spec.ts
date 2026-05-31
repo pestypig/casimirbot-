@@ -57,6 +57,28 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.usedLegacyShadow).toBe(true);
   });
 
+  it("uses selected final answer for model-synthesized final drafts instead of concise presentation text", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "Long model-authored synthesis with field, photon, probability, and geodesic details.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_presentation: {
+        concise_text: "Short projection.",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: "Short projection.",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+    });
+
+    expect(terminal.text).toBe("Long model-authored synthesis with field, photon, probability, and geodesic details.");
+    expect(terminal.source).toBe("selected_final_answer");
+    expect(terminal.usedLegacyShadow).toBe(false);
+  });
+
   it("recovers a satisfied model-direct answer artifact from stale placeholder failure text", () => {
     const terminal = resolveHelixVisibleTerminal({
       selected_final_answer: "I could not produce a terminal answer for this turn.",

@@ -35,6 +35,7 @@ export const ASK_EVIDENCE_SCHEMA_ALLOWLIST: Record<string, AskEvidenceSanitizer>
   "helix.minecraft_route_objective.v1": sanitizeMinecraftRouteObjective,
   "helix.minecraft_route_rehearsal.v1": sanitizeMinecraftRouteRehearsal,
   "helix.minecraft_route_drift_event.v1": sanitizeMinecraftRouteDriftEvent,
+  "helix.minecraft_route_lifecycle_receipt.v1": sanitizeMinecraftRouteLifecycleReceipt,
   "helix.minecraft_visual_observation.v1": sanitizeMinecraftVisualObservation,
   "helix.live_translation_turn.v1": sanitizeLiveTranslationTurn,
   "helix.browser_claim_evidence.v1": sanitizeBrowserClaimEvidence,
@@ -167,6 +168,32 @@ function sanitizeMinecraftRouteDriftEvent(input: unknown): SanitizedAskEvidenceI
       drift_status: readStringField(input, "drift_status"),
       stale_reason: readStringField(input, "stale_reason"),
       salience_candidate: readBooleanField(input, "salience_candidate"),
+    },
+  });
+}
+
+function sanitizeMinecraftRouteLifecycleReceipt(input: unknown): SanitizedAskEvidenceItem | null {
+  if (!hasSafeEnvelope(input)) {
+    return null;
+  }
+
+  const itemId = readStringField(input, "receipt_id");
+  if (!itemId) {
+    return null;
+  }
+
+  return sanitizedItem(input, {
+    item_id: itemId,
+    scenario_kind: "minecraft_route_monitor",
+    fields: {
+      objective_id: readStringField(input, "objective_id"),
+      route_rehearsal_id: readStringField(input, "route_rehearsal_id"),
+      reason: readStringField(input, "reason"),
+      previous_lifecycle: readStringField(input, "previous_lifecycle"),
+      next_lifecycle: readStringField(input, "next_lifecycle"),
+      previous_intent_status: readStringField(input, "previous_intent_status"),
+      next_intent_status: readStringField(input, "next_intent_status"),
+      route_stage_status: readStringField(input, "route_stage_status"),
     },
   });
 }

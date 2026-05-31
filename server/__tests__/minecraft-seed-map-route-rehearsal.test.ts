@@ -204,6 +204,34 @@ describe("Minecraft seed map route rehearsal", () => {
     expect(lines.recommendation?.value).not.toMatch(/\bgo\b/i);
   });
 
+  it("records route lifecycle invalidation in the world-event ingest path", async () => {
+    await ingestWorldEvent(locationEvent(), { appendToThread: false });
+
+    const result = await ingestWorldEvent(
+      {
+        ...locationEvent(),
+        ts: "2026-05-20T12:00:05.000Z",
+        event_type: "player_death",
+        location: { dimension: "minecraft:overworld", x: 12, y: 60, z: 12 },
+        evidence_refs: ["mc:event:death"],
+      },
+      { appendToThread: false },
+    );
+
+    expect(result.minecraft_route_lifecycle_receipt).toMatchObject({
+      schema: "helix.minecraft_route_lifecycle_receipt.v1",
+      reason: "player_death",
+      next_lifecycle: "stale",
+      next_intent_status: "cancelled",
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      ask_context_policy: "evidence_only",
+      context_role: "tool_evidence",
+      creates_ask_turn: false,
+      turn_triggered: false,
+    });
+  });
+
   it("keeps block delta overlay separate from seed forecasts", () => {
     const overlay = reduceMinecraftWorldDeltaOverlay({
       schema: "helix.minecraft_spatial_event.v1",

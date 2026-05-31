@@ -295,8 +295,18 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     terminalArtifactKind === "typed_failure" ||
     finalAnswerSource === "typed_failure" ||
     Boolean(terminalErrorCode);
+  const modelSynthesizedFinalDraft =
+    !terminalIsTypedFailure &&
+    terminalArtifactKind === "model_synthesized_answer" &&
+    finalAnswerSource === "final_answer_draft";
   const selectedFinalAnswer =
-    terminalIsTypedFailure
+    modelSynthesizedFinalDraft
+      ? readString(payload.selected_final_answer) ??
+        readString(agentLoop?.selected_final_answer) ??
+        readString(debug?.selected_final_answer) ??
+        terminalAuthorityText ??
+        readString(terminalPresentation?.concise_text)
+      : terminalIsTypedFailure
       ? readString(payload.terminal_failure_text) ??
         readString(typedFailure?.message) ??
         terminalAuthorityText

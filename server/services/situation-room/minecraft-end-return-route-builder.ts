@@ -14,6 +14,12 @@ export type MinecraftRoutePoint = {
   z: number;
 };
 
+export type MinecraftRouteEvidenceCell = MinecraftRoutePoint & {
+  block_type?: string | null;
+  tags?: string[];
+  evidence_refs?: string[];
+};
+
 export type MinecraftRouteRehearsalStage = {
   stage_code:
     | "reach_return_end_gateway"
@@ -82,6 +88,11 @@ export type BuildEndReturnRouteInput = {
   objective: MinecraftRouteObjectiveState;
   current_position: MinecraftRoutePoint;
   gateway_candidate?: MinecraftRoutePoint | null;
+  observed_gateway_candidate?: MinecraftRoutePoint | null;
+  seed_forecast_gateway_candidate?: MinecraftRoutePoint | null;
+  client_planner_gateway_candidate?: MinecraftRoutePoint | null;
+  chunk_surface_cells?: MinecraftRouteEvidenceCell[];
+  block_delta_overlay_cells?: MinecraftRouteEvidenceCell[];
   bridge_overlay_observed: boolean;
   ender_pearl_known_available?: boolean | null;
   respawn_location_known: boolean;
@@ -89,15 +100,62 @@ export type BuildEndReturnRouteInput = {
   ts: string;
 };
 
+const hasTag = (cell: MinecraftRouteEvidenceCell, pattern: RegExp): boolean =>
+  (cell.tags ?? []).some((tag) => pattern.test(tag));
+
+const firstTaggedCell = (
+  cells: MinecraftRouteEvidenceCell[],
+  pattern: RegExp,
+): MinecraftRouteEvidenceCell | null =>
+  cells.find((cell) => hasTag(cell, pattern) || pattern.test(cell.block_type ?? "")) ?? null;
+
+const uniqueEvidenceRefs = (input: BuildEndReturnRouteInput): string[] =>
+  Array.from(new Set([
+    ...input.evidence_refs,
+    ...(input.chunk_surface_cells ?? []).flatMap((cell) => cell.evidence_refs ?? []),
+    ...(input.block_delta_overlay_cells ?? []).flatMap((cell) => cell.evidence_refs ?? []),
+  ]));
+
 export function buildEndReturnRouteRehearsal(
   input: BuildEndReturnRouteInput,
 ): MinecraftRouteRehearsal {
-  if (!input.gateway_candidate) {
+  const chunkSurfaceCells = input.chunk_surface_cells ?? [];
+  const blockDeltaOverlayCells = input.block_delta_overlay_cells ?? [];
+  const chunkGateway = firstTaggedCell(chunkSurfaceCells, /gateway|portal/i);
+  const gateway =
+    input.observed_gateway_candidate ??
+    input.gateway_candidate ??
+    (chunkGateway ? {
+      dimension: chunkGateway.dimension,
+      x: chunkGateway.x,
+      y: chunkGateway.y ?? null,
+      z: chunkGateway.z,
+    } : null) ??
+    input.seed_forecast_gateway_candidate ??
+    input.client_planner_gateway_candidate ??
+    null;
+  const gatewayBasis =
+    input.observed_gateway_candidate || input.gateway_candidate || chunkGateway
+      ? "observed_current_world"
+      : input.seed_forecast_gateway_candidate
+        ? "seed_forecast"
+        : input.client_planner_gateway_candidate
+          ? "client_planner"
+          : null;
+  const bridgeOverlayObserved =
+    input.bridge_overlay_observed ||
+    blockDeltaOverlayCells.length > 0 ||
+    chunkSurfaceCells.some((cell) => hasTag(cell, /bridge_like|traversable/i));
+  const currentWorldObserved = chunkSurfaceCells.length > 0 || Boolean(input.observed_gateway_candidate) || Boolean(input.gateway_candidate);
+  const routeIncludesVoidRisk = bridgeOverlayObserved || chunkSurfaceCells.some((cell) => hasTag(cell, /void|drop|hazard_lava/i));
+  const evidenceRefs = uniqueEvidenceRefs(input);
+
+  if (!gateway) {
     const missingEvidence: MinecraftRouteRehearsalStage["missing_evidence_codes"] = [
       "no_gateway_candidate",
-      "no_observed_gateway",
-      "no_seed_forecast_gateway",
-      "no_client_planner_gateway_candidate",
+      ...(input.observed_gateway_candidate || input.gateway_candidate || chunkGateway ? [] : ["no_observed_gateway" as const]),
+      ...(input.seed_forecast_gateway_candidate ? [] : ["no_seed_forecast_gateway" as const]),
+      ...(input.client_planner_gateway_candidate ? [] : ["no_client_planner_gateway_candidate" as const]),
       "cannot_compute_return_route_without_gateway",
     ];
 
@@ -126,21 +184,34 @@ export function buildEndReturnRouteRehearsal(
       missing_evidence_codes: missingEvidence,
       current_position: input.current_position,
       candidate_next_waypoint: null,
-      evidence_refs: [input.objective.objective_id, ...input.evidence_refs],
+      evidence_refs: [input.objective.objective_id, ...evidenceRefs],
       normalized_by_deterministic_reducer: true,
       model_invoked_by_helix: false,
       ts: input.ts,
     };
   }
 
-  const gateway = input.gateway_candidate;
-
   const routeConfidence =
     0.38 +
-    (input.gateway_candidate ? 0.18 : 0) +
-    (input.bridge_overlay_observed ? 0.12 : 0) +
+    (gatewayBasis === "observed_current_world" ? 0.2 : 0) +
+    (gatewayBasis === "seed_forecast" ? 0.12 : 0) +
+    (gatewayBasis === "client_planner" ? 0.1 : 0) +
+    (bridgeOverlayObserved ? 0.12 : 0) +
+    (chunkSurfaceCells.length > 0 ? 0.08 : 0) +
     (input.ender_pearl_known_available ? 0.08 : 0) +
     (input.respawn_location_known ? 0.08 : 0);
+
+  const reachGatewayMissingEvidence: MinecraftRouteRehearsalStage["missing_evidence_codes"] = [
+    ...(gatewayBasis === "observed_current_world" ? [] : ["gateway_unconfirmed" as const]),
+    ...(routeIncludesVoidRisk ? ["route_includes_void_adjacent_bridge" as const] : []),
+    ...(input.ender_pearl_known_available ? [] : ["ender_pearl_unknown" as const]),
+  ];
+  const reachGatewayBasis: MinecraftRouteRehearsalStage["route_basis"] = [
+    ...(bridgeOverlayObserved ? ["persisted_block_delta_overlay" as const] : []),
+    ...(currentWorldObserved ? ["observed_current_world" as const] : []),
+    ...(gatewayBasis === "seed_forecast" ? ["seed_forecast" as const] : []),
+    ...(input.objective.evidence_refs.length > 0 ? ["transcript_intent" as const] : []),
+  ];
 
   return {
     schema: HELIX_MINECRAFT_ROUTE_REHEARSAL_SCHEMA,
@@ -158,18 +229,10 @@ export function buildEndReturnRouteRehearsal(
         from_dimension: "minecraft:the_end",
         to_dimension: "minecraft:the_end",
         target_type: "end_gateway",
-        route_basis: [
-          ...(input.bridge_overlay_observed ? ["persisted_block_delta_overlay" as const] : []),
-          "observed_current_world",
-          ...(input.gateway_candidate ? [] : ["seed_forecast" as const]),
-        ],
-        reachable_confidence: input.gateway_candidate ? 0.62 : 0.48,
-        risk: "high",
-        missing_evidence_codes: [
-          ...(input.gateway_candidate ? [] : ["gateway_unconfirmed" as const]),
-          "route_includes_void_adjacent_bridge",
-          ...(input.ender_pearl_known_available ? [] : ["ender_pearl_unknown" as const]),
-        ],
+        route_basis: reachGatewayBasis,
+        reachable_confidence: Math.min(0.42 + (routeConfidence * 0.35), 0.82),
+        risk: routeIncludesVoidRisk ? "high" : "medium",
+        missing_evidence_codes: reachGatewayMissingEvidence,
       },
       {
         stage_code: "return_to_central_end",
@@ -203,7 +266,7 @@ export function buildEndReturnRouteRehearsal(
       },
     ],
     missing_evidence_codes: [
-      "route_includes_void_adjacent_bridge",
+      ...(routeIncludesVoidRisk ? ["route_includes_void_adjacent_bridge" as const] : []),
       ...(input.ender_pearl_known_available ? [] : ["ender_pearl_unknown" as const]),
       "gateway_destination_unconfirmed",
       "central_island_position_unsampled",
@@ -214,9 +277,9 @@ export function buildEndReturnRouteRehearsal(
       ...gateway,
       label_code: "return_end_gateway_candidate",
       expected_direction: compassDirection(input.current_position, gateway),
-      confidence: input.gateway_candidate ? 0.61 : 0.46,
+      confidence: gatewayBasis === "observed_current_world" ? 0.68 : gatewayBasis === "seed_forecast" ? 0.52 : 0.48,
     },
-    evidence_refs: [input.objective.objective_id, ...input.evidence_refs],
+    evidence_refs: [input.objective.objective_id, ...evidenceRefs],
     normalized_by_deterministic_reducer: true,
     model_invoked_by_helix: false,
     ts: input.ts,

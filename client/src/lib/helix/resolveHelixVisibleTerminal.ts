@@ -251,6 +251,25 @@ export function resolveHelixVisibleTerminal(
   const finalAnswerSource =
     firstText(envelope?.final_answer_source, authority?.final_answer_source, record?.final_answer_source, debug?.final_answer_source) ||
     (terminalErrorCode ? "typed_failure" : null);
+  const selectedFinalAnswer = firstText(record?.selected_final_answer, debug?.selected_final_answer);
+  const selectedFinalAnswerIsAuthoritativeModelDraft =
+    !terminalErrorCode &&
+    terminalKind === "model_synthesized_answer" &&
+    finalAnswerSource === "final_answer_draft" &&
+    Boolean(selectedFinalAnswer);
+
+  if (selectedFinalAnswerIsAuthoritativeModelDraft) {
+    return {
+      text: selectedFinalAnswer,
+      source: "selected_final_answer",
+      backendTerminalText: selectedFinalAnswer,
+      terminalKind,
+      finalAnswerSource,
+      terminalErrorCode,
+      authorityVerified: Boolean(authority?.server_authoritative === true),
+      usedLegacyShadow: false,
+    };
+  }
 
   const singleWriterText = firstText(singleWriter?.visible_text);
   const singleWriterIntegrity = readRecord(singleWriter?.integrity);

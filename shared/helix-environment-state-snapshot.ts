@@ -174,6 +174,9 @@ export type HelixEnvironmentStateSnapshot = {
     latest_drift_event_id?: string | null;
     route_status?: string | null;
     policy_surface_status?: string | null;
+    latest_lifecycle_receipt_id?: string | null;
+    route_lifecycle_status?: string | null;
+    route_intent_status?: string | null;
     current_stage_label?: string | null;
     updated_at?: string | null;
     evidence_refs?: string[];

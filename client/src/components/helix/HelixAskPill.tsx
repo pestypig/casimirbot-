@@ -6907,8 +6907,17 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
           liveFinalAnswer
         )
       : "";
+  const canonicalSelectedFinalAnswer =
+    !isTypedFailure && terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
+      ? (
+          coerceText(replyRecord?.selected_final_answer).trim() ||
+          coerceText(debugRecord?.selected_final_answer).trim()
+        )
+      : "";
   const selectedFinalAnswerRaw =
-    terminalResolution.text &&
+    canonicalSelectedFinalAnswer
+      ? canonicalSelectedFinalAnswer
+      : terminalResolution.text &&
     terminalResolution.source !== "legacy_shadow" &&
     terminalResolution.source !== "empty" &&
     terminalResolution.source !== "typed_failure"

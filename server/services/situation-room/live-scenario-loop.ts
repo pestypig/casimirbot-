@@ -2,14 +2,25 @@ import type { LiveScenarioKind } from "../../../shared/helix-live-scenario-evide
 import type { MinecraftRouteObjectiveState } from "../../../shared/helix-minecraft-route-objective.ts";
 import type { MinecraftRouteDriftEvent } from "../../../shared/helix-minecraft-route-drift.ts";
 import type { DotOperatorReferral } from "../../../shared/helix-operator-referral.ts";
+import type { HelixWorldEvent } from "../../../shared/helix-world-event.ts";
 import type { AskEvidencePack } from "./live-scenario-ask-allowlist.ts";
 import { buildAskEvidencePackFromAllowlist } from "./live-scenario-ask-allowlist.ts";
 import type { AskTurnSink } from "./ask-turn-sink.ts";
-import { buildEndReturnRouteRehearsal, type MinecraftRoutePoint, type MinecraftRouteRehearsal } from "./minecraft-end-return-route-builder.ts";
+import {
+  buildEndReturnRouteRehearsal,
+  type MinecraftRouteEvidenceCell,
+  type MinecraftRoutePoint,
+  type MinecraftRouteRehearsal,
+} from "./minecraft-end-return-route-builder.ts";
 import { monitorRouteDrift, type PlayerLocationSample } from "./minecraft-route-drift-monitor.ts";
+import {
+  reduceMinecraftRouteObjectiveLifecycle,
+  type MinecraftRouteLifecycleReceipt,
+} from "./minecraft-route-lifecycle-reducer.ts";
 import { extractMinecraftRouteIntent } from "./minecraft-route-intent-extractor.ts";
 import { createMinecraftDiscordActorBinding, type MinecraftDiscordActorBinding } from "./minecraft-session-actor-binding.ts";
 import { buildRouteAssistOperatorReferral } from "./operator-referral-builder.ts";
+import { recordMinecraftRouteLifecycleReceipt } from "./minecraft-navigation-state-store.ts";
 
 export type LiveScenarioEvent =
   | {
@@ -27,6 +38,11 @@ export type LiveScenarioEvent =
       kind: "minecraft_route_context";
       current_position: MinecraftRoutePoint;
       gateway_candidate?: MinecraftRoutePoint | null;
+      observed_gateway_candidate?: MinecraftRoutePoint | null;
+      seed_forecast_gateway_candidate?: MinecraftRoutePoint | null;
+      client_planner_gateway_candidate?: MinecraftRoutePoint | null;
+      chunk_surface_cells?: MinecraftRouteEvidenceCell[];
+      block_delta_overlay_cells?: MinecraftRouteEvidenceCell[];
       bridge_overlay_observed?: boolean;
       ender_pearl_known_available?: boolean | null;
       respawn_location_known?: boolean;
@@ -35,6 +51,10 @@ export type LiveScenarioEvent =
   | {
       kind: "minecraft_location_sample";
       sample: PlayerLocationSample;
+    }
+  | {
+      kind: "minecraft_world_event";
+      event: HelixWorldEvent;
     }
   | {
       kind: "policy_approval";
@@ -47,6 +67,7 @@ export type LiveScenarioLoopResult = {
   objective?: MinecraftRouteObjectiveState | null;
   rehearsal?: MinecraftRouteRehearsal | null;
   drift?: MinecraftRouteDriftEvent | null;
+  lifecycle_receipts: MinecraftRouteLifecycleReceipt[];
   referral?: DotOperatorReferral | null;
   ask_pack: AskEvidencePack;
   direct_address_candidate: boolean;
@@ -62,6 +83,7 @@ export function runLiveScenarioLoop(input: {
     return {
       ask_pack: buildAskEvidencePackFromAllowlist({ items: [], now: input.now }),
       direct_address_candidate: false,
+      lifecycle_receipts: [],
     };
   }
 
@@ -79,6 +101,7 @@ export function runLiveScenarioLoop(input: {
   let directAddressCandidate = false;
   let routeContext: Extract<LiveScenarioEvent, { kind: "minecraft_route_context" }> | null = null;
   const samples: PlayerLocationSample[] = [];
+  const lifecycleEvents: HelixWorldEvent[] = [];
   let pendingPolicyApproval:
     | Extract<LiveScenarioEvent, { kind: "policy_approval" }>
     | null = null;
@@ -105,6 +128,8 @@ export function runLiveScenarioLoop(input: {
       routeContext = event;
     } else if (event.kind === "minecraft_location_sample") {
       samples.push(event.sample);
+    } else if (event.kind === "minecraft_world_event") {
+      lifecycleEvents.push(event.event);
     } else if (event.kind === "policy_approval") {
       pendingPolicyApproval = event;
     }
@@ -116,12 +141,32 @@ export function runLiveScenarioLoop(input: {
       objective,
       current_position: routeContext.current_position,
       gateway_candidate: routeContext.gateway_candidate,
+      observed_gateway_candidate: routeContext.observed_gateway_candidate,
+      seed_forecast_gateway_candidate: routeContext.seed_forecast_gateway_candidate,
+      client_planner_gateway_candidate: routeContext.client_planner_gateway_candidate,
+      chunk_surface_cells: routeContext.chunk_surface_cells,
+      block_delta_overlay_cells: routeContext.block_delta_overlay_cells,
       bridge_overlay_observed: routeContext.bridge_overlay_observed ?? false,
       ender_pearl_known_available: routeContext.ender_pearl_known_available ?? null,
       respawn_location_known: routeContext.respawn_location_known ?? false,
       evidence_refs: routeContext.evidence_refs ?? [],
       ts: input.now,
     });
+  }
+
+  const lifecycleReceipts: MinecraftRouteLifecycleReceipt[] = [];
+  if (objective && rehearsal) {
+    for (const event of lifecycleEvents) {
+      const reduction = reduceMinecraftRouteObjectiveLifecycle({
+        objective,
+        rehearsal,
+        event,
+        now: input.now,
+      });
+      objective = reduction.objective;
+      lifecycleReceipts.push(reduction.receipt);
+      recordMinecraftRouteLifecycleReceipt(reduction.receipt);
+    }
   }
 
   const drift = objective && rehearsal ? monitorRouteDrift({ objective, rehearsal, samples, now: input.now }) : null;
@@ -151,7 +196,7 @@ export function runLiveScenarioLoop(input: {
   }
 
   const askPack = buildAskEvidencePackFromAllowlist({
-    items: [objective, rehearsal, drift].filter(Boolean),
+    items: [objective, rehearsal, drift, ...lifecycleReceipts].filter(Boolean),
     now: input.now,
   });
 
@@ -159,6 +204,7 @@ export function runLiveScenarioLoop(input: {
     objective,
     rehearsal,
     drift,
+    lifecycle_receipts: lifecycleReceipts,
     referral,
     ask_pack: askPack,
     direct_address_candidate: directAddressCandidate,

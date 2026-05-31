@@ -130,10 +130,12 @@ import {
   resetMinecraftRouteDriftStateForTest,
 } from "./minecraft-route-drift";
 import {
+  recordMinecraftNavigationLifecycleFromWorldEvent,
   recordMinecraftNavigationEvidence,
   queryMinecraftNavigationState,
   resetMinecraftNavigationStateStoreForTest,
 } from "./minecraft-navigation-state-store";
+import type { MinecraftRouteLifecycleReceipt } from "./minecraft-route-lifecycle-reducer";
 import {
   reduceMinecraftSpatialIntent,
 } from "./minecraft-intent-hypothesis-reducer";
@@ -247,6 +249,7 @@ export type WorldEventIngestResult = {
   minecraft_spatial_graph?: MinecraftSpatialGraph | null;
   minecraft_route_rehearsal?: HelixMinecraftRouteRehearsal | null;
   minecraft_route_drift_event?: HelixMinecraftRouteDriftEvent | null;
+  minecraft_route_lifecycle_receipt?: MinecraftRouteLifecycleReceipt | null;
   minecraft_world_delta_overlay?: HelixMinecraftWorldDeltaOverlay | null;
   minecraft_world_sense_event?: HelixMinecraftWorldSenseEvent | null;
   minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
@@ -912,6 +915,10 @@ export const ingestWorldEvent = async (
     routeDrift: minecraftRouteDriftEvent,
     now: event.ts,
   });
+  const minecraftRouteLifecycleReceipt = recordMinecraftNavigationLifecycleFromWorldEvent({
+    event,
+    now: event.ts,
+  });
   state.signals.push(signal);
   state.signals.sort((a: SituationEventSignal, b: SituationEventSignal) =>
     a.ts.localeCompare(b.ts) || a.signal_id.localeCompare(b.signal_id),
@@ -1197,6 +1204,9 @@ export const ingestWorldEvent = async (
             latest_drift_event_id: navigationQuery.navigation_state.latest_drift_event_id,
             route_status: navigationQuery.navigation_state.route_status,
             policy_surface_status: navigationQuery.navigation_state.policy_surface_status,
+            latest_lifecycle_receipt_id: navigationQuery.navigation_state.latest_lifecycle_receipt_id ?? null,
+            route_lifecycle_status: navigationQuery.navigation_state.route_lifecycle_status ?? null,
+            route_intent_status: navigationQuery.navigation_state.route_intent_status ?? null,
             updated_at: navigationQuery.navigation_state.updated_at,
             evidence_refs: navigationQuery.navigation_state.evidence_refs,
             instruction_authority: "none",
@@ -1654,6 +1664,7 @@ export const ingestWorldEvent = async (
     minecraft_spatial_graph: minecraftSpatialGraph,
     minecraft_route_rehearsal: minecraftRouteRehearsal,
     minecraft_route_drift_event: minecraftRouteDriftEvent,
+    minecraft_route_lifecycle_receipt: minecraftRouteLifecycleReceipt,
     minecraft_world_delta_overlay: minecraftWorldDeltaOverlay,
     minecraft_world_sense_event: worldSenseResult.world_sense_event,
     minecraft_world_sense_context: worldSenseResult.world_sense_context,

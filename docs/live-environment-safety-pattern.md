@@ -14,11 +14,15 @@ It must not secretly tell Helix Ask what to say.
 - Minecraft route objective
 - End-return rehearsal
 - Route drift detection
+- Route lifecycle receipts for death, stale-route, and End-to-Overworld completion
 - Ask evidence-pack safety filtering
+- Schema-allowlisted Ask evidence filtering for route objective, rehearsal, drift, lifecycle, visual, and thin cross-domain evidence contracts
 - Operator referral isolation
 - Ambient transcript does not create Ask turns
 - Route drift contains no `surface_text`
 - Recommendation remains policy-gated
+- Paper plugin snapshot enrichment for compact entity state, local traversability cells, chunk snapshot summaries, block-event bursts, and container memory
+- Current-world block delta overlay persistence
 
 ## Implemented By This Follow-Up Patch
 
@@ -27,10 +31,11 @@ It must not secretly tell Helix Ask what to say.
 - Schema-allowlisted Ask-pack builder
 - Real Ask-turn sink test harness
 - Generic D.O.T referral union
-- Route lifecycle/dimension guards
+- Route lifecycle/dimension guards wired into the live loop and world-event ingest path
 - Thin cross-domain evidence stubs
 - Live-loop safety validator
 - Poisoning regression tests
+- Ask-pack sanitizer coverage for route lifecycle receipts
 
 ## Not Implemented Yet
 
@@ -44,3 +49,5 @@ It must not secretly tell Helix Ask what to say.
 - Support procedure reducer
 - Domain-specific anomaly monitors
 - Domain-specific policy renderers
+- Route-corridor-specific chunk sampling beyond bounded local chunk summaries
+- Full Paper plugin compile/runtime verification in this workspace

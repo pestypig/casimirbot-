@@ -274,4 +274,41 @@ describe("helix ask pill E68 debug export envelope", () => {
       clipboard_debug_copy_required_for_prompt_submission: false,
     });
   });
+
+  it("exports backend selected_final_answer for model-synthesized final drafts instead of concise presentation text", () => {
+    const longSelected =
+      "Long model-authored synthesis: curvature is encoded by the metric and Riemann tensor, matter enters through stress-energy, and free fall follows geodesics while tidal forces reveal curvature.";
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:model-synth",
+        question: "Explain spacetime curvature.",
+        content: "Short projection.",
+      } as any,
+      {
+        selectedDebugFinalAnswer: longSelected,
+        selected_final_answer: longSelected,
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_presentation: {
+          concise_text: "Short projection.",
+        },
+        terminal_answer_authority: {
+          turn_id: "ask:model-synth",
+          terminal_text_preview: "Short projection.",
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+        debug: {
+          turn_id: "ask:model-synth",
+          selected_final_answer: longSelected,
+          final_answer_source: "final_answer_draft",
+          terminal_artifact_kind: "model_synthesized_answer",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.selected_final_answer).toBe(longSelected);
+    expect(parsed.selected_final_answer).not.toBe("Short projection.");
+  });
 });
