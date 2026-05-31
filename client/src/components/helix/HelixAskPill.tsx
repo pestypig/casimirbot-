@@ -11767,7 +11767,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       ],
     },
   };
-  const visibleFinalAnswerForParity = coerceText(reply.content).trim() || selectedFinalAnswer || "";
+  const visibleFinalAnswerForParity =
+    terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
+      ? selectedFinalAnswer || coerceText(reply.content).trim()
+      : coerceText(reply.content).trim() || selectedFinalAnswer || "";
   const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
   const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
   const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)
@@ -11907,6 +11910,41 @@ const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => 
   const delayMs = [100, 250, 500, 900][Math.min(attempt, 3)] ?? 900;
   await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
 };
+
+async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
+  if (typeof fetch !== "function") return localPayload;
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(localPayload) as Record<string, unknown>;
+  } catch {
+    return localPayload;
+  }
+  const backendRef = readAgentLoopAuditRecord(parsed.backend_debug_response_ref);
+  const endpoint = coerceText(backendRef?.endpoint).trim();
+  const backendTurnId = coerceText(backendRef?.turn_id).trim();
+  const activeTurnId = coerceText(parsed.active_turn_id).trim();
+  if (!endpoint || !endpoint.startsWith("/api/agi/ask/turn/")) return localPayload;
+  if (backendTurnId && activeTurnId && backendTurnId !== activeTurnId) return localPayload;
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) return localPayload;
+    const body = await response.json() as Record<string, unknown>;
+    const authoritativePayload = readAgentLoopAuditRecord(body.payload) ?? readAgentLoopAuditRecord(body);
+    if (!authoritativePayload) return localPayload;
+    const authoritativeTurnId = coerceText(authoritativePayload.active_turn_id).trim();
+    if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) return localPayload;
+    return JSON.stringify({
+      ...authoritativePayload,
+      debug_export_source: "backend_endpoint",
+      client_projection_payload_hash: hashDebugExportText(localPayload),
+    }, null, 2);
+  } catch {
+    return localPayload;
+  }
+}
 
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
   const json = typeof payload === "string" ? payload : "";
@@ -17019,7 +17057,8 @@ export function HelixAskPill({
       if (debugCopyInFlightRef.current) return;
       debugCopyInFlightRef.current = true;
       try {
-        const exportPayload = normalizeReplyMasterDebugPayload(reply, payload);
+        const localExportPayload = normalizeReplyMasterDebugPayload(reply, payload);
+        const exportPayload = await resolveAuthoritativeDebugExportPayload(localExportPayload);
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
@@ -28015,7 +28054,10 @@ export function HelixAskPill({
               turn_contract: localResponse.turn_contract ?? null,
               invariant_violations: localResponse.invariant_violations ?? [],
               latest_result_artifact: localResponse.latest_result_artifact ?? null,
-              selected_final_answer: terminalResolution.text || localResponseRecord.selected_final_answer || null,
+              selected_final_answer:
+                typeof localResponseRecord.selected_final_answer === "string" && localResponseRecord.selected_final_answer.trim()
+                  ? localResponseRecord.selected_final_answer
+                  : terminalResolution.text || null,
               final_answer_source: localResponseRecord.final_answer_source ?? null,
               final_artifact_scope:
                 typeof localResponseRecord.final_artifact_scope === "string"
@@ -28350,8 +28392,25 @@ export function HelixAskPill({
             readAgentLoopAuditRecord(responseLiveEnvironmentRelevanceForDebug)?.artifact_synthesis_allowed === true
               ? renderLiveAnswerEnvironmentContextPackAnswer(responseSituationContextPackForDebug)
               : null;
+          const responseCanonicalSelectedFinalAnswer =
+            typeof localResponseRecord.selected_final_answer === "string" && localResponseRecord.selected_final_answer.trim()
+              ? localResponseRecord.selected_final_answer.trim()
+              : "";
+          const responseIsModelSynthesizedFinalDraft =
+            (
+              localResponseRecord.terminal_artifact_kind === "model_synthesized_answer" ||
+              responseDebugPayload.terminal_artifact_kind === "model_synthesized_answer" ||
+              readAgentLoopAuditRecord(responseDebugPayload.resolved_turn_summary)?.terminal_artifact_kind === "model_synthesized_answer"
+            ) &&
+            (
+              localResponseRecord.final_answer_source === "final_answer_draft" ||
+              responseDebugPayload.final_answer_source === "final_answer_draft"
+            ) &&
+            Boolean(responseCanonicalSelectedFinalAnswer);
           const responseDebugSelectedFinalAnswer =
-            responseLiveEnvironmentAnswerForDebug && isInvalidTerminalAnswerText(responseText)
+            responseIsModelSynthesizedFinalDraft
+              ? responseCanonicalSelectedFinalAnswer
+              : responseLiveEnvironmentAnswerForDebug && isInvalidTerminalAnswerText(responseText)
               ? responseLiveEnvironmentAnswerForDebug
               : responseText;
           const responseDebugUsedLiveEnvironmentAnswer =
@@ -28378,13 +28437,25 @@ export function HelixAskPill({
                       ? localResponseRecord.terminal_artifact_id
                       : responseDebugPayload.terminal_artifact_id,
                   terminal_error_code:
-                    typeof localResponseRecord.terminal_error_code === "string"
+                    responseIsModelSynthesizedFinalDraft && typeof localResponseRecord.terminal_error_code !== "string"
+                      ? null
+                      : typeof localResponseRecord.terminal_error_code === "string"
                       ? localResponseRecord.terminal_error_code
                       : responseDebugPayload.terminal_error_code,
                   situation_context_pack: responseSituationContextPackForDebug,
                   live_environment_turn_relevance: responseLiveEnvironmentRelevanceForDebug,
                   resolved_turn_summary:
-                    responseDebugUsedLiveEnvironmentAnswer && responseDebugPayload.resolved_turn_summary
+                    responseIsModelSynthesizedFinalDraft && responseDebugPayload.resolved_turn_summary
+                      ? {
+                          ...(responseDebugPayload.resolved_turn_summary as Record<string, unknown>),
+                          final_status: "final_answer",
+                          terminal_artifact_kind: "model_synthesized_answer",
+                          terminal_error_code:
+                            typeof localResponseRecord.terminal_error_code === "string"
+                              ? localResponseRecord.terminal_error_code
+                              : null,
+                        }
+                      : responseDebugUsedLiveEnvironmentAnswer && responseDebugPayload.resolved_turn_summary
                       ? {
                           ...(responseDebugPayload.resolved_turn_summary as Record<string, unknown>),
                           final_status: "final_answer",
@@ -31083,10 +31154,16 @@ export function HelixAskPill({
             const chosenVisibleFinalIsTypedFailureBoundary =
               /\bCause:\s*(?:equation_source_unavailable|calculator_evidence_unavailable|synthesis_unavailable)\b/i.test(chosenVisibleFinalText) ||
               /^I looked for an NHM2 paper\/document with equation-bearing snippets/i.test(chosenVisibleFinalText);
-            const finalAnswerRawText =
-              transcriptFinalRowText && (visibleResolvedTurn.terminal_error_code || chosenVisibleFinalIsTypedFailureBoundary)
-                ? transcriptFinalRowText
-                : chosenVisibleFinalText;
+            const shouldUseTranscriptFinalRow =
+              Boolean(transcriptFinalRowText) &&
+              (
+                chosenVisibleFinalIsTypedFailureBoundary ||
+                visibleResolvedTurn.primary_terminal_label === "final_failure" ||
+                visibleResolvedTurn.primary_source_label.replace(/\s+/g, "_") === "typed_failure"
+              );
+            const finalAnswerRawText = shouldUseTranscriptFinalRow
+              ? transcriptFinalRowText ?? chosenVisibleFinalText
+              : chosenVisibleFinalText;
             const finalAnswerIsLong = hasLongText(finalAnswerRawText, HELIX_ASK_MAX_RENDER_CHARS);
             const finalAnswerIsCollapsedPreview = finalAnswerIsLong && !expanded;
             const transcriptAnswer = clipForDisplay(

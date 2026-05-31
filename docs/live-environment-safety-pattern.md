@@ -23,6 +23,7 @@ It must not secretly tell Helix Ask what to say.
 - Recommendation remains policy-gated
 - Paper plugin snapshot enrichment for compact entity state, local traversability cells, chunk snapshot summaries, block-event bursts, and container memory
 - Current-world block delta overlay persistence
+- Durable risk/resource ledger for snapshot hazards, resources, damage events, and inventory/container transitions
 
 ## Implemented By This Follow-Up Patch
 
@@ -36,6 +37,7 @@ It must not secretly tell Helix Ask what to say.
 - Live-loop safety validator
 - Poisoning regression tests
 - Ask-pack sanitizer coverage for route lifecycle receipts
+- World-event ingest wiring for risk/resource ledger updates
 
 ## Not Implemented Yet
 

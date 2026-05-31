@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
 
 beforeAll(async () => {
+  (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({ copyDebugPayloadToClipboard } = await import("@/components/helix/HelixAskPill"));
 });
 

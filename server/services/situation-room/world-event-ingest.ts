@@ -151,6 +151,12 @@ import {
 import { clearGameSemanticLookupReceiptsForTest } from "./game-semantic-reference";
 import { clearEventJournalForTest, recordEventJournalEvent } from "./event-journal-store";
 import { clearPatternCandidatesForTest } from "./pattern-candidate-ledger";
+import {
+  resetEnvironmentRiskResourceLedgersForTest,
+  updateEnvironmentRiskResourceLedgerFromSnapshot,
+  updateEnvironmentRiskResourceLedgerFromWorldEvent,
+  type EnvironmentRiskResourceLedger,
+} from "./environment-risk-resource-ledger";
 import { processWorldEventForCategorizationJobs } from "./categorization-job-runner";
 import { clearContinuousCategorizationJobsForTest } from "./continuous-categorization-job-store";
 import { clearProfileSituationArchivesForTest } from "./profile-situation-archive-store";
@@ -251,6 +257,7 @@ export type WorldEventIngestResult = {
   minecraft_route_drift_event?: HelixMinecraftRouteDriftEvent | null;
   minecraft_route_lifecycle_receipt?: MinecraftRouteLifecycleReceipt | null;
   minecraft_world_delta_overlay?: HelixMinecraftWorldDeltaOverlay | null;
+  environment_risk_resource_ledger?: EnvironmentRiskResourceLedger | null;
   minecraft_world_sense_event?: HelixMinecraftWorldSenseEvent | null;
   minecraft_world_sense_context?: HelixMinecraftWorldSenseContext | null;
   game_semantic_lookup_receipts?: GameSemanticLookupReceipt[];
@@ -388,6 +395,7 @@ export const resetWorldEventIngestState = (options: ResetWorldEventIngestStateOp
   resetMinecraftSeedMapProviderForTest();
   resetMinecraftRouteDriftStateForTest();
   resetMinecraftNavigationStateStoreForTest();
+  resetEnvironmentRiskResourceLedgersForTest();
   if (!options.preserveSemanticLedgers) {
     clearGameSemanticLookupReceiptsForTest();
     clearGameUtilityHypothesesForTest();
@@ -882,6 +890,7 @@ export const ingestWorldEvent = async (
   const signal = normalizeMinecraftWorldEventToSignal({ event, signalId, graphId });
   const spatialResult = ingestMinecraftSpatialWorldEvent(event);
   const worldSenseResult = ingestMinecraftWorldSenseEvent(event);
+  let environmentRiskResourceLedger = updateEnvironmentRiskResourceLedgerFromWorldEvent(event);
   const minecraftWorldDeltaOverlay = persistMinecraftWorldDeltaOverlay(
     reduceMinecraftWorldDeltaOverlay(spatialResult.spatial_event),
   );
@@ -1195,7 +1204,7 @@ export const ingestWorldEvent = async (
       actorLabel: environmentStateSnapshot.actor_label ?? event.actor_label ?? null,
       limit: 1,
     });
-    ingestEnvironmentStateSnapshot(navigationQuery.navigation_state
+    const enrichedSnapshot = navigationQuery.navigation_state
       ? {
           ...environmentStateSnapshot,
           route_state: {
@@ -1214,7 +1223,9 @@ export const ingestWorldEvent = async (
             raw_content_included: false,
           },
         }
-      : environmentStateSnapshot);
+      : environmentStateSnapshot;
+    ingestEnvironmentStateSnapshot(enrichedSnapshot);
+    environmentRiskResourceLedger = updateEnvironmentRiskResourceLedgerFromSnapshot(enrichedSnapshot);
   }
   const liveArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId
@@ -1666,6 +1677,7 @@ export const ingestWorldEvent = async (
     minecraft_route_drift_event: minecraftRouteDriftEvent,
     minecraft_route_lifecycle_receipt: minecraftRouteLifecycleReceipt,
     minecraft_world_delta_overlay: minecraftWorldDeltaOverlay,
+    environment_risk_resource_ledger: environmentRiskResourceLedger,
     minecraft_world_sense_event: worldSenseResult.world_sense_event,
     minecraft_world_sense_context: worldSenseResult.world_sense_context,
     game_semantic_lookup_receipts: semanticUtilityReduction?.lookup_receipts ?? [],

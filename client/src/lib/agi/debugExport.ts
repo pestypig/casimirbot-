@@ -454,8 +454,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       ],
     },
   };
+  const visibleFinalAnswerForParity = modelSynthesizedFinalDraft
+    ? selectedFinalAnswer
+    : readString(reply.content) ?? selectedFinalAnswer;
   const uiDebugParityHarness = buildHelixUiDebugParityHarnessSnapshot({
-    visibleFinalAnswer: readString(reply.content) ?? selectedFinalAnswer,
+    visibleFinalAnswer: visibleFinalAnswerForParity,
     debugExport: envelopeWithoutHash,
     calculatorPanelState,
   });

@@ -9,6 +9,7 @@ import type { HelixRecommendationGate } from "@shared/helix-recommendation-gate"
 import { updateLiveAnswerEnvironment } from "./live-answer-environment-store";
 import { reduceEnvironmentAffordances } from "./environment-affordance-reducer";
 import { updateEnvironmentMemoryLedger } from "./environment-memory-ledger";
+import { updateEnvironmentRiskResourceLedgerFromSnapshot } from "./environment-risk-resource-ledger";
 import { buildPossibilityGraph } from "./possibility-graph-builder";
 import { rehearsePossibilityGraph } from "./action-rehearsal-engine";
 import { reduceEnvironmentStateSnapshot } from "./environment-state-snapshot-reducer";
@@ -49,6 +50,7 @@ export function reduceLiveAnswerEnvironmentFromEnvironmentStateSnapshot(input: {
   const affordances = reduceEnvironmentAffordances(input.snapshot);
   const affordanceAudit = auditEnvironmentSourceContract({ subject: affordances, now });
   const memory = updateEnvironmentMemoryLedger(input.snapshot);
+  updateEnvironmentRiskResourceLedgerFromSnapshot(input.snapshot);
   const graphCandidate = buildPossibilityGraph({
     objective: input.objective ?? environment.objective,
     threadId: input.threadId,
