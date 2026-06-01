@@ -18,11 +18,14 @@ describe("FruitionCalculatorPanel", () => {
     expect(screen.getByTestId("fruition-calculator-panel")).toBeTruthy();
     expect(screen.getByText("Fruition Calculator")).toBeTruthy();
     expect(screen.getByText("Procedural expression")).toBeTruthy();
-    expect(screen.getByText("Result posture")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Solve" })).toBeTruthy();
+    expect(screen.getByTestId("fruition-answer-box")).toBeTruthy();
+    expect(screen.getByText("Answer")).toBeTruthy();
+    expect(screen.getByText("Trace")).toBeTruthy();
     expect(screen.getAllByText(/first principle/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/supports/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Evidence only/i)).toBeTruthy();
-    expect(screen.getByText(/Agent executable: false/i)).toBeTruthy();
+    expect(screen.getByText(/Executable: false/i)).toBeTruthy();
   });
 
   it("renders a Zen Badge Graph-loaded expression from the calculator store", () => {
@@ -32,8 +35,8 @@ describe("FruitionCalculatorPanel", () => {
     render(<FruitionCalculatorPanel />);
 
     expect(screen.getByText(fruition.expression)).toBeTruthy();
-    expect(screen.getByText(`${fruition.terms.length} terms`)).toBeTruthy();
-    expect(screen.getByText(`${fruition.operators.length} operators`)).toBeTruthy();
+    expect(screen.getAllByText(`${fruition.terms.length} terms`).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(`${fruition.operators.length} operators`).length).toBeGreaterThan(0);
     expect(screen.getByText("1 history entries")).toBeTruthy();
   });
 });

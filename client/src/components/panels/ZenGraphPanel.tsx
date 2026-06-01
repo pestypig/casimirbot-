@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useZenGraphReflection } from "@/hooks/useZenGraphReflection";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 
-type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action";
+type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective";
 
 type ZenGraphNode = {
   id: string;
@@ -20,6 +20,7 @@ type ZenGraphNode = {
   confidence?: number;
   tags?: string[];
   summary: string;
+  proceduralExpression?: string;
   proceduralRole?: string;
   procedureOperator?: string;
   actionEffect?: string;
@@ -96,6 +97,9 @@ function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted:
     case "action":
       classes.push("border-violet-200 bg-gradient-to-br from-violet-100 via-zinc-400 to-violet-950 text-zinc-950");
       break;
+    case "objective":
+      classes.push("border-fuchsia-200 bg-gradient-to-br from-fuchsia-100 via-zinc-400 to-fuchsia-950 text-zinc-950");
+      break;
   }
   if (args.selected) classes.push("ring-4 ring-cyan-200/80 shadow-cyan-200/50");
   else if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
@@ -110,11 +114,63 @@ function nodeGlyph(node: ZenGraphNode): string {
   if (node.tone === "trait") return "T";
   if (node.tone === "safeguard") return "G";
   if (node.tone === "boundary") return "!";
+  if (node.tone === "objective") return "B";
   return "A";
 }
 
 function matchLabel(match: IdeologyNodeMatchV1): string {
   return `${match.label} / ${confidenceLabel(match.score)}`;
+}
+
+function proceduralToken(value: string): string {
+  return value.replace(/[^a-z0-9_-]+/gi, "_");
+}
+
+function proceduralSubjectForNode(node: Pick<ZenGraphNode, "id" | "tone">): string {
+  if (node.tone === "root") return `root.${proceduralToken(node.id)}`;
+  if (node.tone === "principle") return `principle.${proceduralToken(node.id)}`;
+  if (node.tone === "objective") return `objective.${proceduralToken(node.id)}`;
+  if (node.tone === "safeguard") return `gate.${proceduralToken(node.id)}`;
+  if (node.tone === "boundary") return `missing.${proceduralToken(node.id.replace(/^missing:/, ""))}`;
+  if (node.tone === "action") return `action.${proceduralToken(node.id.replace(/^action:/, ""))}`;
+  return `lens.${proceduralToken(node.id)}`;
+}
+
+function rootProcedureExpression(rootId: string): string {
+  if (rootId !== ZEN_WISDOM_ROOT_ID) return `root.${proceduralToken(rootId)} supports result.procedural_posture`;
+  return `objective.${ZEN_WISDOM_ROOT_ID} receives preset.wisdom-foundation`;
+}
+
+function principleProcedureExpression(principle: (typeof ZEN_WISDOM_PRINCIPLES)[number]): string {
+  return `principle.${proceduralToken(principle.id)} ${labelize(principle.procedureOperator)} result.procedural_posture`;
+}
+
+function fallbackProcedureExpression(node: ZenGraphNode): string {
+  const operator = node.procedureOperator ?? (node.tone === "boundary" || node.tone === "safeguard" ? "requires" : "supports");
+  return `${proceduralSubjectForNode(node)} ${labelize(operator)} result.procedural_posture`;
+}
+
+function termProcedureExpression(node: ZenGraphNode, term: FruitionProcedureTermV1): string {
+  return `${proceduralSubjectForNode(node)} ${labelize(term.procedureOperator ?? term.polarity)} result.procedural_posture`;
+}
+
+function selectedCombinationOutcome(nodes: ZenGraphNode[]): { posture: string; label: string } {
+  if (nodes.some((node) => node.tone === "boundary" || node.procedureOperator === "blocks")) {
+    return { posture: "blocked_or_missing_check", label: "Selected badges route toward a blocked or missing-check posture." };
+  }
+  if (nodes.some((node) => node.tone === "safeguard" || node.procedureOperator === "requires" || node.procedureOperator === "asks_for")) {
+    return { posture: "requires_check", label: "Selected badges require checks before the procedure can advance." };
+  }
+  if (nodes.some((node) => node.procedureOperator === "constrains" || node.procedureOperator === "balances")) {
+    return { posture: "constrained_action_posture", label: "Selected badges constrain or balance the action posture." };
+  }
+  return { posture: "supported_action_posture", label: "Selected badges support the current procedural posture." };
+}
+
+function selectedCombinationExpression(nodes: ZenGraphNode[]): string {
+  if (nodes.length === 0) return "No selected badge combination.";
+  const outcome = selectedCombinationOutcome(nodes);
+  return `${nodes.map((node) => node.proceduralExpression ?? fallbackProcedureExpression(node)).join(" + ")} => ${outcome.posture}`;
 }
 
 function addNode(nodes: Map<string, ZenGraphNode>, node: ZenGraphNode): void {
@@ -135,26 +191,37 @@ function addPathNodes(params: {
 }): void {
   const pathRootFirst = [...params.path].reverse();
   pathRootFirst.forEach((nodeId, index) => {
-    const isRoot = index === 0;
+    const isRoot = nodeId === ZEN_WISDOM_ROOT_ID;
     addNode(params.nodes, {
       id: nodeId,
       label: params.labelsById.get(nodeId) ?? labelize(nodeId),
-      tone: isRoot ? "root" : params.tone,
+      tone: isRoot ? "objective" : params.tone,
       glyph: "",
-      x: 90 + index * 150,
+      x: isRoot ? 920 : 210 + index * 150,
       y: params.laneY,
       confidence: isRoot ? undefined : params.confidence,
-      tags: isRoot ? ["root"] : params.tags,
-      summary: isRoot ? "Root principle" : params.summary,
+      tags: isRoot ? ["objective_binding", "preset"] : params.tags,
+      summary: isRoot ? "Objective binding assembled from primitive wisdom badges." : params.summary,
+      proceduralExpression: isRoot
+        ? rootProcedureExpression(nodeId)
+        : fallbackProcedureExpression({
+            id: nodeId,
+            label: params.labelsById.get(nodeId) ?? labelize(nodeId),
+            tone: params.tone,
+            glyph: "",
+            x: 0,
+            y: 0,
+            summary: params.summary,
+          }),
     });
     if (index > 0) {
-      const from = pathRootFirst[index - 1];
-      const to = nodeId;
+      const from = nodeId;
+      const to = pathRootFirst[index - 1];
       params.edges.push({
         id: `path:${from}:${to}`,
         from,
         to,
-        label: "path to root",
+        label: "path to binding",
         tone: params.edgeTone,
       });
     }
@@ -174,9 +241,15 @@ function findProcedureTermForNode(node: ZenGraphNode, fruition: FruitionProcedur
 
 function decorateProcedureNode(node: ZenGraphNode, fruition: FruitionProcedureExpressionV1): ZenGraphNode {
   const term = findProcedureTermForNode(node, fruition);
-  if (!term) return node;
+  if (!term) {
+    return {
+      ...node,
+      proceduralExpression: node.proceduralExpression ?? fallbackProcedureExpression(node),
+    };
+  }
   return {
     ...node,
+    proceduralExpression: termProcedureExpression(node, term),
     proceduralRole: term.proceduralRole,
     procedureOperator: term.procedureOperator,
     actionEffect: term.actionEffect,
@@ -203,21 +276,19 @@ function buildGraph(
 
   addNode(nodes, {
     id: reflection.graph.rootId,
-    label: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "Wisdom Root" : labelize(reflection.graph.rootId),
-    tone: "root",
-    glyph: "",
-    x: 90,
+    label: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "Wisdom First Principles" : labelize(reflection.graph.rootId),
+    tone: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "objective" : "root",
+    glyph: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "B" : "",
+    x: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? 900 : 90,
     y: 210,
-    tags: ["root"],
-    summary:
-      reflection.graph.rootId === ZEN_WISDOM_ROOT_ID
-        ? "Root container. The composable first principles are the connected primitive badges."
-        : "Root principle",
+    tags: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? ["objective_binding", "preset"] : ["root"],
+    summary: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "Objective binding assembled from primitive wisdom badges." : "Root principle",
+    proceduralExpression: rootProcedureExpression(reflection.graph.rootId),
   });
 
   if (reflection.graph.rootId === ZEN_WISDOM_ROOT_ID) {
     ZEN_WISDOM_PRINCIPLES.forEach((principle, index) => {
-      const x = 210 + (index % 4) * 128;
+      const x = 120 + (index % 4) * 142;
       const y = 84 + Math.floor(index / 4) * 92;
       addNode(nodes, {
         id: principle.id,
@@ -228,6 +299,7 @@ function buildGraph(
         y,
         tags: principle.tags,
         summary: principle.summary,
+        proceduralExpression: principleProcedureExpression(principle),
         proceduralRole: principle.proceduralRole,
         procedureOperator: principle.procedureOperator,
         actionEffect: principle.actionEffect,
@@ -236,10 +308,10 @@ function buildGraph(
       });
       edges.push({
         id: `wisdom:${reflection.graph.rootId}:${principle.id}`,
-        from: reflection.graph.rootId,
-        to: principle.id,
-        label: "first principle",
-        tone: "cyan",
+        from: principle.id,
+        to: reflection.graph.rootId,
+        label: "assembles binding",
+        tone: "emerald",
       });
     });
   }
@@ -272,6 +344,7 @@ function buildGraph(
       confidence: match.score,
       tags: match.tags,
       summary,
+      proceduralExpression: `${kind}.${proceduralToken(match.nodeId)} supports result.procedural_posture`,
     });
     edges.push({ id: `root:${match.nodeId}`, from: reflection.graph.rootId, to: match.nodeId, label: "activates", tone: edgeTone });
     lane += 1;
@@ -308,6 +381,7 @@ function buildGraph(
       y,
       tags: warning.requiredCheck ? [warning.requiredCheck] : ["action_gate"],
       summary: warning.warning,
+      proceduralExpression: `gate.${proceduralToken(warning.gateId)} requires result.procedural_posture`,
     });
     for (const target of [...reflection.matches.exact, ...reflection.matches.likely, ...reflection.matches.inferred_lenses]) {
       if (target.nodeId !== warning.gateId && nodes.has(target.nodeId)) {
@@ -333,6 +407,7 @@ function buildGraph(
       y: 330 + index * 90,
       tags: ["missing_check"],
       summary: "Missing check keeps the reflection diagnostic.",
+      proceduralExpression: `missing.${proceduralToken(missing)} asks for result.procedural_posture`,
     });
     edges.push({ id: `boundary:${id}`, from: reflection.graph.rootId, to: id, label: "claim boundary", tone: "rose" });
   });
@@ -348,6 +423,7 @@ function buildGraph(
       y: 135 + index * 95,
       tags: action.reasonCodes,
       summary: `${labelize(action.admission)} / ${labelize(action.risk)} / ${labelize(action.display_policy ?? "actionable")}`,
+      proceduralExpression: `action.${proceduralToken(action.actionId)} ${action.admission === "blocked" ? "blocks" : "routes to"} result.procedural_posture`,
     });
     edges.push({
       id: `action:${action.actionId}`,
@@ -439,6 +515,7 @@ function ObjectiveBindingRail({
   admission,
   fruition,
   selectedNode,
+  selectedNodes,
   onSelectNode,
   onLoadFruition,
 }: {
@@ -446,6 +523,7 @@ function ObjectiveBindingRail({
   admission: HelixRecommendedActionAdmissionV1;
   fruition: FruitionProcedureExpressionV1;
   selectedNode: ZenGraphNode | null;
+  selectedNodes: ZenGraphNode[];
   onSelectNode: (id: string) => void;
   onLoadFruition: () => void;
 }) {
@@ -465,8 +543,8 @@ function ObjectiveBindingRail({
         ].find((entry) => entry.nodeId === selectedNode.id)?.pathToRoot ?? []
       : [];
   const presetPath = selectedPath.length
-    ? [...selectedPath].reverse()
-    : [...(reflection.activated_traits[0]?.pathToRoot ?? reflection.matches.exact[0]?.pathToRoot ?? [])].reverse();
+    ? selectedPath
+    : (reflection.activated_traits[0]?.pathToRoot ?? reflection.matches.exact[0]?.pathToRoot ?? []);
   const missingChecks = reflection.claim_boundaries.missing_evidence ?? [];
   const askUserActions = admission.actions.filter((action) => action.admission === "ask_user");
   const blockedActions = admission.actions.filter((action) => action.admission === "blocked");
@@ -474,6 +552,9 @@ function ObjectiveBindingRail({
   const selectedProcedure = selectedNode?.proceduralRole
     ? `${labelize(selectedNode.proceduralRole)} ${selectedNode.procedureOperator ? `-> ${labelize(selectedNode.procedureOperator)}` : ""}`
     : "No procedure role mapped.";
+  const selectedProcedureExpression = selectedNode?.proceduralExpression ?? "No procedural expression mapped.";
+  const combinationOutcome = selectedCombinationOutcome(selectedNodes);
+  const combinationExpression = selectedCombinationExpression(selectedNodes);
   return (
     <aside
       data-testid="zen-graph-objective-binding-overlay"
@@ -483,22 +564,22 @@ function ObjectiveBindingRail({
         <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Objective Bindings</div>
         <h2 className="mt-0.5 text-base font-semibold leading-tight">ZenGraph Fruition Path</h2>
         <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
-          Preset paths bind first principles to outer objective badges and the Fruition procedure expression.
+          Preset bindings show primitive design-language badges combining into an objective view.
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         <BindingBox
-          title="First principle"
-          label="root"
+          title="Objective binding"
+          label="preset"
           tone="slate"
           activeNodeIds={[reflection.graph.rootId]}
           onSelectNode={onSelectNode}
         >
-          {labelize(reflection.graph.rootId)} is the root badge for this objective path.
+          {labelize(reflection.graph.rootId)} is assembled from primitive design-language badges.
         </BindingBox>
         <BindingBox
           title="Preset path stack"
-          label="first principle to objective"
+          label="primitive to binding"
           tone="emerald"
           activeNodeIds={presetPath}
           onSelectNode={onSelectNode}
@@ -554,9 +635,25 @@ function ObjectiveBindingRail({
             </button>
           </div>
         </BindingBox>
+        <BindingBox
+          title="Selected combination"
+          label={`${selectedNodes.length} badge${selectedNodes.length === 1 ? "" : "s"}`}
+          tone="emerald"
+          activeNodeIds={selectedNodes.map((node) => node.id)}
+          onSelectNode={onSelectNode}
+        >
+          <div className="space-y-1">
+            <div className="font-mono text-[10px] leading-snug text-emerald-100">{combinationExpression}</div>
+            <div className="text-[11px] opacity-80">{combinationOutcome.label}</div>
+            <div className="text-[11px] opacity-80">
+              Compare reflection: {labelize(fruition.result.posture)}
+            </div>
+          </div>
+        </BindingBox>
         <BindingBox title="Badge procedure" label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
           <div className="space-y-1">
-            <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedure}</div>
+            <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedureExpression}</div>
+            <div className="text-[11px] opacity-80">{selectedProcedure}</div>
             <div className="text-[11px] opacity-80">
               {selectedNode?.actionEffect ?? "Select a mapped badge to inspect how it contributes to the procedural action."}
             </div>
@@ -611,15 +708,34 @@ export function ZenGraphPanel({
   const fruition = useMemo(() => calculateFruitionFromReflection({ reflection, admission }), [admission, reflection]);
   const graph = useMemo(() => buildGraph(reflection, admission, fruition), [admission, fruition, reflection]);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId);
+  const initialSelectedNodeId = reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(initialSelectedNodeId);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([initialSelectedNodeId]);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [objectiveBindingsOpen, setObjectiveBindingsOpen] = useState(false);
   const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
+  const selectedNodes = selectedNodeIds
+    .map((id) => graph.nodes.find((node) => node.id === id))
+    .filter((node): node is ZenGraphNode => Boolean(node));
+  const hoveredNode = hoveredNodeId ? graph.nodes.find((node) => node.id === hoveredNodeId) ?? null : null;
   const highlighted = new Set([
-    selectedNodeId,
+    ...selectedNodeIds,
     ...(reflection.overlay?.highlightedNodeIds ?? []),
     ...(selectedNode?.tone === "root" ? [] : [reflection.graph.rootId]),
   ]);
   const hasFocus = highlighted.size > 0;
+  const addNodeToSelection = (id: string) => {
+    setSelectedNodeId(id);
+    setSelectedNodeIds((current) => (current.includes(id) ? current : [...current, id]));
+  };
+  const toggleNodeSelection = (id: string) => {
+    setSelectedNodeId(id);
+    setSelectedNodeIds((current) => {
+      if (!current.includes(id)) return [...current, id];
+      if (current.length === 1) return current;
+      return current.filter((selectedId) => selectedId !== id);
+    });
+  };
   const loadToFruitionCalculator = () => {
     loadFruitionExpression(fruition, { source: "zen_badge_graph" });
     if (typeof window !== "undefined") {
@@ -655,7 +771,8 @@ export function ZenGraphPanel({
               admission={admission}
               fruition={fruition}
               selectedNode={selectedNode}
-              onSelectNode={setSelectedNodeId}
+              selectedNodes={selectedNodes}
+              onSelectNode={addNodeToSelection}
               onLoadFruition={loadToFruitionCalculator}
             />
           ) : null}
@@ -716,7 +833,7 @@ export function ZenGraphPanel({
                 })}
               </svg>
               {graph.nodes.map((node) => {
-                const selected = selectedNodeId === node.id;
+                const selected = selectedNodeIds.includes(node.id);
                 const highlightedNode = highlighted.has(node.id);
                 const dimmed = hasFocus && !highlightedNode;
                 return (
@@ -726,21 +843,14 @@ export function ZenGraphPanel({
                     className={nodeClasses({ node, selected, highlighted: highlightedNode, dimmed })}
                     data-testid="zen-graph-badge-node"
                     style={{ left: node.x, top: node.y }}
-                    title={[
-                      node.label,
-                      node.summary,
-                      confidenceLabel(node.confidence),
-                      node.proceduralRole ? `procedural role: ${labelize(node.proceduralRole)}` : null,
-                      node.procedureOperator ? `operator: ${labelize(node.procedureOperator)}` : null,
-                      node.actionEffect,
-                      node.evidenceNeeds?.length ? `needs: ${node.evidenceNeeds.map(labelize).join(", ")}` : null,
-                      node.refusesAuthority?.length ? `refuses: ${node.refusesAuthority.map(labelize).join(", ")}` : null,
-                      ...(node.tags ?? []),
-                    ].filter(Boolean).join("\n")}
                     aria-label={node.label}
+                    onMouseEnter={() => setHoveredNodeId(node.id)}
+                    onMouseLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
+                    onFocus={() => setHoveredNodeId(node.id)}
+                    onBlur={() => setHoveredNodeId((current) => (current === node.id ? null : current))}
                     onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                       event.stopPropagation();
-                      setSelectedNodeId(node.id);
+                      toggleNodeSelection(node.id);
                     }}
                   >
                     <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
@@ -755,32 +865,36 @@ export function ZenGraphPanel({
                   </button>
                 );
               })}
-              {selectedNode ? (
+              {hoveredNode ? (
                 <div
-                  className="pointer-events-none absolute z-10 max-w-[240px] rounded border border-zinc-700 bg-zinc-950/90 p-2 text-xs text-zinc-200 shadow"
-                  style={{ left: selectedNode.x + 62, top: selectedNode.y - 8 }}
+                  data-testid="zen-graph-hover-card"
+                  className="pointer-events-none absolute z-50 max-w-[260px] rounded border border-cyan-700/70 bg-zinc-950/95 p-2 text-xs text-zinc-200 shadow-2xl shadow-cyan-950/40"
+                  style={{ left: hoveredNode.x + 62, top: Math.max(12, hoveredNode.y - 8) }}
                 >
-                  <div className="font-semibold text-zinc-50">{selectedNode.label}</div>
-                  <div className="mt-1 text-zinc-400">{selectedNode.summary}</div>
-                  {selectedNode.proceduralRole ? (
+                  <div className="font-semibold text-zinc-50">{hoveredNode.label}</div>
+                  <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{hoveredNode.id}</div>
+                  <div className="mt-1 font-mono text-[11px] leading-snug text-cyan-100">
+                    {hoveredNode.proceduralExpression ?? fallbackProcedureExpression(hoveredNode)}
+                  </div>
+                  {hoveredNode.proceduralRole ? (
                     <div className="mt-1 text-cyan-100">
-                      {labelize(selectedNode.proceduralRole)}
-                      {selectedNode.procedureOperator ? ` -> ${labelize(selectedNode.procedureOperator)}` : ""}
+                      {labelize(hoveredNode.proceduralRole)}
+                      {hoveredNode.procedureOperator ? ` -> ${labelize(hoveredNode.procedureOperator)}` : ""}
                     </div>
                   ) : null}
-                  {selectedNode.actionEffect ? (
-                    <div className="mt-1 text-zinc-300">{selectedNode.actionEffect}</div>
+                  {hoveredNode.actionEffect ? (
+                    <div className="mt-1 text-zinc-300">{hoveredNode.actionEffect}</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
-                      {selectedNode.tone}
+                      {hoveredNode.tone}
                     </Badge>
-                    {selectedNode.proceduralRole ? (
+                    {hoveredNode.proceduralRole ? (
                       <Badge variant="outline" className="border-cyan-700 text-[10px] text-cyan-200">
-                        {labelize(selectedNode.proceduralRole)}
+                        {labelize(hoveredNode.proceduralRole)}
                       </Badge>
                     ) : null}
-                    {(selectedNode.tags ?? []).slice(0, 2).map((tag) => (
+                    {(hoveredNode.tags ?? []).slice(0, 2).map((tag) => (
                       <Badge key={tag} variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
                         {labelize(tag)}
                       </Badge>

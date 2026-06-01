@@ -138,8 +138,12 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByTestId("zen-graph-map-scrollport")).toBeTruthy();
     expect(screen.getByText("Zen Badge Graph")).toBeTruthy();
     expect(screen.queryByTestId("zen-graph-objective-binding-overlay")).toBeNull();
-    expect(screen.getByRole("button", { name: "Wisdom Root" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Direct Observation Before Claim" })).toBeTruthy();
+    const rootBadge = screen.getByRole("button", { name: "Wisdom First Principles" });
+    expect(rootBadge).toBeTruthy();
+    expect(rootBadge.getAttribute("title")).toBeNull();
+    const observationBadge = screen.getByRole("button", { name: "Direct Observation Before Claim" });
+    expect(observationBadge).toBeTruthy();
+    expect(observationBadge.getAttribute("title")).toBeNull();
     expect(screen.getByRole("button", { name: "Impermanence, Entropy, and Revision" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Interdependence and Yin-Yang Balance" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Falsifiability and Truth Convergence" })).toBeTruthy();
@@ -155,11 +159,31 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByText("Objective Bindings")).toBeTruthy();
     expect(screen.getByTestId("zen-graph-objective-binding-overlay")).toBeTruthy();
     expect(screen.getByText("ZenGraph Fruition Path")).toBeTruthy();
-    expect(screen.getByText("First principle")).toBeTruthy();
+    expect(screen.getByText("Objective binding")).toBeTruthy();
     expect(screen.getByText("Preset path stack")).toBeTruthy();
     expect(screen.getByText("Fruition procedure")).toBeTruthy();
     expect(screen.getByText("Badge procedure")).toBeTruthy();
     expect(screen.getByText("Outer objective view")).toBeTruthy();
+    expect(screen.getAllByText(/primitive design-language badges/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/skillful mediation -> right speech infrastructure -> mission ethos -> wisdom first principles/i)).toBeTruthy();
+  });
+
+  it("shows badge procedure details only in the custom hover card", () => {
+    renderPanel();
+
+    const observationBadge = screen.getByRole("button", { name: "Direct Observation Before Claim" });
+    expect(screen.queryByTestId("zen-graph-hover-card")).toBeNull();
+
+    fireEvent.click(observationBadge);
+    expect(screen.queryByTestId("zen-graph-hover-card")).toBeNull();
+
+    fireEvent.mouseEnter(observationBadge);
+    expect(screen.getByTestId("zen-graph-hover-card")).toBeTruthy();
+    expect(screen.getByText("principle.direct-observation-before-claim supports result.procedural_posture")).toBeTruthy();
+    expect(screen.getByText("Start the procedure from observed evidence before naming a claim.")).toBeTruthy();
+
+    fireEvent.mouseLeave(observationBadge);
+    expect(screen.queryByTestId("zen-graph-hover-card")).toBeNull();
   });
 
   it("shows how a selected Zen badge contributes to the action procedure", () => {
@@ -172,6 +196,21 @@ describe("ZenGraphPanel", () => {
     expect(screen.getAllByText(/constrains/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Right Speech Infrastructure constrains how the action may be formulated.").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/execution authority/i).length).toBeGreaterThan(0);
+  });
+
+  it("combines multiple selected badges into a procedural outcome", () => {
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Direct Observation Before Claim" }));
+    fireEvent.click(screen.getByRole("button", { name: "Right Speech and Accurate Formulation" }));
+    openObjectiveBindings();
+
+    expect(screen.getByText("Selected combination")).toBeTruthy();
+    expect(screen.getByText("3 badges")).toBeTruthy();
+    expect(screen.getByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/)).toBeTruthy();
+    expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Selected badges constrain or balance the action posture.")).toBeTruthy();
+    expect(screen.getAllByText((_, element) => element?.textContent?.includes("Compare reflection:") ?? false).length).toBeGreaterThan(0);
   });
 
   it("renders safeguards, action gate warnings, tensions, and claim boundaries", () => {
