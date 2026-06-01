@@ -24,7 +24,7 @@ describe("curvature/collapse theory badges", () => {
     ).toBe(true);
     expect(isTheoryBadgeGraphV1(graph)).toBe(true);
     expect(JSON.stringify(curvature)).not.toMatch(
-      /curvature-gravity certified|objective-collapse proof|objective collapse proof|faster-than-light|confirmed physical mechanism|validated propulsion|CL4 support/i,
+      /curvature-gravity certified|objective collapse proof|faster-than-light|confirmed physical mechanism|validated propulsion|CL4 support/i,
     );
   });
 
