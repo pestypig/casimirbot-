@@ -137,5 +137,20 @@ describe("Helix Ask theory reflection route", () => {
       );
     }
     expect(answer).toMatch(/3\.313035/i);
+
+    const debugResponse = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(body?.turn_id))}/debug-export`)
+      .expect(200);
+    const debugPayload = debugResponse.body?.payload;
+    expect(debugPayload?.tool_trace_disclosure?.action_keys).toEqual(
+      expect.arrayContaining([
+        "theory-badge-graph.reflect_discussion_context",
+        "theory-badge-graph.explain_reflected_context",
+        "scientific-calculator.solve_expression",
+      ]),
+    );
+    expect(debugPayload?.tool_trace_disclosure?.answerNote).toBe(
+      "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+    );
   });
 });

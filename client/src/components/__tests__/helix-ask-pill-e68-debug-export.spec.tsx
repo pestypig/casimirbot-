@@ -311,4 +311,78 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.selected_final_answer).toBe(longSelected);
     expect(parsed.selected_final_answer).not.toBe("Short projection.");
   });
+
+  it("exports compact theory reflection and calculator tool trace disclosure", () => {
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:tool-trace",
+        question: "Calculate photon energy for f=5e14 Hz and show where E=hf fits in the theory graph.",
+        content:
+          "Calculator-backed answer:\nPhoton energy: 3.313035e-19 J.\n\nEvidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+      } as any,
+      {
+        selected_final_answer:
+          "Calculator-backed answer:\nPhoton energy: 3.313035e-19 J.\n\nEvidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_answer_authority: {
+          turn_id: "ask:tool-trace",
+          terminal_text_preview:
+            "Calculator-backed answer:\nPhoton energy: 3.313035e-19 J.\n\nEvidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+        action_envelope: {
+          schema: "helix.ask.action_envelope.v1",
+          workstation_actions: [
+            { panel_id: "theory-badge-graph", action_id: "reflect_discussion_context", args: {} },
+            { panel_id: "theory-badge-graph", action_id: "explain_reflected_context", args: {} },
+            { panel_id: "scientific-calculator", action_id: "solve_expression", args: {} },
+          ],
+        },
+        debug: {
+          turn_id: "ask:tool-trace",
+          selected_final_answer:
+            "Calculator-backed answer:\nPhoton energy: 3.313035e-19 J.\n\nEvidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+          final_answer_source: "final_answer_draft",
+          terminal_artifact_kind: "model_synthesized_answer",
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.action_envelope.workstation_actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action_id: "reflect_discussion_context" }),
+        expect.objectContaining({ action_id: "explain_reflected_context" }),
+        expect.objectContaining({ action_id: "solve_expression" }),
+      ]),
+    );
+    expect(parsed.tool_trace_disclosure.action_keys).toEqual(
+      expect.arrayContaining([
+        "theory-badge-graph.reflect_discussion_context",
+        "theory-badge-graph.explain_reflected_context",
+        "scientific-calculator.solve_expression",
+      ]),
+    );
+    expect(parsed.tool_trace_disclosure.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tool: "theory-badge-graph.reflect_discussion_context",
+          role: "context_locator",
+          authority: "evidence_only",
+        }),
+        expect.objectContaining({
+          tool: "scientific-calculator.solve_expression",
+          role: "scalar_solver",
+          authority: "numeric_observation",
+        }),
+      ]),
+    );
+    expect(parsed.tool_trace_disclosure.answerNote).toBe(
+      "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+    );
+    expect(parsed.tool_trace_disclosure.assistant_answer).toBe(false);
+    expect(parsed.tool_trace_disclosure.terminal_eligible).toBe(false);
+  });
 });

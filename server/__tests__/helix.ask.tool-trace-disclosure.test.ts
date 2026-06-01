@@ -57,4 +57,58 @@ describe("Helix Ask tool trace disclosure", () => {
     expect(answer).toContain("Evidence note:");
     expect(twice.match(/Evidence note:/g)?.length).toBe(1);
   });
+
+  it("classifies source lookup plus calculator solves without theory-specific hardcoding", () => {
+    const disclosure = buildAskToolTraceDisclosure({
+      turnId: "turn:source",
+      steps: [
+        {
+          step_id: "read_doc",
+          kind: "run_panel_action",
+          panel_id: "doc-viewer",
+          action_id: "open_doc_and_read",
+          required: true,
+        },
+        {
+          step_id: "solve_expression",
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "solve_expression",
+          required: true,
+        },
+      ],
+    });
+
+    expect(disclosure.items.map((item) => item.role)).toEqual(["source_lookup", "scalar_solver"]);
+    expect(disclosure.items.find((item) => item.role === "source_lookup")?.authority).toBe("source_evidence");
+    expect(disclosure.answerNote).toBe(
+      "Evidence note: source lookup supplied evidence; Scientific Calculator receipts supplied the numeric result.",
+    );
+  });
+
+  it("keeps UI navigation visible but non-authoritative", () => {
+    const disclosure = buildAskToolTraceDisclosure({
+      turnId: "turn:open",
+      steps: [
+        {
+          step_id: "open_calculator",
+          kind: "open_panel",
+          panel_id: "scientific-calculator",
+          action_id: "open",
+          required: true,
+        },
+        {
+          step_id: "solve_expression",
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "solve_expression",
+          required: true,
+        },
+      ],
+    });
+
+    expect(disclosure.actionKeys).toEqual(["scientific-calculator.open", "scientific-calculator.solve_expression"]);
+    expect(disclosure.items.find((item) => item.tool === "scientific-calculator.open")?.role).toBe("ui_navigation");
+    expect(disclosure.answerNote).toBeNull();
+  });
 });

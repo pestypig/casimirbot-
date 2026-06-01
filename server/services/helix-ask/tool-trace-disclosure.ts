@@ -1,19 +1,16 @@
 import type { HelixWorkstationToolPlan, HelixWorkstationToolPlanStep } from "../../../shared/helix-workstation-tool-plan";
+import {
+  buildWorkstationToolKey,
+  getWorkstationPanelToolAuthority,
+  type HelixWorkstationPanelToolAuthority,
+  type HelixWorkstationPanelToolRole,
+} from "./workstation-panel-tool-authority";
 
 export const HELIX_ASK_TOOL_TRACE_DISCLOSURE_SCHEMA = "helix.ask_tool_trace_disclosure.v1" as const;
 
-export type HelixAskToolTraceDisclosureItemRole =
-  | "context_locator"
-  | "context_route_builder"
-  | "scalar_solver"
-  | "runtime_observer"
-  | "panel_state";
+export type HelixAskToolTraceDisclosureItemRole = HelixWorkstationPanelToolRole;
 
-export type HelixAskToolTraceDisclosureAuthority =
-  | "evidence_only"
-  | "numeric_observation"
-  | "runtime_observation"
-  | "ui_state";
+export type HelixAskToolTraceDisclosureAuthority = HelixWorkstationPanelToolAuthority;
 
 export type HelixAskToolTraceDisclosureItem = {
   tool: string;
@@ -26,6 +23,7 @@ export type HelixAskToolTraceDisclosure = {
   schema: typeof HELIX_ASK_TOOL_TRACE_DISCLOSURE_SCHEMA;
   disclosureId: string;
   turnId: string;
+  actionKeys: string[];
   items: HelixAskToolTraceDisclosureItem[];
   answerNote: string | null;
   assistant_answer: false;
@@ -39,53 +37,23 @@ type ToolTraceDisclosureStep = Partial<Pick<HelixWorkstationToolPlanStep, "panel
   } | null;
 };
 
-const toolKey = (step: ToolTraceDisclosureStep): string | null => {
+const readStepPanelAction = (step: ToolTraceDisclosureStep): { panelId: string; actionId: string } | null => {
   const panelId = step.panel_id ?? step.action?.panel_id ?? null;
   const actionId = step.action_id ?? step.action?.action_id ?? null;
-  if (!panelId || !actionId || actionId === "open") return null;
-  return `${panelId}.${actionId}`;
+  const tool = buildWorkstationToolKey(panelId, actionId);
+  if (!tool || !panelId || !actionId) return null;
+  return { panelId, actionId };
 };
 
 const itemForStep = (step: ToolTraceDisclosureStep): HelixAskToolTraceDisclosureItem | null => {
-  const tool = toolKey(step);
-  if (!tool) return null;
-  if (tool === "theory-badge-graph.reflect_discussion_context") {
-    return {
-      tool,
-      role: "context_locator",
-      authority: "evidence_only",
-      summary: "Located the prompt in theory graph space.",
-    };
-  }
-  if (tool === "theory-badge-graph.explain_reflected_context") {
-    return {
-      tool,
-      role: "context_route_builder",
-      authority: "evidence_only",
-      summary: "Built a first-principles context route from the reflection.",
-    };
-  }
-  if (tool === "scientific-calculator.solve_expression" || tool === "scientific-calculator.solve_with_steps") {
-    return {
-      tool,
-      role: "scalar_solver",
-      authority: "numeric_observation",
-      summary: "Computed the scalar result in the Scientific Calculator.",
-    };
-  }
-  if (tool.includes("runtime") || tool.includes("trace")) {
-    return {
-      tool,
-      role: "runtime_observer",
-      authority: "runtime_observation",
-      summary: "Returned runtime or tensor/reference observation evidence.",
-    };
-  }
+  const panelAction = readStepPanelAction(step);
+  if (!panelAction) return null;
+  const authority = getWorkstationPanelToolAuthority(panelAction.panelId, panelAction.actionId);
   return {
-    tool,
-    role: "panel_state",
-    authority: "ui_state",
-    summary: "Updated workstation panel state.",
+    tool: authority.tool,
+    role: authority.role,
+    authority: authority.authority,
+    summary: authority.summary,
   };
 };
 
@@ -105,6 +73,12 @@ const answerNoteForItems = (items: HelixAskToolTraceDisclosureItem[]): string | 
   const hasTheoryReflection = items.some((item) => item.role === "context_locator" || item.role === "context_route_builder");
   const hasScalarSolver = items.some((item) => item.role === "scalar_solver");
   const hasRuntimeObserver = items.some((item) => item.role === "runtime_observer");
+  const hasSourceLookup = items.some((item) => item.role === "source_lookup");
+  const hasStateMutation = items.some((item) => item.role === "state_mutation");
+  const hasLivePipeline = items.some((item) => item.tool.startsWith("situation-room.pipeline.") || item.tool.startsWith("situation-room.live-source."));
+  if (hasLivePipeline) {
+    return "Evidence note: Live Answer pipeline receipts supplied workstation state and runtime observations; they are not raw logs or a standalone answer.";
+  }
   if (hasTheoryReflection && hasScalarSolver) {
     return "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.";
   }
@@ -116,6 +90,15 @@ const answerNoteForItems = (items: HelixAskToolTraceDisclosureItem[]): string | 
   }
   if (hasScalarSolver && hasRuntimeObserver) {
     return "Evidence note: calculator receipts supplied scalar results; runtime receipts supplied system-level observations.";
+  }
+  if (hasSourceLookup && hasScalarSolver) {
+    return "Evidence note: source lookup supplied evidence; Scientific Calculator receipts supplied the numeric result.";
+  }
+  if (hasSourceLookup) {
+    return "Evidence note: workstation source lookup supplied evidence only; it is not a solve.";
+  }
+  if (hasStateMutation) {
+    return "Evidence note: workstation mutation receipts confirm panel state changes; they are not factual support by themselves.";
   }
   return null;
 };
@@ -132,6 +115,7 @@ export function buildAskToolTraceDisclosure(args: {
     schema: HELIX_ASK_TOOL_TRACE_DISCLOSURE_SCHEMA,
     disclosureId: `${turnId}:tool_trace_disclosure`,
     turnId,
+    actionKeys: items.map((item) => item.tool),
     items,
     answerNote: answerNoteForItems(items),
     assistant_answer: false,
