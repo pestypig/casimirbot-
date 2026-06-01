@@ -72,6 +72,13 @@ const MODEL_DIRECT_ANSWER_GOAL_KINDS = new Set([
   "conversation",
 ]);
 
+const LIVE_PIPELINE_RECEIPT_GOAL_KINDS = new Set([
+  "live_interval_set",
+  "live_source_continuation",
+  "live_pipeline_control",
+  "live_pipeline_repair",
+]);
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -85,6 +92,9 @@ const readArray = (value: unknown): unknown[] =>
 
 const readStringArray = (value: unknown): string[] =>
   readArray(value).filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
+
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
 
 const payloadGoalKind = (payload: Record<string, unknown>): string | null =>
   readString(readRecord(payload.canonical_goal_frame)?.goal_kind) ??
@@ -547,6 +557,52 @@ export function hasDirectAnswerDraft(payload: Record<string, unknown>): boolean 
   });
 }
 
+const livePipelineReceiptTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  if (terminalKind !== "live_pipeline_receipt" || finalAnswerSource !== "live_pipeline_receipt") return false;
+
+  const goal = readRecord(payload.canonical_goal_frame);
+  const goalKind = readString(goal?.goal_kind);
+  const requiredTerminalKind = readString(goal?.required_terminal_kind);
+  if (!goalKind || !LIVE_PIPELINE_RECEIPT_GOAL_KINDS.has(goalKind)) return false;
+  if (requiredTerminalKind && requiredTerminalKind !== "live_pipeline_receipt") return false;
+
+  const sourceTargetIntent = readRecord(payload.source_target_intent);
+  if (readString(sourceTargetIntent?.target_source) !== "live_pipeline") return false;
+  if (sourceTargetIntent?.allow_no_tool_direct === true || sourceTargetIntent?.allow_client_shortcut === true) return false;
+
+  const contract = readRecord(payload.route_product_contract);
+  if (readString(contract?.source_target) !== "live_pipeline") return false;
+  const allowedTerminalKinds = readStringArray(contract?.allowed_terminal_artifact_kinds);
+  const forbiddenTerminalKinds = readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  if (!allowedTerminalKinds.includes("live_pipeline_receipt")) return false;
+  if (forbiddenTerminalKinds.includes("live_pipeline_receipt")) return false;
+
+  const guard = readRecord(payload.terminal_artifact_selection_guard);
+  if (readBoolean(guard?.allowed) === false) return false;
+  if (readString(guard?.terminal_artifact_kind) && readString(guard?.terminal_artifact_kind) !== "live_pipeline_receipt") return false;
+
+  const productGuard = readRecord(payload.product_authority_guard);
+  if (readBoolean(productGuard?.allowed) === false || readBoolean(productGuard?.ok) === false) return false;
+
+  const admission = readRecord(payload.tool_call_admission_decision);
+  if (readString(admission?.source_target) !== "live_pipeline") return false;
+  if (admission?.required !== true) return false;
+  if (!readStringArray(admission?.admitted_tool_families).includes("live_pipeline")) return false;
+
+  const receipt = readRecord(payload.live_pipeline_turn_receipt);
+  if (readString(receipt?.schema) !== "helix.live_pipeline_turn_receipt.v1") return false;
+  if (readBoolean(receipt?.assistant_answer) !== false || readBoolean(receipt?.raw_content_included) !== false) return false;
+
+  const disclosure = readRecord(payload.tool_trace_disclosure);
+  if (readString(disclosure?.schema) !== "helix.ask_tool_trace_disclosure.v1") return false;
+  if (readBoolean(disclosure?.assistant_answer) !== false || readBoolean(disclosure?.terminal_eligible) !== false) return false;
+  if (readArray(disclosure?.items).length === 0) return false;
+
+  return true;
+};
+
 export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>): boolean {
   const goalSatisfaction =
     readRecord(payload.goal_satisfaction_evaluation) ??
@@ -556,6 +612,7 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   const nextDecision = readString(goalSatisfaction?.next_decision);
   const terminalKind = readString(payload.terminal_artifact_kind);
   if (terminalKind === "typed_failure") return hasCleanTypedFailure(payload);
+  if (livePipelineReceiptTerminalAllowed(payload)) return true;
   if (satisfaction === "satisfied" && (!nextDecision || nextDecision === "allow_terminal")) return true;
   const bridge = readRecord(payload.post_tool_authority_bridge);
   if (
@@ -596,6 +653,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const runtimeBoundTurn = sourceCapabilityDiagnosticTurn || modelDirectAnswerTurn;
   const terminalKind = readString(payload.terminal_artifact_kind);
   const finalAnswerSource = readString(payload.final_answer_source);
+  const livePipelineReceiptAllowed = livePipelineReceiptTerminalAllowed(payload);
   const checks = {
     agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
     agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
@@ -604,16 +662,19 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
-  const requiresRuntimeLoop = sourceCapabilityDiagnosticTurn && terminalKind !== "typed_failure";
+  const requiresRuntimeLoop = sourceCapabilityDiagnosticTurn && terminalKind !== "typed_failure" && !livePipelineReceiptAllowed;
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
-    if (!checks.goal_satisfaction_allows_terminal) blockingReasons.push("goal_satisfaction_not_terminal");
+    if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
     } else if (modelDirectAnswerTurn) {
       if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
       if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
       if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
+    } else if (livePipelineReceiptAllowed) {
+      // Control/status Live Pipeline receipts are terminal only by route-product contract.
+      // The receipt and disclosure remain observations, not assistant answers or raw logs.
     } else {
       if (!checks.agent_runtime_loop) blockingReasons.push("agent_runtime_loop_missing");
       if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");

@@ -85,6 +85,16 @@ describe("Helix Ask theory reflection route", () => {
 
     expect(body?.route_reason_code).toBe("theory_context_reflection");
     expect(body?.workstation_tool_plan?.intent).toBe("physics_calculation_context");
+    expect(body?.current_turn_artifact_ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "helix_theory_context_reflection_tool_receipt",
+        }),
+      ]),
+    );
+    expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
+      "helix_theory_context_reflection_tool_receipt",
+    );
     expect(actions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -131,5 +141,40 @@ describe("Helix Ask theory reflection route", () => {
     expect(debugPayload?.tool_trace_disclosure?.answerNote).toBe(
       "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
     );
+  });
+
+  it("routes mapped first-principles Casimir scalar prompts through theory reflection plus calculator receipts", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Map Casimir cavity mode energy to first principles, then calculate a mode frequency for L=1e-6 m and n=1, and the photon energy of that mode.",
+        mode: "read",
+        debug: true,
+        sessionId: `theory-reflection-casimir-calculator-route-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const answer = String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "");
+
+    expect(body?.route_reason_code).toBe("calculator_solve / calculator_compound_chain");
+    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
+      "helix_theory_context_reflection_tool_receipt",
+    );
+    expect(body?.current_turn_artifact_ledger).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "helix_theory_context_reflection_tool_receipt" }),
+        expect.objectContaining({ kind: "calculator_receipt" }),
+      ]),
+    );
+    expect(answer).toMatch(/Mode frequency:\s*1\.5e\+14 Hz/i);
+    expect(answer).toMatch(/Photon energy:\s*9\.939105e-20 J/i);
+    expect(answer).toMatch(/Theory context:/i);
+    expect(answer).toMatch(/graph reflection is context evidence only/i);
+    expect(answer).toMatch(/Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i);
+    expect(answer).not.toMatch(/model-only/i);
   });
 });

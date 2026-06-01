@@ -774,6 +774,119 @@ describe("helix ask runtime authority contract", () => {
     expect(report.eligible).toBe(true);
   });
 
+  it("allows live pipeline control receipts when route authority and disclosure keep them observation-only", () => {
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "live_pipeline_control",
+        required_terminal_kind: "live_pipeline_receipt",
+      },
+      source_target_intent: {
+        target_source: "live_pipeline",
+        target_kind: "live_pipeline",
+        allow_no_tool_direct: false,
+        allow_client_shortcut: false,
+      },
+      route_product_contract: {
+        source_target: "live_pipeline",
+        allowed_terminal_artifact_kinds: ["live_pipeline_receipt", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["situation_context_pack"],
+      },
+      terminal_artifact_selection_guard: {
+        allowed: true,
+        terminal_artifact_kind: "live_pipeline_receipt",
+      },
+      product_authority_guard: {
+        allowed: true,
+      },
+      tool_call_admission_decision: {
+        source_target: "live_pipeline",
+        required: true,
+        admitted_tool_families: ["live_pipeline"],
+      },
+      live_pipeline_turn_receipt: {
+        schema: "helix.live_pipeline_turn_receipt.v1",
+        actions: ["situation-room.pipeline.inspect", "situation-room.live-source.set_rate"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_trace_disclosure: {
+        schema: "helix.ask_tool_trace_disclosure.v1",
+        items: [
+          {
+            tool: "situation-room.live-source.set_rate",
+            role: "state_mutation",
+            authority: "mutation_receipt",
+            summary: "Changed the live source cadence policy.",
+          },
+        ],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      terminal_artifact_kind: "live_pipeline_receipt",
+      final_answer_source: "live_pipeline_receipt",
+    };
+
+    expect(goalSatisfactionAllowsTerminal(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.source_capability_diagnostic_turn).toBe(true);
+    expect(report.requires_runtime_loop).toBe(false);
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+  });
+
+  it("does not allow live pipeline receipts when the route contract forbids receipt terminals", () => {
+    const report = evaluateTerminalBoundaryEligibility({
+      canonical_goal_frame: {
+        goal_kind: "live_pipeline_control",
+        required_terminal_kind: "live_pipeline_receipt",
+      },
+      source_target_intent: {
+        target_source: "live_pipeline",
+        target_kind: "live_pipeline",
+        allow_no_tool_direct: false,
+        allow_client_shortcut: false,
+      },
+      route_product_contract: {
+        source_target: "live_pipeline",
+        allowed_terminal_artifact_kinds: ["typed_failure"],
+        forbidden_terminal_artifact_kinds: ["live_pipeline_receipt"],
+      },
+      terminal_artifact_selection_guard: {
+        allowed: false,
+        terminal_artifact_kind: "live_pipeline_receipt",
+      },
+      tool_call_admission_decision: {
+        source_target: "live_pipeline",
+        required: true,
+        admitted_tool_families: ["live_pipeline"],
+      },
+      live_pipeline_turn_receipt: {
+        schema: "helix.live_pipeline_turn_receipt.v1",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_trace_disclosure: {
+        schema: "helix.ask_tool_trace_disclosure.v1",
+        items: [{ tool: "situation-room.pipeline.inspect" }],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      terminal_artifact_kind: "live_pipeline_receipt",
+      final_answer_source: "live_pipeline_receipt",
+    });
+
+    expect(report.requires_runtime_loop).toBe(true);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toEqual(
+      expect.arrayContaining([
+        "goal_satisfaction_not_terminal",
+        "agent_runtime_loop_missing",
+        "selected_capability_observation_missing",
+      ]),
+    );
+  });
+
   it("blocks typed failures that do not carry a failure code", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "visual_capture_describe" },

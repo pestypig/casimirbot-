@@ -103,10 +103,15 @@ import {
   shouldUseProcessGraphContextPack,
 } from "@/lib/workstation/processGraph/processGraphAskOverview";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
+import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
 import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { base64FromFile } from "@/utils/files";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import type { HelixAttachmentCommitCheck } from "@shared/helix-attachment-commit";
+import {
+  isTheoryContextReflectionV1,
+  type TheoryContextReflectionV1,
+} from "@shared/contracts/theory-context-reflection.v1";
 import {
   readMissionContextControls,
   stopDesktopTier1ScreenSession,
@@ -6297,6 +6302,25 @@ function coerceText(value: unknown): string {
 
 function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function extractAskLevelTheoryReflection(value: unknown): TheoryContextReflectionV1 | null {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  const directReceipt = readAgentLoopAuditRecord(record.theory_context_reflection_tool_receipt);
+  if (isTheoryContextReflectionV1(directReceipt?.reflectionV1)) return directReceipt.reflectionV1;
+  const directArtifact = readAgentLoopAuditRecord(record.artifact_v1);
+  if (isTheoryContextReflectionV1(directArtifact?.reflectionV1)) return directArtifact.reflectionV1;
+  const ledger = Array.isArray(record.current_turn_artifact_ledger) ? record.current_turn_artifact_ledger : [];
+  for (const item of ledger) {
+    const artifact = readAgentLoopAuditRecord(item);
+    if (!artifact || artifact.kind !== "helix_theory_context_reflection_tool_receipt") continue;
+    const payload = readAgentLoopAuditRecord(artifact.payload);
+    const artifactV1 = readAgentLoopAuditRecord(payload?.artifact_v1);
+    if (isTheoryContextReflectionV1(artifactV1?.reflectionV1)) return artifactV1.reflectionV1;
+    if (isTheoryContextReflectionV1(payload?.reflectionV1)) return payload.reflectionV1;
+  }
+  return null;
 }
 
 type HelixActionEnvelopeRuntimeAuthority = {
@@ -28093,6 +28117,10 @@ export function HelixAskPill({
             ? responseActionEnvelope.workstation_actions[0]
             : undefined;
           const localResponseRecord = localResponse as unknown as Record<string, unknown>;
+          const askLevelTheoryReflection = extractAskLevelTheoryReflection(localResponseRecord);
+          if (askLevelTheoryReflection) {
+            useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(askLevelTheoryReflection);
+          }
           responseDebug = attachHelixActionEnvelopeRuntimeAuthorityDebug(
             responseDebug,
             localResponse.action_envelope,

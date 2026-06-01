@@ -75,6 +75,31 @@ describe("Helix Ask calculator compound chain", () => {
     expect(chain?.answer_text).toContain("Photon energy:");
   });
 
+  it("plans Casimir cavity mode frequency before photon energy", () => {
+    const chain = runCalculatorCompoundChain({
+      prompt: "Map Casimir cavity mode energy to first principles, then calculate a mode frequency for L=1e-6 m and n=1, and the photon energy of that mode.",
+      threadId: "thread:test",
+      turnId: "turn:test",
+    });
+
+    expect(chain).not.toBeNull();
+    expect(chain?.plan.subgoals.map((subgoal) => subgoal.id)).toEqual([
+      "casimir_cavity_mode_frequency",
+      "casimir_mode_photon_energy",
+    ]);
+    expect(chain?.receipts[0]).toMatchObject({
+      result_unit: "Hz",
+      result_quantity: "frequency",
+    });
+    expect(chain?.receipts[1]).toMatchObject({
+      result_unit: "J",
+      result_quantity: "energy",
+    });
+    expect(chain?.answer_text).toContain("Mode frequency:");
+    expect(chain?.answer_text).toContain("Photon energy:");
+    expect(chain?.answer_text).toContain("not a backend Casimir field solve");
+  });
+
   it("chains kinetic energy calculations before comparing doubled speed", () => {
     const chain = runCalculatorCompoundChain({
       prompt: "A 2 kg object moves at 15 m/s, then doubles speed. Use the calculator to compute both kinetic energies and compare them.",

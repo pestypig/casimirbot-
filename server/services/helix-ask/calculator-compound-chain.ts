@@ -679,6 +679,73 @@ const buildPhotonWavelengthDraft = (wavelength: { meters: number; label: string 
   return subgoals;
 };
 
+const extractModeNumber = (prompt: string): number => {
+  const match =
+    prompt.match(/\b(?:n|mode(?:\s+number)?)\s*(?:=|is)?\s*(\d+)\b/i) ??
+    prompt.match(/\b(\d+)(?:st|nd|rd|th)?\s+mode\b/i);
+  const value = Number(match?.[1]);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
+};
+
+const buildCasimirCavityModeDraft = (lengthMeters: number, modeNumber: number): DraftSubgoal[] => {
+  const frequency = (modeNumber * C) / (2 * lengthMeters);
+  const photonEnergy = H * frequency;
+  const frequencyExpression = `${formatNumber(modeNumber)}*3e8/(2*${formatNumber(lengthMeters)})`;
+  const energyExpression = `6.62607015e-34*${formatNumber(frequency)}`;
+  return [
+    {
+      id: "casimir_cavity_mode_frequency",
+      label: "Compute Casimir cavity mode frequency",
+      expression: frequencyExpression,
+      expected_quantity: "frequency",
+      expected_unit: "Hz",
+      depends_on: [],
+      value: frequency,
+      result_text: formatNumber(frequency),
+      setup: unitSetup({
+        expression: frequencyExpression,
+        domain: "generic",
+        subgoal: "Compute cavity mode frequency from f_n = n c / (2 L).",
+        equation: "f_n = n c / (2 L)",
+        resultUnit: "Hz",
+        variables: [
+          { symbol: "n", value: formatNumber(modeNumber), unit: null, meaning: "mode number" },
+          { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light" },
+          { symbol: "L", value: formatNumber(lengthMeters), unit: "m", meaning: "cavity length" },
+        ],
+        assumptions: [
+          "Uses the idealized one-dimensional cavity mode relation.",
+          "Boundary, material, and finite-temperature corrections are not included in this scalar cut.",
+        ],
+        interpretation: "Use this as a scalar cavity-mode proxy, not a full Casimir field solve.",
+      }),
+    },
+    {
+      id: "casimir_mode_photon_energy",
+      label: "Compute photon energy of the cavity mode",
+      expression: energyExpression,
+      expected_quantity: "energy",
+      expected_unit: "J",
+      depends_on: ["casimir_cavity_mode_frequency"],
+      value: photonEnergy,
+      result_text: formatNumber(photonEnergy),
+      setup: unitSetup({
+        expression: energyExpression,
+        domain: "photon_energy",
+        subgoal: "Compute photon energy from E = h f using the cavity-mode frequency.",
+        equation: "E = h f",
+        resultUnit: "J",
+        variables: [
+          { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
+          { symbol: "f_n", value: formatNumber(frequency), unit: "Hz", meaning: "cavity mode frequency" },
+        ],
+        assumptions: ["Uses the frequency computed from the idealized scalar cavity-mode relation."],
+        interpretation: "Use this as the photon-energy scalar cut associated with the cavity mode.",
+      }),
+    },
+  ];
+};
+
 const buildKineticDoubleDraft = (massSpeed: { mass: number; speed: number }): DraftSubgoal[] => {
   const ke1 = 0.5 * massSpeed.mass * massSpeed.speed ** 2;
   const doubled = massSpeed.speed * 2;
@@ -909,6 +976,18 @@ const draftSubgoalsForPrompt = (prompt: string): { subgoals: DraftSubgoal[]; ans
     const wavelength = extractWavelengthMeters(normalized);
     if (wavelength) return { subgoals: buildPhotonWavelengthDraft(wavelength), answerKind: `photon_wavelength_chain:${colorRangeForWavelength(wavelength.meters)}` };
   }
+  if (
+    /\b(?:casimir|cavity|mode)\b/i.test(normalized) &&
+    /\b(?:mode\s+frequency|frequency|photon\s+energy|energy)\b/i.test(normalized)
+  ) {
+    const lengthMeters = extractNumberNear(normalized, ["m", "meter", "meters", "metre", "metres"]);
+    if (lengthMeters && lengthMeters > 0) {
+      return {
+        subgoals: buildCasimirCavityModeDraft(lengthMeters, extractModeNumber(normalized)),
+        answerKind: "casimir_cavity_mode_chain",
+      };
+    }
+  }
   if (/\bkinetic\s+energ/i.test(normalized) && /\b(?:double|doubles|doubled|twice)\b/i.test(normalized)) {
     const massSpeed = extractMassSpeed(normalized);
     if (massSpeed) return { subgoals: buildKineticDoubleDraft(massSpeed), answerKind: "kinetic_double_chain" };
@@ -958,6 +1037,14 @@ const synthesizeAnswer = (prompt: string, answerKind: string, receipts: HelixCal
       `Photon energy: ${byId.get("photon_energy_ev")?.result_text} eV.`,
       `Color range: ${color}.`,
       "Interpretation: the chain computed frequency from wavelength, used that validated frequency in E = hf, then converted the joule result to electronvolts.",
+    ].join("\n");
+  }
+  if (answerKind === "casimir_cavity_mode_chain") {
+    return [
+      "Calculator compound plan completed.",
+      `Mode frequency: ${byId.get("casimir_cavity_mode_frequency")?.result_text} Hz.`,
+      `Photon energy: ${byId.get("casimir_mode_photon_energy")?.result_text} J.`,
+      "Interpretation: the chain used the idealized cavity-mode scalar relation, then used Planck's relation for the photon-energy scalar cut. This is not a backend Casimir field solve.",
     ].join("\n");
   }
   if (answerKind === "kinetic_double_chain") {
