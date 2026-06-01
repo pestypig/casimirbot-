@@ -54,6 +54,123 @@ describe("Helix Ask workstation receipt evaluator theory receipts", () => {
     expect(evaluation.summary).toMatch(/Warp \/ GR \/ NHM2/);
   });
 
+  it("accepts Ask-level theory reflection tool receipts as evidence only", () => {
+    const reflectionV1 = {
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+      evidenceForAsk: {
+        summary: "The discussion appears near Solar Spectrum and energy-frequency badges.",
+      },
+    };
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        tool_id: "helix_ask.reflect_theory_context",
+        receipt_id: "receipt:reflection",
+        artifact: {
+          kind: "helix_theory_context_reflection_tool_receipt",
+          artifactId: "helix_theory_context_reflection_tool_receipt",
+          schemaVersion: "helix_theory_context_reflection_tool_receipt/v1",
+          reflectionV1,
+          explanationPlanV1: null,
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            panel_generated_answer: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+            deterministic_content_role: "observation_not_assistant_answer",
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("supports_subgoal");
+    expect(evaluation.summary).toMatch(/evidence only/i);
+    expect(evaluation.summary).toMatch(/Solar Spectrum/);
+  });
+
+  it("rejects terminal Ask-level theory reflection tool receipts", () => {
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        tool_id: "helix_ask.reflect_theory_context",
+        artifact: {
+          kind: "helix_theory_context_reflection_tool_receipt",
+          artifactId: "helix_theory_context_reflection_tool_receipt",
+          schemaVersion: "helix_theory_context_reflection_tool_receipt/v1",
+          reflectionV1: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            panel_generated_answer: false,
+          },
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: true,
+            panel_generated_answer: false,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("insufficient");
+    expect(evaluation.summary).toMatch(/terminal_eligible_not_false/);
+  });
+
+  it("rejects forbidden overclaim phrases in Ask-level theory reflection tool receipts", () => {
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        tool_id: "helix_ask.reflect_theory_context",
+        artifact: {
+          kind: "helix_theory_context_reflection_tool_receipt",
+          artifactId: "helix_theory_context_reflection_tool_receipt",
+          schemaVersion: "helix_theory_context_reflection_tool_receipt/v1",
+          reflectionV1: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            panel_generated_answer: false,
+            evidenceForAsk: {
+              summary: "QEI passed and physical mechanism confirmed.",
+            },
+          },
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            panel_generated_answer: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("insufficient");
+    expect(evaluation.summary).toMatch(/forbidden_claim_phrase/);
+  });
+
   it("rejects terminal-eligible theory reflection receipts", () => {
     const evaluation = evaluateWorkstationToolReceipt({
       thread_id: "thread:test",

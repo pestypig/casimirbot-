@@ -10,6 +10,10 @@ import {
   buildTheoryContextReflectionV1,
   type TheoryContextReflectionV1,
 } from "../theory-context-reflection.v1";
+import {
+  buildTheoryContextExplanationPlanV1,
+  type TheoryContextExplanationPlanV1,
+} from "../theory-context-explanation-plan.v1";
 
 function reflectionFixture(): TheoryContextReflectionV1 {
   return buildTheoryContextReflectionV1({
@@ -119,6 +123,42 @@ function receiptFixture(
   });
 }
 
+function explanationPlanFixture(): TheoryContextExplanationPlanV1 {
+  return buildTheoryContextExplanationPlanV1({
+    generatedAt: "2026-05-31T00:00:00.000Z",
+    planId: "theory-context-explanation:test",
+    graphId: "nhm2-theory-badge-graph",
+    reflectionId: "reflection:test",
+    source: {
+      kind: "theory_context_reflection",
+      prompt: "Map source residual and QEI margin in the theory graph.",
+      confidenceMode: "soft_locator",
+    },
+    inferredDomains: [],
+    selectedBadgeIds: ["nhm2.closure.source_residual"],
+    firstPrincipleRoots: [],
+    branchNodes: [],
+    diagnosticNodes: [],
+    runtimeNodes: [],
+    claimBoundaryNodes: [],
+    connectingEdges: [],
+    explanationSteps: [],
+    scalarCutBadgeIds: [],
+    runtimeTraceBadgeIds: [],
+    claimBoundaryNotes: ["Diagnostic-only context."],
+    recommendedNextActions: [
+      {
+        actionId: "theory-badge-graph.get_runtime_math_trace",
+        label: "Get runtime math trace",
+        panelId: "theory-badge-graph",
+        args: { badge_id: "nhm2.closure.source_residual" },
+        mutatesCalculator: false,
+        solves: false,
+      },
+    ],
+  });
+}
+
 describe("helix theory context reflection tool receipt v1", () => {
   it("builds a valid evidence-only Ask tool receipt", () => {
     const receipt = receiptFixture();
@@ -148,6 +188,32 @@ describe("helix theory context reflection tool receipt v1", () => {
     expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toContain(
       "artifactId must be helix_theory_context_reflection_tool_receipt",
     );
+  });
+
+  it("allows null explanationPlanV1", () => {
+    const receipt = receiptFixture({ explanationPlanV1: null });
+
+    expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toEqual([]);
+    expect(isHelixTheoryContextReflectionToolReceiptV1(receipt)).toBe(true);
+  });
+
+  it("accepts combined reflection and explanation recommended next actions", () => {
+    const reflection = reflectionFixture();
+    const explanationPlan = explanationPlanFixture();
+    const receipt = receiptFixture({
+      reflectionV1: reflection,
+      explanationPlanV1: explanationPlan,
+      recommendedNextActions: [
+        ...reflection.evidenceForAsk.recommendedNextActions,
+        ...explanationPlan.recommendedNextActions,
+      ],
+    });
+
+    expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toEqual([]);
+    expect(receipt.recommendedNextActions.map((action: { actionId: string }) => action.actionId)).toEqual([
+      "theory-badge-graph.build_compound_theory_run",
+      "theory-badge-graph.get_runtime_math_trace",
+    ]);
   });
 
   it("rejects terminal nested authority", () => {

@@ -105,6 +105,9 @@ const artifactKindMatchesCapability = (
   const joined = [kind, payloadKind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
 
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
+  if (capability === "helix_ask.reflect_theory_context") {
+    return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
+  }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
   if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);

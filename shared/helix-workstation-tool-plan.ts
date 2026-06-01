@@ -17,6 +17,7 @@ export type HelixWorkstationToolPlanIntent =
 export type HelixWorkstationToolPlanStepKind =
   | "open_panel"
   | "run_panel_action"
+  | "run_ask_tool"
   | "run_job"
   | "observe_state"
   | "evaluate_result";
@@ -26,6 +27,7 @@ export type HelixWorkstationToolPlanStep = {
   kind: HelixWorkstationToolPlanStepKind;
   panel_id?: string | null;
   action_id?: string | null;
+  tool_id?: string | null;
   args?: Record<string, unknown>;
   depends_on?: string[];
   expected_receipt_kind?: string | null;

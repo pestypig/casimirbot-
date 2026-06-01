@@ -221,12 +221,22 @@ function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
   return typeof target === "string" && target.trim() ? target.trim() : "the selected Helix Ask run";
 }
 
+function isTheoryReflectionStep(step: HelixWorkstationToolPlanStep): boolean {
+  return (
+    step.tool_id === "helix_ask.reflect_theory_context" ||
+    (step.panel_id === "theory-badge-graph" && step.action_id === "reflect_discussion_context")
+  );
+}
+
 function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary ?? "The graph reflection returned a non-terminal context observation.";
   const evaluationResult = (input.evaluation as { result?: string } | null | undefined)?.result ?? null;
   const hasExplanationPlan = input.plan.steps.some(
     (step: HelixWorkstationToolPlanStep) =>
-      step.panel_id === "theory-badge-graph" && step.action_id === "explain_reflected_context",
+      (step.panel_id === "theory-badge-graph" && step.action_id === "explain_reflected_context") ||
+      (step.kind === "run_ask_tool" &&
+        step.tool_id === "helix_ask.reflect_theory_context" &&
+        step.args?.build_explanation_plan !== false),
   );
   const cleanSummary = summary
     .replace(/^Theory reflection located discussion context as evidence only:\s*/i, "")
@@ -255,9 +265,7 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
 }
 
 function hasTheoryReflectionAndCalculatorSolve(plan: HelixWorkstationToolPlan): boolean {
-  const hasReflection = plan.steps.some(
-    (step: HelixWorkstationToolPlanStep) => step.panel_id === "theory-badge-graph" && step.action_id === "reflect_discussion_context",
-  );
+  const hasReflection = plan.steps.some(isTheoryReflectionStep);
   const hasCalculatorSolve = plan.steps.some(
     (step: HelixWorkstationToolPlanStep) =>
       step.panel_id === "scientific-calculator" &&

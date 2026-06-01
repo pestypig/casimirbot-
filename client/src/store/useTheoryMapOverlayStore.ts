@@ -42,8 +42,12 @@ type TheoryMapOverlayState = {
   updatedAt: string | null;
   lastLocatorArtifact: TheoryBadgeLocatorArtifactV1 | null;
   lastReflectionArtifact: TheoryContextReflectionV1 | null;
+  reflectionOverlay: TheoryContextReflectionV1 | null;
+  liveAnswerContextReflection: TheoryContextReflectionV1 | null;
   setLocatorOverlay: (artifact: TheoryBadgeLocatorArtifactV1) => void;
   setReflectionOverlay: (artifact: TheoryContextReflectionV1) => void;
+  setLiveAnswerContextReflection: (artifact: TheoryContextReflectionV1) => void;
+  restoreLiveAnswerContextOverlay: () => void;
   setSelectionOverlay: (args: {
     selectedBadgeIds: string[];
     highlightedBadgeIds: string[];
@@ -51,6 +55,7 @@ type TheoryMapOverlayState = {
     claimBoundaryNotes?: string[];
   }) => void;
   clearOverlay: () => void;
+  clearLiveAnswerContext: () => void;
 };
 
 const emptyOverlay = {
@@ -74,7 +79,29 @@ const emptyOverlay = {
   updatedAt: null,
   lastLocatorArtifact: null,
   lastReflectionArtifact: null,
+  reflectionOverlay: null,
+  liveAnswerContextReflection: null,
 };
+
+function visibleOverlayFromReflection(artifact: TheoryContextReflectionV1) {
+  return {
+    source: "discussion_reflection" as const,
+    query: artifact.input.prompt,
+    centerBadgeIds: artifact.overlay.centerBadgeIds,
+    highlightedBadgeIds: artifact.overlay.highlightedBadgeIds,
+    highlightedEdgeIds: artifact.overlay.highlightedEdgeIds,
+    rippleBadgeIds: [] as string[],
+    heatByBadgeId: artifact.overlay.heatByBadgeId,
+    selectedBadgeIds: artifact.overlay.centerBadgeIds,
+    exactBadgeIds: artifact.overlay.exactBadgeIds,
+    likelyBadgeIds: artifact.overlay.likelyBadgeIds,
+    softRegions: artifact.overlay.softRegion ? [artifact.overlay.softRegion] : [],
+    claimBoundaryNotes: artifact.evidenceForAsk.claimBoundaries,
+    recommendedActions: adaptReflectionActions(artifact),
+    updatedAt: new Date().toISOString(),
+    lastLocatorArtifact: null,
+  };
+}
 
 function adaptReflectionActions(
   artifact: TheoryContextReflectionV1,
@@ -105,25 +132,33 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       updatedAt: new Date().toISOString(),
       lastLocatorArtifact: artifact,
       lastReflectionArtifact: state.lastReflectionArtifact,
+      reflectionOverlay: state.reflectionOverlay,
+      liveAnswerContextReflection: state.liveAnswerContextReflection,
     })),
   setReflectionOverlay: (artifact) =>
-    set({
-      source: "discussion_reflection",
-      query: artifact.input.prompt,
-      centerBadgeIds: artifact.overlay.centerBadgeIds,
-      highlightedBadgeIds: artifact.overlay.highlightedBadgeIds,
-      highlightedEdgeIds: artifact.overlay.highlightedEdgeIds,
-      rippleBadgeIds: [],
-      heatByBadgeId: artifact.overlay.heatByBadgeId,
-      selectedBadgeIds: artifact.overlay.centerBadgeIds,
-      exactBadgeIds: artifact.overlay.exactBadgeIds,
-      likelyBadgeIds: artifact.overlay.likelyBadgeIds,
-      softRegions: artifact.overlay.softRegion ? [artifact.overlay.softRegion] : [],
-      claimBoundaryNotes: artifact.evidenceForAsk.claimBoundaries,
-      recommendedActions: adaptReflectionActions(artifact),
-      updatedAt: new Date().toISOString(),
-      lastLocatorArtifact: null,
+    set((state) => ({
+      ...visibleOverlayFromReflection(artifact),
       lastReflectionArtifact: artifact,
+      reflectionOverlay: artifact,
+      liveAnswerContextReflection: state.liveAnswerContextReflection,
+    })),
+  setLiveAnswerContextReflection: (artifact) =>
+    set((state) => ({
+      lastReflectionArtifact: artifact,
+      liveAnswerContextReflection: artifact,
+      reflectionOverlay: state.reflectionOverlay,
+      updatedAt: new Date().toISOString(),
+    })),
+  restoreLiveAnswerContextOverlay: () =>
+    set((state) => {
+      const artifact = state.liveAnswerContextReflection;
+      if (!artifact) return state;
+      return {
+        ...visibleOverlayFromReflection(artifact),
+        lastReflectionArtifact: artifact,
+        reflectionOverlay: artifact,
+        liveAnswerContextReflection: artifact,
+      };
     }),
   setSelectionOverlay: (args) =>
     set((state) => ({
@@ -142,6 +177,21 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       updatedAt: new Date().toISOString(),
       lastLocatorArtifact: null,
       lastReflectionArtifact: state.lastReflectionArtifact,
+      reflectionOverlay: state.reflectionOverlay,
+      liveAnswerContextReflection: state.liveAnswerContextReflection,
     })),
-  clearOverlay: () => set(emptyOverlay),
+  clearOverlay: () =>
+    set((state) => ({
+      ...emptyOverlay,
+      lastReflectionArtifact: state.lastReflectionArtifact,
+      liveAnswerContextReflection: state.liveAnswerContextReflection,
+    })),
+  clearLiveAnswerContext: () =>
+    set((state) => ({
+      liveAnswerContextReflection: null,
+      lastReflectionArtifact:
+        state.lastReflectionArtifact === state.liveAnswerContextReflection || !state.reflectionOverlay
+          ? state.reflectionOverlay
+          : state.lastReflectionArtifact,
+    })),
 }));

@@ -709,7 +709,7 @@ export default function TheoryBadgeGraphPanel() {
   );
   const mapOverlay = useTheoryMapOverlayStore();
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
-  const setReflectionOverlay = useTheoryMapOverlayStore((state) => state.setReflectionOverlay);
+  const restoreLiveAnswerContextOverlay = useTheoryMapOverlayStore((state) => state.restoreLiveAnswerContextOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
   const playbackStore = useTheoryBadgePlaybackStore();
   const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
@@ -2158,9 +2158,9 @@ export default function TheoryBadgeGraphPanel() {
   };
 
   const selectLiveAnswerContext = () => {
-    if (!mapOverlay.lastReflectionArtifact) return;
+    if (!mapOverlay.liveAnswerContextReflection) return;
     setActiveAtlasLensId(null);
-    setReflectionOverlay(mapOverlay.lastReflectionArtifact);
+    restoreLiveAnswerContextOverlay();
   };
 
   if (viewMode === "map") {
@@ -2168,8 +2168,12 @@ export default function TheoryBadgeGraphPanel() {
       <div className="relative flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950">
         <TheoryAtlasRail
           activeLensId={activeLensId}
-          hasLiveReflection={Boolean(mapOverlay.lastReflectionArtifact)}
-          liveReflectionActive={mapOverlay.source === "discussion_reflection"}
+          hasLiveReflection={Boolean(mapOverlay.liveAnswerContextReflection)}
+          liveReflectionActive={
+            mapOverlay.source === "discussion_reflection" &&
+            Boolean(mapOverlay.liveAnswerContextReflection) &&
+            mapOverlay.reflectionOverlay === mapOverlay.liveAnswerContextReflection
+          }
           onSelectLiveReflection={selectLiveAnswerContext}
           onSelectLens={selectAtlasLens}
         />

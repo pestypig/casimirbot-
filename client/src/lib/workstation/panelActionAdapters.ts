@@ -12,6 +12,7 @@ import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunne
 import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
+import { runClientTheoryContextReflectionTool } from "@/lib/workstation/theoryContextReflectionToolAdapter";
 import { runStarSimRuntimeBadge } from "@shared/theory/starsim-runtime-adapter";
 import { recordClipboardReceipt } from "@/lib/workstation/workstationClipboard";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
@@ -5059,26 +5060,25 @@ export function executeHelixPanelAction(
         };
       }
 
-      const reflection = buildTheoryContextReflection({
-        graph,
+      const receipt = runClientTheoryContextReflectionTool({
         prompt,
-        conversationContext: asNonEmptyString(args.conversation_context ?? args.conversationContext),
+        conversationContext: asNonEmptyString(args.conversation_context ?? args.conversationContext) ?? null,
         mentionedEquations: asStringArray(args.mentioned_equations ?? args.mentionedEquations),
         mentionedSymbols: asStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
         mentionedDomains: asStringArray(args.mentioned_domains ?? args.mentionedDomains),
         confidenceMode: asTheoryContextReflectionConfidenceMode(args.confidence_mode ?? args.confidenceMode),
         source: asTheoryContextReflectionSource(args.source),
         limit: asNumber(args.limit) ?? undefined,
+        turnId: asNonEmptyString(args.turn_id ?? args.turnId) ?? `panel:${Date.now()}`,
+        threadId: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+        buildExplanationPlan: asBoolean(args.build_explanation_plan ?? args.buildExplanationPlan) ?? false,
+        syncPanel: asBoolean(args.overlay) ?? true,
+        overlayMode: "discussion_zone",
+        openPanel: asBoolean(args.open_panel ?? args.openPanel) ?? true,
+        openPanelHandler: (targetPanelId: string) => context.openPanel(targetPanelId, undefined),
+        focusPanelHandler: (targetPanelId: string) => context.focusPanel(targetPanelId, undefined),
       });
-
-      if (asBoolean(args.overlay) ?? true) {
-        useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
-        useTheoryBadgeGraphPanelStore.getState().setActiveAtlasLensId(null);
-      }
-      if (asBoolean(args.open_panel ?? args.openPanel) ?? true) {
-        context.openPanel(panelId, undefined);
-        context.focusPanel(panelId, undefined);
-      }
+      const reflection = receipt.reflectionV1;
 
       return {
         ok: true,
@@ -5088,6 +5088,7 @@ export function executeHelixPanelAction(
           kind: "theory_context_reflection",
           schemaVersion: reflection.schemaVersion,
           artifact_v1: reflection,
+          tool_receipt_v1: receipt,
           graph_id: graph.graphId,
           exact_badge_ids: reflection.overlay.exactBadgeIds,
           likely_badge_ids: reflection.overlay.likelyBadgeIds,

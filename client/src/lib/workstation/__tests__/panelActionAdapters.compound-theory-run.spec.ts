@@ -5,9 +5,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import { getWorkstationPanelCapabilities } from "@/lib/workstation/panelCapabilities";
+import type { WorkstationPanelActionDefinition } from "@/lib/workstation/panelCapabilities";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { isTheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
+import type { TheoryCompoundRunRowV1 } from "@shared/contracts/theory-compound-run.v1";
 import { isTheoryRuntimeMathTraceV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
 
 vi.mock("@/lib/helix/display-audio-capture", () => ({
@@ -33,7 +35,10 @@ describe("theory badge graph compound theory run actions", () => {
   });
 
   it("exposes compound theory run actions in capabilities", () => {
-    const actionIds = getWorkstationPanelCapabilities("theory-badge-graph")?.actions.map((action) => action.id) ?? [];
+    const actionIds =
+      getWorkstationPanelCapabilities("theory-badge-graph")?.actions.map(
+        (action: WorkstationPanelActionDefinition) => action.id,
+      ) ?? [];
 
     expect(actionIds).toEqual(
       expect.arrayContaining([
@@ -114,8 +119,8 @@ describe("theory badge graph compound theory run actions", () => {
     expect(isTheoryCompoundRunV1(run)).toBe(true);
     if (isTheoryCompoundRunV1(run)) {
       expect(run.summary.solvedCount).toBeGreaterThan(0);
-      expect(run.rows.some((row) => row.calculatorArtifactV1)).toBe(true);
-      expect(run.rows.some((row) => row.claimBoundaryNotes.length > 0)).toBe(true);
+      expect(run.rows.some((row: TheoryCompoundRunRowV1) => row.calculatorArtifactV1)).toBe(true);
+      expect(run.rows.some((row: TheoryCompoundRunRowV1) => row.claimBoundaryNotes.length > 0)).toBe(true);
     }
   });
 

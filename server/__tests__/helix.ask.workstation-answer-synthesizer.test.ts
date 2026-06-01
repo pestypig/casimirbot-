@@ -77,7 +77,14 @@ describe("Helix Ask workstation answer synthesizer", () => {
   it("synthesizes a model-authored answer from theory reflection evidence", () => {
     const prompt = "Where does E=hf fit in the theory graph?";
     const plan = planWorkstationToolUse(prompt).tool_plan;
-    const rawSummary = "The discussion appears near quantum energy and Solar Spectrum.";
+    const receipt = {
+      reflectionV1: {
+        evidenceForAsk: {
+          summary: "The discussion appears near quantum energy and Solar Spectrum.",
+        },
+      },
+    };
+    const rawSummary = receipt.reflectionV1.evidenceForAsk.summary;
 
     expect(plan).toBeTruthy();
     const answer = synthesizeWorkstationToolAnswer({
@@ -100,7 +107,8 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).toContain("I located this discussion in the Theory Badge Graph, then built a first-principles explanation route");
     expect(answer).toContain("The graph route suggests:");
     expect(answer).toContain("Read that route as evidence, not as a solve");
-    expect(answer).not.toBe(rawSummary);
+    expect(answer).not.toBe(receipt.reflectionV1.evidenceForAsk.summary);
+    expect(answer).toMatch(/context locator|evidence|not as a solve/i);
   });
 
   it("keeps calculator numeric authority separate from theory reflection context", () => {

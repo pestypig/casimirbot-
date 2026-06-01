@@ -30,7 +30,7 @@ export type HelixAskToolTraceDisclosure = {
   terminal_eligible: false;
 };
 
-type ToolTraceDisclosureStep = Partial<Pick<HelixWorkstationToolPlanStep, "panel_id" | "action_id">> & {
+type ToolTraceDisclosureStep = Partial<Pick<HelixWorkstationToolPlanStep, "panel_id" | "action_id" | "tool_id">> & {
   action?: {
     panel_id?: string | null;
     action_id?: string | null;
@@ -46,6 +46,14 @@ const readStepPanelAction = (step: ToolTraceDisclosureStep): { panelId: string; 
 };
 
 const itemForStep = (step: ToolTraceDisclosureStep): HelixAskToolTraceDisclosureItem | null => {
+  if (step.tool_id === "helix_ask.reflect_theory_context") {
+    return {
+      tool: "helix_ask.reflect_theory_context",
+      role: "context_locator",
+      authority: "evidence_only",
+      summary: "Located the prompt in theory graph space from Ask without making it a final answer.",
+    };
+  }
   const panelAction = readStepPanelAction(step);
   if (!panelAction) return null;
   const authority = getWorkstationPanelToolAuthority(panelAction.panelId, panelAction.actionId);

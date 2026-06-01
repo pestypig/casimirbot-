@@ -46,12 +46,15 @@ const THEORY_REFLECTION_FORBIDDEN_PATTERNS = [
 
 function containsForbiddenTheoryReflectionClaim(value: unknown): boolean {
   const text = JSON.stringify(value ?? "");
-  return THEORY_REFLECTION_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(text));
+  return THEORY_REFLECTION_FORBIDDEN_PATTERNS.some((pattern: RegExp) => pattern.test(text));
 }
 
 function theoryReflectionAuthorityIssues(artifact: Record<string, unknown>): string[] {
   const artifactV1 = asRecord(artifact.artifact_v1);
-  const authoritySources = [artifact, artifactV1].filter(Boolean) as Record<string, unknown>[];
+  const authority = asRecord(artifact.authority);
+  const reflectionV1 = asRecord(artifact.reflectionV1);
+  const explanationPlanV1 = asRecord(artifact.explanationPlanV1);
+  const authoritySources = [artifact, artifactV1, authority, reflectionV1, explanationPlanV1].filter(Boolean) as Record<string, unknown>[];
   const issues: string[] = [];
   for (const source of authoritySources) {
     if (getBoolean(source.assistant_answer) !== false) issues.push("assistant_answer_not_false");
@@ -62,12 +65,60 @@ function theoryReflectionAuthorityIssues(artifact: Record<string, unknown>): str
   return Array.from(new Set(issues));
 }
 
+function extractTheoryReflectionEvidence(receipt: Record<string, unknown>): {
+  reflection: Record<string, unknown> | null;
+  explanationPlan: Record<string, unknown> | null;
+  authoritySources: Record<string, unknown>[];
+  summary: string | null;
+  artifact: Record<string, unknown> | null;
+} {
+  const artifact = asRecord(receipt.artifact) ?? receipt;
+  const artifactV1 = asRecord(artifact.artifact_v1);
+  const reflection =
+    asRecord(artifact.reflectionV1) ??
+    asRecord(artifactV1?.reflectionV1) ??
+    artifactV1 ??
+    null;
+  const explanationPlan =
+    asRecord(artifact.explanationPlanV1) ??
+    asRecord(artifactV1?.explanationPlanV1) ??
+    null;
+  const authoritySources = [
+    artifact,
+    asRecord(artifact.authority),
+    artifactV1,
+    reflection,
+    explanationPlan,
+  ].filter(Boolean) as Record<string, unknown>[];
+  const evidenceForAsk =
+    asRecord(artifact.evidence_for_ask) ??
+    asRecord(reflection?.evidenceForAsk) ??
+    asRecord(reflection?.evidence_for_ask);
+  return {
+    reflection,
+    explanationPlan,
+    authoritySources,
+    summary: getString(evidenceForAsk?.summary),
+    artifact,
+  };
+}
+
+function isTheoryReflectionReceiptKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  return (
+    kind === "theory_context_reflection" ||
+    kind === "helix_theory_context_reflection_tool_receipt" ||
+    artifact?.artifactId === "helix_theory_context_reflection_tool_receipt" ||
+    artifact?.schemaVersion === "helix_theory_context_reflection_tool_receipt/v1"
+  );
+}
+
 export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolReceiptInput): WorkstationToolEvaluation {
   const receipt = input.receipt as Record<string, unknown>;
   const artifact = asRecord(receipt.artifact);
   const panelId = getString(receipt.panel_id) ?? getString(artifact?.panel_id) ?? "unknown";
   const actionId = getString(receipt.action_id) ?? getString(artifact?.action_id) ?? "unknown";
   const ok = receipt.ok === true;
+  const topLevelKind = getString(artifact?.kind) ?? getString(receipt.kind) ?? getString(artifact?.artifactId) ?? getString(receipt.artifactId);
   const evidenceRefs = Array.isArray(receipt.evidence_refs)
     ? receipt.evidence_refs.filter((entry: unknown): entry is string => typeof entry === "string")
     : [`workstation:${panelId}.${actionId}`];
@@ -89,6 +140,26 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       result = "supports_subgoal";
       summary = `Calculator verified ${getString(artifact?.normalized_expression) ?? "the expression"} with result ${resultText ?? "available in receipt"}.`;
     }
+  } else if (isTheoryReflectionReceiptKind(topLevelKind, artifact ?? receipt)) {
+    const evidence = extractTheoryReflectionEvidence(receipt);
+    const theoryArtifact = {
+      ...(evidence.artifact ?? {}),
+      ...asRecord((evidence.artifact ?? {}).authority),
+      artifact_v1: evidence.reflection,
+    };
+    const issues = theoryReflectionAuthorityIssues(theoryArtifact);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Theory context reflection did not produce a usable receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `Theory context reflection rejected as terminal evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary = evidence.summary
+        ? `Theory reflection located discussion context as evidence only: ${evidence.summary}`
+        : "Theory reflection located discussion context as evidence only.";
+    }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";
     summary = ok
@@ -107,14 +178,17 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
           ? "Physics context plan located theory badges and proposed follow-up workstation actions."
           : "Physics context plan located theory badges and claim boundaries.";
     } else if (kind === "theory_context_reflection") {
+      const evidence = extractTheoryReflectionEvidence(receipt);
       const theoryArtifact = artifact ?? {};
-      const issues = theoryReflectionAuthorityIssues(theoryArtifact);
+      const issues = theoryReflectionAuthorityIssues({
+        ...theoryArtifact,
+        artifact_v1: evidence.reflection ?? asRecord(theoryArtifact.artifact_v1),
+      });
       if (issues.length > 0) {
         result = "insufficient";
         summary = `Theory context reflection rejected as terminal evidence: ${issues.join(", ")}.`;
       } else {
-        const evidenceForAsk = asRecord(theoryArtifact.evidence_for_ask) ?? asRecord(asRecord(theoryArtifact.artifact_v1)?.evidenceForAsk);
-        const reflectionSummary = getString(evidenceForAsk?.summary);
+        const reflectionSummary = evidence.summary;
         result = "supports_subgoal";
         summary = reflectionSummary
           ? `Theory reflection located discussion context as evidence only: ${reflectionSummary}`

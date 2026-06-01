@@ -639,6 +639,43 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
   };
 }
 
+function makeTheoryReflectionAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "reflect_theory_context",
+    kind: "run_ask_tool",
+    tool_id: "helix_ask.reflect_theory_context",
+    args: {
+      prompt,
+      build_explanation_plan: true,
+      sync_panel: true,
+      panel_overlay_mode: "live_answer_context",
+      open_panel: false,
+    },
+    expected_receipt_kind: "helix_theory_context_reflection_tool_receipt",
+    expected_state_change: { store: "theory-map-overlay", proof_key: "lastReflectionArtifact" },
+    required: true,
+  };
+}
+
+function makePanelReflectionStep(prompt: string, depends_on: string[] = []): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "reflect_discussion_context",
+    kind: "run_panel_action",
+    panel_id: "theory-badge-graph",
+    action_id: "reflect_discussion_context",
+    args: {
+      prompt,
+      build_explanation_plan: true,
+      overlay: true,
+      open_panel: true,
+    },
+    depends_on,
+    expected_receipt_kind: "theory_context_reflection",
+    expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+    required: true,
+  };
+}
+
 function isCompoundCalculatorPlanningPrompt(prompt: string): boolean {
   if (!/\b(?:calculator|calculate|compute|solve|evaluate|estimate)\b/i.test(prompt)) return false;
   const requestedQuantities = [
@@ -665,6 +702,17 @@ function isPhysicsCalculationContextPrompt(prompt: string): boolean {
 function userExplicitlyDisallowsPanelsOrTools(prompt: string): boolean {
   return /\b(?:do\s+not|don't|without|no)\s+(?:open|use|call|run)\b[\s\S]{0,60}\b(?:panel|panels|tool|tools|workstation|calculator|theory\s+(?:map|graph)|badge\s+graph)\b/i.test(
     prompt,
+  );
+}
+
+function userExplicitlyRequestsTheoryGraphPanel(prompt: string): boolean {
+  return (
+    /\b(?:open|display|bring\s+up|pull\s+up)\b[\s\S]{0,80}\b(?:theory\s+(?:badge\s+)?graph|badge\s+graph|theory\s+panel|theory\s+map)\b/i.test(
+      prompt,
+    ) ||
+    /\bshow\s+(?:me\s+)?(?:the\s+)?(?:theory\s+(?:badge\s+)?graph|badge\s+graph|theory\s+panel|theory\s+map)\b/i.test(
+      prompt,
+    )
   );
 }
 
@@ -1013,16 +1061,11 @@ export function planWorkstationToolUse(
     const calculatorSetup = buildCalculatorSetupContext(normalized, latex);
     const wantsSteps = /\b(?:steps?|show\s+work|trace|verify|check)\b/i.test(normalized);
     const actionId = wantsSteps ? "solve_with_steps" : "solve_expression";
-    const reflectArgs = {
-      prompt: normalized,
-      overlay: true,
-      open_panel: true,
-    };
     const solveArgs = calculatorArgs(latex, calculatorSetup);
     pushScore({
-      affordance_id: "theory-badge-graph.reflect_discussion_context",
-      panel_id: "theory-badge-graph",
-      action_id: "reflect_discussion_context",
+      affordance_id: "helix_ask.reflect_theory_context",
+      panel_id: "helix_ask",
+      action_id: "reflect_theory_context",
       score: 0.9,
       reason: "physics calculation prompt also asks to locate the equation in theory graph space",
       required_args_missing: [],
@@ -1041,29 +1084,8 @@ export function planWorkstationToolUse(
       missing: [],
       options,
       steps: [
-        makeOpenStep("theory-badge-graph"),
-        {
-          step_id: "reflect_discussion_context",
-          kind: "run_panel_action",
-          panel_id: "theory-badge-graph",
-          action_id: "reflect_discussion_context",
-          args: reflectArgs,
-          depends_on: ["open_theory_badge_graph"],
-          expected_receipt_kind: "theory_context_reflection",
-          expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
-          required: true,
-        },
-        {
-          step_id: "explain_reflected_context",
-          kind: "run_panel_action",
-          panel_id: "theory-badge-graph",
-          action_id: "explain_reflected_context",
-          args: {},
-          depends_on: ["reflect_discussion_context"],
-          expected_receipt_kind: "theory_context_explanation_plan",
-          required: true,
-        },
-        makeOpenStep("scientific-calculator", ["explain_reflected_context"]),
+        makeTheoryReflectionAskToolStep(normalized),
+        makeOpenStep("scientific-calculator", ["reflect_theory_context"]),
         {
           step_id: "ingest_expression",
           kind: "run_panel_action",
@@ -1089,7 +1111,7 @@ export function planWorkstationToolUse(
         {
           step_id: "evaluate_reflection_and_calculator",
           kind: "evaluate_result",
-          depends_on: ["explain_reflected_context", actionId],
+          depends_on: ["reflect_theory_context", actionId],
           expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
           required: true,
         },
@@ -1111,15 +1133,13 @@ export function planWorkstationToolUse(
   }
 
   if (isTheoryContextReflectionPrompt(normalized)) {
-    const args = {
-      prompt: normalized,
-      overlay: true,
-      open_panel: true,
-    };
+    const wantsVisibleTheoryGraph = userExplicitlyRequestsTheoryGraphPanel(normalized);
     pushScore({
-      affordance_id: "theory-badge-graph.reflect_discussion_context",
-      panel_id: "theory-badge-graph",
-      action_id: "reflect_discussion_context",
+      affordance_id: wantsVisibleTheoryGraph
+        ? "theory-badge-graph.reflect_discussion_context"
+        : "helix_ask.reflect_theory_context",
+      panel_id: wantsVisibleTheoryGraph ? "theory-badge-graph" : "helix_ask",
+      action_id: wantsVisibleTheoryGraph ? "reflect_discussion_context" : "reflect_theory_context",
       score: 0.88,
       reason: "mapped physics/theory prompt can be reflected into the badge graph as non-terminal evidence",
       required_args_missing: [],
@@ -1130,32 +1150,16 @@ export function planWorkstationToolUse(
       missing: [],
       options,
       steps: [
-        makeOpenStep("theory-badge-graph"),
-        {
-          step_id: "reflect_discussion_context",
-          kind: "run_panel_action",
-          panel_id: "theory-badge-graph",
-          action_id: "reflect_discussion_context",
-          args,
-          depends_on: ["open_theory_badge_graph"],
-          expected_receipt_kind: "theory_context_reflection",
-          expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
-          required: true,
-        },
-        {
-          step_id: "explain_reflected_context",
-          kind: "run_panel_action",
-          panel_id: "theory-badge-graph",
-          action_id: "explain_reflected_context",
-          args: {},
-          depends_on: ["reflect_discussion_context"],
-          expected_receipt_kind: "theory_context_explanation_plan",
-          required: true,
-        },
+        ...(wantsVisibleTheoryGraph
+          ? [
+              makeOpenStep("theory-badge-graph"),
+              makePanelReflectionStep(normalized, ["open_theory_badge_graph"]),
+            ]
+          : [makeTheoryReflectionAskToolStep(normalized)]),
         {
           step_id: "evaluate_theory_context_reflection",
           kind: "evaluate_result",
-          depends_on: ["explain_reflected_context"],
+          depends_on: [wantsVisibleTheoryGraph ? "reflect_discussion_context" : "reflect_theory_context"],
           expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
           required: true,
         },
@@ -1163,11 +1167,18 @@ export function planWorkstationToolUse(
     });
     return {
       intent: "theory_context_reflection",
-      action: {
-        panel_id: "theory-badge-graph",
-        action_id: "reflect_discussion_context",
-        args,
-      },
+      action: wantsVisibleTheoryGraph
+        ? {
+            panel_id: "theory-badge-graph",
+            action_id: "reflect_discussion_context",
+            args: {
+              prompt: normalized,
+              build_explanation_plan: true,
+              overlay: true,
+              open_panel: true,
+            },
+          }
+        : null,
       tool_plan: toolPlan,
       scores,
       should_use_tool: true,

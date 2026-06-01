@@ -227,7 +227,7 @@ export function validateHelixTheoryContextReflectionToolReceiptV1(value: unknown
   if (!Array.isArray(value.recommendedNextActions)) {
     issues.push("recommendedNextActions must be an array");
   } else {
-    value.recommendedNextActions.forEach((action, index) =>
+    value.recommendedNextActions.forEach((action: unknown, index: number) =>
       validateRecommendedAction(`recommendedNextActions[${index}]`, action, issues),
     );
   }

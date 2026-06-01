@@ -34,21 +34,9 @@ describe("Helix Ask theory reflection route", () => {
     expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(body?.workstation_tool_plan?.intent).toBe("theory_context_reflection");
     expect(body?.workstation_tool_evaluation?.supports_goal).toBe(true);
-    expect(actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "open",
-        }),
-        expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "reflect_discussion_context",
-        }),
-        expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "explain_reflected_context",
-        }),
-      ]),
+    expect(actions).toEqual([]);
+    expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
+      "helix_theory_context_reflection_tool_receipt",
     );
     expect(answer).toMatch(/Theory Badge Graph|first-principles explanation route|context evidence/i);
     expect(answer).toMatch(/not as a solve/i);
@@ -71,17 +59,9 @@ describe("Helix Ask theory reflection route", () => {
     const body = response.body;
 
     expect(body?.route_reason_code).toBe("theory_context_reflection");
-    expect(body?.action_envelope?.workstation_actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "reflect_discussion_context",
-        }),
-        expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "explain_reflected_context",
-        }),
-      ]),
+    expect(body?.action_envelope?.workstation_actions).toEqual([]);
+    expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
+      "helix_theory_context_reflection_tool_receipt",
     );
     expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(/first-principles explanation route|context evidence/i);
   });
@@ -108,12 +88,12 @@ describe("Helix Ask theory reflection route", () => {
     expect(actions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "reflect_discussion_context",
+          panel_id: "scientific-calculator",
+          action_id: "open",
         }),
         expect.objectContaining({
-          panel_id: "theory-badge-graph",
-          action_id: "explain_reflected_context",
+          panel_id: "scientific-calculator",
+          action_id: "ingest_latex",
         }),
         expect.objectContaining({
           panel_id: "scientific-calculator",
@@ -144,8 +124,7 @@ describe("Helix Ask theory reflection route", () => {
     const debugPayload = debugResponse.body?.payload;
     expect(debugPayload?.tool_trace_disclosure?.action_keys).toEqual(
       expect.arrayContaining([
-        "theory-badge-graph.reflect_discussion_context",
-        "theory-badge-graph.explain_reflected_context",
+        "helix_ask.reflect_theory_context",
         "scientific-calculator.solve_expression",
       ]),
     );

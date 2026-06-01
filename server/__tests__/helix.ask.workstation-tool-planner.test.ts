@@ -328,36 +328,50 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.reason).toBe(
       "Prompt discusses mapped theory/physics concepts; reflect discussion context as evidence before final answer.",
     );
-    expect(plan.action).toEqual({
-      panel_id: "theory-badge-graph",
-      action_id: "reflect_discussion_context",
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_theory_context",
+      "evaluate_theory_context_reflection",
+    ]);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_theory_context");
+    expect(reflectStep).toEqual(expect.objectContaining({
+      kind: "run_ask_tool",
+      tool_id: "helix_ask.reflect_theory_context",
+      expected_receipt_kind: "helix_theory_context_reflection_tool_receipt",
+      expected_state_change: { store: "theory-map-overlay", proof_key: "lastReflectionArtifact" },
       args: expect.objectContaining({
         prompt: "Where does E=hf fit in the theory graph?",
-        overlay: true,
-        open_panel: true,
+        build_explanation_plan: true,
+        sync_panel: true,
+        panel_overlay_mode: "live_answer_context",
+        open_panel: false,
       }),
-    });
+    }));
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_theory_badge_graph");
+    expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
+      kind: "evaluate_result",
+      depends_on: ["reflect_theory_context"],
+    }));
+  });
+
+  it("uses legacy panel open only when the user explicitly asks to show the graph", () => {
+    const plan = planWorkstationToolUse("Open the Theory Badge Graph and map source residual and QEI margin.");
+
+    expect(plan.intent).toBe("theory_context_reflection");
+    expect(plan.action).toEqual(expect.objectContaining({
+      panel_id: "theory-badge-graph",
+      action_id: "reflect_discussion_context",
+    }));
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
       "open_theory_badge_graph",
       "reflect_discussion_context",
-      "explain_reflected_context",
       "evaluate_theory_context_reflection",
     ]);
-    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_discussion_context");
-    expect(reflectStep).toEqual(expect.objectContaining({
-      expected_receipt_kind: "theory_context_reflection",
-      expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
-    }));
-    expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
-      kind: "evaluate_result",
-      depends_on: ["explain_reflected_context"],
-    }));
-    const explainStep = plan.tool_plan?.steps.find((step) => step.step_id === "explain_reflected_context");
-    expect(explainStep).toEqual(expect.objectContaining({
+    expect(plan.tool_plan?.steps[1]).toEqual(expect.objectContaining({
+      kind: "run_panel_action",
       panel_id: "theory-badge-graph",
-      action_id: "explain_reflected_context",
-      expected_receipt_kind: "theory_context_explanation_plan",
-      depends_on: ["reflect_discussion_context"],
+      action_id: "reflect_discussion_context",
+      depends_on: ["open_theory_badge_graph"],
     }));
   });
 
@@ -366,9 +380,10 @@ describe("Helix Ask workstation tool planner", () => {
 
     expect(plan.intent).toBe("theory_context_reflection");
     expect(plan.should_use_tool).toBe(true);
-    expect(plan.action).toEqual(expect.objectContaining({
-      panel_id: "theory-badge-graph",
-      action_id: "reflect_discussion_context",
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "reflect_theory_context")).toEqual(expect.objectContaining({
+      kind: "run_ask_tool",
+      tool_id: "helix_ask.reflect_theory_context",
     }));
   });
 
@@ -404,18 +419,28 @@ describe("Helix Ask workstation tool planner", () => {
       "Prompt asks for mapped theory context and a scalar calculation; reflect context before calculator solve.",
     );
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
-      "open_theory_badge_graph",
-      "reflect_discussion_context",
-      "explain_reflected_context",
+      "reflect_theory_context",
       "open_scientific_calculator",
       "ingest_expression",
       "solve_expression",
       "evaluate_reflection_and_calculator",
     ]);
-    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_discussion_context");
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_theory_context");
     expect(reflectStep).toEqual(expect.objectContaining({
-      expected_receipt_kind: "theory_context_reflection",
-      expected_state_change: { store: "theory-map-overlay", proof_key: "softRegions" },
+      kind: "run_ask_tool",
+      tool_id: "helix_ask.reflect_theory_context",
+      expected_receipt_kind: "helix_theory_context_reflection_tool_receipt",
+      expected_state_change: { store: "theory-map-overlay", proof_key: "lastReflectionArtifact" },
+      args: expect.objectContaining({
+        prompt: "Calculate photon energy for f=5e14 Hz and show where E=hf fits in the theory graph.",
+        build_explanation_plan: true,
+        sync_panel: true,
+        panel_overlay_mode: "live_answer_context",
+        open_panel: false,
+      }),
+    }));
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "open_scientific_calculator")).toEqual(expect.objectContaining({
+      depends_on: ["reflect_theory_context"],
     }));
     const solveStep = plan.tool_plan?.steps.find((step) => step.step_id === "solve_expression");
     expect(solveStep).toEqual(expect.objectContaining({
@@ -426,7 +451,7 @@ describe("Helix Ask workstation tool planner", () => {
     }));
     expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
       kind: "evaluate_result",
-      depends_on: ["explain_reflected_context", "solve_expression"],
+      depends_on: ["reflect_theory_context", "solve_expression"],
     }));
   });
 
@@ -435,17 +460,15 @@ describe("Helix Ask workstation tool planner", () => {
 
     expect(plan.intent).toBe("theory_context_reflection");
     expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
-    expect(plan.tool_plan?.steps.map((step) => step.action_id)).toContain("reflect_discussion_context");
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id)).toContain("helix_ask.reflect_theory_context");
   });
 
   it("still reflects mapped theory prompts when no calculator expression is available", () => {
     const plan = planWorkstationToolUse("Show where photon energy fits in the theory graph and calculate the value.");
 
     expect(plan.intent).toBe("theory_context_reflection");
-    expect(plan.action).toEqual(expect.objectContaining({
-      panel_id: "theory-badge-graph",
-      action_id: "reflect_discussion_context",
-    }));
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id)).toContain("helix_ask.reflect_theory_context");
     expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
   });
 

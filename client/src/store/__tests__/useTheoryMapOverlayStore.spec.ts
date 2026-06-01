@@ -96,6 +96,7 @@ function locatorFixture() {
 describe("useTheoryMapOverlayStore", () => {
   beforeEach(() => {
     useTheoryMapOverlayStore.getState().clearOverlay();
+    useTheoryMapOverlayStore.getState().clearLiveAnswerContext();
   });
 
   it("sets discussion reflection overlay fields", () => {
@@ -121,10 +122,13 @@ describe("useTheoryMapOverlayStore", () => {
       },
     ]);
     expect(state.lastReflectionArtifact).toBe(artifact);
+    expect(state.reflectionOverlay).toBe(artifact);
   });
 
-  it("clearOverlay clears reflection state", () => {
-    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflectionFixture());
+  it("clearOverlay clears visible reflection state but keeps live answer memory", () => {
+    const reflection = reflectionFixture();
+    useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(reflection);
+    useTheoryMapOverlayStore.getState().restoreLiveAnswerContextOverlay();
     useTheoryMapOverlayStore.getState().clearOverlay();
     const state = useTheoryMapOverlayStore.getState();
 
@@ -132,12 +136,39 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.exactBadgeIds).toEqual([]);
     expect(state.likelyBadgeIds).toEqual([]);
     expect(state.softRegions).toEqual([]);
-    expect(state.lastReflectionArtifact).toBeNull();
+    expect(state.reflectionOverlay).toBeNull();
+    expect(state.liveAnswerContextReflection).toBe(reflection);
+    expect(state.lastReflectionArtifact).toBe(reflection);
+  });
+
+  it("stores live answer context reflection without showing a discussion overlay", () => {
+    const reflection = reflectionFixture();
+
+    useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(reflection);
+    const state = useTheoryMapOverlayStore.getState();
+
+    expect(state.source).toBe("none");
+    expect(state.softRegions).toEqual([]);
+    expect(state.liveAnswerContextReflection).toBe(reflection);
+    expect(state.lastReflectionArtifact).toBe(reflection);
+  });
+
+  it("restores live answer context into the visible discussion overlay", () => {
+    const reflection = reflectionFixture();
+    useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(reflection);
+
+    useTheoryMapOverlayStore.getState().restoreLiveAnswerContextOverlay();
+    const state = useTheoryMapOverlayStore.getState();
+
+    expect(state.source).toBe("discussion_reflection");
+    expect(state.softRegions).toEqual([reflection.overlay.softRegion]);
+    expect(state.reflectionOverlay).toBe(reflection);
+    expect(state.liveAnswerContextReflection).toBe(reflection);
   });
 
   it("existing setLocatorOverlay still works and keeps the last reflection artifact available", () => {
     const reflection = reflectionFixture();
-    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
+    useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(reflection);
     const locator = locatorFixture();
 
     useTheoryMapOverlayStore.getState().setLocatorOverlay(locator);
@@ -151,11 +182,12 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.likelyBadgeIds).toEqual([]);
     expect(state.softRegions).toEqual([]);
     expect(state.lastReflectionArtifact).toBe(reflection);
+    expect(state.liveAnswerContextReflection).toBe(reflection);
   });
 
   it("existing setSelectionOverlay still works and keeps the last reflection artifact available", () => {
     const reflection = reflectionFixture();
-    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
+    useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(reflection);
 
     useTheoryMapOverlayStore.getState().setSelectionOverlay({
       selectedBadgeIds: ["nhm2.closure.source_residual"],
@@ -173,5 +205,6 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.likelyBadgeIds).toEqual([]);
     expect(state.softRegions).toEqual([]);
     expect(state.lastReflectionArtifact).toBe(reflection);
+    expect(state.liveAnswerContextReflection).toBe(reflection);
   });
 });

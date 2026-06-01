@@ -37,8 +37,8 @@ export default function TheoryAtlasRail({
       {hasLiveReflection ? (
         <button
           type="button"
-          aria-label="Live answer theory context"
-          title="Live answer theory context"
+          aria-label="Current answer context"
+          title="Latest Ask-level theory reflection. Evidence only, not a solved answer."
           onClick={onSelectLiveReflection}
           className={`flex h-6 w-6 items-center justify-center border-2 bg-emerald-600 text-[11px] font-black text-white shadow ${
             liveReflectionActive
@@ -46,7 +46,7 @@ export default function TheoryAtlasRail({
               : "border-zinc-800 hover:border-emerald-200"
           }`}
         >
-          ∴
+          &there4;
         </button>
       ) : null}
       {PHYSICS_ATLAS_BLOCKS.map((block: PhysicsAtlasBlockV1) => {

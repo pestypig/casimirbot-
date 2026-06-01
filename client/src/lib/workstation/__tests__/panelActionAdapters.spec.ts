@@ -17,6 +17,7 @@ import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-
 import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
 import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
 import { isTheoryContextExplanationPlanV1 } from "@shared/contracts/theory-context-explanation-plan.v1";
+import { isHelixTheoryContextReflectionToolReceiptV1 } from "@shared/contracts/helix-theory-context-reflection-tool-receipt.v1";
 import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
 
 const hoisted = vi.hoisted(() => {
@@ -80,6 +81,7 @@ describe("panelActionAdapters", () => {
     });
     useScientificCalculatorLiveSourceStore.getState().stopPrimeStream();
     useTheoryMapOverlayStore.getState().clearOverlay();
+    useTheoryMapOverlayStore.getState().clearLiveAnswerContext();
     useTheoryBadgeGraphPanelStore.getState().resetPanelMemory();
     useScientificCalculatorLiveSourceStore.setState({
       status: "idle",
@@ -1782,6 +1784,14 @@ describe("panelActionAdapters", () => {
       expect(result.artifact?.kind).toBe("theory_context_reflection");
       expect(result.artifact?.schemaVersion).toBe("theory_context_reflection/v1");
       expect(isTheoryContextReflectionV1(result.artifact?.artifact_v1)).toBe(true);
+      expect(isHelixTheoryContextReflectionToolReceiptV1(result.artifact?.tool_receipt_v1)).toBe(true);
+      expect(result.artifact?.tool_receipt_v1).toMatchObject({
+        panelSync: {
+          requested: true,
+          applied: true,
+          overlayMode: "discussion_zone",
+        },
+      });
       expect(result.artifact).toMatchObject({
         assistant_answer: false,
         raw_content_included: false,
