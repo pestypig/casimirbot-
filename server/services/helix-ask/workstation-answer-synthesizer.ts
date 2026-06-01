@@ -3,11 +3,13 @@ import { appendAskToolTraceDisclosureNote, buildAskToolTraceDisclosure } from ".
 import type { HelixWorkstationToolPlan, HelixWorkstationToolPlanStep } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixWorkstationToolEvaluation } from "../../../shared/helix-workstation-tool-evaluation";
 import type { HelixCalculatorSetupContext, HelixCalculatorSetupVariable } from "../../../shared/helix-calculator-setup-context";
+import type { HelixPostToolSynthesisPlanV1 } from "../../../shared/contracts/helix-post-tool-synthesis-plan.v1";
 
 export type SynthesizeWorkstationAnswerInput = {
   prompt: string;
   plan: HelixWorkstationToolPlan;
   evaluation?: HelixWorkstationToolEvaluation | null;
+  postToolSynthesisPlan?: HelixPostToolSynthesisPlanV1 | null;
 };
 
 export type CalculatorObservation = {
@@ -243,11 +245,24 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
     .replace(/^Theory reflection located discussion context as evidence only\.\s*/i, "")
     .replace(/^Theory explanation plan traced reflected context\s*/i, "traced reflected context ")
     .trim();
+  const shouldLeadWithConcept =
+    input.postToolSynthesisPlan?.answerIntent === "mixed" ||
+    input.postToolSynthesisPlan?.answerIntent === "concept_explanation" ||
+    input.postToolSynthesisPlan?.secondaryIntents.includes("concept_explanation") === true;
   if (evaluationResult === "insufficient") {
     return [
       "The theory reflection receipt was not accepted as final-answer evidence.",
       cleanSummary || "The receipt failed route-authority checks.",
       "I should answer from the prompt directly or rerun the reflection with a valid non-terminal receipt before using it as context.",
+    ].join("\n");
+  }
+  if (shouldLeadWithConcept && /\be\s*=\s*h\s*f\b/i.test(input.prompt)) {
+    return [
+      "E = hf means a photon's energy is proportional to its frequency.",
+      "Here, E is the photon energy, h is Planck's constant, and f is the light frequency. It is the scalar bridge between wave behavior and quantum energy packets; higher-frequency light carries more energy per photon.",
+      "In the Theory Badge Graph, this belongs near the quantum/constants/radiation roots, then branches into photon-energy rows, spectrum rows such as solar lines, and cavity-mode photon-energy cuts. The related wavelength form is E = hc/lambda when frequency is expressed as c/lambda.",
+      `The graph reflection observed: ${cleanSummary || "this prompt overlaps mapped photon-energy and radiation badges."}`,
+      "That graph placement is context evidence, not a solve. Numeric photon energies still need calculator receipts, and runtime or claim-bearing rows still need their own receipts.",
     ].join("\n");
   }
   if (hasExplanationPlan) {

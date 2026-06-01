@@ -38,9 +38,13 @@ describe("Helix Ask theory reflection route", () => {
     expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
       "helix_theory_context_reflection_tool_receipt",
     );
-    expect(answer).toMatch(/Theory Badge Graph|first-principles explanation route|context evidence/i);
-    expect(answer).toMatch(/not as a solve/i);
-    expect(answer).not.toMatch(/^E=hf fits into the theory graph as a fundamental equation/i);
+    expect(body?.post_tool_synthesis_plan?.artifactId).toBe("helix_post_tool_synthesis_plan");
+    expect(answer).toMatch(/E = hf means a photon's energy is proportional to its frequency/i);
+    expect(answer).toMatch(/Theory Badge Graph|graph reflection observed|context evidence/i);
+    expect(answer).toMatch(/not a solve/i);
+    expect(answer).not.toBe(
+      body?.theory_context_reflection_tool_receipt?.reflectionV1?.evidenceForAsk?.summary,
+    );
   });
 
   it("routes NHM2/QEI mapping prompts through reflection instead of direct answers", async () => {
@@ -63,6 +67,7 @@ describe("Helix Ask theory reflection route", () => {
     expect(body?.theory_context_reflection_tool_receipt?.artifactId).toBe(
       "helix_theory_context_reflection_tool_receipt",
     );
+    expect(body?.post_tool_synthesis_plan?.artifactId).toBe("helix_post_tool_synthesis_plan");
     expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(/first-principles explanation route|context evidence/i);
   });
 
@@ -112,6 +117,10 @@ describe("Helix Ask theory reflection route", () => {
       ]),
     );
     expect(answer).toMatch(/Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i);
+    expect(body?.post_tool_synthesis_plan?.artifactId).toBe("helix_post_tool_synthesis_plan");
+    expect(body?.current_turn_artifact_ledger).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "helix_post_tool_synthesis_plan" })]),
+    );
     const finalDraftText = String(body?.final_answer_draft?.text ?? body?.debug?.final_answer_draft?.text ?? "");
     if (finalDraftText) {
       expect(finalDraftText).toMatch(
