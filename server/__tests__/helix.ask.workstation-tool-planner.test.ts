@@ -480,6 +480,65 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.action).toBeNull();
   });
 
+  it("admits ZenGraph reflection and Fruition expression prompts before the scientific calculator", () => {
+    const plan = planWorkstationToolUse(
+      "Use the Zen Badge Graph to reflect this situation: I need to respond to a teammate who made an uncertain safety claim. Plot direct observation, right speech, and two-key review, then show what Fruition would solve before any action.",
+    );
+
+    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.reason).toBe(
+      "Prompt asks for ZenGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
+    );
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_zen_graph_context",
+      "open_fruition_calculator",
+      "evaluate_zen_graph_reflection",
+    ]);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    expect(reflectStep).toEqual(expect.objectContaining({
+      kind: "run_ask_tool",
+      tool_id: "helix_ask.reflect_ideology_context",
+      expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+      expected_state_change: { store: "zen-graph", proof_key: "locator" },
+      args: expect.objectContaining({
+        inputKind: "user_prompt",
+        options: expect.objectContaining({
+          includeLocator: true,
+          includeFruition: true,
+          includeAdmissionArtifacts: true,
+        }),
+      }),
+    }));
+    expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
+  });
+
+  it("opens the Zen Badge Graph only when explicitly requested", () => {
+    const plan = planWorkstationToolUse("Open the Zen Badge Graph and plot right speech against two-key review.");
+
+    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "open_zen_badge_graph",
+      "reflect_zen_graph_context",
+      "evaluate_zen_graph_reflection",
+    ]);
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "open_zen_badge_graph")).toEqual(expect.objectContaining({
+      kind: "open_panel",
+      panel_id: "zen-badge-graph",
+    }));
+  });
+
+  it("honors explicit requests not to use ZenGraph tools", () => {
+    const plan = planWorkstationToolUse(
+      "Do not use tools or panels; just discuss the phrase 'Zen Badge Graph and Fruition calculator' as a concept.",
+    );
+
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.tool_plan).toBeNull();
+  });
+
   it("routes motive/Zen comparisons through mission ethos affordances", () => {
     const plan = planWorkstationToolUse("Compare this motive to Zen: I am gathering resources to survive.");
 

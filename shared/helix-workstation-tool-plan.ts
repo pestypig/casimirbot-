@@ -12,6 +12,7 @@ export type HelixWorkstationToolPlanIntent =
   | "live_environment_create"
   | "theory_context_reflection"
   | "physics_calculation_context"
+  | "zen_graph_reflection"
   | "direct_answer";
 
 export type HelixWorkstationToolPlanStepKind =

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import type { HelixRecommendedActionAdmissionV1 } from "@shared/contracts/helix-recommended-action-admission.v1";
 import type { IdeologyContextReflectionV1, IdeologyNodeMatchV1 } from "@shared/ideology-context-reflection";
+import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
 import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
 import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@shared/fruition-procedure-expression";
@@ -344,7 +345,7 @@ function buildGraph(
       confidence: match.score,
       tags: match.tags,
       summary,
-      proceduralExpression: `${kind}.${proceduralToken(match.nodeId)} supports result.procedural_posture`,
+      proceduralExpression: `lens.${proceduralToken(match.nodeId)} supports result.procedural_posture`,
     });
     edges.push({ id: `root:${match.nodeId}`, from: reflection.graph.rootId, to: match.nodeId, label: "activates", tone: edgeTone });
     lane += 1;
@@ -514,6 +515,7 @@ function ObjectiveBindingRail({
   reflection,
   admission,
   fruition,
+  locator,
   selectedNode,
   selectedNodes,
   onSelectNode,
@@ -522,6 +524,7 @@ function ObjectiveBindingRail({
   reflection: IdeologyContextReflectionV1;
   admission: HelixRecommendedActionAdmissionV1;
   fruition: FruitionProcedureExpressionV1;
+  locator?: ZenBadgeLocatorV1;
   selectedNode: ZenGraphNode | null;
   selectedNodes: ZenGraphNode[];
   onSelectNode: (id: string) => void;
@@ -636,6 +639,26 @@ function ObjectiveBindingRail({
           </div>
         </BindingBox>
         <BindingBox
+          title="Located comparison"
+          label={locator ? labelize(locator.comparisonSeed.expectedFruitionPosture) : "not located"}
+          tone="cyan"
+          activeNodeIds={locator?.comparisonSeed.selectedNodeIds}
+          onSelectNode={onSelectNode}
+        >
+          {locator ? (
+            <div className="space-y-1">
+              <div className="font-mono text-[10px] leading-snug text-cyan-100">
+                {locator.comparisonSeed.proceduralExpression}
+              </div>
+              <div className="text-[11px] opacity-80">
+                {locator.locatedBindings.length} binding path{locator.locatedBindings.length === 1 ? "" : "s"} located
+              </div>
+            </div>
+          ) : (
+            "No Zen badge locator artifact is attached to this graph view."
+          )}
+        </BindingBox>
+        <BindingBox
           title="Selected combination"
           label={`${selectedNodes.length} badge${selectedNodes.length === 1 ? "" : "s"}`}
           tone="emerald"
@@ -700,17 +723,22 @@ function ObjectiveBindingRail({
 export function ZenGraphPanel({
   reflection,
   admission,
+  locator,
 }: {
   reflection: IdeologyContextReflectionV1;
   admission: HelixRecommendedActionAdmissionV1;
+  locator?: ZenBadgeLocatorV1;
 }) {
   const state = useZenGraphReflection({ reflection, admission });
   const fruition = useMemo(() => calculateFruitionFromReflection({ reflection, admission }), [admission, reflection]);
   const graph = useMemo(() => buildGraph(reflection, admission, fruition), [admission, fruition, reflection]);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
-  const initialSelectedNodeId = reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
+  const locatorSeedNodeIds =
+    locator?.comparisonSeed.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)) ?? [];
+  const initialSelectedNodeId = locatorSeedNodeIds[0] ?? reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
+  const initialSelectedNodeIds = locatorSeedNodeIds.length > 0 ? locatorSeedNodeIds : [initialSelectedNodeId];
   const [selectedNodeId, setSelectedNodeId] = useState<string>(initialSelectedNodeId);
-  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([initialSelectedNodeId]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(initialSelectedNodeIds);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [objectiveBindingsOpen, setObjectiveBindingsOpen] = useState(false);
   const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
@@ -770,6 +798,7 @@ export function ZenGraphPanel({
               reflection={reflection}
               admission={admission}
               fruition={fruition}
+              locator={locator}
               selectedNode={selectedNode}
               selectedNodes={selectedNodes}
               onSelectNode={addNodeToSelection}

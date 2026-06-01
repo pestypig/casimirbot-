@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateHelixRecommendedActionAdmissionV1 } from "../../../../shared/contracts/helix-recommended-action-admission.v1";
 import { validateIdeologyContextReflectionV1 } from "../../../../shared/ideology-context-reflection";
+import { validateZenBadgeLocatorV1 } from "../../../../shared/zen-badge-locator";
+import { validateFruitionProcedureExpressionV1 } from "../../../../shared/fruition-procedure-expression";
 import { evaluateWorkstationToolReceipt } from "../workstation-tool-evaluator";
 import {
   HELIX_ASK_ZEN_GRAPH_REFLECTION_TOOL_NAME,
@@ -18,6 +20,9 @@ describe("Helix Ask ZenGraph reflection tool", () => {
     });
 
     expect(validateIdeologyContextReflectionV1(output.reflection)).toEqual([]);
+    expect(output.locator).toBeDefined();
+    expect(validateZenBadgeLocatorV1(output.locator!)).toEqual([]);
+    expect(output.fruition).toBeUndefined();
     expect(output.reflection.artifactId).toBe("ideology_context_reflection");
     expect(output.reflection.authority).toMatchObject({
       assistant_answer: false,
@@ -29,6 +34,24 @@ describe("Helix Ask ZenGraph reflection tool", () => {
     });
     expect(output.admissions.length).toBe(1);
     expect(validateHelixRecommendedActionAdmissionV1(output.admissions[0])).toEqual([]);
+  });
+
+  it("can include the Fruition procedure expression in the same evidence receipt", async () => {
+    const output = await runHelixAskZenGraphReflectionTool({
+      inputKind: "user_prompt",
+      text: "Plot direct observation, right speech, and two-key review, then show what Fruition would solve.",
+      refs: ["turn:fruition"],
+      options: {
+        includeFruition: true,
+        includeLocator: true,
+      },
+    });
+
+    expect(output.locator).toBeDefined();
+    expect(output.fruition).toBeDefined();
+    expect(validateZenBadgeLocatorV1(output.locator!)).toEqual([]);
+    expect(validateFruitionProcedureExpressionV1(output.fruition!)).toEqual([]);
+    expect(output.fruition?.sourceReflectionId).toBe(output.reflection.reflectionId);
   });
 
   it("preserves admission source metadata and evidence-only authority", async () => {
@@ -98,6 +121,7 @@ describe("Helix Ask ZenGraph reflection tool", () => {
 
     expect(evaluation.result).toBe("supports_subgoal");
     expect(evaluation.summary).toContain("evidence-only ideology lenses");
+    expect(evaluation.summary).toContain("badge locator paths");
     expect(evaluation.model_invoked).toBe(false);
     expect(evaluation.deterministic_gate).toBe(true);
   });

@@ -5,6 +5,8 @@ import {
 } from "../../../shared/helix-workstation-affordance";
 import { validateHelixRecommendedActionAdmissionV1 } from "../../../shared/contracts/helix-recommended-action-admission.v1";
 import { validateIdeologyContextReflectionV1 } from "../../../shared/ideology-context-reflection";
+import { validateZenBadgeLocatorV1 } from "../../../shared/zen-badge-locator";
+import { validateFruitionProcedureExpressionV1 } from "../../../shared/fruition-procedure-expression";
 
 export type EvaluateWorkstationToolReceiptInput = {
   thread_id: string;
@@ -124,12 +126,19 @@ function isRecommendedActionAdmissionKind(kind: string | null, artifact: Record<
 
 function isZenGraphReflectionToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
   const reflection = asRecord(artifact?.reflection);
+  const locator = asRecord(artifact?.locator);
+  const fruition = asRecord(artifact?.fruition);
   return (
     kind === "helix_zen_graph_reflection_tool_result" ||
     kind === "ideology_context_reflection" ||
     artifact?.tool_id === "helix_ask.reflect_ideology_context" ||
+    artifact?.tool_id === "helix_ask.calculate_fruition" ||
     reflection?.artifactId === "ideology_context_reflection" ||
-    reflection?.schemaVersion === "ideology_context_reflection/v1"
+    reflection?.schemaVersion === "ideology_context_reflection/v1" ||
+    locator?.artifactId === "zen_badge_locator" ||
+    locator?.schemaVersion === "zen_badge_locator/v1" ||
+    fruition?.artifactId === "fruition_procedure_expression" ||
+    fruition?.schemaVersion === "fruition_procedure_expression/v1"
   );
 }
 
@@ -137,6 +146,14 @@ function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>)
   const issues: string[] = [];
   const reflection = asRecord(artifact.reflection) ?? artifact;
   issues.push(...validateIdeologyContextReflectionV1(reflection));
+  const locator = asRecord(artifact.locator);
+  if (locator) {
+    issues.push(...validateZenBadgeLocatorV1(locator).map((issue) => `locator.${issue}`));
+  }
+  const fruition = asRecord(artifact.fruition);
+  if (fruition) {
+    issues.push(...validateFruitionProcedureExpressionV1(fruition).map((issue) => `fruition.${issue}`));
+  }
   const admissions = Array.isArray(artifact.admissions) ? artifact.admissions : [];
   for (const [index, admission] of admissions.entries()) {
     const admissionIssues = validateHelixRecommendedActionAdmissionV1(admission);
@@ -220,7 +237,12 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       summary = `ZenGraph reflection rejected as policy evidence: ${issues.join(", ")}.`;
     } else {
       result = "supports_subgoal";
-      summary = "ZenGraph reflection produced evidence-only ideology lenses, missing checks, and admissions.";
+      summary = [
+        "ZenGraph reflection produced evidence-only ideology lenses",
+        asRecord(zenArtifact.locator) ? "badge locator paths" : null,
+        asRecord(zenArtifact.fruition) ? "Fruition procedure expression" : null,
+        "missing checks, and admissions.",
+      ].filter(Boolean).join(", ");
     }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";

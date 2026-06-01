@@ -298,6 +298,21 @@ function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstation
   return appendAskToolTraceDisclosureNote(calculatorAnswer, buildAskToolTraceDisclosure({ plan: input.plan }));
 }
 
+function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  const summary = input.evaluation?.summary?.trim();
+  const includesFruition = input.plan.steps.some((step) => {
+    const options = step.args?.options;
+    return Boolean(options && typeof options === "object" && !Array.isArray(options) && (options as Record<string, unknown>).includeFruition === true);
+  });
+  return [
+    includesFruition
+      ? "I reflected the prompt through the Zen Badge Graph and assembled the Fruition procedure expression as evidence."
+      : "I reflected the prompt through the Zen Badge Graph as evidence.",
+    summary || "The receipt contains activated lenses, badge locator paths, missing checks, and evidence-only admissions.",
+    "Use that state to explain possible paths, tensions, and next questions. It is not a character verdict, moral finality, terminal authority, or execution permission.",
+  ].join("\n");
+}
+
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
   if (hasTheoryReflectionAndCalculatorSolve(input.plan)) {
     return synthesizeTheoryReflectionCalculatorAnswer(input);
@@ -338,6 +353,9 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   }
   if (input.plan.intent === "theory_context_reflection") {
     return synthesizeTheoryContextReflectionAnswer(input);
+  }
+  if (input.plan.intent === "zen_graph_reflection") {
+    return synthesizeZenGraphReflectionAnswer(input);
   }
   return input.evaluation?.summary ?? "Completed workstation tool evaluation.";
 }

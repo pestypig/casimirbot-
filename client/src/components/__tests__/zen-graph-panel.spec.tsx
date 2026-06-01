@@ -3,6 +3,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildIdeologyContextReflectionV1 } from "@shared/ideology-context-reflection";
+import { buildZenBadgeLocatorV1, type ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import ZenGraphPanel from "../panels/ZenGraphPanel";
@@ -117,9 +118,73 @@ function buildFixture() {
   };
 }
 
-function renderPanel() {
+function buildLocatorFixture(): ZenBadgeLocatorV1 {
+  return buildZenBadgeLocatorV1({
+    generatedAt: "2026-06-01T00:00:00.000Z",
+    locatorId: "zen-badge-locator:panel",
+    input: {
+      kind: "user_prompt",
+      summary: "Reflect this through direct observation and right speech.",
+      refs: ["turn:panel"],
+    },
+    graph: {
+      graphId: "zen-graph",
+      rootId: "wisdom-first-principles",
+      source: "docs/ethos/ideology.json",
+    },
+    locatedBadges: {
+      exact: [
+        {
+          nodeId: "direct-observation-before-claim",
+          label: "Direct Observation Before Claim",
+          confidence: 1,
+          matchType: "node_id",
+          pathToBinding: ["direct-observation-before-claim", "wisdom-first-principles"],
+          proceduralExpression: "principle.direct-observation-before-claim supports result.procedural_posture",
+          reasonCodes: ["zen_badge_locator", "match_type:node_id"],
+          tags: ["first_principle", "observation"],
+        },
+        {
+          nodeId: "right-speech-and-accurate-formulation",
+          label: "Right Speech and Accurate Formulation",
+          confidence: 0.9,
+          matchType: "label",
+          pathToBinding: ["right-speech-and-accurate-formulation", "wisdom-first-principles"],
+          proceduralExpression: "principle.right-speech-and-accurate-formulation constrains result.procedural_posture",
+          reasonCodes: ["zen_badge_locator", "match_type:label"],
+          tags: ["first_principle", "right_speech"],
+        },
+      ],
+      likely: [],
+      inferred: [],
+    },
+    locatedBindings: [
+      {
+        id: "wisdom-first-principles",
+        label: "Wisdom First Principles",
+        bindingType: "objective_binding",
+        pathNodeIds: ["direct-observation-before-claim", "wisdom-first-principles"],
+        reasonCodes: ["located_path_to_binding"],
+        confidence: 1,
+      },
+    ],
+    comparisonSeed: {
+      selectedNodeIds: [
+        "direct-observation-before-claim",
+        "right-speech-and-accurate-formulation",
+        "wisdom-first-principles",
+      ],
+      proceduralExpression:
+        "principle.direct-observation-before-claim supports result.procedural_posture + principle.right-speech-and-accurate-formulation constrains result.procedural_posture => constrained_action_posture",
+      expectedFruitionPosture: "constrained_action_posture",
+      reasonCodes: ["zen_badge_locator", "deterministic_badge_comparison"],
+    },
+  });
+}
+
+function renderPanel(locator?: ZenBadgeLocatorV1) {
   const { reflection, admission } = buildFixture();
-  return render(<ZenGraphPanel reflection={reflection} admission={admission} />);
+  return render(<ZenGraphPanel reflection={reflection} admission={admission} locator={locator} />);
 }
 
 function openObjectiveBindings() {
@@ -207,10 +272,21 @@ describe("ZenGraphPanel", () => {
 
     expect(screen.getByText("Selected combination")).toBeTruthy();
     expect(screen.getByText("3 badges")).toBeTruthy();
-    expect(screen.getByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/)).toBeTruthy();
+    expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getByText("Selected badges constrain or balance the action posture.")).toBeTruthy();
     expect(screen.getAllByText((_, element) => element?.textContent?.includes("Compare reflection:") ?? false).length).toBeGreaterThan(0);
+  });
+
+  it("uses a Zen badge locator artifact to seed the visible comparison", () => {
+    renderPanel(buildLocatorFixture());
+    openObjectiveBindings();
+
+    expect(screen.getByText("Located comparison")).toBeTruthy();
+    expect(screen.getByText("constrained action posture")).toBeTruthy();
+    expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
+    expect(screen.getByText("3 badges")).toBeTruthy();
   });
 
   it("renders safeguards, action gate warnings, tensions, and claim boundaries", () => {

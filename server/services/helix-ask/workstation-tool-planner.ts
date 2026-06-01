@@ -30,6 +30,7 @@ export type WorkstationToolIntent =
   | "live_environment_create"
   | "theory_context_reflection"
   | "physics_calculation_context"
+  | "zen_graph_reflection"
   | "direct_answer";
 
 export type WorkstationToolPlannerAction = {
@@ -657,6 +658,29 @@ function makeTheoryReflectionAskToolStep(prompt: string): HelixWorkstationToolPl
   };
 }
 
+function makeZenGraphReflectionAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "reflect_zen_graph_context",
+    kind: "run_ask_tool",
+    tool_id: "helix_ask.reflect_ideology_context",
+    args: {
+      inputKind: "user_prompt",
+      text: prompt,
+      refs: ["helix-ask:current-turn"],
+      options: {
+        includeOverlay: true,
+        includeRecommendedActions: true,
+        includeAdmissionArtifacts: true,
+        includeLocator: true,
+        includeFruition: true,
+      },
+    },
+    expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+    expected_state_change: { store: "zen-graph", proof_key: "locator" },
+    required: true,
+  };
+}
+
 function makePanelReflectionStep(prompt: string, depends_on: string[] = []): HelixWorkstationToolPlanStep {
   return {
     step_id: "reflect_discussion_context",
@@ -705,6 +729,12 @@ function userExplicitlyDisallowsPanelsOrTools(prompt: string): boolean {
   );
 }
 
+function userExplicitlyDisallowsZenGraphTools(prompt: string): boolean {
+  return /\b(?:do\s+not|don't|dont|without|no|not\s+asking\s+to)\s+(?:open|use|call|run|plot|map|reflect)\b[\s\S]{0,90}\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph|fruition|ideology\s+(?:tree|graph|map)|badge\s+graph)\b/i.test(
+    prompt,
+  );
+}
+
 function userExplicitlyRequestsTheoryGraphPanel(prompt: string): boolean {
   return (
     /\b(?:open|display|bring\s+up|pull\s+up)\b[\s\S]{0,80}\b(?:theory\s+(?:badge\s+)?graph|badge\s+graph|theory\s+panel|theory\s+map)\b/i.test(
@@ -713,6 +743,38 @@ function userExplicitlyRequestsTheoryGraphPanel(prompt: string): boolean {
     /\bshow\s+(?:me\s+)?(?:the\s+)?(?:theory\s+(?:badge\s+)?graph|badge\s+graph|theory\s+panel|theory\s+map)\b/i.test(
       prompt,
     )
+  );
+}
+
+function userExplicitlyRequestsZenGraphPanel(prompt: string): boolean {
+  return (
+    /\b(?:open|display|bring\s+up|pull\s+up|show)\b[\s\S]{0,90}\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph|ideology\s+(?:tree|graph|map))\b/i.test(
+      prompt,
+    ) ||
+    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|zen\s*batch\s*graph)\b[\s\S]{0,90}\b(?:panel|visible|launch\s+panel)\b/i.test(
+      prompt,
+    )
+  );
+}
+
+function userExplicitlyRequestsFruitionPanel(prompt: string): boolean {
+  return /\b(?:open|display|bring\s+up|pull\s+up|show)\b[\s\S]{0,90}\b(?:fruition\s+(?:calculator|panel)|procedural\s+(?:calculator|expression|solve))\b|\b(?:fruition\s+(?:calculator|panel)|what\s+fruition\s+would\s+solve)\b/i.test(
+    prompt,
+  );
+}
+
+function hasZenGraphPromptCue(prompt: string): boolean {
+  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|procedural\s+(?:language|expression|action)|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
+    prompt,
+  );
+}
+
+function isZenGraphReflectionPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsZenGraphTools(prompt)) return false;
+  if (!hasZenGraphPromptCue(prompt)) return false;
+  return /\b(?:use|through|with|plot|map|reflect|compare|locate|show|calculate|solve|assemble|derive|trace|badge|fruition|lens|lenses|procedural)\b/i.test(
+    prompt,
   );
 }
 
@@ -1053,6 +1115,47 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isZenGraphReflectionPrompt(normalized)) {
+    const wantsVisibleZenGraph = userExplicitlyRequestsZenGraphPanel(normalized);
+    const wantsFruitionPanel = userExplicitlyRequestsFruitionPanel(normalized) || /\bfruition\b/i.test(normalized);
+    const steps: HelixWorkstationToolPlanStep[] = [
+      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-badge-graph")] : []),
+      makeZenGraphReflectionAskToolStep(normalized),
+      ...(wantsFruitionPanel ? [makeOpenStep("fruition-calculator", ["reflect_zen_graph_context"])] : []),
+      {
+        step_id: "evaluate_zen_graph_reflection",
+        kind: "evaluate_result",
+        depends_on: ["reflect_zen_graph_context"],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      },
+    ];
+    pushScore({
+      affordance_id: "helix_ask.reflect_ideology_context",
+      panel_id: "helix_ask",
+      action_id: "reflect_ideology_context",
+      score: 0.89,
+      reason: "ZenGraph/Fruition prompt can be reflected into badge locator and procedural expression evidence",
+      required_args_missing: [],
+    });
+    const toolPlan = buildToolPlan({
+      prompt: normalized,
+      intent: "zen_graph_reflection",
+      missing: [],
+      options,
+      steps,
+    });
+    return {
+      intent: "zen_graph_reflection",
+      action: null,
+      tool_plan: toolPlan,
+      scores,
+      should_use_tool: true,
+      reason: "Prompt asks for ZenGraph/Fruition reflection; produce locator and procedural expression evidence before final answer.",
+      missing_required_args: [],
     };
   }
 

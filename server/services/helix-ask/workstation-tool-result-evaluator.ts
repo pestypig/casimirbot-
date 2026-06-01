@@ -56,6 +56,13 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "ideology",
     };
   }
+  if (intent === "zen_graph_reflection") {
+    return {
+      source_family: "ideology",
+      category: "motive_framework",
+      produced_by: "deterministic_reducer",
+    };
+  }
   if (intent === "dottie_observer") {
     return {
       source_family: "live_environment",
@@ -121,6 +128,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Store text in workstation notes and keep compact references."
       : input.plan.intent === "ideology_compare"
         ? "Compare the motive against compact ideology/Zen framework evidence."
+      : input.plan.intent === "zen_graph_reflection"
+        ? "Reflect the prompt through ZenGraph and Fruition as evidence-only procedural state."
       : input.plan.intent === "dottie_observer"
         ? "Attach or inspect Auntie Dottie as a witness-only Situation Room observer."
       : input.plan.intent === "physics_calculation_context"

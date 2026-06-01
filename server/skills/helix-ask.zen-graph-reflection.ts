@@ -1,13 +1,17 @@
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
+import type { FruitionProcedureExpressionV1 } from "@shared/fruition-procedure-expression";
 import type { HelixRecommendedActionAdmissionV1 } from "@shared/contracts/helix-recommended-action-admission.v1";
 import type {
   IdeologyContextReflectionInputKindV1,
   IdeologyContextReflectionV1,
 } from "@shared/ideology-context-reflection";
+import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { loadIdeologyGraphFromFile } from "@shared/zen-graph/load-ideology-graph";
 import { reflectIdeologyContext } from "@shared/zen-graph/reflect-ideology-context";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
+import { locateZenBadges } from "@shared/zen-graph/locate-zen-badges";
+import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
 
 export const HELIX_ASK_ZEN_GRAPH_REFLECTION_TOOL_NAME = "helix_ask.reflect_ideology_context" as const;
 
@@ -32,6 +36,8 @@ const ZenGraphToolInputSchema = z.object({
       includeOverlay: z.boolean().optional(),
       includeRecommendedActions: z.boolean().optional(),
       includeAdmissionArtifacts: z.boolean().optional(),
+      includeLocator: z.boolean().optional(),
+      includeFruition: z.boolean().optional(),
     })
     .optional(),
 });
@@ -44,11 +50,15 @@ export type HelixAskZenGraphReflectionToolInput = {
     includeOverlay?: boolean;
     includeRecommendedActions?: boolean;
     includeAdmissionArtifacts?: boolean;
+    includeLocator?: boolean;
+    includeFruition?: boolean;
   };
 };
 
 export type HelixAskZenGraphReflectionToolOutput = {
   reflection: IdeologyContextReflectionV1;
+  locator?: ZenBadgeLocatorV1;
+  fruition?: FruitionProcedureExpressionV1;
   admissions: HelixRecommendedActionAdmissionV1[];
 };
 
@@ -85,8 +95,29 @@ export async function runHelixAskZenGraphReflectionTool(
     input.options?.includeAdmissionArtifacts === false
       ? []
       : [mapIdeologyReflectionToRecommendedActionAdmission(reflection)];
+  const admission = admissions[0] ?? mapIdeologyReflectionToRecommendedActionAdmission(reflection);
+  const locator = input.options?.includeLocator === false
+    ? undefined
+    : locateZenBadges(graph, {
+        kind: input.inputKind,
+        text: input.text,
+        refs: input.refs,
+        reflection,
+      });
+  const fruition = input.options?.includeFruition
+    ? calculateFruitionFromReflection({
+        reflection,
+        admission,
+        objective: reflection.input.summary,
+      })
+    : undefined;
 
-  return { reflection, admissions };
+  return {
+    reflection,
+    ...(locator ? { locator } : {}),
+    ...(fruition ? { fruition } : {}),
+    admissions,
+  };
 }
 
 export const zenGraphReflectionSpec: ToolSpecShape = {
@@ -104,6 +135,8 @@ export const zenGraphReflectionSpec: ToolSpecShape = {
           includeOverlay: { type: "boolean" },
           includeRecommendedActions: { type: "boolean" },
           includeAdmissionArtifacts: { type: "boolean" },
+          includeLocator: { type: "boolean" },
+          includeFruition: { type: "boolean" },
         },
       },
     },
@@ -113,6 +146,8 @@ export const zenGraphReflectionSpec: ToolSpecShape = {
     type: "object",
     properties: {
       reflection: { type: "object" },
+      locator: { type: "object" },
+      fruition: { type: "object" },
       admissions: { type: "array", items: { type: "object" } },
     },
     required: ["reflection", "admissions"],

@@ -6,10 +6,12 @@ import type {
   IdeologyContextReflectionInputKindV1,
   IdeologyContextReflectionV1,
 } from "@shared/ideology-context-reflection";
+import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { loadIdeologyGraphFromFile } from "@shared/zen-graph/load-ideology-graph";
 import { reflectIdeologyContext } from "@shared/zen-graph/reflect-ideology-context";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
 import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
+import { locateZenBadges } from "@shared/zen-graph/locate-zen-badges";
 
 export const HELIX_ASK_FRUITION_TOOL_NAME = "helix_ask.calculate_fruition" as const;
 
@@ -34,6 +36,7 @@ const FruitionToolInputSchema = z.object({
     .object({
       includeReflection: z.boolean().optional(),
       includeAdmissionArtifacts: z.boolean().optional(),
+      includeLocator: z.boolean().optional(),
     })
     .optional(),
 });
@@ -46,11 +49,13 @@ export type HelixAskFruitionToolInput = {
   options?: {
     includeReflection?: boolean;
     includeAdmissionArtifacts?: boolean;
+    includeLocator?: boolean;
   };
 };
 
 export type HelixAskFruitionToolOutput = {
   reflection?: IdeologyContextReflectionV1;
+  locator?: ZenBadgeLocatorV1;
   fruition: FruitionProcedureExpressionV1;
   admissions: HelixRecommendedActionAdmissionV1[];
 };
@@ -77,10 +82,19 @@ export async function runHelixAskFruitionTool(
     admission,
     objective: input.objective,
   });
+  const locator = input.options?.includeLocator === false
+    ? undefined
+    : locateZenBadges(graph, {
+        kind: input.inputKind,
+        text: input.text,
+        refs: input.refs,
+        reflection,
+      });
   const admissions = input.options?.includeAdmissionArtifacts === false ? [] : [admission];
 
   return {
     ...(input.options?.includeReflection === false ? {} : { reflection }),
+    ...(locator ? { locator } : {}),
     fruition,
     admissions,
   };
@@ -101,6 +115,7 @@ export const fruitionSpec: ToolSpecShape = {
         properties: {
           includeReflection: { type: "boolean" },
           includeAdmissionArtifacts: { type: "boolean" },
+          includeLocator: { type: "boolean" },
         },
       },
     },
@@ -110,6 +125,7 @@ export const fruitionSpec: ToolSpecShape = {
     type: "object",
     properties: {
       reflection: { type: "object" },
+      locator: { type: "object" },
       fruition: { type: "object" },
       admissions: { type: "array", items: { type: "object" } },
     },
