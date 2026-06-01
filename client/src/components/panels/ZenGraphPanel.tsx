@@ -6,7 +6,6 @@ import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fru
 import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
 import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@shared/fruition-procedure-expression";
 import { Badge } from "@/components/ui/badge";
-import { useZenGraphReflection } from "@/hooks/useZenGraphReflection";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 
 type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective";
@@ -729,7 +728,6 @@ export function ZenGraphPanel({
   admission: HelixRecommendedActionAdmissionV1;
   locator?: ZenBadgeLocatorV1;
 }) {
-  const state = useZenGraphReflection({ reflection, admission });
   const fruition = useMemo(() => calculateFruitionFromReflection({ reflection, admission }), [admission, reflection]);
   const graph = useMemo(() => buildGraph(reflection, admission, fruition), [admission, fruition, reflection]);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
@@ -826,14 +824,6 @@ export function ZenGraphPanel({
               }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-[70px] h-10 bg-[linear-gradient(135deg,transparent_0_16px,rgba(39,39,42,0.9)_17px_32px,transparent_33px_48px)] bg-[length:96px_40px]" />
-              <div className="pointer-events-none absolute left-4 top-4 z-20 rounded border border-zinc-700 bg-zinc-950/85 px-3 py-2 text-zinc-100 shadow">
-                <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Zen Badge Graph</div>
-                <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-zinc-300">
-                  <span>{graph.nodes.length} badges</span>
-                  <span>{graph.edges.length} connections</span>
-                  <span>{state.admissionCount} admissions</span>
-                </div>
-              </div>
               <svg className="pointer-events-none absolute inset-0" width={graph.width} height={graph.height}>
                 <defs>
                   <marker id="zen-graph-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
