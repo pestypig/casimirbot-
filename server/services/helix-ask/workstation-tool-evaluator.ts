@@ -3,6 +3,8 @@ import {
   type HelixWorkstationActionReceipt,
   type WorkstationToolEvaluation,
 } from "../../../shared/helix-workstation-affordance";
+import { validateHelixRecommendedActionAdmissionV1 } from "../../../shared/contracts/helix-recommended-action-admission.v1";
+import { validateIdeologyContextReflectionV1 } from "../../../shared/ideology-context-reflection";
 
 export type EvaluateWorkstationToolReceiptInput = {
   thread_id: string;
@@ -112,6 +114,40 @@ function isTheoryReflectionReceiptKind(kind: string | null, artifact: Record<str
   );
 }
 
+function isRecommendedActionAdmissionKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  return (
+    kind === "helix_recommended_action_admission" ||
+    artifact?.artifactId === "helix_recommended_action_admission" ||
+    artifact?.schemaVersion === "helix_recommended_action_admission/v1"
+  );
+}
+
+function isZenGraphReflectionToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  const reflection = asRecord(artifact?.reflection);
+  return (
+    kind === "helix_zen_graph_reflection_tool_result" ||
+    kind === "ideology_context_reflection" ||
+    artifact?.tool_id === "helix_ask.reflect_ideology_context" ||
+    reflection?.artifactId === "ideology_context_reflection" ||
+    reflection?.schemaVersion === "ideology_context_reflection/v1"
+  );
+}
+
+function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>): string[] {
+  const issues: string[] = [];
+  const reflection = asRecord(artifact.reflection) ?? artifact;
+  issues.push(...validateIdeologyContextReflectionV1(reflection));
+  const admissions = Array.isArray(artifact.admissions) ? artifact.admissions : [];
+  for (const [index, admission] of admissions.entries()) {
+    const admissionIssues = validateHelixRecommendedActionAdmissionV1(admission);
+    issues.push(...admissionIssues.map((issue) => `admissions[${index}].${issue}`));
+  }
+  if (admissions.some((entry) => asRecord(entry)?.authority && getBoolean(asRecord(asRecord(entry)?.authority)?.agent_executable) !== false)) {
+    issues.push("admission_authority_agent_executable_not_false");
+  }
+  return issues;
+}
+
 export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolReceiptInput): WorkstationToolEvaluation {
   const receipt = input.receipt as Record<string, unknown>;
   const artifact = asRecord(receipt.artifact);
@@ -159,6 +195,32 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       summary = evidence.summary
         ? `Theory reflection located discussion context as evidence only: ${evidence.summary}`
         : "Theory reflection located discussion context as evidence only.";
+    }
+  } else if (isRecommendedActionAdmissionKind(topLevelKind, artifact ?? receipt)) {
+    const admission = artifact ?? receipt;
+    const issues = validateHelixRecommendedActionAdmissionV1(admission);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Recommended action admission did not produce a usable policy receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `Recommended action admission rejected as policy evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary = "Recommended action admission classified candidate actions as evidence-only tool policy.";
+    }
+  } else if (isZenGraphReflectionToolKind(topLevelKind, artifact ?? receipt)) {
+    const zenArtifact = artifact ?? receipt;
+    const issues = validateZenGraphReflectionToolResult(zenArtifact);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "ZenGraph reflection tool did not produce a usable receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `ZenGraph reflection rejected as policy evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary = "ZenGraph reflection produced evidence-only ideology lenses, missing checks, and admissions.";
     }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";

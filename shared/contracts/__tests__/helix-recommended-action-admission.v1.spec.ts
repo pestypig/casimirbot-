@@ -20,7 +20,13 @@ const validAdmission = () =>
         risk: "read_only",
         admission: "auto",
         requiresConfirmation: false,
+        agentExecutable: true,
         reason: "Read-only preview.",
+        reasonCode: "read_only_allowlisted",
+        display_policy: "actionable",
+        evidenceRefs: ["badge:source-residual"],
+        reasonCodes: ["evidence_only_authority", "read_only_allowlisted"],
+        source: { panel: "theory-badge-graph", panelId: "theory-badge-graph" },
       },
       {
         actionId: "scientific-calculator.solve_expression",
@@ -32,9 +38,24 @@ const validAdmission = () =>
         risk: "expensive",
         admission: "ask_user",
         requiresConfirmation: true,
+        agentExecutable: false,
         reason: "Solving requires explicit admission.",
+        reasonCode: "solve_requires_confirmation",
+        display_policy: "actionable",
+        reasonCodes: ["solve_requires_confirmation"],
+        source: { panel: "scientific-calculator", panelId: "scientific-calculator" },
       },
     ],
+    source: {
+      workstation: "ask",
+      panel: "theory-badge-graph",
+      route: "theory_context_reflection",
+      tool: "helix_ask.reflect_theory_context",
+      artifact_type: "theory_context_reflection",
+      artifact_id: "reflection:test",
+    },
+    evidenceRefs: ["receipt:test"],
+    reasonCodes: ["auto_admission_is_not_agent_execution"],
   });
 
 describe("helix recommended action admission v1", () => {
@@ -51,6 +72,11 @@ describe("helix recommended action admission v1", () => {
     });
     expect(artifact.authority.assistant_answer).toBe(false);
     expect(artifact.authority.terminal_eligible).toBe(false);
+    expect(artifact.authority.agent_executable).toBe(false);
+    expect(artifact.actions[0]?.display_policy).toBe("actionable");
+    expect(artifact.actions[0]?.agentExecutable).toBe(true);
+    expect(artifact.actions[0]?.reasonCode).toBe("read_only_allowlisted");
+    expect(artifact.source?.artifact_type).toBe("theory_context_reflection");
     expect(isHelixRecommendedActionAdmissionV1(artifact)).toBe(true);
   });
 
@@ -96,6 +122,7 @@ describe("helix recommended action admission v1", () => {
         terminal_eligible: true,
         context_role: "tool_policy",
         ask_context_policy: "evidence_only",
+        agent_executable: false,
       },
     });
 
@@ -115,5 +142,103 @@ describe("helix recommended action admission v1", () => {
     });
 
     expect(issues.some((issue) => issue.includes("forbidden overclaiming text"))).toBe(true);
+  });
+
+  it("accepts optional source metadata and evidence refs", () => {
+    const artifact = validAdmission();
+
+    expect(validateHelixRecommendedActionAdmissionV1(artifact)).toEqual([]);
+    expect(artifact.evidenceRefs).toEqual(["receipt:test"]);
+    expect(artifact.actions[0]?.evidenceRefs).toEqual(["badge:source-residual"]);
+  });
+
+  it("rejects blocked executable admissions", () => {
+    const artifact = validAdmission();
+    const issues = validateHelixRecommendedActionAdmissionV1({
+      ...artifact,
+      authority: {
+        ...artifact.authority,
+        terminal_eligible: true,
+        agent_executable: true,
+      },
+      actions: [
+        {
+          ...artifact.actions[0],
+          admission: "blocked",
+          requiresConfirmation: true,
+          agentExecutable: true,
+        },
+      ],
+    });
+
+    expect(issues).toContain("authority.terminal_eligible must be false");
+    expect(issues).toContain("authority.agent_executable must be false");
+    expect(issues).toContain("blocked actions cannot be agent executable");
+  });
+
+  it("rejects diagnostic-only executable admissions", () => {
+    const artifact = validAdmission();
+    const issues = validateHelixRecommendedActionAdmissionV1({
+      ...artifact,
+      authority: {
+        ...artifact.authority,
+        terminal_eligible: true,
+        agent_executable: true,
+      },
+      actions: [
+        {
+          ...artifact.actions[0],
+          display_policy: "diagnostic_only",
+          agentExecutable: true,
+        },
+        artifact.actions[1],
+      ],
+    });
+
+    expect(issues).toContain("authority.agent_executable must be false");
+    expect(issues).toContain("diagnostic_only actions cannot be agent executable");
+  });
+
+  it("rejects executable admissions with missing evidence", () => {
+    const artifact = validAdmission();
+    const issues = validateHelixRecommendedActionAdmissionV1({
+      ...artifact,
+      authority: {
+        ...artifact.authority,
+        terminal_eligible: true,
+        agent_executable: true,
+      },
+      actions: [
+        {
+          ...artifact.actions[0],
+          display_policy: "actionable",
+          agentExecutable: true,
+          evidenceRequirements: {
+            required: ["runtime_trace"],
+            missing: ["runtime_trace"],
+          },
+        },
+        artifact.actions[1],
+      ],
+    });
+
+    expect(issues).toContain("authority.agent_executable must be false");
+    expect(issues).toContain("missing required evidence cannot produce an executable action");
+  });
+
+  it("rejects auto admissions that solve", () => {
+    const artifact = validAdmission();
+    const issues = validateHelixRecommendedActionAdmissionV1({
+      ...artifact,
+      actions: [
+        {
+          ...artifact.actions[0],
+          solves: true,
+        },
+        artifact.actions[1],
+      ],
+    });
+
+    expect(issues).toContain("actions[0] auto actions cannot solve");
   });
 });

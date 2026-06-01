@@ -283,4 +283,110 @@ describe("Helix Ask workstation receipt evaluator theory receipts", () => {
     expect(evaluation.result).toBe("insufficient");
     expect(evaluation.summary).toMatch(/forbidden_claim_phrase/);
   });
+
+  it("treats recommended action admission artifacts as evidence-only policy", () => {
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        receipt_id: "receipt:admission",
+        artifact: {
+          kind: "helix_recommended_action_admission",
+          artifactId: "helix_recommended_action_admission",
+          schemaVersion: "helix_recommended_action_admission/v1",
+          generatedAt: "2026-06-01T00:00:00.000Z",
+          admissionId: "admission:test",
+          prompt: "Map source residual.",
+          sourceReceiptId: "receipt:reflection",
+          actions: [
+            {
+              actionId: "theory-badge-graph.build_compound_theory_run",
+              panelId: "theory-badge-graph",
+              label: "Build compound theory run",
+              mutatesCalculator: false,
+              solves: false,
+              objectiveFit: "high",
+              risk: "read_only",
+              admission: "auto",
+              requiresConfirmation: false,
+              agentExecutable: false,
+              reason: "Read-only preview.",
+              reasonCode: "read_only_allowlisted",
+              display_policy: "diagnostic_only",
+            },
+          ],
+          summary: {
+            actionCount: 1,
+            autoCount: 1,
+            askUserCount: 0,
+            blockedCount: 0,
+          },
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            context_role: "tool_policy",
+            ask_context_policy: "evidence_only",
+            agent_executable: false,
+          },
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("supports_subgoal");
+    expect(evaluation.summary).toMatch(/evidence-only tool policy/i);
+  });
+
+  it("rejects executable recommended action admissions", () => {
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        receipt_id: "receipt:bad-admission",
+        artifact: {
+          kind: "helix_recommended_action_admission",
+          artifactId: "helix_recommended_action_admission",
+          schemaVersion: "helix_recommended_action_admission/v1",
+          generatedAt: "2026-06-01T00:00:00.000Z",
+          admissionId: "admission:bad",
+          prompt: "Map source residual.",
+          sourceReceiptId: "receipt:reflection",
+          actions: [
+            {
+              actionId: "theory-badge-graph.build_compound_theory_run",
+              panelId: "theory-badge-graph",
+              label: "Build compound theory run",
+              mutatesCalculator: false,
+              solves: false,
+              objectiveFit: "high",
+              risk: "read_only",
+              admission: "auto",
+              requiresConfirmation: false,
+              agentExecutable: true,
+              reason: "Read-only preview.",
+              reasonCode: "read_only_allowlisted",
+              display_policy: "diagnostic_only",
+            },
+          ],
+          summary: {
+            actionCount: 1,
+            autoCount: 1,
+            askUserCount: 0,
+            blockedCount: 0,
+          },
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: true,
+            context_role: "tool_policy",
+            ask_context_policy: "evidence_only",
+            agent_executable: true,
+          },
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("insufficient");
+    expect(evaluation.summary).toMatch(/diagnostic_only actions cannot be agent executable/);
+  });
 });

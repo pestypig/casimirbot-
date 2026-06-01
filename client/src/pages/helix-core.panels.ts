@@ -129,6 +129,14 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "unit signatures",
     "claim boundary"
   ],
+  "zen-graph": [
+    "zen graph",
+    "ideology reflection",
+    "ethos lens",
+    "right speech",
+    "two key review",
+    "diagnostic compass"
+  ],
   "universal-audit-tree": [
     "audit tree",
     "ideology tags",
@@ -408,6 +416,16 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     mobileReady: true,
     endpoints: [API.theoryGraph],
     keywords: PANEL_KEYWORDS["theory-badge-graph"]
+  },
+  {
+    id: "zen-graph",
+    title: "ZenGraph",
+    icon: Shield,
+    loader: lazyPanel(() => import("@/components/panels/ZenGraphLaunchPanel")),
+    defaultSize: { w: 1040, h: 720 },
+    defaultPosition: { x: 320, y: 200 },
+    mobileReady: true,
+    keywords: PANEL_KEYWORDS["zen-graph"]
   },
   {
     id: "universal-audit-tree",
