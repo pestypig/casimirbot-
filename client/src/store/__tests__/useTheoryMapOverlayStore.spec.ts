@@ -135,8 +135,9 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.lastReflectionArtifact).toBeNull();
   });
 
-  it("existing setLocatorOverlay still works and clears reflection fields", () => {
-    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflectionFixture());
+  it("existing setLocatorOverlay still works and keeps the last reflection artifact available", () => {
+    const reflection = reflectionFixture();
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
     const locator = locatorFixture();
 
     useTheoryMapOverlayStore.getState().setLocatorOverlay(locator);
@@ -149,11 +150,12 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.exactBadgeIds).toEqual([]);
     expect(state.likelyBadgeIds).toEqual([]);
     expect(state.softRegions).toEqual([]);
-    expect(state.lastReflectionArtifact).toBeNull();
+    expect(state.lastReflectionArtifact).toBe(reflection);
   });
 
-  it("existing setSelectionOverlay still works and clears reflection fields", () => {
-    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflectionFixture());
+  it("existing setSelectionOverlay still works and keeps the last reflection artifact available", () => {
+    const reflection = reflectionFixture();
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
 
     useTheoryMapOverlayStore.getState().setSelectionOverlay({
       selectedBadgeIds: ["nhm2.closure.source_residual"],
@@ -170,6 +172,6 @@ describe("useTheoryMapOverlayStore", () => {
     expect(state.exactBadgeIds).toEqual([]);
     expect(state.likelyBadgeIds).toEqual([]);
     expect(state.softRegions).toEqual([]);
-    expect(state.lastReflectionArtifact).toBeNull();
+    expect(state.lastReflectionArtifact).toBe(reflection);
   });
 });

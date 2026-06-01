@@ -79,6 +79,41 @@ describe("Helix Ask workstation receipt evaluator theory receipts", () => {
     expect(evaluation.summary).toMatch(/terminal_eligible_not_false/);
   });
 
+  it("accepts theory explanation plans as evidence only", () => {
+    const evaluation = evaluateWorkstationToolReceipt({
+      thread_id: "thread:test",
+      receipt: {
+        ok: true,
+        panel_id: "theory-badge-graph",
+        action_id: "explain_reflected_context",
+        artifact: {
+          kind: "theory_context_explanation_plan",
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+          artifact_v1: {
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+            panel_generated_answer: false,
+            explanationSteps: [{ id: "step:1" }],
+            summary: {
+              scalarCutCount: 2,
+              runtimeCount: 1,
+            },
+          },
+        },
+      },
+    });
+
+    expect(evaluation.result).toBe("supports_subgoal");
+    expect(evaluation.summary).toMatch(/first-principle roots/i);
+    expect(evaluation.summary).toMatch(/2 scalar cuts/);
+  });
+
   it("rejects raw-content theory reflection receipts", () => {
     const evaluation = evaluateWorkstationToolReceipt({
       thread_id: "thread:test",

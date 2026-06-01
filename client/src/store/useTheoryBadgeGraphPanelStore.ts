@@ -11,7 +11,7 @@ import type { GalacticDynamicsGroupId } from "@shared/theory/galactic-dynamics-m
 import type { CurvatureCollapseGroupId } from "@shared/theory/curvature-collapse-map";
 import type { PhysicsAtlasBlockId } from "@shared/contracts/physics-atlas.v1";
 
-const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v1";
+const THEORY_BADGE_GRAPH_PANEL_MEMORY_KEY = "theory-badge-graph-panel:v2";
 
 type TheoryBadgeGraphViewport = {
   scrollLeft: number;
@@ -113,7 +113,7 @@ const initialState = {
     scrollLeft: 0,
     scrollTop: 0,
   },
-  activeAtlasLensId: "stellar_evolution" as TheoryBadgeGraphAtlasLensId | null,
+  activeAtlasLensId: null as TheoryBadgeGraphAtlasLensId | null,
   selectedStarSimStageId: null as StarSimStellarEvolutionStageId | null,
   selectedStarSimObjectBindingId: null as string | null,
   selectedCosmicDistanceRungId: null as CosmicDistanceLadderRungId | null,

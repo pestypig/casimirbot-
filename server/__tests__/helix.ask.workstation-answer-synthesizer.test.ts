@@ -97,9 +97,9 @@ describe("Helix Ask workstation answer synthesizer", () => {
       },
     });
 
-    expect(answer).toContain("I located this discussion in the Theory Badge Graph as context evidence.");
-    expect(answer).toContain("The graph reflection suggests:");
-    expect(answer).toContain("This is a context locator, not a solve.");
+    expect(answer).toContain("I located this discussion in the Theory Badge Graph, then built a first-principles explanation route");
+    expect(answer).toContain("The graph route suggests:");
+    expect(answer).toContain("Read that route as evidence, not as a solve");
     expect(answer).not.toBe(rawSummary);
   });
 

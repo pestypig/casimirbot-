@@ -88,7 +88,7 @@ function adaptReflectionActions(
 export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) => ({
   ...emptyOverlay,
   setLocatorOverlay: (artifact) =>
-    set({
+    set((state) => ({
       source: artifact.input.source,
       query: artifact.input.query ?? artifact.input.expression,
       centerBadgeIds: artifact.overlay.centerBadgeIds,
@@ -104,8 +104,8 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       recommendedActions: artifact.recommendedActions,
       updatedAt: new Date().toISOString(),
       lastLocatorArtifact: artifact,
-      lastReflectionArtifact: null,
-    }),
+      lastReflectionArtifact: state.lastReflectionArtifact,
+    })),
   setReflectionOverlay: (artifact) =>
     set({
       source: "discussion_reflection",
@@ -126,7 +126,7 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       lastReflectionArtifact: artifact,
     }),
   setSelectionOverlay: (args) =>
-    set({
+    set((state) => ({
       source: "multi_select",
       query: null,
       selectedBadgeIds: args.selectedBadgeIds,
@@ -141,7 +141,7 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       recommendedActions: [],
       updatedAt: new Date().toISOString(),
       lastLocatorArtifact: null,
-      lastReflectionArtifact: null,
-    }),
+      lastReflectionArtifact: state.lastReflectionArtifact,
+    })),
   clearOverlay: () => set(emptyOverlay),
 }));

@@ -223,15 +223,27 @@ function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
 function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary ?? "The graph reflection returned a non-terminal context observation.";
   const evaluationResult = (input.evaluation as { result?: string } | null | undefined)?.result ?? null;
+  const hasExplanationPlan = input.plan.steps.some(
+    (step: HelixWorkstationToolPlanStep) =>
+      step.panel_id === "theory-badge-graph" && step.action_id === "explain_reflected_context",
+  );
   const cleanSummary = summary
     .replace(/^Theory reflection located discussion context as evidence only:\s*/i, "")
     .replace(/^Theory reflection located discussion context as evidence only\.\s*/i, "")
+    .replace(/^Theory explanation plan traced reflected context\s*/i, "traced reflected context ")
     .trim();
   if (evaluationResult === "insufficient") {
     return [
       "The theory reflection receipt was not accepted as final-answer evidence.",
       cleanSummary || "The receipt failed route-authority checks.",
       "I should answer from the prompt directly or rerun the reflection with a valid non-terminal receipt before using it as context.",
+    ].join("\n");
+  }
+  if (hasExplanationPlan) {
+    return [
+      "I located this discussion in the Theory Badge Graph, then built a first-principles explanation route from that reflection.",
+      `The graph route suggests: ${cleanSummary || "start from shared first-principle badges, follow the relevant theory branch, then keep runtime/evidence and claim-boundary rows visible."}`,
+      "Read that route as evidence, not as a solve: roots and branch badges explain where the concept lives, scalar cuts can go to the calculator, and tensor/runtime rows need receipts before they can support stronger interpretation.",
     ].join("\n");
   }
   return [

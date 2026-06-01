@@ -42,7 +42,7 @@ const THEORY_REFLECTION_FORBIDDEN_PATTERNS = [
   /QEI passed/i,
   /proven warp/i,
   /certified transport solution/i,
-];
+] as const;
 
 function containsForbiddenTheoryReflectionClaim(value: unknown): boolean {
   const text = JSON.stringify(value ?? "");
@@ -119,6 +119,21 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
         summary = reflectionSummary
           ? `Theory reflection located discussion context as evidence only: ${reflectionSummary}`
           : "Theory reflection located discussion context as evidence only.";
+      }
+    } else if (kind === "theory_context_explanation_plan") {
+      const theoryArtifact = artifact ?? {};
+      const issues = theoryReflectionAuthorityIssues(theoryArtifact);
+      if (issues.length > 0) {
+        result = "insufficient";
+        summary = `Theory context explanation rejected as terminal evidence: ${issues.join(", ")}.`;
+      } else {
+        const plan = asRecord(theoryArtifact.artifact_v1);
+        const planSummary = asRecord(plan?.summary);
+        const stepCount = Array.isArray(plan?.explanationSteps) ? plan.explanationSteps.length : 0;
+        const scalarCount = typeof planSummary?.scalarCutCount === "number" ? planSummary.scalarCutCount : 0;
+        const runtimeCount = typeof planSummary?.runtimeCount === "number" ? planSummary.runtimeCount : 0;
+        result = "supports_subgoal";
+        summary = `Theory explanation plan traced reflected context from first-principle roots through branch, runtime/evidence, and boundary rows as evidence only (${stepCount} steps, ${scalarCount} scalar cuts, ${runtimeCount} runtime/evidence rows).`;
       }
     } else if (kind === "theory_badge_locator") {
       result = "supports_subgoal";

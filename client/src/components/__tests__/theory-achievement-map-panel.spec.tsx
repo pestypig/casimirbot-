@@ -51,7 +51,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(screen.queryByTestId("discussion-zone-legend")).toBeNull();
   });
 
-  it("shows discussion-zone legend and reflection receipt inspector when reflection overlay is active", async () => {
+  it("keeps reflection receipts as backend memory with a live answer rail block", async () => {
     const artifact = buildTheoryContextReflectionV1({
       generatedAt: "2026-05-31T00:00:00.000Z",
       reflectionId: "reflection:inspector-test",
@@ -113,22 +113,66 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     renderPanel();
 
-    expect(await screen.findByTestId("discussion-zone-legend")).toBeTruthy();
-    expect(screen.getAllByText("Discussion zone").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Soft locator; not proof").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Exact matches").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Likely matches").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Claim boundaries").length).toBeGreaterThan(0);
-
-    expect(screen.getByTestId("reflection-receipt-inspector")).toBeTruthy();
-    expect(screen.getByText("The discussion appears near QEI and source residual.")).toBeTruthy();
-    expect(screen.getByText("Warp / GR / NHM2")).toBeTruthy();
-    expect(screen.getByText("Diagnostic-only context.")).toBeTruthy();
-    expect(screen.getByText("Build compound theory run")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy JSON" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Live answer theory context" })).toBeTruthy();
+    expect(screen.queryByTestId("discussion-zone-legend")).toBeNull();
+    expect(screen.queryByTestId("reflection-receipt-inspector")).toBeNull();
+    expect(screen.queryByText("The discussion appears near QEI and source residual.")).toBeNull();
+    expect(useTheoryMapOverlayStore.getState().lastReflectionArtifact).toBe(artifact);
   });
 
-  it("renders discussion soft region and exact/likely badge markers", async () => {
+  it("lets atlas lenses change the map without losing the live answer context", async () => {
+    const artifact = buildTheoryContextReflectionV1({
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:live-context-test",
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        prompt: "Where does E=hf fit?",
+        conversationContext: null,
+        mentionedEquations: ["E = h*f"],
+        mentionedSymbols: ["E", "h", "f"],
+        mentionedDomains: ["solar_surface_spectrum"],
+        source: "helix_ask",
+        confidenceMode: "soft_locator",
+      },
+      exactMatches: [],
+      likelyMatches: [],
+      inferredDomains: [],
+      overlay: {
+        centerBadgeIds: ["solar.spectrum.photon_energy"],
+        highlightedBadgeIds: ["solar.spectrum.photon_energy"],
+        highlightedEdgeIds: [],
+        heatByBadgeId: { "solar.spectrum.photon_energy": 1 },
+        exactBadgeIds: ["solar.spectrum.photon_energy"],
+        likelyBadgeIds: [],
+        softRegion: {
+          id: "discussion-zone:live-context-test",
+          label: "Current discussion zone",
+          badgeIds: ["solar.spectrum.photon_energy"],
+          confidence: 0.9,
+          tone: "green",
+          meaning: "discussion_context_not_proof",
+        },
+      },
+      evidenceForAsk: {
+        summary: "The discussion appears near photon energy.",
+        claimBoundaries: [],
+        recommendedNextActions: [],
+      },
+    });
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(artifact);
+
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Solar Surface & Spectrum atlas lens" }));
+    expect(useTheoryMapOverlayStore.getState().source).toBe("multi_select");
+    expect(useTheoryMapOverlayStore.getState().lastReflectionArtifact).toBe(artifact);
+
+    fireEvent.click(screen.getByRole("button", { name: "Live answer theory context" }));
+    expect(useTheoryMapOverlayStore.getState().source).toBe("discussion_reflection");
+    expect(useTheoryMapOverlayStore.getState().highlightedBadgeIds).toEqual(["solar.spectrum.photon_energy"]);
+  });
+
+  it("keeps discussion soft regions hidden from the front-facing map", async () => {
     const artifact = buildTheoryContextReflectionV1({
       generatedAt: "2026-05-31T00:00:00.000Z",
       reflectionId: "reflection:map-test",
@@ -174,19 +218,16 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     renderPanel();
 
-    expect(await screen.findByTestId("discussion-soft-region")).toBeTruthy();
-    expect(screen.getByText("Current discussion zone")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "QEI sampling window" })).toHaveAttribute(
+    expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
+    expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
+    expect(screen.queryByText("Current discussion zone")).toBeNull();
+    expect(screen.getByRole("button", { name: "QEI sampling window" })).not.toHaveAttribute(
       "data-discussion-match",
-      "exact",
     );
-    expect(screen.getByRole("button", { name: "Source residual" })).toHaveAttribute(
-      "data-discussion-match",
-      "likely",
-    );
+    expect(screen.getByRole("button", { name: "Source residual" })).not.toHaveAttribute("data-discussion-match");
   });
 
-  it("keeps claim-boundary badge styling above discussion exact markers", async () => {
+  it("keeps claim-boundary badge styling without discussion marker rings", async () => {
     const artifact = buildTheoryContextReflectionV1({
       generatedAt: "2026-05-31T00:00:00.000Z",
       reflectionId: "reflection:boundary-test",
@@ -230,7 +271,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
     const boundary = await screen.findByRole("button", { name: "Diagnostic-only claim boundary" });
 
-    expect(boundary).toHaveAttribute("data-discussion-match", "exact");
+    expect(boundary).not.toHaveAttribute("data-discussion-match");
     expect(boundary.className).toMatch(/border-amber-300/);
     expect(boundary.className).not.toMatch(/ring-emerald/);
   });
@@ -366,6 +407,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
 
     const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
     expect(starSimLensButton).toBeTruthy();
+    fireEvent.click(starSimLensButton);
     fireEvent.click(await screen.findByRole("button", { name: "Select Main Sequence" }));
 
     await waitFor(() => {
@@ -391,6 +433,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   it("persists the picked StarSim object binding and exposes its loadout to the calculator", async () => {
     const firstRender = renderPanel();
 
+    fireEvent.click(await screen.findByRole("button", { name: "Stellar Evolution atlas lens" }));
     fireEvent.click(await screen.findByRole("button", { name: "Select Red Giant" }));
     fireEvent.click(await screen.findByRole("button", { name: "Use K1III red giant object binding" }));
 
@@ -414,24 +457,26 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
 
     const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
+    expect(screen.queryByText("Stellar Evolution")).toBeNull();
+
+    fireEvent.click(starSimLensButton);
+
     expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
 
     fireEvent.click(starSimLensButton);
 
     expect(screen.queryByText("Stellar Evolution")).toBeNull();
     expect(screen.getByTestId("theory-achievement-map-scrollport")).toBeTruthy();
-
-    fireEvent.click(starSimLensButton);
-
-    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
   });
 
   it("remembers whether the StarSim lens is collapsed across remounts", async () => {
     const firstRender = renderPanel();
 
     const starSimLensButton = await screen.findByRole("button", { name: "Stellar Evolution atlas lens" });
-    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
+    expect(screen.queryByText("Stellar Evolution")).toBeNull();
 
+    fireEvent.click(starSimLensButton);
+    expect(await screen.findByText("Stellar Evolution")).toBeTruthy();
     fireEvent.click(starSimLensButton);
 
     expect(screen.queryByText("Stellar Evolution")).toBeNull();

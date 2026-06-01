@@ -18,9 +18,15 @@ const blockColors: Record<PhysicsAtlasBlockId, string> = {
 
 export default function TheoryAtlasRail({
   activeLensId,
+  hasLiveReflection,
+  liveReflectionActive,
+  onSelectLiveReflection,
   onSelectLens,
 }: {
   activeLensId: TheoryAtlasLensId | null;
+  hasLiveReflection?: boolean;
+  liveReflectionActive?: boolean;
+  onSelectLiveReflection?: () => void;
   onSelectLens: (lensId: TheoryAtlasLensId) => void;
 }) {
   return (
@@ -28,6 +34,21 @@ export default function TheoryAtlasRail({
       aria-label="Theory atlas lenses"
       className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
     >
+      {hasLiveReflection ? (
+        <button
+          type="button"
+          aria-label="Live answer theory context"
+          title="Live answer theory context"
+          onClick={onSelectLiveReflection}
+          className={`flex h-6 w-6 items-center justify-center border-2 bg-emerald-600 text-[11px] font-black text-white shadow ${
+            liveReflectionActive
+              ? "border-emerald-100 ring-2 ring-emerald-300"
+              : "border-zinc-800 hover:border-emerald-200"
+          }`}
+        >
+          ∴
+        </button>
+      ) : null}
       {PHYSICS_ATLAS_BLOCKS.map((block: PhysicsAtlasBlockV1) => {
         const active = activeLensId === block.id;
         const planned = block.status === "planned";

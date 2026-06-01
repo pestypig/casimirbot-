@@ -16,6 +16,7 @@ import { isScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/sci
 import { isTheoryBadgePlaybackArtifactV1 } from "@shared/contracts/theory-badge-playback.v1";
 import { isTheoryCalculatorLoadoutV1 } from "@shared/contracts/theory-calculator-loadout.v1";
 import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
+import { isTheoryContextExplanationPlanV1 } from "@shared/contracts/theory-context-explanation-plan.v1";
 import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
 
 const hoisted = vi.hoisted(() => {
@@ -1896,6 +1897,62 @@ describe("panelActionAdapters", () => {
       expect(result.ok).toBe(true);
       expect(useTheoryMapOverlayStore.getState().source).toBe("none");
       expect(useTheoryMapOverlayStore.getState().lastReflectionArtifact).toBeNull();
+    });
+
+    it("builds a non-terminal explanation plan from the active reflection", () => {
+      const reflection = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "reflect_discussion_context",
+          args: {
+            prompt: "Map source residual and QEI margin in the theory graph.",
+            mentioned_symbols: ["R_source", "qei_margin"],
+            mentioned_domains: ["warp_gr_nhm2", "qei_stress_energy"],
+            overlay: true,
+            open_panel: false,
+          },
+        },
+        actionContext(),
+      );
+      const result = executeHelixPanelAction(
+        {
+          panel_id: "theory-badge-graph",
+          action_id: "explain_reflected_context",
+          args: {},
+        },
+        actionContext(),
+      );
+
+      expect(reflection.ok).toBe(true);
+      expect(result.ok).toBe(true);
+      expect(result.artifact?.kind).toBe("theory_context_explanation_plan");
+      expect(isTheoryContextExplanationPlanV1(result.artifact?.artifact_v1)).toBe(true);
+      expect(result.artifact).toMatchObject({
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+        panel_generated_answer: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      });
+      expect(JSON.stringify(result.artifact)).toContain("nhm2.closure.source_residual");
+      expect(JSON.stringify(result.artifact)).toContain("qei");
+      expect(useScientificCalculatorStore.getState().currentLatex).toBe("");
+      expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
+      expect(useScientificCalculatorStore.getState().lastTheoryLoadout).toBeNull();
+    });
+
+    it("declares explain_reflected_context as a low-risk artifact action", () => {
+      const capabilities = WORKSTATION_V1_PANEL_CAPABILITIES["theory-badge-graph"];
+      const action = capabilities.actions.find((candidate) => candidate.id === "explain_reflected_context");
+
+      expect(action).toMatchObject({
+        title: "Explain Reflected Context",
+        risk: "low",
+        returns_artifact: true,
+      });
+      expect(capabilities.safe_actions).toContain("explain_reflected_context");
+      expect(capabilities.returns_artifact_actions).toContain("explain_reflected_context");
     });
 
     it("declares reflect_discussion_context as a low-risk artifact action", () => {

@@ -340,6 +340,7 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
       "open_theory_badge_graph",
       "reflect_discussion_context",
+      "explain_reflected_context",
       "evaluate_theory_context_reflection",
     ]);
     const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_discussion_context");
@@ -349,6 +350,13 @@ describe("Helix Ask workstation tool planner", () => {
     }));
     expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
       kind: "evaluate_result",
+      depends_on: ["explain_reflected_context"],
+    }));
+    const explainStep = plan.tool_plan?.steps.find((step) => step.step_id === "explain_reflected_context");
+    expect(explainStep).toEqual(expect.objectContaining({
+      panel_id: "theory-badge-graph",
+      action_id: "explain_reflected_context",
+      expected_receipt_kind: "theory_context_explanation_plan",
       depends_on: ["reflect_discussion_context"],
     }));
   });
@@ -398,6 +406,7 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
       "open_theory_badge_graph",
       "reflect_discussion_context",
+      "explain_reflected_context",
       "open_scientific_calculator",
       "ingest_expression",
       "solve_expression",
@@ -417,7 +426,7 @@ describe("Helix Ask workstation tool planner", () => {
     }));
     expect(plan.tool_plan?.steps.at(-1)).toEqual(expect.objectContaining({
       kind: "evaluate_result",
-      depends_on: ["reflect_discussion_context", "solve_expression"],
+      depends_on: ["explain_reflected_context", "solve_expression"],
     }));
   });
 

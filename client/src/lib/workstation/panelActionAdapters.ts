@@ -86,10 +86,12 @@ import {
   traceTheoryBadgeConnections,
 } from "@shared/theory/theory-badge-overlap-locator";
 import { buildTheoryContextReflection } from "@shared/theory/theory-context-reflector";
+import { buildTheoryContextExplanationPlan } from "@shared/theory/theory-context-explanation-plan";
 import type {
   TheoryContextReflectionConfidenceMode,
   TheoryContextReflectionSource,
 } from "@shared/contracts/theory-context-reflection.v1";
+import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
 import {
   PHYSICS_ATLAS_BLOCK_IDS,
   type PhysicsAtlasBlockId,
@@ -5071,6 +5073,7 @@ export function executeHelixPanelAction(
 
       if (asBoolean(args.overlay) ?? true) {
         useTheoryMapOverlayStore.getState().setReflectionOverlay(reflection);
+        useTheoryBadgeGraphPanelStore.getState().setActiveAtlasLensId(null);
       }
       if (asBoolean(args.open_panel ?? args.openPanel) ?? true) {
         context.openPanel(panelId, undefined);
@@ -5091,6 +5094,71 @@ export function executeHelixPanelAction(
           soft_region: reflection.overlay.softRegion,
           evidence_for_ask: reflection.evidenceForAsk,
           claim_boundary_notes: reflection.evidenceForAsk.claimBoundaries,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+          deterministic_content_role: "observation_not_assistant_answer",
+        },
+      };
+    }
+
+    if (actionId === "explain_reflected_context") {
+      const reflectionArg = asRecord(args.reflection ?? args.artifact_v1 ?? args.artifactV1);
+      const nestedReflectionArg = asRecord(reflectionArg?.artifact_v1 ?? reflectionArg?.artifactV1);
+      const storedReflection = useTheoryMapOverlayStore.getState().lastReflectionArtifact;
+      let reflection =
+        (reflectionArg && isTheoryContextReflectionV1(reflectionArg) ? reflectionArg : null) ??
+        (nestedReflectionArg && isTheoryContextReflectionV1(nestedReflectionArg) ? nestedReflectionArg : null) ??
+        storedReflection;
+
+      if (!reflection) {
+        const prompt = asNonEmptyString(args.prompt ?? args.query ?? args.text);
+        if (!prompt) {
+          return {
+            ok: false,
+            panel_id: panelId,
+            action_id: actionId,
+            message:
+              "theory-badge-graph.explain_reflected_context requires a reflection artifact or prompt.",
+          };
+        }
+        reflection = buildTheoryContextReflection({
+          graph,
+          prompt,
+          conversationContext: asNonEmptyString(args.conversation_context ?? args.conversationContext),
+          mentionedEquations: asStringArray(args.mentioned_equations ?? args.mentionedEquations),
+          mentionedSymbols: asStringArray(args.mentioned_symbols ?? args.mentionedSymbols),
+          mentionedDomains: asStringArray(args.mentioned_domains ?? args.mentionedDomains),
+          confidenceMode: asTheoryContextReflectionConfidenceMode(args.confidence_mode ?? args.confidenceMode),
+          source: asTheoryContextReflectionSource(args.source),
+          limit: asNumber(args.limit) ?? undefined,
+        });
+      }
+
+      const plan = buildTheoryContextExplanationPlan({
+        graph,
+        reflection,
+      });
+
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "theory_context_explanation_plan",
+          schemaVersion: plan.schemaVersion,
+          artifact_v1: plan,
+          graph_id: graph.graphId,
+          reflection_id: plan.reflectionId,
+          selected_badge_ids: plan.selectedBadgeIds,
+          explanation_steps: plan.explanationSteps,
+          scalar_cut_badge_ids: plan.scalarCutBadgeIds,
+          runtime_trace_badge_ids: plan.runtimeTraceBadgeIds,
+          claim_boundary_notes: plan.claimBoundaryNotes,
+          recommended_next_actions: plan.recommendedNextActions,
           assistant_answer: false,
           raw_content_included: false,
           terminal_eligible: false,

@@ -450,6 +450,27 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "explain_reflected_context",
+        title: "Explain Reflected Context",
+        description:
+          "Build a first-principles-to-branch explanation plan from a theory context reflection. Returns evidence only; does not solve or mutate calculator state.",
+        risk: "low",
+        optional_args: [
+          "reflection",
+          "artifact_v1",
+          "reflection_id",
+          "prompt",
+          "query",
+          "text",
+          "conversation_context",
+          "mentioned_equations",
+          "mentioned_symbols",
+          "mentioned_domains",
+          "limit",
+        ],
+        returns_artifact: true,
+      },
+      {
         id: "plan_calculation_context",
         title: "Plan Physics Calculation Context",
         description:
