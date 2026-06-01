@@ -122,6 +122,10 @@ function renderPanel() {
   return render(<ZenGraphPanel reflection={reflection} admission={admission} />);
 }
 
+function openObjectiveBindings() {
+  fireEvent.click(screen.getByRole("button", { name: "Toggle Fruition objective binding lens" }));
+}
+
 afterEach(() => {
   useFruitionCalculatorStore.getState().clear();
   cleanup();
@@ -133,6 +137,21 @@ describe("ZenGraphPanel", () => {
 
     expect(screen.getByTestId("zen-graph-map-scrollport")).toBeTruthy();
     expect(screen.getByText("Zen Badge Graph")).toBeTruthy();
+    expect(screen.queryByTestId("zen-graph-objective-binding-overlay")).toBeNull();
+    expect(screen.getByRole("button", { name: "Wisdom Root" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Direct Observation Before Claim" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Impermanence, Entropy, and Revision" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Interdependence and Yin-Yang Balance" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Falsifiability and Truth Convergence" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Right Speech and Accurate Formulation" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Non-Harm and Compassionate Constraint" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Fairness, Due Process, and Justification" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Skillful Action Under Uncertainty" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Skillful Mediation" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "mission ethos" })).toBeTruthy();
+    expect(screen.getAllByTestId("zen-graph-badge-node").length).toBeGreaterThan(12);
+
+    openObjectiveBindings();
     expect(screen.getByText("Objective Bindings")).toBeTruthy();
     expect(screen.getByTestId("zen-graph-objective-binding-overlay")).toBeTruthy();
     expect(screen.getByText("ZenGraph Fruition Path")).toBeTruthy();
@@ -141,16 +160,13 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByText("Fruition procedure")).toBeTruthy();
     expect(screen.getByText("Badge procedure")).toBeTruthy();
     expect(screen.getByText("Outer objective view")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Skillful Mediation" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "wisdom first principles" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "mission ethos" })).toBeTruthy();
-    expect(screen.getAllByTestId("zen-graph-badge-node").length).toBeGreaterThan(4);
   });
 
   it("shows how a selected Zen badge contributes to the action procedure", () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Right Speech Infrastructure" }));
+    openObjectiveBindings();
 
     expect(screen.getAllByText(/constraint/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/constrains/i).length).toBeGreaterThan(0);
@@ -160,6 +176,7 @@ describe("ZenGraphPanel", () => {
 
   it("renders safeguards, action gate warnings, tensions, and claim boundaries", () => {
     renderPanel();
+    openObjectiveBindings();
 
     expect(screen.getByRole("button", { name: "Two-Key Approval" })).toBeTruthy();
     expect(screen.getByText("legal_key_and_ethos_key")).toBeTruthy();
@@ -172,6 +189,7 @@ describe("ZenGraphPanel", () => {
 
   it("renders admission state, risk, display policy, and evidence refs", () => {
     renderPanel();
+    openObjectiveBindings();
 
     expect(screen.getByText(/Admission state:/)).toBeTruthy();
     expect(screen.getAllByText(/Risk: claim sensitive/).length).toBeGreaterThan(0);
@@ -190,11 +208,11 @@ describe("ZenGraphPanel", () => {
   it("toggles the objective binding overlay from the Fruition lens block", () => {
     renderPanel();
 
-    expect(screen.getByTestId("zen-graph-objective-binding-overlay")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Toggle Fruition objective binding lens" }));
     expect(screen.queryByTestId("zen-graph-objective-binding-overlay")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Toggle Fruition objective binding lens" }));
+    openObjectiveBindings();
     expect(screen.getByTestId("zen-graph-objective-binding-overlay")).toBeTruthy();
+    openObjectiveBindings();
+    expect(screen.queryByTestId("zen-graph-objective-binding-overlay")).toBeNull();
   });
 
   it("loads the current graph expression into the Fruition Calculator panel", () => {
@@ -204,6 +222,7 @@ describe("ZenGraphPanel", () => {
     };
     window.addEventListener("open-helix-panel", listener);
     renderPanel();
+    openObjectiveBindings();
 
     fireEvent.click(screen.getByRole("button", { name: "Load to Fruition Calculator" }));
 

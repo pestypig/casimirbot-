@@ -10,6 +10,7 @@ describe("curvature/collapse object bindings", () => {
       area_m2: 10,
       tau_ms: 1000,
       dt_ms: 50,
+      deltaE_G_J: 1e-30,
     });
 
     expect(context.kind).toBe("curvature_collapse_object");
@@ -17,6 +18,10 @@ describe("curvature/collapse object bindings", () => {
     expect(context.variableBindings.power_W).toBe(1000000);
     expect(context.variableBindings.c).toBe(299792458);
     expect(context.variableBindings.G).toBe(6.6743e-11);
+    expect(context.variableBindings.h).toBe(6.62607015e-34);
+    expect(context.variableBindings.hbar).toBe(1.054571817e-34);
+    expect(context.variableBindings.deltaE_G_J).toBe(1e-30);
     expect(context.claimBoundaryNotes.join(" ")).toMatch(/benchmark diagnostics/i);
+    expect(context.claimBoundaryNotes.join(" ")).toMatch(/Diosi-Penrose timescale/i);
   });
 });
