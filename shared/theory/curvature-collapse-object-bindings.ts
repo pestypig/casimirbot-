@@ -19,7 +19,17 @@ export type CurvatureCollapseObjectBindingInput = {
   observed?: number;
   bound?: number;
   sigma?: number;
+  E_J?: number;
+  f_Hz?: number;
+  T_s?: number;
+  omega_rad_s?: number;
+  deltaE_G_J?: number;
+  tau_DP_s?: number;
+  tau_DP_ms?: number;
+  Gamma_DP_Hz?: number;
   G?: number;
+  h?: number;
+  hbar?: number;
   source?: TheoryCalculatorObjectContextV1["source"];
 };
 
@@ -49,7 +59,17 @@ export function buildCurvatureCollapseObjectBindings(
     observed: input.observed,
     bound: input.bound,
     sigma: input.sigma,
+    E_J: input.E_J,
+    f_Hz: input.f_Hz,
+    T_s: input.T_s,
+    omega_rad_s: input.omega_rad_s,
+    deltaE_G_J: input.deltaE_G_J,
+    tau_DP_s: input.tau_DP_s,
+    tau_DP_ms: input.tau_DP_ms,
+    Gamma_DP_Hz: input.Gamma_DP_Hz,
     G: input.G ?? 6.6743e-11,
+    h: input.h ?? 6.62607015e-34,
+    hbar: input.hbar ?? 1.054571817e-34,
   });
 
   return {
@@ -74,6 +94,14 @@ export function buildCurvatureCollapseObjectBindings(
       observed: input.observed ?? null,
       bound: input.bound ?? null,
       sigma: input.sigma ?? null,
+      E_J: input.E_J ?? null,
+      f_Hz: input.f_Hz ?? null,
+      T_s: input.T_s ?? null,
+      omega_rad_s: input.omega_rad_s ?? null,
+      deltaE_G_J: input.deltaE_G_J ?? null,
+      tau_DP_s: input.tau_DP_s ?? null,
+      tau_DP_ms: input.tau_DP_ms ?? null,
+      Gamma_DP_Hz: input.Gamma_DP_Hz ?? null,
     },
     variableBindings,
     units: {
@@ -93,16 +121,28 @@ export function buildCurvatureCollapseObjectBindings(
       observed: "varies",
       bound: "varies",
       sigma: "varies",
+      E_J: "J",
+      f_Hz: "Hz",
+      T_s: "s",
+      omega_rad_s: "rad/s",
+      deltaE_G_J: "J",
+      tau_DP_s: "s",
+      tau_DP_ms: "ms",
+      Gamma_DP_Hz: "Hz",
       G: "m^3 kg^-1 s^-2",
+      h: "J s",
+      hbar: "J s",
     },
     source: input.source ?? "manual",
     assumptions: [
       "Curvature/collapse rows are diagnostic calculator helpers.",
       "Collapse benchmark rows model commit/selection cadence, not literal objective-collapse physics.",
+      "Objective-collapse rows are exploratory model-comparison helpers, not established collapse physics.",
       "Runtime and certificate interpretation require backend receipts.",
     ],
     claimBoundaryNotes: [
       "Curvature/collapse loadouts are benchmark diagnostics.",
+      "Diosi-Penrose timescale rows require explicit mass-density branch evidence and experimental-bound context.",
       "Calculator rows do not certify curvature gravity, signal behavior, or mechanism claims.",
     ],
   };

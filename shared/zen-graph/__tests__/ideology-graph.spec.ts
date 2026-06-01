@@ -84,8 +84,12 @@ describe("ZenGraph ideology loader and traversal", () => {
   it("loads the canonical docs/ethos/ideology.json seed graph", async () => {
     const graph = await loadIdeologyGraphFromFile();
 
-    expect(graph.rootId).toBe("mission-ethos");
-    expect(getIdeologyNodeById(graph, graph.rootId)?.id).toBe("mission-ethos");
+    expect(graph.rootId).toBe("wisdom-first-principles");
+    expect(getIdeologyNodeById(graph, graph.rootId)?.id).toBe("wisdom-first-principles");
+    expect(getIdeologyChildren(graph, graph.rootId).map((node) => node.id)).toEqual(
+      expect.arrayContaining(["direct-observation-before-claim", "mission-ethos"]),
+    );
+    expect(getIdeologyPathToRoot(graph, "mission-ethos")).toEqual(["mission-ethos", "wisdom-first-principles"]);
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(getIdeologyActionGatePolicy(graph)?.hard_fail_ids?.missing_legal_key).toBe("IDEOLOGY_MISSING_LEGAL_KEY");
   });

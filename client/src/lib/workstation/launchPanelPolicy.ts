@@ -10,6 +10,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "scientific-calculator",
   "theory-badge-graph",
   "zen-graph",
+  "fruition-calculator",
   "mission-ethos",
 ]);
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "rootId": "mission-ethos",
+  "rootId": "wisdom-first-principles",
   "actionGatePolicy": {
     "version": 1,
     "claim_tier": "diagnostic",
@@ -37,6 +37,760 @@
   },
   "nodes": [
     {
+      "id": "wisdom-first-principles",
+      "slug": "wisdom-first-principles",
+      "title": "Wisdom First Principles",
+      "excerpt": "Begin from observation, balance, revision, non-harm, and justified formulation before assembling any mission view.",
+      "bodyMD": "The ideology tree begins with the primitive disciplines that make a view fair before it becomes an objective: observe before judging, balance coupled forces, revise under entropy, test claims against evidence, speak with calibrated certainty, constrain harm, and justify action through due process.\n\nMission ethos is downstream of this root. It is an assembled objective view, not the first principle itself.\n\nA ZenGraph reflection should therefore climb from concrete lenses back to these wisdom primitives before presenting an outer objective view.",
+      "tags": [
+        "first_principle",
+        "wisdom",
+        "zen",
+        "observation",
+        "validation",
+        "balance",
+        "non-harm",
+        "fairness"
+      ],
+      "children": [
+        "direct-observation-before-claim",
+        "impermanence-entropy-and-revision",
+        "interdependence-yin-yang-balance",
+        "falsifiability-and-truth-convergence",
+        "right-speech-and-accurate-formulation",
+        "non-harm-and-compassionate-constraint",
+        "fairness-due-process-and-justification",
+        "skillful-action-under-uncertainty",
+        "mission-ethos"
+      ],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "beginners-mind"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
+        },
+        {
+          "rel": "see-also",
+          "to": "worldview-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "mission-ethos"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Begin from observation, balance, revision, non-harm, and justified formulation before assembling any mission view.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "direct-observation-before-claim",
+      "slug": "direct-observation-before-claim",
+      "title": "Direct Observation Before Claim",
+      "excerpt": "Look first, name later: distinguish observation from interpretation before forming a view.",
+      "bodyMD": "A fair view begins by separating what was observed from what was inferred. Beginner's mind is not ignorance; it is the discipline of not letting the story outrun the evidence.\n\nMinimal artifact: observation notes with source refs, uncertainty, and what has not yet been checked.",
+      "tags": [
+        "first_principle",
+        "observation",
+        "shoshin",
+        "evidence",
+        "epistemic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "beginners-mind"
+        },
+        {
+          "rel": "see-also",
+          "to": "liveness-or-it-didnt-happen"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Look first, name later: distinguish observation from interpretation before forming a view.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "impermanence-entropy-and-revision",
+      "slug": "impermanence-entropy-and-revision",
+      "title": "Impermanence, Entropy, and Revision",
+      "excerpt": "Systems drift, evidence ages, and valid views require explicit revalidation.",
+      "bodyMD": "A claim is not permanently alive because it was once true. Entropy, changing context, stale evidence, and social pressure all degrade certainty.\n\nThe wise posture is reviewable: publish the revision trigger, show the uncertainty, and sunset claims that no longer pass observation.",
+      "tags": [
+        "first_principle",
+        "impermanence",
+        "entropy",
+        "revision",
+        "validation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "impermanence-by-design"
+        },
+        {
+          "rel": "see-also",
+          "to": "worldview-integrity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Systems drift, evidence ages, and valid views require explicit revalidation.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "interdependence-yin-yang-balance",
+      "slug": "interdependence-yin-yang-balance",
+      "title": "Interdependence and Yin-Yang Balance",
+      "excerpt": "Opposing pressures are coupled; fair reasoning tracks reciprocal effects instead of treating one side as disposable.",
+      "bodyMD": "Yin and yang here are not decoration. They name the discipline of seeing coupled forces: restraint and ambition, action and non-action, certainty and humility, self and system.\n\nA justified view asks what each side is balancing, what cost is displaced, and what hidden dependency is being ignored.",
+      "tags": [
+        "first_principle",
+        "yin",
+        "yang",
+        "balance",
+        "interdependence",
+        "systems"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "interbeing-systems"
+        },
+        {
+          "rel": "see-also",
+          "to": "koan-governance"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Opposing pressures are coupled; fair reasoning tracks reciprocal effects instead of treating one side as disposable.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "falsifiability-and-truth-convergence",
+      "slug": "falsifiability-and-truth-convergence",
+      "title": "Falsifiability and Truth Convergence",
+      "excerpt": "A view earns confidence only through testable claims, shared observations, and reproducible checks.",
+      "bodyMD": "Truth convergence is not forced agreement. It is the public discipline of allowing many hypotheses while making every claim answerable to observation, falsifiability, uncertainty bounds, and reproducible checks.",
+      "tags": [
+        "first_principle",
+        "scientific_method",
+        "falsifiability",
+        "truth",
+        "validation",
+        "observation"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "truth-convergence-pathways"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "A view earns confidence only through testable claims, shared observations, and reproducible checks.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "right-speech-and-accurate-formulation",
+      "slug": "right-speech-and-accurate-formulation",
+      "title": "Right Speech and Accurate Formulation",
+      "excerpt": "Language should encode evidence strength, uncertainty, and boundaries without pretending to final authority.",
+      "bodyMD": "Accurate formulation is a technical and ethical discipline. It asks whether the words preserve what is known, what is missing, what is inferred, and what would change the claim.\n\nRight speech is not just politeness; it is calibration.",
+      "tags": [
+        "first_principle",
+        "right_speech",
+        "formulation",
+        "uncertainty",
+        "evidence"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-infrastructure"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Language should encode evidence strength, uncertainty, and boundaries without pretending to final authority.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "non-harm-and-compassionate-constraint",
+      "slug": "non-harm-and-compassionate-constraint",
+      "title": "Non-Harm and Compassionate Constraint",
+      "excerpt": "Capability is constrained by harm reduction, repair, consent, dignity, and proportionality.",
+      "bodyMD": "Compassion becomes operational when it constrains capability. A wise objective does not merely ask what can be done; it asks who may be harmed, what repair path exists, and whether restraint protects agency.",
+      "tags": [
+        "first_principle",
+        "non-harm",
+        "compassion",
+        "constraint",
+        "repair"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "restorative-harm-repair"
+        },
+        {
+          "rel": "see-also",
+          "to": "lawful-interface-protocol"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Capability is constrained by harm reduction, repair, consent, dignity, and proportionality.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "fairness-due-process-and-justification",
+      "slug": "fairness-due-process-and-justification",
+      "title": "Fairness, Due Process, and Justification",
+      "excerpt": "Power requires reasons, jurisdiction, contestability, and review before it becomes legitimate action.",
+      "bodyMD": "A fair view is not just internally coherent. It must be justifiable to the people affected by it, bounded by jurisdiction, and open to contestation.\n\nThis principle turns governance from assertion into accountable procedure.",
+      "tags": [
+        "first_principle",
+        "fairness",
+        "due-process",
+        "justification",
+        "governance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "jurisdictional-floor"
+        },
+        {
+          "rel": "see-also",
+          "to": "two-key-approval"
+        },
+        {
+          "rel": "see-also",
+          "to": "citizens-arc"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Power requires reasons, jurisdiction, contestability, and review before it becomes legitimate action.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
+      "id": "skillful-action-under-uncertainty",
+      "slug": "skillful-action-under-uncertainty",
+      "title": "Skillful Action Under Uncertainty",
+      "excerpt": "Action should scale with evidence, risk, reversibility, and missing checks.",
+      "bodyMD": "Wisdom does not mean never acting. It means matching action to the evidence and risk state: ask when evidence is missing, review when gates are near, block when authority is unclear, and keep repair paths visible.",
+      "tags": [
+        "first_principle",
+        "skillful_action",
+        "uncertainty",
+        "action_gate",
+        "review"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-mediation"
+        },
+        {
+          "rel": "see-also",
+          "to": "no-bypass-guardrail"
+        },
+        {
+          "rel": "see-also",
+          "to": "three-tenets-loop"
+        }
+      ],
+      "references": [
+        {
+          "kind": "doc",
+          "title": "Ideology Graph",
+          "path": "docs/ethos/ideology.json"
+        }
+      ],
+      "summary": "Action should scale with evidence, risk, reversibility, and missing checks.",
+      "nodeType": "concept",
+      "inputs": [],
+      "outputs": [],
+      "assumptions": [],
+      "validity": {},
+      "deterministic": null,
+      "tolerance": null,
+      "environment": null,
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/ethos/ideology.json",
+          "title": "Ideology Graph",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        },
+        {
+          "type": "code",
+          "path": "client/src/components/IdeologyPanel.tsx",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:f27e5208541b31a471aebf8f55ad84426b9e40dc7a53bc4d5f5ac678619b8e2a"
+        },
+        {
+          "type": "telemetry",
+          "path": "docs/ethos/ideology-telemetry-schema.json",
+          "repo_rev": "a993f4618e92989c20b05232addbc333ded95a29",
+          "content_hash": "sha256:7bc969a0b6844a29949cfbb67d17cf5916c64a4182d7f503515fac563232a394"
+        }
+      ],
+      "predictability": {
+        "status": "partial",
+        "missing": [
+          "inputs",
+          "outputs",
+          "assumptions",
+          "validity",
+          "deterministic",
+          "tolerance",
+          "environment"
+        ]
+      }
+    },
+    {
       "id": "mission-ethos",
       "slug": "mission-ethos",
       "title": "Mission Ethos",
@@ -44,7 +798,9 @@
       "bodyMD": "The craft is not built for conquest; it exists to tend the stellar ledger and keep worlds nourished.\n\nWe treat each joule extracted from the vacuum as a promise to replenish what was lost elsewhere.\n\nWhen measurements disagree with our story, we revise the story. The vow survives by truth, not by force.",
       "tags": [
         "stewardship",
-        "compassion"
+        "compassion",
+        "objective_view",
+        "mission"
       ],
       "children": [
         "bodhisattva-craft",
@@ -84,6 +840,10 @@
         "truth-convergence-pathways"
       ],
       "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
         {
           "rel": "see-also",
           "to": "bodhisattva-craft"
@@ -130,7 +890,9 @@
       "deterministic": null,
       "tolerance": null,
       "environment": null,
-      "dependencies": [],
+      "dependencies": [
+        "wisdom-first-principles"
+      ],
       "evidence": [
         {
           "type": "doc",

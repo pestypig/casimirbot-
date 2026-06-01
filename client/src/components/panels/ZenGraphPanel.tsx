@@ -1,172 +1,381 @@
 import React, { useMemo, useState } from "react";
-import type {
-  HelixRecommendedActionAdmissionEntryV1,
-  HelixRecommendedActionAdmissionV1,
-} from "@shared/contracts/helix-recommended-action-admission.v1";
-import { canAgentAutomateAdmissionAction } from "@shared/helix-recommended-action-admission";
+import type { HelixRecommendedActionAdmissionV1 } from "@shared/contracts/helix-recommended-action-admission.v1";
 import type { IdeologyContextReflectionV1, IdeologyNodeMatchV1 } from "@shared/ideology-context-reflection";
+import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
+import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
+import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@shared/fruition-procedure-expression";
 import { Badge } from "@/components/ui/badge";
 import { useZenGraphReflection } from "@/hooks/useZenGraphReflection";
+import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 
-type ZenBadgeTone = "lens" | "safeguard" | "boundary" | "action";
+type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action";
 
-type ZenBadge = {
+type ZenGraphNode = {
   id: string;
-  title: string;
-  subtitle: string;
-  group: string;
-  tone: ZenBadgeTone;
+  label: string;
+  tone: ZenGraphNodeTone;
+  glyph: string;
+  x: number;
+  y: number;
   confidence?: number;
   tags?: string[];
-  pathToRoot?: string[];
+  summary: string;
+  proceduralRole?: string;
+  procedureOperator?: string;
+  actionEffect?: string;
+  evidenceNeeds?: string[];
+  refusesAuthority?: string[];
 };
 
-function formatToken(value: string): string {
-  return value.replace(/_/g, " ");
-}
+type ZenGraphEdge = {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  tone: "cyan" | "emerald" | "amber" | "rose" | "violet" | "slate";
+};
 
-function toneClasses(tone: ZenBadgeTone, selected = false): string {
-  const selectedRing = selected ? " ring-1 ring-cyan-300" : "";
-  switch (tone) {
-    case "lens":
-      return `border-cyan-700 bg-cyan-950/35 text-cyan-50${selectedRing}`;
-    case "safeguard":
-      return `border-amber-700 bg-amber-950/35 text-amber-50${selectedRing}`;
-    case "boundary":
-      return `border-rose-800 bg-rose-950/35 text-rose-50${selectedRing}`;
-    case "action":
-      return `border-violet-700 bg-violet-950/30 text-violet-50${selectedRing}`;
-    default:
-      return `border-slate-800 bg-slate-950/70 text-slate-100${selectedRing}`;
-  }
-}
-
-function bindingBoxClasses(tone: "cyan" | "emerald" | "amber" | "rose" | "violet" | "slate"): string {
-  switch (tone) {
-    case "cyan":
-      return "border-cyan-700 bg-cyan-950/35 text-cyan-50";
-    case "emerald":
-      return "border-emerald-700 bg-emerald-950/35 text-emerald-50";
-    case "amber":
-      return "border-amber-700 bg-amber-950/35 text-amber-50";
-    case "rose":
-      return "border-rose-800 bg-rose-950/35 text-rose-50";
-    case "violet":
-      return "border-violet-700 bg-violet-950/30 text-violet-50";
-    default:
-      return "border-slate-800 bg-slate-950/70 text-slate-100";
-  }
+function labelize(value: string): string {
+  return value.replace(/[_-]/g, " ");
 }
 
 function confidenceLabel(value?: number): string {
   return typeof value === "number" ? `confidence ${value.toFixed(2)}` : "diagnostic";
 }
 
-function canShowExecutionControl(admission: HelixRecommendedActionAdmissionV1, action: HelixRecommendedActionAdmissionEntryV1) {
-  return canAgentAutomateAdmissionAction(admission, action);
+function edgePath(from: ZenGraphNode, to: ZenGraphNode): string {
+  const x1 = from.x + 24;
+  const y1 = from.y + 24;
+  const x2 = to.x + 24;
+  const y2 = to.y + 24;
+  const midX = (x1 + x2) / 2;
+  return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
 
-function matchToBadge(match: IdeologyNodeMatchV1, group: string, tone: ZenBadgeTone): ZenBadge {
-  return {
-    id: match.nodeId,
-    title: match.label,
-    subtitle: `${group} / ${confidenceLabel(match.score)}`,
-    group,
-    tone,
-    confidence: match.score,
-    tags: match.tags,
-    pathToRoot: match.pathToRoot,
-  };
+function edgeStroke(tone: ZenGraphEdge["tone"]): string {
+  switch (tone) {
+    case "cyan":
+      return "rgb(103 232 249)";
+    case "emerald":
+      return "rgb(110 231 183)";
+    case "amber":
+      return "rgb(252 211 77)";
+    case "rose":
+      return "rgb(251 113 133)";
+    case "violet":
+      return "rgb(196 181 253)";
+    default:
+      return "rgb(161 161 170)";
+  }
 }
 
-function buildBadges(reflection: IdeologyContextReflectionV1, admission: HelixRecommendedActionAdmissionV1): ZenBadge[] {
-  const badges: ZenBadge[] = [
-    ...reflection.matches.exact.map((match) => matchToBadge(match, "Exact lens matches", "lens")),
-    ...reflection.matches.likely.map((match) => matchToBadge(match, "Likely lens matches", "lens")),
-    ...reflection.matches.inferred_lenses.map((match) => matchToBadge(match, "Inferred outer-edge lenses", "lens")),
-    ...reflection.activated_traits.map((trait) => ({
-      id: trait.nodeId,
-      title: trait.label,
-      subtitle: `Activated lens / ${confidenceLabel(trait.confidence)}`,
-      group: "Activated traits",
-      tone: "lens" as const,
-      confidence: trait.confidence,
-      tags: trait.tags,
-      pathToRoot: trait.pathToRoot,
-    })),
-    ...(reflection.action_gate_warnings ?? []).map((warning) => ({
-      id: warning.gateId,
-      title: warning.label,
-      subtitle: `Requires ${warning.requiredCheck ?? warning.warning}`,
-      group: "Safeguards",
-      tone: "safeguard" as const,
-      tags: warning.requiredCheck ? [warning.requiredCheck] : [],
-    })),
-    ...(reflection.claim_boundaries.missing_evidence ?? []).map((missing) => ({
-      id: `missing:${missing}`,
-      title: `Boundary: ${formatToken(missing)}`,
-      subtitle: "Claim boundary",
-      group: "Claim boundaries",
-      tone: "boundary" as const,
-      tags: ["missing_evidence"],
-    })),
-    ...admission.actions.map((action) => ({
-      id: action.actionId,
-      title: action.label,
-      subtitle: `${formatToken(action.admission)} / ${formatToken(action.risk)}`,
-      group: "Recommended next steps",
-      tone: action.admission === "blocked" ? ("boundary" as const) : ("action" as const),
-      tags: action.reasonCodes,
-    })),
+function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted: boolean; dimmed: boolean }): string {
+  const classes = [
+    "absolute flex h-12 w-12 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
+    "focus:outline-none focus:ring-2 focus:ring-cyan-200",
   ];
+  switch (args.node.tone) {
+    case "root":
+      classes.push("border-zinc-100 bg-gradient-to-br from-zinc-100 via-zinc-400 to-zinc-800 text-zinc-950");
+      break;
+    case "principle":
+      classes.push("border-sky-200 bg-gradient-to-br from-sky-100 via-zinc-300 to-sky-950 text-zinc-950");
+      break;
+    case "lens":
+      classes.push("border-cyan-200 bg-gradient-to-br from-cyan-100 via-zinc-400 to-cyan-900 text-zinc-950");
+      break;
+    case "trait":
+      classes.push("border-emerald-200 bg-gradient-to-br from-emerald-100 via-zinc-400 to-emerald-900 text-zinc-950");
+      break;
+    case "safeguard":
+      classes.push("border-amber-200 bg-gradient-to-br from-amber-100 via-zinc-400 to-amber-950 text-zinc-950");
+      break;
+    case "boundary":
+      classes.push("border-rose-200 bg-gradient-to-br from-rose-100 via-zinc-500 to-rose-950 text-zinc-950");
+      break;
+    case "action":
+      classes.push("border-violet-200 bg-gradient-to-br from-violet-100 via-zinc-400 to-violet-950 text-zinc-950");
+      break;
+  }
+  if (args.selected) classes.push("ring-4 ring-cyan-200/80 shadow-cyan-200/50");
+  else if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
+  if (args.dimmed) classes.push("opacity-30 grayscale");
+  return classes.join(" ");
+}
 
-  const seen = new Set<string>();
-  return badges.filter((badge) => {
-    const key = `${badge.group}:${badge.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+function nodeGlyph(node: ZenGraphNode): string {
+  if (node.tone === "root") return "R";
+  if (node.tone === "principle") return "P";
+  if (node.tone === "lens") return "L";
+  if (node.tone === "trait") return "T";
+  if (node.tone === "safeguard") return "G";
+  if (node.tone === "boundary") return "!";
+  return "A";
+}
+
+function matchLabel(match: IdeologyNodeMatchV1): string {
+  return `${match.label} / ${confidenceLabel(match.score)}`;
+}
+
+function addNode(nodes: Map<string, ZenGraphNode>, node: ZenGraphNode): void {
+  if (!nodes.has(node.id)) nodes.set(node.id, node);
+}
+
+function addPathNodes(params: {
+  nodes: Map<string, ZenGraphNode>;
+  edges: ZenGraphEdge[];
+  path: string[];
+  labelsById: Map<string, string>;
+  laneY: number;
+  tone: ZenGraphNodeTone;
+  edgeTone: ZenGraphEdge["tone"];
+  summary: string;
+  confidence?: number;
+  tags?: string[];
+}): void {
+  const pathRootFirst = [...params.path].reverse();
+  pathRootFirst.forEach((nodeId, index) => {
+    const isRoot = index === 0;
+    addNode(params.nodes, {
+      id: nodeId,
+      label: params.labelsById.get(nodeId) ?? labelize(nodeId),
+      tone: isRoot ? "root" : params.tone,
+      glyph: "",
+      x: 90 + index * 150,
+      y: params.laneY,
+      confidence: isRoot ? undefined : params.confidence,
+      tags: isRoot ? ["root"] : params.tags,
+      summary: isRoot ? "Root principle" : params.summary,
+    });
+    if (index > 0) {
+      const from = pathRootFirst[index - 1];
+      const to = nodeId;
+      params.edges.push({
+        id: `path:${from}:${to}`,
+        from,
+        to,
+        label: "path to root",
+        tone: params.edgeTone,
+      });
+    }
   });
 }
 
-function BadgeButton({
-  badge,
-  selected,
-  onSelect,
-}: {
-  badge: ZenBadge;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`w-full rounded-md border p-3 text-left transition hover:border-slate-500 ${toneClasses(badge.tone, selected)}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{badge.title}</div>
-          <div className="mt-1 line-clamp-2 text-xs opacity-80">{badge.subtitle}</div>
-        </div>
-        {typeof badge.confidence === "number" ? (
-          <span className="rounded border border-current/30 px-1.5 py-0.5 text-[10px] opacity-80">
-            {badge.confidence.toFixed(2)}
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1">
-        <Badge variant="outline" className="border-current/30 text-[10px] text-current">
-          {formatToken(badge.tone)}
-        </Badge>
-        {(badge.tags ?? []).slice(0, 2).map((tag) => (
-          <Badge key={tag} variant="outline" className="border-current/25 text-[10px] text-current opacity-75">
-            {formatToken(tag)}
-          </Badge>
-        ))}
-      </div>
-    </button>
-  );
+function findProcedureTermForNode(node: ZenGraphNode, fruition: FruitionProcedureExpressionV1): FruitionProcedureTermV1 | undefined {
+  const missingCheck = node.id.startsWith("missing:") ? node.id.slice("missing:".length) : null;
+  const actionId = node.id.startsWith("action:") ? node.id.slice("action:".length) : null;
+  return fruition.terms.find((term) => {
+    if (term.sourceNodeIds?.includes(node.id)) return true;
+    if (missingCheck && term.id === `fruition.missing.${missingCheck.replace(/[^a-z0-9_-]+/gi, "_")}`) return true;
+    if (actionId && term.id === `fruition.action.${actionId.replace(/[^a-z0-9_-]+/gi, "_")}`) return true;
+    return false;
+  });
+}
+
+function decorateProcedureNode(node: ZenGraphNode, fruition: FruitionProcedureExpressionV1): ZenGraphNode {
+  const term = findProcedureTermForNode(node, fruition);
+  if (!term) return node;
+  return {
+    ...node,
+    proceduralRole: term.proceduralRole,
+    procedureOperator: term.procedureOperator,
+    actionEffect: term.actionEffect,
+    evidenceNeeds: term.evidenceNeeds,
+    refusesAuthority: term.refusesAuthority,
+  };
+}
+
+function buildGraph(
+  reflection: IdeologyContextReflectionV1,
+  admission: HelixRecommendedActionAdmissionV1,
+  fruition: FruitionProcedureExpressionV1,
+) {
+  const nodes = new Map<string, ZenGraphNode>();
+  const edges: ZenGraphEdge[] = [];
+  const labelsById = new Map<string, string>([
+    [reflection.graph.rootId, labelize(reflection.graph.rootId)],
+    ...reflection.matches.exact.map((match) => [match.nodeId, match.label] as const),
+    ...reflection.matches.likely.map((match) => [match.nodeId, match.label] as const),
+    ...reflection.matches.inferred_lenses.map((match) => [match.nodeId, match.label] as const),
+    ...reflection.activated_traits.map((trait) => [trait.nodeId, trait.label] as const),
+    ...(reflection.action_gate_warnings ?? []).map((warning) => [warning.gateId, warning.label] as const),
+  ]);
+
+  addNode(nodes, {
+    id: reflection.graph.rootId,
+    label: reflection.graph.rootId === ZEN_WISDOM_ROOT_ID ? "Wisdom Root" : labelize(reflection.graph.rootId),
+    tone: "root",
+    glyph: "",
+    x: 90,
+    y: 210,
+    tags: ["root"],
+    summary:
+      reflection.graph.rootId === ZEN_WISDOM_ROOT_ID
+        ? "Root container. The composable first principles are the connected primitive badges."
+        : "Root principle",
+  });
+
+  if (reflection.graph.rootId === ZEN_WISDOM_ROOT_ID) {
+    ZEN_WISDOM_PRINCIPLES.forEach((principle, index) => {
+      const x = 210 + (index % 4) * 128;
+      const y = 84 + Math.floor(index / 4) * 92;
+      addNode(nodes, {
+        id: principle.id,
+        label: principle.label,
+        tone: "principle",
+        glyph: principle.glyph,
+        x,
+        y,
+        tags: principle.tags,
+        summary: principle.summary,
+        proceduralRole: principle.proceduralRole,
+        procedureOperator: principle.procedureOperator,
+        actionEffect: principle.actionEffect,
+        evidenceNeeds: principle.evidenceNeeds,
+        refusesAuthority: principle.refusesAuthority,
+      });
+      edges.push({
+        id: `wisdom:${reflection.graph.rootId}:${principle.id}`,
+        from: reflection.graph.rootId,
+        to: principle.id,
+        label: "first principle",
+        tone: "cyan",
+      });
+    });
+  }
+
+  let lane = 0;
+  const addMatch = (match: IdeologyNodeMatchV1, tone: ZenGraphNodeTone, edgeTone: ZenGraphEdge["tone"], summary: string) => {
+    if (match.pathToRoot?.length) {
+      addPathNodes({
+        nodes,
+        edges,
+        path: match.pathToRoot,
+        labelsById,
+        laneY: 130 + lane * 120,
+        tone,
+        edgeTone,
+        summary,
+        confidence: match.score,
+        tags: match.tags,
+      });
+      lane += 1;
+      return;
+    }
+    addNode(nodes, {
+      id: match.nodeId,
+      label: match.label,
+      tone,
+      glyph: "",
+      x: 320,
+      y: 130 + lane * 120,
+      confidence: match.score,
+      tags: match.tags,
+      summary,
+    });
+    edges.push({ id: `root:${match.nodeId}`, from: reflection.graph.rootId, to: match.nodeId, label: "activates", tone: edgeTone });
+    lane += 1;
+  };
+
+  reflection.matches.exact.forEach((match) => addMatch(match, "lens", "cyan", "Exact ZenGraph lens match"));
+  reflection.matches.likely.forEach((match) => addMatch(match, "lens", "slate", "Likely ZenGraph lens match"));
+  reflection.matches.inferred_lenses.forEach((match) => addMatch(match, "trait", "emerald", "Inferred outer-edge lens"));
+  reflection.activated_traits.forEach((trait) => {
+    if (!trait.pathToRoot.length) return;
+    addPathNodes({
+      nodes,
+      edges,
+      path: trait.pathToRoot,
+      labelsById,
+      laneY: 130 + lane * 120,
+      tone: "trait",
+      edgeTone: "emerald",
+      summary: "Activated trait path",
+      confidence: trait.confidence,
+      tags: trait.tags,
+    });
+    lane += 1;
+  });
+
+  (reflection.action_gate_warnings ?? []).forEach((warning, index) => {
+    const y = 110 + index * 105;
+    addNode(nodes, {
+      id: warning.gateId,
+      label: warning.label,
+      tone: "safeguard",
+      glyph: "",
+      x: 620,
+      y,
+      tags: warning.requiredCheck ? [warning.requiredCheck] : ["action_gate"],
+      summary: warning.warning,
+    });
+    for (const target of [...reflection.matches.exact, ...reflection.matches.likely, ...reflection.matches.inferred_lenses]) {
+      if (target.nodeId !== warning.gateId && nodes.has(target.nodeId)) {
+        edges.push({
+          id: `safeguard:${target.nodeId}:${warning.gateId}`,
+          from: target.nodeId,
+          to: warning.gateId,
+          label: "safeguard",
+          tone: "amber",
+        });
+      }
+    }
+  });
+
+  (reflection.claim_boundaries.missing_evidence ?? []).forEach((missing, index) => {
+    const id = `missing:${missing}`;
+    addNode(nodes, {
+      id,
+      label: labelize(missing),
+      tone: "boundary",
+      glyph: "",
+      x: 620,
+      y: 330 + index * 90,
+      tags: ["missing_check"],
+      summary: "Missing check keeps the reflection diagnostic.",
+    });
+    edges.push({ id: `boundary:${id}`, from: reflection.graph.rootId, to: id, label: "claim boundary", tone: "rose" });
+  });
+
+  admission.actions.slice(0, 4).forEach((action, index) => {
+    const id = `action:${action.actionId}`;
+    addNode(nodes, {
+      id,
+      label: action.label,
+      tone: action.admission === "blocked" ? "boundary" : "action",
+      glyph: "",
+      x: 850,
+      y: 135 + index * 95,
+      tags: action.reasonCodes,
+      summary: `${labelize(action.admission)} / ${labelize(action.risk)} / ${labelize(action.display_policy ?? "actionable")}`,
+    });
+    edges.push({
+      id: `action:${action.actionId}`,
+      from: reflection.graph.rootId,
+      to: id,
+      label: "recommended next step",
+      tone: action.admission === "blocked" ? "rose" : "violet",
+    });
+  });
+
+  if (reflection.graph.rootId === ZEN_WISDOM_ROOT_ID && nodes.has("mission-ethos")) {
+    ZEN_WISDOM_PRINCIPLES.forEach((principle) => {
+      edges.push({
+        id: `wisdom-objective:${principle.id}:mission-ethos`,
+        from: principle.id,
+        to: "mission-ethos",
+        label: "assembles objective",
+        tone: "emerald",
+      });
+    });
+  }
+
+  return {
+    nodes: [...nodes.values()].map((node) => decorateProcedureNode({ ...node, glyph: node.glyph || nodeGlyph(node) }, fruition)),
+    edges: edges.filter((edge, index, all) => all.findIndex((candidate) => candidate.id === edge.id) === index),
+    width: 1200,
+    height: Math.max(640, 190 + Math.max(3, lane) * 120),
+  };
 }
 
 function BindingBox({
@@ -174,14 +383,30 @@ function BindingBox({
   label,
   children,
   tone,
+  activeNodeIds,
+  onSelectNode,
 }: {
   title: string;
   label?: string;
   children: React.ReactNode;
   tone: "cyan" | "emerald" | "amber" | "rose" | "violet" | "slate";
+  activeNodeIds?: string[];
+  onSelectNode?: (id: string) => void;
 }) {
+  const classes =
+    tone === "cyan"
+      ? "border-cyan-700 bg-cyan-950/35 text-cyan-50"
+      : tone === "emerald"
+        ? "border-emerald-700 bg-emerald-950/35 text-emerald-50"
+      : tone === "amber"
+        ? "border-amber-700 bg-amber-950/35 text-amber-50"
+      : tone === "rose"
+        ? "border-rose-800 bg-rose-950/35 text-rose-50"
+      : tone === "violet"
+        ? "border-violet-700 bg-violet-950/30 text-violet-50"
+        : "border-slate-800 bg-slate-900/70 text-slate-100";
   return (
-    <section className={`rounded-md border p-3 ${bindingBoxClasses(tone)}`}>
+    <section className={`rounded-md border p-2 ${classes}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide opacity-80">{title}</h3>
         {label ? (
@@ -190,8 +415,188 @@ function BindingBox({
           </span>
         ) : null}
       </div>
-      <div className="mt-2 text-sm leading-relaxed">{children}</div>
+      <div className="mt-1 text-[11px] leading-relaxed">{children}</div>
+      {activeNodeIds?.length ? (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {Array.from(new Set(activeNodeIds)).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelectNode?.(id)}
+              className="max-w-full truncate rounded border border-current/25 bg-black/20 px-1.5 py-0.5 font-mono text-[9px] opacity-85"
+            >
+              {id}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function ObjectiveBindingRail({
+  reflection,
+  admission,
+  fruition,
+  selectedNode,
+  onSelectNode,
+  onLoadFruition,
+}: {
+  reflection: IdeologyContextReflectionV1;
+  admission: HelixRecommendedActionAdmissionV1;
+  fruition: FruitionProcedureExpressionV1;
+  selectedNode: ZenGraphNode | null;
+  onSelectNode: (id: string) => void;
+  onLoadFruition: () => void;
+}) {
+  const activeLensIds = Array.from(new Set([
+    ...reflection.matches.exact.map((match) => match.nodeId),
+    ...reflection.matches.likely.map((match) => match.nodeId),
+    ...reflection.matches.inferred_lenses.map((match) => match.nodeId),
+    ...reflection.activated_traits.map((trait) => trait.nodeId),
+  ]));
+  const selectedPath =
+    selectedNode?.id
+      ? [
+          ...reflection.activated_traits.map((trait) => ({ nodeId: trait.nodeId, pathToRoot: trait.pathToRoot })),
+          ...reflection.matches.exact.map((match) => ({ nodeId: match.nodeId, pathToRoot: match.pathToRoot ?? [] })),
+          ...reflection.matches.likely.map((match) => ({ nodeId: match.nodeId, pathToRoot: match.pathToRoot ?? [] })),
+          ...reflection.matches.inferred_lenses.map((match) => ({ nodeId: match.nodeId, pathToRoot: match.pathToRoot ?? [] })),
+        ].find((entry) => entry.nodeId === selectedNode.id)?.pathToRoot ?? []
+      : [];
+  const presetPath = selectedPath.length
+    ? [...selectedPath].reverse()
+    : [...(reflection.activated_traits[0]?.pathToRoot ?? reflection.matches.exact[0]?.pathToRoot ?? [])].reverse();
+  const missingChecks = reflection.claim_boundaries.missing_evidence ?? [];
+  const askUserActions = admission.actions.filter((action) => action.admission === "ask_user");
+  const blockedActions = admission.actions.filter((action) => action.admission === "blocked");
+  const firstAction = admission.actions[0] ?? null;
+  const selectedProcedure = selectedNode?.proceduralRole
+    ? `${labelize(selectedNode.proceduralRole)} ${selectedNode.procedureOperator ? `-> ${labelize(selectedNode.procedureOperator)}` : ""}`
+    : "No procedure role mapped.";
+  return (
+    <aside
+      data-testid="zen-graph-objective-binding-overlay"
+      className="pointer-events-auto absolute bottom-3 left-9 top-3 z-30 flex w-64 shrink-0 flex-col border border-zinc-800 bg-zinc-950/95 text-zinc-100 shadow-2xl"
+    >
+      <div className="border-b border-zinc-800 p-2.5">
+        <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Objective Bindings</div>
+        <h2 className="mt-0.5 text-base font-semibold leading-tight">ZenGraph Fruition Path</h2>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+          Preset paths bind first principles to outer objective badges and the Fruition procedure expression.
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+        <BindingBox
+          title="First principle"
+          label="root"
+          tone="slate"
+          activeNodeIds={[reflection.graph.rootId]}
+          onSelectNode={onSelectNode}
+        >
+          {labelize(reflection.graph.rootId)} is the root badge for this objective path.
+        </BindingBox>
+        <BindingBox
+          title="Preset path stack"
+          label="first principle to objective"
+          tone="emerald"
+          activeNodeIds={presetPath}
+          onSelectNode={onSelectNode}
+        >
+          {presetPath.length > 0
+            ? presetPath.map((nodeId) => labelize(nodeId)).join(" -> ")
+            : "No preset path is available for the selected badge."}
+        </BindingBox>
+        <BindingBox title="Activated lenses" label="prompt state" tone="cyan" activeNodeIds={activeLensIds} onSelectNode={onSelectNode}>
+          {activeLensIds.length > 0
+            ? reflection.matches.inferred_lenses.concat(reflection.matches.exact, reflection.matches.likely).slice(0, 3).map((match) => match.label).join(" / ")
+            : "No deterministic lens badge is active."}
+        </BindingBox>
+        <BindingBox
+          title="Safeguards"
+          label="gate edges"
+          tone="amber"
+          activeNodeIds={(reflection.action_gate_warnings ?? []).map((warning) => warning.gateId)}
+          onSelectNode={onSelectNode}
+        >
+          {(reflection.action_gate_warnings ?? []).length > 0
+            ? (reflection.action_gate_warnings ?? []).map((warning) => warning.requiredCheck ?? warning.warning).join(", ")
+            : "No nearby safeguard badge is active."}
+        </BindingBox>
+        <div className="grid grid-cols-2 gap-2">
+          <BindingBox title="Possible tensions" label="zone" tone="violet">
+            {reflection.tensions?.length
+              ? reflection.tensions.map((tension) => tension.description).join(" ")
+              : "No possible tension zone is flagged."}
+          </BindingBox>
+          <BindingBox
+            title="Claim boundaries"
+            label="diagnostic only"
+            tone="rose"
+            activeNodeIds={missingChecks.map((item) => `missing:${item}`)}
+            onSelectNode={onSelectNode}
+          >
+            {missingChecks.length > 0
+              ? missingChecks.map((item) => `Missing check: ${labelize(item)}`).join(" | ")
+              : "No missing check listed."}
+          </BindingBox>
+        </div>
+        <BindingBox title="Fruition procedure" label={labelize(fruition.result.posture)} tone="violet">
+          <div className="space-y-1">
+            <div className="font-mono text-[10px] leading-snug text-violet-100">{fruition.expression}</div>
+            <div className="text-[11px] opacity-80">{fruition.result.label}</div>
+            <button
+              type="button"
+              onClick={onLoadFruition}
+              className="mt-2 w-full rounded border border-violet-500/70 bg-violet-950/70 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-violet-100 hover:border-violet-200"
+            >
+              Load to Fruition Calculator
+            </button>
+          </div>
+        </BindingBox>
+        <BindingBox title="Badge procedure" label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
+          <div className="space-y-1">
+            <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedure}</div>
+            <div className="text-[11px] opacity-80">
+              {selectedNode?.actionEffect ?? "Select a mapped badge to inspect how it contributes to the procedural action."}
+            </div>
+            {selectedNode?.evidenceNeeds?.length ? (
+              <div className="text-[11px] opacity-80">Needs: {selectedNode.evidenceNeeds.map(labelize).join(", ")}</div>
+            ) : null}
+            {selectedNode?.refusesAuthority?.length ? (
+              <div className="text-[11px] opacity-80">Refuses: {selectedNode.refusesAuthority.map(labelize).join(", ")}</div>
+            ) : null}
+          </div>
+        </BindingBox>
+        <BindingBox title="Outer objective view" label="evidence only" tone="slate">
+          <div className="space-y-1">
+            <div className="text-xs font-semibold">
+              {selectedNode ? selectedNode.label : "No outer objective badge selected"}
+            </div>
+            <div className="text-[11px] opacity-80">
+              {selectedNode?.summary ?? "Select a badge to inspect its objective role."}
+            </div>
+            <div className="text-[11px] opacity-80">
+              Admission state: {admission.summary.autoCount} auto / {admission.summary.askUserCount} ask user / {admission.summary.blockedCount} blocked
+            </div>
+            <div className="truncate text-[11px] opacity-80">
+              Evidence refs: {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : "none"}
+            </div>
+            <div className="text-[11px] opacity-80">
+              Recommended next step: {firstAction ? firstAction.label : "none"}
+            </div>
+            <div className="text-[11px] opacity-80">
+              Risk: {labelize(firstAction?.risk ?? "unknown")} / Display policy: {labelize(firstAction?.display_policy ?? "diagnostic_only")}
+            </div>
+            <div className="flex flex-wrap gap-1 text-[10px]">
+              {askUserActions.length > 0 ? <span className="rounded border border-amber-600 px-1.5 py-0.5 text-amber-100">Ask user</span> : null}
+              {blockedActions.length > 0 ? <span className="rounded border border-rose-600 px-1.5 py-0.5 text-rose-100">Blocked</span> : null}
+              <span className="rounded border border-cyan-700 px-1.5 py-0.5 text-cyan-100">Evidence only</span>
+            </div>
+          </div>
+        </BindingBox>
+      </div>
+    </aside>
   );
 }
 
@@ -203,194 +608,186 @@ export function ZenGraphPanel({
   admission: HelixRecommendedActionAdmissionV1;
 }) {
   const state = useZenGraphReflection({ reflection, admission });
-  const badges = useMemo(() => buildBadges(reflection, admission), [admission, reflection]);
-  const [selectedBadgeId, setSelectedBadgeId] = useState<string>(badges[0]?.id ?? "");
-  const selectedBadge = badges.find((badge) => badge.id === selectedBadgeId) ?? badges[0] ?? null;
-  const activeLenses =
-    reflection.activated_traits.length > 0
-      ? reflection.activated_traits
-      : reflection.matches.inferred_lenses.map((match) => ({
-          nodeId: match.nodeId,
-          label: match.label,
-          confidence: match.score,
-          pathToRoot: match.pathToRoot ?? [],
-          tags: match.tags,
-        }));
-  const primaryPath = selectedBadge?.pathToRoot?.length
-    ? selectedBadge.pathToRoot
-    : activeLenses[0]?.pathToRoot ?? [];
-  const missingChecks = reflection.claim_boundaries.missing_evidence ?? [];
-  const groupedBadges = useMemo(() => {
-    const groups = new Map<string, ZenBadge[]>();
-    for (const badge of badges) {
-      groups.set(badge.group, [...(groups.get(badge.group) ?? []), badge]);
+  const fruition = useMemo(() => calculateFruitionFromReflection({ reflection, admission }), [admission, reflection]);
+  const graph = useMemo(() => buildGraph(reflection, admission, fruition), [admission, fruition, reflection]);
+  const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId);
+  const [objectiveBindingsOpen, setObjectiveBindingsOpen] = useState(false);
+  const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
+  const highlighted = new Set([
+    selectedNodeId,
+    ...(reflection.overlay?.highlightedNodeIds ?? []),
+    ...(selectedNode?.tone === "root" ? [] : [reflection.graph.rootId]),
+  ]);
+  const hasFocus = highlighted.size > 0;
+  const loadToFruitionCalculator = () => {
+    loadFruitionExpression(fruition, { source: "zen_badge_graph" });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "fruition-calculator" } }));
     }
-    return [...groups.entries()];
-  }, [badges]);
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100" data-testid="zen-graph-panel">
-      <header className="border-b border-slate-800 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">ZenGraph</div>
-            <h2 className="text-xl font-semibold leading-tight">Diagnostic compass</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-400">{reflection.input.summary}</p>
+    <div className="relative flex h-full min-h-0 overflow-hidden bg-zinc-900 text-zinc-950" data-testid="zen-graph-panel">
+      <div className="flex min-w-0 flex-1 flex-col bg-zinc-900">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-zinc-900">
+          <div
+            aria-label="ZenGraph objective lenses"
+            className="absolute bottom-0 left-0 top-0 z-40 flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
+          >
+            <button
+              type="button"
+              aria-label="Toggle Fruition objective binding lens"
+              title="Toggle Fruition objective binding lens"
+              onClick={() => setObjectiveBindingsOpen((open) => !open)}
+              className={`flex h-6 w-6 items-center justify-center border-2 bg-violet-700 text-[11px] font-black text-white shadow ${
+                objectiveBindingsOpen
+                  ? "border-cyan-100 ring-2 ring-cyan-300"
+                  : "border-zinc-800 opacity-80 hover:border-cyan-200"
+              }`}
+            >
+              F
+            </button>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-            <Badge variant="outline" className="border-slate-700">Diagnostic only</Badge>
-            <Badge variant="outline" className="border-slate-700">Evidence only</Badge>
-            <Badge variant="outline" className="border-slate-700">{badges.length} badges</Badge>
-            <Badge variant="outline" className="border-slate-700">{state.admissionCount} admissions</Badge>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="min-h-0 overflow-y-auto pr-1">
-          <div className="space-y-4">
-            {groupedBadges.map(([group, items]) => (
-              <section key={group}>
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{group}</div>
-                <div className="space-y-2">
-                  {items.map((badge) => (
-                    <BadgeButton
-                      key={`${badge.group}:${badge.id}`}
-                      badge={badge}
-                      selected={badge.id === selectedBadge?.id && badge.group === selectedBadge.group}
-                      onSelect={() => setSelectedBadgeId(badge.id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
-
-        <div className="min-h-0 overflow-y-auto">
-          <div className="rounded-md border border-slate-800 bg-slate-950/80">
-            <div className="border-b border-slate-800 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-50">{selectedBadge?.title ?? "ZenGraph Objective Bindings"}</h3>
-                  <div className="mt-1 text-xs text-slate-400">{selectedBadge?.id ?? reflection.reflectionId}</div>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Badge className="bg-cyan-900/80 text-cyan-50">{selectedBadge ? formatToken(selectedBadge.tone) : "lens"}</Badge>
-                  <Badge variant="outline" className="border-slate-700 text-slate-300">Evidence only</Badge>
+          {objectiveBindingsOpen ? (
+            <ObjectiveBindingRail
+              reflection={reflection}
+              admission={admission}
+              fruition={fruition}
+              selectedNode={selectedNode}
+              onSelectNode={setSelectedNodeId}
+              onLoadFruition={loadToFruitionCalculator}
+            />
+          ) : null}
+          <div
+            data-testid="zen-graph-map-scrollport"
+            className="relative h-full min-h-0 w-full overflow-scroll border border-zinc-950 bg-zinc-900"
+            style={{ scrollbarGutter: "stable both-edges" }}
+          >
+            <div
+              className="relative"
+              style={{
+                width: graph.width,
+                height: graph.height,
+                backgroundImage: [
+                  "linear-gradient(rgba(10,10,10,0.22) 1px, transparent 1px)",
+                  "linear-gradient(90deg, rgba(10,10,10,0.22) 1px, transparent 1px)",
+                  "radial-gradient(circle at 16% 20%, rgba(22,78,99,0.32) 0 8px, transparent 9px)",
+                  "radial-gradient(circle at 76% 26%, rgba(113,63,18,0.28) 0 9px, transparent 10px)",
+                  "linear-gradient(to bottom, #312e20 0 70px, #3f3f46 70px 78%, #171717 78% 100%)",
+                ].join(", "),
+                backgroundSize: "32px 32px, 32px 32px, 220px 180px, 280px 220px, auto",
+              }}
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-[70px] h-10 bg-[linear-gradient(135deg,transparent_0_16px,rgba(39,39,42,0.9)_17px_32px,transparent_33px_48px)] bg-[length:96px_40px]" />
+              <div className="pointer-events-none absolute left-4 top-4 z-20 rounded border border-zinc-700 bg-zinc-950/85 px-3 py-2 text-zinc-100 shadow">
+                <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Zen Badge Graph</div>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-zinc-300">
+                  <span>{graph.nodes.length} badges</span>
+                  <span>{graph.edges.length} connections</span>
+                  <span>{state.admissionCount} admissions</span>
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-3 p-4">
-              <BindingBox title="Objective binding" label="activated lens" tone="cyan">
-                <div className="font-semibold">{selectedBadge?.title ?? activeLenses[0]?.label ?? "No activated lens"}</div>
-                <div className="mt-1 text-xs opacity-80">
-                  {selectedBadge?.subtitle ?? "No deterministic ideology lens was selected."}
-                </div>
-              </BindingBox>
-
-              <BindingBox title="Path to root" label="graph ancestry" tone="emerald">
-                {primaryPath.length > 0 ? (
-                  <ol className="space-y-2" aria-label="Path to root">
-                    {primaryPath.map((nodeId, index) => (
-                      <li key={`${nodeId}-${index}`} className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded border border-current/25 text-xs">
-                          {index + 1}
-                        </span>
-                        <span className="rounded border border-current/20 bg-black/20 px-2 py-1 font-mono text-xs">
-                          {nodeId}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <span className="text-sm opacity-75">No path to root available.</span>
-                )}
-              </BindingBox>
-
-              <BindingBox title="Safeguards" label="missing checks" tone="amber">
-                {reflection.action_gate_warnings && reflection.action_gate_warnings.length > 0 ? (
-                  <div className="space-y-2">
-                    {reflection.action_gate_warnings.map((warning) => (
-                      <div key={warning.gateId} className="rounded border border-current/20 bg-black/20 p-2">
-                        <div className="font-semibold">{warning.label}</div>
-                        <div className="mt-1 text-xs opacity-80">Missing check: {warning.requiredCheck ?? warning.warning}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-sm opacity-75">No nearby safeguard warning found.</span>
-                )}
-              </BindingBox>
-
-              <BindingBox title="Possible tensions" label="lens conflict" tone="violet">
-                {reflection.tensions && reflection.tensions.length > 0 ? (
-                  <div className="space-y-2">
-                    {reflection.tensions.map((tension, index) => (
-                      <div key={`${tension.description}-${index}`} className="rounded border border-current/20 bg-black/20 p-2">
-                        <div className="font-semibold">Possible tension</div>
-                        <p className="mt-1 text-xs opacity-80">{tension.description}</p>
-                        <div className="mt-2 text-xs opacity-80">Severity: {tension.severity}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-sm opacity-75">No possible tension flagged.</span>
-                )}
-              </BindingBox>
-
-              <BindingBox title="Claim boundaries" label="diagnostic only" tone="rose">
-                <div className="space-y-2">
-                  {missingChecks.length > 0 ? (
-                    missingChecks.map((item) => (
-                      <div key={item} className="rounded border border-current/20 bg-black/20 px-2 py-1">
-                        Missing check: {formatToken(item)}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="opacity-75">No missing check listed.</div>
-                  )}
-                  <div className="grid gap-1 text-xs opacity-80">
-                    <span>Diagnostic only: {reflection.claim_boundaries.diagnostic_only ? "true" : "false"}</span>
-                    <span>Evidence only: {reflection.authority.ask_context_policy === "evidence_only" ? "true" : "false"}</span>
-                  </div>
-                </div>
-              </BindingBox>
-
-              <BindingBox title="Recommended next steps" label="admission contract" tone="slate">
-                <div className="space-y-2">
-                  {admission.actions.map((action) => (
-                    <div key={action.actionId} className="rounded border border-slate-800 bg-slate-900/70 p-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-sm font-semibold text-slate-100">Recommended next step: {action.label}</div>
-                        <span className="rounded border border-slate-700 px-2 py-0.5 text-xs text-slate-300">
-                          {action.admission === "ask_user" ? "Ask user" : action.admission === "blocked" ? "Blocked" : "Auto"}
-                        </span>
-                      </div>
-                      <div className="mt-2 grid gap-1 text-xs text-slate-400">
-                        <span>Risk: {formatToken(action.risk)}</span>
-                        <span>Display policy: {formatToken(action.display_policy ?? "actionable")}</span>
-                        <span>Reason: {action.reason}</span>
-                      </div>
-                      {canShowExecutionControl(admission, action) ? (
-                        <button type="button" className="mt-2 rounded border border-cyan-500 px-2 py-1 text-xs text-cyan-100">
-                          Execute
-                        </button>
-                      ) : null}
+              <svg className="pointer-events-none absolute inset-0" width={graph.width} height={graph.height}>
+                <defs>
+                  <marker id="zen-graph-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                    <path d="M 0 0 L 7 3.5 L 0 7 z" fill="rgb(161 161 170)" />
+                  </marker>
+                </defs>
+                {graph.edges.map((edge) => {
+                  const from = graph.nodes.find((node) => node.id === edge.from);
+                  const to = graph.nodes.find((node) => node.id === edge.to);
+                  if (!from || !to) return null;
+                  const highlightedEdge = highlighted.has(edge.from) && highlighted.has(edge.to);
+                  return (
+                    <g key={edge.id}>
+                      <path
+                        d={edgePath(from, to)}
+                        stroke={edgeStroke(edge.tone)}
+                        strokeWidth={highlightedEdge ? 4 : 2}
+                        strokeOpacity={hasFocus && !highlightedEdge ? 0.26 : 0.78}
+                        strokeDasharray={edge.label === "claim boundary" ? "6 7" : undefined}
+                        fill="none"
+                        strokeLinecap="square"
+                        markerEnd="url(#zen-graph-arrow)"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+              {graph.nodes.map((node) => {
+                const selected = selectedNodeId === node.id;
+                const highlightedNode = highlighted.has(node.id);
+                const dimmed = hasFocus && !highlightedNode;
+                return (
+                  <button
+                    key={node.id}
+                    type="button"
+                    className={nodeClasses({ node, selected, highlighted: highlightedNode, dimmed })}
+                    data-testid="zen-graph-badge-node"
+                    style={{ left: node.x, top: node.y }}
+                    title={[
+                      node.label,
+                      node.summary,
+                      confidenceLabel(node.confidence),
+                      node.proceduralRole ? `procedural role: ${labelize(node.proceduralRole)}` : null,
+                      node.procedureOperator ? `operator: ${labelize(node.procedureOperator)}` : null,
+                      node.actionEffect,
+                      node.evidenceNeeds?.length ? `needs: ${node.evidenceNeeds.map(labelize).join(", ")}` : null,
+                      node.refusesAuthority?.length ? `refuses: ${node.refusesAuthority.map(labelize).join(", ")}` : null,
+                      ...(node.tags ?? []),
+                    ].filter(Boolean).join("\n")}
+                    aria-label={node.label}
+                    onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                      event.stopPropagation();
+                      setSelectedNodeId(node.id);
+                    }}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
+                      {node.glyph}
+                    </span>
+                    {node.confidence ? (
+                      <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
+                    ) : null}
+                    {node.tone === "boundary" ? (
+                      <span className="pointer-events-none absolute -inset-1.5 border-2 border-rose-300/80" />
+                    ) : null}
+                  </button>
+                );
+              })}
+              {selectedNode ? (
+                <div
+                  className="pointer-events-none absolute z-10 max-w-[240px] rounded border border-zinc-700 bg-zinc-950/90 p-2 text-xs text-zinc-200 shadow"
+                  style={{ left: selectedNode.x + 62, top: selectedNode.y - 8 }}
+                >
+                  <div className="font-semibold text-zinc-50">{selectedNode.label}</div>
+                  <div className="mt-1 text-zinc-400">{selectedNode.summary}</div>
+                  {selectedNode.proceduralRole ? (
+                    <div className="mt-1 text-cyan-100">
+                      {labelize(selectedNode.proceduralRole)}
+                      {selectedNode.procedureOperator ? ` -> ${labelize(selectedNode.procedureOperator)}` : ""}
                     </div>
-                  ))}
+                  ) : null}
+                  {selectedNode.actionEffect ? (
+                    <div className="mt-1 text-zinc-300">{selectedNode.actionEffect}</div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
+                      {selectedNode.tone}
+                    </Badge>
+                    {selectedNode.proceduralRole ? (
+                      <Badge variant="outline" className="border-cyan-700 text-[10px] text-cyan-200">
+                        {labelize(selectedNode.proceduralRole)}
+                      </Badge>
+                    ) : null}
+                    {(selectedNode.tags ?? []).slice(0, 2).map((tag) => (
+                      <Badge key={tag} variant="outline" className="border-zinc-700 text-[10px] text-zinc-300">
+                        {labelize(tag)}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </BindingBox>
-
-              <BindingBox title="Admission/debug details" label="source refs" tone="slate">
-                <div className="space-y-2 text-xs text-slate-400">
-                  <div>Admission state: {admission.summary.autoCount} auto / {admission.summary.askUserCount} ask user / {admission.summary.blockedCount} blocked</div>
-                  <div>Artifact: {admission.source?.artifact_id ?? admission.sourceReceiptId ?? "none"}</div>
-                  <div>Authority: Evidence only</div>
-                  <div>Evidence refs: {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : "none"}</div>
-                </div>
-              </BindingBox>
+              ) : null}
             </div>
           </div>
         </div>

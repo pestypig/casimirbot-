@@ -131,11 +131,23 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
   ],
   "zen-graph": [
     "zen graph",
+    "zen badge graph",
+    "ideology badge graph",
     "ideology reflection",
     "ethos lens",
     "right speech",
     "two key review",
     "diagnostic compass"
+  ],
+  "fruition-calculator": [
+    "fruition",
+    "fruition calculator",
+    "fruition procedure",
+    "procedure expression",
+    "action expression",
+    "zen calculator",
+    "ideology calculator",
+    "evidence only procedure"
   ],
   "universal-audit-tree": [
     "audit tree",
@@ -419,13 +431,23 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
   },
   {
     id: "zen-graph",
-    title: "ZenGraph",
+    title: "Zen Badge Graph",
     icon: Shield,
     loader: lazyPanel(() => import("@/components/panels/ZenGraphLaunchPanel")),
     defaultSize: { w: 1040, h: 720 },
     defaultPosition: { x: 320, y: 200 },
     mobileReady: true,
     keywords: PANEL_KEYWORDS["zen-graph"]
+  },
+  {
+    id: "fruition-calculator",
+    title: "Fruition Calculator",
+    icon: Calculator,
+    loader: lazyPanel(() => import("@/components/panels/FruitionCalculatorPanel")),
+    defaultSize: { w: 900, h: 700 },
+    defaultPosition: { x: 340, y: 220 },
+    mobileReady: true,
+    keywords: PANEL_KEYWORDS["fruition-calculator"]
   },
   {
     id: "universal-audit-tree",

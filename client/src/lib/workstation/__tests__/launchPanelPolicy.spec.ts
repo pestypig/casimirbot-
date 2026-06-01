@@ -29,8 +29,9 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("theory-badge-graph")).toBe(true);
   });
 
-  it("includes ZenGraph in launch panels", () => {
+  it("includes the Zen Badge Graph and Fruition Calculator in launch panels", () => {
     expect(isUserLaunchPanel("zen-graph")).toBe(true);
+    expect(isUserLaunchPanel("fruition-calculator")).toBe(true);
   });
 
   it("keeps Essence Console as a legacy/debug panel outside default launch", () => {
