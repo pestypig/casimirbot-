@@ -121,7 +121,21 @@ describe("Helix Ask theory reflection route", () => {
         }),
       ]),
     );
-    expect(answer).toMatch(/Theory Badge Graph|Scientific Calculator|non-terminal context locator/i);
+    expect(answer).toMatch(/Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i);
+    const finalDraftText = String(body?.final_answer_draft?.text ?? body?.debug?.final_answer_draft?.text ?? "");
+    if (finalDraftText) {
+      expect(finalDraftText).toMatch(
+        /Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i,
+      );
+    }
+    const calculatorDraftText = String(
+      body?.calculator_final_answer_draft?.text ?? body?.debug?.calculator_final_answer_draft?.text ?? "",
+    );
+    if (calculatorDraftText) {
+      expect(calculatorDraftText).toMatch(
+        /Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i,
+      );
+    }
     expect(answer).toMatch(/3\.313035/i);
   });
 });

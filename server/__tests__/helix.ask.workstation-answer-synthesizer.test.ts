@@ -137,10 +137,11 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(plan).toBeTruthy();
     const answer = synthesizeWorkstationToolAnswer({ prompt, plan: plan! });
 
-    expect(answer).toContain("I first located the equation in the Theory Badge Graph as context evidence");
-    expect(answer).toContain("The theory reflection is a non-terminal context locator, not the numeric solve.");
     expect(answer).toContain("Calculator subgoal");
     expect(answer).toContain("3.313035e-19 J");
     expect(answer).toContain("Trace source: scientific-calculator.solve_expression.");
+    expect(answer).toContain(
+      "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+    );
   });
 });

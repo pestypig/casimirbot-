@@ -1,4 +1,5 @@
 import { extractCalculatorExpression } from "./workstation-tool-planner";
+import { appendAskToolTraceDisclosureNote, buildAskToolTraceDisclosure } from "./tool-trace-disclosure";
 import type { HelixWorkstationToolPlan, HelixWorkstationToolPlanStep } from "../../../shared/helix-workstation-tool-plan";
 import type { HelixWorkstationToolEvaluation } from "../../../shared/helix-workstation-tool-evaluation";
 import type { HelixCalculatorSetupContext, HelixCalculatorSetupVariable } from "../../../shared/helix-calculator-setup-context";
@@ -271,11 +272,7 @@ function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstation
   const calculatorAnswer = needsPhysicsSynthesis
     ? synthesizeCompoundCalculatorAnswer(input.prompt, input.plan)
     : calculatorResultText(input.prompt, input.plan);
-  return [
-    "I first located the equation in the Theory Badge Graph as context evidence, then used the Scientific Calculator for the scalar numeric step.",
-    "The theory reflection is a non-terminal context locator, not the numeric solve.",
-    calculatorAnswer,
-  ].join("\n");
+  return appendAskToolTraceDisclosureNote(calculatorAnswer, buildAskToolTraceDisclosure({ plan: input.plan }));
 }
 
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
