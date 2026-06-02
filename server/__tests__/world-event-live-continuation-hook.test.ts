@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import type { HelixWorldEvent } from "@shared/helix-world-event";
+import {
+  __resetHelixThreadLedgerStore,
+  getHelixThreadLedgerEvents,
+} from "../services/helix-thread/ledger";
+import {
+  ingestWorldEvent,
+  resetWorldEventIngestState,
+} from "../services/situation-room/world-event-ingest";
+import {
+  createSituationThreadBinding,
+  resetSituationThreadBindings,
+} from "../services/situation-room/thread-binding-store";
+import {
+  resetLiveContinuationJobsForTest,
+  upsertLiveContinuationJob,
+} from "../services/situation-room/live-continuation-job-store";
+
+const riskEvent = (): HelixWorldEvent => ({
+  schema: "helix.world_event.v1",
+  world_id: "minecraft:minehut",
+  room_id: "room:minecraft:continuation",
+  source_id: "source:minecraft-server",
+  ts: "2026-06-02T02:30:00.000Z",
+  actor_id: "player:datdampig",
+  actor_label: "DatDamPig",
+  event_type: "player_damage",
+  location: { dimension: "minecraft:overworld", x: 10, y: 52, z: -10, light: 4 },
+  health_delta: { current_health: 4, previous_health: 10, damage: 6, reason: "hostile damage near lava" },
+  entities: [{ type: "zombie", distance: 4 }],
+  evidence_refs: ["mc:continuation:risk:1"],
+  meta: { hostile_nearby: true, server_id: "server:paper" },
+});
+
+describe("world-event ingest live continuation hook", () => {
+  beforeEach(() => {
+    __resetHelixThreadLedgerStore();
+    resetWorldEventIngestState();
+    resetSituationThreadBindings();
+    resetLiveContinuationJobsForTest();
+  });
+
+  it("appends live continuation tick and side receipts as non-terminal tool observations", async () => {
+    const threadId = "thread:continuation-hook";
+    createSituationThreadBinding({
+      room_id: "room:minecraft:continuation",
+      source_id: "source:minecraft-server",
+      world_id: "minecraft:minehut",
+      thread_id: threadId,
+      mode: "standby_receipts",
+      append_policy: "salient_only",
+    });
+    upsertLiveContinuationJob({
+      thread_id: threadId,
+      room_id: "room:minecraft:continuation",
+      source_ids: ["source:minecraft-server"],
+      objective: "Watch my Minecraft run and flag danger or progress.",
+      voice_policy: "confirm_speak_required",
+      now: "2026-06-02T02:29:59.000Z",
+    });
+
+    const result = await ingestWorldEvent(riskEvent());
+    const completed = getHelixThreadLedgerEvents({ threadId }).filter(
+      (event) => event.event_type === "item_completed",
+    );
+    const kinds = completed.map((event) => event.meta?.kind);
+    const tickEvent = completed.find((event) => event.meta?.kind === "live_continuation_tick");
+
+    expect(result.live_continuation_tick).toMatchObject({
+      schema: "helix.live_continuation_tick.v1",
+      status: "completed",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      post_tool_model_step_required: true,
+    });
+    expect(result.live_continuation_worker_receipts?.map((receipt) => receipt.lane)).toEqual(
+      expect.arrayContaining(["world_state", "risk_watch", "route_watch", "prediction_reflection", "voice_gate"]),
+    );
+    expect(result.live_continuation_goal_evaluation).toMatchObject({
+      schema: "helix.goal_evaluation_receipt.v1",
+      terminal_eligible: false,
+    });
+    expect(result.live_continuation_callout_candidate).toMatchObject({
+      schema: "helix.callout_candidate.v1",
+      terminal_eligible: false,
+      requires_confirmation: true,
+    });
+    expect(kinds).toEqual(expect.arrayContaining([
+      "live_continuation_tick",
+      "worker_lane_receipt",
+      "goal_evaluation_receipt",
+      "callout_candidate",
+    ]));
+    expect(tickEvent?.item_type).toBe("toolObservation");
+    expect(tickEvent?.observation_ref).toMatchObject({
+      provenance: "live_continuation_runner",
+      context_role: "receipt_not_assistant_answer",
+      safe_for_future_context: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+});

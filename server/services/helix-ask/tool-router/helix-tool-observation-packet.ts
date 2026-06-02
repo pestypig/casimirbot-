@@ -7,6 +7,22 @@ import {
 import type { SituationRoomConstructObservation } from "@shared/situation-room-construct-observation";
 import type { SituationRoomLiveJobContract } from "@shared/situation-room-live-job-contract";
 
+const SITUATION_ROOM_OBSERVATION_SCHEMAS = new Set([
+  "helix.situation_room_live_job_contract.v1",
+  "helix.situation_room_construct_observation.v1",
+  "helix.live_source_admission_receipt.v1",
+  "helix.live_source_event_observation.v1",
+  "helix.live_continuation_tick.v1",
+  "helix.worker_lane_receipt.v1",
+  "helix.goal_evaluation_receipt.v1",
+  "helix.callout_candidate.v1",
+  "helix.live_answer_environment_delta.v1",
+  "helix.situation_salience_receipt.v1",
+  "helix.situation_interjection_proposal.v1",
+]);
+
+const SITUATION_ROOM_OBSERVATION_ACTIONS = /^(?:attach_live_source|create_live_answer_environment|set_live_commentary_policy|request_agentic_review|query_event_window|query_synthetic_evidence|start_situation_goal_session|goal_ledger\.|callout_policy\.|live-source\.|live_continuation\.|worker_lane\.|voice_delivery\.|construct\.|dottie\.|observer\.)/i;
+
 const suggestedNextStepsForStatus = (
   status: HelixAgentStepObservationPacket["status"],
 ): HelixAgentStepObservationPacket["suggested_next_steps"] => {
@@ -75,6 +91,33 @@ const readArtifactRecord = (result: unknown): Record<string, unknown> | null => 
   );
 };
 
+const readSchema = (artifact: Record<string, unknown> | null): string | null =>
+  readString(artifact?.schema);
+
+const findSituationRoomObservationArtifact = (raw: unknown): Record<string, unknown> | null => {
+  const artifact = readArtifactRecord(raw);
+  if (!artifact) return null;
+  if (SITUATION_ROOM_OBSERVATION_SCHEMAS.has(readSchema(artifact) ?? "")) return artifact;
+  for (const key of [
+    "live_job_contract",
+    "contract",
+    "construct_observation",
+    "observation",
+    "receipt",
+    "tick",
+    "goal",
+    "callout",
+    "delta",
+    "artifact",
+    "payload",
+    "result",
+  ]) {
+    const nested = readRecord(artifact[key]);
+    if (nested && SITUATION_ROOM_OBSERVATION_SCHEMAS.has(readSchema(nested) ?? "")) return nested;
+  }
+  return null;
+};
+
 const readLiveJobContract = (artifact: Record<string, unknown> | null): SituationRoomLiveJobContract | null => {
   const direct = readRecord(artifact?.live_job_contract) ?? readRecord(artifact?.contract);
   if (direct?.schema === "helix.situation_room_live_job_contract.v1") {
@@ -97,15 +140,20 @@ const readConstructObservation = (artifact: Record<string, unknown> | null): Sit
   return null;
 };
 
+const isSituationRoomObservationAction = (call: HelixRuntimeToolCallV1): boolean => {
+  if (call.panel_id !== "situation-room-pipelines") return false;
+  return SITUATION_ROOM_OBSERVATION_ACTIONS.test(call.action);
+};
+
 const isSituationRoomLiveJobObservationResult = (call: HelixRuntimeToolCallV1, raw: unknown): boolean => {
-  if (
-    call.panel_id !== "situation-room-pipelines" ||
-    !/^(?:construct\.|dottie\.|observer\.|voice_delivery\.)/i.test(call.action)
-  ) {
-    return false;
-  }
+  if (!isSituationRoomObservationAction(call)) return false;
   const artifact = readArtifactRecord(raw);
   return Boolean(readLiveJobContract(artifact) || readConstructObservation(artifact));
+};
+
+const isSituationRoomObservationResult = (call: HelixRuntimeToolCallV1, raw: unknown): boolean => {
+  if (!isSituationRoomObservationAction(call)) return false;
+  return Boolean(findSituationRoomObservationArtifact(raw));
 };
 
 const collectLiveJobArtifactRefs = (
@@ -256,7 +304,99 @@ export const buildSituationRoomLiveJobObservationPacket = (args: {
   });
 };
 
-export const buildHelixAgentStepObservationPacket = (args: {
+const collectSituationRoomObservationRefs = (artifact: Record<string, unknown> | null): string[] => {
+  const refs = new Set<string>();
+  const add = (value: unknown) => {
+    const text = readString(value);
+    if (text) refs.add(text);
+  };
+  for (const field of [
+    "receipt_id",
+    "observation_id",
+    "tick_id",
+    "candidate_id",
+    "delta_id",
+    "proposal_id",
+    "contract_id",
+    "environment_id",
+    "source_id",
+    "job_id",
+  ]) {
+    add(artifact?.[field]);
+  }
+  for (const ref of readArray(artifact?.evidence_refs)) add(ref);
+  for (const ref of readArray(artifact?.worker_receipt_refs)) add(ref);
+  add(artifact?.goal_evaluation_ref);
+  add(artifact?.callout_candidate_ref);
+  return Array.from(refs);
+};
+
+const collectSituationRoomObservationMissingRequirements = (
+  artifact: Record<string, unknown> | null,
+): HelixAgentStepObservationPacket["missing_requirements"] => {
+  const requirements = new Map<string, HelixAgentStepObservationPacket["missing_requirements"][number]>();
+  const add = (code: string, message: string, repairAction = "repair") => {
+    if (!requirements.has(code)) requirements.set(code, { code, message, repair_action: repairAction });
+  };
+  for (const missing of readArray(artifact?.missing_evidence)) {
+    const text = readString(missing);
+    if (text) add(`missing:${text}`, `Missing evidence: ${text}.`, "repair");
+  }
+  const freshness = readRecord(artifact?.freshness);
+  const freshnessStatus = readString(freshness?.status);
+  if (freshnessStatus && freshnessStatus !== "connected") {
+    add(`source:${freshnessStatus}`, `Live source freshness is ${freshnessStatus}.`, "ask_user");
+  }
+  return Array.from(requirements.values());
+};
+
+const deriveSituationRoomObservationStatus = (
+  artifact: Record<string, unknown> | null,
+  missingRequirements: HelixAgentStepObservationPacket["missing_requirements"],
+): HelixAgentStepObservationPacket["status"] => {
+  const status = readString(artifact?.status);
+  if (status === "blocked" || status === "fail_closed") return "blocked";
+  if (status === "missing_input" || status === "missing" || missingRequirements.length > 0) return "missing_input";
+  if (status === "suppressed" || status === "stale") return "blocked";
+  if (status === "failed") return "failed";
+  return "succeeded";
+};
+
+const summarizeSituationRoomObservation = (args: {
+  call: HelixRuntimeToolCallV1;
+  artifact: Record<string, unknown> | null;
+  missingRequirements: HelixAgentStepObservationPacket["missing_requirements"];
+}): string => {
+  const schema = readSchema(args.artifact) ?? "unknown";
+  const status = readString(args.artifact?.status);
+  const facts = [
+    `${args.call.capability_key} produced a non-terminal Situation Room observation (${schema}).`,
+  ];
+  if (status) facts.push(`Observation status: ${status}.`);
+  if (schema === "helix.live_continuation_tick.v1") {
+    const trigger = readString(args.artifact?.trigger);
+    const nextStep = readString(args.artifact?.next_step);
+    if (trigger) facts.push(`Continuation trigger: ${trigger}.`);
+    if (nextStep) facts.push(`Continuation next step: ${nextStep}.`);
+  }
+  if (schema === "helix.worker_lane_receipt.v1") {
+    const lane = readString(args.artifact?.lane);
+    if (lane) facts.push(`Worker lane: ${lane}.`);
+  }
+  if (schema === "helix.callout_candidate.v1") {
+    const intent = readString(args.artifact?.callout_intent);
+    const priority = readString(args.artifact?.priority);
+    if (intent) facts.push(`Callout intent: ${intent}.`);
+    if (priority) facts.push(`Callout priority: ${priority}.`);
+  }
+  if (args.missingRequirements.length > 0) {
+    facts.push(`Missing requirements: ${args.missingRequirements.map((entry) => entry.code).join(", ")}.`);
+  }
+  facts.push("This packet is evidence only; the model must compose the next answer after observation re-entry.");
+  return facts.join(" ");
+};
+
+export const buildSituationRoomObservationPacket = (args: {
   turnId: string;
   iteration: number;
   call: HelixRuntimeToolCallV1;
@@ -264,6 +404,48 @@ export const buildHelixAgentStepObservationPacket = (args: {
 }): HelixAgentStepObservationPacket => {
   if (isSituationRoomLiveJobObservationResult(args.call, args.result.raw)) {
     return buildSituationRoomLiveJobObservationPacket(args);
+  }
+  const artifact = findSituationRoomObservationArtifact(args.result.raw);
+  const missingRequirements = collectSituationRoomObservationMissingRequirements(artifact);
+  const status = args.result.status ?? deriveSituationRoomObservationStatus(artifact, missingRequirements);
+  const refs = collectSituationRoomObservationRefs(artifact);
+  return buildGenericHelixAgentStepObservationPacket({
+    ...args,
+    result: {
+      ...args.result,
+      ok: status === "succeeded",
+      status,
+      summary: summarizeSituationRoomObservation({
+        call: args.call,
+        artifact,
+        missingRequirements,
+      }),
+      produced_artifact_refs: Array.from(new Set([...(args.result.produced_artifact_refs ?? []), ...refs])),
+      receipts: [
+        ...(args.result.receipts ?? []),
+        ...refs.slice(0, 8).map((ref) => ({
+          receipt_ref: ref,
+          kind: readSchema(artifact) ?? "situation_room_observation",
+          status,
+        })),
+      ],
+      missing_requirements: missingRequirements,
+      state_delta: {
+        ...(args.result.state_delta ?? {}),
+        focused_panel: args.result.state_delta?.focused_panel ?? args.call.panel_id,
+      },
+    },
+  });
+};
+
+export const buildHelixAgentStepObservationPacket = (args: {
+  turnId: string;
+  iteration: number;
+  call: HelixRuntimeToolCallV1;
+  result: HelixRawToolResult;
+}): HelixAgentStepObservationPacket => {
+  if (isSituationRoomObservationResult(args.call, args.result.raw)) {
+    return buildSituationRoomObservationPacket(args);
   }
   return buildGenericHelixAgentStepObservationPacket(args);
 };

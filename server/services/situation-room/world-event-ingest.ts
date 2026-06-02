@@ -33,6 +33,14 @@ import type {
   LiveAnswerEnvironment,
   LiveAnswerEnvironmentDelta,
 } from "@shared/helix-live-answer-environment";
+import {
+  HELIX_LIVE_CONTINUATION_TICK_SCHEMA,
+  helixReceiptNotAnswerFlags,
+  type HelixCalloutCandidate,
+  type HelixGoalEvaluationReceipt,
+  type HelixLiveContinuationTick,
+  type HelixWorkerLaneReceipt,
+} from "@shared/helix-live-continuation";
 import type { HelixCategorizationEvent } from "@shared/helix-categorization-event";
 import type { HelixSyntheticEvidence } from "@shared/helix-synthetic-evidence";
 import type { HelixMinecraftSpatialEvent } from "@shared/helix-minecraft-spatial-event";
@@ -111,6 +119,11 @@ import {
 } from "./live-situation-artifact-store";
 import { getActiveLiveAnswerEnvironmentForRoom } from "./live-answer-environment-store";
 import { reduceLiveAnswerEnvironmentFromWorldEvent } from "./live-answer-line-reducer";
+import { getActiveLiveContinuationJobForRoom } from "./live-continuation-job-store";
+import {
+  getLiveContinuationRunDebug,
+  runLiveContinuationTick,
+} from "./live-continuation-runner";
 import {
   extractEnvironmentStateSnapshotFromWorldEvent,
   ingestEnvironmentStateSnapshot,
@@ -253,6 +266,10 @@ export type WorldEventIngestResult = {
   live_situation_artifact_delta?: LiveSituationArtifactDelta | null;
   live_answer_environment?: LiveAnswerEnvironment | null;
   live_answer_environment_delta?: LiveAnswerEnvironmentDelta | null;
+  live_continuation_tick?: HelixLiveContinuationTick | null;
+  live_continuation_worker_receipts?: HelixWorkerLaneReceipt[];
+  live_continuation_goal_evaluation?: HelixGoalEvaluationReceipt | null;
+  live_continuation_callout_candidate?: HelixCalloutCandidate | null;
   minecraft_spatial_event?: HelixMinecraftSpatialEvent | null;
   minecraft_spatial_episode?: HelixMinecraftSpatialEpisode | null;
   minecraft_seed_map_result?: HelixMinecraftSeedMapResult | null;
@@ -1315,6 +1332,95 @@ export const ingestWorldEvent = async (
           now: signal.ts,
         })
       : null;
+  const liveContinuationJob =
+    resolvedBinding && options.appendToThread !== false
+      ? getActiveLiveContinuationJobForRoom(resolvedBinding.room_id)
+      : null;
+  const liveContinuationPartialResult: WorldEventIngestResult | null =
+    liveContinuationJob && standbyTurnId
+      ? {
+          ok: true,
+          schema: "helix.world_event_ingest_response.v1",
+          appended: false,
+          signal_id: signal.signal_id,
+          salience_receipt_id: salienceReceipt?.receipt_id ?? null,
+          projection_id: projection.projection_id,
+          goal_hypothesis_ids: goalHypotheses.map((goal: SituationGoalHypothesis) => goal.hypothesis_id),
+          thread_id: resolvedBinding?.thread_id ?? explicitThreadId ?? null,
+          turn_id: standbyTurnId,
+          item_id: null,
+          reason: null,
+          message: "World event reduced for live continuation.",
+          event_type: event.event_type,
+          signal,
+          projection,
+          goal_hypotheses: goalHypotheses,
+          salience_receipt: salienceReceipt,
+          interjection_proposal: interjectionProposal,
+          semantic_events: semanticEvents,
+          narration_receipt: narrationReceipt,
+          predictions,
+          episodes,
+          episode_narrations: episodeNarrations,
+          episode_predictions: episodePredictions,
+          queue_items: queueItems,
+          interjection_decision: interjectionDecision,
+          append_candidate: appendCandidate,
+          callout_proposal: calloutProposal,
+          callout_delivery_receipt: calloutDeliveryReceipt,
+          live_situation_artifact: liveArtifactBeforeUpdate,
+          live_situation_artifact_delta: liveArtifactUpdate?.delta ?? null,
+          live_answer_environment: liveAnswerEnvironmentUpdate?.environment ?? liveAnswerEnvironmentBeforeUpdate ?? null,
+          live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
+          minecraft_spatial_event: spatialResult.spatial_event,
+          minecraft_spatial_episode: spatialResult.spatial_episode,
+          minecraft_seed_map_result: seedMapResult,
+          minecraft_seed_map_claims: seedMapResult?.claims ?? [],
+          minecraft_spatial_graph: minecraftSpatialGraph,
+          minecraft_route_rehearsal: minecraftRouteRehearsal,
+          minecraft_route_drift_event: minecraftRouteDriftEvent,
+          minecraft_route_lifecycle_receipt: minecraftRouteLifecycleReceipt,
+          minecraft_world_delta_overlay: minecraftWorldDeltaOverlay,
+          environment_risk_resource_ledger: environmentRiskResourceLedger,
+          minecraft_world_sense_event: worldSenseResult.world_sense_event,
+          minecraft_world_sense_context: worldSenseResult.world_sense_context,
+          game_semantic_lookup_receipts: semanticEvents.length > 0 ? [] : [],
+          game_utility_hypotheses: [],
+          continuous_categorization_job_receipts: [],
+          categorization_events: [],
+          synthetic_evidence: [],
+        }
+      : null;
+  const liveContinuationTick =
+    liveContinuationJob && standbyTurnId && liveContinuationPartialResult
+      ? await runLiveContinuationTick({
+          job: liveContinuationJob,
+          trigger: salienceReceipt ? "salience" : "world_event",
+          worldEventResult: liveContinuationPartialResult,
+          now: signal.ts,
+        }).catch((error: unknown): HelixLiveContinuationTick => ({
+          schema: HELIX_LIVE_CONTINUATION_TICK_SCHEMA,
+          tick_id: `live_continuation_tick:${hashShort([liveContinuationJob.job_id, signal.signal_id, "blocked"], 18)}`,
+          job_id: liveContinuationJob.job_id,
+          thread_id: liveContinuationJob.thread_id,
+          room_id: liveContinuationJob.room_id,
+          environment_id: liveContinuationJob.environment_id ?? null,
+          contract_id: liveContinuationJob.contract_id ?? null,
+          trigger: salienceReceipt ? "salience" : "world_event",
+          status: "blocked",
+          selected_lanes: [],
+          worker_receipt_refs: [],
+          goal_evaluation_ref: null,
+          callout_candidate_ref: null,
+          next_step: "fail_closed",
+          evidence_refs: [
+            `live_continuation_job:${liveContinuationJob.job_id}`,
+            `world_event_signal:${signal.signal_id}`,
+            `live_continuation_error:${hashShort([error instanceof Error ? error.message : String(error)], 10)}`,
+          ],
+          ...helixReceiptNotAnswerFlags,
+        }))
+      : null;
   const shouldPublishSpatial =
     resolvedBinding && options.appendToThread !== false
       ? shouldPublishSpatialEpisode(resolvedBinding.thread_id, spatialResult.spatial_episode)
@@ -1361,6 +1467,65 @@ export const ingestWorldEvent = async (
     syntheticEvidence: syntheticEvidenceForJobs,
     utilityHypotheses: semanticUtilityReduction?.utility_hypotheses ?? [],
   });
+  const liveContinuationDebug = liveContinuationTick
+    ? getLiveContinuationRunDebug(liveContinuationTick.tick_id)
+    : null;
+  const liveContinuationExtraItems = liveContinuationTick
+    ? [
+        {
+          itemId: `live_continuation_tick:${hashShort([liveContinuationTick.tick_id], 14)}`,
+          itemType: "toolObservation" as const,
+          kind: "live_continuation_tick",
+          observationRef: {
+            ...liveContinuationTick,
+            provenance: "live_continuation_runner",
+            context_role: "receipt_not_assistant_answer",
+            safe_for_future_context: true,
+          } as Record<string, unknown>,
+        },
+        ...(liveContinuationDebug?.workers ?? []).map((receipt: HelixWorkerLaneReceipt) => ({
+          itemId: `worker_lane:${hashShort([receipt.receipt_id], 14)}`,
+          itemType: "toolObservation" as const,
+          kind: "worker_lane_receipt",
+          observationRef: {
+            ...receipt,
+            provenance: "live_continuation_runner",
+            context_role: "hypothesis_not_assistant_answer",
+            safe_for_future_context: true,
+          } as Record<string, unknown>,
+        })),
+        ...(liveContinuationDebug?.goal
+          ? [
+              {
+                itemId: `goal_evaluation:${hashShort([liveContinuationDebug.goal.receipt_id], 14)}`,
+                itemType: "toolObservation" as const,
+                kind: "goal_evaluation_receipt",
+                observationRef: {
+                  ...liveContinuationDebug.goal,
+                  provenance: "live_continuation_runner",
+                  context_role: "receipt_not_assistant_answer",
+                  safe_for_future_context: true,
+                } as Record<string, unknown>,
+              },
+            ]
+          : []),
+        ...(liveContinuationDebug?.callout
+          ? [
+              {
+                itemId: `callout_candidate:${hashShort([liveContinuationDebug.callout.candidate_id], 14)}`,
+                itemType: "toolObservation" as const,
+                kind: "callout_candidate",
+                observationRef: {
+                  ...liveContinuationDebug.callout,
+                  provenance: "live_continuation_runner",
+                  context_role: "hypothesis_not_assistant_answer",
+                  safe_for_future_context: true,
+                } as Record<string, unknown>,
+              },
+            ]
+          : []),
+      ]
+    : [];
   const spatialArtifactUpdate =
     liveArtifactBeforeUpdate && standbyTurnId && spatialReduction && spatialResult.spatial_episode
       ? updateLiveSituationArtifact({
@@ -1391,7 +1556,7 @@ export const ingestWorldEvent = async (
         })
       : null;
   const batchReceipt =
-    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || spatialArtifactUpdate || spatialReduction || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0) && resolvedBinding && !options.deferThreadAppend
+    (appendCandidate || liveArtifactUpdate || liveAnswerEnvironmentUpdate || liveContinuationTick || spatialArtifactUpdate || spatialReduction || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0) && resolvedBinding && !options.deferThreadAppend
       ? await appendStandbyObservationBatch({
           threadId: resolvedBinding.thread_id,
           turnId: standbyTurnId,
@@ -1526,8 +1691,9 @@ export const ingestWorldEvent = async (
                     safe_for_future_context: true,
                   } as Record<string, unknown>,
                 })),
+                ...liveContinuationExtraItems,
               ]
-            : liveAnswerEnvironmentUpdate || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0
+            : liveAnswerEnvironmentUpdate || liveContinuationExtraItems.length > 0 || (spatialReduction && spatialResult.spatial_episode) || worldSenseReduction || semanticUtilityReduction || continuousCategorizationJobReceipts.length > 0
               ? [
                   ...(spatialReduction && spatialResult.spatial_episode
                     ? [
@@ -1616,6 +1782,7 @@ export const ingestWorldEvent = async (
                       safe_for_future_context: true,
                     } as Record<string, unknown>,
                   })),
+                  ...liveContinuationExtraItems,
                 ]
               : [],
         })
@@ -1729,6 +1896,10 @@ export const ingestWorldEvent = async (
     live_situation_artifact_delta: spatialArtifactUpdate?.delta ?? liveArtifactUpdate?.delta ?? null,
     live_answer_environment: liveAnswerEnvironmentUpdate?.environment ?? liveAnswerEnvironmentBeforeUpdate ?? null,
     live_answer_environment_delta: liveAnswerEnvironmentUpdate?.delta ?? null,
+    live_continuation_tick: liveContinuationTick,
+    live_continuation_worker_receipts: liveContinuationDebug?.workers ?? [],
+    live_continuation_goal_evaluation: liveContinuationDebug?.goal ?? null,
+    live_continuation_callout_candidate: liveContinuationDebug?.callout ?? null,
     minecraft_spatial_event: spatialResult.spatial_event,
     minecraft_spatial_episode: spatialResult.spatial_episode,
     minecraft_seed_map_result: seedMapResult,

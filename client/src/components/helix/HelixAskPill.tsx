@@ -57,6 +57,7 @@ import {
   type HelixAskAnswerContract,
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
+import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
 import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
@@ -27931,11 +27932,16 @@ export function HelixAskPill({
               : !manualDispatchHint || inferredMode === "observe"
                 ? undefined
                 : inferredMode;
+          const isolatedZenGraphAskTurn = shouldUseIsolatedZenGraphAskTurn(trimmed);
           const reasoningContextModeForTurn: "attached" | "isolated" =
-            options?.contextMode === "isolated" || repoCodeEvidencePrompt ? "isolated" : "attached";
-          const workspaceContextSnapshot = buildAskTurnWorkspaceContextSnapshot(sessionId);
+            options?.contextMode === "isolated" || repoCodeEvidencePrompt || isolatedZenGraphAskTurn
+              ? "isolated"
+              : "attached";
+          const workspaceContextSnapshot =
+            reasoningContextModeForTurn === "isolated" ? {} : buildAskTurnWorkspaceContextSnapshot(sessionId);
           const processGraphContextPackForTurn =
-            manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning
+            reasoningContextModeForTurn !== "isolated" &&
+            (manualDispatchHint || backgroundWorkspaceReasoningLane || preliminaryDispatchPlan.should_dispatch_reasoning)
               ? useWorkstationProcessGraphStore.getState().getContextPack()
               : null;
           const ambientVisualCapability =
@@ -28078,6 +28084,11 @@ export function HelixAskPill({
               ? {
                   ...localResponse.debug,
                   ...(inferredMode ? { client_inferred_mode: inferredMode } : {}),
+                  ...(isolatedZenGraphAskTurn
+                    ? {
+                        client_zen_graph_isolated_ask_turn: true,
+                      }
+                    : {}),
                   ...(docsViewerAnchorPath
                     ? {
                         client_docs_viewer_anchor_path: docsViewerAnchorPath,

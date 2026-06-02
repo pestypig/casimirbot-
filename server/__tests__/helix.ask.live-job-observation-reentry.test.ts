@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { HelixRawToolResult, HelixRuntimeToolCallV1 } from "@shared/helix-agent-step-observation-packet";
 import {
+  buildHelixAgentStepObservationPacket,
   buildSituationRoomLiveJobObservationPacket,
 } from "../services/helix-ask/tool-router/helix-tool-observation-packet";
 
@@ -168,6 +169,94 @@ describe("Situation Room live-job observation re-entry packets", () => {
     expect(packet.status).toBe("succeeded");
     expect(packet.observation_summary).toContain("spoken: true");
     expect(packet.observation_summary).toContain("confirm-speak receipt: true");
+    expect(packet.terminal_eligible).toBe(false);
+  });
+
+  it("re-enters live continuation schemas as non-terminal Situation Room observations", () => {
+    const packet = buildHelixAgentStepObservationPacket({
+      turnId: "turn:continuation",
+      iteration: 3,
+      call: makeCall("live_continuation.tick"),
+      result: {
+        ok: true,
+        summary: "Panel prose: tell the user the cave is safe.",
+        raw: {
+          artifact: {
+            schema: "helix.live_continuation_tick.v1",
+            tick_id: "tick:continuation",
+            job_id: "job:continuation",
+            thread_id: "thread:continuation",
+            room_id: "room:minecraft",
+            trigger: "world_event",
+            status: "completed",
+            selected_lanes: ["source_health", "risk_watch"],
+            worker_receipt_refs: ["worker:risk"],
+            goal_evaluation_ref: "goal:risk",
+            callout_candidate_ref: "callout:risk",
+            next_step: "continue",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+            context_role: "receipt_not_assistant_answer",
+            evidence_refs: ["world-event:risk"],
+          },
+        },
+      },
+    });
+
+    expect(packet.status).toBe("succeeded");
+    expect(packet.terminal_eligible).toBe(false);
+    expect(packet.post_tool_model_step_required).toBe(true);
+    expect(packet.assistant_answer).toBe(false);
+    expect(packet.raw_content_included).toBe(false);
+    expect(packet.observation_summary).toContain("helix.live_continuation_tick.v1");
+    expect(packet.observation_summary).toContain("Continuation trigger: world_event");
+    expect(packet.observation_summary).not.toContain("tell the user the cave is safe");
+    expect(packet.produced_artifact_refs).toEqual(expect.arrayContaining([
+      "tick:continuation",
+      "job:continuation",
+      "worker:risk",
+      "goal:risk",
+      "callout:risk",
+    ]));
+  });
+
+  it("recognizes goal ledger actions with continuation receipt schemas", () => {
+    const packet = buildHelixAgentStepObservationPacket({
+      turnId: "turn:goal",
+      iteration: 4,
+      call: makeCall("goal_ledger.set_objective"),
+      result: {
+        ok: true,
+        raw: {
+          artifact: {
+            schema: "helix.goal_evaluation_receipt.v1",
+            receipt_id: "goal:eval",
+            job_id: "job:continuation",
+            thread_id: "thread:continuation",
+            room_id: "room:minecraft",
+            status: "needs_more_observation",
+            rationale_codes: ["missing_visual_confirmation"],
+            satisfied_evidence_refs: [],
+            missing_evidence: ["latest visual frame"],
+            next_step: "continue",
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            raw_content_included: false,
+            context_role: "receipt_not_assistant_answer",
+            evidence_refs: ["world-event:risk"],
+          },
+        },
+      },
+    });
+
+    expect(packet.status).toBe("missing_input");
+    expect(packet.missing_requirements).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "missing:latest visual frame" }),
+    ]));
+    expect(packet.observation_summary).toContain("helix.goal_evaluation_receipt.v1");
     expect(packet.terminal_eligible).toBe(false);
   });
 });
