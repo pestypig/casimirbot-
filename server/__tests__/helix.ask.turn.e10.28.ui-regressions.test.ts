@@ -29,6 +29,33 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
     .filter(Boolean) as Array<{ event: string; data: any }>;
 
 describe("helix ask turn e10.28 ui regressions", () => {
+  it("streams a terminal payload for model-only direct-answer turns after runtime completion", async () => {
+    const app = createApp();
+    const sessionId = `e1028-model-only-stream-${Date.now()}`;
+    const question = "What is 2 plus 2? Answer in one short sentence.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question,
+        mode: "read",
+        debug: true,
+        sessionId,
+        context_mode: "isolated",
+        turn_input_items: [{ type: "text", source: "user", text: question }],
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const transcriptEvents = events.filter((event) => event.event === "turn_transcript_event");
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+
+    expect(transcriptEvents.some((event) => event.data?.source_event_type === "item_completed")).toBe(true);
+    expect(finalPacket).toBeTruthy();
+    expect(finalPacket?.client_server_terminal_match).toBe(true);
+    expect(finalPacket?.terminal_answer_authority?.server_authoritative).toBe(true);
+  }, 60_000);
+
   it("streams turn transcript events and a final ask turn payload", async () => {
     const app = createApp();
     const sessionId = `e1028-stream-${Date.now()}`;

@@ -235,7 +235,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget: "workstation_panel",
       allowedCore: [],
-      allowedExtra: ["workstation_tool_evaluation", "tool_evaluation"],
+      allowedExtra: ["workstation_tool_evaluation", "tool_evaluation", "model_synthesized_answer"],
       forbiddenExtra: [
         "active_doc_identity",
         "client_projection",
@@ -244,7 +244,6 @@ export function buildRouteProductContract(input: {
         "doc_summary",
         "live_pipeline_receipt",
         "model_only_concept",
-        "model_synthesized_answer",
         "no_tool_direct",
         "panel_generated_answer",
         "workspace_action_receipt",
@@ -255,7 +254,7 @@ export function buildRouteProductContract(input: {
         "fruition_procedure_expression/v1",
         "helix_recommended_action_admission/v1",
       ],
-      precedenceReason: "zen_graph_reflection_allows_only_evidence_terminal_products",
+      precedenceReason: "zen_graph_reflection_requires_evidence_reentry_before_terminal_synthesis",
     });
   }
 

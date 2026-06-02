@@ -59,15 +59,15 @@ describe("Helix Ask ZenGraph reflection route", () => {
 
     expect(body?.route_reason_code).toBe("zen_graph_reflection");
     expect(body?.route).toBe("zen_graph_reflection");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(body?.canonical_goal_frame?.goal_kind).toBe("zen_graph_reflection");
-    expect(body?.canonical_goal_frame?.required_terminal_kind).toBe("workstation_tool_evaluation");
+    expect(body?.canonical_goal_frame?.required_terminal_kind).toBe("model_synthesized_answer");
     expect(body?.route_product_contract?.allowed_terminal_artifact_kinds).toEqual(
-      expect.arrayContaining(["workstation_tool_evaluation"]),
+      expect.arrayContaining(["model_synthesized_answer"]),
     );
     expect(body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
-      expect.arrayContaining(["workspace_action_receipt", "model_synthesized_answer", "direct_answer_text"]),
+      expect.arrayContaining(["workspace_action_receipt", "direct_answer_text"]),
     );
     expect(body?.workstation_tool_plan?.intent).toBe("zen_graph_reflection");
     expect(body?.source_target_intent?.suppressed_routes).toEqual(
@@ -92,9 +92,21 @@ describe("Helix Ask ZenGraph reflection route", () => {
         }),
       ]),
     );
-    expect(answer).toMatch(/Zen Badge Graph/i);
-    expect(answer).toMatch(/Fruition procedure expression/i);
-    expect(answer).toMatch(/not a character verdict|not.*terminal authority|execution permission/i);
+    expect(body?.current_turn_artifact_ledger?.map((artifact: any) => artifact.kind)).toEqual(
+      expect.arrayContaining(["helix_zen_graph_reflection_tool_result", "workstation_tool_evaluation", "final_answer_draft"]),
+    );
+    expect(body?.zen_graph_reflection_tool_result?.admissions?.[0]?.authority?.terminal_eligible).toBe(false);
+    expect(body?.final_answer_draft).toMatchObject({
+      schema: "helix.final_answer_draft.v1",
+      goal_kind: "zen_graph_reflection",
+    });
+    expect(answer).toMatch(/ZenGraph applied reflection/i);
+    expect(answer).toMatch(/Restated through ZenGraph:/i);
+    expect(answer).toMatch(/Activated lenses:/i);
+    expect(answer).toMatch(/Applied to the prompt:/i);
+    expect(answer).toMatch(/Path to root:/i);
+    expect(answer).toMatch(/Next evidence question:/i);
+    expect(answer).toMatch(/agent_executable=false/i);
   }, 60_000);
 
   it("streams Zen Badge Graph and Fruition prompts through the same workstation evaluation terminal product", async () => {
@@ -116,24 +128,28 @@ describe("Helix Ask ZenGraph reflection route", () => {
     const finalEvent = events.find((entry) => entry.event === "turn_final");
     const body = finalEvent?.data;
 
-    expect(terminalEvent?.data?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(terminalEvent?.data?.final_answer_source).toBe("final_answer_draft");
     expect(body?.route_reason_code).toBe("zen_graph_reflection");
     expect(body?.route).toBe("zen_graph_reflection");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(body?.canonical_goal_frame?.goal_kind).toBe("zen_graph_reflection");
+    expect(body?.canonical_goal_frame?.required_terminal_kind).toBe("model_synthesized_answer");
     expect(body?.workstation_tool_plan?.intent).toBe("zen_graph_reflection");
     expect(body?.ideology_context_reflection?.schemaVersion).toBe("ideology_context_reflection/v1");
     expect(body?.zen_badge_locator?.schemaVersion).toBe("zen_badge_locator/v1");
     expect(body?.fruition_procedure_expression?.schemaVersion).toBe("fruition_procedure_expression/v1");
     expect(body?.zen_graph_reflection_tool_result?.admissions?.[0]?.authority?.agent_executable).toBe(false);
-    expect(body?.terminal_answer_authority?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(body?.terminal_answer_authority?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.terminal_answer_authority?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(body?.terminal_answer_authority?.final_answer_source).toBe("final_answer_draft");
     expect(body?.terminal_surface_parity_invariant?.ok).toBe(true);
     expect(body?.terminal_surface_parity_invariant?.failure_codes ?? []).not.toEqual(
       expect.arrayContaining(["controller_decision_not_terminal", "controller_goal_terminal_mismatch"]),
     );
-    expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(/Fruition procedure expression/i);
+    expect(body?.current_turn_artifact_ledger?.map((artifact: any) => artifact.kind)).toEqual(
+      expect.arrayContaining(["helix_zen_graph_reflection_tool_result", "workstation_tool_evaluation", "final_answer_draft"]),
+    );
+    expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(/Restated through ZenGraph:|Applied to the prompt:/i);
   }, 60_000);
 
   it("keeps the desktop Ask endpoint and debug export aligned for ZenGraph/Fruition evidence", async () => {
@@ -152,17 +168,17 @@ describe("Helix Ask ZenGraph reflection route", () => {
     const body = response.body;
     expect(body?.route_reason_code).toBe("zen_graph_reflection");
     expect(body?.route).toBe("zen_graph_reflection");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(body?.canonical_goal_frame).toMatchObject({
       goal_kind: "zen_graph_reflection",
-      required_terminal_kind: "workstation_tool_evaluation",
+      required_terminal_kind: "model_synthesized_answer",
     });
     expect(body?.route_product_contract?.allowed_terminal_artifact_kinds).toEqual(
-      expect.arrayContaining(["workstation_tool_evaluation"]),
+      expect.arrayContaining(["model_synthesized_answer"]),
     );
     expect(body?.route_product_contract?.forbidden_terminal_artifact_kinds).toEqual(
-      expect.arrayContaining(["workspace_action_receipt", "model_synthesized_answer", "direct_answer_text"]),
+      expect.arrayContaining(["workspace_action_receipt", "direct_answer_text"]),
     );
     expect(body?.ideology_context_reflection?.schemaVersion).toBe("ideology_context_reflection/v1");
     expect(body?.zen_badge_locator?.schemaVersion).toBe("zen_badge_locator/v1");
@@ -175,8 +191,8 @@ describe("Helix Ask ZenGraph reflection route", () => {
       ]),
     );
     expect(body?.terminal_answer_authority).toMatchObject({
-      final_answer_source: "workstation_tool_evaluation",
-      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
       route: "zen_graph_reflection",
     });
     expect(body?.terminal_surface_parity_invariant?.ok).toBe(true);
@@ -184,8 +200,8 @@ describe("Helix Ask ZenGraph reflection route", () => {
     expect(body?.solver_controller_decision).toMatchObject({
       decision: "allow_terminal",
       canonical_goal_kind: "zen_graph_reflection",
-      required_terminal_kind: "workstation_tool_evaluation",
-      selected_terminal_artifact_kind: "workstation_tool_evaluation",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_artifact_kind: "model_synthesized_answer",
     });
 
     const debugExport = await request(app)
@@ -194,16 +210,19 @@ describe("Helix Ask ZenGraph reflection route", () => {
     const exported = debugExport.body?.payload;
     expect(exported?.resolved_turn_summary).toMatchObject({
       resolved_route_label: "zen_graph_reflection",
-      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_artifact_kind: "model_synthesized_answer",
     });
-    expect(exported?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(exported?.final_answer_source).toBe("final_answer_draft");
     expect(exported?.solver_controller_summary).toMatchObject({
       decision: "allow_terminal",
       final_route: "zen_graph_reflection",
-      required_terminal_kind: "workstation_tool_evaluation",
-      selected_terminal_artifact_kind: "workstation_tool_evaluation",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_artifact_kind: "model_synthesized_answer",
       final_route_reconciliation_ok: true,
     });
+    expect(exported?.current_turn_artifact_ledger?.map((artifact: any) => artifact.kind)).toEqual(
+      expect.arrayContaining(["helix_zen_graph_reflection_tool_result", "workstation_tool_evaluation", "final_answer_draft"]),
+    );
     expect(exported?.terminal_surface_parity_invariant?.ok).toBe(true);
   }, 60_000);
 });

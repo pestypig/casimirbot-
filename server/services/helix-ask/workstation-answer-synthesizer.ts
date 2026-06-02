@@ -10,6 +10,7 @@ export type SynthesizeWorkstationAnswerInput = {
   plan: HelixWorkstationToolPlan;
   evaluation?: HelixWorkstationToolEvaluation | null;
   postToolSynthesisPlan?: HelixPostToolSynthesisPlanV1 | null;
+  zenGraphReflectionToolOutput?: unknown;
 };
 
 export type CalculatorObservation = {
@@ -300,16 +301,97 @@ function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstation
 
 function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary?.trim();
+  const toolOutput =
+    input.zenGraphReflectionToolOutput &&
+    typeof input.zenGraphReflectionToolOutput === "object" &&
+    !Array.isArray(input.zenGraphReflectionToolOutput)
+      ? (input.zenGraphReflectionToolOutput as Record<string, unknown>)
+      : null;
+  const reflection =
+    toolOutput?.reflection && typeof toolOutput.reflection === "object" && !Array.isArray(toolOutput.reflection)
+      ? (toolOutput.reflection as Record<string, unknown>)
+      : null;
+  const matches =
+    reflection?.matches && typeof reflection.matches === "object" && !Array.isArray(reflection.matches)
+      ? (reflection.matches as Record<string, unknown>)
+      : null;
+  const exactMatches = Array.isArray(matches?.exact) ? matches.exact : [];
+  const likelyMatches = Array.isArray(matches?.likely) ? matches.likely : [];
+  const activated = [...exactMatches, ...likelyMatches]
+    .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .slice(0, 4);
+  const activatedLines = activated.map((entry) => {
+    const label = typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : String(entry.nodeId ?? "unlabeled lens");
+    const reasons = Array.isArray(entry.reasons)
+      ? entry.reasons.map((reason) => String(reason ?? "").trim()).filter(Boolean).slice(0, 2).join("; ")
+      : "";
+    return reasons ? `- ${label}: ${reasons}` : `- ${label}`;
+  });
+  const firstPath = activated
+    .map((entry) => Array.isArray(entry.pathToRoot) ? entry.pathToRoot.map((item) => String(item ?? "").trim()).filter(Boolean) : [])
+    .find((path) => path.length > 1) ?? [];
+  const pathLine = firstPath.length > 1
+    ? `Path to root: ${firstPath.slice(0, 6).join(" -> ")}`
+    : "Path to root: no complete path was exposed in the receipt.";
+  const recommendedActions = Array.isArray(reflection?.recommended_actions) ? reflection.recommended_actions : [];
+  const recommendedAction = recommendedActions
+    .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
+    .find((entry): entry is Record<string, unknown> => Boolean(entry));
+  const nextQuestion =
+    typeof recommendedAction?.label === "string" && recommendedAction.label.trim()
+      ? recommendedAction.label.trim()
+      : "Ask what evidence would make review bypass safe enough to justify, and what harm would result if that evidence is wrong.";
+  const admissions = Array.isArray(toolOutput?.admissions) ? toolOutput.admissions : [];
+  const firstAdmission = admissions.find((entry) => entry && typeof entry === "object") as Record<string, unknown> | undefined;
+  const admissionAuthority =
+    firstAdmission?.authority && typeof firstAdmission.authority === "object" && !Array.isArray(firstAdmission.authority)
+      ? (firstAdmission.authority as Record<string, unknown>)
+      : null;
+  const executable = admissionAuthority?.agent_executable === true ? "true" : "false";
   const includesFruition = input.plan.steps.some((step) => {
     const options = step.args?.options;
     return Boolean(options && typeof options === "object" && !Array.isArray(options) && (options as Record<string, unknown>).includeFruition === true);
   });
+  const restatedSituation =
+    input.prompt.trim().length > 0
+      ? `Restated through ZenGraph: ${input.prompt.trim()}`
+      : "Restated through ZenGraph: reflect the situation as a values-and-evidence question before deciding what action is justified.";
+  const appliedLines = activated.map((entry) => {
+    const label = typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : String(entry.nodeId ?? "unlabeled lens");
+    const lower = label.toLowerCase();
+    if (/direct observation|observation/.test(lower)) {
+      return `- ${label}: start from what is directly known, then separate observed facts from assumptions.`;
+    }
+    if (/right speech|speech|formulation/.test(lower)) {
+      return `- ${label}: phrase the response as an evidence gap or clarification, not as a character judgment.`;
+    }
+    if (/non-harm|harm|compassion/.test(lower)) {
+      return `- ${label}: treat plausible user impact as a constraint that should slow bypasses until evidence is checked.`;
+    }
+    if (/two-key|review|approval|due process|fairness/.test(lower)) {
+      return `- ${label}: prefer a review or second-key gate when a fast action could affect others.`;
+    }
+    if (/uncertainty|skillful action|falsifiability|truth/.test(lower)) {
+      return `- ${label}: choose the smallest next test that reduces uncertainty without pretending the conclusion is final.`;
+    }
+    return `- ${label}: apply this lens as diagnostic evidence for the situation, not as a verdict.`;
+  });
   return [
+    "ZenGraph applied reflection:",
+    restatedSituation,
+    activatedLines.length > 0
+      ? ["Activated lenses:", ...activatedLines].join("\n")
+      : `Activated lenses: ${summary || "the receipt did not expose named matches."}`,
+    appliedLines.length > 0
+      ? ["Applied to the prompt:", ...appliedLines].join("\n")
+      : "Applied to the prompt: use the graph receipt as evidence for a careful next question, not as a final moral classification.",
+    pathLine,
     includesFruition
-      ? "I reflected the prompt through the Zen Badge Graph and assembled the Fruition procedure expression as evidence."
-      : "I reflected the prompt through the Zen Badge Graph as evidence.",
-    summary || "The receipt contains activated lenses, badge locator paths, missing checks, and evidence-only admissions.",
-    "Use that state to explain possible paths, tensions, and next questions. It is not a character verdict, moral finality, terminal authority, or execution permission.",
+      ? "Fruition binding: represent the situation as badge-combination evidence, then keep the output diagnostic until review/evidence gates are satisfied."
+      : "Binding: represent the situation as badge-combination evidence, not as a verdict.",
+    `Next evidence question: ${nextQuestion}`,
+    `Admission boundary: agent_executable=${executable}; this is not character judgment, moral finality, or execution permission.`,
   ].join("\n");
 }
 
