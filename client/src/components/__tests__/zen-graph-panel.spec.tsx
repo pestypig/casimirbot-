@@ -6,11 +6,11 @@ import type { CharacterSituationComparisonV1 } from "@shared/character-situation
 import { buildIdeologyContextReflectionV1 } from "@shared/ideology-context-reflection";
 import { buildZenBadgeLocatorV1, type ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { REINHARD_VON_LOHENGRAMM_PROFILE } from "@shared/zen-graph/character-profiles/reinhard-von-lohengramm";
+import { buildIdeologyGraph } from "@shared/zen-graph/build-ideology-graph";
 import { compareCharacterSituation } from "@shared/zen-graph/compare-character-situation";
 import type { IdeologyGraphDocument } from "@shared/zen-graph/ideology-graph-types";
-import { buildIdeologyGraph } from "@shared/zen-graph/load-ideology-graph";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
-import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
+import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID, type ZenWisdomPrinciple } from "@shared/zen-graph/wisdom-principles";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import ZenGraphPanel from "../panels/ZenGraphPanel";
 
@@ -31,9 +31,9 @@ const graphDocument: IdeologyGraphDocument = {
       id: ZEN_WISDOM_ROOT_ID,
       title: "Wisdom First Principles",
       tags: ["objective_binding"],
-      children: ZEN_WISDOM_PRINCIPLES.map((principle) => principle.id),
+      children: ZEN_WISDOM_PRINCIPLES.map((principle: ZenWisdomPrinciple) => principle.id),
     },
-    ...ZEN_WISDOM_PRINCIPLES.map((principle) => ({
+    ...ZEN_WISDOM_PRINCIPLES.map((principle: ZenWisdomPrinciple) => ({
       id: principle.id,
       title: principle.label,
       summary: principle.summary,
@@ -242,8 +242,12 @@ function renderPanel(locator?: ZenBadgeLocatorV1, characterComparison?: Characte
   );
 }
 
+function openObjectiveLens(name = "Wisdom objective binding lens") {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 function openObjectiveBindings() {
-  fireEvent.click(screen.getByRole("button", { name: "Toggle Fruition objective binding lens" }));
+  openObjectiveLens();
 }
 
 afterEach(() => {
@@ -275,16 +279,15 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByRole("button", { name: "mission ethos" })).toBeTruthy();
     expect(screen.getAllByTestId("zen-graph-badge-node").length).toBeGreaterThan(12);
 
-    openObjectiveBindings();
+    openObjectiveLens("Wisdom objective binding lens");
     expect(screen.getByText("Objective Bindings")).toBeTruthy();
     expect(screen.getByTestId("zen-graph-objective-binding-overlay")).toBeTruthy();
-    expect(screen.getByText("ZenGraph Fruition Path")).toBeTruthy();
-    expect(screen.getByText("Objective binding")).toBeTruthy();
-    expect(screen.getByText("Preset path stack")).toBeTruthy();
-    expect(screen.getByText("Fruition procedure")).toBeTruthy();
+    expect(screen.getByText("ZenGraph Wisdom")).toBeTruthy();
+    expect(screen.getByText("Subject")).toBeTruthy();
+    expect(screen.getByText("Objective state")).toBeTruthy();
+    expect(screen.getByText("Bindings")).toBeTruthy();
     expect(screen.getByText("Badge procedure")).toBeTruthy();
-    expect(screen.getByText("Outer objective view")).toBeTruthy();
-    expect(screen.getAllByText(/primitive design-language badges/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("Authority boundary")).toBeTruthy();
     expect(screen.getByText(/skillful mediation -> right speech infrastructure -> mission ethos -> wisdom first principles/i)).toBeTruthy();
   });
 
@@ -310,7 +313,7 @@ describe("ZenGraphPanel", () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "Right Speech Infrastructure" }));
-    openObjectiveBindings();
+    openObjectiveLens("Wisdom objective binding lens");
 
     expect(screen.getAllByText(/constraint/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/constrains/i).length).toBeGreaterThan(0);
@@ -325,35 +328,37 @@ describe("ZenGraphPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Right Speech and Accurate Formulation" }));
     openObjectiveBindings();
 
-    expect(screen.getByText("Selected combination")).toBeTruthy();
+    expect(screen.getByText("Procedural trace")).toBeTruthy();
     expect(screen.getByText("3 badges")).toBeTruthy();
     expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getByText("Selected badges constrain or balance the action posture.")).toBeTruthy();
-    expect(screen.getAllByText((_, element) => element?.textContent?.includes("Compare reflection:") ?? false).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/procedure\.direct-observation-before-claim|principle\.direct-observation-before-claim/i).length).toBeGreaterThan(0);
   });
 
   it("uses a Zen badge locator artifact to seed the visible comparison", () => {
     renderPanel(buildLocatorFixture());
     openObjectiveBindings();
 
-    expect(screen.getByText("Located comparison")).toBeTruthy();
-    expect(screen.getByText("constrained action posture")).toBeTruthy();
+    expect(screen.queryByText("Located comparison")).toBeNull();
     expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
-    expect(screen.getByText("3 badges")).toBeTruthy();
   });
 
-  it("renders a colored character profile block linked from activated Zen badges", () => {
+  it("renders a normal character badge that opens a character preset binding", () => {
     renderPanel(buildLocatorFixture(), buildCharacterComparisonFixture());
 
-    expect(screen.getByRole("button", { name: "Reinhard von Lohengramm" })).toBeTruthy();
-    expect(screen.getAllByText("Character Profile").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/sovereign ambition 0\.98/i).length).toBeGreaterThan(0);
+    const characterBadge = screen.getByRole("button", { name: "Reinhard von Lohengramm" });
+    expect(characterBadge).toBeTruthy();
+    expect(screen.queryByText("Reinhard von Lohengramm")).toBeNull();
 
-    openObjectiveBindings();
-    expect(screen.getByText("Character block")).toBeTruthy();
+    fireEvent.click(characterBadge);
+    expect(screen.getByText("ZenGraph Character")).toBeTruthy();
+    expect(screen.getByText("Subject")).toBeTruthy();
+    expect(screen.getByText("Objective state")).toBeTruthy();
+    expect(screen.getByText("Bindings")).toBeTruthy();
     expect(screen.getAllByText(/Reinhard von Lohengramm/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/sovereign ambition 0\.98/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/displacement|conquest|forced restructuring/i).length).toBeGreaterThan(0);
   });
 
@@ -367,7 +372,6 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByText("Capability pressure may outrun restraint.")).toBeTruthy();
     expect(screen.getByText("Missing check: jurisdiction context")).toBeTruthy();
     expect(screen.getByText("Claim boundaries")).toBeTruthy();
-    expect(screen.getAllByText(/evidence only/i).length).toBeGreaterThan(0);
   });
 
   it("renders admission state, risk, display policy, and evidence refs", () => {

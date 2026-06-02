@@ -1,8 +1,8 @@
 import { buildZenGraphLaunchReflectionArtifacts } from "@/lib/zen-graph/fruitionLaunchArtifact";
 import { REINHARD_VON_LOHENGRAMM_PROFILE } from "@shared/zen-graph/character-profiles/reinhard-von-lohengramm";
+import { buildIdeologyGraph } from "@shared/zen-graph/build-ideology-graph";
 import { compareCharacterSituation } from "@shared/zen-graph/compare-character-situation";
 import type { IdeologyGraphDocument } from "@shared/zen-graph/ideology-graph-types";
-import { buildIdeologyGraph } from "@shared/zen-graph/load-ideology-graph";
 import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
 import ZenGraphPanel from "./ZenGraphPanel";
 

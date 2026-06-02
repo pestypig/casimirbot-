@@ -42,6 +42,19 @@ type ZenGraphEdge = {
   weight?: number;
 };
 
+type ZenObjectiveLensId = "wisdom" | "character";
+
+const ZEN_OBJECTIVE_LENSES: Array<{
+  id: ZenObjectiveLensId;
+  glyph: string;
+  label: string;
+  title: string;
+  tone: string;
+}> = [
+  { id: "wisdom", glyph: "W", label: "Wisdom", title: "Wisdom objective binding lens", tone: "bg-violet-700" },
+  { id: "character", glyph: "C", label: "Character", title: "Character objective binding lens", tone: "bg-red-800" },
+];
+
 function labelize(value: string): string {
   return value.replace(/[_-]/g, " ");
 }
@@ -87,9 +100,7 @@ function edgeStroke(tone: ZenGraphEdge["tone"]): string {
 
 function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted: boolean; dimmed: boolean }): string {
   const classes = [
-    args.node.tone === "character"
-      ? "absolute flex min-h-[88px] w-64 flex-col justify-between border-2 p-2 text-left shadow-xl transition"
-      : "absolute flex h-12 w-12 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
+    "absolute flex h-12 w-12 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
     "focus:outline-none focus:ring-2 focus:ring-cyan-200",
   ];
   switch (args.node.tone) {
@@ -118,7 +129,7 @@ function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted:
       classes.push("border-fuchsia-200 bg-gradient-to-br from-fuchsia-100 via-zinc-400 to-fuchsia-950 text-zinc-950");
       break;
     case "character":
-      classes.push("border-amber-200 bg-gradient-to-br from-amber-200 via-red-900 to-zinc-950 text-amber-50");
+      classes.push("border-amber-200 bg-gradient-to-br from-amber-100 via-zinc-400 to-red-950 text-zinc-950");
       break;
   }
   if (args.selected) classes.push("ring-4 ring-cyan-200/80 shadow-cyan-200/50");
@@ -482,10 +493,8 @@ function buildGraph(
       glyph: "C",
       x: 700,
       y: Math.max(430, 120 + Math.max(3, lane) * 92),
-      width: 256,
-      height: 112,
-      tags: ["character_profile", "diagnostic_only", characterComparison.predictedPosture],
-      summary: "Character profile block: Zen badges are reweighted into a bounded behavioral hypothesis.",
+      tags: ["character_preset", "diagnostic_only", characterComparison.predictedPosture],
+      summary: "Character preset badge: opens a bounded objective binding modeled from a known figure.",
       proceduralExpression: `character.${proceduralToken(characterComparison.characterId)} weights activated badges => ${labelize(
         characterComparison.predictedPosture,
       )}`,
@@ -590,6 +599,7 @@ function BindingBox({
 }
 
 function ObjectiveBindingRail({
+  activeLensId,
   reflection,
   admission,
   fruition,
@@ -600,6 +610,7 @@ function ObjectiveBindingRail({
   onSelectNode,
   onLoadFruition,
 }: {
+  activeLensId: ZenObjectiveLensId;
   reflection: IdeologyContextReflectionV1;
   admission: HelixRecommendedActionAdmissionV1;
   fruition: FruitionProcedureExpressionV1;
@@ -638,6 +649,7 @@ function ObjectiveBindingRail({
   const selectedProcedureExpression = selectedNode?.proceduralExpression ?? "No procedural expression mapped.";
   const combinationOutcome = selectedCombinationOutcome(selectedNodes);
   const combinationExpression = selectedCombinationExpression(selectedNodes);
+  const activeLens = ZEN_OBJECTIVE_LENSES.find((lens) => lens.id === activeLensId) ?? ZEN_OBJECTIVE_LENSES[0];
   return (
     <aside
       data-testid="zen-graph-objective-binding-overlay"
@@ -645,83 +657,135 @@ function ObjectiveBindingRail({
     >
       <div className="border-b border-zinc-800 p-2.5">
         <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Objective Bindings</div>
-        <h2 className="mt-0.5 text-base font-semibold leading-tight">ZenGraph Fruition Path</h2>
+        <h2 className="mt-0.5 text-base font-semibold leading-tight">ZenGraph {activeLens.label}</h2>
         <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
-          Preset bindings show primitive design-language badges combining into an objective view.
+          {activeLensId === "character"
+            ? "A modeled figure is a subject binding: active badges, constraints, and procedural trace stay together."
+            : "Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together."}
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-        <BindingBox
-          title="Objective binding"
-          label="preset"
-          tone="slate"
-          activeNodeIds={[reflection.graph.rootId]}
-          onSelectNode={onSelectNode}
-        >
-          {labelize(reflection.graph.rootId)} is assembled from primitive design-language badges.
-        </BindingBox>
-        <BindingBox
-          title="Preset path stack"
-          label="primitive to binding"
-          tone="emerald"
-          activeNodeIds={presetPath}
-          onSelectNode={onSelectNode}
-        >
-          {presetPath.length > 0
-            ? presetPath.map((nodeId) => labelize(nodeId)).join(" -> ")
-            : "No preset path is available for the selected badge."}
-        </BindingBox>
-        <BindingBox title="Activated lenses" label="prompt state" tone="cyan" activeNodeIds={activeLensIds} onSelectNode={onSelectNode}>
-          {activeLensIds.length > 0
-            ? reflection.matches.inferred_lenses.concat(reflection.matches.exact, reflection.matches.likely).slice(0, 3).map((match) => match.label).join(" / ")
-            : "No deterministic lens badge is active."}
-        </BindingBox>
-        <BindingBox
-          title="Safeguards"
-          label="gate edges"
-          tone="amber"
-          activeNodeIds={(reflection.action_gate_warnings ?? []).map((warning) => warning.gateId)}
-          onSelectNode={onSelectNode}
-        >
-          {(reflection.action_gate_warnings ?? []).length > 0
-            ? (reflection.action_gate_warnings ?? []).map((warning) => warning.requiredCheck ?? warning.warning).join(", ")
-            : "No nearby safeguard badge is active."}
-        </BindingBox>
-        <div className="grid grid-cols-2 gap-2">
-          <BindingBox title="Possible tensions" label="zone" tone="violet">
-            {reflection.tensions?.length
-              ? reflection.tensions.map((tension) => tension.description).join(" ")
-              : "No possible tension zone is flagged."}
-          </BindingBox>
-          <BindingBox
-            title="Claim boundaries"
-            label="diagnostic only"
-            tone="rose"
-            activeNodeIds={missingChecks.map((item) => `missing:${item}`)}
-            onSelectNode={onSelectNode}
-          >
-            {missingChecks.length > 0
-              ? missingChecks.map((item) => `Missing check: ${labelize(item)}`).join(" | ")
-              : "No missing check listed."}
-          </BindingBox>
-        </div>
-        <BindingBox title="Fruition procedure" label={labelize(fruition.result.posture)} tone="violet">
-          <div className="space-y-1">
-            <div className="font-mono text-[10px] leading-snug text-violet-100">{fruition.expression}</div>
-            <div className="text-[11px] opacity-80">{fruition.result.label}</div>
-            <button
-              type="button"
-              onClick={onLoadFruition}
-              className="mt-2 w-full rounded border border-violet-500/70 bg-violet-950/70 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-violet-100 hover:border-violet-200"
+        {activeLensId === "wisdom" ? (
+          <>
+            <BindingBox title="Subject" label="objective binding" tone="slate" activeNodeIds={[reflection.graph.rootId]} onSelectNode={onSelectNode}>
+              {labelize(reflection.graph.rootId)} is assembled from primitive design-language badges.
+            </BindingBox>
+            <BindingBox title="Objective state" label={labelize(fruition.result.posture)} tone="violet">
+              <div className="space-y-1">
+                <div className="text-[11px] opacity-80">{fruition.result.label}</div>
+                <button
+                  type="button"
+                  onClick={onLoadFruition}
+                  className="mt-2 w-full rounded border border-violet-500/70 bg-violet-950/70 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-violet-100 hover:border-violet-200"
+                >
+                  Load to Fruition Calculator
+                </button>
+              </div>
+            </BindingBox>
+            <BindingBox title="Bindings" label="primitive to subject" tone="emerald" activeNodeIds={presetPath} onSelectNode={onSelectNode}>
+              {presetPath.length > 0
+                ? presetPath.map((nodeId) => labelize(nodeId)).join(" -> ")
+                : "No preset path is available for the selected badge."}
+            </BindingBox>
+            <BindingBox title="Activated lenses" label="prompt state" tone="cyan" activeNodeIds={activeLensIds} onSelectNode={onSelectNode}>
+              {activeLensIds.length > 0
+                ? reflection.matches.inferred_lenses.concat(reflection.matches.exact, reflection.matches.likely).slice(0, 3).map((match) => match.label).join(" / ")
+                : "No deterministic lens badge is active."}
+            </BindingBox>
+            <BindingBox title="Badge procedure" label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
+              <div className="space-y-1">
+                <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedureExpression}</div>
+                <div className="text-[11px] opacity-80">{selectedProcedure}</div>
+                <div className="text-[11px] opacity-80">
+                  {selectedNode?.actionEffect ?? "Select a mapped badge to inspect how it contributes to the procedural action."}
+                </div>
+                {selectedNode?.evidenceNeeds?.length ? (
+                  <div className="text-[11px] opacity-80">Needs: {selectedNode.evidenceNeeds.map(labelize).join(", ")}</div>
+                ) : null}
+                {selectedNode?.refusesAuthority?.length ? (
+                  <div className="text-[11px] opacity-80">Refuses: {selectedNode.refusesAuthority.map(labelize).join(", ")}</div>
+                ) : null}
+              </div>
+            </BindingBox>
+            <BindingBox
+              title="Safeguards"
+              label="gate edges"
+              tone="amber"
+              activeNodeIds={(reflection.action_gate_warnings ?? []).map((warning) => warning.gateId)}
+              onSelectNode={onSelectNode}
             >
-              Load to Fruition Calculator
-            </button>
-          </div>
-        </BindingBox>
-        {characterComparison ? (
+              {(reflection.action_gate_warnings ?? []).length > 0
+                ? (reflection.action_gate_warnings ?? []).map((warning) => warning.requiredCheck ?? warning.warning).join(", ")
+                : "No nearby safeguard badge is active."}
+            </BindingBox>
+            <div className="grid grid-cols-2 gap-2">
+              <BindingBox title="Possible tensions" label="zone" tone="violet">
+                {reflection.tensions?.length
+                  ? reflection.tensions.map((tension) => tension.description).join(" ")
+                  : "No possible tension zone is flagged."}
+              </BindingBox>
+              <BindingBox
+                title="Claim boundaries"
+                label="diagnostic only"
+                tone="rose"
+                activeNodeIds={missingChecks.map((item) => `missing:${item}`)}
+                onSelectNode={onSelectNode}
+              >
+                {missingChecks.length > 0
+                  ? missingChecks.map((item) => `Missing check: ${labelize(item)}`).join(" | ")
+                  : "No missing check listed."}
+              </BindingBox>
+            </div>
+            <BindingBox
+              title="Procedural trace"
+              label={`${selectedNodes.length} badge${selectedNodes.length === 1 ? "" : "s"}`}
+              tone="emerald"
+              activeNodeIds={selectedNodes.map((node) => node.id)}
+              onSelectNode={onSelectNode}
+            >
+              <div className="space-y-1">
+                <div className="font-mono text-[10px] leading-snug text-emerald-100">{combinationExpression}</div>
+                <div className="text-[11px] opacity-80">{combinationOutcome.label}</div>
+                <div className="font-mono text-[10px] leading-snug text-violet-100">{fruition.expression}</div>
+              </div>
+            </BindingBox>
+            <BindingBox title="Authority boundary" label="evidence only" tone="slate">
+              <div className="space-y-1">
+                <div className="text-xs font-semibold">
+                  {selectedNode ? selectedNode.label : "No outer objective badge selected"}
+                </div>
+                <div className="text-[11px] opacity-80">
+                  {selectedNode?.summary ?? "Select a badge to inspect its objective role."}
+                </div>
+                <div className="text-[11px] opacity-80">
+                  Admission state: {admission.summary.autoCount} auto / {admission.summary.askUserCount} ask user / {admission.summary.blockedCount} blocked
+                </div>
+                <div className="truncate text-[11px] opacity-80">
+                  Evidence refs: {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : "none"}
+                </div>
+                <div className="text-[11px] opacity-80">
+                  Recommended next step: {firstAction ? firstAction.label : "none"}
+                </div>
+                <div className="text-[11px] opacity-80">
+                  Risk: {labelize(firstAction?.risk ?? "unknown")} / Display policy: {labelize(firstAction?.display_policy ?? "diagnostic_only")}
+                </div>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {askUserActions.length > 0 ? <span className="rounded border border-amber-600 px-1.5 py-0.5 text-amber-100">Ask user</span> : null}
+                  {blockedActions.length > 0 ? <span className="rounded border border-rose-600 px-1.5 py-0.5 text-rose-100">Blocked</span> : null}
+                  <span className="rounded border border-cyan-700 px-1.5 py-0.5 text-cyan-100">Evidence only</span>
+                </div>
+              </div>
+            </BindingBox>
+          </>
+        ) : null}
+        {activeLensId === "character" && characterComparison ? (
           <BindingBox
-            title="Character block"
-            label={labelize(characterComparison.predictedPosture)}
+            title="Subject"
+            label={
+              characterComparison.characterId === "logh.reinhard_von_lohengramm"
+                ? "Reinhard von Lohengramm"
+                : labelize(characterComparison.characterId)
+            }
             tone="amber"
             activeNodeIds={[
               `character:${characterComparison.characterId}`,
@@ -729,13 +793,28 @@ function ObjectiveBindingRail({
             ]}
             onSelectNode={onSelectNode}
           >
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="font-semibold text-amber-50">
                 {characterComparison.characterId === "logh.reinhard_von_lohengramm"
                   ? "Reinhard von Lohengramm"
                   : labelize(characterComparison.characterId)}
               </div>
-              <div className="text-[11px] opacity-80">{characterComparison.behavioralHypothesis.likelyChoice}</div>
+              <div className="rounded border border-amber-500/50 bg-amber-950/40 p-2">
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">Objective state</div>
+                <div className="text-[11px] opacity-90">{characterComparison.behavioralHypothesis.likelyChoice}</div>
+              </div>
+              <div className="rounded border border-amber-500/40 bg-black/20 p-2">
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-amber-200">Bindings</div>
+                <div className="font-mono text-[10px] leading-snug text-amber-100">
+                  character.{proceduralToken(characterComparison.characterId)} weights activated badges =&gt;{" "}
+                  {labelize(characterComparison.predictedPosture)}
+                </div>
+                {characterComparison.matchedRules.slice(0, 3).map((rule) => (
+                  <div key={rule.id} className="mt-1 text-[10px] opacity-80">
+                    {labelize(rule.id)} -&gt; {labelize(rule.posture)} ({rule.confidence.toFixed(2)})
+                  </div>
+                ))}
+              </div>
               <div className="flex flex-wrap gap-1">
                 {characterComparison.activatedProfileWeights.slice(0, 4).map((entry) => (
                   <span key={entry.nodeId} className="rounded border border-amber-500/40 bg-black/20 px-1.5 py-0.5 text-[9px]">
@@ -743,86 +822,20 @@ function ObjectiveBindingRail({
                   </span>
                 ))}
               </div>
+              <div className="rounded border border-rose-500/40 bg-black/20 p-2">
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-rose-200">Authority boundary</div>
+                <div className="text-[11px] opacity-80">
+                  Missing: {characterComparison.behavioralHypothesis.missingEvidence.map(labelize).join(", ")}
+                </div>
+              </div>
             </div>
           </BindingBox>
         ) : null}
-        <BindingBox
-          title="Located comparison"
-          label={locator ? labelize(locator.comparisonSeed.expectedFruitionPosture) : "not located"}
-          tone="cyan"
-          activeNodeIds={locator?.comparisonSeed.selectedNodeIds}
-          onSelectNode={onSelectNode}
-        >
-          {locator ? (
-            <div className="space-y-1">
-              <div className="font-mono text-[10px] leading-snug text-cyan-100">
-                {locator.comparisonSeed.proceduralExpression}
-              </div>
-              <div className="text-[11px] opacity-80">
-                {locator.locatedBindings.length} binding path{locator.locatedBindings.length === 1 ? "" : "s"} located
-              </div>
-            </div>
-          ) : (
-            "No Zen badge locator artifact is attached to this graph view."
-          )}
-        </BindingBox>
-        <BindingBox
-          title="Selected combination"
-          label={`${selectedNodes.length} badge${selectedNodes.length === 1 ? "" : "s"}`}
-          tone="emerald"
-          activeNodeIds={selectedNodes.map((node) => node.id)}
-          onSelectNode={onSelectNode}
-        >
-          <div className="space-y-1">
-            <div className="font-mono text-[10px] leading-snug text-emerald-100">{combinationExpression}</div>
-            <div className="text-[11px] opacity-80">{combinationOutcome.label}</div>
-            <div className="text-[11px] opacity-80">
-              Compare reflection: {labelize(fruition.result.posture)}
-            </div>
-          </div>
-        </BindingBox>
-        <BindingBox title="Badge procedure" label={selectedNode?.proceduralRole ? labelize(selectedNode.proceduralRole) : "unmapped"} tone="cyan">
-          <div className="space-y-1">
-            <div className="font-mono text-[10px] leading-snug text-cyan-100">{selectedProcedureExpression}</div>
-            <div className="text-[11px] opacity-80">{selectedProcedure}</div>
-            <div className="text-[11px] opacity-80">
-              {selectedNode?.actionEffect ?? "Select a mapped badge to inspect how it contributes to the procedural action."}
-            </div>
-            {selectedNode?.evidenceNeeds?.length ? (
-              <div className="text-[11px] opacity-80">Needs: {selectedNode.evidenceNeeds.map(labelize).join(", ")}</div>
-            ) : null}
-            {selectedNode?.refusesAuthority?.length ? (
-              <div className="text-[11px] opacity-80">Refuses: {selectedNode.refusesAuthority.map(labelize).join(", ")}</div>
-            ) : null}
-          </div>
-        </BindingBox>
-        <BindingBox title="Outer objective view" label="evidence only" tone="slate">
-          <div className="space-y-1">
-            <div className="text-xs font-semibold">
-              {selectedNode ? selectedNode.label : "No outer objective badge selected"}
-            </div>
-            <div className="text-[11px] opacity-80">
-              {selectedNode?.summary ?? "Select a badge to inspect its objective role."}
-            </div>
-            <div className="text-[11px] opacity-80">
-              Admission state: {admission.summary.autoCount} auto / {admission.summary.askUserCount} ask user / {admission.summary.blockedCount} blocked
-            </div>
-            <div className="truncate text-[11px] opacity-80">
-              Evidence refs: {(admission.evidenceRefs ?? []).length > 0 ? admission.evidenceRefs?.join(", ") : "none"}
-            </div>
-            <div className="text-[11px] opacity-80">
-              Recommended next step: {firstAction ? firstAction.label : "none"}
-            </div>
-            <div className="text-[11px] opacity-80">
-              Risk: {labelize(firstAction?.risk ?? "unknown")} / Display policy: {labelize(firstAction?.display_policy ?? "diagnostic_only")}
-            </div>
-            <div className="flex flex-wrap gap-1 text-[10px]">
-              {askUserActions.length > 0 ? <span className="rounded border border-amber-600 px-1.5 py-0.5 text-amber-100">Ask user</span> : null}
-              {blockedActions.length > 0 ? <span className="rounded border border-rose-600 px-1.5 py-0.5 text-rose-100">Blocked</span> : null}
-              <span className="rounded border border-cyan-700 px-1.5 py-0.5 text-cyan-100">Evidence only</span>
-            </div>
-          </div>
-        </BindingBox>
+        {activeLensId === "character" && !characterComparison ? (
+          <BindingBox title="Subject" label="no character binding" tone="amber">
+            No character preset comparison is attached to this graph view.
+          </BindingBox>
+        ) : null}
       </div>
     </aside>
   );
@@ -854,6 +867,7 @@ export function ZenGraphPanel({
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(initialSelectedNodeIds);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [objectiveBindingsOpen, setObjectiveBindingsOpen] = useState(false);
+  const [activeObjectiveLensId, setActiveObjectiveLensId] = useState<ZenObjectiveLensId>("wisdom");
   const selectedNode = graph.nodes.find((node) => node.id === selectedNodeId) ?? graph.nodes[0] ?? null;
   const selectedNodes = selectedNodeIds
     .map((id) => graph.nodes.find((node) => node.id === id))
@@ -898,22 +912,32 @@ export function ZenGraphPanel({
             aria-label="ZenGraph objective lenses"
             className="absolute bottom-0 left-0 top-0 z-40 flex w-9 shrink-0 flex-col items-center gap-2 border-r border-zinc-950 bg-zinc-950 px-1.5 py-2"
           >
-            <button
-              type="button"
-              aria-label="Toggle Fruition objective binding lens"
-              title="Toggle Fruition objective binding lens"
-              onClick={() => setObjectiveBindingsOpen((open) => !open)}
-              className={`flex h-6 w-6 items-center justify-center border-2 bg-violet-700 text-[11px] font-black text-white shadow ${
-                objectiveBindingsOpen
-                  ? "border-cyan-100 ring-2 ring-cyan-300"
-                  : "border-zinc-800 opacity-80 hover:border-cyan-200"
-              }`}
-            >
-              F
-            </button>
+            {ZEN_OBJECTIVE_LENSES.map((lens) => {
+              const active = objectiveBindingsOpen && activeObjectiveLensId === lens.id;
+              return (
+                <button
+                  key={lens.id}
+                  type="button"
+                  aria-label={lens.title}
+                  title={lens.title}
+                  onClick={() => {
+                    setActiveObjectiveLensId(lens.id);
+                    setObjectiveBindingsOpen((open) => (active ? false : true));
+                  }}
+                  className={`flex h-6 w-6 items-center justify-center border-2 text-[11px] font-black text-white shadow ${
+                    active
+                      ? "border-cyan-100 ring-2 ring-cyan-300"
+                      : "border-zinc-800 opacity-80 hover:border-cyan-200"
+                  } ${lens.tone}`}
+                >
+                  {lens.glyph}
+                </button>
+              );
+            })}
           </div>
           {objectiveBindingsOpen ? (
             <ObjectiveBindingRail
+              activeLensId={activeObjectiveLensId}
               reflection={reflection}
               admission={admission}
               fruition={fruition}
@@ -992,46 +1016,21 @@ export function ZenGraphPanel({
                     onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
                       event.stopPropagation();
                       toggleNodeSelection(node.id);
+                      if (node.tone === "character") {
+                        setActiveObjectiveLensId("character");
+                        setObjectiveBindingsOpen(true);
+                      }
                     }}
                   >
-                    {node.tone === "character" ? (
-                      <>
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Character Profile</div>
-                            <div className="text-sm font-black leading-tight text-amber-50">{node.label}</div>
-                          </div>
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-amber-100 bg-zinc-950 text-[13px] font-black text-amber-100">
-                            {node.glyph}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {(node.characterWeights ?? []).slice(0, 4).map((entry) => (
-                            <span
-                              key={entry.nodeId}
-                              className="rounded border border-amber-300/40 bg-black/25 px-1.5 py-0.5 text-[9px] font-semibold normal-case text-amber-50"
-                            >
-                              {labelize(entry.nodeId)} {entry.characterWeight.toFixed(2)}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="mt-1 line-clamp-2 text-[10px] font-medium normal-case leading-snug text-amber-100/90">
-                          {node.characterHypothesis?.likelyChoice ?? node.summary}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
-                          {node.glyph}
-                        </span>
-                        {node.confidence ? (
-                          <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
-                        ) : null}
-                        {node.tone === "boundary" ? (
-                          <span className="pointer-events-none absolute -inset-1.5 border-2 border-rose-300/80" />
-                        ) : null}
-                      </>
-                    )}
+                    <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
+                      {node.glyph}
+                    </span>
+                    {node.confidence || node.tone === "character" ? (
+                      <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
+                    ) : null}
+                    {node.tone === "boundary" ? (
+                      <span className="pointer-events-none absolute -inset-1.5 border-2 border-rose-300/80" />
+                    ) : null}
                   </button>
                 );
               })}

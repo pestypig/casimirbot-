@@ -64,6 +64,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "repo_entity_definition",
   "situation_context_question",
   "visual_capture_describe",
+  "zen_graph_reflection",
 ]);
 
 const MODEL_DIRECT_ANSWER_GOAL_KINDS = new Set([
@@ -117,6 +118,9 @@ const artifactKindMatchesCapability = (
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
+  }
+  if (capability === "helix_ask.reflect_ideology_context") {
+    return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
@@ -180,6 +184,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   const joined = [kind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";
+  }
+  if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
+    return "helix_ask.reflect_ideology_context";
   }
   if (/dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer\.attach|observer\.detach|observer_subscription/i.test(joined)) {
     return "situation-room-pipelines.observer.attach";

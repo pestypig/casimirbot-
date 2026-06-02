@@ -223,6 +223,41 @@ export function buildRouteProductContract(input: {
   const visualSceneMemoryTarget =
     sourceTarget === "visual_scene_memory" ||
     targetKind === "visual_scene_memory";
+  const zenGraphReflectionTarget =
+    requestedOutputs.includes("ideology_context_reflection/v1") ||
+    requestedOutputs.includes("zen_badge_locator/v1") ||
+    requestedOutputs.includes("fruition_procedure_expression/v1") ||
+    /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
+
+  if (zenGraphReflectionTarget && sourceTarget === "workstation_panel") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "workstation_panel",
+      allowedCore: [],
+      allowedExtra: ["workstation_tool_evaluation", "tool_evaluation"],
+      forbiddenExtra: [
+        "active_doc_identity",
+        "client_projection",
+        "direct_answer_text",
+        "doc_open_receipt",
+        "doc_summary",
+        "live_pipeline_receipt",
+        "model_only_concept",
+        "model_synthesized_answer",
+        "no_tool_direct",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+      ],
+      sideArtifactKindsAllowed: [
+        "ideology_context_reflection/v1",
+        "zen_badge_locator/v1",
+        "fruition_procedure_expression/v1",
+        "helix_recommended_action_admission/v1",
+      ],
+      precedenceReason: "zen_graph_reflection_allows_only_evidence_terminal_products",
+    });
+  }
 
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc") {
     return makeContract({
