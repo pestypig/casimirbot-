@@ -33,6 +33,9 @@ import {
 import {
   buildCurvatureCollapseTheoryBadgesV1,
 } from "./curvature-collapse-theory-badges";
+import {
+  buildOrchOrCoherenceTheoryBadgesV1,
+} from "./orch-or-coherence-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -756,6 +759,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const tokamak = buildTokamakPlasmaTheoryBadgesV1();
   const galactic = buildGalacticDynamicsTheoryBadgesV1();
   const curvature = buildCurvatureCollapseTheoryBadgesV1();
+  const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
@@ -772,6 +776,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...tokamak.badges,
       ...galactic.badges,
       ...curvature.badges,
+      ...orchOr.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -783,6 +788,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...tokamak.edges,
       ...galactic.edges,
       ...curvature.edges,
+      ...orchOr.edges,
     ],
   });
 }

@@ -10,6 +10,7 @@ import {
   hasSelectedCapabilityObservation,
   isSourceCapabilityDiagnosticTurn,
 } from "../services/helix-ask/runtime-authority-contract";
+import { buildPostToolAuthorityBridge } from "../services/helix-ask/post-tool-authority-bridge";
 
 describe("helix ask runtime authority contract", () => {
   it("requires model-only direct answers to include a model answer step and answer draft", () => {
@@ -758,6 +759,105 @@ describe("helix ask runtime authority contract", () => {
     };
 
     expect(buildCapabilityBindingMismatchObservation(payload)).toBeNull();
+  });
+
+  it("matches Stage Play reflections to the Stage Play Ask capability without treating the graph as a post-tool answer", () => {
+    const payload = {
+      turn_id: "turn-stage-play-1",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stage-play",
+            decision_authority: "llm",
+            decision_timing: "tool_selection",
+            chosen_capability: "helix_ask.reflect_stage_play_context",
+            observed_artifact_refs: ["stage-play-observation-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage-play-observation-1",
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.reflect_stage_play_context",
+            observation: {
+              artifactId: "stage_play_badge_graph",
+              schemaVersion: "stage_play_badge_graph/v1",
+              badges: [],
+              recommendedActions: [],
+            },
+          },
+        },
+      ],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+    expect(hasPostObservationModelDecision(payload)).toBe(false);
+
+    const bridge = buildPostToolAuthorityBridge({ turnId: "turn-stage-play-1", payload });
+    expect(bridge.tool_observation_refs).toEqual(["stage-play-observation-1"]);
+    expect(bridge.answer_draft_refs).toEqual([]);
+    expect(bridge.observation_support_status).toBe("not_enough_information");
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.checks.post_observation_model_decision).toBe(false);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("post_observation_model_decision_missing");
+  });
+
+  it("suggests the Stage Play capability when a selected capability observes a Stage Play graph", () => {
+    const observation = buildCapabilityBindingMismatchObservation({
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stage-play-mismatch",
+            decision_authority: "llm",
+            decision_timing: "tool_selection",
+            chosen_capability: "helix_ask.reflect_ideology_context",
+            observed_artifact_refs: ["stage-play-observation-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage-play-observation-1",
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.reflect_stage_play_context",
+            observation: {
+              artifactId: "stage_play_badge_graph",
+              schemaVersion: "stage_play_badge_graph/v1",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.capability_binding_mismatch_observation.v1",
+      selected_capability: "helix_ask.reflect_ideology_context",
+      observed_artifact_refs: ["stage-play-observation-1"],
+      observed_artifact_kinds: ["live_environment_tool_observation"],
+      suggested_capability: "helix_ask.reflect_stage_play_context",
+      suggested_repair: "rebind_selected_capability_to_observed_tool_plan",
+    });
   });
 
   it("allows clean typed failures for source/capability turns without minting a successful terminal", () => {

@@ -35,6 +35,33 @@ The development server runs Express with Vite middleware. Open:
 
 Do not start a separate Vite server for normal development; the dev scripts already wire the API and UI together. Use `npm run dev` for the default port or `npm run dev:agi:5050` for the AGI-enabled 5050 workflow.
 
+### Local Runtime Environment
+
+For Windows PowerShell local development, set runtime secrets and service endpoints in the same terminal session before starting the server. Leave values blank until you have your own local keys or URLs. Do not commit real secrets.
+
+```powershell
+$env:GOOGLE_CLIENT_ID=""
+$env:VITE_GOOGLE_CLIENT_ID=""
+$env:SESSION_SECRET=""
+
+$env:DISCORD_BOT_TOKEN=""
+$env:DISCORD_APPLICATION_ID=""
+$env:PORT="5050"
+$env:NODE_ENV="development"
+$env:ENABLE_AGI="1"
+$env:LLM_POLICY="http"
+$env:LLM_RUNTIME="http"
+$env:HULL_MODE="1"
+$env:HULL_ALLOW_HOSTS=""
+$env:LLM_HTTP_BASE=""
+$env:OPENAI_API_KEY=""
+$env:ELEVENLABS_API_KEY=""
+
+npm run dev
+```
+
+`GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` should use the same Google OAuth Web application client ID. `VITE_GOOGLE_CLIENT_ID` is intentionally exposed to the browser; the other key and token values should remain private.
+
 ## High-Signal Runs
 
 These commands are the best first pass for understanding what the repo can do:

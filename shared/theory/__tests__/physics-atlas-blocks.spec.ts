@@ -31,5 +31,12 @@ describe("physics atlas blocks", () => {
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
     expect(byId.get("curvature_collapse")?.status).toBe("active");
     expect(byId.get("curvature_collapse")?.primaryBadgeIds).toContain("curvature.proxy.body_density");
+    expect(byId.get("curvature_collapse")?.primaryBadgeIds).toContain("orch_or.microtubule.coherence_window");
+    expect(byId.get("curvature_collapse")?.claimBoundaryBadgeIds).toContain(
+      "orch_or.claim_boundary.exploratory_only",
+    );
+    expect(byId.get("curvature_collapse")?.repoPathHints).toContain(
+      "shared/theory/orch-or-coherence-theory-badges.ts",
+    );
   });
 });

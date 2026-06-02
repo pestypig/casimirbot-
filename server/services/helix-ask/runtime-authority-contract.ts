@@ -122,6 +122,9 @@ const artifactKindMatchesCapability = (
   if (capability === "helix_ask.reflect_ideology_context") {
     return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
+  if (capability === "helix_ask.reflect_stage_play_context") {
+    return /stage_play_badge_graph|reflect_stage_play_context|live_env\.reflect_stage_play_context/i.test(joined);
+  }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
   if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);
@@ -187,6 +190,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   }
   if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
+  }
+  if (/stage_play_badge_graph|reflect_stage_play_context/i.test(joined)) {
+    return "helix_ask.reflect_stage_play_context";
   }
   if (/dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer\.attach|observer\.detach|observer_subscription/i.test(joined)) {
     return "situation-room-pipelines.observer.attach";
