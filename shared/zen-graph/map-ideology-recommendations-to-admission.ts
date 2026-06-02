@@ -11,21 +11,34 @@ import type {
 
 const DISPLAY_ONLY_ACTION_TYPES = new Set([
   "highlight_ideology_lens",
+  "show_activated_lens",
   "show_path_to_root",
   "show_nearby_safeguard",
+  "show_action_gate_warning",
+  "compare_character_perspectives",
   "suggest_review",
   "link_ethos_node",
 ]);
 
 const MUTATING_ACTION_TYPES = new Set(["suggest_note_tag"]);
 
+const CLAIM_SENSITIVE_CONFIRMATION_ACTION_TYPES = new Set([
+  "ask_for_missing_evidence",
+  "suggest_wise_next_question",
+]);
+
 const BLOCKED_ACTION_TYPES = new Set([
+  "execute_action",
   "send_message",
   "edit_document",
+  "edit_document_without_confirmation",
   "commit_code",
   "open_terminal",
   "run_command",
   "call_external_tool",
+  "make_legal_medical_financial_claim",
+  "label_real_person_character",
+  "make_terminal_moral_verdict",
 ]);
 
 function sourceForReflection(reflection: IdeologyContextReflectionV1): HelixRecommendedActionAdmissionSourceV1 {
@@ -96,18 +109,24 @@ function mapRecommendation(
     };
   }
 
-  if (recommendation.type === "ask_for_missing_evidence" || missingEvidence.length > 0) {
+  if (CLAIM_SENSITIVE_CONFIRMATION_ACTION_TYPES.has(recommendation.type) || missingEvidence.length > 0) {
     return {
       ...base,
       risk: "claim_sensitive",
       admission: "ask_user",
       requiresConfirmation: true,
       agentExecutable: false,
-      reason: "ZenGraph reflection is missing evidence and requires user confirmation.",
-      reasonCode: "missing_evidence",
-      display_policy: "diagnostic_only",
+      reason: CLAIM_SENSITIVE_CONFIRMATION_ACTION_TYPES.has(recommendation.type)
+        ? "ZenGraph claim-sensitive recommendation requires user confirmation and remains evidence-only."
+        : "ZenGraph reflection is missing evidence and requires user confirmation.",
+      reasonCode: missingEvidence.length > 0 ? "missing_evidence" : "claim_sensitive_language",
+      display_policy: "actionable",
       evidenceRequirements: { missing: missingEvidence.length > 0 ? missingEvidence : ["missing_evidence"] },
-      reasonCodes: ["zen_graph_reflection", "missing_evidence", "evidence_only_authority"],
+      reasonCodes: [
+        "zen_graph_reflection",
+        missingEvidence.length > 0 ? "missing_evidence" : "claim_sensitive_confirmation",
+        "evidence_only_authority",
+      ],
     };
   }
 

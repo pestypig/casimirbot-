@@ -50,22 +50,70 @@ function reflection(overrides: Partial<Parameters<typeof buildIdeologyContextRef
 
 describe("ZenGraph recommendation admission mapping", () => {
   it("maps display-only ZenGraph actions to auto diagnostic evidence without execution", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(
+      reflection({
+        recommended_actions: [
+          {
+            id: "zen-graph.show_activated_lens",
+            type: "show_activated_lens",
+            label: "Show activated lens",
+          },
+          {
+            id: "zen-graph.show_path_to_root",
+            type: "show_path_to_root",
+            label: "Show path to root",
+          },
+          {
+            id: "zen-graph.compare_character_perspectives",
+            type: "compare_character_perspectives",
+            label: "Compare character perspectives",
+          },
+          {
+            id: "zen-graph.show_action_gate_warning",
+            type: "show_action_gate_warning",
+            label: "Show action gate warning",
+          },
+          {
+            id: "zen-graph.link_ethos_node",
+            type: "link_ethos_node",
+            label: "Link ethos node",
+          },
+        ],
+      }),
+    );
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.summary).toMatchObject({
+      actionCount: 5,
+      autoCount: 5,
+      askUserCount: 0,
+      blockedCount: 0,
+    });
+    for (const action of admission.actions) {
+      expect(action).toMatchObject({
+        admission: "auto",
+        risk: "claim_sensitive",
+        display_policy: "diagnostic_only",
+        agentExecutable: false,
+        reasonCode: "diagnostic_only_not_executable",
+      });
+      expect(action.reasonCodes).toEqual([
+        "zen_graph_reflection",
+        "diagnostic_overlay_only",
+        "evidence_only_authority",
+      ]);
+    }
+    expect(admission.authority.agent_executable).toBe(false);
+  });
+
+  it("proves auto admission does not mean executable for ZenGraph recommendations", () => {
     const admission = mapIdeologyReflectionToRecommendedActionAdmission(reflection());
 
     expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
     expect(admission.actions[0]).toMatchObject({
       admission: "auto",
-      risk: "claim_sensitive",
-      display_policy: "diagnostic_only",
       agentExecutable: false,
-      reasonCode: "diagnostic_only_not_executable",
     });
-    expect(admission.actions[0]?.reasonCodes).toEqual([
-      "zen_graph_reflection",
-      "diagnostic_overlay_only",
-      "evidence_only_authority",
-    ]);
-    expect(admission.authority.agent_executable).toBe(false);
   });
 
   it("maps missing evidence to ask_user with evidenceRequirements.missing", () => {
@@ -91,13 +139,36 @@ describe("ZenGraph recommendation admission mapping", () => {
     expect(admission.actions[0]).toMatchObject({
       admission: "ask_user",
       risk: "claim_sensitive",
-      display_policy: "diagnostic_only",
+      display_policy: "actionable",
       agentExecutable: false,
       evidenceRequirements: {
         missing: ["jurisdiction_context", "source_refs"],
       },
     });
     expect(admission.evidenceRequirements?.missing).toEqual(["jurisdiction_context", "source_refs"]);
+  });
+
+  it("maps claim-sensitive ZenGraph suggestions to ask_user without execution", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(
+      reflection({
+        recommended_actions: [
+          {
+            id: "zen-graph.suggest_wise_next_question",
+            type: "suggest_wise_next_question",
+            label: "Suggest wise next question",
+          },
+        ],
+      }),
+    );
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.actions[0]).toMatchObject({
+      admission: "ask_user",
+      risk: "claim_sensitive",
+      display_policy: "actionable",
+      agentExecutable: false,
+      reasonCode: "claim_sensitive_language",
+    });
   });
 
   it("maps mutating ZenGraph actions to ask_user", () => {
@@ -128,9 +199,93 @@ describe("ZenGraph recommendation admission mapping", () => {
       reflection({
         recommended_actions: [
           {
+            id: "zen-graph.execute_action",
+            type: "execute_action",
+            label: "Execute action",
+          },
+          {
+            id: "zen-graph.send_message",
+            type: "send_message",
+            label: "Send message",
+          },
+          {
+            id: "zen-graph.edit_document_without_confirmation",
+            type: "edit_document_without_confirmation",
+            label: "Edit document without confirmation",
+          },
+          {
             id: "zen-graph.run_command",
             type: "run_command",
             label: "Run command",
+          },
+          {
+            id: "zen-graph.commit_code",
+            type: "commit_code",
+            label: "Commit code",
+          },
+          {
+            id: "zen-graph.make_legal_medical_financial_claim",
+            type: "make_legal_medical_financial_claim",
+            label: "Make legal medical financial claim",
+          },
+        ],
+      }),
+    );
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.summary.blockedCount).toBe(6);
+    for (const action of admission.actions) {
+      expect(action).toMatchObject({
+        admission: "blocked",
+        risk: "unknown",
+        display_policy: "hidden",
+        agentExecutable: false,
+        reasonCode: "unknown_action_not_allowlisted",
+      });
+    }
+  });
+
+  it("proves diagnostic_only admissions cannot be executable", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(reflection());
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.actions[0]).toMatchObject({
+      display_policy: "diagnostic_only",
+      agentExecutable: false,
+    });
+  });
+
+  it("proves missing evidence prevents execution", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(
+      reflection({
+        claim_boundaries: {
+          diagnostic_only: true,
+          avoid_character_judgment: true,
+          needs_user_confirmation: true,
+          missing_evidence: ["first_party_account"],
+        },
+      }),
+    );
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.evidenceRequirements?.missing).toEqual(["first_party_account"]);
+    expect(admission.actions[0]).toMatchObject({
+      admission: "ask_user",
+      agentExecutable: false,
+      evidenceRequirements: {
+        missing: ["first_party_account"],
+      },
+    });
+  });
+
+  it("blocks character label actions for real people", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(
+      reflection({
+        recommended_actions: [
+          {
+            id: "zen-graph.label_real_person_character",
+            type: "label_real_person_character",
+            label: "Label real person character",
           },
         ],
       }),
@@ -142,8 +297,44 @@ describe("ZenGraph recommendation admission mapping", () => {
       risk: "unknown",
       display_policy: "hidden",
       agentExecutable: false,
-      reasonCode: "unknown_action_not_allowlisted",
     });
+    expect(admission.actions[0]?.reasonCodes).toContain("blocked_operational_action");
+  });
+
+  it("preserves evidence-only authority for every ZenGraph admission", () => {
+    const admission = mapIdeologyReflectionToRecommendedActionAdmission(
+      reflection({
+        recommended_actions: [
+          {
+            id: "zen-graph.show_activated_lens",
+            type: "show_activated_lens",
+            label: "Show activated lens",
+          },
+          {
+            id: "zen-graph.suggest_note_tag",
+            type: "suggest_note_tag",
+            label: "Suggest note tag",
+          },
+          {
+            id: "zen-graph.label_real_person_character",
+            type: "label_real_person_character",
+            label: "Label real person character",
+          },
+        ],
+      }),
+    );
+
+    expect(validateHelixRecommendedActionAdmissionV1(admission)).toEqual([]);
+    expect(admission.authority).toEqual({
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      context_role: "tool_policy",
+      ask_context_policy: "evidence_only",
+      agent_executable: false,
+    });
+    expect(admission.actions.every((action) => action.agentExecutable === false)).toBe(true);
+    expect(admission.actions.every((action) => action.reasonCodes?.includes("evidence_only_authority"))).toBe(true);
   });
 
   it("links source artifact id back to the ideology reflection and preserves evidence refs", () => {
