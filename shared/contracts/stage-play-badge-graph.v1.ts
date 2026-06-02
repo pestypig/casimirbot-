@@ -5,6 +5,8 @@ export const STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION =
   "stage_play_badge_graph/v1" as const;
 
 export const STAGE_PLAY_BADGE_KINDS = [
+  "source",
+  "interpreter",
   "setting",
   "actor",
   "prop",
@@ -35,6 +37,8 @@ export const STAGE_PLAY_BADGE_STATUSES = [
 ] as const;
 
 export const STAGE_PLAY_EDGE_RELATIONS = [
+  "feeds",
+  "interprets",
   "observes",
   "located_near",
   "contains",
@@ -54,6 +58,8 @@ export const STAGE_PLAY_EDGE_RELATIONS = [
 ] as const;
 
 export const STAGE_PLAY_SOURCE_REF_KINDS = [
+  "live_source_descriptor",
+  "live_source_producer",
   "live_source_observation",
   "environment_state_snapshot",
   "world_event",
@@ -66,6 +72,11 @@ export const STAGE_PLAY_SOURCE_REF_KINDS = [
 ] as const;
 
 export const STAGE_PLAY_LIVE_BINDING_KINDS = [
+  "source_descriptor",
+  "source_producer",
+  "source_modality",
+  "source_status",
+  "source_cadence",
   "actor_pose",
   "current_block",
   "feet_block",
@@ -239,6 +250,8 @@ export type StagePlayBadgeGraphV1 = {
     fromTs?: string | null;
     toTs?: string | null;
     latestObservationRefs: string[];
+    latestSourceDescriptorRefs?: string[];
+    latestSourceProducerRefs?: string[];
     latestSnapshotRefs: string[];
     latestDeltaOverlayRefs: string[];
     latestNavigationRefs: string[];
@@ -431,11 +444,17 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   } else {
     for (const field of [
       "latestObservationRefs",
+      "latestSourceDescriptorRefs",
+      "latestSourceProducerRefs",
       "latestSnapshotRefs",
       "latestDeltaOverlayRefs",
       "latestNavigationRefs",
     ] as const) {
-      if (!isStringArray(value.sourceWindow[field])) issues.push(`sourceWindow.${field} must be strings`);
+      const maybe = value.sourceWindow[field];
+      const required = field === "latestObservationRefs" || field === "latestSnapshotRefs" || field === "latestDeltaOverlayRefs" || field === "latestNavigationRefs";
+      if ((required || maybe != null) && !isStringArray(maybe)) {
+        issues.push(`sourceWindow.${field} must be strings`);
+      }
     }
     if (!["fresh", "stale", "missing", "mixed", "unknown"].includes(String(value.sourceWindow.freshness ?? ""))) {
       issues.push("sourceWindow.freshness is invalid");
@@ -445,6 +464,8 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
     isRecord(value.sourceWindow) &&
     (
       (Array.isArray(value.sourceWindow.latestObservationRefs) && value.sourceWindow.latestObservationRefs.length > 0) ||
+      (Array.isArray(value.sourceWindow.latestSourceDescriptorRefs) && value.sourceWindow.latestSourceDescriptorRefs.length > 0) ||
+      (Array.isArray(value.sourceWindow.latestSourceProducerRefs) && value.sourceWindow.latestSourceProducerRefs.length > 0) ||
       (Array.isArray(value.sourceWindow.latestSnapshotRefs) && value.sourceWindow.latestSnapshotRefs.length > 0) ||
       (Array.isArray(value.sourceWindow.latestDeltaOverlayRefs) && value.sourceWindow.latestDeltaOverlayRefs.length > 0) ||
       (Array.isArray(value.sourceWindow.latestNavigationRefs) && value.sourceWindow.latestNavigationRefs.length > 0)

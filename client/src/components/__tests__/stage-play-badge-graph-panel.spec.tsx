@@ -147,9 +147,33 @@ function buildFixture(): StagePlayBadgeGraphV1 {
   });
 }
 
-function renderPanel() {
+function renderPanel(options: {
+  descriptors?: Array<Record<string, unknown>>;
+  producers?: Array<Record<string, unknown>>;
+} = {}) {
   const graph = buildFixture();
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn(async (requestInput: RequestInfo | URL) => {
+    const url = String(requestInput);
+    if (url.includes("/api/agi/situation/live-source/descriptors")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "helix.live_source_descriptors_response.v1",
+        descriptors: options.descriptors ?? [],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/agi/situation/live-source/producers")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "helix.live_source_producers_response.v1",
+        producers: options.producers ?? [],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify(graph), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -310,6 +334,88 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByDisplayValue("parameter")).toBeTruthy();
   });
 
+  it("binds a dropped source node to an active live source handle", async () => {
+    renderPanel({
+      descriptors: [
+        {
+          schema: "helix.live_source_descriptor.v1",
+          descriptor_id: "live_source_descriptor:visual",
+          source_id: "source:visual-tab",
+          thread_id: "helix-ask:desktop",
+          environment_id: "live_env:minecraft",
+          modality: "visual_frame",
+          user_label: "Anime tab",
+          serving_context: {
+            surface: "browser_tab",
+            app_hint: "Chrome",
+            window_title_hint: "Legend of the Galactic Heroes",
+            source_origin: "browser_getDisplayMedia",
+          },
+          capabilities: ["frame_capture"],
+          current_state: "active_interval",
+          cadence_ms: 10000,
+          latest_observation_refs: ["visual_observation:latest"],
+          raw_content_included: false,
+          assistant_answer: false,
+        },
+      ],
+      producers: [
+        {
+          schema: "helix.live_source_producer.v1",
+          producer_id: "live_source_producer:visual",
+          source_id: "source:visual-tab",
+          thread_id: "helix-ask:desktop",
+          modality: "visual_frame",
+          status: "active",
+          cadence_ms: 10000,
+          capture_mode: "interval",
+          latest_chunk_id: "live_source_chunk:visual",
+          next_chunk_due_at: null,
+          backpressure_policy: { max_buffered_chunks: 12 },
+          raw_content_policy: "ephemeral",
+          assistant_answer: false,
+        },
+      ],
+    });
+
+    const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
+    Object.defineProperty(scrollport, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 900,
+        bottom: 600,
+        width: 900,
+        height: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(scrollport, "scrollLeft", { configurable: true, value: 0 });
+    Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 0 });
+    scrollport.scrollBy = vi.fn();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    dispatchPointer(screen.getByRole("button", { name: /Source Class/i }), "pointerdown", 120, 160);
+    dispatchPointer(window, "pointerup", 240, 220);
+
+    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Source class"), {
+      target: { value: "visual_frame" },
+    });
+    expect(screen.getByDisplayValue("visual_frame")).toBeTruthy();
+
+    const activeSource = await screen.findByRole("button", { name: /Anime tab/i });
+    fireEvent.click(activeSource);
+
+    expect(screen.getByDisplayValue("source:visual-tab")).toBeTruthy();
+    expect(screen.getByDisplayValue("live_source_descriptor:visual")).toBeTruthy();
+    expect(screen.getByDisplayValue("live_source_producer:visual")).toBeTruthy();
+    expect(screen.getByDisplayValue("visual_observation:latest")).toBeTruthy();
+  });
+
   it("lets the bindings overlay close and reopen without removing the graph", async () => {
     renderPanel();
 
@@ -367,10 +473,12 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
-    const firstUrl = String(vi.mocked(fetch).mock.calls[0]?.[0] ?? "");
-    expect(firstUrl).toContain("/api/helix/stage-play/graph?");
-    expect(firstUrl).toContain("threadId=helix-ask%3Adesktop");
-    expect(firstUrl).toContain("roomId=room%3Aminecraft-env");
-    expect(firstUrl).toContain("environmentId=live_env%3Aui");
+    const graphUrl = vi.mocked(fetch).mock.calls
+      .map((call) => String(call[0]))
+      .find((url) => url.includes("/api/helix/stage-play/graph?")) ?? "";
+    expect(graphUrl).toContain("/api/helix/stage-play/graph?");
+    expect(graphUrl).toContain("threadId=helix-ask%3Adesktop");
+    expect(graphUrl).toContain("roomId=room%3Aminecraft-env");
+    expect(graphUrl).toContain("environmentId=live_env%3Aui");
   });
 });

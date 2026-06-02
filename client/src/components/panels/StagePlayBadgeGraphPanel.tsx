@@ -7,6 +7,8 @@ import type {
   StagePlayBadgeGraphV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
+import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descriptor";
+import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useStagePlayBadgeGraphPanelStore } from "@/store/useStagePlayBadgeGraphPanelStore";
@@ -41,6 +43,20 @@ type HeldStagePlayNode = StagePlayNodeBuilderType & {
   clientY: number;
 };
 
+type StagePlaySourceOption = {
+  id: string;
+  sourceId: string;
+  label: string;
+  sourceClass: string;
+  status: string;
+  descriptorId?: string | null;
+  producerId?: string | null;
+  surface?: string | null;
+  origin?: string | null;
+  cadenceMs?: number | null;
+  latestRef?: string | null;
+};
+
 async function fetchStagePlayBadgeGraph(input: {
   threadId: string;
   roomId?: string | null;
@@ -57,6 +73,67 @@ async function fetchStagePlayBadgeGraph(input: {
     throw new Error(`Stage Play graph request failed: ${response.status}`);
   }
   return await response.json() as StagePlayBadgeGraphV1;
+}
+
+async function fetchStagePlaySourceOptions(input: {
+  threadId: string;
+  environmentId?: string | null;
+}): Promise<StagePlaySourceOption[]> {
+  const descriptorParams = new URLSearchParams();
+  descriptorParams.set("thread_id", input.threadId);
+  if (input.environmentId) descriptorParams.set("environment_id", input.environmentId);
+  descriptorParams.set("limit", "80");
+  const producerParams = new URLSearchParams();
+  producerParams.set("thread_id", input.threadId);
+  const [descriptorResponse, producerResponse] = await Promise.all([
+    fetch(`/api/agi/situation/live-source/descriptors?${descriptorParams.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
+    fetch(`/api/agi/situation/live-source/producers?${producerParams.toString()}`, {
+      headers: { Accept: "application/json" },
+    }),
+  ]);
+  const descriptorBody = descriptorResponse.ok ? await descriptorResponse.json() : {};
+  const producerBody = producerResponse.ok ? await producerResponse.json() : {};
+  const descriptors = Array.isArray(descriptorBody?.descriptors)
+    ? descriptorBody.descriptors as HelixLiveSourceDescriptor[]
+    : [];
+  const producers = Array.isArray(producerBody?.producers)
+    ? producerBody.producers as HelixLiveSourceProducer[]
+    : [];
+  const producerBySource = new Map(producers.map((producer) => [producer.source_id, producer]));
+  const options = new Map<string, StagePlaySourceOption>();
+  for (const descriptor of descriptors) {
+    const producer = producerBySource.get(descriptor.source_id) ?? null;
+    options.set(descriptor.source_id, {
+      id: descriptor.descriptor_id,
+      sourceId: descriptor.source_id,
+      label: descriptor.user_label ?? descriptor.source_id,
+      sourceClass: descriptor.modality,
+      status: descriptor.current_state,
+      descriptorId: descriptor.descriptor_id,
+      producerId: producer?.producer_id ?? null,
+      surface: descriptor.serving_context.surface,
+      origin: descriptor.serving_context.source_origin,
+      cadenceMs: descriptor.cadence_ms ?? producer?.cadence_ms ?? null,
+      latestRef: descriptor.latest_observation_refs.at(-1) ?? producer?.latest_chunk_id ?? null,
+    });
+  }
+  for (const producer of producers) {
+    if (options.has(producer.source_id)) continue;
+    options.set(producer.source_id, {
+      id: producer.producer_id,
+      sourceId: producer.source_id,
+      label: producer.source_id,
+      sourceClass: producer.modality,
+      status: producer.status,
+      descriptorId: null,
+      producerId: producer.producer_id,
+      cadenceMs: producer.cadence_ms ?? null,
+      latestRef: producer.latest_chunk_id ?? null,
+    });
+  }
+  return Array.from(options.values()).sort((a, b) => a.sourceClass.localeCompare(b.sourceClass) || a.sourceId.localeCompare(b.sourceId));
 }
 
 function labelize(value: string): string {
@@ -80,6 +157,8 @@ function statusTone(status: string): string {
 }
 
 function kindTone(kind: string): string {
+  if (kind === "source") return "border-sky-800/70 bg-sky-950/25";
+  if (kind === "interpreter") return "border-fuchsia-800/70 bg-fuchsia-950/25";
   if (kind === "hazard" || kind === "blocked_affordance") return "border-rose-800/70 bg-rose-950/25";
   if (kind === "procedural_binding" || kind === "intent_module") return "border-violet-800/70 bg-violet-950/25";
   if (kind === "affordance" || kind === "resource") return "border-emerald-800/70 bg-emerald-950/25";
@@ -110,6 +189,8 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
 }
 
 const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
+  { kind: "source", label: "Source Class", role: "live feed handle to wire in" },
+  { kind: "interpreter", label: "Interpreter Job", role: "continual reflection over source refs" },
   { kind: "setting", label: "Setting", role: "where the scene is bounded" },
   { kind: "actor", label: "Actor", role: "who can act or be acted on" },
   { kind: "prop", label: "Prop", role: "nearby object or world feature" },
@@ -127,8 +208,27 @@ const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
   { kind: "missing_evidence", label: "Missing Evidence", role: "unknown fact to resolve" },
 ];
 
+const STAGE_PLAY_SOURCE_CLASSES = [
+  "world_event",
+  "environment_state",
+  "environment_affordance",
+  "visual_frame",
+  "audio_transcript",
+  "text_chat",
+  "screen_summary",
+  "minecraft_world_events",
+  "calculator_stream",
+  "simulation_stream",
+  "document_context",
+  "note_context",
+  "procedure_graph",
+  "process_graph",
+] as const;
+
 function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftStagePlayNodeParameter[] {
   const presets: Record<StagePlayBadgeV1["kind"], [string, string][]> = {
+    source: [["source_class", ""], ["source_id", ""], ["status", ""], ["descriptor_ref", ""], ["producer_ref", ""], ["latest_ref", ""]],
+    interpreter: [["tool", "live_env.reflect_stage_play_context"], ["cadence", ""], ["input_sources", ""], ["output", "stage_play_badge_graph"]],
     setting: [["dimension", ""], ["biome_or_area", ""], ["bounds", ""]],
     actor: [["entity_id", ""], ["state", ""], ["relation", ""]],
     prop: [["object_or_block", ""], ["position", ""], ["state", ""]],
@@ -151,6 +251,33 @@ function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftSta
     key,
     value,
   }));
+}
+
+function readDraftParameter(node: DraftStagePlayNode, key: string): string {
+  return node.parameters.find((parameter) => parameter.key === key)?.value ?? "";
+}
+
+function setDraftParameterValue(node: DraftStagePlayNode, key: string, value: string): DraftStagePlayNode {
+  const index = node.parameters.findIndex((parameter) => parameter.key === key);
+  if (index >= 0) {
+    return {
+      ...node,
+      parameters: node.parameters.map((parameter, parameterIndex) =>
+        parameterIndex === index ? { ...parameter, value } : parameter,
+      ),
+    };
+  }
+  return {
+    ...node,
+    parameters: [
+      ...node.parameters,
+      {
+        id: `${node.id}:param:${key}`,
+        key,
+        value,
+      },
+    ],
+  };
 }
 
 function BadgeButton({
@@ -228,6 +355,8 @@ function StagePlayGraphCanvas({
 }) {
   const columns = useMemo(() => {
     const order = [
+      "source",
+      "interpreter",
       "setting",
       "actor",
       "resource",
@@ -402,15 +531,30 @@ function StagePlayGraphCanvas({
 
 function DraftNodeParameterEditor({
   node,
+  sourceOptions,
   onClose,
   onUpdateParameter,
   onAddParameter,
+  onSetSourceClass,
+  onApplySourceOption,
 }: {
   node: DraftStagePlayNode;
+  sourceOptions: StagePlaySourceOption[];
   onClose: () => void;
   onUpdateParameter: (nodeId: string, parameterId: string, field: "key" | "value", value: string) => void;
   onAddParameter: (nodeId: string) => void;
+  onSetSourceClass: (nodeId: string, sourceClass: string) => void;
+  onApplySourceOption: (nodeId: string, option: StagePlaySourceOption) => void;
 }) {
+  const selectedSourceClass = readDraftParameter(node, "source_class");
+  const matchingSourceOptions = sourceOptions.filter((option) =>
+    !selectedSourceClass || option.sourceClass === selectedSourceClass,
+  );
+  const sourceClassOptions = Array.from(new Set([
+    ...STAGE_PLAY_SOURCE_CLASSES,
+    ...sourceOptions.map((option) => option.sourceClass),
+  ])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+
   return (
     <aside
       data-testid="stage-play-draft-parameter-editor"
@@ -431,6 +575,49 @@ function DraftNodeParameterEditor({
           Close
         </button>
       </div>
+
+      {node.kind === "source" ? (
+        <div className="mt-3 rounded-md border border-sky-800/70 bg-sky-950/20 p-3">
+          <label className="text-[10px] font-semibold uppercase tracking-wide text-sky-200">
+            Source class
+            <select
+              value={selectedSourceClass}
+              onChange={(event) => onSetSourceClass(node.id, event.target.value)}
+              className="mt-1 h-8 w-full rounded border border-slate-800 bg-slate-950 px-2 text-xs normal-case tracking-normal text-slate-100 outline-none focus:border-sky-500"
+              aria-label="Source class"
+            >
+              <option value="">Choose source class</option>
+              {sourceClassOptions.map((sourceClass) => (
+                <option key={sourceClass} value={sourceClass}>{labelize(sourceClass)}</option>
+              ))}
+            </select>
+          </label>
+          <div className="mt-3 space-y-1.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Active sources</div>
+            {matchingSourceOptions.length === 0 ? (
+              <div className="rounded border border-slate-800 bg-black/20 p-2 text-[11px] text-slate-500">
+                No matching source handle is active for this class.
+              </div>
+            ) : matchingSourceOptions.slice(0, 8).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => onApplySourceOption(node.id, option)}
+                className="w-full rounded border border-slate-800 bg-black/20 p-2 text-left text-xs text-slate-200 hover:border-sky-600"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold">{option.label}</span>
+                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">{labelize(option.status)}</span>
+                </div>
+                <div className="mt-1 truncate font-mono text-[10px] text-sky-100">{option.sourceClass} / {option.sourceId}</div>
+                <div className="mt-1 truncate text-[10px] text-slate-500">
+                  {option.descriptorId ?? "no descriptor"} / {option.producerId ?? "no producer"}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-3 space-y-2">
         {node.parameters.map((parameter) => (
@@ -843,6 +1030,15 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayBadgeGraph({ threadId, roomId, environmentId }),
     refetchInterval: 1000,
   });
+  const { data: sourceOptions = [] } = useQuery<StagePlaySourceOption[]>({
+    queryKey: [
+      "/api/agi/situation/live-source/options",
+      threadId,
+      environmentId,
+    ],
+    queryFn: () => fetchStagePlaySourceOptions({ threadId, environmentId }),
+    refetchInterval: 2000,
+  });
 
   const filteredBadges = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -980,6 +1176,34 @@ export default function StagePlayBadgeGraphPanel() {
     );
   }
 
+  function setDraftSourceClass(nodeId: string, sourceClass: string) {
+    setDraftNodes((nodes) =>
+      nodes.map((node) => node.id === nodeId ? setDraftParameterValue(node, "source_class", sourceClass) : node),
+    );
+  }
+
+  function applyDraftSourceOption(nodeId: string, option: StagePlaySourceOption) {
+    setDraftNodes((nodes) =>
+      nodes.map((node) => {
+        if (node.id !== nodeId) return node;
+        return [
+          ["source_class", option.sourceClass],
+          ["source_id", option.sourceId],
+          ["status", option.status],
+          ["descriptor_ref", option.descriptorId ?? ""],
+          ["producer_ref", option.producerId ?? ""],
+          ["latest_ref", option.latestRef ?? ""],
+          ["surface", option.surface ?? ""],
+          ["origin", option.origin ?? ""],
+          ["cadence_ms", option.cadenceMs != null ? String(option.cadenceMs) : ""],
+        ].reduce<DraftStagePlayNode>(
+          (updated, [key, value]) => setDraftParameterValue(updated, key, value),
+          node,
+        );
+      }),
+    );
+  }
+
   useEffect(() => {
     if (!heldNode) return;
 
@@ -1098,9 +1322,12 @@ export default function StagePlayBadgeGraphPanel() {
             return selectedDraftNode ? (
               <DraftNodeParameterEditor
                 node={selectedDraftNode}
+                sourceOptions={sourceOptions}
                 onClose={() => setSelectedDraftNodeId(null)}
                 onUpdateParameter={updateDraftParameter}
                 onAddParameter={addDraftParameter}
+                onSetSourceClass={setDraftSourceClass}
+                onApplySourceOption={applyDraftSourceOption}
               />
             ) : null;
           })()

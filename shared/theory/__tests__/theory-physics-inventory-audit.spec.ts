@@ -26,7 +26,8 @@ describe("theory physics inventory audit", () => {
     });
     const byId = new Map(report.domains.map((domain) => [domain.id, domain]));
 
-    expect(byId.get("granular_tidal_love_number")?.status).toBe("repo_present_graph_gap");
+    expect(byId.get("granular_tidal_love_number")?.status).toBe("represented");
+    expect(byId.get("granular_tidal_love_number")?.missingBadgePrefixes).toEqual([]);
     expect(byId.get("granular_tidal_love_number")?.sampleRepoPaths).toContain(
       "docs/knowledge/physics/tidal-bulge-response.md",
     );

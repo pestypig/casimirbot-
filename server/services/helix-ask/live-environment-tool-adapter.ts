@@ -343,6 +343,8 @@ export function executeLiveEnvironmentTool(
       summary: `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`,
       observation: graph,
       evidenceRefs: [
+        ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
+        ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
         ...graph.sourceWindow.latestObservationRefs,
         ...graph.sourceWindow.latestSnapshotRefs,
         ...graph.sourceWindow.latestDeltaOverlayRefs,

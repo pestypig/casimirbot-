@@ -13,6 +13,14 @@ import {
 } from "../services/situation-room/environment-state-snapshot-window";
 import { clearEventJournalForTest } from "../services/situation-room/event-journal-store";
 import {
+  resetLiveSourceChunkBufferForTest,
+  upsertLiveSourceProducer,
+} from "../services/situation-room/live-source-chunk-buffer";
+import {
+  resetLiveSourceDescriptorsForTest,
+  upsertLiveSourceDescriptor,
+} from "../services/situation-room/live-source-descriptor-builder";
+import {
   recordMinecraftRouteSolverObservation,
   resetMinecraftNavigationStateStoreForTest,
 } from "../services/situation-room/minecraft-navigation-state-store";
@@ -33,6 +41,8 @@ beforeEach(() => {
   resetMinecraftWorldDeltaOverlaysForTest();
   resetMinecraftNavigationStateStoreForTest();
   resetMinecraftWorldSenseWindows();
+  resetLiveSourceDescriptorsForTest();
+  resetLiveSourceChunkBufferForTest();
   clearEventJournalForTest();
 });
 
@@ -160,6 +170,31 @@ describe("Stage Play world-state badge reducer", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    const descriptor = upsertLiveSourceDescriptor({
+      source_id: "source:minecraft-server",
+      thread_id: threadId,
+      environment_id: "env:minecraft",
+      modality: "world_event",
+      user_label: "Minecraft world events",
+      serving_context: {
+        surface: "game",
+        source_origin: "minehut_plugin",
+        app_hint: "Minecraft",
+      },
+      current_state: "active",
+      cadence_ms: 1000,
+      latest_observation_refs: ["live_source_observation:stage-play-reducer"],
+    });
+    const producer = upsertLiveSourceProducer({
+      sourceId: "source:minecraft-server",
+      threadId,
+      modality: "world_event",
+      status: "active",
+      cadenceMs: 1000,
+      captureMode: "push",
+      latestChunkId: "live_source_chunk:minecraft-server",
+      now: "2026-06-02T12:10:01.500Z",
+    });
 
     const routeObservation: HelixMinecraftRouteSolverObservation = {
       schema: "helix.minecraft_route_solver_observation.v1",
@@ -216,6 +251,8 @@ describe("Stage Play world-state badge reducer", () => {
 
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(badgeIds).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^source\./),
+      "interpreter.stage_play_reflection",
       "setting.end",
       "setting.local_map",
       "setting.route_corridor",
@@ -262,6 +299,26 @@ describe("Stage Play world-state badge reducer", () => {
       "binding.tunnel_advance",
       "binding.defensive_retreat_barrier",
     ]));
+    const sourceBadge = graph.badges.find((badge) => badge.kind === "source");
+    expect(sourceBadge).toMatchObject({
+      kind: "source",
+      admission: "auto",
+      subjects: ["source:minecraft-server"],
+    });
+    expect(sourceBadge?.sourceRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "live_source_descriptor", id: descriptor.descriptor_id }),
+      expect.objectContaining({ kind: "live_source_producer", id: producer.producer_id }),
+    ]));
+    expect(graph.badges.find((badge) => badge.id === "interpreter.stage_play_reflection")).toMatchObject({
+      kind: "interpreter",
+      admission: "auto",
+    });
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ relation: "feeds", to: "interpreter.stage_play_reflection" }),
+      expect.objectContaining({ relation: "interprets", from: "interpreter.stage_play_reflection", to: "actor.player" }),
+    ]));
+    expect(graph.sourceWindow.latestSourceDescriptorRefs).toEqual([descriptor.descriptor_id]);
+    expect(graph.sourceWindow.latestSourceProducerRefs).toEqual([producer.producer_id]);
     expect(graph.badges.find((badge) => badge.id === "binding.bridge_forward")?.plainMeaning).toContain(
       "intent.place_block + intent.preserve_floor + affordance.move_forward",
     );

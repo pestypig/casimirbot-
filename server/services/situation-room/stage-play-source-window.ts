@@ -2,10 +2,14 @@ import type { HelixEventJournalQueryResult } from "@shared/helix-event-journal-q
 import type { HelixEnvironmentStateSnapshot } from "@shared/helix-environment-state-snapshot";
 import type { HelixMinecraftWorldDeltaOverlay } from "@shared/helix-minecraft-evidence";
 import type { HelixMinecraftWorldSenseContext } from "@shared/helix-minecraft-world-sense";
+import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descriptor";
+import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
 import type { LiveSourceObservation } from "@shared/live-source-observation";
 import { listLiveSourceObservations } from "../live-source/live-source-observation-store";
 import { getLatestEnvironmentStateSnapshot } from "./environment-state-snapshot-window";
 import { queryEventWindow } from "./event-window-query";
+import { listLiveSourceProducers } from "./live-source-chunk-buffer";
+import { listLiveSourceDescriptors } from "./live-source-descriptor-builder";
 import { queryMinecraftNavigationState } from "./minecraft-navigation-state-store";
 import { listMinecraftWorldDeltaOverlaysForRoom } from "./minecraft-world-delta-overlay";
 import { getLatestMinecraftWorldSenseContextForRoom } from "./minecraft-world-sense-window";
@@ -21,6 +25,8 @@ export type StagePlaySourceWindowV1 = {
   environmentId?: string | null;
   actorLabel?: string | null;
   freshness: "fresh" | "stale" | "missing" | "mixed" | "unknown";
+  latestSourceDescriptorRefs: string[];
+  latestSourceProducerRefs: string[];
   latestObservationRefs: string[];
   latestSnapshotRefs: string[];
   latestDeltaOverlayRefs: string[];
@@ -31,6 +37,26 @@ export type StagePlaySourceWindowV1 = {
   latestEventWindowRefs: string[];
   evidenceRefs: string[];
   compactFacts: {
+    sourceDescriptors: Array<{
+      descriptorId: string;
+      sourceId: string;
+      modality: string;
+      surface: string;
+      origin: string;
+      state: string;
+      cadenceMs?: number | null;
+      latestObservationRefs: string[];
+    }>;
+    sourceProducers: Array<{
+      producerId: string;
+      sourceId: string;
+      modality: string;
+      status: string;
+      captureMode: string;
+      cadenceMs?: number | null;
+      latestChunkId?: string | null;
+      contentRetentionPolicy: string;
+    }>;
     observations: Array<{
       observationId: string;
       sourceId: string;
@@ -159,6 +185,32 @@ const compactObservation = (observation: LiveSourceObservation): StagePlaySource
   evidenceRefs: observation.evidence_refs,
 });
 
+const compactDescriptor = (
+  descriptor: HelixLiveSourceDescriptor,
+): StagePlaySourceWindowV1["compactFacts"]["sourceDescriptors"][number] => ({
+  descriptorId: descriptor.descriptor_id,
+  sourceId: descriptor.source_id,
+  modality: descriptor.modality,
+  surface: descriptor.serving_context.surface,
+  origin: descriptor.serving_context.source_origin,
+  state: descriptor.current_state,
+  cadenceMs: descriptor.cadence_ms ?? null,
+  latestObservationRefs: descriptor.latest_observation_refs,
+});
+
+const compactProducer = (
+  producer: HelixLiveSourceProducer,
+): StagePlaySourceWindowV1["compactFacts"]["sourceProducers"][number] => ({
+  producerId: producer.producer_id,
+  sourceId: producer.source_id,
+  modality: producer.modality,
+  status: producer.status,
+  captureMode: producer.capture_mode,
+  cadenceMs: producer.cadence_ms ?? null,
+  latestChunkId: producer.latest_chunk_id ?? null,
+  contentRetentionPolicy: producer.raw_content_policy,
+});
+
 const freshnessFor = (observations: LiveSourceObservation[]): StagePlaySourceWindowV1["freshness"] => {
   const statuses = uniqueStrings(observations.map((observation) => observation.freshness.status));
   if (statuses.length === 0) return "unknown";
@@ -253,6 +305,19 @@ const compactEventWindow = (
 });
 
 export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindowInput): StagePlaySourceWindowV1 {
+  const descriptors = listLiveSourceDescriptors({
+    threadId: input.threadId ?? null,
+    sourceId: input.sourceId ?? null,
+    environmentId: input.environmentId ?? null,
+    limit: 24,
+  });
+  const descriptorSourceIds = new Set(descriptors.map((descriptor) => descriptor.source_id));
+  const producers = listLiveSourceProducers({
+    threadId: input.threadId ?? null,
+  }).filter((producer) =>
+    (!input.sourceId || producer.source_id === input.sourceId) &&
+    (descriptorSourceIds.size === 0 || descriptorSourceIds.has(producer.source_id))
+  ).slice(-24);
   const observations = listLiveSourceObservations({
     threadId: input.threadId ?? null,
     sourceId: input.sourceId ?? null,
@@ -293,6 +358,8 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
   ]);
   const latestRouteSolverObservationRefs = navigationQuery.latest_solver_observations.map((entry) => entry.observation_id);
   const compactFacts: StagePlaySourceWindowV1["compactFacts"] = {
+    sourceDescriptors: descriptors.map(compactDescriptor),
+    sourceProducers: producers.map(compactProducer),
     observations: observations.map(compactObservation),
     environmentSnapshot: compactSnapshot(snapshot),
     deltaOverlay: compactDeltaOverlay(overlay),
@@ -335,6 +402,8 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     environmentId: input.environmentId ?? observations.at(-1)?.environment_id ?? null,
     actorLabel: input.actorLabel ?? snapshot?.actor_label ?? navigationQuery.actor_label ?? null,
     freshness: freshnessFor(observations),
+    latestSourceDescriptorRefs: descriptors.map((descriptor) => descriptor.descriptor_id),
+    latestSourceProducerRefs: producers.map((producer) => producer.producer_id),
     latestObservationRefs: observations.map((observation) => observation.observation_id),
     latestSnapshotRefs: snapshot ? [snapshot.snapshot_id] : [],
     latestDeltaOverlayRefs: overlay ? [overlay.overlay_id] : [],
@@ -344,6 +413,14 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     latestWorldSenseContextRefs: worldSense ? [worldSense.context_id] : [],
     latestEventWindowRefs: eventWindow.events.map((event) => event.journal_event_id),
     evidenceRefs: uniqueStrings([
+      ...descriptors.flatMap((descriptor) => [
+        descriptor.descriptor_id,
+        ...descriptor.latest_observation_refs,
+      ]),
+      ...producers.flatMap((producer) => [
+        producer.producer_id,
+        producer.latest_chunk_id,
+      ]),
       ...observations.flatMap((observation) => [observation.observation_id, ...observation.evidence_refs]),
       snapshot?.snapshot_id,
       ...(snapshot?.evidence_refs ?? []),

@@ -31,6 +31,9 @@ import {
   buildGalacticDynamicsTheoryBadgesV1,
 } from "./galactic-dynamics-theory-badges";
 import {
+  buildGranularTidalLoveNumberTheoryBadgesV1,
+} from "./granular-tidal-love-number-theory-badges";
+import {
   buildCurvatureCollapseTheoryBadgesV1,
 } from "./curvature-collapse-theory-badges";
 import {
@@ -758,6 +761,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const casimir = buildCasimirCavityTheoryBadgesV1();
   const tokamak = buildTokamakPlasmaTheoryBadgesV1();
   const galactic = buildGalacticDynamicsTheoryBadgesV1();
+  const granularTidal = buildGranularTidalLoveNumberTheoryBadgesV1();
   const curvature = buildCurvatureCollapseTheoryBadgesV1();
   const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
 
@@ -775,6 +779,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...casimir.badges,
       ...tokamak.badges,
       ...galactic.badges,
+      ...granularTidal.badges,
       ...curvature.badges,
       ...orchOr.badges,
     ],
@@ -787,6 +792,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...casimir.edges,
       ...tokamak.edges,
       ...galactic.edges,
+      ...granularTidal.edges,
       ...curvature.edges,
       ...orchOr.edges,
     ],

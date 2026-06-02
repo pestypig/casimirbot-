@@ -29,6 +29,15 @@ describe("physics atlas blocks", () => {
       "solar.spectrum.photon_energy",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
+    expect(byId.get("galactic_dynamics")?.primaryBadgeIds).toContain(
+      "tidal.love_number.displacement_response",
+    );
+    expect(byId.get("galactic_dynamics")?.claimBoundaryBadgeIds).toContain(
+      "tidal.claim_boundary.material_response_only",
+    );
+    expect(byId.get("galactic_dynamics")?.repoPathHints).toContain(
+      "shared/theory/granular-tidal-love-number-theory-badges.ts",
+    );
     expect(byId.get("curvature_collapse")?.status).toBe("active");
     expect(byId.get("curvature_collapse")?.primaryBadgeIds).toContain("curvature.proxy.body_density");
     expect(byId.get("curvature_collapse")?.primaryBadgeIds).toContain("orch_or.microtubule.coherence_window");

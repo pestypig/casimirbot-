@@ -55,6 +55,61 @@ const actorBadge: StagePlayBadgeV1 = {
   admission: null,
 };
 
+const sourceBadge: StagePlayBadgeV1 = {
+  id: "source:visual-tab",
+  title: "Visual frame source",
+  plainMeaning: "A live source handle can feed compact Stage Play interpretation.",
+  whyItMatters: "Source nodes identify source class and active handle before interpreted claims are formed.",
+  kind: "source",
+  status: "observed",
+  subjects: ["source:visual-tab"],
+  tags: ["visual_frame", "browser_tab"],
+  liveBindings: [
+    {
+      bindingKind: "source_descriptor",
+      sourceRefIds: ["live_source_descriptor:visual-tab"],
+      freshness: "fresh",
+      confidence: 0.9,
+      compactValue: "visual_frame",
+    },
+  ],
+  sourceRefs: [
+    { kind: "live_source_descriptor", id: "live_source_descriptor:visual-tab" },
+    { kind: "live_source_producer", id: "live_source_producer:visual-tab" },
+  ],
+  evidenceRefs: ["live_source_descriptor:visual-tab", "live_source_producer:visual-tab"],
+  confidence: 0.86,
+  missingEvidence: [],
+  reasonCodes: ["live_source_descriptor"],
+  admission: "auto",
+};
+
+const interpreterBadge: StagePlayBadgeV1 = {
+  id: "interpreter:stage-play",
+  title: "Stage Play interpreter",
+  plainMeaning: "A continual evidence reducer can interpret selected source refs into stage facts.",
+  whyItMatters: "Interpreter nodes expose reflection boundaries without answer or execution authority.",
+  kind: "interpreter",
+  status: "candidate",
+  subjects: ["thread:stage-play"],
+  tags: ["reflect_stage_play_context", "evidence_only"],
+  liveBindings: [
+    {
+      bindingKind: "source_status",
+      sourceRefIds: ["live_source_descriptor:visual-tab"],
+      freshness: "fresh",
+      confidence: 0.8,
+      compactValue: "active_interval",
+    },
+  ],
+  sourceRefs: sourceBadge.sourceRefs,
+  evidenceRefs: sourceBadge.evidenceRefs,
+  confidence: 0.76,
+  missingEvidence: [],
+  reasonCodes: ["stage_play_interpreter"],
+  admission: "auto",
+};
+
 const buildFixture = (overrides: Partial<StagePlayBadgeGraphV1> = {}): StagePlayBadgeGraphV1 =>
   buildStagePlayBadgeGraphV1({
     generatedAt: "2026-06-02T12:00:02.000Z",
@@ -100,6 +155,43 @@ describe("stage_play_badge_graph/v1", () => {
       instruction_authority: "none",
       ask_instruction_authority: "none",
     });
+  });
+
+  it("accepts source and interpreter badges as evidence-only graph handles", () => {
+    const graph = buildFixture({
+      sourceWindow: {
+        ...sourceWindow,
+        latestSourceDescriptorRefs: ["live_source_descriptor:visual-tab"],
+        latestSourceProducerRefs: ["live_source_producer:visual-tab"],
+      },
+      badges: [sourceBadge, interpreterBadge, actorBadge],
+      edges: [
+        {
+          id: "edge:source:feeds:interpreter",
+          from: sourceBadge.id,
+          to: interpreterBadge.id,
+          relation: "feeds",
+          label: "source handle feeds interpreter",
+          evidenceRefs: sourceBadge.evidenceRefs,
+          reasonCodes: ["source_interpreter_binding"],
+        },
+        {
+          id: "edge:interpreter:interprets:actor",
+          from: interpreterBadge.id,
+          to: actorBadge.id,
+          relation: "interprets",
+          label: "interpreter derives actor badge",
+          evidenceRefs: actorBadge.evidenceRefs,
+          reasonCodes: ["interpreter_actor_binding"],
+        },
+      ],
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.summary.kindCounts.source).toBe(1);
+    expect(graph.summary.kindCounts.interpreter).toBe(1);
+    expect(graph.authority.agent_executable).toBe(false);
+    expect(JSON.stringify(graph)).not.toMatch(/agent[_ -]?executable\s*[:=]\s*true/i);
   });
 
   it("allows empty badges only when there is no admitted source window", () => {

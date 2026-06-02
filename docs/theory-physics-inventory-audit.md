@@ -1,41 +1,34 @@
 # Theory Physics Inventory Audit
 
-Generated: 2026-06-02T06:55:34.509Z
+Generated: 2026-06-02T18:47:25.517Z
 
 This audit compares repo-owned physics docs, configs, scripts, data, and shared modules against the current Physics Atlas and Theory Badge Graph. It does not execute simulations or runtime commands.
 
 ## Summary
 
 - Graph: `nhm2-theory-badge-graph`
-- Badges in graph: 121
+- Badges in graph: 127
 - Atlas blocks: 9
-- Repo-owned paths scanned: 6853
-- Represented domains: 2
-- Partially represented domains: 2
-- Repo-present graph gaps: 4
+- Repo-owned paths scanned: 6857
+- Represented domains: 3
+- Partially represented domains: 3
+- Repo-present graph gaps: 2
 - Not detected: 0
 
 ## Domain Coverage
 
 | Domain | Status | Repo paths | Atlas blocks | Badges | Missing badge prefixes | Next patch |
 | --- | --- | ---: | --- | ---: | --- | --- |
-| Granular / Tidal Love-Number Response | `repo_present_graph_gap` | 12 | - | 0 | `tidal.`, `granular.`, `self_gravity.` | feat(theory): add granular tidal/Love-number badge seed under Galactic or Collapse |
-| Solar Flare / Sunquake / Nanoflare Response | `partially_represented` | 16 | `solar_surface_spectrum` | 2 | `solar.sunquake.`, `solar.nanoflare.` | feat(theory): extend solar atlas with flare-to-sunquake and nanoflare observable badges |
+| Granular / Tidal Love-Number Response | `represented` | 14 | `galactic_dynamics` | 6 | - | feat(theory): add granular tidal/Love-number badge seed under Galactic or Collapse |
+| Solar Flare / Sunquake / Nanoflare Response | `partially_represented` | 16 | `solar_surface_spectrum` | 3 | `solar.sunquake.`, `solar.nanoflare.` | feat(theory): extend solar atlas with flare-to-sunquake and nanoflare observable badges |
 | Solar Restoration / Red-Giant Prevention | `repo_present_graph_gap` | 6 | - | 0 | `stellar.restoration.`, `solar.restoration.`, `starsim.restoration.` | feat(theory): add solar-restoration/red-giant planning badges as non-actionable forecast rows |
 | DP / Objective-Collapse Runtime | `represented` | 21 | `curvature_collapse` | 21 | - | chore(theory): keep DP/objective-collapse badges aligned with runtime artifacts |
 | Orch-OR / Microtubule / Time-Crystal Hypothesis | `represented` | 38 | `curvature_collapse` | 10 | - | chore(theory): keep Orch-OR comparison rows fenced as exploratory |
-| Halobank Solar / Tidal Diagnostics | `repo_present_graph_gap` | 35 | - | 0 | `halobank.`, `solar.tidal.`, `tidal.` | feat(theory): add halobank solar/tidal diagnostic badge seed |
+| Halobank Solar / Tidal Diagnostics | `partially_represented` | 37 | `galactic_dynamics` | 6 | `halobank.`, `solar.tidal.` | feat(theory): add halobank solar/tidal diagnostic badge seed |
 | Stellar Structure / Nucleosynthesis | `partially_represented` | 64 | `galactic_dynamics`, `stellar_evolution` | 23 | `stellar.` | feat(theory): expand Stellar lane with hydrostatic/opacity/nucleosynthesis source rows |
 | Solar Reference Pack / Helioseismic Closure | `repo_present_graph_gap` | 16 | - | 0 | `solar.reference.`, `solar.interior.`, `solar.cycle.` | feat(theory): add solar reference-pack badges for helioseismic/neutrino/cycle context |
 
 ## Gaps To Patch First
-
-### Granular / Tidal Love-Number Response
-
-- Status: `repo_present_graph_gap`
-- Recommended patch: feat(theory): add granular tidal/Love-number badge seed under Galactic or Collapse
-- Claim boundary: Tidal and Love-number rows should be material-response diagnostics, not universal collapse or solar-restoration claims.
-- Sample repo paths: `docs/architecture/granular-tidal-sunquake-bridge-plan.md`, `docs/architecture/gravitational-response-self-gravity-shape-plan.md`, `docs/audits/research/granular-tidal-sunquake-source-check-2026-03-25.md`, `docs/audits/research/self-gravity-shape-source-check-2026-03-25.md`, `docs/knowledge/math-claims/self-gravity-shape.math-claims.json`, `docs/knowledge/physics/granular-collision-dissipation.md`, `docs/knowledge/physics/granular-tidal-response-diagnostic.md`, `docs/knowledge/physics/physics-self-gravity-shape-tree.json`, `docs/knowledge/physics/porous-rubble-pile-rheology.md`, `docs/knowledge/physics/self-gravity-shape.md`, `docs/knowledge/physics/tidal-bulge-response.md`, `docs/knowledge/physics/tidal-quality-factor.md`
 
 ### Solar Flare / Sunquake / Nanoflare Response
 
@@ -53,7 +46,7 @@ This audit compares repo-owned physics docs, configs, scripts, data, and shared 
 
 ### Halobank Solar / Tidal Diagnostics
 
-- Status: `repo_present_graph_gap`
+- Status: `partially_represented`
 - Recommended patch: feat(theory): add halobank solar/tidal diagnostic badge seed
 - Claim boundary: Halobank solar/tidal rows should remain falsifier/diagnostic context unless runtime receipts support a narrower claim.
 - Sample repo paths: `configs/halobank-solar-diagnostic-datasets.v1.json`, `configs/halobank-solar-kernel-bundle.v1.json`, `configs/halobank-solar-local-rest-reference.v1.json`, `configs/halobank-solar-metric-context.v1.json`, `configs/halobank-solar-thresholds.v1.json`, `docs/architecture/granular-tidal-sunquake-bridge-plan.md`, `docs/architecture/halobank-paper-definition-congruence-plan.md`, `docs/knowledge/halobank-solar-proof-tree.json`, `docs/knowledge/halobank.md`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260218-012531.json`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260218t010053z.json`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260219-172109.json`

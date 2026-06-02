@@ -61,6 +61,8 @@ const compactPosition = (cell: EnvironmentCellSummary): string | null =>
 const sourceRefIds = (refs: StagePlayBadgeSourceRefV1[]): string[] => refs.map((ref) => ref.id);
 
 const makeSourceRefs = (input: {
+  sourceDescriptorRefs?: string[];
+  sourceProducerRefs?: string[];
   observationRefs: string[];
   snapshotRefs: string[];
   deltaOverlayRefs: string[];
@@ -70,6 +72,8 @@ const makeSourceRefs = (input: {
   worldSenseContextRefs: string[];
   eventWindowRefs: string[];
 }): StagePlayBadgeSourceRefV1[] => [
+  ...(input.sourceDescriptorRefs ?? []).map((id) => ({ kind: "live_source_descriptor" as const, id })),
+  ...(input.sourceProducerRefs ?? []).map((id) => ({ kind: "live_source_producer" as const, id })),
   ...input.observationRefs.map((id) => ({ kind: "live_source_observation" as const, id })),
   ...input.snapshotRefs.map((id) => ({ kind: "environment_state_snapshot" as const, id })),
   ...input.deltaOverlayRefs.map((id) => ({ kind: "world_delta_overlay" as const, id })),
@@ -322,6 +326,8 @@ export function buildStagePlayRecommendedActionAdmissionV1(
   input: BuildStagePlayRecommendedActionAdmissionInput,
 ): HelixRecommendedActionAdmissionV1 {
   const evidenceRefs = unique([
+    ...(input.graph.sourceWindow.latestSourceDescriptorRefs ?? []),
+    ...(input.graph.sourceWindow.latestSourceProducerRefs ?? []),
     ...input.graph.sourceWindow.latestObservationRefs,
     ...input.graph.sourceWindow.latestSnapshotRefs,
     ...input.graph.sourceWindow.latestDeltaOverlayRefs,
@@ -393,6 +399,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   });
   const snapshot = getLatestEnvironmentStateSnapshot(roomId);
   const sourceRefs = makeSourceRefs({
+    sourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
+    sourceProducerRefs: sourceWindow.latestSourceProducerRefs,
     observationRefs: sourceWindow.latestObservationRefs,
     snapshotRefs: sourceWindow.latestSnapshotRefs,
     deltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
@@ -407,6 +415,112 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   const badges: StagePlayBadgeV1[] = [];
   const edges: StagePlayBadgeGraphV1["edges"] = [];
   const recommendedActions: StagePlayBadgeGraphV1["recommendedActions"] = [];
+
+  const sourceBadgeIds: string[] = [];
+  for (const descriptor of sourceWindow.compactFacts.sourceDescriptors) {
+    const matchingProducer = sourceWindow.compactFacts.sourceProducers.find((producer) => producer.sourceId === descriptor.sourceId) ?? null;
+    const refs = makeSourceRefs({
+      sourceDescriptorRefs: [descriptor.descriptorId],
+      sourceProducerRefs: matchingProducer ? [matchingProducer.producerId] : [],
+      observationRefs: descriptor.latestObservationRefs,
+      snapshotRefs: [],
+      deltaOverlayRefs: [],
+      chunkSampleRefs: [],
+      navigationRefs: [],
+      routeSolverObservationRefs: [],
+      worldSenseContextRefs: [],
+      eventWindowRefs: [],
+    });
+    const refIds = sourceRefIds(refs);
+    sourceBadgeIds.push(pushBadge(badges, badge({
+      id: `source.${hashShort([descriptor.sourceId, descriptor.modality], 10)}`,
+      title: descriptor.modality.replace(/_/g, " "),
+      plainMeaning: "A live source handle is available for Stage Play interpretation.",
+      whyItMatters: "Source badges show which admitted feed can be wired into the interpreter before any world-state claims are formed.",
+      kind: "source",
+      status: descriptor.state === "stale" || descriptor.state === "paused" ? "stale" : "observed",
+      subjects: [descriptor.sourceId],
+      tags: ["source", descriptor.modality, descriptor.surface, descriptor.origin, descriptor.state],
+      sourceRefs: refs,
+      evidenceRefs: unique([descriptor.descriptorId, ...(matchingProducer ? [matchingProducer.producerId] : []), ...descriptor.latestObservationRefs]),
+      confidence: descriptor.state === "active" || descriptor.state === "active_interval" ? 0.84 : 0.62,
+      liveBindings: [
+        makeBinding("source_descriptor", refIds, descriptor.descriptorId),
+        ...(matchingProducer ? [makeBinding("source_producer", refIds, matchingProducer.producerId)] : []),
+        makeBinding("source_modality", refIds, descriptor.modality),
+        makeBinding("source_status", refIds, descriptor.state),
+        ...(descriptor.cadenceMs != null ? [makeBinding("source_cadence", refIds, descriptor.cadenceMs)] : []),
+      ],
+      reasonCodes: ["live_source_descriptor"],
+      admission: "auto",
+    })));
+  }
+  for (const producer of sourceWindow.compactFacts.sourceProducers) {
+    if (sourceWindow.compactFacts.sourceDescriptors.some((descriptor) => descriptor.sourceId === producer.sourceId)) continue;
+    const refs = makeSourceRefs({
+      sourceDescriptorRefs: [],
+      sourceProducerRefs: [producer.producerId],
+      observationRefs: [],
+      snapshotRefs: [],
+      deltaOverlayRefs: [],
+      chunkSampleRefs: [],
+      navigationRefs: [],
+      routeSolverObservationRefs: [],
+      worldSenseContextRefs: [],
+      eventWindowRefs: [],
+    });
+    const refIds = sourceRefIds(refs);
+    sourceBadgeIds.push(pushBadge(badges, badge({
+      id: `source.${hashShort([producer.sourceId, producer.modality], 10)}`,
+      title: producer.modality.replace(/_/g, " "),
+      plainMeaning: "A live source producer exists for Stage Play interpretation.",
+      whyItMatters: "Producer-only source badges can be bound later to a descriptor or interpreter job.",
+      kind: "source",
+      status: producer.status === "stale" || producer.status === "paused" ? "stale" : "observed",
+      subjects: [producer.sourceId],
+      tags: ["source", producer.modality, producer.status, producer.captureMode],
+      sourceRefs: refs,
+      evidenceRefs: unique([producer.producerId, producer.latestChunkId].filter(Boolean) as string[]),
+      confidence: producer.status === "active" ? 0.78 : 0.58,
+      liveBindings: [
+        makeBinding("source_producer", refIds, producer.producerId),
+        makeBinding("source_modality", refIds, producer.modality),
+        makeBinding("source_status", refIds, producer.status),
+        ...(producer.cadenceMs != null ? [makeBinding("source_cadence", refIds, producer.cadenceMs)] : []),
+      ],
+      reasonCodes: ["live_source_producer"],
+      admission: "auto",
+    })));
+  }
+  const interpreterId = pushBadge(badges, badge({
+    id: "interpreter.stage_play_reflection",
+    title: "Stage Play interpreter",
+    plainMeaning: "A compact interpretation job can reduce selected sources into stage facts and procedural bindings.",
+    whyItMatters: "The interpreter node is the continual reflection boundary: it may produce evidence, but it cannot answer or act.",
+    kind: "interpreter",
+    status: sourceRefs.length > 0 ? "candidate" : "missing_evidence",
+    subjects: [input.threadId, roomId],
+    tags: ["interpreter", "reflect_stage_play_context", "evidence_only"],
+    sourceRefs,
+    evidenceRefs,
+    confidence: sourceRefs.length > 0 ? 0.76 : 0.4,
+    liveBindings: [
+      makeBinding("source_status", sourceIds, sourceWindow.freshness),
+      makeBinding("route_state", sourceIds, sourceWindow.compactFacts.navigation?.routeStatus ?? "unknown"),
+    ],
+    reasonCodes: ["stage_play_interpreter", "compact_source_window"],
+    admission: "auto",
+  }));
+  for (const sourceBadgeId of sourceBadgeIds) {
+    pushEdge(edges, {
+      from: sourceBadgeId,
+      to: interpreterId,
+      relation: "feeds",
+      label: "source handle feeds Stage Play interpreter",
+      evidenceRefs,
+      reasonCodes: ["source_interpreter_binding"],
+    });
+  }
 
   const settingIds: string[] = [];
   const dimensionId = dimensionSettingId(snapshot);
@@ -506,6 +620,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     liveBindings: [makeBinding("actor_pose", sourceIds, snapshot?.actor_state?.pose?.position ? "pose observed" : null)],
     reasonCodes: ["player_actor"],
   }));
+  pushEdge(edges, {
+    from: interpreterId,
+    to: actorId,
+    relation: "interprets",
+    label: "interpreter reduces source window into actor badge",
+    evidenceRefs,
+    reasonCodes: ["interpreter_actor_binding"],
+  });
   for (const entity of snapshot?.object_state?.nearby_entities ?? []) {
     const id = classifyEntityBadgeId(entity);
     const entityId = pushBadge(badges, badge({
@@ -859,6 +981,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
 
   for (const settingId of settingIds) {
     pushEdge(edges, {
+      from: interpreterId,
+      to: settingId,
+      relation: "interprets",
+      label: "interpreter reduces source window into setting badge",
+      evidenceRefs,
+      reasonCodes: ["interpreter_setting_binding"],
+    });
+    pushEdge(edges, {
       from: actorId,
       to: settingId,
       relation: "observes",
@@ -953,6 +1083,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       fromTs: sourceWindow.compactFacts.observations[0]?.observedAt ?? snapshot?.ts ?? null,
       toTs: sourceWindow.compactFacts.eventWindow.latestEventTs ?? snapshot?.ts ?? resolvedAt,
       latestObservationRefs: sourceWindow.latestObservationRefs,
+      latestSourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
+      latestSourceProducerRefs: sourceWindow.latestSourceProducerRefs,
       latestSnapshotRefs: sourceWindow.latestSnapshotRefs,
       latestDeltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
       latestNavigationRefs: unique([
