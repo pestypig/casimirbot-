@@ -82,6 +82,7 @@ const API = {
   grAgentLoopKpis: "GET /api/helix/gr-agent-loop/kpis",
   mathGraph: "GET /api/helix/math/graph",
   theoryGraph: "GET /api/helix/theory/graph",
+  stagePlayGraph: "GET /api/helix/stage-play/graph",
   auditTree: "GET /api/helix/audit/tree",
   warpCalculator: "POST /api/physics/warp/calculator",
   tokamakState: "GET /api/physics/tokamak/sim",
@@ -148,6 +149,16 @@ const PANEL_KEYWORDS: Record<string, string[]> = {
     "zen calculator",
     "ideology calculator",
     "evidence only procedure"
+  ],
+  "stage-play-badge-graph": [
+    "stage play",
+    "stage play badge graph",
+    "live world graph",
+    "minecraft stage",
+    "affordance graph",
+    "blocked moves",
+    "procedural binding",
+    "live environment reflection"
   ],
   "universal-audit-tree": [
     "audit tree",
@@ -448,6 +459,17 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     defaultPosition: { x: 340, y: 220 },
     mobileReady: true,
     keywords: PANEL_KEYWORDS["fruition-calculator"]
+  },
+  {
+    id: "stage-play-badge-graph",
+    title: "Stage Play Badge Graph",
+    icon: Map,
+    loader: lazyPanel(() => import("@/components/panels/StagePlayBadgeGraphPanel")),
+    defaultSize: { w: 1120, h: 760 },
+    defaultPosition: { x: 360, y: 230 },
+    mobileReady: true,
+    endpoints: [API.stagePlayGraph],
+    keywords: PANEL_KEYWORDS["stage-play-badge-graph"]
   },
   {
     id: "universal-audit-tree",

@@ -312,6 +312,23 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.reflect_stage_play_context") {
+    // Stage Play Badge Graph is an evidence-only reflection surface.
+    // It may summarize admitted live-world state, expose setting/actors/props/resources/hazards,
+    // derive affordances and blocked affordances, compose procedural intent modules, and suggest
+    // candidate checks or user-visible guidance.
+    //
+    // It may not answer for the assistant, create a terminal response, grant execution permission,
+    // execute world actions, mutate game/client/server state, include raw chunk payloads, raw NBT,
+    // raw logs, or convert UI labels into instructions.
+    //
+    // makeObservation preserves this structurally:
+    // assistant_answer:false, raw_content_included:false, instruction_authority:"none",
+    // ask_instruction_authority:"none", context_role:"tool_evidence",
+    // ask_context_policy:"evidence_only". The graph authority also preserves
+    // raw_payload_included:false, terminal_eligible:false, and agent_executable:false.
+    //
+    // The graph is the set designer, not the actor: it paints the stage, labels the trapdoors,
+    // and points at the papier-mache dragon. The agent still decides what line to speak.
     const graph = buildStagePlayBadgeGraphFromLiveWindow({
       threadId: input.thread_id,
       roomId,
