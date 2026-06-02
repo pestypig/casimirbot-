@@ -235,7 +235,7 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
               ...state.notes,
               [noteId]: {
                 ...current,
-                title: title.trim() || current.title,
+                title,
                 updated_at: new Date().toISOString(),
               },
             },

@@ -23,6 +23,17 @@ type WorkstationClosedPanelEntry = {
   closedAtMs: number;
 };
 
+export type WorkstationLayoutSnapshot = {
+  chatDock: {
+    side: WorkstationDockSide;
+    widthPx: number;
+    collapsed: boolean;
+  };
+  activeGroupId: string;
+  groups: Record<string, WorkstationPanelGroup>;
+  root: WorkstationLayoutNode;
+};
+
 export type WorkstationLayoutState = {
   mode: WorkstationLayoutMode;
   chatDock: {
@@ -52,6 +63,8 @@ export type WorkstationLayoutState = {
   setMobileDrawerOpen: (open: boolean) => void;
   toggleMobileDrawer: () => void;
   setMobileDrawerSnap: (snap: "peek" | "half" | "full") => void;
+  captureLayoutSnapshot: () => WorkstationLayoutSnapshot;
+  applyLayoutSnapshot: (snapshot: WorkstationLayoutSnapshot) => void;
 };
 
 const STORAGE_KEY = "workstation-layout-v1";
@@ -270,6 +283,38 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
             snap,
           },
         })),
+      captureLayoutSnapshot: () => {
+        const state = get();
+        return {
+          chatDock: { ...state.chatDock },
+          activeGroupId: state.activeGroupId,
+          groups: Object.fromEntries(
+            Object.entries(state.groups).map(([groupId, group]) => [
+              groupId,
+              {
+                ...group,
+                panelIds: [...group.panelIds],
+              },
+            ]),
+          ),
+          root: { ...state.root },
+        };
+      },
+      applyLayoutSnapshot: (snapshot) =>
+        set((state) => {
+          const activeGroupId = snapshot.activeGroupId || state.activeGroupId || PRIMARY_GROUP_ID;
+          const groups = ensureGroups(snapshot.groups, activeGroupId);
+          return {
+            chatDock: {
+              ...state.chatDock,
+              ...snapshot.chatDock,
+              widthPx: clamp(Number(snapshot.chatDock.widthPx), DOCK_MIN_WIDTH, DOCK_MAX_WIDTH),
+            },
+            activeGroupId,
+            groups,
+            root: ensureRoot(snapshot.root, activeGroupId),
+          };
+        }),
     }),
     {
       name: STORAGE_KEY,

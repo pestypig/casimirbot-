@@ -532,6 +532,20 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
+    expect(screen.getByText("Latest reflect_stage_play_context")).toBeTruthy();
+    expect(screen.getByText("6 badges")).toBeTruthy();
+    expect(screen.getByText("0 missing checks")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-compact_observations")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-stage_bounds")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-affordance_space")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-intent_modules")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-procedural_bindings")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-predictions_next_checks")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-validation_feedback")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-live_answer_outputs")).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-output-node").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
@@ -546,6 +560,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("stage_play_graph_draft_validation/v1")).toBeTruthy();
     expect(screen.getByText("Node builder")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Observer" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Fusion\b/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Intent Module/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Procedure/i })).toBeTruthy();
 
@@ -563,7 +578,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("Procedural Binding")).toBeTruthy();
     expect(screen.getAllByText(/retreat \+ intent.move_away \+ intent.maintain_line_of_sight \+ intent.place_block/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Admission")).toBeTruthy();
-    expect(screen.getByText(/Candidate: retreat while tracking threat/i)).toBeTruthy();
+    expect(screen.getAllByText(/Candidate: retreat while tracking threat/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/agent executable: false/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /execute|run command|auto move|auto place/i })).toBeNull();
   });

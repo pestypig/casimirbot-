@@ -794,11 +794,11 @@ export default function DesktopPage({
           </>
         )}
 
-        {layoutVariant === "desktop" ? (
+        {layoutVariant === "desktop" && !workstationEnabled ? (
           <DesktopTaskbar
             onOpenPanel={openPanelUniversal}
-            showStart={!workstationEnabled}
-            showWindowTabs={!workstationEnabled}
+            showStart
+            showWindowTabs
           />
         ) : null}
       </div>

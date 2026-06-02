@@ -5,6 +5,7 @@ import {
   AlignRight,
   ArrowLeft,
   Bold,
+  Check,
   Code,
   Eraser,
   FileText,
@@ -14,6 +15,7 @@ import {
   Link,
   List,
   ListOrdered,
+  Loader2,
   Plus,
   Quote,
   Redo2,
@@ -23,6 +25,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { cn } from "@/lib/utils";
 
 function formatWhen(value: string): string {
@@ -138,6 +141,15 @@ type EditorCommand =
   | { id: string; label: string; icon: React.ComponentType<{ className?: string }>; command: string; value?: string }
   | { id: string; label: string; icon: React.ComponentType<{ className?: string }>; action: "link" };
 
+type NoteSaveState = "saved" | "saving";
+
+type WorkstationNoteSessionSaveSnapshot = {
+  note_id: string;
+  title: string;
+  body: string;
+  saved_at: string;
+};
+
 const editorCommandGroups: EditorCommand[][] = [
   [
     { id: "undo", label: "Undo", icon: Undo2, command: "undo" },
@@ -180,17 +192,22 @@ export default function WorkstationNotesPanel() {
   const updateBody = useWorkstationNotesStore((state) => state.updateNoteBody);
   const renameNote = useWorkstationNotesStore((state) => state.renameNote);
   const deleteNote = useWorkstationNotesStore((state) => state.deleteNote);
+  const rememberDraft = useWorkstationSessionMemoryStore((state) => state.rememberDraft);
   const [viewMode, setViewMode] = React.useState<"list" | "reader">("list");
+  const [saveState, setSaveState] = React.useState<NoteSaveState>("saved");
   const noteRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
   const editorRef = React.useRef<HTMLDivElement | null>(null);
   const editorSelectionRef = React.useRef<Range | null>(null);
   const lastActiveNoteIdRef = React.useRef(activeNoteId);
+  const saveStateTimeoutRef = React.useRef<number | null>(null);
+  const pendingEditorSaveFrameRef = React.useRef<number | null>(null);
 
   const noteList = React.useMemo(
     () => order.map((id) => notes[id]).filter(Boolean),
     [notes, order],
   );
   const activeNote = activeNoteId ? notes[activeNoteId] : undefined;
+  const activeNoteTitle = activeNote?.title ?? "";
 
   const editorHtml = React.useMemo(
     () => sanitizeRichNoteHtml(activeNote?.body ?? ""),
@@ -201,6 +218,7 @@ export default function WorkstationNotesPanel() {
     if (!activeNoteId || lastActiveNoteIdRef.current === activeNoteId) return;
     lastActiveNoteIdRef.current = activeNoteId;
     setViewMode("reader");
+    setSaveState("saved");
   }, [activeNoteId]);
 
   React.useEffect(() => {
@@ -236,6 +254,37 @@ export default function WorkstationNotesPanel() {
     return () => document.removeEventListener("selectionchange", updateSelection);
   }, []);
 
+  React.useEffect(() => {
+    return () => {
+      if (saveStateTimeoutRef.current !== null) {
+        window.clearTimeout(saveStateTimeoutRef.current);
+      }
+      if (pendingEditorSaveFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingEditorSaveFrameRef.current);
+      }
+    };
+  }, []);
+
+  const markAutosave = React.useCallback(
+    (snapshot?: WorkstationNoteSessionSaveSnapshot) => {
+      if (snapshot) {
+        rememberDraft(
+          `workstation-notes:${snapshot.note_id}:document`,
+          JSON.stringify(snapshot),
+        );
+      }
+      setSaveState("saving");
+      if (saveStateTimeoutRef.current !== null) {
+        window.clearTimeout(saveStateTimeoutRef.current);
+      }
+      saveStateTimeoutRef.current = window.setTimeout(() => {
+        setSaveState("saved");
+        saveStateTimeoutRef.current = null;
+      }, 450);
+    },
+    [rememberDraft],
+  );
+
   const handleSelectNote = React.useCallback(
     (noteId: string) => {
       setActiveNote(noteId);
@@ -258,6 +307,21 @@ export default function WorkstationNotesPanel() {
     setViewMode("reader");
   }, [createManualNote, setActiveNote]);
 
+  const handleRenameNote = React.useCallback(
+    (title: string) => {
+      if (!activeNote) return;
+      renameNote(activeNote.id, title);
+      rememberDraft(`workstation-notes:${activeNote.id}:title`, title);
+      markAutosave({
+        note_id: activeNote.id,
+        title,
+        body: activeNote.body,
+        saved_at: new Date().toISOString(),
+      });
+    },
+    [activeNote, markAutosave, rememberDraft, renameNote],
+  );
+
   const persistEditorHtml = React.useCallback(() => {
     if (!activeNote || !editorRef.current) return;
     const html = sanitizeRichNoteHtml(editorRef.current.innerHTML);
@@ -265,7 +329,24 @@ export default function WorkstationNotesPanel() {
       editorRef.current.innerHTML = html;
     }
     updateBody(activeNote.id, html);
-  }, [activeNote, updateBody]);
+    rememberDraft(`workstation-notes:${activeNote.id}:body`, html);
+    markAutosave({
+      note_id: activeNote.id,
+      title: activeNote.title,
+      body: html,
+      saved_at: new Date().toISOString(),
+    });
+  }, [activeNote, markAutosave, rememberDraft, updateBody]);
+
+  const scheduleEditorSave = React.useCallback(() => {
+    if (pendingEditorSaveFrameRef.current !== null) {
+      window.cancelAnimationFrame(pendingEditorSaveFrameRef.current);
+    }
+    pendingEditorSaveFrameRef.current = window.requestAnimationFrame(() => {
+      pendingEditorSaveFrameRef.current = null;
+      persistEditorHtml();
+    });
+  }, [persistEditorHtml]);
 
   const runEditorCommand = React.useCallback(
     (command: EditorCommand) => {
@@ -331,24 +412,38 @@ export default function WorkstationNotesPanel() {
                 {noteList.map((note) => {
                   const selected = note.id === activeNoteId;
                   return (
-                    <button
+                    <div
                       key={note.id}
-                      ref={(node) => {
-                        noteRefs.current[note.id] = node;
-                      }}
-                      type="button"
-                      onClick={() => handleSelectNote(note.id)}
                       className={cn(
-                        "w-full rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
+                        "flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors",
                         selected
                           ? "bg-cyan-500/20 text-white ring-1 ring-cyan-500/60"
                           : "text-slate-200 hover:bg-white/5",
                       )}
                     >
-                      <p className="break-words text-sm font-medium leading-tight">{note.title}</p>
-                      <p className="mt-1 break-words text-[11px] text-slate-400">{note.topic}</p>
-                      <p className="mt-1 text-[10px] text-slate-500">{formatWhen(note.updated_at)}</p>
-                    </button>
+                      <button
+                        ref={(node) => {
+                          noteRefs.current[note.id] = node;
+                        }}
+                        type="button"
+                        onClick={() => handleSelectNote(note.id)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="break-words text-sm font-medium leading-tight">
+                          {note.title.trim() || "Untitled note"}
+                        </p>
+                        <p className="mt-1 break-words text-[11px] text-slate-400">{note.topic}</p>
+                        <p className="mt-1 text-[10px] text-slate-500">{formatWhen(note.updated_at)}</p>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${note.title.trim() || "Untitled note"}`}
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -380,29 +475,35 @@ export default function WorkstationNotesPanel() {
                   <ArrowLeft className="mx-auto h-4 w-4" />
                 </button>
                 <input
-                  value={activeNote.title}
-                  onChange={(event) => renameNote(activeNote.id, event.target.value)}
+                  value={activeNoteTitle}
+                  onChange={(event) => handleRenameNote(event.target.value)}
+                  placeholder="Untitled note"
                   className="min-w-0 flex-1 rounded border border-white/20 bg-slate-900 px-2 py-1 text-sm text-slate-100"
                 />
                 <button
                   type="button"
-                  onClick={handleCreateNote}
-                  className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 hover:bg-cyan-500/20"
+                  disabled
+                  aria-label={saveState === "saving" ? "Saving session" : "Session saved"}
+                  title={saveState === "saving" ? "Saving session" : "Session saved"}
+                  className={cn(
+                    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-slate-100",
+                    saveState === "saving"
+                      ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"
+                      : "border-emerald-400/40 bg-emerald-500/10 text-emerald-100",
+                  )}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  New
+                  {saveState === "saving" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteNote(activeNote.id)}
-                  className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-xs text-rose-200 hover:bg-rose-500/20"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </button>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {saveState === "saving" ? "Saving session" : "Session saved"}
+                </span>
               </div>
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[1fr_320px]">
-                <div className="flex min-h-0 flex-col border-b border-white/10 lg:border-b-0 lg:border-r lg:border-white/10">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col">
                   <div className="flex flex-wrap gap-1 border-b border-white/10 bg-slate-950/80 px-3 py-2">
                     {editorCommandGroups.map((group, groupIndex) => (
                       <div
@@ -435,29 +536,13 @@ export default function WorkstationNotesPanel() {
                     role="textbox"
                     aria-label="Workstation note document editor"
                     data-placeholder="Type or paste long-form notes here..."
-                    onInput={persistEditorHtml}
+                    onInput={scheduleEditorSave}
+                    onKeyUp={scheduleEditorSave}
+                    onPaste={scheduleEditorSave}
                     onBlur={persistEditorHtml}
                     className="prose prose-invert prose-sm min-h-[420px] max-w-none flex-1 overflow-y-auto bg-slate-950 px-5 py-4 text-sm leading-6 text-slate-100 outline-none prose-headings:text-white prose-a:text-cyan-300 prose-blockquote:border-cyan-400/40 prose-blockquote:text-slate-300 prose-code:text-cyan-100 empty:before:pointer-events-none empty:before:text-slate-500 empty:before:content-[attr(data-placeholder)]"
                     suppressContentEditableWarning
                   />
-                </div>
-                <div className="min-h-0 overflow-auto p-3 text-xs text-slate-300">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Citations</p>
-                  <div className="mt-2 space-y-2">
-                    {activeNote.citations.length === 0 ? (
-                      <p className="text-slate-500">No citations recorded.</p>
-                    ) : (
-                      activeNote.citations.map((citation) => (
-                        <div key={citation.id} className="rounded border border-white/10 bg-black/20 p-2">
-                          <p className="font-medium text-slate-100">{citation.heading}</p>
-                          <p className="mt-1 break-all text-[11px] text-slate-400">{citation.path}</p>
-                          <p className="mt-1 text-[10px] text-slate-500">
-                            offsets {citation.start_offset}-{citation.end_offset}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
                 </div>
               </div>
             </>

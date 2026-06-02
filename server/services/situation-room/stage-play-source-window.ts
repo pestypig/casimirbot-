@@ -6,6 +6,7 @@ import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descri
 import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
 import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
 import type {
+  StagePlaySourceRouteTargetV1,
   StagePlaySourceRouteV1,
   StagePlaySourceRoutingEntryV1,
   StagePlaySourceRoutingStatusV1,
@@ -45,6 +46,7 @@ export type StagePlaySourceWindowV1 = {
   latestEventWindowRefs: string[];
   latestRawSessionBufferRefs: string[];
   sources: StagePlaySourceRoutingEntryV1[];
+  sourceRoutes: StagePlaySourceRouteV1[];
   evidenceRefs: string[];
   compactFacts: {
     sourceDescriptors: Array<{
@@ -314,7 +316,7 @@ const compactEventWindow = (
   latestEventTs: query.events.at(-1)?.ts ?? null,
 });
 
-const routeForModality = (modality: string): StagePlaySourceRouteV1 => {
+const routeForModality = (modality: string): StagePlaySourceRouteTargetV1 => {
   if (/minecraft|world_event|environment_state|environment_affordance/.test(modality)) return "world_stage_play";
   if (modality === "visual_frame") return "visual_context";
   if (modality === "audio_transcript" || modality === "text_chat" || modality === "document_context" || modality === "note_context") {
@@ -340,7 +342,7 @@ const normalizeRoutingStatus = (value: string | null | undefined): StagePlaySour
 
 const selectedForStagePlay = (
   status: StagePlaySourceRoutingStatusV1,
-  routeTo: StagePlaySourceRouteV1,
+  routeTo: StagePlaySourceRouteTargetV1,
   evidenceRefs: string[],
 ): boolean =>
   evidenceRefs.length > 0 &&
@@ -380,12 +382,21 @@ const nextRequiredActionFor = (status: StagePlaySourceRoutingStatusV1, modality:
   return null;
 };
 
+const routeFromSource = (source: StagePlaySourceRoutingEntryV1): StagePlaySourceRouteV1 => ({
+  sourceId: source.sourceId,
+  modality: source.modality,
+  routeTo: source.routeTo,
+  selected: source.selectedForStagePlay,
+  confidence: source.fidelityScore,
+  freshness: source.status,
+});
+
 export function buildDefaultStagePlayRoutingSources(input: {
   threadId?: string | null;
   environmentId?: string | null;
 } = {}): StagePlaySourceRoutingEntryV1[] {
   void input;
-  return [
+  return ([
     {
       sourceId: "source:visual-frame",
       modality: "visual_frame",
@@ -442,7 +453,10 @@ export function buildDefaultStagePlayRoutingSources(input: {
       nextRequiredAction: null,
       evidenceRefs: [],
     },
-  ];
+  ] as StagePlaySourceRoutingEntryV1[]).map((source) => ({
+    ...source,
+    route: routeFromSource(source),
+  }));
 }
 
 const compactRoutedSource = (input: {
@@ -460,7 +474,7 @@ const compactRoutedSource = (input: {
   const status = normalizeRoutingStatus(input.status);
   const routeTo = routeForModality(input.modality);
   const evidenceRefs = uniqueStrings(input.evidenceRefs);
-  return {
+  const source: StagePlaySourceRoutingEntryV1 = {
     sourceId: input.sourceId,
     modality: input.modality,
     status,
@@ -479,6 +493,10 @@ const compactRoutedSource = (input: {
     missingReason: sourceMissingReason(status, input.modality),
     nextRequiredAction: nextRequiredActionFor(status, input.modality),
     evidenceRefs,
+  };
+  return {
+    ...source,
+    route: routeFromSource(source),
   };
 };
 
@@ -636,7 +654,10 @@ function buildStagePlayRoutingSources(input: {
     }
   }
 
-  return Array.from(byKey.values()).sort((a, b) =>
+  return Array.from(byKey.values()).map((source) => ({
+    ...source,
+    route: routeFromSource(source),
+  })).sort((a, b) =>
     Number(b.selectedForStagePlay) - Number(a.selectedForStagePlay) ||
     a.routeTo.localeCompare(b.routeTo) ||
     a.modality.localeCompare(b.modality) ||
@@ -746,6 +767,7 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     eventWindow: compactEventWindow(eventWindow),
   };
   const sources = buildStagePlayRoutingSources({ descriptors, producers, observations, snapshot, capabilities, rawSessionBufferEntries });
+  const sourceRoutes = sources.map(routeFromSource);
 
   return {
     schemaVersion: STAGE_PLAY_SOURCE_WINDOW_SCHEMA,
@@ -768,6 +790,7 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     latestEventWindowRefs: eventWindow.events.map((event) => event.journal_event_id),
     latestRawSessionBufferRefs: rawSessionBufferEntries.map((entry) => entry.entryId),
     sources,
+    sourceRoutes,
     evidenceRefs: uniqueStrings([
       ...descriptors.flatMap((descriptor) => [
         descriptor.descriptor_id,

@@ -39,6 +39,13 @@ export const CHAT_CONTEXT_BUDGET =
   Number.isFinite(rawBudget) && rawBudget > 0 ? Math.floor(rawBudget) : 8192;
 
 const STORAGE_KEY = "agi-chat-sessions-v1";
+const DEFAULT_CHAT_TITLES = new Set(["New chat", "Helix Ask"]);
+
+function titleFromFirstMessage(content: string): string {
+  const normalized = content.trim().replace(/\s+/g, " ");
+  if (!normalized) return "New chat";
+  return normalized.length > 64 ? `${normalized.slice(0, 61)}...` : normalized;
+}
 
 export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
   persist(
@@ -79,6 +86,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
               ...state.sessions,
               [sessionId]: {
                 ...target,
+                title:
+                  partial.role === "user" &&
+                  target.messages.length === 0 &&
+                  (DEFAULT_CHAT_TITLES.has(target.title) || target.title === target.contextId)
+                    ? titleFromFirstMessage(partial.content)
+                    : target.title,
                 messages: [...target.messages, complete],
                 updatedAt: complete.at
               }

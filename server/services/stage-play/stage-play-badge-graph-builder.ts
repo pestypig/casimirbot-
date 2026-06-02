@@ -110,6 +110,7 @@ const badge = (input: {
   preserves?: string[];
   requires?: string[];
   blocks?: string[];
+  missingEvidence?: string[];
   admission?: StagePlayBadgeV1["admission"];
 }): StagePlayBadgeV1 => ({
   id: input.id,
@@ -124,7 +125,7 @@ const badge = (input: {
   sourceRefs: input.sourceRefs,
   evidenceRefs: input.evidenceRefs,
   confidence: input.confidence ?? 0.74,
-  missingEvidence: [],
+  missingEvidence: input.missingEvidence ?? [],
   reasonCodes: input.reasonCodes ?? [],
   intentModule: input.intentVerb
     ? {
@@ -270,6 +271,196 @@ const observerBadge = (input: {
     reasonCodes: ["observer_source_custody", "stage_play_source_routing"],
     admission: "auto",
   });
+};
+
+const sourceRouteOf = (source: StagePlayBadgeGraphV1["sourceWindow"]["sources"][number]) =>
+  source.route ?? {
+    sourceId: source.sourceId,
+    modality: source.modality,
+    routeTo: source.routeTo,
+    selected: source.selectedForStagePlay,
+    confidence: source.fidelityScore,
+    freshness: source.status,
+  };
+
+const isSourceUsableForFusion = (source: StagePlayBadgeGraphV1["sourceWindow"]["sources"][number]): boolean =>
+  source.evidenceRefs.length > 0 &&
+  (source.status === "active" || source.status === "stale") &&
+  source.routeTo !== "debug_only";
+
+const modalityMatches = (
+  source: StagePlayBadgeGraphV1["sourceWindow"]["sources"][number],
+  pattern: RegExp,
+): boolean => pattern.test(lower(source.modality));
+
+const addFusionBadges = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  input: {
+    observerId: string;
+    interpreterId: string;
+    sourceRefs: StagePlayBadgeSourceRefV1[];
+    evidenceRefs: string[];
+    sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+  },
+): void => {
+  const sources = input.sources;
+  const visualSources = sources.filter((source) =>
+    modalityMatches(source, /visual|screen_capture|browser_tab_visual/)
+  );
+  const audioSources = sources.filter((source) =>
+    modalityMatches(source, /audio|transcript|browser_tab_audio/)
+  );
+  const worldSources = sources.filter((source) =>
+    modalityMatches(source, /minecraft|world_event|environment_state|environment_affordance/)
+  );
+  const activeVisual = visualSources.filter(isSourceUsableForFusion);
+  const activeAudio = audioSources.filter(isSourceUsableForFusion);
+  const activeWorld = worldSources.filter(isSourceUsableForFusion);
+  const fusionEvidence = unique([
+    ...input.evidenceRefs,
+    ...sources.flatMap((source) => source.evidenceRefs),
+  ]);
+  const sourceBadgeIdsFor = (
+    selectedSources: StagePlayBadgeGraphV1["sourceWindow"]["sources"],
+  ): string[] =>
+    badges
+      .filter((entry) => entry.kind === "source" && selectedSources.some((source) => entry.subjects.includes(source.sourceId)))
+      .map((entry) => entry.id);
+  const pushFusion = (fusion: {
+    id: string;
+    title: string;
+    meaning: string;
+    status: StagePlayBadgeStatusV1;
+    selectedSources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+    reasonCodes: string[];
+    confidence: number;
+    missingEvidence?: string[];
+  }) => {
+    const selectedSourceIds = unique(fusion.selectedSources.map((source) => source.sourceId));
+    const badgeId = pushBadge(badges, badge({
+      id: fusion.id,
+      title: fusion.title,
+      plainMeaning: fusion.meaning,
+      whyItMatters: "Fusion badges show whether a stage fact came from audio-only, visual-only, world-only, or combined source evidence.",
+      kind: "fusion",
+      status: fusion.status,
+      subjects: selectedSourceIds,
+      tags: [
+        "fusion",
+        ...unique(fusion.selectedSources.map((source) => source.modality)),
+        ...unique(fusion.selectedSources.map((source) => source.routeTo)),
+      ],
+      sourceRefs: input.sourceRefs,
+      evidenceRefs: unique([
+        ...fusionEvidence,
+        ...fusion.selectedSources.flatMap((source) => source.evidenceRefs),
+      ]),
+      confidence: fusion.confidence,
+      liveBindings: fusion.selectedSources.map((source) => {
+        const route = sourceRouteOf(source);
+        return makeBinding("source_modality", source.evidenceRefs, `${route.modality}->${route.routeTo}:${route.freshness}:${route.confidence.toFixed(2)}`);
+      }),
+      reasonCodes: fusion.reasonCodes,
+      missingEvidence: fusion.missingEvidence ?? [],
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: input.observerId,
+      to: badgeId,
+      relation: "observes",
+      label: "observer compares routed source modalities",
+      evidenceRefs: fusionEvidence,
+      reasonCodes: ["observer_source_fusion"],
+    });
+    pushEdge(edges, {
+      from: badgeId,
+      to: input.interpreterId,
+      relation: "feeds",
+      label: "fusion node feeds compact interpretation",
+      evidenceRefs: fusionEvidence,
+      reasonCodes: ["fusion_interpreter_binding"],
+    });
+    for (const sourceBadgeId of sourceBadgeIdsFor(fusion.selectedSources)) {
+      pushEdge(edges, {
+        from: sourceBadgeId,
+        to: badgeId,
+        relation: "feeds",
+        label: "routed source contributes to fusion node",
+        evidenceRefs: fusionEvidence,
+        reasonCodes: ["source_fusion_binding"],
+      });
+    }
+  };
+
+  if (activeAudio.length > 0 && activeVisual.length > 0) {
+    const selectedSources = [...activeAudio, ...activeVisual];
+    pushFusion({
+      id: "fusion.audio_visual_scene",
+      title: "audio + visual scene",
+      meaning: "Audio/transcript and visual frame sources are both available for the same compact Stage Play window.",
+      status: "observed",
+      selectedSources,
+      reasonCodes: ["audio_visual_same_window", "compact_scene_observation_candidate"],
+      confidence: Math.min(0.9, selectedSources.reduce((sum, source) => sum + source.fidelityScore, 0) / selectedSources.length + 0.08),
+    });
+  }
+
+  if (activeWorld.length > 0 && activeVisual.length > 0) {
+    const selectedSources = [...activeWorld, ...activeVisual];
+    pushFusion({
+      id: "fusion.world_event_visual_alignment",
+      title: "world + visual alignment",
+      meaning: "World-event or environment-state evidence and visual evidence are both available to strengthen observed state.",
+      status: "observed",
+      selectedSources,
+      reasonCodes: ["world_event_visual_same_window", "stronger_observed_state"],
+      confidence: Math.min(0.92, selectedSources.reduce((sum, source) => sum + source.fidelityScore, 0) / selectedSources.length + 0.1),
+    });
+  }
+
+  const conflictText = lower(sources.map((source) => [
+    source.contribution,
+    source.missingReason,
+    source.nextRequiredAction,
+    ...source.evidenceRefs,
+  ].filter(Boolean).join(" ")).join(" "));
+  if (activeAudio.length > 0 && activeVisual.length > 0 && /conflict|contradict|mismatch|different actor|identity split/.test(conflictText)) {
+    pushFusion({
+      id: "fusion.source_conflict",
+      title: "source conflict",
+      meaning: "Compact routed sources carry an explicit conflict or mismatch marker that needs review before prediction.",
+      status: "blocked",
+      selectedSources: [...activeAudio, ...activeVisual],
+      reasonCodes: ["source_conflict", "requires_user_review"],
+      confidence: 0.74,
+      missingEvidence: ["Resolve the compact source conflict before treating the fused scene as stable."],
+    });
+  }
+
+  if (activeVisual.length > 0 && activeAudio.length === 0) {
+    pushFusion({
+      id: "fusion.missing_modality",
+      title: "missing audio modality",
+      meaning: "Visual context is available, but audio/transcript evidence is missing for narrative intent and dialogue.",
+      status: "missing_evidence",
+      selectedSources: visualSources.length > 0 ? visualSources : activeVisual,
+      reasonCodes: ["visual_active_audio_missing", "missing_modality"],
+      confidence: 0.62,
+      missingEvidence: ["Attach browser audio transcript or microphone transcript for narrative Stage Play fusion."],
+    });
+  } else if (activeAudio.length > 0 && activeVisual.length === 0) {
+    pushFusion({
+      id: "fusion.missing_modality",
+      title: "missing visual grounding",
+      meaning: "Audio/transcript context is available, but visual grounding is missing for setting, actors, and action state.",
+      status: "missing_evidence",
+      selectedSources: audioSources.length > 0 ? audioSources : activeAudio,
+      reasonCodes: ["audio_active_visual_missing", "missing_visual_grounding"],
+      confidence: 0.62,
+      missingEvidence: ["Start visual interval capture to ground narrative Stage Play predictions."],
+    });
+  }
 };
 
 const addBinding = (
@@ -426,6 +617,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     latestSourceProducerRefs: [],
     latestRawSessionBufferRefs: [],
     sources: defaultSources,
+    sourceRoutes: defaultSources.map((source) => source.route ?? {
+      sourceId: source.sourceId,
+      modality: source.modality,
+      routeTo: source.routeTo,
+      selected: source.selectedForStagePlay,
+      confidence: source.fidelityScore,
+      freshness: source.status,
+    }),
     latestSnapshotRefs: [],
     latestDeltaOverlayRefs: [],
     latestNavigationRefs: [],
@@ -596,6 +795,13 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     label: "observer routes selected source handles to the interpreter boundary",
     evidenceRefs,
     reasonCodes: ["observer_interpreter_routing"],
+  });
+  addFusionBadges(badges, edges, {
+    observerId,
+    interpreterId,
+    sourceRefs,
+    evidenceRefs,
+    sources: sourceWindow.sources,
   });
 
   const settingIds: string[] = [];
@@ -1163,6 +1369,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       latestSourceProducerRefs: sourceWindow.latestSourceProducerRefs,
       latestRawSessionBufferRefs: sourceWindow.latestRawSessionBufferRefs,
       sources: sourceWindow.sources,
+      sourceRoutes: sourceWindow.sourceRoutes,
       latestSnapshotRefs: sourceWindow.latestSnapshotRefs,
       latestDeltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
       latestNavigationRefs: unique([

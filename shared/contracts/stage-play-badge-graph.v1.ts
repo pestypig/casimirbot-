@@ -7,6 +7,7 @@ export const STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION =
 export const STAGE_PLAY_BADGE_KINDS = [
   "observer",
   "source",
+  "fusion",
   "interpreter",
   "setting",
   "actor",
@@ -89,6 +90,7 @@ export const STAGE_PLAY_SOURCE_REF_KINDS = [
   "route_solver_observation",
   "world_sense_context",
   "stage_play_raw_session_buffer_entry",
+  "stage_play_compact_observation",
   "synthetic_evidence",
 ] as const;
 
@@ -132,6 +134,14 @@ export const STAGE_PLAY_INTENT_VERBS = [
   "close",
   "enter_portal",
   "avoid",
+  "attack",
+  "delay",
+  "negotiate",
+  "reveal_information",
+  "seek_confirmation",
+  "deceive",
+  "escalate",
+  "deescalate",
   "ask_user",
 ] as const;
 
@@ -146,7 +156,15 @@ export const STAGE_PLAY_RECOMMENDED_ACTION_TYPES = [
 
 export type StagePlayBadgeKindV1 = (typeof STAGE_PLAY_BADGE_KINDS)[number];
 export type StagePlaySourceRoutingStatusV1 = (typeof STAGE_PLAY_SOURCE_ROUTING_STATUSES)[number];
-export type StagePlaySourceRouteV1 = (typeof STAGE_PLAY_SOURCE_ROUTES)[number];
+export type StagePlaySourceRouteTargetV1 = (typeof STAGE_PLAY_SOURCE_ROUTES)[number];
+export type StagePlaySourceRouteV1 = {
+  sourceId: string;
+  modality: string;
+  routeTo: StagePlaySourceRouteTargetV1;
+  selected: boolean;
+  confidence: number;
+  freshness: string;
+};
 export type StagePlayBadgeStatusV1 = (typeof STAGE_PLAY_BADGE_STATUSES)[number];
 export type StagePlayBadgeEdgeRelationV1 = (typeof STAGE_PLAY_EDGE_RELATIONS)[number];
 export type StagePlayBadgeSourceRefKindV1 = (typeof STAGE_PLAY_SOURCE_REF_KINDS)[number];
@@ -273,7 +291,8 @@ export type StagePlaySourceRoutingEntryV1 = {
   contribution: string;
   fidelityScore: number;
   selectedForStagePlay: boolean;
-  routeTo: StagePlaySourceRouteV1;
+  routeTo: StagePlaySourceRouteTargetV1;
+  route?: StagePlaySourceRouteV1;
   cadenceMs?: number | null;
   lastEventTs?: string | null;
   missingReason?: string | null;
@@ -300,6 +319,7 @@ export type StagePlayBadgeGraphV1 = {
     latestSourceProducerRefs?: string[];
     latestRawSessionBufferRefs?: string[];
     sources: StagePlaySourceRoutingEntryV1[];
+    sourceRoutes?: StagePlaySourceRouteV1[];
     latestSnapshotRefs: string[];
     latestDeltaOverlayRefs: string[];
     latestNavigationRefs: string[];
@@ -401,6 +421,17 @@ export function buildStagePlayBadgeGraphSummaryV1(
 }
 
 export function buildStagePlayBadgeGraphV1(input: BuildStagePlayBadgeGraphV1Input): StagePlayBadgeGraphV1 {
+  const sources = Array.isArray(input.sourceWindow.sources) ? input.sourceWindow.sources : [];
+  const sourceRoutes = Array.isArray(input.sourceWindow.sourceRoutes)
+    ? input.sourceWindow.sourceRoutes
+    : sources.map((source) => source.route ?? {
+        sourceId: source.sourceId,
+        modality: source.modality,
+        routeTo: source.routeTo,
+        selected: source.selectedForStagePlay,
+        confidence: source.fidelityScore,
+        freshness: source.status,
+      });
   return {
     artifactId: STAGE_PLAY_BADGE_GRAPH_ARTIFACT_ID,
     schemaVersion: STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION,
@@ -408,7 +439,11 @@ export function buildStagePlayBadgeGraphV1(input: BuildStagePlayBadgeGraphV1Inpu
     graphId: input.graphId,
     title: input.title,
     description: input.description,
-    sourceWindow: input.sourceWindow,
+    sourceWindow: {
+      ...input.sourceWindow,
+      sources,
+      sourceRoutes,
+    },
     badges: input.badges,
     edges: input.edges,
     recommendedActions: input.recommendedActions,
@@ -473,6 +508,27 @@ function validateLiveBindings(prefix: string, value: unknown, issues: string[]):
   }
 }
 
+function validateSourceRoute(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  if (!isNonEmptyString(value.sourceId)) issues.push(`${prefix}.sourceId must be a non-empty string`);
+  if (!isNonEmptyString(value.modality)) issues.push(`${prefix}.modality must be a non-empty string`);
+  if (!includes(STAGE_PLAY_SOURCE_ROUTES, value.routeTo)) {
+    issues.push(`${prefix}.routeTo is invalid`);
+  }
+  if (typeof value.selected !== "boolean") {
+    issues.push(`${prefix}.selected must be boolean`);
+  }
+  if (!isConfidence(value.confidence)) {
+    issues.push(`${prefix}.confidence must be between 0 and 1`);
+  }
+  if (!isNonEmptyString(value.freshness)) {
+    issues.push(`${prefix}.freshness must be a non-empty string`);
+  }
+}
+
 export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   const issues: string[] = [];
   if (!isRecord(value)) return ["graph must be an object"];
@@ -529,6 +585,9 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
         if (!includes(STAGE_PLAY_SOURCE_ROUTES, rawSource.routeTo)) {
           issues.push(`${sourcePrefix}.routeTo is invalid`);
         }
+        if (rawSource.route != null) {
+          validateSourceRoute(`${sourcePrefix}.route`, rawSource.route, issues);
+        }
         if (rawSource.cadenceMs != null && (typeof rawSource.cadenceMs !== "number" || !Number.isFinite(rawSource.cadenceMs) || rawSource.cadenceMs < 0)) {
           issues.push(`${sourcePrefix}.cadenceMs must be a non-negative number or null`);
         }
@@ -543,6 +602,15 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
         }
         if (!isStringArray(rawSource.evidenceRefs)) {
           issues.push(`${sourcePrefix}.evidenceRefs must be strings`);
+        }
+      }
+    }
+    if (value.sourceWindow.sourceRoutes != null) {
+      if (!Array.isArray(value.sourceWindow.sourceRoutes)) {
+        issues.push("sourceWindow.sourceRoutes must be an array");
+      } else {
+        for (const [index, rawRoute] of value.sourceWindow.sourceRoutes.entries()) {
+          validateSourceRoute(`sourceWindow.sourceRoutes[${index}]`, rawRoute, issues);
         }
       }
     }

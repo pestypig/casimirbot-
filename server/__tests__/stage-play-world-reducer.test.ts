@@ -20,6 +20,7 @@ import {
   resetLiveSourceDescriptorsForTest,
   upsertLiveSourceDescriptor,
 } from "../services/situation-room/live-source-descriptor-builder";
+import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import {
   recordMinecraftRouteSolverObservation,
   resetMinecraftNavigationStateStoreForTest,
@@ -44,6 +45,7 @@ beforeEach(() => {
   resetMinecraftWorldSenseWindows();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetSituationSourceCapabilitiesForTest();
   resetStagePlayRawSessionBufferForTest();
   clearEventJournalForTest();
 });
@@ -328,6 +330,25 @@ describe("Stage Play world-state badge reducer", () => {
         nextRequiredAction: "Attach audio transcript",
       }),
     ]));
+    expect(graph.sourceWindow.sourceRoutes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:minecraft-server",
+        modality: "world_event",
+        routeTo: "world_stage_play",
+        selected: true,
+        freshness: "active",
+      }),
+      expect.objectContaining({
+        modality: "visual_frame",
+        routeTo: "visual_context",
+        selected: false,
+      }),
+      expect.objectContaining({
+        modality: "audio_transcript",
+        routeTo: "narrative_stage_play",
+        selected: false,
+      }),
+    ]));
     const sourceBadge = graph.badges.find((badge) => badge.kind === "source");
     expect(sourceBadge).toMatchObject({
       kind: "source",
@@ -418,5 +439,310 @@ describe("Stage Play world-state badge reducer", () => {
     expect(graph.authority.agent_executable).toBe(false);
     expect(JSON.stringify(graph)).not.toContain("raw_chunk");
     expect(JSON.stringify(graph)).not.toContain("raw_user_text");
+  });
+
+  it("adds routed fusion badges when active audio, visual, and world sources overlap", () => {
+    const snapshot = normalizeEnvironmentStateSnapshot({
+      threadId,
+      snapshot: {
+        snapshot_id: "snapshot:stage-play-fusion",
+        domain: "minecraft",
+        domain_adapter: "minecraft.adapter.v1",
+        room_id: roomId,
+        world_id: worldId,
+        source_id: "source:minecraft-server",
+        actor_id: "player:datdampig",
+        actor_label: "DatDamPig",
+        ts: "2026-06-02T13:00:00.000Z",
+        actor_state: {
+          pose: { position: { x: 0, y: 64, z: 0 }, facing: "east" },
+          health: 20,
+        },
+        changed_sections: ["actor_state"],
+        section_hashes: { actor_state: "actor-fusion" },
+        evidence_refs: ["evidence:world-snapshot"],
+      },
+    });
+    expect(snapshot).not.toBeNull();
+    ingestEnvironmentStateSnapshot(snapshot!);
+
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:visual-fusion",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:fusion",
+      source_id: "source:visual-tab",
+      source_kind: "screen_capture",
+      event_kind: "visual_summary",
+      observed_at: "2026-06-02T13:00:01.000Z",
+      freshness: { status: "fresh", age_ms: 10 },
+      provenance: { adapter: "browser.visual", confidence: "high" },
+      compact_summary: "Visual frame shows a command bridge.",
+      payload_summary: { visual: { scene_summary: "Command bridge.", confidence: "high" } },
+      evidence_refs: ["evidence:visual-frame"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:audio-fusion",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:fusion",
+      source_id: "source:browser-audio",
+      source_kind: "browser_audio",
+      event_kind: "transcript_segment",
+      observed_at: "2026-06-02T13:00:02.000Z",
+      freshness: { status: "fresh", age_ms: 10 },
+      provenance: { adapter: "browser.audio", confidence: "high" },
+      compact_summary: "Transcript mentions a commander delaying the order.",
+      payload_summary: {
+        transcript: {
+          text: "The commander delays the order.",
+          speaker_label: "Commander",
+        },
+      },
+      evidence_refs: ["evidence:audio-transcript"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:world-fusion",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:fusion",
+      source_id: "source:minecraft-server",
+      source_kind: "minecraft_world_events",
+      event_kind: "position_update",
+      observed_at: "2026-06-02T13:00:03.000Z",
+      freshness: { status: "fresh", age_ms: 10 },
+      provenance: { adapter: "minecraft.plugin", confidence: "high" },
+      compact_summary: "World event reports player position.",
+      evidence_refs: ["evidence:world-event", snapshot!.snapshot_id],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    upsertLiveSourceDescriptor({
+      source_id: "source:visual-tab",
+      thread_id: threadId,
+      environment_id: "env:fusion",
+      modality: "visual_frame",
+      user_label: "Browser tab visual",
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "browser_getDisplayMedia",
+      },
+      current_state: "active",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:visual-fusion"],
+    });
+    upsertLiveSourceDescriptor({
+      source_id: "source:browser-audio",
+      thread_id: threadId,
+      environment_id: "env:fusion",
+      modality: "audio_transcript",
+      user_label: "Browser tab audio",
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "browser_getDisplayMedia",
+      },
+      current_state: "active",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:audio-fusion"],
+    });
+    upsertLiveSourceDescriptor({
+      source_id: "source:minecraft-server",
+      thread_id: threadId,
+      environment_id: "env:fusion",
+      modality: "world_event",
+      user_label: "Minecraft world events",
+      serving_context: {
+        surface: "game",
+        source_origin: "minehut_plugin",
+      },
+      current_state: "active",
+      cadence_ms: 1000,
+      latest_observation_refs: ["live_source_observation:world-fusion"],
+    });
+
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-tab",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-fusion",
+      now: "2026-06-02T13:00:01.500Z",
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:browser-audio",
+      threadId,
+      modality: "audio_transcript",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:audio-fusion",
+      now: "2026-06-02T13:00:02.500Z",
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:minecraft-server",
+      threadId,
+      modality: "world_event",
+      status: "active",
+      cadenceMs: 1000,
+      captureMode: "push",
+      latestChunkId: "live_source_chunk:world-fusion",
+      now: "2026-06-02T13:00:03.500Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: "env:fusion",
+      objective: "track the active scene and the world state together",
+      now: new Date("2026-06-02T13:00:05.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.sourceWindow.sourceRoutes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-tab",
+        modality: "visual_frame",
+        routeTo: "visual_context",
+        selected: true,
+        freshness: "active",
+      }),
+      expect.objectContaining({
+        sourceId: "source:browser-audio",
+        modality: "audio_transcript",
+        routeTo: "narrative_stage_play",
+        selected: true,
+        freshness: "active",
+      }),
+      expect.objectContaining({
+        sourceId: "source:minecraft-server",
+        modality: "world_event",
+        routeTo: "world_stage_play",
+        selected: true,
+        freshness: "active",
+      }),
+    ]));
+    expect(graph.badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "fusion.audio_visual_scene",
+        kind: "fusion",
+        status: "observed",
+        admission: "auto",
+      }),
+      expect.objectContaining({
+        id: "fusion.world_event_visual_alignment",
+        kind: "fusion",
+        status: "observed",
+        admission: "auto",
+      }),
+    ]));
+    expect(graph.badges.find((badge) => badge.id === "fusion.audio_visual_scene")?.liveBindings.map((binding) => binding.compactValue))
+      .toEqual(expect.arrayContaining([
+        expect.stringContaining("audio_transcript->narrative_stage_play:active"),
+        expect.stringContaining("visual_frame->visual_context:active"),
+      ]));
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "fusion.audio_visual_scene",
+        to: "interpreter.stage_play_reflection",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "fusion.world_event_visual_alignment",
+        to: "interpreter.stage_play_reflection",
+        relation: "feeds",
+      }),
+    ]));
+    expect(JSON.stringify(graph)).not.toContain("raw_transcript");
+    expect(JSON.stringify(graph)).not.toContain("raw_chunk");
+  });
+
+  it("marks missing modality fusion when visual evidence lacks audio grounding", () => {
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:visual-only",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:visual-only",
+      source_id: "source:visual-tab",
+      source_kind: "screen_capture",
+      event_kind: "visual_summary",
+      observed_at: "2026-06-02T13:20:01.000Z",
+      freshness: { status: "fresh", age_ms: 10 },
+      provenance: { adapter: "browser.visual", confidence: "high" },
+      compact_summary: "Visual frame shows two actors in a meeting room.",
+      payload_summary: { visual: { scene_summary: "Meeting room.", confidence: "high" } },
+      evidence_refs: ["evidence:visual-only"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    upsertLiveSourceDescriptor({
+      source_id: "source:visual-tab",
+      thread_id: threadId,
+      environment_id: "env:visual-only",
+      modality: "visual_frame",
+      user_label: "Browser tab visual",
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "browser_getDisplayMedia",
+      },
+      current_state: "active",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:visual-only"],
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-tab",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-only",
+      now: "2026-06-02T13:20:01.500Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: "env:visual-only",
+      objective: "prepare a narrative Stage Play window",
+      now: new Date("2026-06-02T13:20:02.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.sourceWindow.sourceRoutes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-tab",
+        modality: "visual_frame",
+        selected: true,
+        routeTo: "visual_context",
+      }),
+      expect.objectContaining({
+        modality: "audio_transcript",
+        selected: false,
+        routeTo: "narrative_stage_play",
+      }),
+    ]));
+    expect(graph.badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "fusion.missing_modality",
+        kind: "fusion",
+        status: "missing_evidence",
+        reasonCodes: expect.arrayContaining(["visual_active_audio_missing", "missing_modality"]),
+        missingEvidence: expect.arrayContaining([
+          "Attach browser audio transcript or microphone transcript for narrative Stage Play fusion.",
+        ]),
+      }),
+    ]));
+    expect(graph.authority.agent_executable).toBe(false);
   });
 });

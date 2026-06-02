@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Link2, PanelLeftClose, PanelLeftOpen, Search, Waypoints } from "lucide-react";
+import { AlertTriangle, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -16,6 +16,11 @@ import type {
 } from "@shared/contracts/stage-play-builder.v1";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  diffStagePlayBadgeGraphs,
+  hasStagePlayGraphDiff,
+  type StagePlayGraphDiff,
+} from "@/lib/stage-play/stagePlayGraphDiff";
 import { useStagePlayBadgeGraphPanelStore } from "@/store/useStagePlayBadgeGraphPanelStore";
 import {
   selectActiveLiveAnswerEnvironment,
@@ -126,6 +131,58 @@ type StagePlayRawSessionBufferListResponse = {
   assistant_answer: false;
   context_role: "audit_buffer_not_graph";
 };
+
+type StagePlayLaneId =
+  | "observer"
+  | "compact_observations"
+  | "stage_bounds"
+  | "affordance_space"
+  | "intent_modules"
+  | "procedural_bindings"
+  | "predictions_next_checks"
+  | "validation_feedback"
+  | "live_answer_outputs";
+
+type StagePlayOutputNodeKind =
+  | "live_answer"
+  | "feedback"
+  | "next_check"
+  | "prediction"
+  | "validation"
+  | "handoff";
+
+type StagePlaySyntheticNodeKind = StagePlayOutputNodeKind | "compact_observation";
+
+type StagePlaySyntheticNode = {
+  id: string;
+  kind: StagePlaySyntheticNodeKind;
+  lane: StagePlayLaneId;
+  title: string;
+  status: "observed" | "candidate" | "blocked" | "missing_evidence" | "available";
+  evidenceRefs: string[];
+  relatedBadgeIds: string[];
+};
+
+type StagePlayRemovedBadgeGhost = {
+  id: string;
+  title: string;
+  kind: StagePlayBadgeV1["kind"];
+  status: StagePlayBadgeV1["status"];
+  lane: StagePlayLaneId;
+  rowIndex: number;
+};
+
+const STAGE_PLAY_LANES: Array<{ id: StagePlayLaneId; title: string }> = [
+  { id: "observer", title: "Observer / Sources" },
+  { id: "compact_observations", title: "Compact Observations" },
+  { id: "stage_bounds", title: "Stage Bounds" },
+  { id: "affordance_space", title: "Affordances / Blocked Moves" },
+  { id: "intent_modules", title: "Intent Modules" },
+  { id: "procedural_bindings", title: "Procedural Bindings" },
+  { id: "predictions_next_checks", title: "Predictions / Next Checks" },
+  { id: "validation_feedback", title: "Validation Feedback" },
+  { id: "live_answer_outputs", title: "Live Answer Outputs" },
+];
 
 async function fetchStagePlayBadgeGraph(input: {
   threadId: string;
@@ -238,6 +295,16 @@ function readClientCoordinate(value: number | undefined): number {
   return Number.isFinite(value) ? Number(value) : 0;
 }
 
+function formatStagePlayClock(value: string | null | undefined): string {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "--:--:--";
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 function statusTone(status: string): string {
   if (status === "blocked") return "border-rose-700 bg-rose-950/40 text-rose-100";
   if (status === "missing_evidence") return "border-amber-700 bg-amber-950/40 text-amber-100";
@@ -249,12 +316,170 @@ function statusTone(status: string): string {
 function kindTone(kind: string): string {
   if (kind === "observer") return "border-amber-800/70 bg-amber-950/25";
   if (kind === "source") return "border-sky-800/70 bg-sky-950/25";
+  if (kind === "fusion") return "border-indigo-800/70 bg-indigo-950/25";
   if (kind === "interpreter") return "border-fuchsia-800/70 bg-fuchsia-950/25";
   if (kind === "hazard" || kind === "blocked_affordance") return "border-rose-800/70 bg-rose-950/25";
   if (kind === "procedural_binding" || kind === "intent_module") return "border-violet-800/70 bg-violet-950/25";
   if (kind === "affordance" || kind === "resource") return "border-emerald-800/70 bg-emerald-950/25";
   if (kind === "setting" || kind === "actor") return "border-cyan-800/70 bg-cyan-950/25";
   return "border-slate-800 bg-slate-950/70";
+}
+
+function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
+  if (badge.kind === "observer" || badge.kind === "source") return "observer";
+  if (badge.kind === "fusion") return "compact_observations";
+  if (badge.kind === "interpreter") return "compact_observations";
+  if (
+    badge.kind === "setting" ||
+    badge.kind === "actor" ||
+    badge.kind === "prop" ||
+    badge.kind === "resource" ||
+    badge.kind === "hazard" ||
+    badge.kind === "constraint" ||
+    badge.kind === "goal" ||
+    badge.kind === "world_state"
+  ) return "stage_bounds";
+  if (badge.kind === "affordance" || badge.kind === "blocked_affordance") return "affordance_space";
+  if (badge.kind === "intent_module") return "intent_modules";
+  if (badge.kind === "procedural_binding") return "procedural_bindings";
+  if (badge.kind === "recommended_check" || badge.kind === "missing_evidence" || badge.kind === "admission_gate") {
+    return "predictions_next_checks";
+  }
+  return "stage_bounds";
+}
+
+function laneForDraftNode(node: DraftStagePlayNode): StagePlayLaneId {
+  return laneForBadge(node as unknown as StagePlayBadgeV1);
+}
+
+function removedGhostsForDiff(
+  previous: StagePlayBadgeGraphV1,
+  diff: StagePlayGraphDiff,
+): StagePlayRemovedBadgeGhost[] {
+  return diff.removedBadgeIds
+    .map((id) => {
+      const badge = previous.badges.find((entry) => entry.id === id);
+      if (!badge) return null;
+      const lane = laneForBadge(badge);
+      const rowIndex = previous.badges
+        .filter((entry) => laneForBadge(entry) === lane)
+        .findIndex((entry) => entry.id === badge.id);
+      return {
+        id: badge.id,
+        title: badge.title,
+        kind: badge.kind,
+        status: badge.status,
+        lane,
+        rowIndex: Math.max(0, rowIndex),
+      };
+    })
+    .filter((entry): entry is StagePlayRemovedBadgeGhost => Boolean(entry));
+}
+
+function compactRefTitle(ref: string): string {
+  if (ref.includes(":")) return ref.split(":").slice(0, 2).join(":");
+  return ref;
+}
+
+function syntheticNodeTone(node: StagePlaySyntheticNode): string {
+  if (node.kind === "prediction") return "border-cyan-700 bg-cyan-950/35 text-cyan-100";
+  if (node.kind === "validation") {
+    return node.status === "blocked"
+      ? "border-rose-700 bg-rose-950/35 text-rose-100"
+      : "border-emerald-700 bg-emerald-950/30 text-emerald-100";
+  }
+  if (node.kind === "live_answer") return "border-slate-500 bg-slate-900/85 text-slate-100";
+  if (node.kind === "handoff") return "border-violet-700 bg-violet-950/35 text-violet-100";
+  if (node.kind === "compact_observation") return "border-sky-700 bg-sky-950/30 text-sky-100";
+  if (node.status === "blocked") return "border-rose-700 bg-rose-950/35 text-rose-100";
+  if (node.status === "missing_evidence") return "border-amber-700 bg-amber-950/35 text-amber-100";
+  return "border-amber-700 bg-amber-950/25 text-amber-100";
+}
+
+function collectGraphRefs(graph: StagePlayBadgeGraphV1): string[] {
+  return uniqueSorted([
+    ...graph.sourceWindow.latestObservationRefs,
+    ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
+    ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
+    ...(graph.sourceWindow.latestRawSessionBufferRefs ?? []),
+    ...graph.sourceWindow.latestSnapshotRefs,
+    ...graph.sourceWindow.latestDeltaOverlayRefs,
+    ...graph.sourceWindow.latestNavigationRefs,
+    ...graph.sourceWindow.sources.flatMap((source) => source.evidenceRefs),
+    ...graph.badges.flatMap((badge) => [
+      ...badge.evidenceRefs,
+      ...badge.sourceRefs.map((ref) => ref.id),
+    ]),
+    ...graph.recommendedActions.flatMap((action) => action.evidenceRefs),
+  ]);
+}
+
+function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNode[] {
+  const graphRefs = collectGraphRefs(graph);
+  const compactObservationRefs = uniqueSorted([
+    ...graph.sourceWindow.latestObservationRefs,
+    ...graphRefs.filter((ref) => /stage_play_compact_observation|live_source_observation|visual_observation|audio_transcript|transcript_observation/i.test(ref)),
+  ]);
+  const predictionRefs = graphRefs.filter((ref) => /stage_play_prediction_hypothesis/i.test(ref));
+  const validationRefs = graphRefs.filter((ref) => /stage_play_prediction_validation/i.test(ref));
+  const liveAnswerSources = graph.sourceWindow.sources.filter((source) => source.routeTo === "live_answer_output");
+  const compactNodes: StagePlaySyntheticNode[] = compactObservationRefs.slice(0, 10).map((ref) => ({
+    id: `synthetic:compact:${ref}`,
+    kind: "compact_observation",
+    lane: "compact_observations",
+    title: compactRefTitle(ref),
+    status: "observed",
+    evidenceRefs: [ref],
+    relatedBadgeIds: graph.badges
+      .filter((badge) => badge.evidenceRefs.includes(ref) || badge.sourceRefs.some((sourceRef) => sourceRef.id === ref))
+      .map((badge) => badge.id),
+  }));
+  const predictionNodes: StagePlaySyntheticNode[] = predictionRefs.slice(0, 8).map((ref) => ({
+    id: `synthetic:prediction:${ref}`,
+    kind: "prediction",
+    lane: "predictions_next_checks",
+    title: compactRefTitle(ref),
+    status: "candidate",
+    evidenceRefs: [ref],
+    relatedBadgeIds: [],
+  }));
+  const validationNodes: StagePlaySyntheticNode[] = validationRefs.slice(0, 8).map((ref) => ({
+    id: `synthetic:validation:${ref}`,
+    kind: "validation",
+    lane: "validation_feedback",
+    title: compactRefTitle(ref),
+    status: /missed|blocked|fail/i.test(ref) ? "blocked" : "observed",
+    evidenceRefs: [ref],
+    relatedBadgeIds: [],
+  }));
+  const nextCheckNodes: StagePlaySyntheticNode[] = graph.recommendedActions.map((action) => ({
+    id: `synthetic:action:${action.id}`,
+    kind: action.admission === "ask_user" ? "handoff" : "next_check",
+    lane: "predictions_next_checks",
+    title: action.label,
+    status: action.admission === "blocked"
+      ? "blocked"
+      : action.missingEvidence.length > 0
+        ? "missing_evidence"
+        : "candidate",
+    evidenceRefs: action.evidenceRefs,
+    relatedBadgeIds: graph.badges
+      .filter((badge) =>
+        action.evidenceRefs.some((ref) => badge.evidenceRefs.includes(ref)) ||
+        action.reasonCodes.some((code) => badge.reasonCodes.includes(code))
+      )
+      .map((badge) => badge.id),
+  }));
+  const liveAnswerNodes: StagePlaySyntheticNode[] = liveAnswerSources.map((source) => ({
+    id: `synthetic:live-answer:${source.sourceId}:${source.modality}`,
+    kind: "live_answer",
+    lane: "live_answer_outputs",
+    title: labelize(source.modality),
+    status: source.status === "active" ? "observed" : source.status === "configured_missing" ? "missing_evidence" : "candidate",
+    evidenceRefs: source.evidenceRefs,
+    relatedBadgeIds: [],
+  }));
+  return [...compactNodes, ...predictionNodes, ...nextCheckNodes, ...validationNodes, ...liveAnswerNodes];
 }
 
 function proceduralExpression(badge: StagePlayBadgeV1): string {
@@ -271,6 +496,8 @@ function proceduralExpression(badge: StagePlayBadgeV1): string {
 
 function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "Source custody and routing";
+  if (badge.kind === "source") return "Routed live source";
+  if (badge.kind === "fusion") return "Source fusion state";
   if (badge.kind === "procedural_binding") return `Assembles: ${proceduralExpression(badge)}`;
   if (badge.kind === "intent_module") return `Verb: ${proceduralExpression(badge)}`;
   if (badge.kind === "affordance") return "Available move candidate";
@@ -280,9 +507,51 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
   return "Observed stage condition";
 }
 
+function StagePlayToolActivityStrip({
+  graph,
+  diff,
+}: {
+  graph: StagePlayBadgeGraphV1;
+  diff: StagePlayGraphDiff | null;
+}) {
+  const sourceFreshnessChanged = diff?.sourceWindowChanged === true;
+  const missingCount = graph.summary.missingEvidenceCount;
+  const summaryText = `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`;
+  return (
+    <div
+      data-testid="stage-play-tool-activity-strip"
+      className={`absolute bottom-3 left-1/2 z-20 max-w-[calc(100%-7rem)] -translate-x-1/2 rounded-md border bg-slate-950/95 px-3 py-2 text-xs text-slate-100 shadow-2xl ${
+        sourceFreshnessChanged
+          ? "border-amber-500 shadow-[0_0_24px_rgba(245,158,11,0.22)]"
+          : "border-slate-800"
+      }`}
+      title={summaryText}
+    >
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <span className="font-semibold text-cyan-100">Latest reflect_stage_play_context</span>
+        <span className="font-mono text-slate-400">{formatStagePlayClock(graph.generatedAt)}</span>
+        <span>{graph.summary.badgeCount} badges</span>
+        <span>{graph.summary.affordanceCount} affordances</span>
+        <span>{graph.summary.blockedAffordanceCount} blocked</span>
+        <span>{graph.summary.proceduralBindingCount} procedural bindings</span>
+        <span className={missingCount > 0 ? "text-amber-100" : "text-slate-400"}>{missingCount} missing checks</span>
+        <span className={sourceFreshnessChanged ? "text-amber-100" : "text-slate-400"}>
+          source freshness: {graph.sourceWindow.freshness}
+        </span>
+        {diff && hasStagePlayGraphDiff(diff) ? (
+          <span className="font-mono text-[11px] text-emerald-200">
+            +{diff.addedBadgeIds.length} / ~{diff.updatedBadgeIds.length} / -{diff.removedBadgeIds.length}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
   { kind: "observer", label: "Observer", role: "source custody and routing" },
   { kind: "source", label: "Source Class", role: "live feed handle to wire in" },
+  { kind: "fusion", label: "Fusion", role: "multi-source alignment or missing modality" },
   { kind: "interpreter", label: "Interpreter Job", role: "continual reflection over source refs" },
   { kind: "setting", label: "Setting", role: "where the scene is bounded" },
   { kind: "actor", label: "Actor", role: "who can act or be acted on" },
@@ -322,6 +591,7 @@ function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftSta
   const presets: Record<StagePlayBadgeV1["kind"], [string, string][]> = {
     observer: [["role", "source_custody"], ["route_policy", "evidence_only"], ["selected_sources", ""]],
     source: [["source_class", ""], ["source_id", ""], ["status", ""], ["descriptor_ref", ""], ["producer_ref", ""], ["latest_ref", ""]],
+    fusion: [["fusion_rule", ""], ["input_modalities", ""], ["result", ""]],
     interpreter: [["tool", "live_env.reflect_stage_play_context"], ["cadence", ""], ["input_sources", ""], ["output", "stage_play_badge_graph"]],
     setting: [["dimension", ""], ["biome_or_area", ""], ["bounds", ""]],
     actor: [["entity_id", ""], ["state", ""], ["relation", ""]],
@@ -538,6 +808,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function StagePlayGraphCanvas({
   graph,
+  graphDiff,
+  removedBadgeGhosts,
   selectedBadgeIds,
   selectedBadgeId,
   draftNodes,
@@ -547,6 +819,8 @@ function StagePlayGraphCanvas({
   onSelectDraftNode,
 }: {
   graph: StagePlayBadgeGraphV1;
+  graphDiff: StagePlayGraphDiff | null;
+  removedBadgeGhosts: StagePlayRemovedBadgeGhost[];
   selectedBadgeIds: string[];
   selectedBadgeId: string | null;
   draftNodes: DraftStagePlayNode[];
@@ -555,58 +829,53 @@ function StagePlayGraphCanvas({
   onSelect: (badgeId: string) => void;
   onSelectDraftNode: (nodeId: string) => void;
 }) {
-  const columns = useMemo(() => {
-    const order = [
-      "observer",
-      "source",
-      "interpreter",
-      "setting",
-      "actor",
-      "resource",
-      "prop",
-      "hazard",
-      "affordance",
-      "blocked_affordance",
-      "intent_module",
-      "procedural_binding",
-      "recommended_check",
-      "admission_gate",
-      "missing_evidence",
-    ];
-    const grouped = new Map<string, StagePlayBadgeV1[]>();
-    for (const kind of order) grouped.set(kind, []);
-    for (const badge of graph.badges) {
-      const group = grouped.get(badge.kind) ?? [];
-      group.push(badge);
-      grouped.set(badge.kind, group);
-    }
-    return Array.from(grouped.entries()).filter(([, badges]) => badges.length > 0);
-  }, [graph.badges]);
+  const outputNodes = useMemo(() => outputNodesForGraph(graph), [graph]);
+  const lanes = useMemo(() => STAGE_PLAY_LANES.map((lane) => ({
+    ...lane,
+    badges: graph.badges.filter((badge) => laneForBadge(badge) === lane.id),
+    outputNodes: outputNodes.filter((node) => node.lane === lane.id),
+  })), [graph.badges, outputNodes]);
 
   const positions = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
-    columns.forEach(([, badges], columnIndex) => {
-      badges.forEach((badge, rowIndex) => {
+    lanes.forEach((lane, laneIndex) => {
+      lane.badges.forEach((badge, rowIndex) => {
         map.set(badge.id, {
-          x: 120 + columnIndex * 190,
-          y: 86 + rowIndex * 92,
+          x: 100 + laneIndex * 218,
+          y: 96 + rowIndex * 92,
         });
       });
     });
     return map;
-  }, [columns]);
+  }, [lanes]);
+
+  const outputPositions = useMemo(() => {
+    const map = new Map<string, { x: number; y: number }>();
+    lanes.forEach((lane, laneIndex) => {
+      lane.outputNodes.forEach((node, outputIndex) => {
+        map.set(node.id, {
+          x: 100 + laneIndex * 218,
+          y: 96 + (lane.badges.length + outputIndex) * 92,
+        });
+      });
+    });
+    return map;
+  }, [lanes]);
 
   const width = Math.max(
-    780,
-    columns.length * 190 + 140,
+    1900,
+    STAGE_PLAY_LANES.length * 218 + 120,
     ...draftNodes.map((node) => node.x + 180),
   );
   const height = Math.max(
-    420,
-    Math.max(...columns.map(([, badges]) => badges.length), 1) * 92 + 120,
+    520,
+    Math.max(...lanes.map((lane) => lane.badges.length + lane.outputNodes.length), 1) * 92 + 160,
     ...draftNodes.map((node) => node.y + 140),
   );
   const selectedSet = new Set(selectedBadgeIds);
+  const addedBadgeIds = new Set(graphDiff?.addedBadgeIds ?? []);
+  const updatedBadgeIds = new Set(graphDiff?.updatedBadgeIds ?? []);
+  const updatedActionIds = new Set(graphDiff?.updatedActionIds ?? []);
   const relatedEdgeIds = new Set(
     graph.edges
       .filter((edge: StagePlayBadgeEdgeV1) =>
@@ -626,19 +895,24 @@ function StagePlayGraphCanvas({
           <marker id="stage-play-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="rgb(100 116 139)" />
           </marker>
+          <marker id="stage-play-dashed-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="rgb(180 83 9)" />
+          </marker>
         </defs>
         {graph.edges.map((edge: StagePlayBadgeEdgeV1) => {
           const from = positions.get(edge.from);
           const to = positions.get(edge.to);
           if (!from || !to) return null;
           const active = relatedEdgeIds.has(edge.id) || selectedSet.has(edge.from) || selectedSet.has(edge.to);
+          const forward = to.x >= from.x;
+          const curve = Math.max(42, Math.abs(to.x - from.x) * 0.48);
+          const startX = from.x + (forward ? 54 : -54);
+          const endX = to.x - (forward ? 54 : -54);
           return (
             <g key={edge.id}>
-              <line
-                x1={from.x + 64}
-                y1={from.y + 26}
-                x2={to.x - 64}
-                y2={to.y + 26}
+              <path
+                d={`M ${startX} ${from.y} C ${startX + (forward ? curve : -curve)} ${from.y}, ${endX - (forward ? curve : -curve)} ${to.y}, ${endX} ${to.y}`}
+                fill="none"
                 stroke={active ? "rgb(34 211 238)" : "rgb(51 65 85)"}
                 strokeWidth={active ? 2 : 1}
                 markerEnd="url(#stage-play-arrow)"
@@ -646,44 +920,108 @@ function StagePlayGraphCanvas({
             </g>
           );
         })}
+        {outputNodes.flatMap((node) => node.relatedBadgeIds.slice(0, 4).map((badgeId) => {
+          const from = positions.get(badgeId);
+          const to = outputPositions.get(node.id);
+          if (!from || !to) return null;
+          const active = selectedSet.has(badgeId);
+          return (
+            <path
+              key={`${node.id}:${badgeId}`}
+              d={`M ${from.x + 54} ${from.y} C ${from.x + 88} ${from.y}, ${to.x - 88} ${to.y}, ${to.x - 54} ${to.y}`}
+              fill="none"
+              stroke={active ? "rgb(251 191 36)" : "rgb(120 113 108)"}
+              strokeDasharray="4 4"
+              strokeWidth={active ? 2 : 1}
+              markerEnd="url(#stage-play-dashed-arrow)"
+            />
+          );
+        }))}
       </svg>
       <div className="relative" style={{ width, height }}>
+        {lanes.map((lane, laneIndex) => (
+          <div
+            key={lane.id}
+            className="absolute bottom-0 top-0 rounded-md border border-slate-900/70 bg-slate-950/35"
+            style={{ left: 18 + laneIndex * 218, width: 196 }}
+            data-testid={`stage-play-lane-${lane.id}`}
+          >
+            <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              {lane.title}
+            </div>
+          </div>
+        ))}
         {graph.badges.map((badge: StagePlayBadgeV1) => {
           const point = positions.get(badge.id);
           if (!point) return null;
           const active = selectedBadgeId === badge.id || selectedSet.has(badge.id);
           const observerSources = badge.kind === "observer" ? graph.sourceWindow.sources ?? [] : [];
           const selectedObserverSourceCount = observerSources.filter((source) => source.selectedForStagePlay).length;
+          const isBlocked = badge.kind === "blocked_affordance" || badge.status === "blocked";
+          const isMissing = badge.kind === "missing_evidence" || badge.status === "missing_evidence";
+          const isNew = addedBadgeIds.has(badge.id);
+          const isUpdated = updatedBadgeIds.has(badge.id) || (badge.kind === "observer" && graphDiff?.sourceWindowChanged === true);
+          const pulseClass = isNew
+            ? "animate-pulse ring-2 ring-emerald-300/70 shadow-[0_0_26px_rgba(52,211,153,0.28)]"
+            : isUpdated
+              ? "ring-1 ring-cyan-300/70 shadow-[0_0_20px_rgba(34,211,238,0.22)]"
+              : isMissing
+                ? "animate-pulse"
+                : "";
+          const nodeSize =
+            badge.kind === "observer"
+              ? "h-20 w-40 rounded-lg"
+            : badge.kind === "procedural_binding"
+                ? "h-[72px] w-44 rounded-md"
+                : badge.kind === "intent_module"
+                  ? "h-16 w-32 rounded-md"
+                  : badge.kind === "affordance" || badge.kind === "blocked_affordance" || badge.kind === "setting" || badge.kind === "actor"
+                    ? "h-14 w-20 rounded-full"
+                    : "h-14 w-28 rounded-md";
           return (
             <div
               key={badge.id}
               className="group absolute"
-              style={{ left: point.x - 64, top: point.y }}
+              style={{ left: point.x - (badge.kind === "observer" ? 80 : badge.kind === "procedural_binding" ? 88 : badge.kind === "intent_module" ? 64 : badge.kind === "affordance" || badge.kind === "blocked_affordance" || badge.kind === "setting" || badge.kind === "actor" ? 40 : 56), top: point.y - 28 }}
             >
               <button
                 type="button"
                 onClick={() => onSelect(badge.id)}
-                className={`flex ${badge.kind === "observer" ? "h-16 w-36" : "h-14 w-32"} flex-col items-center justify-center rounded-md border px-2 text-center text-xs transition ${
+                className={`relative flex ${nodeSize} flex-col items-center justify-center border px-2 text-center text-xs transition ${
                   active
                     ? "border-cyan-400 bg-cyan-950/70 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.2)]"
-                    : `${kindTone(badge.kind)} text-slate-200 hover:border-slate-500`
-                }`}
+                    : isBlocked
+                      ? "border-rose-600 bg-rose-950/35 text-rose-100 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.25)] hover:border-rose-400"
+                      : isMissing
+                        ? "border-amber-600 bg-amber-950/35 text-amber-100 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)] hover:border-amber-400"
+                      : `${kindTone(badge.kind)} text-slate-200 hover:border-slate-500`
+                } ${pulseClass}`}
                 aria-label={badge.title}
               >
-                <span
-                  aria-hidden="true"
-                  className={`h-3.5 w-3.5 rounded-full border ${
-                    active
-                      ? "border-cyan-100 bg-cyan-300"
-                      : badge.status === "blocked"
-                        ? "border-rose-300 bg-rose-500/80"
-                        : badge.kind === "procedural_binding"
-                          ? "border-violet-300 bg-violet-500/80"
-                          : badge.kind === "intent_module"
-                            ? "border-cyan-300 bg-cyan-500/80"
-                            : "border-slate-300 bg-slate-500/80"
-                  }`}
-                />
+                {isBlocked ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1 -top-1 h-3 w-3 rounded-full border border-rose-200 bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.7)]"
+                  />
+                ) : null}
+                {badge.kind === "observer" ? (
+                  <RadioTower className="h-5 w-5 text-amber-100" aria-hidden="true" />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className={`${badge.kind === "procedural_binding" ? "h-5 w-12 rounded-sm" : "h-3.5 w-3.5 rounded-full"} border ${
+                      active
+                        ? "border-cyan-100 bg-cyan-300"
+                        : badge.status === "blocked"
+                          ? "border-rose-300 bg-rose-500/80"
+                          : badge.kind === "procedural_binding"
+                            ? "border-violet-300 bg-violet-500/80"
+                            : badge.kind === "intent_module"
+                              ? "border-cyan-300 bg-cyan-500/80"
+                              : "border-slate-300 bg-slate-500/80"
+                    }`}
+                  />
+                )}
                 {badge.kind === "observer" ? (
                   <>
                     <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100">Observer</span>
@@ -724,16 +1062,94 @@ function StagePlayGraphCanvas({
             </div>
           );
         })}
+        {removedBadgeGhosts.map((ghost) => {
+          const laneIndex = STAGE_PLAY_LANES.findIndex((lane) => lane.id === ghost.lane);
+          const point = {
+            x: 100 + Math.max(0, laneIndex) * 218,
+            y: 96 + ghost.rowIndex * 92,
+          };
+          return (
+            <div
+              key={`removed:${ghost.id}`}
+              className="pointer-events-none absolute flex h-12 w-28 items-center justify-center rounded-md border border-slate-700 bg-slate-900/45 px-2 text-center text-[10px] uppercase tracking-wide text-slate-400 opacity-50 shadow-[0_0_18px_rgba(148,163,184,0.16)]"
+              style={{ left: point.x - 56, top: point.y - 26 }}
+              data-testid="stage-play-removed-ghost"
+            >
+              <span className="truncate">removed {labelize(ghost.kind)}</span>
+            </div>
+          );
+        })}
+        {outputNodes.map((node) => {
+          const point = outputPositions.get(node.id);
+          if (!point) return null;
+          const shapeClass =
+            node.kind === "prediction"
+              ? "h-14 w-36 rounded-full"
+              : node.kind === "validation"
+                ? "h-14 w-28 rounded-sm"
+                : node.kind === "live_answer"
+                  ? "h-20 w-40 rounded-md"
+                  : node.status === "missing_evidence"
+                    ? "h-14 w-28 rounded-md border-dashed"
+                    : "h-12 w-28 rounded-md";
+          const actionId = node.id.startsWith("synthetic:action:")
+            ? node.id.replace("synthetic:action:", "")
+            : null;
+          const outputPulse = actionId && updatedActionIds.has(actionId)
+            ? "ring-1 ring-cyan-300/70 shadow-[0_0_20px_rgba(34,211,238,0.22)]"
+            : node.status === "missing_evidence"
+              ? "animate-pulse"
+              : "";
+          return (
+            <button
+              type="button"
+              key={node.id}
+              onClick={() => {
+                if (node.relatedBadgeIds[0]) onSelect(node.relatedBadgeIds[0]);
+              }}
+              className={`group absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
+              style={{
+                left: point.x - (node.kind === "live_answer" ? 80 : node.kind === "prediction" ? 68 : 56),
+                top: point.y - (node.kind === "live_answer" ? 40 : 28),
+              }}
+              aria-label={node.title}
+              data-testid="stage-play-output-node"
+            >
+              {node.kind === "validation" ? (
+                <span className="text-base" aria-hidden="true">{node.status === "blocked" ? "x" : "ok"}</span>
+              ) : node.kind === "prediction" ? (
+                <span aria-hidden="true">-&gt;</span>
+              ) : node.kind === "live_answer" ? (
+                <span className="font-mono text-[10px]" aria-hidden="true">OUT</span>
+              ) : node.status === "missing_evidence" ? (
+                <span aria-hidden="true">?</span>
+              ) : (
+                <span aria-hidden="true">.</span>
+              )}
+              <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-64 -translate-x-1/2 rounded-md border border-amber-700/70 bg-slate-950/95 p-3 text-left text-xs normal-case tracking-normal text-slate-100 shadow-2xl group-hover:block">
+                <div className="font-semibold text-amber-100">{node.title}</div>
+                <div className="mt-1 text-slate-300">{labelize(node.kind)}</div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(node.status)}</span>
+                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{node.evidenceRefs.length} ref(s)</span>
+                </div>
+                <div className="mt-2 space-y-1 font-mono text-[10px] text-slate-500">
+                  {node.evidenceRefs.slice(0, 4).map((ref) => <div key={ref} className="truncate">{ref}</div>)}
+                </div>
+              </div>
+            </button>
+          );
+        })}
         {draftNodes.map((node) => (
           <button
             type="button"
             key={node.id}
-            className={`group absolute flex h-16 w-16 items-center justify-center rounded-sm border-2 shadow-lg transition ${
+            className={`group absolute flex h-12 w-12 items-center justify-center rounded-sm border-2 shadow-lg transition ${
               selectedDraftNodeId === node.id
                 ? "border-cyan-300 bg-cyan-950/70 shadow-[0_0_24px_rgba(34,211,238,0.25)]"
                 : kindTone(node.kind)
             }`}
-            style={{ left: node.x - 32, top: node.y - 32 }}
+            style={{ left: node.x - 24, top: node.y - 24 }}
             aria-label={`Draft ${node.label} node`}
             data-testid="stage-play-draft-node"
             onClick={() => onSelectDraftNode(node.id)}
@@ -745,7 +1161,7 @@ function StagePlayGraphCanvas({
             <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-56 -translate-x-1/2 rounded-md border border-cyan-700/70 bg-slate-950/95 p-2 text-left text-xs text-slate-100 shadow-2xl group-hover:block">
               <div className="font-semibold text-cyan-100">{node.label}</div>
               <div className="mt-1 text-slate-300">{node.role}</div>
-              <div className="mt-1 font-mono text-[10px] text-cyan-100">draft.{node.kind}</div>
+              <div className="mt-1 font-mono text-[10px] text-cyan-100">draft.{node.kind} / {laneForDraftNode(node)}</div>
               <div className="mt-1 text-[10px] text-slate-400">{node.parameters.length} parameter(s)</div>
             </div>
           </button>
@@ -1672,7 +2088,12 @@ export default function StagePlayBadgeGraphPanel() {
     message: "",
   });
   const [sourceAuditSelection, setSourceAuditSelection] = useState<StagePlaySourceAuditSelection>(null);
+  const [graphDiff, setGraphDiff] = useState<StagePlayGraphDiff | null>(null);
+  const [removedBadgeGhosts, setRemovedBadgeGhosts] = useState<StagePlayRemovedBadgeGhost[]>([]);
   const graphScrollportRef = useRef<HTMLDivElement>(null);
+  const previousGraphRef = useRef<StagePlayBadgeGraphV1 | null>(null);
+  const graphDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const removedGhostClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftNodeCountRef = useRef(0);
   const draftParameterCountRef = useRef(0);
   const activeEnvironment = useLiveAnswerEnvironmentStore((state) =>
@@ -1753,6 +2174,30 @@ export default function StagePlayBadgeGraphPanel() {
     }),
     enabled: draftNodes.length > 0,
   });
+
+  useEffect(() => {
+    return () => {
+      if (graphDiffClearTimerRef.current) clearTimeout(graphDiffClearTimerRef.current);
+      if (removedGhostClearTimerRef.current) clearTimeout(removedGhostClearTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!graph) return;
+    const previousGraph = previousGraphRef.current;
+    if (previousGraph) {
+      const nextDiff = diffStagePlayBadgeGraphs(previousGraph, graph);
+      if (hasStagePlayGraphDiff(nextDiff)) {
+        setGraphDiff(nextDiff);
+        setRemovedBadgeGhosts(removedGhostsForDiff(previousGraph, nextDiff));
+        if (graphDiffClearTimerRef.current) clearTimeout(graphDiffClearTimerRef.current);
+        if (removedGhostClearTimerRef.current) clearTimeout(removedGhostClearTimerRef.current);
+        graphDiffClearTimerRef.current = setTimeout(() => setGraphDiff(null), 1800);
+        removedGhostClearTimerRef.current = setTimeout(() => setRemovedBadgeGhosts([]), 1000);
+      }
+    }
+    previousGraphRef.current = graph;
+  }, [graph]);
 
   const filteredBadges = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -2334,6 +2779,8 @@ export default function StagePlayBadgeGraphPanel() {
           </div>
         ) : null}
 
+        <StagePlayToolActivityStrip graph={graph} diff={graphDiff} />
+
         {selectedDraftNodeId ? (
           (() => {
             const selectedDraftNode = draftNodes.find((node) => node.id === selectedDraftNodeId) ?? null;
@@ -2355,6 +2802,8 @@ export default function StagePlayBadgeGraphPanel() {
         <main className="flex h-full min-h-0 flex-col">
           <StagePlayGraphCanvas
             graph={graph}
+            graphDiff={graphDiff}
+            removedBadgeGhosts={removedBadgeGhosts}
             selectedBadgeIds={selectedBadgeIds}
             selectedBadgeId={selectedBadgeId}
             draftNodes={draftNodes}

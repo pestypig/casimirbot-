@@ -19,6 +19,7 @@ import {
 } from "../situation-room/live-environment-commentary-store";
 import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
 import { buildStagePlayGraphFromWorld as buildStagePlayBadgeGraphFromLiveWindow } from "../stage-play/stage-play-badge-graph-builder";
+import { reduceLiveAnswerEnvironmentFromStagePlayGraph } from "../stage-play/stage-play-output-lane-reducer";
 import {
   buildStagePlayBuilderCatalog,
   buildStagePlaySourceQuery,
@@ -405,6 +406,13 @@ export function executeLiveEnvironmentTool(
           draft: args.draft,
         })
       : null;
+    const liveAnswerLineReduction = environment && (!draftValidation || draftValidation.ok)
+      ? reduceLiveAnswerEnvironmentFromStagePlayGraph({
+          environment,
+          graph,
+          now: new Date().toISOString(),
+        })
+      : null;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -434,6 +442,12 @@ export function executeLiveEnvironmentTool(
         ...graph.sourceWindow.latestNavigationRefs,
         ...graph.badges.flatMap((badge) => badge.evidenceRefs),
         ...graph.recommendedActions.flatMap((action) => action.evidenceRefs),
+        ...(liveAnswerLineReduction
+          ? [
+              liveAnswerLineReduction.delta.delta_id,
+              liveAnswerLineReduction.environment.environment_id,
+            ]
+          : []),
       ],
     });
   }

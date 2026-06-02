@@ -29,7 +29,7 @@ export function WorkstationResizeRail({
     <div
       role="separator"
       aria-orientation="vertical"
-      className="w-1.5 cursor-col-resize bg-transparent hover:bg-sky-400/30"
+      className="h-full w-1.5 cursor-col-resize bg-transparent hover:bg-sky-400/30"
       onMouseDown={(event) => {
         event.preventDefault();
         startXRef.current = event.clientX;

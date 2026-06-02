@@ -9,12 +9,14 @@ import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 export function HelixAskDock({
   widthPx,
   collapsed,
+  contextId = HELIX_ASK_CONTEXT_ID.desktop,
   placement = "side",
   onOpenPanel,
   onOpenConversation,
 }: {
   widthPx: number | string;
   collapsed: boolean;
+  contextId?: string;
   placement?: "side" | "bottom";
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
   onOpenConversation: (sessionId: string) => void;
@@ -49,8 +51,9 @@ export function HelixAskDock({
         {!collapsed ? (
           <>
             <HelixAskPill
+              key={contextId}
               className="flex h-full min-h-0 w-full flex-col"
-              contextId={HELIX_ASK_CONTEXT_ID.desktop}
+              contextId={contextId}
               maxWidthClassName="max-w-none"
               layoutVariant="dock"
               onOpenPanel={onOpenPanel}

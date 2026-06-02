@@ -9,6 +9,7 @@ import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environme
 import { buildLiveEnvironmentRuntimePacket } from "../services/situation-room/live-environment-runtime-packet-builder";
 import {
   createLiveAnswerEnvironment,
+  getLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
 import {
@@ -360,6 +361,13 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(graph.summary.badgeCount).toBeGreaterThan(0);
     expect(graph.summary.affordanceCount).toBeGreaterThan(0);
     expect(graph.summary.blockedAffordanceCount).toBeGreaterThan(0);
+    const liveAnswerEnvironment = getLiveAnswerEnvironment(environment.environment_id);
+    expect(liveAnswerEnvironment?.lines_by_key?.risk?.value).toMatch(/drop|fall|void|blocked/i);
+    expect(liveAnswerEnvironment?.lines_by_key?.possibilities?.value).toMatch(/bridge|retreat|tunnel/i);
+    expect(liveAnswerEnvironment?.lines_by_key?.recommendation?.value).toBe(
+      "Awaiting rehearsal before recommending action.",
+    );
+    expect(liveAnswerEnvironment?.latest_evaluation?.model_invoked).toBe(false);
     expect(observation.evidence_refs).toEqual(expect.arrayContaining([
       "live_source_observation:stage-play-live-env-tool",
       "snapshot:stage-play-live-env-tool",
