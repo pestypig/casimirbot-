@@ -142,7 +142,7 @@ describe("Zen badge locator", () => {
 
     expect(gate).toMatchObject({
       matchType: "gate_term",
-      proceduralExpression: "gate.two-key-approval requires result.procedural_posture",
+      proceduralExpression: "principle.two-key-approval requires result.procedural_posture",
     });
     expect(locator.comparisonSeed).toMatchObject({
       expectedFruitionPosture: "requires_check",

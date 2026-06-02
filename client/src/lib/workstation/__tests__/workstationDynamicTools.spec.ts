@@ -3,6 +3,26 @@ import {
   getWorkstationDynamicTools,
   mapClientWorkstationDynamicToolCallToAction,
 } from "@/lib/workstation/workstationDynamicTools";
+import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
+import {
+  WORKSTATION_DYNAMIC_TOOL_ACTIONS,
+  buildWorkstationToolName,
+} from "@shared/workstation-dynamic-tools";
+
+const AGENT_CONTINUATION_ACTION_IDS = [
+  "create_live_answer_environment",
+  "attach_live_source",
+  "set_live_commentary_policy",
+  "request_agentic_review",
+  "query_event_window",
+  "query_synthetic_evidence",
+  "goal_ledger.set_objective",
+  "goal_ledger.mark_complete",
+  "goal_ledger.mark_blocked",
+  "callout_policy.set_mode",
+  "voice_delivery.propose_from_trace",
+  "voice_delivery.confirm_speak",
+] as const;
 
 describe("workstation dynamic tools", () => {
   it("exposes Situation Room panels as schema-bound workstation tools", () => {
@@ -286,5 +306,35 @@ describe("workstation dynamic tools", () => {
         max_timeline: { type: "number" },
       },
     });
+  });
+
+  it("keeps agent continuation Situation Room actions present in both tool registries", () => {
+    const panelActions = new Set(
+      WORKSTATION_V1_PANEL_CAPABILITIES["situation-room-pipelines"].actions.map((action) => action.id),
+    );
+    const sharedActions = new Set(
+      WORKSTATION_DYNAMIC_TOOL_ACTIONS
+        .filter((action) => action.panel_id === "situation-room-pipelines")
+        .map((action) => action.action_id),
+    );
+    const tools = getWorkstationDynamicTools();
+
+    for (const actionId of AGENT_CONTINUATION_ACTION_IDS) {
+      expect(panelActions.has(actionId), `${actionId} missing from panel capabilities`).toBe(true);
+      expect(sharedActions.has(actionId), `${actionId} missing from shared dynamic tool actions`).toBe(true);
+
+      expect(
+        tools.find(
+          (tool) =>
+            tool.name === buildWorkstationToolName("situation-room-pipelines", actionId) &&
+            tool.panel_id === "situation-room-pipelines" &&
+            tool.action_id === actionId,
+        ),
+        `${actionId} missing from generated client workstation tools`,
+      ).toMatchObject({
+        namespace: "workstation",
+        returns_artifact: true,
+      });
+    }
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "@shared/contracts/zen-graph-reflection-tool.v1";
 import { loadIdeologyGraphFromFile } from "@shared/zen-graph/load-ideology-graph";
 import { reflectWithZenGraphToolV1 } from "@shared/zen-graph/zen-graph-reflection-tool";
+import { buildZenGraphDebugTraceViewV1 } from "@shared/zen-graph/zen-graph-debug-trace";
 
 export const zenGraphPrototypeRouter = Router();
 
@@ -224,6 +225,8 @@ zenGraphPrototypeRouter.post("/zen-graph/reflection/prototype", async (req, res)
     });
     const guardAdmission = buildGuardAdmission({ routeId, prompt: text, refs, guards });
     const admissions = guardAdmission ? [...toolResponse.admissions, guardAdmission] : toolResponse.admissions;
+    const toolResponseWithAdmissions = { ...toolResponse, admissions };
+    const validationIssues = validateZenGraphReflectionToolResponseV1(toolResponseWithAdmissions);
     const response = {
       artifactId: "zen_graph_situation_reflection_route",
       schemaVersion: "zen_graph_situation_reflection_route/v1",
@@ -254,12 +257,22 @@ zenGraphPrototypeRouter.post("/zen-graph/reflection/prototype", async (req, res)
           reason: guard.reason,
         })),
       },
-      agentEvidence: buildAgentEvidence({ ...toolResponse, admissions }, routeId),
+      agentEvidence: buildAgentEvidence(toolResponseWithAdmissions, routeId),
       authority: EVIDENCE_ONLY_AUTHORITY,
       ...(includeDebug(parsed.data.debug)
         ? {
             debugTrace: {
               routeId,
+              view: buildZenGraphDebugTraceViewV1({
+                response: toolResponseWithAdmissions,
+                routeId,
+                routeGuards: guards.map((guard) => ({
+                  code: guard.code,
+                  actionType: guard.actionType,
+                  reason: guard.reason,
+                })),
+                validationIssues,
+              }),
               steps: [
                 "normalize_situation_as_user_text",
                 "call_zen_graph_reflection",
@@ -269,7 +282,7 @@ zenGraphPrototypeRouter.post("/zen-graph/reflection/prototype", async (req, res)
                 "produce_recommended_action_admissions",
                 "return_evidence_only_response",
               ],
-              validationIssues: validateZenGraphReflectionToolResponseV1({ ...toolResponse, admissions }),
+              validationIssues,
               blockedGuardCodes: guards.map((guard) => guard.code),
             },
           }

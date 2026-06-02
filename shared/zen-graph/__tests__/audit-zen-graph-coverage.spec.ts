@@ -141,8 +141,69 @@ describe("ZenGraph coverage audit", () => {
     expect(validateZenGraphCoverageAuditV1(audit)).toEqual([]);
     expect(audit.rootId).toBe("wisdom-first-principles");
     expect(audit.summary.total).toBe(audit.nodes.length);
+    expect(audit.summary).toEqual({
+      mapped: 26,
+      partial: 15,
+      conceptual_only: 34,
+      unmapped: 0,
+      total: 75,
+    });
     expect(audit.nodes.find((entry) => entry.ideologyNodeId === "direct-observation-before-claim")?.coverageStatus).toBe(
       "mapped",
     );
+  });
+
+  it("shows expanded procedural coverage for concrete ideology nodes without breaking first-principle mappings", async () => {
+    const audit = auditZenGraphCoverage(await loadIdeologyGraphFromFile());
+    const byId = new Map(audit.nodes.map((entry) => [entry.ideologyNodeId, entry]));
+
+    for (const id of [
+      "mission-ethos",
+      "integrity-protocols",
+      "provenance-protocol",
+      "feedback-loop-hygiene",
+      "two-key-approval",
+      "training-certification-gate",
+      "financial-fog-warning",
+      "flattery-laundering-detection",
+      "capability-ambition-gradient",
+    ]) {
+      expect(byId.get(id)).toMatchObject({
+        coverageStatus: "mapped",
+        mappedBadgeIds: [id],
+        mappedPrincipleIds: [id],
+        missingProceduralPieces: [],
+        recommendedPatchType: "no_change",
+      });
+    }
+
+    expect(byId.get("direct-observation-before-claim")).toMatchObject({
+      coverageStatus: "mapped",
+      mappedBadgeIds: ["direct-observation-before-claim"],
+      mappedPrincipleIds: ["direct-observation-before-claim"],
+      missingProceduralPieces: [],
+    });
+  });
+
+  it("keeps genuinely broad ideology branches conceptual-only with an explicit rationale", async () => {
+    const audit = auditZenGraphCoverage(await loadIdeologyGraphFromFile());
+    const wisdomRoot = audit.nodes.find((entry) => entry.ideologyNodeId === "wisdom-first-principles");
+    const bodhisattvaCraft = audit.nodes.find((entry) => entry.ideologyNodeId === "bodhisattva-craft");
+
+    expect(wisdomRoot).toMatchObject({
+      coverageStatus: "conceptual_only",
+      mappedBadgeIds: [],
+      recommendedPatchType: "add_badge",
+    });
+    expect(wisdomRoot?.notes).toContain(
+      "Explicitly left conceptual-only until a concrete procedural rule, evidence need, or action gate is defined.",
+    );
+
+    expect(bodhisattvaCraft).toMatchObject({
+      coverageStatus: "partial",
+      mappedBadgeIds: ["bodhisattva-craft"],
+      mappedPrincipleIds: [],
+    });
+    expect(bodhisattvaCraft?.missingProceduralPieces).toEqual(expect.arrayContaining(["principle_operator"]));
   });
 });

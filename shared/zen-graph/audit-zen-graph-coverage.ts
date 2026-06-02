@@ -139,6 +139,7 @@ function notesForNode(params: {
   if (params.hasActions) notes.push("Node exposes ideology actions but is missing full procedural principle metadata.");
   if (params.status === "conceptual_only") {
     notes.push("Node has ideology prose/reference structure but no procedural Zen badge binding yet.");
+    notes.push("Explicitly left conceptual-only until a concrete procedural rule, evidence need, or action gate is defined.");
   }
   if (params.status === "unmapped") {
     notes.push("Node has no detected procedural binding or supporting conceptual reference.");

@@ -68,6 +68,24 @@ describe("ZenGraph prototype situation reflection route", () => {
     expect(response.body.objectiveBinding.artifact).toBe("zen_objective_binding");
     expect(response.body.debugTrace.steps).toContain("call_zen_graph_reflection");
     expect(response.body.debugTrace.validationIssues).toEqual([]);
+    expect(response.body.debugTrace.view).toMatchObject({
+      artifactId: "zen_graph_debug_trace",
+      schemaVersion: "zen_graph_debug_trace/v1",
+      source: {
+        inputKind: "user_prompt",
+        sourceKind: "user_text",
+        sourceTrust: "primary",
+      },
+      exposurePolicy: {
+        structuredTraceOnly: true,
+        rawInputIncluded: false,
+        hiddenChainOfThoughtIncluded: false,
+        assistantAnswer: false,
+      },
+    });
+    expect(JSON.stringify(response.body.debugTrace.view)).not.toContain(
+      "Use ZenGraph to reflect on right speech and direct observation before I answer.",
+    );
   });
 
   it("handles a wisdom reflection request with a wisdom preset overlay", async () => {
