@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { validateFruitionProcedureExpressionV1 } from "../../../../shared/fruition-procedure-expression";
 import { validateHelixRecommendedActionAdmissionV1 } from "../../../../shared/contracts/helix-recommended-action-admission.v1";
+import { buildZenBadgeLocatorV1 } from "../../../../shared/zen-badge-locator";
+import { buildFruitionFromZenBadgeComparisonSeed } from "../../../../shared/zen-graph/build-fruition-from-zen-badge-comparison-seed";
 import {
   fruitionHandler,
   fruitionSpec,
@@ -65,6 +67,82 @@ describe("Helix Ask Fruition tool", () => {
     expect(output.admissions).toEqual([]);
     expect(validateFruitionProcedureExpressionV1(output.fruition)).toEqual([]);
     expect(output.fruition.result.admission.artifactId).toBe("helix_recommended_action_admission");
+  });
+
+  it("converts a Zen badge locator comparison seed into a valid Fruition expression", () => {
+    const locator = buildZenBadgeLocatorV1({
+      generatedAt: "2026-06-01T00:00:00.000Z",
+      locatorId: "zen-badge-locator:test-seed",
+      input: {
+        kind: "user_prompt",
+        summary: "Reflect right speech and two-key review before action.",
+        refs: ["turn:seed"],
+      },
+      graph: {
+        graphId: "zen-graph",
+        rootId: "wisdom-first-principles",
+        source: "docs/ethos/ideology.json",
+      },
+      locatedBadges: {
+        exact: [
+          {
+            nodeId: "right-speech-infrastructure",
+            label: "Right Speech Infrastructure",
+            confidence: 0.9,
+            matchType: "label",
+            pathToBinding: ["wisdom-first-principles", "right-speech-infrastructure"],
+            proceduralExpression: "speech.formulation constrains action.posture",
+            reasonCodes: ["label_match"],
+            tags: ["speech", "constraint"],
+          },
+        ],
+        likely: [
+          {
+            nodeId: "two-key-approval",
+            label: "Two-Key Approval",
+            confidence: 0.75,
+            matchType: "action_label",
+            pathToBinding: ["wisdom-first-principles", "two-key-approval"],
+            proceduralExpression: "review.two_key requires action.check",
+            reasonCodes: ["action_label_match"],
+            tags: ["gate", "safeguard"],
+          },
+        ],
+        inferred: [],
+      },
+      locatedBindings: [
+        {
+          id: "binding:review-before-action",
+          label: "Review before action",
+          bindingType: "objective_binding",
+          pathNodeIds: ["wisdom-first-principles", "right-speech-infrastructure", "two-key-approval"],
+          reasonCodes: ["seed_binding"],
+          confidence: 0.8,
+        },
+      ],
+      comparisonSeed: {
+        selectedNodeIds: ["right-speech-infrastructure", "two-key-approval"],
+        proceduralExpression: "speech.formulation constrains action.posture ; review.two_key requires action.check",
+        expectedFruitionPosture: "requires_check",
+        reasonCodes: ["locator_seed"],
+      },
+    });
+
+    const expression = buildFruitionFromZenBadgeComparisonSeed({
+      locator,
+      objective: "Trace locator seed into Fruition.",
+      generatedAt: "2026-06-01T00:00:00.000Z",
+      expressionId: "fruition:test-seed",
+    });
+
+    expect(validateFruitionProcedureExpressionV1(expression)).toEqual([]);
+    expect(expression.sourceReflectionId).toBe(locator.locatorId);
+    expect(expression.result.posture).toBe("requires_review");
+    expect(expression.result.agentExecutable).toBe(false);
+    expect(expression.result.admission.authority.agent_executable).toBe(false);
+    expect(expression.terms.map((term) => term.sourceNodeIds?.[0])).toEqual(
+      expect.arrayContaining(["right-speech-infrastructure", "two-key-approval"]),
+    );
   });
 
   it("registers as a deterministic non-privileged diagnostic calculator tool", () => {

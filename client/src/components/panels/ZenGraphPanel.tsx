@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { HelixRecommendedActionAdmissionV1 } from "@shared/contracts/helix-recommended-action-admission.v1";
+import type { CharacterSituationComparisonV1 } from "@shared/character-situation-comparison";
 import type { IdeologyContextReflectionV1, IdeologyNodeMatchV1 } from "@shared/ideology-context-reflection";
 import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
@@ -8,7 +9,7 @@ import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@sh
 import { Badge } from "@/components/ui/badge";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 
-type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective";
+type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective" | "character";
 
 type ZenGraphNode = {
   id: string;
@@ -17,6 +18,8 @@ type ZenGraphNode = {
   glyph: string;
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   confidence?: number;
   tags?: string[];
   summary: string;
@@ -26,6 +29,8 @@ type ZenGraphNode = {
   actionEffect?: string;
   evidenceNeeds?: string[];
   refusesAuthority?: string[];
+  characterWeights?: CharacterSituationComparisonV1["activatedProfileWeights"];
+  characterHypothesis?: CharacterSituationComparisonV1["behavioralHypothesis"];
 };
 
 type ZenGraphEdge = {
@@ -34,6 +39,7 @@ type ZenGraphEdge = {
   to: string;
   label: string;
   tone: "cyan" | "emerald" | "amber" | "rose" | "violet" | "slate";
+  weight?: number;
 };
 
 function labelize(value: string): string {
@@ -44,11 +50,20 @@ function confidenceLabel(value?: number): string {
   return typeof value === "number" ? `confidence ${value.toFixed(2)}` : "diagnostic";
 }
 
+function nodeCenter(node: ZenGraphNode): { x: number; y: number } {
+  return {
+    x: node.x + (node.width ?? 48) / 2,
+    y: node.y + (node.height ?? 48) / 2,
+  };
+}
+
 function edgePath(from: ZenGraphNode, to: ZenGraphNode): string {
-  const x1 = from.x + 24;
-  const y1 = from.y + 24;
-  const x2 = to.x + 24;
-  const y2 = to.y + 24;
+  const fromCenter = nodeCenter(from);
+  const toCenter = nodeCenter(to);
+  const x1 = fromCenter.x;
+  const y1 = fromCenter.y;
+  const x2 = toCenter.x;
+  const y2 = toCenter.y;
   const midX = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
@@ -72,7 +87,9 @@ function edgeStroke(tone: ZenGraphEdge["tone"]): string {
 
 function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted: boolean; dimmed: boolean }): string {
   const classes = [
-    "absolute flex h-12 w-12 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
+    args.node.tone === "character"
+      ? "absolute flex min-h-[88px] w-64 flex-col justify-between border-2 p-2 text-left shadow-xl transition"
+      : "absolute flex h-12 w-12 items-center justify-center border-2 text-[13px] font-black uppercase shadow transition",
     "focus:outline-none focus:ring-2 focus:ring-cyan-200",
   ];
   switch (args.node.tone) {
@@ -100,6 +117,9 @@ function nodeClasses(args: { node: ZenGraphNode; selected: boolean; highlighted:
     case "objective":
       classes.push("border-fuchsia-200 bg-gradient-to-br from-fuchsia-100 via-zinc-400 to-fuchsia-950 text-zinc-950");
       break;
+    case "character":
+      classes.push("border-amber-200 bg-gradient-to-br from-amber-200 via-red-900 to-zinc-950 text-amber-50");
+      break;
   }
   if (args.selected) classes.push("ring-4 ring-cyan-200/80 shadow-cyan-200/50");
   else if (args.highlighted) classes.push("ring-2 ring-cyan-400/70");
@@ -115,6 +135,7 @@ function nodeGlyph(node: ZenGraphNode): string {
   if (node.tone === "safeguard") return "G";
   if (node.tone === "boundary") return "!";
   if (node.tone === "objective") return "B";
+  if (node.tone === "character") return "C";
   return "A";
 }
 
@@ -130,6 +151,7 @@ function proceduralSubjectForNode(node: Pick<ZenGraphNode, "id" | "tone">): stri
   if (node.tone === "root") return `root.${proceduralToken(node.id)}`;
   if (node.tone === "principle") return `principle.${proceduralToken(node.id)}`;
   if (node.tone === "objective") return `objective.${proceduralToken(node.id)}`;
+  if (node.tone === "character") return `character.${proceduralToken(node.id)}`;
   if (node.tone === "safeguard") return `gate.${proceduralToken(node.id)}`;
   if (node.tone === "boundary") return `missing.${proceduralToken(node.id.replace(/^missing:/, ""))}`;
   if (node.tone === "action") return `action.${proceduralToken(node.id.replace(/^action:/, ""))}`;
@@ -262,6 +284,7 @@ function buildGraph(
   reflection: IdeologyContextReflectionV1,
   admission: HelixRecommendedActionAdmissionV1,
   fruition: FruitionProcedureExpressionV1,
+  characterComparison?: CharacterSituationComparisonV1,
 ) {
   const nodes = new Map<string, ZenGraphNode>();
   const edges: ZenGraphEdge[] = [];
@@ -446,11 +469,67 @@ function buildGraph(
     });
   }
 
+  if (characterComparison) {
+    const characterNodeId = `character:${characterComparison.characterId}`;
+    const activatedWeights = characterComparison.activatedProfileWeights.slice(0, 7);
+    addNode(nodes, {
+      id: characterNodeId,
+      label:
+        characterComparison.characterId === "logh.reinhard_von_lohengramm"
+          ? "Reinhard von Lohengramm"
+          : labelize(characterComparison.characterId),
+      tone: "character",
+      glyph: "C",
+      x: 700,
+      y: Math.max(430, 120 + Math.max(3, lane) * 92),
+      width: 256,
+      height: 112,
+      tags: ["character_profile", "diagnostic_only", characterComparison.predictedPosture],
+      summary: "Character profile block: Zen badges are reweighted into a bounded behavioral hypothesis.",
+      proceduralExpression: `character.${proceduralToken(characterComparison.characterId)} weights activated badges => ${labelize(
+        characterComparison.predictedPosture,
+      )}`,
+      proceduralRole: "objective_view",
+      procedureOperator: "routes_to",
+      actionEffect: characterComparison.behavioralHypothesis.likelyChoice,
+      evidenceNeeds: characterComparison.behavioralHypothesis.missingEvidence,
+      refusesAuthority: ["moral_verdict", "canon_certainty_without_source", "execution_authority"],
+      characterWeights: activatedWeights,
+      characterHypothesis: characterComparison.behavioralHypothesis,
+    });
+    for (const activation of activatedWeights) {
+      if (!nodes.has(activation.nodeId)) continue;
+      edges.push({
+        id: `character:${activation.nodeId}:${characterNodeId}`,
+        from: activation.nodeId,
+        to: characterNodeId,
+        label: labelize(activation.relation),
+        tone:
+          activation.relation === "tensions"
+            ? "rose"
+            : activation.relation === "counterweighted"
+              ? "amber"
+              : activation.relation === "missing"
+                ? "violet"
+                : "emerald",
+        weight: Math.max(0.5, activation.graphConfidence * activation.characterWeight),
+      });
+    }
+    edges.push({
+      id: `character:${characterNodeId}:fruition`,
+      from: characterNodeId,
+      to: reflection.graph.rootId,
+      label: "character weighted posture",
+      tone: "amber",
+      weight: 0.85,
+    });
+  }
+
   return {
     nodes: [...nodes.values()].map((node) => decorateProcedureNode({ ...node, glyph: node.glyph || nodeGlyph(node) }, fruition)),
     edges: edges.filter((edge, index, all) => all.findIndex((candidate) => candidate.id === edge.id) === index),
     width: 1200,
-    height: Math.max(640, 190 + Math.max(3, lane) * 120),
+    height: Math.max(760, 260 + Math.max(3, lane) * 120),
   };
 }
 
@@ -515,6 +594,7 @@ function ObjectiveBindingRail({
   admission,
   fruition,
   locator,
+  characterComparison,
   selectedNode,
   selectedNodes,
   onSelectNode,
@@ -524,6 +604,7 @@ function ObjectiveBindingRail({
   admission: HelixRecommendedActionAdmissionV1;
   fruition: FruitionProcedureExpressionV1;
   locator?: ZenBadgeLocatorV1;
+  characterComparison?: CharacterSituationComparisonV1;
   selectedNode: ZenGraphNode | null;
   selectedNodes: ZenGraphNode[];
   onSelectNode: (id: string) => void;
@@ -637,6 +718,34 @@ function ObjectiveBindingRail({
             </button>
           </div>
         </BindingBox>
+        {characterComparison ? (
+          <BindingBox
+            title="Character block"
+            label={labelize(characterComparison.predictedPosture)}
+            tone="amber"
+            activeNodeIds={[
+              `character:${characterComparison.characterId}`,
+              ...characterComparison.activatedProfileWeights.slice(0, 5).map((entry) => entry.nodeId),
+            ]}
+            onSelectNode={onSelectNode}
+          >
+            <div className="space-y-1">
+              <div className="font-semibold text-amber-50">
+                {characterComparison.characterId === "logh.reinhard_von_lohengramm"
+                  ? "Reinhard von Lohengramm"
+                  : labelize(characterComparison.characterId)}
+              </div>
+              <div className="text-[11px] opacity-80">{characterComparison.behavioralHypothesis.likelyChoice}</div>
+              <div className="flex flex-wrap gap-1">
+                {characterComparison.activatedProfileWeights.slice(0, 4).map((entry) => (
+                  <span key={entry.nodeId} className="rounded border border-amber-500/40 bg-black/20 px-1.5 py-0.5 text-[9px]">
+                    {labelize(entry.nodeId)} {entry.characterWeight.toFixed(2)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </BindingBox>
+        ) : null}
         <BindingBox
           title="Located comparison"
           label={locator ? labelize(locator.comparisonSeed.expectedFruitionPosture) : "not located"}
@@ -723,14 +832,20 @@ export function ZenGraphPanel({
   reflection,
   admission,
   locator,
+  characterComparison,
 }: {
   reflection: IdeologyContextReflectionV1;
   admission: HelixRecommendedActionAdmissionV1;
   locator?: ZenBadgeLocatorV1;
+  characterComparison?: CharacterSituationComparisonV1;
 }) {
   const fruition = useMemo(() => calculateFruitionFromReflection({ reflection, admission }), [admission, reflection]);
-  const graph = useMemo(() => buildGraph(reflection, admission, fruition), [admission, fruition, reflection]);
+  const graph = useMemo(
+    () => buildGraph(reflection, admission, fruition, characterComparison),
+    [admission, characterComparison, fruition, reflection],
+  );
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
+  const loadFruitionLocatorSeed = useFruitionCalculatorStore((store) => store.loadLocatorSeed);
   const locatorSeedNodeIds =
     locator?.comparisonSeed.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)) ?? [];
   const initialSelectedNodeId = locatorSeedNodeIds[0] ?? reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
@@ -747,6 +862,8 @@ export function ZenGraphPanel({
   const highlighted = new Set([
     ...selectedNodeIds,
     ...(reflection.overlay?.highlightedNodeIds ?? []),
+    ...(characterComparison?.activatedProfileWeights.map((entry) => entry.nodeId) ?? []),
+    ...(characterComparison ? [`character:${characterComparison.characterId}`] : []),
     ...(selectedNode?.tone === "root" ? [] : [reflection.graph.rootId]),
   ]);
   const hasFocus = highlighted.size > 0;
@@ -763,7 +880,11 @@ export function ZenGraphPanel({
     });
   };
   const loadToFruitionCalculator = () => {
-    loadFruitionExpression(fruition, { source: "zen_badge_graph" });
+    if (locator) {
+      loadFruitionLocatorSeed(locator, { source: "zen_badge_graph" });
+    } else {
+      loadFruitionExpression(fruition, { source: "zen_badge_graph" });
+    }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "fruition-calculator" } }));
     }
@@ -797,6 +918,7 @@ export function ZenGraphPanel({
               admission={admission}
               fruition={fruition}
               locator={locator}
+              characterComparison={characterComparison}
               selectedNode={selectedNode}
               selectedNodes={selectedNodes}
               onSelectNode={addNodeToSelection}
@@ -840,7 +962,7 @@ export function ZenGraphPanel({
                       <path
                         d={edgePath(from, to)}
                         stroke={edgeStroke(edge.tone)}
-                        strokeWidth={highlightedEdge ? 4 : 2}
+                        strokeWidth={highlightedEdge ? 4 + (edge.weight ?? 0) * 2 : 2 + (edge.weight ?? 0)}
                         strokeOpacity={hasFocus && !highlightedEdge ? 0.26 : 0.78}
                         strokeDasharray={edge.label === "claim boundary" ? "6 7" : undefined}
                         fill="none"
@@ -872,15 +994,44 @@ export function ZenGraphPanel({
                       toggleNodeSelection(node.id);
                     }}
                   >
-                    <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
-                      {node.glyph}
-                    </span>
-                    {node.confidence ? (
-                      <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
-                    ) : null}
-                    {node.tone === "boundary" ? (
-                      <span className="pointer-events-none absolute -inset-1.5 border-2 border-rose-300/80" />
-                    ) : null}
+                    {node.tone === "character" ? (
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Character Profile</div>
+                            <div className="text-sm font-black leading-tight text-amber-50">{node.label}</div>
+                          </div>
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-amber-100 bg-zinc-950 text-[13px] font-black text-amber-100">
+                            {node.glyph}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {(node.characterWeights ?? []).slice(0, 4).map((entry) => (
+                            <span
+                              key={entry.nodeId}
+                              className="rounded border border-amber-300/40 bg-black/25 px-1.5 py-0.5 text-[9px] font-semibold normal-case text-amber-50"
+                            >
+                              {labelize(entry.nodeId)} {entry.characterWeight.toFixed(2)}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-[10px] font-medium normal-case leading-snug text-amber-100/90">
+                          {node.characterHypothesis?.likelyChoice ?? node.summary}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex h-8 w-8 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
+                          {node.glyph}
+                        </span>
+                        {node.confidence ? (
+                          <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
+                        ) : null}
+                        {node.tone === "boundary" ? (
+                          <span className="pointer-events-none absolute -inset-1.5 border-2 border-rose-300/80" />
+                        ) : null}
+                      </>
+                    )}
                   </button>
                 );
               })}

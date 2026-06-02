@@ -2,11 +2,47 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import type { CharacterSituationComparisonV1 } from "@shared/character-situation-comparison";
 import { buildIdeologyContextReflectionV1 } from "@shared/ideology-context-reflection";
 import { buildZenBadgeLocatorV1, type ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
+import { REINHARD_VON_LOHENGRAMM_PROFILE } from "@shared/zen-graph/character-profiles/reinhard-von-lohengramm";
+import { compareCharacterSituation } from "@shared/zen-graph/compare-character-situation";
+import type { IdeologyGraphDocument } from "@shared/zen-graph/ideology-graph-types";
+import { buildIdeologyGraph } from "@shared/zen-graph/load-ideology-graph";
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
+import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import ZenGraphPanel from "../panels/ZenGraphPanel";
+
+const graphDocument: IdeologyGraphDocument = {
+  version: 1,
+  rootId: ZEN_WISDOM_ROOT_ID,
+  actionGatePolicy: {
+    version: 1,
+    covered_action_tags: ["covered-action"],
+    legal_key_tags: ["legal-key"],
+    ethos_key_tags: ["ethos-key"],
+    hard_fail_ids: {
+      missing_legal_key: "IDEOLOGY_MISSING_LEGAL_KEY",
+    },
+  },
+  nodes: [
+    {
+      id: ZEN_WISDOM_ROOT_ID,
+      title: "Wisdom First Principles",
+      tags: ["objective_binding"],
+      children: ZEN_WISDOM_PRINCIPLES.map((principle) => principle.id),
+    },
+    ...ZEN_WISDOM_PRINCIPLES.map((principle) => ({
+      id: principle.id,
+      title: principle.label,
+      summary: principle.summary,
+      tags: principle.tags,
+    })),
+  ],
+};
+
+const characterGraph = buildIdeologyGraph(graphDocument);
 
 function buildFixture() {
   const reflection = buildIdeologyContextReflectionV1({
@@ -182,9 +218,28 @@ function buildLocatorFixture(): ZenBadgeLocatorV1 {
   });
 }
 
-function renderPanel(locator?: ZenBadgeLocatorV1) {
+function buildCharacterComparisonFixture(): CharacterSituationComparisonV1 {
+  return compareCharacterSituation({
+    graph: characterGraph,
+    profile: REINHARD_VON_LOHENGRAMM_PROFILE,
+    situationText:
+      "A corrupt inherited noble authority blocks agency while a cold advisor suggests strategic leverage.",
+    refs: ["turn:panel"],
+    generatedAt: "2026-06-01T00:00:00.000Z",
+    comparisonId: "character-situation:panel",
+  });
+}
+
+function renderPanel(locator?: ZenBadgeLocatorV1, characterComparison?: CharacterSituationComparisonV1) {
   const { reflection, admission } = buildFixture();
-  return render(<ZenGraphPanel reflection={reflection} admission={admission} locator={locator} />);
+  return render(
+    <ZenGraphPanel
+      reflection={reflection}
+      admission={admission}
+      locator={locator}
+      characterComparison={characterComparison}
+    />,
+  );
 }
 
 function openObjectiveBindings() {
@@ -201,7 +256,7 @@ describe("ZenGraphPanel", () => {
     renderPanel();
 
     expect(screen.getByTestId("zen-graph-map-scrollport")).toBeTruthy();
-    expect(screen.getByText("Zen Badge Graph")).toBeTruthy();
+    expect(screen.getByLabelText("ZenGraph objective lenses")).toBeTruthy();
     expect(screen.queryByTestId("zen-graph-objective-binding-overlay")).toBeNull();
     const rootBadge = screen.getByRole("button", { name: "Wisdom First Principles" });
     expect(rootBadge).toBeTruthy();
@@ -287,6 +342,19 @@ describe("ZenGraphPanel", () => {
     expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getByText("3 badges")).toBeTruthy();
+  });
+
+  it("renders a colored character profile block linked from activated Zen badges", () => {
+    renderPanel(buildLocatorFixture(), buildCharacterComparisonFixture());
+
+    expect(screen.getByRole("button", { name: "Reinhard von Lohengramm" })).toBeTruthy();
+    expect(screen.getAllByText("Character Profile").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/sovereign ambition 0\.98/i).length).toBeGreaterThan(0);
+
+    openObjectiveBindings();
+    expect(screen.getByText("Character block")).toBeTruthy();
+    expect(screen.getAllByText(/Reinhard von Lohengramm/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/displacement|conquest|forced restructuring/i).length).toBeGreaterThan(0);
   });
 
   it("renders safeguards, action gate warnings, tensions, and claim boundaries", () => {

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { FruitionProcedureExpressionV1 } from "@shared/fruition-procedure-expression";
+import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
+import { buildFruitionFromZenBadgeComparisonSeed } from "@shared/zen-graph/build-fruition-from-zen-badge-comparison-seed";
 
 const FRUITION_CALCULATOR_STORAGE_KEY = "fruition-calculator:v1";
 
@@ -18,6 +20,10 @@ type FruitionCalculatorState = {
     expression: FruitionProcedureExpressionV1,
     meta?: { source?: FruitionCalculatorHistoryEntry["source"] },
   ) => FruitionCalculatorHistoryEntry;
+  loadLocatorSeed: (
+    locator: ZenBadgeLocatorV1,
+    meta?: { source?: FruitionCalculatorHistoryEntry["source"] },
+  ) => FruitionCalculatorHistoryEntry;
   clear: () => void;
 };
 
@@ -33,6 +39,23 @@ export const useFruitionCalculatorStore = create<FruitionCalculatorState>()(
           id: `fruition-calc:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
           expression,
           source: meta?.source ?? "unknown",
+          ts: new Date().toISOString(),
+        };
+        set((state) => ({
+          currentExpression: expression,
+          history: [entry, ...state.history].slice(0, MAX_HISTORY),
+        }));
+        return entry;
+      },
+      loadLocatorSeed: (locator, meta) => {
+        const expression = buildFruitionFromZenBadgeComparisonSeed({
+          locator,
+          objective: locator.input.summary,
+        });
+        const entry: FruitionCalculatorHistoryEntry = {
+          id: `fruition-calc:${Date.now()}:${Math.random().toString(36).slice(2, 7)}`,
+          expression,
+          source: meta?.source ?? "zen_badge_graph",
           ts: new Date().toISOString(),
         };
         set((state) => ({
