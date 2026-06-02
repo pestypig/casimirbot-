@@ -134,8 +134,259 @@ describe("live continuation runner", () => {
     });
     expect(debug?.callout).toMatchObject({
       schema: "helix.callout_candidate.v1",
-      callout_intent: "warning",
-      requires_confirmation: true,
+      callout_type: "warning",
+      delivery: "voice_proposal",
+      blocked_reason: "confirm_speak_required",
+      certainty: "observed",
+      context_role: "observation_not_assistant_answer",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("enforces voice policy delivery modes and certainty threshold caps", async () => {
+    const base = {
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      environment_id: "env:minecraft",
+      source_ids: ["source:paper"],
+      objective: "Watch my Minecraft run and flag danger.",
+      now: "2026-06-02T02:19:59.000Z",
+    };
+
+    const muted = upsertLiveContinuationJob({
+      ...base,
+      job_id: "job:muted",
+      voice_policy: "muted",
+    });
+    const mutedTick = await runLiveContinuationTick({
+      job: muted,
+      trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:01.000Z",
+    });
+    expect(getLiveContinuationRunDebugForTest(mutedTick.tick_id)?.callout).toMatchObject({
+      delivery: "typed_only",
+      blocked_reason: "voice_policy_muted",
+      certainty: "observed",
+    });
+
+    const propose = upsertLiveContinuationJob({
+      ...base,
+      job_id: "job:propose",
+      voice_policy: "propose_only",
+    });
+    const proposeTick = await runLiveContinuationTick({
+      job: propose,
+      trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:02.000Z",
+    });
+    expect(getLiveContinuationRunDebugForTest(proposeTick.tick_id)?.callout).toMatchObject({
+      delivery: "voice_proposal",
+      blocked_reason: null,
+    });
+
+    const automatic = upsertLiveContinuationJob({
+      ...base,
+      job_id: "job:auto",
+      voice_policy: "automatic_when_policy_allows",
+    });
+    const automaticTick = await runLiveContinuationTick({
+      job: automatic,
+      trigger: "salience",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:03.000Z",
+    });
+    expect(getLiveContinuationRunDebugForTest(automaticTick.tick_id)?.callout).toMatchObject({
+      delivery: "automatic_spoken",
+      blocked_reason: null,
+      certainty: "observed",
+    });
+
+    const capped = upsertLiveContinuationJob({
+      ...base,
+      job_id: "job:threshold",
+      voice_policy: "automatic_when_policy_allows",
+      evidence_threshold: "likely",
+    });
+    const cappedTick = await runLiveContinuationTick({
+      job: capped,
+      trigger: "salience",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:04.000Z",
+    });
+    expect(getLiveContinuationRunDebugForTest(cappedTick.tick_id)?.callout).toMatchObject({
+      delivery: "automatic_spoken",
+      certainty: "likely",
+    });
+
+    const coolingDown = upsertLiveContinuationJob({
+      ...base,
+      job_id: "job:cooldown",
+      voice_policy: "automatic_when_policy_allows",
+      cooldowns: {
+        last_tick_at: "2026-06-02T02:20:00.000Z",
+        min_tick_interval_ms: 10_000,
+      },
+    });
+    const coolingDownTick = await runLiveContinuationTick({
+      job: coolingDown,
+      trigger: "salience",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:04.000Z",
+    });
+    expect(getLiveContinuationRunDebugForTest(coolingDownTick.tick_id)?.callout).toMatchObject({
+      delivery: "suppressed",
+      blocked_reason: "callout_interval_cooldown",
+    });
+  });
+
+  it("keeps multiple Minecraft events on the same single-agent job baton", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:paper"],
+      objective: "Watch my Minecraft run and flag danger or progress.",
+      voice_policy: "propose_only",
+    });
+
+    const progressTick = await runLiveContinuationTick({
+      job,
+      trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent({
+        event_type: "item_acquired",
+        health_delta: undefined,
+        inventory_delta: { item_id: "minecraft:blaze_rod", count_delta: 1 },
+        objective_delta: { status: "progress", goal_label: "collect blaze rods" },
+        entities: [],
+        evidence_refs: ["world-event:event:progress"],
+      }), {
+        signal_id: "signal:progress",
+        salience_receipt_id: "salience:progress",
+        projection_id: "projection:progress",
+        goal_hypothesis_ids: ["goal:progress"],
+      }),
+      now: "2026-06-02T02:20:02.000Z",
+    });
+    const damageTick = await runLiveContinuationTick({
+      job,
+      trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent()),
+      now: "2026-06-02T02:20:03.000Z",
+    });
+
+    expect(progressTick.job_id).toBe(job.job_id);
+    expect(damageTick.job_id).toBe(job.job_id);
+    expect(progressTick.selected_lanes).toEqual(expect.arrayContaining(["objective_progress", "world_state"]));
+    expect(damageTick.selected_lanes).toEqual(expect.arrayContaining(["risk_watch", "world_state"]));
+    expect(getLiveContinuationRunDebugForTest(progressTick.tick_id)?.workers.every((worker) => worker.assistant_answer === false)).toBe(true);
+    expect(getLiveContinuationRunDebugForTest(damageTick.tick_id)?.workers.every((worker) => worker.assistant_answer === false)).toBe(true);
+  });
+
+  it("updates route context for location samples without producing callout spam", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:paper"],
+      objective: "Watch my Minecraft route quietly.",
+      voice_policy: "automatic_when_policy_allows",
+    });
+    const tick = await runLiveContinuationTick({
+      job,
+      trigger: "world_event",
+      worldEventResult: ingestResult(minecraftEvent({
+        event_type: "player_location_sample",
+        health_delta: undefined,
+        entities: [],
+        evidence_refs: ["world-event:event:location"],
+      }), {
+        signal_id: "signal:location",
+        salience_receipt_id: null,
+        append_candidate: {
+          event: minecraftEvent({
+            event_type: "player_location_sample",
+            health_delta: undefined,
+            entities: [],
+            evidence_refs: ["world-event:event:location"],
+          }),
+          eventId: "event:location",
+          threadId: "thread:minecraft",
+          roomId: "room:overworld",
+          worldId: "world:overworld",
+          sourceId: "source:paper",
+          observationRef: { event_type: "player_location_sample" },
+          evidenceRefs: ["append-candidate:event:location"],
+        },
+      }),
+      now: "2026-06-02T02:20:05.000Z",
+    });
+
+    expect(tick.selected_lanes).toEqual(expect.arrayContaining(["source_health", "world_state", "route_watch"]));
+    expect(tick.selected_lanes).not.toContain("risk_watch");
+    expect(tick.callout_candidate_ref).toBeNull();
+    expect(getLiveContinuationRunDebugForTest(tick.tick_id)?.callout).toBeNull();
+  });
+
+  it("routes disconnected sources to source health and ask-user repair without confident tactical advice", async () => {
+    const job = upsertLiveContinuationJob({
+      thread_id: "thread:minecraft",
+      room_id: "room:overworld",
+      source_ids: ["source:paper"],
+      objective: "Watch my Minecraft run and flag danger.",
+      voice_policy: "automatic_when_policy_allows",
+    });
+    const tick = await runLiveContinuationTick({
+      job,
+      trigger: "salience",
+      worldEventResult: ingestResult(minecraftEvent({
+        event_type: "source_disconnected",
+        health_delta: undefined,
+        entities: [],
+        text: "Minecraft world-event source disconnected.",
+        evidence_refs: ["world-event:event:source-disconnected"],
+      }), {
+        signal_id: "signal:source-disconnected",
+        salience_receipt_id: "salience:source-disconnected",
+        append_candidate: {
+          event: minecraftEvent({
+            event_type: "source_disconnected",
+            health_delta: undefined,
+            entities: [],
+            text: "Minecraft world-event source disconnected.",
+            evidence_refs: ["world-event:event:source-disconnected"],
+          }),
+          eventId: "event:source-disconnected",
+          threadId: "thread:minecraft",
+          roomId: "room:overworld",
+          worldId: "world:overworld",
+          sourceId: "source:paper",
+          observationRef: { event_type: "source_disconnected" },
+          salienceReason: "source_health",
+          saliencePriority: "warn",
+          evidenceRefs: ["append-candidate:event:source-disconnected"],
+        },
+      }),
+      now: "2026-06-02T02:20:06.000Z",
+    });
+    const debug = getLiveContinuationRunDebugForTest(tick.tick_id);
+
+    expect(debug?.admission).toMatchObject({
+      freshness: expect.objectContaining({ status: "stale" }),
+      trust_level: "unverified",
+    });
+    expect(tick.selected_lanes).toEqual(expect.arrayContaining(["source_health", "voice_gate"]));
+    expect(debug?.goal).toMatchObject({
+      status: "ask_user",
+      next_step: "ask_user",
+      rationale_codes: expect.arrayContaining(["source_stale"]),
+      missing_evidence: expect.arrayContaining(["live_source_freshness"]),
+    });
+    expect(debug?.callout).toMatchObject({
+      callout_type: "source_health",
+      certainty: "unknown",
+      delivery: "suppressed",
+      blocked_reason: "source_stale",
       assistant_answer: false,
       terminal_eligible: false,
     });

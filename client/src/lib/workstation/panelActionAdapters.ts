@@ -68,6 +68,14 @@ import {
   HELIX_PHYSICS_CALCULATION_INTENTS,
   type HelixPhysicsCalculationIntent,
 } from "@shared/contracts/helix-physics-calculation-context-plan.v1";
+import {
+  HELIX_GOAL_EVALUATION_RECEIPT_SCHEMA,
+  HELIX_LIVE_CONTINUATION_TICK_SCHEMA,
+  HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
+  HELIX_WORKER_LANE_RECEIPT_SCHEMA,
+  helixHypothesisNotAnswerFlags,
+  helixReceiptNotAnswerFlags,
+} from "@shared/helix-live-continuation";
 import { planHelixPhysicsCalculationContext } from "@shared/theory/helix-physics-calculation-context-planner";
 import {
   isTheoryCalculatorLoadoutV1,
@@ -4368,13 +4376,39 @@ export function executeHelixPanelAction(
         panel_id: panelId,
         action_id: actionId,
         artifact: {
-          kind: actionId === "attach_live_source" ? "workstation_live_source_receipt" : "live_answer_environment_receipt",
-          ok: true,
+          ...(actionId === "attach_live_source"
+            ? {
+                schema: HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
+                receipt_id: `live_source_admission:${Date.now()}`,
+                source_id: asNonEmptyString(args.source_id ?? args.sourceId) ?? "source:manual-feed",
+                source_kind: "minecraft_world_events",
+                transport: "cloudflarelink",
+                source_identity: {
+                  world_id: asNonEmptyString(args.world_id ?? args.worldId) ?? null,
+                  server_id: asNonEmptyString(args.server_id ?? args.serverId) ?? null,
+                  player_id: asNonEmptyString(args.player_id ?? args.playerId) ?? null,
+                  profile_id: asNonEmptyString(args.profile_id ?? args.profileId) ?? null,
+                },
+                freshness: {
+                  status: "connected",
+                  last_seen_at: new Date().toISOString(),
+                  stale_after_ms: null,
+                },
+                trust_level: "admitted_live_source",
+                ...helixReceiptNotAnswerFlags,
+                evidence_refs: [`live_answer_environment:${environmentId}:source_attached`],
+              }
+            : {
+                kind: "live_answer_environment_receipt",
+                ok: true,
+                context_role: "observation_not_assistant_answer",
+              }),
           environment_id: environmentId,
+          thread_id: asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop",
+          room_id: asNonEmptyString(args.room_id ?? args.roomId) ?? "room:minecraft-minehut",
           request: args,
           deterministic: true,
           model_invoked: false,
-          context_role: "observation_not_assistant_answer",
         },
         message: `Queued ${actionId.replace(/_/g, " ")} for ${environmentId}.`,
       };
@@ -4509,9 +4543,9 @@ export function executeHelixPanelAction(
       };
     }
 
-      if (actionId === "voice_delivery.confirm_speak") {
-        const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
-        const spokenText = asNonEmptyString(args.spoken_text ?? args.spokenText ?? args.text) ?? "";
+    if (actionId === "voice_delivery.confirm_speak") {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const spokenText = asNonEmptyString(args.spoken_text ?? args.spokenText ?? args.text) ?? "";
         const sourceEventId = asNonEmptyString(args.source_event_id ?? args.sourceEventId);
         const proposalId = asNonEmptyString(args.proposal_id ?? args.proposalId);
         const authorityArtifactRef = proposalId ?? sourceEventId ?? `voice_confirm_speak:${Date.now()}`;
@@ -4554,6 +4588,206 @@ export function executeHelixPanelAction(
         action_id: actionId,
         artifact: receipt,
         message: "Confirmed voice delivery for the proposed callout.",
+      };
+    }
+
+    if (
+      actionId.startsWith("live_continuation.") ||
+      actionId === "worker_lane.run" ||
+      actionId === "goal.evaluate" ||
+      actionId === "source_health.query"
+    ) {
+      const threadId = asNonEmptyString(args.thread_id ?? args.threadId) ?? "helix-ask:desktop";
+      const roomId = asNonEmptyString(args.room_id ?? args.roomId) ?? "room:minecraft-minehut";
+      const jobId = asNonEmptyString(args.job_id ?? args.jobId);
+      const evidenceRefs = Array.isArray(args.evidence_refs)
+        ? args.evidence_refs.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        : [];
+
+      if (actionId === "live_continuation.start") {
+        postLiveEnvironmentControl("/api/agi/situation/live-continuation/start", {
+          thread_id: threadId,
+          room_id: roomId,
+          objective: asNonEmptyString(args.objective) ?? "Continue monitoring the live situation.",
+          environment_id: asNonEmptyString(args.environment_id ?? args.environmentId) ?? null,
+          contract_id: asNonEmptyString(args.contract_id ?? args.contractId) ?? null,
+          source_ids: Array.isArray(args.source_ids)
+            ? args.source_ids
+            : asNonEmptyString(args.source_id ?? args.sourceId)
+              ? [asNonEmptyString(args.source_id ?? args.sourceId)]
+              : [],
+          voice_policy: asNonEmptyString(args.voice_policy ?? args.voicePolicy) ?? undefined,
+          evidence_threshold: asNonEmptyString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
+          lanes_enabled: Array.isArray(args.lanes_enabled) ? args.lanes_enabled : undefined,
+          min_tick_interval_ms: typeof args.min_tick_interval_ms === "number" ? args.min_tick_interval_ms : undefined,
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            schema: "helix.live_continuation_job_receipt.v1",
+            receipt_id: `live_continuation_start:${Date.now()}`,
+            action: actionId,
+            thread_id: threadId,
+            room_id: roomId,
+            job_id: jobId ?? null,
+            status: "queued",
+            mode: "single_agent",
+            ...helixReceiptNotAnswerFlags,
+            evidence_refs: evidenceRefs,
+          },
+          message: "Queued live continuation start as a non-terminal receipt.",
+        };
+      }
+
+      if (actionId === "live_continuation.tick") {
+        postLiveEnvironmentControl("/api/agi/situation/live-continuation/tick", {
+          job_id: jobId,
+          thread_id: threadId,
+          room_id: roomId,
+          trigger: asNonEmptyString(args.trigger) ?? "manual_refresh",
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            schema: HELIX_LIVE_CONTINUATION_TICK_SCHEMA,
+            tick_id: `live_continuation_tick:queued:${Date.now()}`,
+            job_id: jobId ?? "pending_job_resolution",
+            thread_id: threadId,
+            room_id: roomId,
+            trigger: asNonEmptyString(args.trigger) ?? "manual_refresh",
+            status: "queued",
+            selected_lanes: [],
+            worker_receipt_refs: [],
+            next_step: "continue",
+            ...helixReceiptNotAnswerFlags,
+            evidence_refs: evidenceRefs,
+          },
+          message: "Queued live continuation tick as a non-terminal receipt.",
+        };
+      }
+
+      if (
+        actionId === "live_continuation.query" ||
+        actionId === "live_continuation.pause" ||
+        actionId === "live_continuation.resume" ||
+        actionId === "live_continuation.stop"
+      ) {
+        const command = actionId.slice("live_continuation.".length);
+        postLiveEnvironmentControl(`/api/agi/situation/live-continuation/${command}`, {
+          job_id: jobId,
+          thread_id: threadId,
+          room_id: roomId,
+          source_id: asNonEmptyString(args.source_id ?? args.sourceId) ?? null,
+          status: asNonEmptyString(args.status) ?? null,
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            schema: "helix.live_continuation_job_receipt.v1",
+            receipt_id: `live_continuation_${command}:${Date.now()}`,
+            action: actionId,
+            thread_id: threadId,
+            room_id: roomId,
+            job_id: jobId ?? null,
+            status: command === "query" ? "read_requested" : "queued",
+            ...helixReceiptNotAnswerFlags,
+            evidence_refs: evidenceRefs,
+          },
+          message: `Queued ${actionId} as a non-terminal receipt.`,
+        };
+      }
+
+      if (actionId === "worker_lane.run") {
+        const lane = asNonEmptyString(args.lane) ?? "world_state";
+        postLiveEnvironmentControl("/api/agi/situation/live-continuation/worker-lane/run", {
+          lane,
+          job_id: jobId,
+          thread_id: threadId,
+          room_id: roomId,
+          evidence_refs: evidenceRefs,
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            schema: HELIX_WORKER_LANE_RECEIPT_SCHEMA,
+            receipt_id: `worker_lane:${lane}:${Date.now()}`,
+            lane,
+            status: "succeeded",
+            summary: "Queued compact procedural lane reducer.",
+            hypotheses: [],
+            recommended_next_observations: [],
+            ...helixHypothesisNotAnswerFlags,
+            evidence_refs: evidenceRefs,
+          },
+          message: "Queued worker lane reducer as a non-terminal receipt.",
+        };
+      }
+
+      if (actionId === "goal.evaluate") {
+        postLiveEnvironmentControl("/api/agi/situation/live-continuation/goal/evaluate", {
+          job_id: jobId,
+          thread_id: threadId,
+          room_id: roomId,
+          objective: asNonEmptyString(args.objective) ?? null,
+          evidence_refs: evidenceRefs,
+        });
+        return {
+          ok: true,
+          panel_id: panelId,
+          action_id: actionId,
+          artifact: {
+            schema: HELIX_GOAL_EVALUATION_RECEIPT_SCHEMA,
+            receipt_id: `goal_evaluation:${Date.now()}`,
+            job_id: jobId ?? "pending_job_resolution",
+            thread_id: threadId,
+            room_id: roomId,
+            objective_ref: asNonEmptyString(args.objective) ?? null,
+            status: "needs_more_observation",
+            rationale_codes: ["queued_goal_evaluation"],
+            satisfied_evidence_refs: [],
+            missing_evidence: evidenceRefs.length ? [] : ["compact_goal_evidence"],
+            next_step: "continue",
+            ...helixReceiptNotAnswerFlags,
+            evidence_refs: evidenceRefs,
+          },
+          message: "Queued goal evaluation as a non-terminal receipt.",
+        };
+      }
+
+      const sourceId = asNonEmptyString(args.source_id ?? args.sourceId) ?? jobId ?? "source:unknown";
+      postLiveEnvironmentControl("/api/agi/situation/live-continuation/source-health/query", {
+        job_id: jobId,
+        thread_id: threadId,
+        room_id: roomId,
+        source_id: sourceId,
+      });
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          schema: HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
+          receipt_id: `source_health:${Date.now()}`,
+          thread_id: threadId,
+          room_id: roomId,
+          source_id: sourceId,
+          source_kind: "minecraft_world_events",
+          transport: "unknown",
+          source_identity: {},
+          freshness: { status: "unknown" },
+          trust_level: "unverified",
+          ...helixReceiptNotAnswerFlags,
+          evidence_refs: evidenceRefs,
+        },
+        message: "Queued source health query as a non-terminal receipt.",
       };
     }
 

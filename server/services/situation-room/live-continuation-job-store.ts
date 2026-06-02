@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
-import type { HelixWorkerLaneReceipt } from "@shared/helix-live-continuation";
+import type {
+  HelixLiveContinuationEvidenceThreshold,
+  HelixWorkerLaneReceipt,
+} from "@shared/helix-live-continuation";
 
 export type LiveContinuationJobStatus = "active" | "paused" | "blocked" | "stale" | "stopped";
 export type LiveContinuationJobMode = "single_agent";
@@ -21,6 +24,7 @@ export type LiveContinuationJob = {
   status: LiveContinuationJobStatus;
   mode: LiveContinuationJobMode;
   voice_policy: LiveContinuationVoicePolicy;
+  evidence_threshold: HelixLiveContinuationEvidenceThreshold;
   lanes_enabled: LiveContinuationLane[];
   cooldowns: {
     callout_dedupe_keys: Record<string, string>;
@@ -42,6 +46,7 @@ export type UpsertLiveContinuationJobInput = {
   objective: string;
   status?: LiveContinuationJobStatus | null;
   voice_policy?: LiveContinuationVoicePolicy | null;
+  evidence_threshold?: HelixLiveContinuationEvidenceThreshold | null;
   lanes_enabled?: LiveContinuationLane[] | null;
   cooldowns?: Partial<LiveContinuationJob["cooldowns"]> | null;
   last_observation_refs?: string[] | null;
@@ -108,6 +113,13 @@ const normalizeVoicePolicy = (value?: LiveContinuationVoicePolicy | null): LiveC
   return "propose_only";
 };
 
+const normalizeEvidenceThreshold = (
+  value?: HelixLiveContinuationEvidenceThreshold | null,
+): HelixLiveContinuationEvidenceThreshold => {
+  if (value === "likely" || value === "confirmed") return value;
+  return "observed";
+};
+
 const normalizeStatus = (value?: LiveContinuationJobStatus | null): LiveContinuationJobStatus => {
   if (value === "paused" || value === "blocked" || value === "stale" || value === "stopped") return value;
   return "active";
@@ -162,6 +174,7 @@ export function upsertLiveContinuationJob(input: UpsertLiveContinuationJobInput)
     status: normalizeStatus(input.status ?? existing?.status ?? "active"),
     mode: "single_agent",
     voice_policy: normalizeVoicePolicy(input.voice_policy ?? existing?.voice_policy),
+    evidence_threshold: normalizeEvidenceThreshold(input.evidence_threshold ?? existing?.evidence_threshold),
     lanes_enabled: normalizeLanes(input.lanes_enabled ?? existing?.lanes_enabled),
     cooldowns: {
       callout_dedupe_keys: {

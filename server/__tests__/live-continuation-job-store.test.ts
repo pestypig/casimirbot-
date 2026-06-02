@@ -43,6 +43,7 @@ describe("live continuation job store", () => {
       status: "active",
       mode: "single_agent",
       voice_policy: "confirm_speak_required",
+      evidence_threshold: "observed",
       lanes_enabled: ["prediction_reflection", "source_health", "voice_gate"],
       cooldowns: {
         callout_dedupe_keys: { "risk:cave": "2026-06-02T02:00:00.000Z" },
@@ -112,6 +113,7 @@ describe("live continuation job store", () => {
 
     expect(job.mode).toBe("single_agent");
     expect(job.voice_policy).toBe("propose_only");
+    expect(job.evidence_threshold).toBe("observed");
     expect(job.lanes_enabled).toEqual(DEFAULT_LIVE_CONTINUATION_LANES);
   });
 });

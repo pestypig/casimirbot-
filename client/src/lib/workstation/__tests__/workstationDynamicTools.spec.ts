@@ -19,9 +19,18 @@ const AGENT_CONTINUATION_ACTION_IDS = [
   "goal_ledger.set_objective",
   "goal_ledger.mark_complete",
   "goal_ledger.mark_blocked",
+  "goal.evaluate",
   "callout_policy.set_mode",
   "voice_delivery.propose_from_trace",
   "voice_delivery.confirm_speak",
+  "live_continuation.start",
+  "live_continuation.tick",
+  "live_continuation.query",
+  "live_continuation.pause",
+  "live_continuation.resume",
+  "live_continuation.stop",
+  "worker_lane.run",
+  "source_health.query",
 ] as const;
 
 describe("workstation dynamic tools", () => {

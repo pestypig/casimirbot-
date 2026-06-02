@@ -123,6 +123,11 @@ export type LiveAnswerEnvironment = {
   raw_transcript_included: false;
   raw_audio_included: false;
   deterministic_content_role: "observation_not_assistant_answer";
+  context_role: "observation_not_assistant_answer";
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  raw_content_included: false;
 };
 
 export type LiveAnswerEnvironmentDelta = {
@@ -154,6 +159,14 @@ export type LiveAnswerEnvironmentDelta = {
   model_invoked?: boolean;
   context_policy?: "compact_context_pack_only";
   raw_logs_included?: false;
+  raw_transcript_included?: false;
+  raw_audio_included?: false;
+  deterministic_content_role?: "observation_not_assistant_answer";
+  context_role: "observation_not_assistant_answer";
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  raw_content_included: false;
   ts: string;
 };
 
@@ -171,6 +184,11 @@ export type LiveAnswerEnvironmentReceipt = {
   attachment_policy: "manual_only";
   context_injection: "explicit_attachment_only";
   command_lane_enabled: false;
+  context_role: "receipt_not_assistant_answer";
+  terminal_eligible: false;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  raw_content_included: false;
   error?: string | null;
 };
 

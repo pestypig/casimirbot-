@@ -1047,6 +1047,60 @@ describe("panelActionAdapters", () => {
     );
   });
 
+  it("treats Situation Room live-source attach as source admission", () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "situation-room-pipelines",
+        action_id: "attach_live_source",
+        args: {
+          thread_id: "thread:minecraft-live",
+          room_id: "room:minecraft-minehut",
+          environment_id: "live-env:minecraft",
+          source_id: "source:minecraft-server",
+          world_id: "minecraft:minehut",
+          kind: "minecraft_world_events",
+        },
+      },
+      {
+        openPanel: vi.fn(),
+        focusPanel: vi.fn(),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.artifact).toMatchObject({
+      schema: "helix.live_source_admission_receipt.v1",
+      thread_id: "thread:minecraft-live",
+      room_id: "room:minecraft-minehut",
+      environment_id: "live-env:minecraft",
+      source_id: "source:minecraft-server",
+      source_kind: "minecraft_world_events",
+      transport: "cloudflarelink",
+      trust_level: "admitted_live_source",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      post_tool_model_step_required: true,
+      context_role: "receipt_not_assistant_answer",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agi/situation/live-source/event",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("attaches and queries Dottie as a witness-only observer", () => {
     const context = {
       openPanel: vi.fn(),

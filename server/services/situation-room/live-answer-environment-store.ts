@@ -17,6 +17,30 @@ import {
 const environments = new Map<string, LiveAnswerEnvironment>();
 const deltasByEnvironment = new Map<string, LiveAnswerEnvironmentDelta[]>();
 
+const liveAnswerEnvironmentAuthority = {
+  context_role: "observation_not_assistant_answer" as const,
+  terminal_eligible: false as const,
+  post_tool_model_step_required: true as const,
+  assistant_answer: false as const,
+  raw_content_included: false as const,
+};
+
+const liveAnswerReceiptAuthority = {
+  context_role: "receipt_not_assistant_answer" as const,
+  terminal_eligible: false as const,
+  post_tool_model_step_required: true as const,
+  assistant_answer: false as const,
+  raw_content_included: false as const,
+};
+
+const liveAnswerRawExclusion = {
+  context_policy: "compact_context_pack_only" as const,
+  raw_logs_included: false as const,
+  raw_transcript_included: false as const,
+  raw_audio_included: false as const,
+  deterministic_content_role: "observation_not_assistant_answer" as const,
+};
+
 const stableJson = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -254,11 +278,8 @@ export function createLiveAnswerEnvironment(input: {
     evidence_refs: uniqueStrings([...(existing?.evidence_refs ?? []), ...setupEvidence]),
     created_at: existing?.created_at ?? now,
     updated_at: now,
-    context_policy: "compact_context_pack_only",
-    raw_logs_included: false,
-    raw_transcript_included: false,
-    raw_audio_included: false,
-    deterministic_content_role: "observation_not_assistant_answer",
+    ...liveAnswerRawExclusion,
+    ...liveAnswerEnvironmentAuthority,
   };
   environments.set(environmentId, environment);
   const receipt: LiveAnswerEnvironmentReceipt = {
@@ -275,6 +296,7 @@ export function createLiveAnswerEnvironment(input: {
     attachment_policy: "manual_only",
     context_injection: "explicit_attachment_only",
     command_lane_enabled: false,
+    ...liveAnswerReceiptAuthority,
     error: null,
   };
   return { environment, receipt };
@@ -345,8 +367,8 @@ export function addLiveAnswerEnvironmentSourceIds(input: {
         window_id: null,
         window_count: null,
         model_invoked: false,
-        context_policy: "compact_context_pack_only",
-        raw_logs_included: false,
+        ...liveAnswerRawExclusion,
+        ...liveAnswerEnvironmentAuthority,
         ts: now,
       },
     };
@@ -376,8 +398,8 @@ export function addLiveAnswerEnvironmentSourceIds(input: {
     window_id: null,
     window_count: null,
     model_invoked: false,
-    context_policy: "compact_context_pack_only",
-    raw_logs_included: false,
+    ...liveAnswerRawExclusion,
+    ...liveAnswerEnvironmentAuthority,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
@@ -482,8 +504,8 @@ export function updateLiveAnswerEnvironment(input: {
     window_id: input.window_id ?? null,
     window_count: input.window_count ?? null,
     model_invoked: next.latest_evaluation?.model_invoked ?? false,
-    context_policy: "compact_context_pack_only",
-    raw_logs_included: false,
+    ...liveAnswerRawExclusion,
+    ...liveAnswerEnvironmentAuthority,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
@@ -521,8 +543,8 @@ export function setLiveAnswerEnvironmentStatus(input: {
         window_id: null,
         window_count: null,
         model_invoked: false,
-        context_policy: "compact_context_pack_only",
-        raw_logs_included: false,
+        ...liveAnswerRawExclusion,
+        ...liveAnswerEnvironmentAuthority,
         ts: now,
       },
     };
@@ -562,8 +584,8 @@ export function setLiveAnswerEnvironmentStatus(input: {
     window_id: null,
     window_count: null,
     model_invoked: false,
-    context_policy: "compact_context_pack_only",
-    raw_logs_included: false,
+    ...liveAnswerRawExclusion,
+    ...liveAnswerEnvironmentAuthority,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));
@@ -643,8 +665,8 @@ export function setLiveAnswerEnvironmentLineSchema(input: {
     window_id: null,
     window_count: null,
     model_invoked: false,
-    context_policy: "compact_context_pack_only",
-    raw_logs_included: false,
+    ...liveAnswerRawExclusion,
+    ...liveAnswerEnvironmentAuthority,
     ts: now,
   };
   deltasByEnvironment.set(next.environment_id, [...(deltasByEnvironment.get(next.environment_id) ?? []), delta].slice(-80));

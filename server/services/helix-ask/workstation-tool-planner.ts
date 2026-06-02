@@ -28,6 +28,7 @@ export type WorkstationToolIntent =
   | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
+  | "minecraft_live_continuation"
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"
@@ -606,6 +607,157 @@ function isDottieObserverToolPrompt(prompt: string): boolean {
   return !negatedCommand;
 }
 
+function isMinecraftLiveContinuationPrompt(prompt: string): boolean {
+  const mentionsMinecraft = /\b(?:minecraft|minehut|overworld|nether|server)\b/i.test(prompt);
+  const mentionsLiveAnswer = /\b(?:live\s+answer|live\s+source|live\s+server|server\s+as\s+a\s+live|mission\s+controller|riding\s+shotgun)\b/i.test(prompt);
+  const wantsWatch = /\b(?:keep|continue|start|set\s+up|setup|watch|monitor|observe|track)\b[\s\S]{0,100}\b(?:watching|checking|monitoring|observing|minecraft|server|live\s+answer)\b/i.test(prompt) ||
+    /\b(?:watch|monitor|observe|track)\b[\s\S]{0,120}\b(?:minecraft|server)\b/i.test(prompt);
+  const negated =
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,100}\b(?:watch|monitor|create|start|attach|live\s+answer|live\s+continuation)\b/i.test(prompt) ||
+    /\b(?:should|could|would)\s+(?:we|you)\b[\s\S]{0,100}\b(?:watch|monitor|create|start|attach)\b/i.test(prompt);
+  return mentionsMinecraft && mentionsLiveAnswer && wantsWatch && !negated;
+}
+
+function buildMinecraftLiveContinuationPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const threadId = options.threadId ?? "helix-ask:desktop";
+  const roomId = extractNamedArg(normalized, ["room_id", "room id"]) ?? "room:minecraft-minehut";
+  const sourceId = extractNamedArg(normalized, ["source_id", "source id"]) ?? "source:minecraft-server";
+  const objective =
+    extractNamedArg(normalized, ["objective"]) ??
+    "Keep watching the Minecraft server as a live answer and surface only salient state changes.";
+  const environmentId = `live-env:minecraft:${threadId.replace(/[^a-z0-9_-]+/gi, "_")}`;
+  const createArgs = {
+    thread_id: threadId,
+    room_id: roomId,
+    source_ids: [sourceId],
+    objective,
+    preset: "minecraft_mission_controller",
+    mode: "standby_receipts",
+    source_config: {
+      source_kind: "minecraft_world_events",
+      transport: "cloudflarelink",
+    },
+  };
+  const attachArgs = {
+    thread_id: threadId,
+    environment_id: environmentId,
+    source_id: sourceId,
+    source_family: "minecraft_world_events",
+    kind: "minecraft_world_events",
+    panel_id: "situation-room-pipelines",
+  };
+  const continuationArgs = {
+    thread_id: threadId,
+    room_id: roomId,
+    environment_id: environmentId,
+    source_ids: [sourceId],
+    objective,
+    voice_policy: "confirm_speak_required",
+    evidence_threshold: "observed",
+    lanes_enabled: [
+      "source_health",
+      "world_state",
+      "risk_watch",
+      "objective_progress",
+      "route_watch",
+      "prediction_reflection",
+      "voice_gate",
+    ],
+  };
+  const steps: HelixWorkstationToolPlanStep[] = [
+    makeOpenStep("situation-room-pipelines"),
+    {
+      step_id: "create_minecraft_live_answer_environment",
+      kind: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "create_live_answer_environment",
+      args: createArgs,
+      depends_on: ["open_situation_room_pipelines"],
+      expected_receipt_kind: "live_answer_environment_receipt",
+      expected_state_change: { store: "live-answer-environment", proof_key: "environment_id" },
+      required: true,
+    },
+    {
+      step_id: "attach_minecraft_live_source",
+      kind: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "attach_live_source",
+      args: attachArgs,
+      depends_on: ["create_minecraft_live_answer_environment"],
+      expected_receipt_kind: "helix.live_source_admission_receipt.v1",
+      expected_state_change: { store: "live-answer-environment", proof_key: "source_id" },
+      required: true,
+    },
+    {
+      step_id: "start_minecraft_live_continuation",
+      kind: "run_panel_action",
+      panel_id: "situation-room-pipelines",
+      action_id: "live_continuation.start",
+      args: continuationArgs,
+      depends_on: ["attach_minecraft_live_source"],
+      expected_receipt_kind: "helix.live_continuation_job_receipt.v1",
+      expected_state_change: { store: "live-continuation-job-store", proof_key: "job_id" },
+      required: true,
+    },
+    {
+      step_id: "evaluate_minecraft_live_continuation_receipts",
+      kind: "evaluate_result",
+      depends_on: ["create_minecraft_live_answer_environment", "attach_minecraft_live_source", "start_minecraft_live_continuation"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  scores.push(
+    {
+      affordance_id: "situation-room-pipelines.create_live_answer_environment",
+      panel_id: "situation-room-pipelines",
+      action_id: "create_live_answer_environment",
+      score: 0.96,
+      reason: "affirmative Minecraft live-answer watch request should create the live answer environment",
+      required_args_missing: [],
+    },
+    {
+      affordance_id: "situation-room-pipelines.attach_live_source",
+      panel_id: "situation-room-pipelines",
+      action_id: "attach_live_source",
+      score: 0.95,
+      reason: "Minecraft CloudflareLink source must be admitted before continuation",
+      required_args_missing: [],
+    },
+    {
+      affordance_id: "situation-room-pipelines.live_continuation.start",
+      panel_id: "situation-room-pipelines",
+      action_id: "live_continuation.start",
+      score: 0.95,
+      reason: "live continuation baton drives procedural lanes without spawning a new chat",
+      required_args_missing: [],
+    },
+  );
+  return {
+    intent: "minecraft_live_continuation",
+    action: {
+      panel_id: "situation-room-pipelines",
+      action_id: "create_live_answer_environment",
+      args: createArgs,
+    },
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "minecraft_live_continuation",
+      missing: [],
+      options,
+      steps,
+    }),
+    scores,
+    should_use_tool: true,
+    reason: "Prompt asks to keep the Minecraft server attached as a live answer with a single-agent continuation baton.",
+    missing_required_args: [],
+  };
+}
+
 function buildToolPlan(args: {
   prompt: string;
   intent: Exclude<HelixWorkstationToolPlanIntent, "direct_answer">;
@@ -838,6 +990,10 @@ export function planWorkstationToolUse(
   const normalized = normalizePrompt(prompt);
   const scores: AffordanceScore[] = [];
   const pushScore = (score: AffordanceScore) => scores.push(score);
+
+  if (isMinecraftLiveContinuationPrompt(normalized)) {
+    return buildMinecraftLiveContinuationPlan(normalized, options, scores);
+  }
 
   if (isDottieObserverToolPrompt(normalized)) {
     const targetRunId = extractDottieTargetRunId(normalized);

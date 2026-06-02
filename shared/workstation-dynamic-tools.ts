@@ -155,10 +155,19 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.goal_ledger.set_objective",
   "situation-room-pipelines.goal_ledger.mark_complete",
   "situation-room-pipelines.goal_ledger.mark_blocked",
+  "situation-room-pipelines.goal.evaluate",
   "situation-room-pipelines.situation_context.attach_to_ask",
   "situation-room-pipelines.callout_policy.set_mode",
   "situation-room-pipelines.voice_delivery.propose_from_trace",
   "situation-room-pipelines.voice_delivery.confirm_speak",
+  "situation-room-pipelines.live_continuation.start",
+  "situation-room-pipelines.live_continuation.tick",
+  "situation-room-pipelines.live_continuation.query",
+  "situation-room-pipelines.live_continuation.pause",
+  "situation-room-pipelines.live_continuation.resume",
+  "situation-room-pipelines.live_continuation.stop",
+  "situation-room-pipelines.worker_lane.run",
+  "situation-room-pipelines.source_health.query",
   "situation-room-pipelines.start_categorization_job",
   "situation-room-pipelines.pause_categorization_job",
   "situation-room-pipelines.resume_categorization_job",
@@ -872,6 +881,7 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "goal_ledger.set_objective", required_args: ["thread_id", "objective"], optional_args: ["room_id"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "goal_ledger.mark_complete", required_args: ["thread_id", "goal"], optional_args: ["room_id"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "goal_ledger.mark_blocked", required_args: ["thread_id", "goal"], optional_args: ["room_id", "reason"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "goal.evaluate", required_args: ["thread_id"], optional_args: ["room_id", "job_id", "objective", "evidence_refs"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "situation_context.attach_to_ask", required_args: ["thread_id"], optional_args: ["room_id", "session_id"], returns_artifact: true },
   { panel_id: "situation-room-pipelines", action_id: "callout_policy.set_mode", required_args: ["thread_id", "mode"], optional_args: ["room_id"], risk: "medium", returns_artifact: true },
   {
@@ -883,6 +893,28 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
     returns_artifact: true,
   },
   { panel_id: "situation-room-pipelines", action_id: "voice_delivery.confirm_speak", required_args: ["thread_id"], optional_args: ["proposal_id", "delivery_id"], risk: "medium", returns_artifact: true },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "live_continuation.start",
+    required_args: ["thread_id", "room_id", "objective"],
+    optional_args: ["environment_id", "contract_id", "source_ids", "source_id", "voice_policy", "evidence_threshold", "lanes_enabled", "min_tick_interval_ms"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "situation-room-pipelines",
+    action_id: "live_continuation.tick",
+    required_args: [],
+    optional_args: ["job_id", "thread_id", "room_id", "trigger"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  { panel_id: "situation-room-pipelines", action_id: "live_continuation.query", required_args: [], optional_args: ["job_id", "thread_id", "room_id", "source_id", "status"], returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "live_continuation.pause", required_args: ["job_id"], optional_args: ["thread_id"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "live_continuation.resume", required_args: ["job_id"], optional_args: ["thread_id"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "live_continuation.stop", required_args: ["job_id"], optional_args: ["thread_id"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "worker_lane.run", required_args: ["lane"], optional_args: ["thread_id", "room_id", "job_id", "evidence_refs"], risk: "medium", returns_artifact: true },
+  { panel_id: "situation-room-pipelines", action_id: "source_health.query", required_args: [], optional_args: ["thread_id", "room_id", "source_id", "job_id"], returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "get_snapshot", required_args: [], optional_args: ["scope", "max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
@@ -1386,7 +1418,7 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "create_live_answer_environment") return "live_answer_environment_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "create_live_workstation_pipeline") return "live_workstation_pipeline_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_workstation_pipeline", "resume_live_workstation_pipeline", "stop_live_workstation_pipeline", "set_pipeline_transform", "set_pipeline_sink", "attach_pipeline_to_live_answer_environment"].includes(actionId)) return "live_workstation_pipeline_receipt";
-  if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "workstation_live_source_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "attach_live_source") return "helix_live_source_admission_receipt";
   if (panelId === "situation-room-pipelines" && ["pause_live_answer_environment", "resume_live_answer_environment", "stop_live_answer_environment", "set_live_line_schema", "set_live_answer_line_schema"].includes(actionId)) return "live_answer_environment_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "set_live_commentary_policy") return "live_commentary_session_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "request_agentic_review") return "live_agentic_review_receipt";
@@ -1414,10 +1446,14 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   if (panelId === "situation-room-pipelines" && actionId === "interjection_investigator.review_latest") return "interjection_decision";
   if (panelId === "situation-room-pipelines" && actionId === "situation_context.attach_to_ask") return "situation_context_pack";
   if (panelId === "situation-room-pipelines" && actionId.startsWith("goal_ledger.")) return "situation_goal_ledger_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "goal.evaluate") return "helix_goal_evaluation_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "episode_timeline.summarize_window") return "situation_episode_summary";
   if (panelId === "situation-room-pipelines" && actionId === "callout_policy.set_mode") return "standby_callout_policy_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.propose_from_trace") return "dottie_voice_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "voice_delivery.confirm_speak") return "standby_callout_delivery_receipt";
+  if (panelId === "situation-room-pipelines" && actionId.startsWith("live_continuation.")) return "helix_live_continuation_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "worker_lane.run") return "helix_worker_lane_receipt";
+  if (panelId === "situation-room-pipelines" && actionId === "source_health.query") return "helix_live_source_admission_receipt";
   if (panelId === "workstation-process-graph" && actionId !== "open") {
     if (actionId === "export_svg") return "workstation_process_graph_svg";
     if (actionId === "get_context_pack") return "workstation_process_graph_context_pack";
@@ -1478,6 +1514,7 @@ function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkst
   if (panelId === "agi-essence-console") return "debug";
   if (panelId === "situation-room-sources") return "live_source";
   if (panelId === "situation-room-pipelines") {
+    if (actionId.startsWith("live_continuation.") || actionId === "worker_lane.run" || actionId === "goal.evaluate" || actionId === "source_health.query") return "situation_room";
     if (actionId.includes("live_answer") || actionId.includes("line_schema")) return "live_answer_environment";
     if (actionId.includes("live_source") || actionId.includes("live-source") || actionId === "attach_live_source") return "live_source";
     return "situation_room";
@@ -1514,6 +1551,18 @@ function resolveAffordanceBackendEndpoint(panelId: string, actionId: string): st
   }
   if (panelId === "situation-room-pipelines" && actionId === "live-source.set_rate") {
     return "/api/agi/situation/live-source/producer/set-cadence";
+  }
+  if (panelId === "situation-room-pipelines" && actionId.startsWith("live_continuation.")) {
+    return `/api/agi/situation/live-continuation/${actionId.slice("live_continuation.".length)}`;
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "worker_lane.run") {
+    return "/api/agi/situation/live-continuation/worker-lane/run";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "goal.evaluate") {
+    return "/api/agi/situation/live-continuation/goal/evaluate";
+  }
+  if (panelId === "situation-room-pipelines" && actionId === "source_health.query") {
+    return "/api/agi/situation/live-continuation/source-health/query";
   }
   if (panelId === "scientific-calculator" && (actionId.includes("stream") || actionId.includes("live") || actionId.includes("tick"))) {
     return "/api/agi/situation/live-source/event";

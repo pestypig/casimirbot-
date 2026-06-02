@@ -21,7 +21,7 @@ const SITUATION_ROOM_OBSERVATION_SCHEMAS = new Set([
   "helix.situation_interjection_proposal.v1",
 ]);
 
-const SITUATION_ROOM_OBSERVATION_ACTIONS = /^(?:attach_live_source|create_live_answer_environment|set_live_commentary_policy|request_agentic_review|query_event_window|query_synthetic_evidence|start_situation_goal_session|goal_ledger\.|callout_policy\.|live-source\.|live_continuation\.|worker_lane\.|voice_delivery\.|construct\.|dottie\.|observer\.)/i;
+const SITUATION_ROOM_OBSERVATION_ACTIONS = /^(?:attach_live_source|create_live_answer_environment|set_live_commentary_policy|request_agentic_review|query_event_window|query_synthetic_evidence|start_situation_goal_session|goal_ledger\.|goal\.|callout_policy\.|live-source\.|live_continuation\.|worker_lane\.|source_health\.|voice_delivery\.|construct\.|dottie\.|observer\.)/i;
 
 const suggestedNextStepsForStatus = (
   status: HelixAgentStepObservationPacket["status"],
@@ -379,15 +379,26 @@ const summarizeSituationRoomObservation = (args: {
     if (trigger) facts.push(`Continuation trigger: ${trigger}.`);
     if (nextStep) facts.push(`Continuation next step: ${nextStep}.`);
   }
+  if (schema === "helix.live_answer_environment_delta.v1") {
+    const reason = readString(args.artifact?.reason);
+    const changedLineKeys = readArray(args.artifact?.changed_line_keys)
+      .map((entry) => readString(entry))
+      .filter((entry): entry is string => Boolean(entry));
+    if (reason) facts.push(`Live Answer projection update reason: ${reason}.`);
+    if (changedLineKeys.length > 0) facts.push(`Changed projection lines: ${changedLineKeys.join(", ")}.`);
+    facts.push("Live Answer card content is compact context only and does not grant terminal answer authority.");
+  }
   if (schema === "helix.worker_lane_receipt.v1") {
     const lane = readString(args.artifact?.lane);
     if (lane) facts.push(`Worker lane: ${lane}.`);
   }
   if (schema === "helix.callout_candidate.v1") {
-    const intent = readString(args.artifact?.callout_intent);
-    const priority = readString(args.artifact?.priority);
-    if (intent) facts.push(`Callout intent: ${intent}.`);
-    if (priority) facts.push(`Callout priority: ${priority}.`);
+    const calloutType = readString(args.artifact?.callout_type);
+    const delivery = readString(args.artifact?.delivery);
+    const blockedReason = readString(args.artifact?.blocked_reason);
+    if (calloutType) facts.push(`Callout type: ${calloutType}.`);
+    if (delivery) facts.push(`Voice delivery state: ${delivery}.`);
+    if (blockedReason) facts.push(`Voice blocked reason: ${blockedReason}.`);
   }
   if (args.missingRequirements.length > 0) {
     facts.push(`Missing requirements: ${args.missingRequirements.map((entry) => entry.code).join(", ")}.`);

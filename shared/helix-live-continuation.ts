@@ -36,6 +36,11 @@ export type HelixLiveContinuationAntiPoisonFields<
   evidence_refs: string[];
 };
 
+export type HelixLiveContinuationEvidenceThreshold =
+  | "observed"
+  | "likely"
+  | "confirmed";
+
 export const helixReceiptNotAnswerFlags = {
   terminal_eligible: false,
   assistant_answer: false,
@@ -172,6 +177,7 @@ export type HelixGoalEvaluationReceipt =
       | "satisfied"
       | "needs_more_observation"
       | "ask_user"
+      | "repair"
       | "blocked"
       | "fail_closed";
     rationale_codes: string[];
@@ -181,27 +187,28 @@ export type HelixGoalEvaluationReceipt =
   };
 
 export type HelixCalloutCandidate =
-  HelixLiveContinuationAntiPoisonFields<"hypothesis_not_assistant_answer"> & {
+  HelixLiveContinuationAntiPoisonFields<"observation_not_assistant_answer"> & {
     schema: typeof HELIX_CALLOUT_CANDIDATE_SCHEMA;
     candidate_id: string;
-    job_id: string;
     thread_id: string;
     room_id: string;
-    environment_id?: string | null;
-    source_tick_id?: string | null;
-    priority: "info" | "warn" | "critical" | "action";
-    certainty: "low" | "medium" | "high";
-    callout_intent:
-      | "status"
+    source_event_id?: string | null;
+    salience_receipt_id?: string | null;
+    callout_type:
       | "warning"
       | "suggestion"
+      | "status"
       | "question"
-      | "silent";
-    summary: string;
-    claim_refs: string[];
-    missing_evidence: string[];
-    delivery_mode: "voice_proposal" | "text_only" | "suppress";
-    requires_confirmation: boolean;
+      | "source_health";
+    text: string;
+    certainty: "observed" | "likely" | "confirmed" | "unknown";
+    blocked_reason?: string | null;
+    delivery:
+      | "suppressed"
+      | "typed_only"
+      | "voice_proposal"
+      | "confirmed_spoken"
+      | "automatic_spoken";
   };
 
 export type HelixLiveContinuationArtifact =

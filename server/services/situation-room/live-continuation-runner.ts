@@ -131,6 +131,7 @@ function buildAdmission(input: {
 }): HelixLiveSourceAdmissionReceipt {
   const missingSource = input.job.source_ids.length === 0 || !input.sourceId;
   const sourceBlocked = Boolean(input.sourceId && input.job.source_ids.length > 0 && !input.job.source_ids.includes(input.sourceId));
+  const sourceStale = input.event?.event_type === "source_disconnected";
   return {
     schema: HELIX_LIVE_SOURCE_ADMISSION_RECEIPT_SCHEMA,
     receipt_id: `live_source_admission:${hashShort([input.job.job_id, input.sourceId, input.now])}`,
@@ -148,11 +149,11 @@ function buildAdmission(input: {
       profile_id: typeof input.event?.meta?.profile_id === "string" ? input.event.meta.profile_id : null,
     },
     freshness: {
-      status: sourceBlocked ? "blocked" : missingSource ? "missing" : "connected",
+      status: sourceBlocked ? "blocked" : missingSource ? "missing" : sourceStale ? "stale" : "connected",
       last_seen_at: input.event?.ts ?? null,
       stale_after_ms: input.job.cooldowns.min_tick_interval_ms * 3,
     },
-    trust_level: sourceBlocked ? "blocked" : missingSource ? "unverified" : "admitted_live_source",
+    trust_level: sourceBlocked ? "blocked" : missingSource || sourceStale ? "unverified" : "admitted_live_source",
     evidence_refs: input.evidenceRefs,
     ...helixReceiptNotAnswerFlags,
   };
@@ -203,6 +204,9 @@ function selectLanes(input: {
 }): LiveContinuationLane[] {
   const lanes = new Set<LiveContinuationLane>();
   if (input.trigger === "world_event" || input.trigger === "source_health" || input.trigger === "cadence") {
+    lanes.add("source_health");
+  }
+  if (input.admission.freshness.status !== "connected" || input.event?.event_type === "source_disconnected") {
     lanes.add("source_health");
   }
   if (input.event) lanes.add("world_state");
@@ -281,9 +285,12 @@ function buildGoalEvaluation(input: {
 }): HelixGoalEvaluationReceipt {
   const blocked = input.admission.trust_level === "blocked" || input.job.status === "blocked";
   const missing = input.admission.freshness.status === "missing";
+  const stale = input.admission.freshness.status === "stale";
   const status: HelixGoalEvaluationReceipt["status"] = blocked
     ? "fail_closed"
-    : missing || input.missingEvidence.length > 0
+    : missing || stale
+      ? "ask_user"
+      : input.missingEvidence.length > 0
       ? "needs_more_observation"
       : "needs_more_observation";
   return {
@@ -298,49 +305,125 @@ function buildGoalEvaluation(input: {
     rationale_codes: uniqueStrings([
       blocked ? "source_admission_blocked" : null,
       missing ? "source_missing" : null,
+      stale ? "source_stale" : null,
       input.workers.some((worker) => worker.lane === "risk_watch") ? "risk_watch_requires_followup" : null,
       input.workers.some((worker) => worker.lane === "prediction_reflection") ? "prediction_requires_model_reentry" : null,
     ]),
     satisfied_evidence_refs: [],
     missing_evidence: input.missingEvidence,
-    next_step: blocked ? "fail_closed" : "continue",
+    next_step: blocked ? "fail_closed" : missing || stale ? "ask_user" : "continue",
     evidence_refs: input.evidenceRefs,
     ...helixReceiptNotAnswerFlags,
   };
 }
 
+const CALLOUT_CERTAINTY_RANK: Record<HelixCalloutCandidate["certainty"], number> = {
+  unknown: 0,
+  likely: 1,
+  observed: 2,
+  confirmed: 3,
+};
+
+function isCalloutIntervalCoolingDown(job: LiveContinuationJob, now: string): boolean {
+  if (!job.cooldowns.last_tick_at || job.cooldowns.min_tick_interval_ms <= 0) return false;
+  const last = Date.parse(job.cooldowns.last_tick_at);
+  const current = Date.parse(now);
+  if (!Number.isFinite(last) || !Number.isFinite(current)) return false;
+  return current - last < job.cooldowns.min_tick_interval_ms;
+}
+
+function capCalloutCertainty(
+  certainty: HelixCalloutCandidate["certainty"],
+  threshold: LiveContinuationJob["evidence_threshold"],
+): HelixCalloutCandidate["certainty"] {
+  return CALLOUT_CERTAINTY_RANK[certainty] <= CALLOUT_CERTAINTY_RANK[threshold]
+    ? certainty
+    : threshold;
+}
+
 function buildCalloutCandidate(input: {
   job: LiveContinuationJob;
   trigger: LiveContinuationTrigger;
+  admission: HelixLiveSourceAdmissionReceipt;
+  observation: HelixLiveSourceEventObservation | null;
   workers: HelixWorkerLaneReceipt[];
   goal: HelixGoalEvaluationReceipt;
   evidenceRefs: string[];
   now: string;
 }): HelixCalloutCandidate | null {
-  if (input.job.voice_policy === "muted") return null;
   const hasVoiceGate = input.workers.some((worker) => worker.lane === "voice_gate");
   const hasRisk = input.workers.some((worker) => worker.lane === "risk_watch");
-  if (!hasVoiceGate && !hasRisk && input.trigger !== "salience") return null;
+  const sourceFresh = input.admission.freshness.status === "connected";
+  const salient = input.trigger === "salience" || hasRisk || hasVoiceGate;
+  if (!salient && input.admission.freshness.status !== "stale" && input.admission.freshness.status !== "missing") return null;
+  const calloutType: HelixCalloutCandidate["callout_type"] =
+    input.admission.freshness.status !== "connected"
+      ? "source_health"
+      : input.goal.status === "ask_user"
+        ? "question"
+        : hasRisk || input.goal.status === "fail_closed"
+          ? "warning"
+          : input.goal.status === "repair"
+            ? "suggestion"
+            : "status";
+  const observedEvidence = input.evidenceRefs.length > 0 || input.workers.some((worker) => worker.hypotheses.length > 0);
+  const inferredCertainty: HelixCalloutCandidate["certainty"] = sourceFresh && observedEvidence ? "observed" : "unknown";
+  const certainty = capCalloutCertainty(inferredCertainty, input.job.evidence_threshold);
+  const dedupeKey = `${calloutType}:${input.observation?.world_event_id ?? input.goal.receipt_id}`;
+  const duplicateBlocked = Boolean(input.job.cooldowns.callout_dedupe_keys[dedupeKey]);
+  const cooldownBlocked = isCalloutIntervalCoolingDown(input.job, input.now);
+  const missingEvidenceBlocked = input.goal.missing_evidence.length > 0 && input.job.evidence_threshold === "confirmed";
+  const automaticAllowed =
+    input.job.voice_policy === "automatic_when_policy_allows" &&
+    sourceFresh &&
+    salient &&
+    !duplicateBlocked &&
+    !cooldownBlocked &&
+    !missingEvidenceBlocked &&
+    certainty !== "unknown";
+  const blockedReason =
+    input.job.voice_policy === "muted"
+      ? "voice_policy_muted"
+      : !sourceFresh
+        ? `source_${input.admission.freshness.status}`
+        : duplicateBlocked
+          ? "callout_duplicate_cooldown"
+          : cooldownBlocked
+            ? "callout_interval_cooldown"
+            : missingEvidenceBlocked
+              ? "evidence_threshold_not_met"
+              : input.job.voice_policy === "confirm_speak_required"
+                ? "confirm_speak_required"
+                : null;
+  const delivery: HelixCalloutCandidate["delivery"] =
+    input.job.voice_policy === "muted"
+      ? "typed_only"
+      : input.job.voice_policy === "propose_only"
+        ? "voice_proposal"
+        : input.job.voice_policy === "confirm_speak_required"
+          ? "voice_proposal"
+          : automaticAllowed
+            ? "automatic_spoken"
+            : blockedReason
+              ? "suppressed"
+              : "voice_proposal";
   return {
     schema: HELIX_CALLOUT_CANDIDATE_SCHEMA,
     candidate_id: `callout_candidate:${hashShort([input.job.job_id, input.now, input.goal.receipt_id])}`,
-    job_id: input.job.job_id,
     thread_id: input.job.thread_id,
     room_id: input.job.room_id,
-    environment_id: input.job.environment_id ?? null,
-    source_tick_id: null,
-    priority: hasRisk ? "warn" : input.goal.status === "fail_closed" ? "critical" : "info",
-    certainty: input.workers.some((worker) => worker.hypotheses.length > 0) ? "medium" : "low",
-    callout_intent: input.goal.status === "fail_closed" ? "warning" : hasRisk ? "warning" : "status",
-    summary: hasRisk
+    source_event_id: input.observation?.world_event_id ?? null,
+    salience_receipt_id:
+      input.evidenceRefs.find((ref) => ref.startsWith("salience:"))?.slice("salience:".length) ?? null,
+    callout_type: calloutType,
+    text: hasRisk
       ? "Risk-relevant source event detected; voice delivery still requires policy confirmation."
       : "Source-health or salience update is eligible for a voice-gated proposal.",
-    claim_refs: input.workers.map((worker) => worker.receipt_id),
-    missing_evidence: input.goal.missing_evidence,
-    delivery_mode: input.job.voice_policy === "propose_only" ? "voice_proposal" : "text_only",
-    requires_confirmation: input.job.voice_policy !== "automatic_when_policy_allows",
+    certainty,
+    blocked_reason: blockedReason,
+    delivery,
     evidence_refs: input.evidenceRefs,
-    ...helixHypothesisNotAnswerFlags,
+    ...helixObservationNotAnswerFlags,
   };
 }
 
@@ -379,6 +462,7 @@ export async function runLiveContinuationTick(input: {
   const missingEvidence = uniqueStrings([
     input.job.status !== "active" ? `job_status:${input.job.status}` : null,
     admission.freshness.status === "missing" ? "live_source_event" : null,
+    admission.freshness.status === "stale" ? "live_source_freshness" : null,
     input.trigger === "world_event" && !observation ? "world_event_observation" : null,
     hasCompactContext(input.worldEventResult) ? null : "compact_episode_or_context",
   ]);
@@ -415,6 +499,8 @@ export async function runLiveContinuationTick(input: {
     : buildCalloutCandidate({
         job: input.job,
         trigger: input.trigger,
+        admission,
+        observation,
         workers,
         goal,
         evidenceRefs,

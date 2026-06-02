@@ -647,6 +647,54 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("plans Minecraft live answer continuation as create, source admission, then continuation start", () => {
+    const plan = planWorkstationToolUse(
+      "Keep watching the Minecraft server as a live answer.",
+      { threadId: "thread:minecraft-live", turnId: "turn:minecraft-live" },
+    );
+
+    expect(plan.intent).toBe("minecraft_live_continuation");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.action).toEqual({
+      panel_id: "situation-room-pipelines",
+      action_id: "create_live_answer_environment",
+      args: expect.objectContaining({
+        thread_id: "thread:minecraft-live",
+        room_id: "room:minecraft-minehut",
+        source_ids: ["source:minecraft-server"],
+        source_config: expect.objectContaining({
+          source_kind: "minecraft_world_events",
+          transport: "cloudflarelink",
+        }),
+      }),
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "situation-room-pipelines.open",
+      "situation-room-pipelines.create_live_answer_environment",
+      "situation-room-pipelines.attach_live_source",
+      "situation-room-pipelines.live_continuation.start",
+      "undefined.undefined",
+    ]);
+    const continuationStep = plan.tool_plan?.steps.find((step) => step.action_id === "live_continuation.start");
+    expect(continuationStep?.args).toEqual(expect.objectContaining({
+      thread_id: "thread:minecraft-live",
+      room_id: "room:minecraft-minehut",
+      source_ids: ["source:minecraft-server"],
+      voice_policy: "confirm_speak_required",
+      evidence_threshold: "observed",
+      lanes_enabled: expect.arrayContaining([
+        "source_health",
+        "world_state",
+        "risk_watch",
+        "objective_progress",
+        "route_watch",
+        "prediction_reflection",
+        "voice_gate",
+      ]),
+    }));
+  });
+
   it("routes Dottie read-aloud requests to voice proposal planning with missing source input", () => {
     const plan = planWorkstationToolUse(
       "Have Dottie read that out loud.",

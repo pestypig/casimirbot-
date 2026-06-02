@@ -1518,7 +1518,7 @@ export const ingestWorldEvent = async (
                 observationRef: {
                   ...liveContinuationDebug.callout,
                   provenance: "live_continuation_runner",
-                  context_role: "hypothesis_not_assistant_answer",
+                  context_role: "observation_not_assistant_answer",
                   safe_for_future_context: true,
                 } as Record<string, unknown>,
               },
