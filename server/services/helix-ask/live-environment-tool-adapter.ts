@@ -18,6 +18,7 @@ import {
   recordLiveEnvironmentCommentary,
 } from "../situation-room/live-environment-commentary-store";
 import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
+import { buildStagePlayGraphFromWorld as buildStagePlayBadgeGraphFromLiveWindow } from "../stage-play/stage-play-badge-graph-builder";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -307,6 +308,31 @@ export function executeLiveEnvironmentTool(
         : "No compact Minecraft navigation state is available.",
       observation: result,
       evidenceRefs: state?.evidence_refs ?? result.latest_solver_observations.flatMap(evidenceRefsFrom),
+    });
+  }
+
+  if (input.tool_name === "live_env.reflect_stage_play_context") {
+    const graph = buildStagePlayBadgeGraphFromLiveWindow({
+      threadId: input.thread_id,
+      roomId,
+      environmentId: input.environment_id ?? null,
+      objective: readString(args.objective),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`,
+      observation: graph,
+      evidenceRefs: [
+        ...graph.sourceWindow.latestObservationRefs,
+        ...graph.sourceWindow.latestSnapshotRefs,
+        ...graph.sourceWindow.latestDeltaOverlayRefs,
+        ...graph.sourceWindow.latestNavigationRefs,
+        ...graph.badges.flatMap((badge) => badge.evidenceRefs),
+        ...graph.recommendedActions.flatMap((action) => action.evidenceRefs),
+      ],
     });
   }
 

@@ -58,6 +58,7 @@ import {
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
 import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
+import { publishZenGraphCurrentAnswerFromDebugExport } from "@/store/useZenGraphCurrentAnswerStore";
 import {
   HELIX_ASK_LIVE_EVENT_BUS_EVENT,
   coerceHelixAskLiveEventBusPayload,
@@ -14811,6 +14812,14 @@ export function HelixAskPill({
     );
   }, [latestAskReplyId]);
   useEffect(() => {
+    if (!latestAskReply) return;
+    try {
+      publishZenGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
+    } catch {
+      // ZenGraph answer blocks are a debug projection; Ask rendering must not depend on them.
+    }
+  }, [latestAskReply?.content, latestAskReply?.debug, latestAskReply?.id]);
+  useEffect(() => {
     return () => {
       if (askImageAttachment?.previewUrl) {
         URL.revokeObjectURL(askImageAttachment.previewUrl);
@@ -17195,6 +17204,7 @@ export function HelixAskPill({
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }
+        publishZenGraphCurrentAnswerFromDebugExport(exportPayload);
         const copyResult = await copyDebugPayloadToClipboard(exportPayload);
         let finalCopyResult: DebugClipboardCopyResult = copyResult;
         const payloadHash = copyResult.attempted_payload_hash ?? hashDebugExportText(exportPayload);

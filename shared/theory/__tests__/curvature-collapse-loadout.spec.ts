@@ -55,4 +55,39 @@ describe("curvature/collapse calculator loadout", () => {
     expect(loadout.items.some((item) => item.kind === "runtime_context")).toBe(true);
     expect(loadout.items.some((item) => item.kind === "claim_boundary")).toBe(true);
   });
+
+  it("loads objective-collapse present-window rows from explicit DP bindings", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const objectContext = buildCurvatureCollapseObjectBindings({
+      deltaE_G_J: 1e-30,
+      tau_DP_s: 1.054571817e-4,
+      dt_s: 0.05,
+      r_c_m: 0.25,
+    });
+
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: [
+        "collapse.objective.dp_timescale",
+        "collapse.objective.dp_rate",
+        "collapse.objective.present_window",
+        "collapse.objective.dp_hazard_probability",
+        "collapse.objective.experimental_bounds",
+        "curvature.claim_boundary.benchmark_only",
+      ],
+      mode: "selected_badges",
+      source: "achievement_map",
+      objectContext,
+      includeContextItems: true,
+    });
+
+    const solveExpressions = loadout.items.map((item) => item.solveExpression);
+
+    expect(solveExpressions).toContain("tau_DP_s = 1.054571817e-34/1e-30");
+    expect(solveExpressions).toContain("tau_DP_ms = 1000*1.054571817e-34/1e-30");
+    expect(solveExpressions).toContain("Gamma_DP_Hz = 1e-30/1.054571817e-34");
+    expect(solveExpressions).toContain("L_present_DP = min(0.25, 299792458*0.0001054571817)");
+    expect(solveExpressions).toContain("p_DP_trigger = 1 - exp(-0.05/0.0001054571817)");
+    expect(loadout.items.some((item) => item.kind === "claim_boundary")).toBe(true);
+  });
 });

@@ -27,6 +27,9 @@ export type CurvatureCollapseObjectBindingInput = {
   tau_DP_s?: number;
   tau_DP_ms?: number;
   Gamma_DP_Hz?: number;
+  L_present_DP?: number;
+  dt_s?: number;
+  p_DP_trigger?: number;
   G?: number;
   h?: number;
   hbar?: number;
@@ -67,6 +70,9 @@ export function buildCurvatureCollapseObjectBindings(
     tau_DP_s: input.tau_DP_s,
     tau_DP_ms: input.tau_DP_ms,
     Gamma_DP_Hz: input.Gamma_DP_Hz,
+    L_present_DP: input.L_present_DP,
+    dt_s: input.dt_s,
+    p_DP_trigger: input.p_DP_trigger,
     G: input.G ?? 6.6743e-11,
     h: input.h ?? 6.62607015e-34,
     hbar: input.hbar ?? 1.054571817e-34,
@@ -102,6 +108,9 @@ export function buildCurvatureCollapseObjectBindings(
       tau_DP_s: input.tau_DP_s ?? null,
       tau_DP_ms: input.tau_DP_ms ?? null,
       Gamma_DP_Hz: input.Gamma_DP_Hz ?? null,
+      L_present_DP: input.L_present_DP ?? null,
+      dt_s: input.dt_s ?? null,
+      p_DP_trigger: input.p_DP_trigger ?? null,
     },
     variableBindings,
     units: {
@@ -129,6 +138,9 @@ export function buildCurvatureCollapseObjectBindings(
       tau_DP_s: "s",
       tau_DP_ms: "ms",
       Gamma_DP_Hz: "Hz",
+      L_present_DP: "m",
+      dt_s: "s",
+      p_DP_trigger: "1",
       G: "m^3 kg^-1 s^-2",
       h: "J s",
       hbar: "J s",

@@ -8,6 +8,8 @@ import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wis
 import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@shared/fruition-procedure-expression";
 import { Badge } from "@/components/ui/badge";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
+import { useZenGraphCurrentAnswerStore } from "@/store/useZenGraphCurrentAnswerStore";
+import type { ZenGraphCurrentAnswerBlock } from "@/lib/zen-graph/currentAnswerBlock";
 
 type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective" | "character";
 
@@ -42,7 +44,7 @@ type ZenGraphEdge = {
   weight?: number;
 };
 
-type ZenObjectiveLensId = "wisdom" | "character";
+type ZenObjectiveLensId = "wisdom" | "character" | "answer";
 
 const ZEN_OBJECTIVE_LENSES: Array<{
   id: ZenObjectiveLensId;
@@ -53,6 +55,7 @@ const ZEN_OBJECTIVE_LENSES: Array<{
 }> = [
   { id: "wisdom", glyph: "W", label: "Wisdom", title: "Wisdom objective binding lens", tone: "bg-violet-700" },
   { id: "character", glyph: "C", label: "Character", title: "Character objective binding lens", tone: "bg-red-800" },
+  { id: "answer", glyph: "A", label: "Answer", title: "Current answer binding lens", tone: "bg-cyan-800" },
 ];
 
 function labelize(value: string): string {
@@ -605,6 +608,7 @@ function ObjectiveBindingRail({
   fruition,
   locator,
   characterComparison,
+  currentAnswer,
   selectedNode,
   selectedNodes,
   onSelectNode,
@@ -616,6 +620,7 @@ function ObjectiveBindingRail({
   fruition: FruitionProcedureExpressionV1;
   locator?: ZenBadgeLocatorV1;
   characterComparison?: CharacterSituationComparisonV1;
+  currentAnswer?: ZenGraphCurrentAnswerBlock | null;
   selectedNode: ZenGraphNode | null;
   selectedNodes: ZenGraphNode[];
   onSelectNode: (id: string) => void;
@@ -661,7 +666,9 @@ function ObjectiveBindingRail({
         <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
           {activeLensId === "character"
             ? "A modeled figure is a subject binding: active badges, constraints, and procedural trace stay together."
-            : "Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together."}
+            : activeLensId === "answer"
+              ? "The current answer is a read-only block: final draft, tool receipt, activated nodes, and authority boundary stay together."
+              : "Wisdom is the subject binding: objective state, constraints, selected badges, and procedural trace stay together."}
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
@@ -836,6 +843,91 @@ function ObjectiveBindingRail({
             No character preset comparison is attached to this graph view.
           </BindingBox>
         ) : null}
+        {activeLensId === "answer" && currentAnswer ? (
+          <>
+            <BindingBox
+              title="Current answer"
+              label={currentAnswer.terminalArtifactKind}
+              tone="cyan"
+              activeNodeIds={currentAnswer.activatedNodeIds}
+              onSelectNode={onSelectNode}
+            >
+              <div className="space-y-2">
+                <div className="rounded border border-cyan-500/50 bg-cyan-950/40 p-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">Final answer block</div>
+                  <div className="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap pr-1 text-[11px] leading-relaxed text-cyan-50">
+                    {currentAnswer.finalAnswer || "No final answer text captured in the debug export."}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="rounded border border-cyan-500/35 bg-black/20 p-1.5">
+                    <div className="uppercase tracking-wide text-cyan-200">Source</div>
+                    <div className="mt-0.5 font-mono text-cyan-50">{currentAnswer.finalAnswerSource}</div>
+                  </div>
+                  <div className="rounded border border-cyan-500/35 bg-black/20 p-1.5">
+                    <div className="uppercase tracking-wide text-cyan-200">Route</div>
+                    <div className="mt-0.5 font-mono text-cyan-50">{currentAnswer.route}</div>
+                  </div>
+                </div>
+                <div className="rounded border border-cyan-500/35 bg-black/20 p-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">Prompt</div>
+                  <div className="mt-1 max-h-16 overflow-y-auto text-[11px] leading-relaxed opacity-85">
+                    {currentAnswer.prompt || "No prompt captured."}
+                  </div>
+                </div>
+              </div>
+            </BindingBox>
+            <BindingBox
+              title="Activated nodes"
+              label={`${currentAnswer.activatedNodeIds.length} nodes`}
+              tone="emerald"
+              activeNodeIds={currentAnswer.activatedNodeIds}
+              onSelectNode={onSelectNode}
+            >
+              {currentAnswer.activatedLabels.length > 0
+                ? currentAnswer.activatedLabels.slice(0, 6).map(labelize).join(" / ")
+                : "The answer block captured node ids but no display labels."}
+            </BindingBox>
+            <BindingBox
+              title="Tool trace"
+              label={currentAnswer.toolReceiptRef ?? "tool receipt"}
+              tone="violet"
+              activeNodeIds={currentAnswer.pathToRoot}
+              onSelectNode={onSelectNode}
+            >
+              <div className="space-y-1.5">
+                {currentAnswer.trace.length > 0 ? (
+                  currentAnswer.trace.slice(0, 5).map((step) => (
+                    <div key={`${step.step}:${step.reason}`} className="rounded border border-violet-500/30 bg-black/20 p-1.5">
+                      <div className="font-mono text-[10px] text-violet-100">{labelize(step.step)}</div>
+                      <div className="mt-0.5 text-[10px] opacity-80">{step.reason}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div>No structured trace steps were captured for this answer block.</div>
+                )}
+              </div>
+            </BindingBox>
+            <BindingBox title="Authority boundary" label="evidence only" tone={currentAnswer.agentExecutable ? "rose" : "slate"}>
+              <div className="space-y-1">
+                <div className="text-[11px] opacity-80">
+                  The block is a visualization of the Ask terminal answer and its ZenGraph evidence path.
+                </div>
+                <div className="font-mono text-[10px]">
+                  evidence_only={String(currentAnswer.evidenceOnly)} agent_executable={String(currentAnswer.agentExecutable)}
+                </div>
+                <div className="truncate text-[10px] opacity-75">
+                  draft_ref={currentAnswer.finalAnswerDraftRef ?? "none"} receipt_ref={currentAnswer.toolReceiptRef ?? "none"}
+                </div>
+              </div>
+            </BindingBox>
+          </>
+        ) : null}
+        {activeLensId === "answer" && !currentAnswer ? (
+          <BindingBox title="Current answer" label="empty" tone="cyan">
+            No ZenGraph Ask answer has been captured yet. Run a ZenGraph prompt, then copy or open the debug export to publish the current answer block.
+          </BindingBox>
+        ) : null}
       </div>
     </aside>
   );
@@ -857,6 +949,7 @@ export function ZenGraphPanel({
     () => buildGraph(reflection, admission, fruition, characterComparison),
     [admission, characterComparison, fruition, reflection],
   );
+  const currentAnswer = useZenGraphCurrentAnswerStore((store) => store.currentAnswerBlock);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
   const loadFruitionLocatorSeed = useFruitionCalculatorStore((store) => store.loadLocatorSeed);
   const locatorSeedNodeIds =
@@ -878,6 +971,7 @@ export function ZenGraphPanel({
     ...(reflection.overlay?.highlightedNodeIds ?? []),
     ...(characterComparison?.activatedProfileWeights.map((entry) => entry.nodeId) ?? []),
     ...(characterComparison ? [`character:${characterComparison.characterId}`] : []),
+    ...(objectiveBindingsOpen && activeObjectiveLensId === "answer" ? currentAnswer?.activatedNodeIds ?? [] : []),
     ...(selectedNode?.tone === "root" ? [] : [reflection.graph.rootId]),
   ]);
   const hasFocus = highlighted.size > 0;
@@ -943,6 +1037,7 @@ export function ZenGraphPanel({
               fruition={fruition}
               locator={locator}
               characterComparison={characterComparison}
+              currentAnswer={currentAnswer}
               selectedNode={selectedNode}
               selectedNodes={selectedNodes}
               onSelectNode={addNodeToSelection}

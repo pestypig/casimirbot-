@@ -21,6 +21,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.query_event_log", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_world_events", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_navigation_state", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.reflect_stage_play_context", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_source_health", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_constructs", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_job_evidence", requires_user_confirmation: false, can_run_automatically: true },

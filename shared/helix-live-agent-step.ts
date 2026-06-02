@@ -12,6 +12,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_event_log"
   | "live_env.query_world_events"
   | "live_env.query_navigation_state"
+  | "live_env.reflect_stage_play_context"
   | "live_env.query_source_health"
   | "live_env.query_constructs"
   | "live_env.query_job_evidence"
