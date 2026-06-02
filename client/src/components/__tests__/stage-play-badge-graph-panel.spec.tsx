@@ -12,6 +12,21 @@ import {
   type StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
 
+const visualProducerMock = vi.hoisted(() => ({
+  getActiveVisualFrameStream: vi.fn(() => null),
+  getLatestActiveVisualFrameStream: vi.fn(() => null),
+  startVisualFrameProducerInterval: vi.fn(async (input: { sourceId: string }) => ({
+    source_id: input.sourceId,
+    frame_id: "visual_frame:test",
+    evidence_id: "visual_evidence:test",
+    summary: "mock visual capture",
+    evidence: null,
+  })),
+  stopVisualFrameProducerInterval: vi.fn(),
+}));
+
+vi.mock("@/lib/helix/visualFrameProducer", () => visualProducerMock);
+
 const sourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
   threadId: "thread:stage-play-ui",
   roomId: "room:minecraft",
@@ -20,6 +35,37 @@ const sourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
   fromTs: "2026-06-02T00:00:00.000Z",
   toTs: "2026-06-02T00:00:01.000Z",
   latestObservationRefs: ["live_source_observation:ui"],
+  latestRawSessionBufferRefs: ["stage_play_raw_session_buffer_entry:ui"],
+  sources: [
+    {
+      sourceId: "source:visual-tab",
+      modality: "visual_frame",
+      status: "active",
+      contribution: "Visual frames provide compact scene context.",
+      fidelityScore: 0.84,
+      selectedForStagePlay: true,
+      routeTo: "visual_context",
+      cadenceMs: 10000,
+      lastEventTs: "2026-06-02T00:00:01.000Z",
+      missingReason: null,
+      nextRequiredAction: null,
+      evidenceRefs: ["live_source_observation:ui", "stage_play_raw_session_buffer_entry:ui"],
+    },
+    {
+      sourceId: "source:audio-transcript",
+      modality: "audio_transcript",
+      status: "configured_missing",
+      contribution: "Audio transcript can provide dialogue once attached.",
+      fidelityScore: 0,
+      selectedForStagePlay: false,
+      routeTo: "narrative_stage_play",
+      cadenceMs: null,
+      lastEventTs: null,
+      missingReason: "No audio transcript source is currently attached.",
+      nextRequiredAction: "Attach audio transcript",
+      evidenceRefs: [],
+    },
+  ],
   latestSnapshotRefs: ["environment_snapshot:ui"],
   latestDeltaOverlayRefs: [],
   latestNavigationRefs: ["navigation_state:ui"],
@@ -73,6 +119,18 @@ function buildFixture(): StagePlayBadgeGraphV1 {
     description: "Fixture-backed live-world action graph.",
     sourceWindow,
     badges: [
+      badge({
+        id: "observer.live_sources",
+        title: "Observer",
+        plainMeaning: "Source custody and routing for the Stage Play window.",
+        whyItMatters: "Observer shows source availability before story or world facts are interpreted.",
+        kind: "observer",
+        status: "observed",
+        liveBindings: [],
+        intentModule: undefined,
+        evidenceRefs: ["live_source_observation:ui"],
+        reasonCodes: ["observer_source_custody"],
+      }),
       badge({
         id: "actor.player",
         title: "Player",
@@ -334,6 +392,98 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/raw-session-buffer/clear")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_raw_session_buffer_clear/v1",
+        clearedCount: 1,
+        clearedEntryIds: ["stage_play_raw_session_buffer_entry:ui"],
+        assistant_answer: false,
+        context_role: "audit_buffer_not_graph",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/helix/stage-play/raw-session-buffer")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_raw_session_buffer_list/v1",
+        sessionId: "stage_play_session:thread:stage-play-ui:room:minecraft",
+        threadId: "thread:stage-play-ui",
+        roomId: "room:minecraft",
+        sourceId: "source:visual-tab",
+        entries: [
+          {
+            schema: "stage_play_raw_session_buffer_entry/v1",
+            entryId: "stage_play_raw_session_buffer_entry:ui",
+            sessionId: "stage_play_session:thread:stage-play-ui:room:minecraft",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            sourceId: "source:visual-tab",
+            modality: "visual_frame",
+            sourceEventId: "visual_frame:ui",
+            fromTs: "2026-06-02T00:00:01.000Z",
+            toTs: "2026-06-02T00:00:01.000Z",
+            rawKind: "frame_ref",
+            rawRef: "visual_frame:ui",
+            rawTextPreview: "Compact preview of the captured frame.",
+            retention: {
+              policy: "session_ttl",
+              ttlMs: 3600000,
+              expiresAt: "2026-06-02T01:00:01.000Z",
+            },
+            evidenceRefs: ["visual_frame:ui"],
+            assistant_answer: false,
+            context_role: "audit_buffer_not_graph",
+          },
+        ],
+        assistant_answer: false,
+        context_role: "audit_buffer_not_graph",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/agi/situation/visual-source/start")) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      const sourceId = typeof body.source_id === "string" ? body.source_id : "source:visual-tab";
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "helix.visual_snapshot_source_start_response.v1",
+        source: {
+          source_id: sourceId,
+          thread_id: body.thread_id ?? "helix-ask:desktop",
+          room_id: body.room_id ?? null,
+          status: "permission_required",
+        },
+        receipt: {
+          source: {
+            source_id: sourceId,
+            thread_id: body.thread_id ?? "helix-ask:desktop",
+            room_id: body.room_id ?? null,
+            status: "permission_required",
+          },
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/agi/situation/audio-source/permission-granted")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "helix.audio_source_permission_response.v1",
+        assistant_answer: false,
+        raw_content_included: false,
+        raw_transcript_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify(graph), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -395,8 +545,17 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("stage_play_source_query/v1")).toBeTruthy();
     expect(screen.getByText("stage_play_graph_draft_validation/v1")).toBeTruthy();
     expect(screen.getByText("Node builder")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Observer" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Intent Module/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Procedure/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Observer" }));
+    expect(screen.getByText("Observer Source Routes")).toBeTruthy();
+    expect(screen.getAllByText("visual frame").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("audio transcript").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Use for Stage Play" })[0]);
+    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
+    expect(screen.getByDisplayValue("use_for_stage_play")).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Defensive Retreat Barrier" })[0]);
 
@@ -407,6 +566,56 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/Candidate: retreat while tracking threat/i)).toBeTruthy();
     expect(screen.getByText(/agent executable: false/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /execute|run command|auto move|auto place/i })).toBeNull();
+  });
+
+  it("starts visual source setup through the visual producer from the Observer panel", async () => {
+    const stream = {
+      getVideoTracks: () => [],
+      getTracks: () => [{ readyState: "live", stop: vi.fn(), addEventListener: vi.fn() }],
+    } as unknown as MediaStream;
+    vi.stubGlobal("navigator", {
+      mediaDevices: {
+        getDisplayMedia: vi.fn(async () => stream),
+      },
+    });
+    visualProducerMock.startVisualFrameProducerInterval.mockClear();
+
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
+    expect(screen.getByText("Source Setup")).toBeTruthy();
+    expect(screen.getByText("Narrative test defaults")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "30s" }));
+    fireEvent.click(screen.getByRole("button", { name: "Capture browser tab visual" }));
+
+    expect(await screen.findByText(/browser tab visual interval active every 30s/i)).toBeTruthy();
+    expect(visualProducerMock.startVisualFrameProducerInterval).toHaveBeenCalledWith(expect.objectContaining({
+      sourceId: "source:visual-tab",
+      threadId: "helix-ask:desktop",
+      cadenceMs: 30000,
+    }));
+    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
+    expect(screen.getByDisplayValue("start_visual_interval")).toBeTruthy();
+    expect(screen.getAllByDisplayValue("narrative_stage_play").length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("session_ttl")).toBeTruthy();
+  });
+
+  it("opens raw buffer previews from Observer source evidence without graph ownership", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Open raw buffer preview" })[0]);
+
+    expect(await screen.findByText("Source Evidence Audit")).toBeTruthy();
+    expect(await screen.findByText("Compact preview of the captured frame.")).toBeTruthy();
+    expect(screen.getAllByText("stage_play_raw_session_buffer_entry:ui").length).toBeGreaterThan(0);
+    expect(screen.getByText("audit buffer, not graph")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Clear raw buffer" })[0]);
+    expect(await screen.findByText(/Cleared raw buffer entries for source:visual-tab/i)).toBeTruthy();
+    expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/raw-session-buffer/clear"))).toBe(true);
   });
 
   it("adds matching live nodes from the builder palette into the selected trace", async () => {

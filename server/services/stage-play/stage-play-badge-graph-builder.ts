@@ -21,7 +21,10 @@ import type {
   HelixEnvironmentStateSnapshot,
 } from "@shared/helix-environment-state-snapshot";
 import { getLatestEnvironmentStateSnapshot } from "../situation-room/environment-state-snapshot-window";
-import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
+import {
+  buildDefaultStagePlayRoutingSources,
+  resolveStagePlaySourceWindow,
+} from "../situation-room/stage-play-source-window";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -72,6 +75,7 @@ const makeSourceRefs = (input: {
   routeSolverObservationRefs: string[];
   worldSenseContextRefs: string[];
   eventWindowRefs: string[];
+  rawSessionBufferRefs?: string[];
 }): StagePlayBadgeSourceRefV1[] => [
   ...(input.sourceDescriptorRefs ?? []).map((id) => ({ kind: "live_source_descriptor" as const, id })),
   ...(input.sourceProducerRefs ?? []).map((id) => ({ kind: "live_source_producer" as const, id })),
@@ -83,6 +87,7 @@ const makeSourceRefs = (input: {
   ...input.routeSolverObservationRefs.map((id) => ({ kind: "route_solver_observation" as const, id })),
   ...input.worldSenseContextRefs.map((id) => ({ kind: "world_sense_context" as const, id })),
   ...input.eventWindowRefs.map((id) => ({ kind: "world_event" as const, id })),
+  ...(input.rawSessionBufferRefs ?? []).map((id) => ({ kind: "stage_play_raw_session_buffer_entry" as const, id })),
 ];
 
 const badge = (input: {
@@ -228,6 +233,45 @@ const addIntent = (
   admission: "auto",
 }));
 
+const observerBadge = (input: {
+  sourceRefs: StagePlayBadgeSourceRefV1[];
+  evidenceRefs: string[];
+  sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+}): StagePlayBadgeV1 => {
+  const selectedCount = input.sources.filter((source) => source.selectedForStagePlay).length;
+  const activeCount = input.sources.filter((source) => source.status === "active").length;
+  const missingCount = input.sources.filter((source) =>
+    source.status === "configured_missing" || source.status === "permission_required" || source.status === "waiting_for_client"
+  ).length;
+  return badge({
+    id: "observer.live_sources",
+    title: "Observer",
+    plainMeaning: "Source custody and routing for the Stage Play window.",
+    whyItMatters: "Observer is the first tile: it shows which live sources exist, what is missing, and which sources may feed Stage Play before any story or world facts are interpreted.",
+    kind: "observer",
+    status: selectedCount > 0 ? "observed" : "missing_evidence",
+    subjects: input.sources.map((source) => source.sourceId),
+    tags: [
+      "observer",
+      "source_custody",
+      "stage_play_routing",
+      ...unique(input.sources.map((source) => source.modality)),
+      ...unique(input.sources.map((source) => source.routeTo)),
+    ],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: input.evidenceRefs,
+    confidence: input.sources.length > 0 ? Math.max(0.35, Math.min(0.92, input.sources.reduce((sum, source) => sum + source.fidelityScore, 0) / input.sources.length)) : 0.35,
+    liveBindings: [
+      makeBinding("source_status", sourceRefIds(input.sourceRefs), `active:${activeCount} selected:${selectedCount} missing:${missingCount}`),
+      ...input.sources.slice(0, 8).map((source) =>
+        makeBinding("source_modality", source.evidenceRefs, `${source.modality}:${source.status}:${source.routeTo}`)
+      ),
+    ],
+    reasonCodes: ["observer_source_custody", "stage_play_source_routing"],
+    admission: "auto",
+  });
+};
+
 const addBinding = (
   badges: StagePlayBadgeV1[],
   edges: StagePlayBadgeGraphV1["edges"],
@@ -366,6 +410,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   const now = input.now ?? new Date();
   const resolvedAt = now.toISOString();
   const roomId = input.roomId ?? null;
+  const defaultSources = buildDefaultStagePlayRoutingSources({
+    threadId: input.threadId,
+    environmentId: input.environmentId ?? null,
+  });
   const emptySourceWindow = {
     threadId: input.threadId,
     roomId,
@@ -374,6 +422,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     fromTs: null,
     toTs: resolvedAt,
     latestObservationRefs: [],
+    latestSourceDescriptorRefs: [],
+    latestSourceProducerRefs: [],
+    latestRawSessionBufferRefs: [],
+    sources: defaultSources,
     latestSnapshotRefs: [],
     latestDeltaOverlayRefs: [],
     latestNavigationRefs: [],
@@ -386,7 +438,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       title: "Stage Play Badge Graph",
       description: "No room source window has been admitted yet.",
       sourceWindow: emptySourceWindow,
-      badges: [],
+      badges: [observerBadge({ sourceRefs: [], evidenceRefs: [], sources: defaultSources })],
       edges: [],
       recommendedActions: [],
     });
@@ -411,12 +463,18 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     routeSolverObservationRefs: sourceWindow.latestRouteSolverObservationRefs,
     worldSenseContextRefs: sourceWindow.latestWorldSenseContextRefs,
     eventWindowRefs: sourceWindow.latestEventWindowRefs,
+    rawSessionBufferRefs: sourceWindow.latestRawSessionBufferRefs,
   });
   const evidenceRefs = sourceWindow.evidenceRefs;
   const sourceIds = sourceRefIds(sourceRefs);
   const badges: StagePlayBadgeV1[] = [];
   const edges: StagePlayBadgeGraphV1["edges"] = [];
   const recommendedActions: StagePlayBadgeGraphV1["recommendedActions"] = [];
+  const observerId = pushBadge(badges, observerBadge({
+    sourceRefs,
+    evidenceRefs,
+    sources: sourceWindow.sources,
+  }));
 
   const sourceBadgeIds: string[] = [];
   for (const descriptor of sourceWindow.compactFacts.sourceDescriptors) {
@@ -515,6 +573,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   }));
   for (const sourceBadgeId of sourceBadgeIds) {
     pushEdge(edges, {
+      from: observerId,
+      to: sourceBadgeId,
+      relation: "observes",
+      label: "observer tracks source custody and routing",
+      evidenceRefs,
+      reasonCodes: ["observer_source_routing"],
+    });
+    pushEdge(edges, {
       from: sourceBadgeId,
       to: interpreterId,
       relation: "feeds",
@@ -523,6 +589,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       reasonCodes: ["source_interpreter_binding"],
     });
   }
+  pushEdge(edges, {
+    from: observerId,
+    to: interpreterId,
+    relation: "feeds",
+    label: "observer routes selected source handles to the interpreter boundary",
+    evidenceRefs,
+    reasonCodes: ["observer_interpreter_routing"],
+  });
 
   const settingIds: string[] = [];
   const dimensionId = dimensionSettingId(snapshot);
@@ -1087,6 +1161,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       latestObservationRefs: sourceWindow.latestObservationRefs,
       latestSourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
       latestSourceProducerRefs: sourceWindow.latestSourceProducerRefs,
+      latestRawSessionBufferRefs: sourceWindow.latestRawSessionBufferRefs,
+      sources: sourceWindow.sources,
       latestSnapshotRefs: sourceWindow.latestSnapshotRefs,
       latestDeltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
       latestNavigationRefs: unique([

@@ -27,6 +27,18 @@ describe("workstation stores", () => {
     expect(state.order[0]).toBe("note:test");
   });
 
+  it("creates manual workstation notes with stable unique ids", () => {
+    const notes = useWorkstationNotesStore.getState();
+    const first = notes.createManualNote({ title: "Draft brief" });
+    const second = notes.createManualNote({ title: "Draft brief" });
+    const state = useWorkstationNotesStore.getState();
+    expect(first.id).toBe("note:manual:draft-brief");
+    expect(second.id).toBe("note:manual:draft-brief-2");
+    expect(state.active_note_id).toBe(second.id);
+    expect(state.notes[first.id]?.topic).toBe("manual-document");
+    expect(state.order.slice(0, 2)).toEqual([second.id, first.id]);
+  });
+
   it("updates note body and timestamp deterministically", () => {
     const notes = useWorkstationNotesStore.getState();
     notes.upsertWorkflowNote({

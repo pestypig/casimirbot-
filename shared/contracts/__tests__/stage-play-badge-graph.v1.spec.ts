@@ -15,6 +15,22 @@ const sourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
   fromTs: "2026-06-02T12:00:00.000Z",
   toTs: "2026-06-02T12:00:01.000Z",
   latestObservationRefs: ["observation:1"],
+  sources: [
+    {
+      sourceId: "source:visual-tab",
+      modality: "visual_frame",
+      status: "active",
+      contribution: "Visual frame source provides compact scene context.",
+      fidelityScore: 0.82,
+      selectedForStagePlay: true,
+      routeTo: "visual_context",
+      cadenceMs: 10000,
+      lastEventTs: "2026-06-02T12:00:01.000Z",
+      missingReason: null,
+      nextRequiredAction: null,
+      evidenceRefs: ["observation:1"],
+    },
+  ],
   latestSnapshotRefs: ["snapshot:1"],
   latestDeltaOverlayRefs: [],
   latestNavigationRefs: [],
@@ -23,6 +39,7 @@ const sourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
 
 const emptySourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
   latestObservationRefs: [],
+  sources: [],
   latestSnapshotRefs: [],
   latestDeltaOverlayRefs: [],
   latestNavigationRefs: [],
@@ -194,6 +211,48 @@ describe("stage_play_badge_graph/v1", () => {
     expect(JSON.stringify(graph)).not.toMatch(/agent[_ -]?executable\s*[:=]\s*true/i);
   });
 
+  it("allows raw session buffer ids as refs without allowing raw content in the graph", () => {
+    const rawBufferRef = "stage_play_raw_session_buffer_entry:abc123";
+    const graph = buildFixture({
+      sourceWindow: {
+        ...sourceWindow,
+        latestRawSessionBufferRefs: [rawBufferRef],
+        sources: [
+          {
+            ...sourceWindow.sources[0],
+            evidenceRefs: [...sourceWindow.sources[0].evidenceRefs, rawBufferRef],
+          },
+        ],
+      },
+      badges: [
+        {
+          ...sourceBadge,
+          sourceRefs: [
+            ...sourceBadge.sourceRefs,
+            { kind: "stage_play_raw_session_buffer_entry", id: rawBufferRef },
+          ],
+          evidenceRefs: [...sourceBadge.evidenceRefs, rawBufferRef],
+        },
+      ],
+    });
+    const graphWithRawTranscript = buildFixture({
+      badges: [
+        {
+          ...sourceBadge,
+          plainMeaning: "Contains full transcript text from the raw log.",
+        },
+      ],
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(JSON.stringify(graph)).toContain(rawBufferRef);
+    expect(validateStagePlayBadgeGraphV1(graphWithRawTranscript)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/forbidden raw-content phrase matched/i),
+      ]),
+    );
+  });
+
   it("allows empty badges only when there is no admitted source window", () => {
     const emptyWithoutSource = buildFixture({
       sourceWindow: emptySourceWindow,
@@ -237,6 +296,29 @@ describe("stage_play_badge_graph/v1", () => {
     expect(issues).toMatch(/badges\[0\]\.confidence must be between 0 and 1/);
     expect(issues).toMatch(/badges\[0\]\.liveBindings\[0\]\.confidence must be between 0 and 1/);
     expect(issues).toMatch(/edges\[0\]\.to references missing badge: missing:badge/);
+  });
+
+  it("rejects invalid source routing entries", () => {
+    const graph = buildFixture({
+      sourceWindow: {
+        ...sourceWindow,
+        sources: [
+          {
+            ...sourceWindow.sources[0],
+            status: "active_interval",
+            fidelityScore: 1.4,
+            selectedForStagePlay: "yes",
+            routeTo: "execute_world_action",
+          } as StagePlayBadgeGraphV1["sourceWindow"]["sources"][number],
+        ],
+      },
+    });
+    const issues = validateStagePlayBadgeGraphV1(graph).join("\n");
+
+    expect(issues).toMatch(/sourceWindow\.sources\[0\]\.status is invalid/);
+    expect(issues).toMatch(/sourceWindow\.sources\[0\]\.fidelityScore must be between 0 and 1/);
+    expect(issues).toMatch(/sourceWindow\.sources\[0\]\.selectedForStagePlay must be boolean/);
+    expect(issues).toMatch(/sourceWindow\.sources\[0\]\.routeTo is invalid/);
   });
 
   it("rejects executable recommendations and non-evidence graph authority", () => {

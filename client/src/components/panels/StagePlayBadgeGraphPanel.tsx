@@ -7,6 +7,7 @@ import type {
   StagePlayBadgeGraphV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
+import type { StagePlayRawSessionBufferEntryV1 } from "@shared/stage-play-raw-session-buffer";
 import type {
   StagePlayBuilderCatalogV1,
   StagePlayGraphDraftValidationV1,
@@ -20,8 +21,24 @@ import {
   selectActiveLiveAnswerEnvironment,
   useLiveAnswerEnvironmentStore,
 } from "@/store/useLiveAnswerEnvironmentStore";
+import {
+  getActiveVisualFrameStream,
+  getLatestActiveVisualFrameStream,
+  startVisualFrameProducerInterval,
+  stopVisualFrameProducerInterval,
+} from "@/lib/helix/visualFrameProducer";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
+
+const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
+  routeTo: "narrative_stage_play",
+  visualCadenceMs: 10_000,
+  audioWindowMs: 10_000,
+  compactObservationWindowMs: 10_000,
+  rawRetention: "session_ttl",
+} as const;
+
+const STAGE_PLAY_VISUAL_CADENCE_OPTIONS = [5_000, 10_000, 15_000, 30_000] as const;
 
 type StagePlayNodeBuilderType = {
   kind: StagePlayBadgeV1["kind"];
@@ -71,6 +88,45 @@ type StagePlayBuilderContextResponse = {
   authority: StagePlayBuilderCatalogV1["authority"];
 };
 
+type StagePlayObserverSource = StagePlayBadgeGraphV1["sourceWindow"]["sources"][number];
+
+type StagePlayObserverDraftAction =
+  | "use_for_stage_play"
+  | "route_to_narrative"
+  | "route_to_minecraft_world"
+  | "start_visual_interval"
+  | "attach_audio_transcript"
+  | "pause_source"
+  | "clear_session_buffer";
+
+type StagePlayVisualCaptureSurface = "browser_tab" | "screen";
+
+type StagePlayAudioTranscriptSource = "browser_audio" | "microphone";
+
+type StagePlaySourceSetupStatus = {
+  level: "idle" | "working" | "ok" | "error";
+  message: string;
+};
+
+type StagePlaySourceAuditMode = "source_evidence" | "compact_observation" | "raw_buffer";
+
+type StagePlaySourceAuditSelection = {
+  source: StagePlayObserverSource;
+  mode: StagePlaySourceAuditMode;
+} | null;
+
+type StagePlayRawSessionBufferListResponse = {
+  ok: boolean;
+  schema: "stage_play_raw_session_buffer_list/v1";
+  sessionId: string;
+  threadId: string;
+  roomId?: string | null;
+  sourceId?: string | null;
+  entries: StagePlayRawSessionBufferEntryV1[];
+  assistant_answer: false;
+  context_role: "audit_buffer_not_graph";
+};
+
 async function fetchStagePlayBadgeGraph(input: {
   threadId: string;
   roomId?: string | null;
@@ -103,6 +159,24 @@ async function fetchStagePlayBuilderContext(input: {
     throw new Error(`Stage Play builder request failed: ${response.status}`);
   }
   return await response.json() as StagePlayBuilderContextResponse;
+}
+
+async function fetchStagePlayRawSessionBuffer(input: {
+  threadId: string;
+  roomId?: string | null;
+  sourceId?: string | null;
+}): Promise<StagePlayRawSessionBufferListResponse> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  if (input.roomId) params.set("roomId", input.roomId);
+  if (input.sourceId) params.set("sourceId", input.sourceId);
+  const response = await fetch(`/api/helix/stage-play/raw-session-buffer?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play raw session buffer request failed: ${response.status}`);
+  }
+  return await response.json() as StagePlayRawSessionBufferListResponse;
 }
 
 async function validateStagePlayDraft(input: {
@@ -146,6 +220,12 @@ function sourceOptionFromHandle(handle: StagePlaySourceHandleV1): StagePlaySourc
   };
 }
 
+const isRawBufferRef = (ref: string): boolean =>
+  ref.startsWith("stage_play_raw_session_buffer_entry:");
+
+const isCompactObservationRef = (ref: string): boolean =>
+  !isRawBufferRef(ref) && /(?:observation|snapshot|chunk|evidence|visual|transcript|event|descriptor|producer|capability)/i.test(ref);
+
 function labelize(value: string): string {
   return value.replace(/[._-]/g, " ");
 }
@@ -167,6 +247,7 @@ function statusTone(status: string): string {
 }
 
 function kindTone(kind: string): string {
+  if (kind === "observer") return "border-amber-800/70 bg-amber-950/25";
   if (kind === "source") return "border-sky-800/70 bg-sky-950/25";
   if (kind === "interpreter") return "border-fuchsia-800/70 bg-fuchsia-950/25";
   if (kind === "hazard" || kind === "blocked_affordance") return "border-rose-800/70 bg-rose-950/25";
@@ -189,6 +270,7 @@ function proceduralExpression(badge: StagePlayBadgeV1): string {
 }
 
 function badgeActionLine(badge: StagePlayBadgeV1): string {
+  if (badge.kind === "observer") return "Source custody and routing";
   if (badge.kind === "procedural_binding") return `Assembles: ${proceduralExpression(badge)}`;
   if (badge.kind === "intent_module") return `Verb: ${proceduralExpression(badge)}`;
   if (badge.kind === "affordance") return "Available move candidate";
@@ -199,6 +281,7 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
 }
 
 const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
+  { kind: "observer", label: "Observer", role: "source custody and routing" },
   { kind: "source", label: "Source Class", role: "live feed handle to wire in" },
   { kind: "interpreter", label: "Interpreter Job", role: "continual reflection over source refs" },
   { kind: "setting", label: "Setting", role: "where the scene is bounded" },
@@ -237,6 +320,7 @@ const STAGE_PLAY_SOURCE_CLASSES = [
 
 function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftStagePlayNodeParameter[] {
   const presets: Record<StagePlayBadgeV1["kind"], [string, string][]> = {
+    observer: [["role", "source_custody"], ["route_policy", "evidence_only"], ["selected_sources", ""]],
     source: [["source_class", ""], ["source_id", ""], ["status", ""], ["descriptor_ref", ""], ["producer_ref", ""], ["latest_ref", ""]],
     interpreter: [["tool", "live_env.reflect_stage_play_context"], ["cadence", ""], ["input_sources", ""], ["output", "stage_play_badge_graph"]],
     setting: [["dimension", ""], ["biome_or_area", ""], ["bounds", ""]],
@@ -319,6 +403,7 @@ function draftNodeEvidenceRefs(node: DraftStagePlayNode): string[] {
 function buildDraftEdges(nodes: DraftStagePlayNode[]) {
   const edges: { from: string; to: string; relation: string; label: string }[] = [];
   let edgeCount = 0;
+  const observerNodes = nodes.filter((node) => node.kind === "observer");
   const sourceNodes = nodes.filter((node) => node.kind === "source");
   const interpreterNodes = nodes.filter((node) => node.kind === "interpreter");
   const intentNodes = nodes.filter((node) => node.kind === "intent_module");
@@ -335,6 +420,10 @@ function buildDraftEdges(nodes: DraftStagePlayNode[]) {
     });
   };
 
+  for (const observer of observerNodes) {
+    for (const source of sourceNodes) addEdge(observer, source, "observes", "observer tracks source custody");
+    for (const interpreter of interpreterNodes) addEdge(observer, interpreter, "feeds", "observer routes sources to interpreter");
+  }
   for (const source of sourceNodes) {
     for (const interpreter of interpreterNodes) addEdge(source, interpreter, "feeds", "source feeds interpreter");
   }
@@ -468,6 +557,7 @@ function StagePlayGraphCanvas({
 }) {
   const columns = useMemo(() => {
     const order = [
+      "observer",
       "source",
       "interpreter",
       "setting",
@@ -562,6 +652,8 @@ function StagePlayGraphCanvas({
           const point = positions.get(badge.id);
           if (!point) return null;
           const active = selectedBadgeId === badge.id || selectedSet.has(badge.id);
+          const observerSources = badge.kind === "observer" ? graph.sourceWindow.sources ?? [] : [];
+          const selectedObserverSourceCount = observerSources.filter((source) => source.selectedForStagePlay).length;
           return (
             <div
               key={badge.id}
@@ -571,7 +663,7 @@ function StagePlayGraphCanvas({
               <button
                 type="button"
                 onClick={() => onSelect(badge.id)}
-                className={`flex h-14 w-32 flex-col items-center justify-center rounded-md border px-2 text-center text-xs transition ${
+                className={`flex ${badge.kind === "observer" ? "h-16 w-36" : "h-14 w-32"} flex-col items-center justify-center rounded-md border px-2 text-center text-xs transition ${
                   active
                     ? "border-cyan-400 bg-cyan-950/70 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.2)]"
                     : `${kindTone(badge.kind)} text-slate-200 hover:border-slate-500`
@@ -592,6 +684,12 @@ function StagePlayGraphCanvas({
                             : "border-slate-300 bg-slate-500/80"
                   }`}
                 />
+                {badge.kind === "observer" ? (
+                  <>
+                    <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100">Observer</span>
+                    <span className="font-mono text-[9px] text-slate-400">{selectedObserverSourceCount}/{observerSources.length} routed</span>
+                  </>
+                ) : null}
               </button>
               <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-64 -translate-x-1/2 rounded-md border border-cyan-700/70 bg-slate-950/95 p-3 text-left text-xs text-slate-100 shadow-2xl group-hover:block">
                 <div className="font-semibold text-cyan-100">{badge.title}</div>
@@ -600,6 +698,21 @@ function StagePlayGraphCanvas({
                   {proceduralExpression(badge) || labelize(badge.kind)}
                 </div>
                 <div className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400">{badge.plainMeaning}</div>
+                {badge.kind === "observer" ? (
+                  <div className="mt-2 space-y-1">
+                    {observerSources.slice(0, 5).map((source) => (
+                      <div key={`${source.sourceId}:${source.modality}`} className="rounded border border-slate-800 bg-black/20 px-2 py-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-[10px] text-slate-200">{labelize(source.modality)}</span>
+                          <span className="text-[10px] text-slate-500">{labelize(source.status)}</span>
+                        </div>
+                        <div className="mt-0.5 truncate font-mono text-[10px] text-amber-100">
+                          {source.routeTo} {source.cadenceMs ? `@ ${source.cadenceMs}ms` : ""}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-1">
                   <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.kind)}</span>
                   <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.status)}</span>
@@ -816,6 +929,18 @@ function StagePlayBindingOverlay({
   relatedBadges,
   relatedActions,
   onStartBuilderDrag,
+  onObserverDraftAction,
+  sourceSetupCadenceMs,
+  sourceSetupStatus,
+  onSetSourceSetupCadenceMs,
+  onStartVisualSourceSetup,
+  onAttachAudioTranscriptSource,
+  onPauseVisualSourceSetup,
+  sourceAuditSelection,
+  rawSessionBufferEntries,
+  rawSessionBufferLoading,
+  onOpenSourceAudit,
+  onClearRawSessionBuffer,
   onClose,
 }: {
   graph: StagePlayBadgeGraphV1;
@@ -837,6 +962,18 @@ function StagePlayBindingOverlay({
   relatedBadges: StagePlayBadgeV1[];
   relatedActions: StagePlayBadgeGraphRecommendedActionV1[];
   onStartBuilderDrag: (nodeType: StagePlayNodeBuilderType, event: React.PointerEvent<HTMLButtonElement>) => void;
+  onObserverDraftAction: (source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) => void;
+  sourceSetupCadenceMs: number;
+  sourceSetupStatus: StagePlaySourceSetupStatus;
+  onSetSourceSetupCadenceMs: (cadenceMs: number) => void;
+  onStartVisualSourceSetup: (surface: StagePlayVisualCaptureSurface) => void;
+  onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
+  onPauseVisualSourceSetup: () => void;
+  sourceAuditSelection: StagePlaySourceAuditSelection;
+  rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
+  rawSessionBufferLoading: boolean;
+  onOpenSourceAudit: (source: StagePlayObserverSource, mode: StagePlaySourceAuditMode) => void;
+  onClearRawSessionBuffer: (source: StagePlayObserverSource | null) => void;
   onClose: () => void;
 }) {
   const selectedBadges = graph.badges.filter((badge) => selectedBadgeIds.includes(badge.id));
@@ -1043,6 +1180,19 @@ function StagePlayBindingOverlay({
             relatedEdges={relatedEdges}
             relatedBadges={relatedBadges}
             relatedActions={relatedActions}
+            observerSources={graph.sourceWindow.sources}
+            onObserverDraftAction={onObserverDraftAction}
+            sourceSetupCadenceMs={sourceSetupCadenceMs}
+            sourceSetupStatus={sourceSetupStatus}
+            onSetSourceSetupCadenceMs={onSetSourceSetupCadenceMs}
+            onStartVisualSourceSetup={onStartVisualSourceSetup}
+            onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
+            onPauseVisualSourceSetup={onPauseVisualSourceSetup}
+            sourceAuditSelection={sourceAuditSelection}
+            rawSessionBufferEntries={rawSessionBufferEntries}
+            rawSessionBufferLoading={rawSessionBufferLoading}
+            onOpenSourceAudit={onOpenSourceAudit}
+            onClearRawSessionBuffer={onClearRawSessionBuffer}
           />
         </div>
       </div>
@@ -1055,11 +1205,37 @@ function Inspector({
   relatedEdges,
   relatedBadges,
   relatedActions,
+  observerSources,
+  onObserverDraftAction,
+  sourceSetupCadenceMs,
+  sourceSetupStatus,
+  onSetSourceSetupCadenceMs,
+  onStartVisualSourceSetup,
+  onAttachAudioTranscriptSource,
+  onPauseVisualSourceSetup,
+  sourceAuditSelection,
+  rawSessionBufferEntries,
+  rawSessionBufferLoading,
+  onOpenSourceAudit,
+  onClearRawSessionBuffer,
 }: {
   badge: StagePlayBadgeV1 | null;
   relatedEdges: StagePlayBadgeEdgeV1[];
   relatedBadges: StagePlayBadgeV1[];
   relatedActions: StagePlayBadgeGraphRecommendedActionV1[];
+  observerSources: StagePlayObserverSource[];
+  onObserverDraftAction: (source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) => void;
+  sourceSetupCadenceMs: number;
+  sourceSetupStatus: StagePlaySourceSetupStatus;
+  onSetSourceSetupCadenceMs: (cadenceMs: number) => void;
+  onStartVisualSourceSetup: (surface: StagePlayVisualCaptureSurface) => void;
+  onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
+  onPauseVisualSourceSetup: () => void;
+  sourceAuditSelection: StagePlaySourceAuditSelection;
+  rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
+  rawSessionBufferLoading: boolean;
+  onOpenSourceAudit: (source: StagePlayObserverSource, mode: StagePlaySourceAuditMode) => void;
+  onClearRawSessionBuffer: (source: StagePlayObserverSource | null) => void;
 }) {
   if (!badge) {
     return (
@@ -1088,6 +1264,277 @@ function Inspector({
           <p>{badge.plainMeaning}</p>
           <p className="mt-2 text-xs text-slate-400">{badge.whyItMatters}</p>
         </Section>
+
+        {badge.kind === "observer" ? (
+          <>
+          <Section title="Source Setup">
+            <div className="space-y-3">
+              <div className="rounded border border-slate-800 bg-black/20 p-2 text-[11px] leading-relaxed text-slate-400">
+                <div className="font-semibold uppercase tracking-wide text-amber-100">Narrative test defaults</div>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <div>Route: <span className="font-mono text-slate-200">{STAGE_PLAY_SOURCE_SETUP_DEFAULTS.routeTo}</span></div>
+                  <div>Visual: <span className="font-mono text-slate-200">{STAGE_PLAY_SOURCE_SETUP_DEFAULTS.visualCadenceMs / 1000}s</span></div>
+                  <div>Audio: <span className="font-mono text-slate-200">{STAGE_PLAY_SOURCE_SETUP_DEFAULTS.audioWindowMs / 1000}s</span></div>
+                  <div>Window: <span className="font-mono text-slate-200">{STAGE_PLAY_SOURCE_SETUP_DEFAULTS.compactObservationWindowMs / 1000}s</span></div>
+                  <div className="col-span-2">Raw retention: <span className="font-mono text-slate-200">{STAGE_PLAY_SOURCE_SETUP_DEFAULTS.rawRetention}</span></div>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Set visual cadence</div>
+                <div className="flex flex-wrap gap-1">
+                  {STAGE_PLAY_VISUAL_CADENCE_OPTIONS.map((cadenceMs) => (
+                    <button
+                      key={cadenceMs}
+                      type="button"
+                      onClick={() => onSetSourceSetupCadenceMs(cadenceMs)}
+                      className={`rounded border px-2 py-1 text-[10px] font-semibold ${
+                        sourceSetupCadenceMs === cadenceMs
+                          ? "border-cyan-500 bg-cyan-950/40 text-cyan-100"
+                          : "border-slate-700 text-slate-300 hover:border-cyan-500 hover:text-cyan-100"
+                      }`}
+                    >
+                      {cadenceMs / 1000}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => onStartVisualSourceSetup("browser_tab")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Capture browser tab visual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onStartVisualSourceSetup("screen")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Capture screen visual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAttachAudioTranscriptSource("browser_audio")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Attach browser audio transcript
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAttachAudioTranscriptSource("microphone")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Attach microphone transcript
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onObserverDraftAction(observerSources.find((source) => source.selectedForStagePlay) ?? observerSources[0] ?? null, "use_for_stage_play")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Use source for Stage Play
+                </button>
+                <button
+                  type="button"
+                  onClick={onPauseVisualSourceSetup}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Pause source
+                </button>
+              </div>
+
+              {sourceSetupStatus.message ? (
+                <div className={`rounded border p-2 text-[11px] ${
+                  sourceSetupStatus.level === "error"
+                    ? "border-rose-800 bg-rose-950/25 text-rose-100"
+                    : sourceSetupStatus.level === "ok"
+                      ? "border-emerald-800 bg-emerald-950/25 text-emerald-100"
+                      : sourceSetupStatus.level === "working"
+                        ? "border-cyan-800 bg-cyan-950/25 text-cyan-100"
+                        : "border-slate-800 bg-black/20 text-slate-400"
+                }`}>
+                  {sourceSetupStatus.message}
+                </div>
+              ) : null}
+              <div className="text-[11px] leading-relaxed text-slate-500">
+                Visual capture is owned by the visual source producer. Audio transcript attachment is registered as source setup and reflected after source capability evidence exists.
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Observer Source Routes">
+            <div className="space-y-2">
+              {observerSources.length === 0 ? (
+                <div className="text-slate-500">No source routes are registered yet.</div>
+              ) : observerSources.map((source) => (
+                <div key={`${source.sourceId}:${source.modality}`} className="rounded border border-slate-800 bg-black/20 p-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-100">{labelize(source.modality)}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{source.sourceId}</div>
+                    </div>
+                    <Badge variant="outline" className={statusTone(source.status === "active" ? "observed" : source.status === "configured_missing" ? "missing_evidence" : source.status)}>
+                      {labelize(source.status)}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                    <div>Route: <span className="font-mono text-amber-100">{source.routeTo}</span></div>
+                    <div>Selected: <span className="font-mono text-slate-200">{source.selectedForStagePlay ? "yes" : "no"}</span></div>
+                    <div>Fidelity: <span className="font-mono text-slate-200">{source.fidelityScore.toFixed(2)}</span></div>
+                    <div>Cadence: <span className="font-mono text-slate-200">{source.cadenceMs ? `${source.cadenceMs}ms` : "none"}</span></div>
+                  </div>
+                  <div className="mt-2 text-[11px] leading-relaxed text-slate-400">{source.contribution}</div>
+                  {source.missingReason || source.nextRequiredAction ? (
+                    <div className="mt-2 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+                      {source.missingReason ?? source.nextRequiredAction}
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onObserverDraftAction(source, "use_for_stage_play")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Use for Stage Play
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onObserverDraftAction(source, "route_to_narrative")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Route to Narrative
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onObserverDraftAction(source, "route_to_minecraft_world")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Route to Minecraft World
+                    </button>
+                    {source.modality === "visual_frame" ? (
+                      <button
+                        type="button"
+                        onClick={() => onObserverDraftAction(source, "start_visual_interval")}
+                        className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                      >
+                        Start visual interval
+                      </button>
+                    ) : null}
+                    {source.modality === "audio_transcript" ? (
+                      <button
+                        type="button"
+                        onClick={() => onObserverDraftAction(source, "attach_audio_transcript")}
+                        className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                      >
+                        Attach audio transcript
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onObserverDraftAction(source, "pause_source")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Pause source
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSourceAudit(source, "source_evidence")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Review source evidence
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSourceAudit(source, "compact_observation")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Open compact observation
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSourceAudit(source, "raw_buffer")}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                    >
+                      Open raw buffer preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onClearRawSessionBuffer(source)}
+                      className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-amber-500 hover:text-amber-100"
+                    >
+                      Clear raw buffer
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => onClearRawSessionBuffer(null)}
+                className="w-full rounded border border-slate-700 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+              >
+                Clear session buffer
+              </button>
+              <div className="text-[11px] leading-relaxed text-slate-500">
+                Routing controls create local draft requests. Audit controls operate on the separate raw session buffer; the graph updates only after source capability or evidence refs exist.
+              </div>
+            </div>
+          </Section>
+
+          {sourceAuditSelection ? (
+            <Section title="Source Evidence Audit">
+              <div className="space-y-2 text-xs">
+                <div className="rounded border border-slate-800 bg-black/20 p-2">
+                  <div className="font-semibold text-slate-100">{labelize(sourceAuditSelection.source.modality)}</div>
+                  <div className="mt-1 font-mono text-[10px] text-slate-500">{sourceAuditSelection.source.sourceId}</div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Badge variant="outline" className="border-slate-700 text-slate-300">{labelize(sourceAuditSelection.mode)}</Badge>
+                    <Badge variant="outline" className="border-slate-700 text-slate-300">audit buffer, not graph</Badge>
+                  </div>
+                </div>
+                {sourceAuditSelection.mode === "source_evidence" ? (
+                  <div className="space-y-1 font-mono text-[11px] text-slate-400">
+                    {sourceAuditSelection.source.evidenceRefs.length > 0
+                      ? sourceAuditSelection.source.evidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                      : <div>No source evidence refs recorded.</div>}
+                  </div>
+                ) : null}
+                {sourceAuditSelection.mode === "compact_observation" ? (
+                  <div className="space-y-1 font-mono text-[11px] text-slate-400">
+                    {sourceAuditSelection.source.evidenceRefs.filter(isCompactObservationRef).length > 0
+                      ? sourceAuditSelection.source.evidenceRefs.filter(isCompactObservationRef).map((ref) => <div key={ref}>{ref}</div>)
+                      : <div>No compact observation refs recorded.</div>}
+                  </div>
+                ) : null}
+                {sourceAuditSelection.mode === "raw_buffer" ? (
+                  <div className="space-y-2">
+                    {rawSessionBufferLoading ? (
+                      <div className="text-slate-500">Loading raw buffer previews...</div>
+                    ) : rawSessionBufferEntries.length > 0 ? rawSessionBufferEntries.map((entry) => (
+                      <div key={entry.entryId} className="rounded border border-slate-800 bg-black/20 p-2">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">{labelize(entry.rawKind)}</Badge>
+                          <Badge variant="outline" className="border-slate-700 text-slate-300">{entry.retention.policy}</Badge>
+                        </div>
+                        <div className="mt-2 font-mono text-[10px] text-slate-500">{entry.entryId}</div>
+                        <div className="mt-1 font-mono text-[10px] text-slate-500">{entry.rawRef}</div>
+                        {entry.rawTextPreview ? (
+                          <div className="mt-2 rounded border border-slate-800 bg-slate-950 p-2 text-[11px] leading-relaxed text-slate-300">
+                            {entry.rawTextPreview}
+                          </div>
+                        ) : null}
+                      </div>
+                    )) : (
+                      <div className="text-slate-500">No raw buffer preview entries for this source.</div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </Section>
+          ) : null}
+          </>
+        ) : null}
 
         <Section title="Live Bindings">
           {badge.liveBindings.length > 0 ? (
@@ -1219,6 +1666,12 @@ export default function StagePlayBadgeGraphPanel() {
   const [draftNodes, setDraftNodes] = useState<DraftStagePlayNode[]>([]);
   const [selectedDraftNodeId, setSelectedDraftNodeId] = useState<string | null>(null);
   const [heldNode, setHeldNode] = useState<HeldStagePlayNode | null>(null);
+  const [sourceSetupCadenceMs, setSourceSetupCadenceMs] = useState<number>(STAGE_PLAY_SOURCE_SETUP_DEFAULTS.visualCadenceMs);
+  const [sourceSetupStatus, setSourceSetupStatus] = useState<StagePlaySourceSetupStatus>({
+    level: "idle",
+    message: "",
+  });
+  const [sourceAuditSelection, setSourceAuditSelection] = useState<StagePlaySourceAuditSelection>(null);
   const graphScrollportRef = useRef<HTMLDivElement>(null);
   const draftNodeCountRef = useRef(0);
   const draftParameterCountRef = useRef(0);
@@ -1235,7 +1688,7 @@ export default function StagePlayBadgeGraphPanel() {
   const setSelectedBadgeIds = useStagePlayBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useStagePlayBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
   const setActiveFilterKind = useStagePlayBadgeGraphPanelStore((state) => state.setActiveFilterKind);
-  const { data: graph, isLoading, error } = useQuery<StagePlayBadgeGraphV1>({
+  const graphQuery = useQuery<StagePlayBadgeGraphV1>({
     queryKey: [
       "/api/helix/stage-play/graph",
       threadId,
@@ -1245,7 +1698,23 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayBadgeGraph({ threadId, roomId, environmentId }),
     refetchInterval: 1000,
   });
-  const { data: builderContext = null } = useQuery<StagePlayBuilderContextResponse>({
+  const { data: graph, isLoading, error } = graphQuery;
+  const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
+    queryKey: [
+      "/api/helix/stage-play/raw-session-buffer",
+      threadId,
+      roomId,
+      sourceAuditSelection?.source.sourceId ?? null,
+    ],
+    queryFn: () => fetchStagePlayRawSessionBuffer({
+      threadId,
+      roomId,
+      sourceId: sourceAuditSelection?.source.sourceId ?? null,
+    }),
+    enabled: Boolean(sourceAuditSelection),
+    refetchInterval: sourceAuditSelection?.mode === "raw_buffer" ? 1000 : false,
+  });
+  const builderContextQuery = useQuery<StagePlayBuilderContextResponse>({
     queryKey: [
       "/api/helix/stage-play/builder",
       threadId,
@@ -1254,6 +1723,7 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayBuilderContext({ threadId, environmentId }),
     refetchInterval: 2000,
   });
+  const builderContext = builderContextQuery.data ?? null;
   const sourceOptions = useMemo(
     () => (builderContext?.sourceQuery.sourceHandles ?? []).map(sourceOptionFromHandle),
     [builderContext?.sourceQuery.sourceHandles],
@@ -1448,6 +1918,294 @@ export default function StagePlayBadgeGraphPanel() {
     );
   }
 
+  function addObserverDraftAction(source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) {
+    draftNodeCountRef.current += 1;
+    const actionLabel = labelize(action);
+    const nodeType: StagePlayNodeBuilderType = {
+      kind: action === "clear_session_buffer" ? "recommended_check" : "source",
+      label: action === "clear_session_buffer" ? "Clear session buffer" : `Source request: ${actionLabel}`,
+      role: "local user draft request",
+    };
+    const parameters: [string, string][] = action === "clear_session_buffer"
+      ? [
+          ["check", "clear_session_buffer"],
+          ["status", "local_draft_only"],
+          ["authority", "user_action_required"],
+        ]
+      : [
+          ["source_class", source?.modality ?? ""],
+          ["source_id", source?.sourceId ?? ""],
+          ["status", source?.status ?? ""],
+          ["route_to", action === "route_to_narrative" ? "narrative_stage_play" : action === "route_to_minecraft_world" ? "world_stage_play" : source?.routeTo ?? ""],
+          ["requested_action", action],
+          ["selected_for_stage_play", action === "use_for_stage_play" ? "true" : String(source?.selectedForStagePlay ?? false)],
+          ["latest_ref", source?.evidenceRefs.at(-1) ?? ""],
+          ["draft_only", "true"],
+        ];
+    const nextNode: DraftStagePlayNode = {
+      ...nodeType,
+      id: `draft:${nodeType.kind}:${draftNodeCountRef.current}`,
+      x: 96 + draftNodeCountRef.current * 18,
+      y: 96 + draftNodeCountRef.current * 28,
+      parameters: parameters.map(([key, value], index) => ({
+        id: `${nodeType.kind}:observer-action:${draftNodeCountRef.current}:${index + 1}`,
+        key,
+        value,
+      })),
+    };
+    setDraftNodes((nodes) => [...nodes, nextNode]);
+    setSelectedDraftNodeId(nextNode.id);
+  }
+
+  async function postJson(path: string, body?: Record<string, unknown>): Promise<any> {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(typeof payload?.error === "string" ? payload.error : `request_failed:${response.status}`);
+    }
+    return payload;
+  }
+
+  function sourceSetupDraft(source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction, extra: [string, string][] = []) {
+    addObserverDraftAction(source, action);
+    if (extra.length === 0) return;
+    setDraftNodes((nodes) =>
+      nodes.map((node, index) =>
+        index === nodes.length - 1
+          ? {
+              ...node,
+              parameters: [
+                ...node.parameters,
+                ...extra.map(([key, value], extraIndex) => ({
+                  id: `${node.id}:setup:${extraIndex + 1}`,
+                  key,
+                  value,
+                })),
+              ],
+            }
+          : node,
+      ),
+    );
+  }
+
+  function openSourceAudit(source: StagePlayObserverSource, mode: StagePlaySourceAuditMode) {
+    setSourceAuditSelection({ source, mode });
+  }
+
+  async function clearRawSessionBuffer(source: StagePlayObserverSource | null) {
+    try {
+      await postJson("/api/helix/stage-play/raw-session-buffer/clear", {
+        threadId,
+        roomId,
+        sourceId: source?.sourceId ?? null,
+      });
+      if (!source) addObserverDraftAction(null, "clear_session_buffer");
+      setSourceSetupStatus({
+        level: "ok",
+        message: source
+          ? `Cleared raw buffer entries for ${source.sourceId}.`
+          : "Cleared raw session buffer entries for this Stage Play window.",
+      });
+      await Promise.all([rawSessionBufferQuery.refetch(), graphQuery.refetch(), builderContextQuery.refetch()]);
+    } catch (error) {
+      setSourceSetupStatus({
+        level: "error",
+        message: error instanceof Error ? error.message : "raw_session_buffer_clear_failed",
+      });
+    }
+  }
+
+  function existingVisualSourceId(): string | null {
+    const routed = graph?.sourceWindow.sources.find((source) =>
+      source.modality === "visual_frame" &&
+      source.sourceId &&
+      !source.sourceId.startsWith("missing:") &&
+      !source.sourceId.startsWith("source:visual-frame")
+    );
+    return routed?.sourceId ?? getLatestActiveVisualFrameStream(threadId)?.sourceId ?? null;
+  }
+
+  async function requestVisualSetupStream(surface: StagePlayVisualCaptureSurface): Promise<MediaStream> {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+      throw new Error("screen_capture_not_available_in_this_browser");
+    }
+    const displaySurface = surface === "browser_tab" ? "browser" : "monitor";
+    return navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface } as MediaTrackConstraints,
+      audio: false,
+    });
+  }
+
+  async function ensureVisualSetupSource(surface: StagePlayVisualCaptureSurface): Promise<string> {
+    const existingSourceId = existingVisualSourceId();
+    const response = await postJson("/api/agi/situation/visual-source/start", {
+      source_id: existingSourceId ?? `source:visual_frame:${threadId}`,
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: environmentId,
+      capture_mode: "interval",
+      source_surface: surface,
+      status: "permission_required",
+      cadence_ms: sourceSetupCadenceMs,
+      raw_image_storage_policy: "ephemeral",
+    });
+    const source = response?.source ?? response?.receipt?.source ?? null;
+    const sourceId = typeof source?.source_id === "string" ? source.source_id : existingSourceId;
+    if (!sourceId) throw new Error("visual_source_registration_failed");
+    return sourceId;
+  }
+
+  async function startVisualSourceSetup(surface: StagePlayVisualCaptureSurface) {
+    let stream: MediaStream | null = null;
+    let ownsStream = false;
+    const label = surface === "browser_tab" ? "browser tab visual" : "screen visual";
+    setSourceSetupStatus({ level: "working", message: `Requesting ${label} capture permission...` });
+    try {
+      const sourceId = await ensureVisualSetupSource(surface);
+      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+      if (!stream) {
+        stream = await requestVisualSetupStream(surface);
+        ownsStream = true;
+      }
+      const result = await startVisualFrameProducerInterval({
+        sourceId,
+        threadId,
+        roomId,
+        environmentId,
+        cadenceMs: sourceSetupCadenceMs,
+        stream,
+        postJson,
+        preserveExistingStream: !ownsStream,
+        prompt: "Summarize this live visual frame as compact Stage Play source evidence for narrative or world-state interpretation. Include uncertainty and avoid raw text transcription unless it is necessary as compact evidence.",
+      });
+      stream = null;
+      sourceSetupDraft(
+        {
+          sourceId,
+          modality: "visual_frame",
+          status: "active",
+          contribution: `${label} interval producer requested from Stage Play setup.`,
+          fidelityScore: 0.8,
+          selectedForStagePlay: true,
+          routeTo: STAGE_PLAY_SOURCE_SETUP_DEFAULTS.routeTo,
+          cadenceMs: sourceSetupCadenceMs,
+          lastEventTs: new Date().toISOString(),
+          missingReason: null,
+          nextRequiredAction: null,
+          evidenceRefs: [result.evidence_id, result.frame_id].filter((ref): ref is string => Boolean(ref)),
+        },
+        "start_visual_interval",
+        [
+          ["capture_surface", surface],
+          ["visual_cadence_ms", String(sourceSetupCadenceMs)],
+          ["route_to", STAGE_PLAY_SOURCE_SETUP_DEFAULTS.routeTo],
+          ["compact_observation_window_ms", String(STAGE_PLAY_SOURCE_SETUP_DEFAULTS.compactObservationWindowMs)],
+          ["raw_retention", STAGE_PLAY_SOURCE_SETUP_DEFAULTS.rawRetention],
+        ],
+      );
+      setSourceSetupStatus({
+        level: "ok",
+        message: `${label} interval active every ${sourceSetupCadenceMs / 1000}s. ${result.summary}`,
+      });
+      await Promise.all([graphQuery.refetch(), builderContextQuery.refetch()]);
+    } catch (error) {
+      if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      setSourceSetupStatus({
+        level: "error",
+        message: error instanceof Error ? error.message : "visual_source_setup_failed",
+      });
+    }
+  }
+
+  async function attachAudioTranscriptSource(source: StagePlayAudioTranscriptSource) {
+    const label = source === "browser_audio" ? "browser audio transcript" : "microphone transcript";
+    setSourceSetupStatus({ level: "working", message: `Requesting ${label} setup...` });
+    try {
+      const { useSituationRoomStore } = await import("@/store/useSituationRoomStore");
+      const situationRoom = useSituationRoomStore.getState();
+      const localRoomId = situationRoom.active_room_id && situationRoom.rooms[situationRoom.active_room_id]
+        ? situationRoom.active_room_id
+        : situationRoom.createRoom("Stage Play Source Setup").room_id;
+      const attached = source === "browser_audio"
+        ? await situationRoom.attachDisplayAudioSource(localRoomId, "Stage Play browser audio")
+        : await situationRoom.attachMicAudioSource(localRoomId, "Stage Play microphone");
+      const sourceId = attached?.source_id ?? `audio_transcript:${threadId}`;
+      await postJson("/api/agi/situation/audio-source/permission-granted", {
+        source_id: sourceId,
+        thread_id: threadId,
+        room_id: roomId,
+        ts: new Date().toISOString(),
+      }).catch(() => null);
+      sourceSetupDraft(
+        {
+          sourceId,
+          modality: "audio_transcript",
+          status: attached?.status === "active" ? "active" : "waiting_for_client",
+          contribution: `${label} requested from Stage Play source setup.`,
+          fidelityScore: attached?.status === "active" ? 0.72 : 0.3,
+          selectedForStagePlay: attached?.status === "active",
+          routeTo: STAGE_PLAY_SOURCE_SETUP_DEFAULTS.routeTo,
+          cadenceMs: STAGE_PLAY_SOURCE_SETUP_DEFAULTS.audioWindowMs,
+          lastEventTs: new Date().toISOString(),
+          missingReason: attached?.status === "active" ? null : "Audio capture did not become active yet.",
+          nextRequiredAction: attached?.status === "active" ? null : "Confirm audio capture permission",
+          evidenceRefs: attached ? [`situation-room:${attached.room_id}:${attached.source_id}`] : [],
+        },
+        "attach_audio_transcript",
+        [
+          ["capture_source", source],
+          ["audio_window_ms", String(STAGE_PLAY_SOURCE_SETUP_DEFAULTS.audioWindowMs)],
+          ["route_to", STAGE_PLAY_SOURCE_SETUP_DEFAULTS.routeTo],
+          ["compact_observation_window_ms", String(STAGE_PLAY_SOURCE_SETUP_DEFAULTS.compactObservationWindowMs)],
+          ["raw_retention", STAGE_PLAY_SOURCE_SETUP_DEFAULTS.rawRetention],
+        ],
+      );
+      setSourceSetupStatus({
+        level: attached?.status === "active" ? "ok" : "error",
+        message: attached?.status === "active"
+          ? `${label} attached. Transcript chunks remain source evidence, not assistant answers.`
+          : attached?.last_error ?? `${label} setup did not become active.`,
+      });
+      await Promise.all([graphQuery.refetch(), builderContextQuery.refetch()]);
+    } catch (error) {
+      setSourceSetupStatus({
+        level: "error",
+        message: error instanceof Error ? error.message : "audio_transcript_setup_failed",
+      });
+    }
+  }
+
+  async function pauseVisualSourceSetup() {
+    const sourceId = existingVisualSourceId();
+    if (!sourceId) {
+      setSourceSetupStatus({ level: "error", message: "No visual source is registered." });
+      return;
+    }
+    stopVisualFrameProducerInterval(sourceId, { stopStream: false });
+    await postJson("/api/agi/situation/live-source/producer/heartbeat", {
+      source_id: sourceId,
+      thread_id: threadId,
+      environment_id: environmentId,
+      client_stream_confirmed: Boolean(getActiveVisualFrameStream(sourceId)),
+      status: "paused",
+      ts: new Date().toISOString(),
+    }).catch(() => null);
+    sourceSetupDraft(
+      graph?.sourceWindow.sources.find((source) => source.sourceId === sourceId) ?? null,
+      "pause_source",
+      [["visual_cadence_ms", String(sourceSetupCadenceMs)]],
+    );
+    setSourceSetupStatus({ level: "ok", message: "Paused visual interval capture; existing stream ownership stayed with the visual producer." });
+    await Promise.all([graphQuery.refetch(), builderContextQuery.refetch()]);
+  }
+
   useEffect(() => {
     if (!heldNode) return;
 
@@ -1549,6 +2307,18 @@ export default function StagePlayBadgeGraphPanel() {
             relatedBadges={relatedBadges}
             relatedActions={relatedActions}
             onStartBuilderDrag={startBuilderDrag}
+            onObserverDraftAction={addObserverDraftAction}
+            sourceSetupCadenceMs={sourceSetupCadenceMs}
+            sourceSetupStatus={sourceSetupStatus}
+            onSetSourceSetupCadenceMs={setSourceSetupCadenceMs}
+            onStartVisualSourceSetup={startVisualSourceSetup}
+            onAttachAudioTranscriptSource={attachAudioTranscriptSource}
+            onPauseVisualSourceSetup={pauseVisualSourceSetup}
+            sourceAuditSelection={sourceAuditSelection}
+            rawSessionBufferEntries={rawSessionBufferQuery.data?.entries ?? []}
+            rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
+            onOpenSourceAudit={openSourceAudit}
+            onClearRawSessionBuffer={clearRawSessionBuffer}
             onClose={() => setBindingOverlayOpen(false)}
           />
         ) : null}

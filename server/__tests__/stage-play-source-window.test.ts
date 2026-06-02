@@ -19,6 +19,10 @@ import {
 } from "../services/situation-room/minecraft-world-delta-overlay";
 import { ingestMinecraftWorldSenseEvent, resetMinecraftWorldSenseWindows } from "../services/situation-room/minecraft-world-sense-window";
 import { resolveStagePlaySourceWindow } from "../services/situation-room/stage-play-source-window";
+import {
+  recordStagePlayRawSessionBufferEntry,
+  resetStagePlayRawSessionBufferForTest,
+} from "../services/stage-play/stage-play-raw-session-buffer-store";
 
 const roomId = "room:minecraft-stage-play";
 const worldId = "minecraft:stage-world";
@@ -30,6 +34,7 @@ beforeEach(() => {
   resetMinecraftWorldDeltaOverlaysForTest();
   resetMinecraftNavigationStateStoreForTest();
   resetMinecraftWorldSenseWindows();
+  resetStagePlayRawSessionBufferForTest();
   clearEventJournalForTest();
 });
 
@@ -183,6 +188,20 @@ describe("Stage Play source window resolver", () => {
       ts: "2026-06-02T12:00:05.000Z",
     };
     recordMinecraftRouteSolverObservation(routeSolverObservation);
+    const rawEntry = recordStagePlayRawSessionBufferEntry({
+      threadId,
+      roomId,
+      sourceId: "source:minecraft-server",
+      modality: "world_event",
+      sourceEventId: blockEvent.event_id,
+      fromTs: "2026-06-02T12:00:03.000Z",
+      toTs: "2026-06-02T12:00:03.000Z",
+      rawKind: "world_event_ref",
+      rawRef: blockEvent.event_id,
+      rawTextPreview: "Player placed a block near the corridor.",
+      evidenceRefs: ["evidence:block-delta"],
+      now: "2026-06-02T12:00:03.000Z",
+    });
 
     const window = resolveStagePlaySourceWindow({
       roomId,
@@ -203,6 +222,7 @@ describe("Stage Play source window resolver", () => {
     expect(window.latestRouteSolverObservationRefs).toEqual([routeSolverObservation.observation_id]);
     expect(window.latestWorldSenseContextRefs[0]).toMatch(/^minecraft_world_sense_context:/);
     expect(window.latestEventWindowRefs[0]).toMatch(/^event_journal:/);
+    expect(window.latestRawSessionBufferRefs).toEqual([rawEntry!.entryId]);
     expect(window.compactFacts.environmentSnapshot?.chunkSnapshot).toMatchObject({
       sampleRef: `chunk_snapshot_sample:${snapshot!.snapshot_id}:chunk-map-hash`,
       surfaceCellCount: 1,
@@ -233,6 +253,41 @@ describe("Stage Play source window resolver", () => {
       returnedCount: 1,
       eventTypes: ["hostile_context_sample"],
     });
+    expect(window.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:minecraft-server",
+        modality: "minecraft_world_events",
+        status: "active",
+        selectedForStagePlay: true,
+        routeTo: "world_stage_play",
+        evidenceRefs: expect.arrayContaining([observation.observation_id]),
+      }),
+      expect.objectContaining({
+        sourceId: "source:minecraft-server",
+        modality: "environment_state",
+        status: "active",
+        selectedForStagePlay: true,
+        routeTo: "world_stage_play",
+        evidenceRefs: expect.arrayContaining([snapshot!.snapshot_id]),
+      }),
+      expect.objectContaining({
+        modality: "visual_frame",
+        status: "permission_required",
+        selectedForStagePlay: false,
+        routeTo: "visual_context",
+        nextRequiredAction: "Start visual interval",
+      }),
+      expect.objectContaining({
+        modality: "audio_transcript",
+        status: "configured_missing",
+        selectedForStagePlay: false,
+        routeTo: "narrative_stage_play",
+        nextRequiredAction: "Attach audio transcript",
+      }),
+    ]));
+    expect(window.sources.some((source) =>
+      source.sourceId === "source:minecraft-server" && source.evidenceRefs.includes(rawEntry!.entryId)
+    )).toBe(true);
     expect(window.authority).toMatchObject({
       assistant_answer: false,
       raw_content_included: false,

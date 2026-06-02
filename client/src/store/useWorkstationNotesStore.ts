@@ -36,6 +36,11 @@ type WorkstationNotesState = {
   notes: Record<string, WorkstationNote>;
   order: string[];
   active_note_id?: string;
+  createManualNote: (input?: {
+    title?: string;
+    topic?: string;
+    body?: string;
+  }) => WorkstationNote;
   upsertWorkflowNote: (input: {
     id: string;
     title: string;
@@ -60,12 +65,45 @@ type WorkstationNotesState = {
   deleteNote: (noteId: string) => void;
 };
 
+const slugForNoteId = (value: string): string => {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return slug || "untitled-note";
+};
+
+const buildManualNoteId = (title: string, existingIds: string[]): string => {
+  const base = `note:manual:${slugForNoteId(title)}`;
+  if (!existingIds.includes(base)) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = `${base}-${index}`;
+    if (!existingIds.includes(candidate)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+};
+
 export const useWorkstationNotesStore = create<WorkstationNotesState>()(
   persist(
     (set, get) => ({
       notes: {},
       order: [],
       active_note_id: undefined,
+      createManualNote: (input) => {
+        const title = input?.title?.trim() || "Untitled note";
+        const note = get().upsertWorkflowNote({
+          id: buildManualNoteId(title, Object.keys(get().notes)),
+          title,
+          topic: input?.topic?.trim() || "manual-document",
+          body: input?.body ?? "",
+          citations: [],
+          snippets: [],
+          trace_id: `workstation-notes:manual:${Date.now()}`,
+        });
+        return note;
+      },
       upsertWorkflowNote: (input) => {
         const nowIso = new Date().toISOString();
         const prev = get().notes[input.id];

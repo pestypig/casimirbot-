@@ -5,6 +5,7 @@ export const STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION =
   "stage_play_badge_graph/v1" as const;
 
 export const STAGE_PLAY_BADGE_KINDS = [
+  "observer",
   "source",
   "interpreter",
   "setting",
@@ -22,6 +23,25 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "recommended_check",
   "admission_gate",
   "missing_evidence",
+] as const;
+
+export const STAGE_PLAY_SOURCE_ROUTING_STATUSES = [
+  "active",
+  "waiting_for_client",
+  "permission_required",
+  "configured_missing",
+  "stale",
+  "error",
+  "paused",
+  "stopped",
+] as const;
+
+export const STAGE_PLAY_SOURCE_ROUTES = [
+  "world_stage_play",
+  "narrative_stage_play",
+  "visual_context",
+  "live_answer_output",
+  "debug_only",
 ] as const;
 
 export const STAGE_PLAY_BADGE_STATUSES = [
@@ -68,6 +88,7 @@ export const STAGE_PLAY_SOURCE_REF_KINDS = [
   "navigation_state",
   "route_solver_observation",
   "world_sense_context",
+  "stage_play_raw_session_buffer_entry",
   "synthetic_evidence",
 ] as const;
 
@@ -124,6 +145,8 @@ export const STAGE_PLAY_RECOMMENDED_ACTION_TYPES = [
 ] as const;
 
 export type StagePlayBadgeKindV1 = (typeof STAGE_PLAY_BADGE_KINDS)[number];
+export type StagePlaySourceRoutingStatusV1 = (typeof STAGE_PLAY_SOURCE_ROUTING_STATUSES)[number];
+export type StagePlaySourceRouteV1 = (typeof STAGE_PLAY_SOURCE_ROUTES)[number];
 export type StagePlayBadgeStatusV1 = (typeof STAGE_PLAY_BADGE_STATUSES)[number];
 export type StagePlayBadgeEdgeRelationV1 = (typeof STAGE_PLAY_EDGE_RELATIONS)[number];
 export type StagePlayBadgeSourceRefKindV1 = (typeof STAGE_PLAY_SOURCE_REF_KINDS)[number];
@@ -235,6 +258,29 @@ export type StagePlayBadgeGraphSummaryV1 = {
   missingEvidenceCount: number;
 };
 
+export type StagePlaySourceRoutingEntryV1 = {
+  sourceId: string;
+  modality:
+    | "world_event"
+    | "environment_state"
+    | "environment_affordance"
+    | "visual_frame"
+    | "audio_transcript"
+    | "text_chat"
+    | "procedure_graph"
+    | string;
+  status: StagePlaySourceRoutingStatusV1;
+  contribution: string;
+  fidelityScore: number;
+  selectedForStagePlay: boolean;
+  routeTo: StagePlaySourceRouteV1;
+  cadenceMs?: number | null;
+  lastEventTs?: string | null;
+  missingReason?: string | null;
+  nextRequiredAction?: string | null;
+  evidenceRefs: string[];
+};
+
 export type StagePlayBadgeGraphV1 = {
   artifactId: typeof STAGE_PLAY_BADGE_GRAPH_ARTIFACT_ID;
   schemaVersion: typeof STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION;
@@ -252,6 +298,8 @@ export type StagePlayBadgeGraphV1 = {
     latestObservationRefs: string[];
     latestSourceDescriptorRefs?: string[];
     latestSourceProducerRefs?: string[];
+    latestRawSessionBufferRefs?: string[];
+    sources: StagePlaySourceRoutingEntryV1[];
     latestSnapshotRefs: string[];
     latestDeltaOverlayRefs: string[];
     latestNavigationRefs: string[];
@@ -446,6 +494,7 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
       "latestObservationRefs",
       "latestSourceDescriptorRefs",
       "latestSourceProducerRefs",
+      "latestRawSessionBufferRefs",
       "latestSnapshotRefs",
       "latestDeltaOverlayRefs",
       "latestNavigationRefs",
@@ -454,6 +503,47 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
       const required = field === "latestObservationRefs" || field === "latestSnapshotRefs" || field === "latestDeltaOverlayRefs" || field === "latestNavigationRefs";
       if ((required || maybe != null) && !isStringArray(maybe)) {
         issues.push(`sourceWindow.${field} must be strings`);
+      }
+    }
+    if (!Array.isArray(value.sourceWindow.sources)) {
+      issues.push("sourceWindow.sources must be an array");
+    } else {
+      for (const [index, rawSource] of value.sourceWindow.sources.entries()) {
+        const sourcePrefix = `sourceWindow.sources[${index}]`;
+        if (!isRecord(rawSource)) {
+          issues.push(`${sourcePrefix} must be an object`);
+          continue;
+        }
+        if (!isNonEmptyString(rawSource.sourceId)) issues.push(`${sourcePrefix}.sourceId must be a non-empty string`);
+        if (!isNonEmptyString(rawSource.modality)) issues.push(`${sourcePrefix}.modality must be a non-empty string`);
+        if (!includes(STAGE_PLAY_SOURCE_ROUTING_STATUSES, rawSource.status)) {
+          issues.push(`${sourcePrefix}.status is invalid`);
+        }
+        if (!isNonEmptyString(rawSource.contribution)) issues.push(`${sourcePrefix}.contribution must be a non-empty string`);
+        if (!isConfidence(rawSource.fidelityScore)) {
+          issues.push(`${sourcePrefix}.fidelityScore must be between 0 and 1`);
+        }
+        if (typeof rawSource.selectedForStagePlay !== "boolean") {
+          issues.push(`${sourcePrefix}.selectedForStagePlay must be boolean`);
+        }
+        if (!includes(STAGE_PLAY_SOURCE_ROUTES, rawSource.routeTo)) {
+          issues.push(`${sourcePrefix}.routeTo is invalid`);
+        }
+        if (rawSource.cadenceMs != null && (typeof rawSource.cadenceMs !== "number" || !Number.isFinite(rawSource.cadenceMs) || rawSource.cadenceMs < 0)) {
+          issues.push(`${sourcePrefix}.cadenceMs must be a non-negative number or null`);
+        }
+        if (rawSource.lastEventTs != null && typeof rawSource.lastEventTs !== "string") {
+          issues.push(`${sourcePrefix}.lastEventTs must be a string or null`);
+        }
+        if (rawSource.missingReason != null && typeof rawSource.missingReason !== "string") {
+          issues.push(`${sourcePrefix}.missingReason must be a string or null`);
+        }
+        if (rawSource.nextRequiredAction != null && typeof rawSource.nextRequiredAction !== "string") {
+          issues.push(`${sourcePrefix}.nextRequiredAction must be a string or null`);
+        }
+        if (!isStringArray(rawSource.evidenceRefs)) {
+          issues.push(`${sourcePrefix}.evidenceRefs must be strings`);
+        }
       }
     }
     if (!["fresh", "stale", "missing", "mixed", "unknown"].includes(String(value.sourceWindow.freshness ?? ""))) {

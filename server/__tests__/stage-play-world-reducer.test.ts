@@ -30,6 +30,7 @@ import {
   buildStagePlayGraphFromWorld,
   buildStagePlayRecommendedActionAdmissionV1,
 } from "../services/stage-play/stage-play-badge-graph-builder";
+import { resetStagePlayRawSessionBufferForTest } from "../services/stage-play/stage-play-raw-session-buffer-store";
 
 const threadId = "thread:stage-play-reducer";
 const roomId = "room:minecraft-stage-play-reducer";
@@ -43,6 +44,7 @@ beforeEach(() => {
   resetMinecraftWorldSenseWindows();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetStagePlayRawSessionBufferForTest();
   clearEventJournalForTest();
 });
 
@@ -251,6 +253,7 @@ describe("Stage Play world-state badge reducer", () => {
 
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(badgeIds).toEqual(expect.arrayContaining([
+      "observer.live_sources",
       expect.stringMatching(/^source\./),
       "interpreter.stage_play_reflection",
       "setting.end",
@@ -299,6 +302,32 @@ describe("Stage Play world-state badge reducer", () => {
       "binding.tunnel_advance",
       "binding.defensive_retreat_barrier",
     ]));
+    const observerBadge = graph.badges.find((badge) => badge.id === "observer.live_sources");
+    expect(observerBadge).toMatchObject({
+      kind: "observer",
+      admission: "auto",
+    });
+    expect(graph.summary.kindCounts.observer).toBe(1);
+    expect(graph.sourceWindow.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:minecraft-server",
+        status: "active",
+        selectedForStagePlay: true,
+        routeTo: "world_stage_play",
+      }),
+      expect.objectContaining({
+        modality: "visual_frame",
+        selectedForStagePlay: false,
+        routeTo: "visual_context",
+        nextRequiredAction: "Start visual interval",
+      }),
+      expect.objectContaining({
+        modality: "audio_transcript",
+        selectedForStagePlay: false,
+        routeTo: "narrative_stage_play",
+        nextRequiredAction: "Attach audio transcript",
+      }),
+    ]));
     const sourceBadge = graph.badges.find((badge) => badge.kind === "source");
     expect(sourceBadge).toMatchObject({
       kind: "source",
@@ -314,7 +343,9 @@ describe("Stage Play world-state badge reducer", () => {
       admission: "auto",
     });
     expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ relation: "observes", from: "observer.live_sources" }),
       expect.objectContaining({ relation: "feeds", to: "interpreter.stage_play_reflection" }),
+      expect.objectContaining({ relation: "feeds", from: "observer.live_sources", to: "interpreter.stage_play_reflection" }),
       expect.objectContaining({ relation: "interprets", from: "interpreter.stage_play_reflection", to: "actor.player" }),
     ]));
     expect(graph.sourceWindow.latestSourceDescriptorRefs).toEqual([descriptor.descriptor_id]);
