@@ -19,6 +19,12 @@ import {
 } from "../situation-room/live-environment-commentary-store";
 import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
 import { buildStagePlayGraphFromWorld as buildStagePlayBadgeGraphFromLiveWindow } from "../stage-play/stage-play-badge-graph-builder";
+import {
+  buildStagePlayBuilderCatalog,
+  buildStagePlaySourceQuery,
+  sourceIdsFromStagePlayDraft,
+  validateStagePlayBuilderDraft,
+} from "../stage-play/stage-play-builder-compiler";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -311,6 +317,58 @@ export function executeLiveEnvironmentTool(
     });
   }
 
+  if (input.tool_name === "live_env.describe_stage_builder") {
+    const catalog = buildStagePlayBuilderCatalog({
+      threadId: input.thread_id,
+      environmentId: input.environment_id ?? null,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Described Stage Builder grammar with ${catalog.nodeKinds.length} node kind(s), ${catalog.edgeRelations.length} edge relation(s), and ${catalog.sourceClasses.length} source class(es).`,
+      observation: catalog,
+      evidenceRefs: [],
+    });
+  }
+
+  if (input.tool_name === "live_env.query_stage_sources") {
+    const sources = buildStagePlaySourceQuery({
+      threadId: input.thread_id,
+      environmentId: input.environment_id ?? null,
+      sourceId: readString(args.source_id),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Found ${sources.sourceHandles.length} Stage Builder source handle(s).`,
+      observation: sources,
+      evidenceRefs: sources.sourceHandles.flatMap((source) => source.latestEvidenceRefs),
+    });
+  }
+
+  if (input.tool_name === "live_env.draft_stage_play_graph" || input.tool_name === "live_env.validate_stage_play_graph") {
+    const validation = validateStagePlayBuilderDraft({
+      threadId: input.thread_id,
+      environmentId: input.environment_id ?? null,
+      draft: args.draft ?? args,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: validation.ok,
+      summary: validation.ok
+        ? `Accepted Stage Play graph draft ${validation.draftId ?? "draft"} with ${validation.resolvedSourceIds.length} resolved source handle(s).`
+        : `Rejected Stage Play graph draft with ${validation.issues.length} issue(s).`,
+      observation: validation,
+      evidenceRefs: validation.evidenceRefs,
+    });
+  }
+
   if (input.tool_name === "live_env.reflect_stage_play_context") {
     // Stage Play Badge Graph is an evidence-only reflection surface.
     // It may summarize admitted live-world state, expose setting/actors/props/resources/hazards,
@@ -333,16 +391,41 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       roomId,
       environmentId: input.environment_id ?? null,
+      sourceId: readString(args.source_id) ?? sourceIdsFromStagePlayDraft({
+        draft: args.draft,
+        threadId: input.thread_id,
+        environmentId: input.environment_id ?? null,
+      })[0] ?? null,
       objective: readString(args.objective),
     });
+    const draftValidation = args.draft
+      ? validateStagePlayBuilderDraft({
+          threadId: input.thread_id,
+          environmentId: input.environment_id ?? null,
+          draft: args.draft,
+        })
+      : null;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`,
-      observation: graph,
+      ok: draftValidation ? draftValidation.ok : true,
+      summary: draftValidation && !draftValidation.ok
+        ? `Stage Play draft was rejected with ${draftValidation.issues.length} issue(s); graph remains diagnostic evidence.`
+        : `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`,
+      observation: draftValidation
+        ? {
+            schema: "stage_play_reflection_with_draft/v1",
+            graph,
+            draftValidation,
+            assistant_answer: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          }
+        : graph,
       evidenceRefs: [
+        ...(draftValidation?.evidenceRefs ?? []),
         ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
         ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
         ...graph.sourceWindow.latestObservationRefs,

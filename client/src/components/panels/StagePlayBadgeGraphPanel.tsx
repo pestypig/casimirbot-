@@ -7,8 +7,12 @@ import type {
   StagePlayBadgeGraphV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
-import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descriptor";
-import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
+import type {
+  StagePlayBuilderCatalogV1,
+  StagePlayGraphDraftValidationV1,
+  StagePlaySourceHandleV1,
+  StagePlaySourceQueryV1,
+} from "@shared/contracts/stage-play-builder.v1";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useStagePlayBadgeGraphPanelStore } from "@/store/useStagePlayBadgeGraphPanelStore";
@@ -55,6 +59,16 @@ type StagePlaySourceOption = {
   origin?: string | null;
   cadenceMs?: number | null;
   latestRef?: string | null;
+  latestEvidenceRefs: string[];
+};
+
+type StagePlayBuilderContextResponse = {
+  artifactId: "stage_play_builder_context";
+  schemaVersion: "stage_play_builder_context/v1";
+  generatedAt: string;
+  catalog: StagePlayBuilderCatalogV1;
+  sourceQuery: StagePlaySourceQueryV1;
+  authority: StagePlayBuilderCatalogV1["authority"];
 };
 
 async function fetchStagePlayBadgeGraph(input: {
@@ -75,65 +89,61 @@ async function fetchStagePlayBadgeGraph(input: {
   return await response.json() as StagePlayBadgeGraphV1;
 }
 
-async function fetchStagePlaySourceOptions(input: {
+async function fetchStagePlayBuilderContext(input: {
   threadId: string;
   environmentId?: string | null;
-}): Promise<StagePlaySourceOption[]> {
-  const descriptorParams = new URLSearchParams();
-  descriptorParams.set("thread_id", input.threadId);
-  if (input.environmentId) descriptorParams.set("environment_id", input.environmentId);
-  descriptorParams.set("limit", "80");
-  const producerParams = new URLSearchParams();
-  producerParams.set("thread_id", input.threadId);
-  const [descriptorResponse, producerResponse] = await Promise.all([
-    fetch(`/api/agi/situation/live-source/descriptors?${descriptorParams.toString()}`, {
-      headers: { Accept: "application/json" },
-    }),
-    fetch(`/api/agi/situation/live-source/producers?${producerParams.toString()}`, {
-      headers: { Accept: "application/json" },
-    }),
-  ]);
-  const descriptorBody = descriptorResponse.ok ? await descriptorResponse.json() : {};
-  const producerBody = producerResponse.ok ? await producerResponse.json() : {};
-  const descriptors = Array.isArray(descriptorBody?.descriptors)
-    ? descriptorBody.descriptors as HelixLiveSourceDescriptor[]
-    : [];
-  const producers = Array.isArray(producerBody?.producers)
-    ? producerBody.producers as HelixLiveSourceProducer[]
-    : [];
-  const producerBySource = new Map(producers.map((producer) => [producer.source_id, producer]));
-  const options = new Map<string, StagePlaySourceOption>();
-  for (const descriptor of descriptors) {
-    const producer = producerBySource.get(descriptor.source_id) ?? null;
-    options.set(descriptor.source_id, {
-      id: descriptor.descriptor_id,
-      sourceId: descriptor.source_id,
-      label: descriptor.user_label ?? descriptor.source_id,
-      sourceClass: descriptor.modality,
-      status: descriptor.current_state,
-      descriptorId: descriptor.descriptor_id,
-      producerId: producer?.producer_id ?? null,
-      surface: descriptor.serving_context.surface,
-      origin: descriptor.serving_context.source_origin,
-      cadenceMs: descriptor.cadence_ms ?? producer?.cadence_ms ?? null,
-      latestRef: descriptor.latest_observation_refs.at(-1) ?? producer?.latest_chunk_id ?? null,
-    });
+}): Promise<StagePlayBuilderContextResponse> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  if (input.environmentId) params.set("environmentId", input.environmentId);
+  const response = await fetch(`/api/helix/stage-play/builder?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play builder request failed: ${response.status}`);
   }
-  for (const producer of producers) {
-    if (options.has(producer.source_id)) continue;
-    options.set(producer.source_id, {
-      id: producer.producer_id,
-      sourceId: producer.source_id,
-      label: producer.source_id,
-      sourceClass: producer.modality,
-      status: producer.status,
-      descriptorId: null,
-      producerId: producer.producer_id,
-      cadenceMs: producer.cadence_ms ?? null,
-      latestRef: producer.latest_chunk_id ?? null,
-    });
+  return await response.json() as StagePlayBuilderContextResponse;
+}
+
+async function validateStagePlayDraft(input: {
+  threadId: string;
+  environmentId?: string | null;
+  draft: unknown;
+}): Promise<StagePlayGraphDraftValidationV1> {
+  const response = await fetch("/api/helix/stage-play/draft/validate", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      threadId: input.threadId,
+      environmentId: input.environmentId ?? null,
+      draft: input.draft,
+    }),
+  });
+  if (!response.ok && response.status !== 422) {
+    throw new Error(`Stage Play draft validation failed: ${response.status}`);
   }
-  return Array.from(options.values()).sort((a, b) => a.sourceClass.localeCompare(b.sourceClass) || a.sourceId.localeCompare(b.sourceId));
+  return await response.json() as StagePlayGraphDraftValidationV1;
+}
+
+function sourceOptionFromHandle(handle: StagePlaySourceHandleV1): StagePlaySourceOption {
+  const latestObservationRef = [...handle.latestEvidenceRefs].reverse().find((ref) => /observation/i.test(ref));
+  return {
+    id: handle.descriptorId ?? handle.producerId ?? handle.sourceId,
+    sourceId: handle.sourceId,
+    label: handle.label ?? (handle.surface ? `${labelize(handle.sourceClass)} on ${labelize(handle.surface)}` : handle.sourceId),
+    sourceClass: handle.sourceClass,
+    status: handle.status,
+    descriptorId: handle.descriptorId ?? null,
+    producerId: handle.producerId ?? null,
+    surface: handle.surface ?? null,
+    origin: handle.origin ?? null,
+    cadenceMs: handle.cadenceMs ?? null,
+    latestRef: latestObservationRef ?? handle.latestEvidenceRefs.at(-1) ?? null,
+    latestEvidenceRefs: handle.latestEvidenceRefs,
+  };
 }
 
 function labelize(value: string): string {
@@ -277,6 +287,109 @@ function setDraftParameterValue(node: DraftStagePlayNode, key: string, value: st
         value,
       },
     ],
+  };
+}
+
+function draftParameterRecord(node: DraftStagePlayNode): Record<string, string> {
+  return Object.fromEntries(
+    node.parameters
+      .map((parameter) => [parameter.key.trim(), parameter.value.trim()] as const)
+      .filter(([key]) => key.length > 0),
+  );
+}
+
+function splitEvidenceRefs(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(/[,\n]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function draftNodeEvidenceRefs(node: DraftStagePlayNode): string[] {
+  const parameters = draftParameterRecord(node);
+  return uniqueSorted([
+    ...splitEvidenceRefs(parameters.descriptor_ref),
+    ...splitEvidenceRefs(parameters.producer_ref),
+    ...splitEvidenceRefs(parameters.latest_ref),
+    ...splitEvidenceRefs(parameters.source_ref),
+    ...splitEvidenceRefs(parameters.evidence_ref),
+  ]);
+}
+
+function buildDraftEdges(nodes: DraftStagePlayNode[]) {
+  const edges: { from: string; to: string; relation: string; label: string }[] = [];
+  let edgeCount = 0;
+  const sourceNodes = nodes.filter((node) => node.kind === "source");
+  const interpreterNodes = nodes.filter((node) => node.kind === "interpreter");
+  const intentNodes = nodes.filter((node) => node.kind === "intent_module");
+  const procedureNodes = nodes.filter((node) => node.kind === "procedural_binding");
+  const affordanceNodes = nodes.filter((node) => node.kind === "affordance" || node.kind === "blocked_affordance");
+  const constraintNodes = nodes.filter((node) => node.kind === "hazard" || node.kind === "constraint" || node.kind === "missing_evidence");
+  const addEdge = (from: DraftStagePlayNode, to: DraftStagePlayNode, relation: string, label: string) => {
+    edgeCount += 1;
+    edges.push({
+      from: from.id,
+      to: to.id,
+      relation,
+      label: `${edgeCount}. ${label}`,
+    });
+  };
+
+  for (const source of sourceNodes) {
+    for (const interpreter of interpreterNodes) addEdge(source, interpreter, "feeds", "source feeds interpreter");
+  }
+  for (const interpreter of interpreterNodes) {
+    for (const node of nodes.filter((entry) => entry.kind !== "source" && entry.kind !== "interpreter")) {
+      addEdge(interpreter, node, "interprets", "interpreter produces stage fact");
+    }
+  }
+  for (const intent of intentNodes) {
+    for (const procedure of procedureNodes) addEdge(intent, procedure, "composes_with", "intent composes procedure");
+  }
+  for (const constraint of constraintNodes) {
+    for (const affordance of affordanceNodes) addEdge(constraint, affordance, "constrains", "constraint bounds affordance");
+  }
+  return edges;
+}
+
+function buildStagePlayDraftFromNodes(input: {
+  draftNodes: DraftStagePlayNode[];
+  objective?: string | null;
+}) {
+  const cadenceCandidate = input.draftNodes
+    .flatMap((node) => [
+      readDraftParameter(node, "cadence_ms"),
+      readDraftParameter(node, "cadence"),
+    ])
+    .map((value) => Number.parseInt(value, 10))
+    .find((value) => Number.isFinite(value) && value > 0);
+  return {
+    artifactId: "stage_play_graph_draft",
+    schemaVersion: "stage_play_graph_draft/v1",
+    draftId: "stage_play_panel_draft",
+    objective: input.objective ?? "Assemble a Stage Play evidence graph from admitted source handles.",
+    nodes: input.draftNodes.map((node) => {
+      const parameters = draftParameterRecord(node);
+      return {
+        id: node.id,
+        kind: node.kind,
+        title: node.label,
+        bind: node.kind === "source"
+          ? {
+              sourceClass: parameters.source_class || null,
+              sourceId: parameters.source_id || null,
+            }
+          : null,
+        parameters,
+        evidenceRefs: draftNodeEvidenceRefs(node),
+      };
+    }),
+    edges: buildDraftEdges(input.draftNodes),
+    checkpointPolicy: {
+      cadenceMs: cadenceCandidate ?? null,
+      completeEachWindow: true,
+      standingJobRemainsOpen: true,
+    },
   };
 }
 
@@ -532,6 +645,7 @@ function StagePlayGraphCanvas({
 function DraftNodeParameterEditor({
   node,
   sourceOptions,
+  draftValidation,
   onClose,
   onUpdateParameter,
   onAddParameter,
@@ -540,6 +654,7 @@ function DraftNodeParameterEditor({
 }: {
   node: DraftStagePlayNode;
   sourceOptions: StagePlaySourceOption[];
+  draftValidation?: StagePlayGraphDraftValidationV1 | null;
   onClose: () => void;
   onUpdateParameter: (nodeId: string, parameterId: string, field: "key" | "value", value: string) => void;
   onAddParameter: (nodeId: string) => void;
@@ -649,12 +764,44 @@ function DraftNodeParameterEditor({
       <div className="mt-3 text-[11px] leading-relaxed text-slate-500">
         Manual parameters stay local until a future admission path explicitly persists them.
       </div>
+      <div
+        data-testid="stage-play-draft-validation-status"
+        className={`mt-3 rounded-md border p-3 text-xs ${
+          draftValidation?.ok
+            ? "border-emerald-800 bg-emerald-950/25 text-emerald-100"
+            : draftValidation
+              ? "border-amber-800 bg-amber-950/25 text-amber-100"
+              : "border-slate-800 bg-black/20 text-slate-400"
+        }`}
+      >
+        <div className="font-semibold">
+          {draftValidation?.ok ? "Draft accepted" : draftValidation ? "Draft needs checks" : "Draft not submitted"}
+        </div>
+        {draftValidation ? (
+          <div className="mt-2 space-y-1">
+            <div className="font-mono text-[10px] text-slate-300">{draftValidation.schemaVersion}</div>
+            {draftValidation.resolvedSourceIds.length > 0 ? (
+              <div>Resolved source: {draftValidation.resolvedSourceIds.join(", ")}</div>
+            ) : null}
+            {draftValidation.issues.slice(0, 3).map((issue) => (
+              <div key={issue}>Issue: {issue}</div>
+            ))}
+            {draftValidation.warnings.slice(0, 2).map((warning) => (
+              <div key={warning}>Warning: {warning}</div>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </aside>
   );
 }
 
 function StagePlayBindingOverlay({
   graph,
+  builderContext,
+  sourceOptions,
+  draftNodeCount,
+  draftValidation,
   query,
   setQuery,
   groupedBadges,
@@ -672,6 +819,10 @@ function StagePlayBindingOverlay({
   onClose,
 }: {
   graph: StagePlayBadgeGraphV1;
+  builderContext?: StagePlayBuilderContextResponse | null;
+  sourceOptions: StagePlaySourceOption[];
+  draftNodeCount: number;
+  draftValidation?: StagePlayGraphDraftValidationV1 | null;
   query: string;
   setQuery: (value: string) => void;
   groupedBadges: { kind: string; badges: StagePlayBadgeV1[] }[];
@@ -768,6 +919,70 @@ function StagePlayBindingOverlay({
                 </button>
               );
             })}
+          </div>
+        </Section>
+
+        <Section title="Tool assembly">
+          <div data-testid="stage-play-builder-artifacts" className="space-y-2 text-xs">
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="outline" className="border-cyan-800 text-cyan-100">
+                {builderContext?.catalog.schemaVersion ?? "stage_play_builder_catalog/v1"}
+              </Badge>
+              <Badge variant="outline" className="border-cyan-800 text-cyan-100">
+                {builderContext?.sourceQuery.schemaVersion ?? "stage_play_source_query/v1"}
+              </Badge>
+              <Badge variant="outline" className="border-cyan-800 text-cyan-100">
+                {draftValidation?.schemaVersion ?? "stage_play_graph_draft_validation/v1"}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="font-mono text-sm text-slate-100">{sourceOptions.length}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">sources</div>
+              </div>
+              <div className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="font-mono text-sm text-slate-100">{draftNodeCount}</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">draft nodes</div>
+              </div>
+              <div className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="font-mono text-sm text-slate-100">
+                  {draftValidation ? (draftValidation.ok ? "ok" : "check") : "idle"}
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">validation</div>
+              </div>
+            </div>
+            {draftValidation ? (
+              <div className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="font-semibold text-slate-200">
+                  {draftValidation.ok ? "Draft accepted by builder contract." : "Draft needs checks before reflection."}
+                </div>
+                {draftValidation.issues.length > 0 ? (
+                  <div className="mt-1 text-amber-100">{draftValidation.issues[0]}</div>
+                ) : draftValidation.warnings.length > 0 ? (
+                  <div className="mt-1 text-slate-400">{draftValidation.warnings[0]}</div>
+                ) : (
+                  <div className="mt-1 text-slate-400">Evidence-only validation; no execution permission granted.</div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </Section>
+
+        <Section title="Source handles">
+          <div className="space-y-1.5 text-xs">
+            {sourceOptions.length === 0 ? (
+              <div className="rounded border border-slate-800 bg-black/20 p-2 text-slate-500">
+                No active source handles are available to stage.
+              </div>
+            ) : sourceOptions.slice(0, 6).map((option) => (
+              <div key={option.id} className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold text-slate-100">{option.label}</span>
+                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400">{labelize(option.status)}</span>
+                </div>
+                <div className="mt-1 truncate font-mono text-[10px] text-cyan-100">{option.sourceClass} / {option.sourceId}</div>
+              </div>
+            ))}
           </div>
         </Section>
 
@@ -1030,14 +1245,43 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayBadgeGraph({ threadId, roomId, environmentId }),
     refetchInterval: 1000,
   });
-  const { data: sourceOptions = [] } = useQuery<StagePlaySourceOption[]>({
+  const { data: builderContext = null } = useQuery<StagePlayBuilderContextResponse>({
     queryKey: [
-      "/api/agi/situation/live-source/options",
+      "/api/helix/stage-play/builder",
       threadId,
       environmentId,
     ],
-    queryFn: () => fetchStagePlaySourceOptions({ threadId, environmentId }),
+    queryFn: () => fetchStagePlayBuilderContext({ threadId, environmentId }),
     refetchInterval: 2000,
+  });
+  const sourceOptions = useMemo(
+    () => (builderContext?.sourceQuery.sourceHandles ?? []).map(sourceOptionFromHandle),
+    [builderContext?.sourceQuery.sourceHandles],
+  );
+  const draftForValidation = useMemo(
+    () => buildStagePlayDraftFromNodes({
+      draftNodes,
+      objective: graph?.description ?? graph?.title ?? null,
+    }),
+    [draftNodes, graph?.description, graph?.title],
+  );
+  const draftValidationKey = useMemo(
+    () => JSON.stringify(draftForValidation),
+    [draftForValidation],
+  );
+  const { data: draftValidation = null } = useQuery<StagePlayGraphDraftValidationV1>({
+    queryKey: [
+      "/api/helix/stage-play/draft/validate",
+      threadId,
+      environmentId,
+      draftValidationKey,
+    ],
+    queryFn: () => validateStagePlayDraft({
+      threadId,
+      environmentId,
+      draft: draftForValidation,
+    }),
+    enabled: draftNodes.length > 0,
   });
 
   const filteredBadges = useMemo(() => {
@@ -1287,6 +1531,10 @@ export default function StagePlayBadgeGraphPanel() {
         {bindingOverlayOpen ? (
           <StagePlayBindingOverlay
             graph={graph}
+            builderContext={builderContext}
+            sourceOptions={sourceOptions}
+            draftNodeCount={draftNodes.length}
+            draftValidation={draftValidation}
             query={query}
             setQuery={setQuery}
             groupedBadges={groupedBadges}
@@ -1323,6 +1571,7 @@ export default function StagePlayBadgeGraphPanel() {
               <DraftNodeParameterEditor
                 node={selectedDraftNode}
                 sourceOptions={sourceOptions}
+                draftValidation={draftValidation}
                 onClose={() => setSelectedDraftNodeId(null)}
                 onUpdateParameter={updateDraftParameter}
                 onAddParameter={addDraftParameter}

@@ -27,6 +27,7 @@ export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
+  sourceId?: string | null;
   objective?: string | null;
   now?: Date;
 };
@@ -395,6 +396,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     threadId: input.threadId,
     roomId,
     environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId ?? null,
     now: resolvedAt,
   });
   const snapshot = getLatestEnvironmentStateSnapshot(roomId);

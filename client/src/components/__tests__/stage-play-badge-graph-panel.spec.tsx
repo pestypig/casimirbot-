@@ -31,6 +31,19 @@ const sourceRefs: StagePlayBadgeV1["sourceRefs"] = [
   { kind: "environment_state_snapshot", id: "environment_snapshot:ui" },
 ];
 
+type TestSourceHandle = {
+  sourceId: string;
+  sourceClass: string;
+  status: string;
+  label: unknown;
+  descriptorId: unknown;
+  producerId: unknown;
+  surface: unknown;
+  origin: unknown;
+  cadenceMs: unknown;
+  latestEvidenceRefs: string[];
+};
+
 function badge(overrides: Partial<StagePlayBadgeV1>): StagePlayBadgeV1 {
   return {
     id: "intent.move_away",
@@ -147,30 +160,177 @@ function buildFixture(): StagePlayBadgeGraphV1 {
   });
 }
 
+function buildSourceHandles(options: {
+  descriptors?: Array<Record<string, unknown>>;
+  producers?: Array<Record<string, unknown>>;
+}): TestSourceHandle[] {
+  const producers: Array<Record<string, unknown>> = options.producers ?? [];
+  const producerBySource = new Map<string, Record<string, unknown>>(
+    producers.map((producer: Record<string, unknown>) => [String(producer.source_id), producer]),
+  );
+  const handles = new Map<string, TestSourceHandle>();
+  for (const descriptor of options.descriptors ?? []) {
+    const sourceId = String(descriptor.source_id);
+    const serving = descriptor.serving_context as Record<string, unknown> | undefined;
+    const producer = producerBySource.get(sourceId);
+    handles.set(sourceId, {
+      sourceId,
+      sourceClass: String(descriptor.modality),
+      status: String(descriptor.current_state),
+      label: descriptor.user_label ?? null,
+      descriptorId: descriptor.descriptor_id ?? null,
+      producerId: producer?.producer_id ?? null,
+      surface: serving?.surface ?? null,
+      origin: serving?.source_origin ?? null,
+      cadenceMs: descriptor.cadence_ms ?? producer?.cadence_ms ?? null,
+      latestEvidenceRefs: [
+        descriptor.descriptor_id,
+        producer?.producer_id,
+        ...(Array.isArray(descriptor.latest_observation_refs) ? descriptor.latest_observation_refs : []),
+        producer?.latest_chunk_id,
+      ].filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+    });
+  }
+  for (const producer of producers) {
+    const sourceId = String(producer.source_id);
+    if (handles.has(sourceId)) continue;
+    handles.set(sourceId, {
+      sourceId,
+      sourceClass: String(producer.modality),
+      status: String(producer.status),
+      label: null,
+      descriptorId: null,
+      producerId: producer.producer_id ?? null,
+      surface: null,
+      origin: null,
+      cadenceMs: producer.cadence_ms ?? null,
+      latestEvidenceRefs: [producer.producer_id, producer.latest_chunk_id]
+        .filter((entry): entry is string => typeof entry === "string" && entry.length > 0),
+    });
+  }
+  return Array.from(handles.values());
+}
+
+function sourceIdFromDraftNode(node: Record<string, unknown>): string {
+  const bind = node.bind as Record<string, unknown> | null;
+  return String(bind?.sourceId ?? "");
+}
+
+function fetchCallUrls(): string[] {
+  const calls = vi.mocked(fetch).mock.calls as Array<[RequestInfo | URL, RequestInit?]>;
+  return calls.map((call: [RequestInfo | URL, RequestInit?]) => String(call[0]));
+}
+
 function renderPanel(options: {
   descriptors?: Array<Record<string, unknown>>;
   producers?: Array<Record<string, unknown>>;
 } = {}) {
   const graph = buildFixture();
-  const fetchMock = vi.fn(async (requestInput: RequestInfo | URL) => {
+  const sourceHandles = buildSourceHandles(options);
+  const fetchMock = vi.fn(async (requestInput: RequestInfo | URL, init?: RequestInit) => {
     const url = String(requestInput);
-    if (url.includes("/api/agi/situation/live-source/descriptors")) {
+    if (url.includes("/api/helix/stage-play/builder")) {
       return new Response(JSON.stringify({
-        ok: true,
-        schema: "helix.live_source_descriptors_response.v1",
-        descriptors: options.descriptors ?? [],
+        artifactId: "stage_play_builder_context",
+        schemaVersion: "stage_play_builder_context/v1",
+        generatedAt: "2026-06-02T00:00:00.000Z",
+        catalog: {
+          artifactId: "stage_play_builder_catalog",
+          schemaVersion: "stage_play_builder_catalog/v1",
+          generatedAt: "2026-06-02T00:00:00.000Z",
+          nodeKinds: ["source", "interpreter", "intent_module", "procedural_binding"],
+          edgeRelations: ["feeds", "interprets", "composes_with", "constrains"],
+          sourceClasses: ["visual_frame", "audio_transcript", "minecraft_world_events"],
+          portKinds: ["source_handle", "incoming_compact_window", "checkpoint_receipt"],
+          requiredFlow: ["source feeds interpreter", "all outputs remain evidence-only"],
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            raw_payload_included: false,
+            terminal_eligible: false,
+            agent_executable: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+            instruction_authority: "none",
+            ask_instruction_authority: "none",
+          },
+        },
+        sourceQuery: {
+          artifactId: "stage_play_source_query",
+          schemaVersion: "stage_play_source_query/v1",
+          generatedAt: "2026-06-02T00:00:00.000Z",
+          threadId: "helix-ask:desktop",
+          environmentId: null,
+          sourceHandles,
+          authority: {
+            assistant_answer: false,
+            raw_content_included: false,
+            raw_payload_included: false,
+            terminal_eligible: false,
+            agent_executable: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+            instruction_authority: "none",
+            ask_instruction_authority: "none",
+          },
+        },
+        authority: {
+          assistant_answer: false,
+          raw_content_included: false,
+          raw_payload_included: false,
+          terminal_eligible: false,
+          agent_executable: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+          instruction_authority: "none",
+          ask_instruction_authority: "none",
+        },
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
-    if (url.includes("/api/agi/situation/live-source/producers")) {
+    if (url.includes("/api/helix/stage-play/draft/validate")) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      const draft = body.draft as Record<string, unknown> | undefined;
+      const nodes = Array.isArray(draft?.nodes) ? draft.nodes as Array<Record<string, unknown>> : [];
+      const sourceHandleById = new Map(sourceHandles.map((handle: TestSourceHandle) => [handle.sourceId, handle]));
+      const resolvedSourceIds = nodes
+        .map(sourceIdFromDraftNode)
+        .filter((sourceId: string) => sourceHandleById.has(sourceId));
+      const issues = nodes
+        .map(sourceIdFromDraftNode)
+        .filter((sourceId: string) => sourceId.length > 0 && !sourceHandleById.has(sourceId))
+        .map((sourceId: string) => `source handle unavailable: ${sourceId}`);
+      const validation = {
+        artifactId: "stage_play_graph_draft_validation",
+        schemaVersion: "stage_play_graph_draft_validation/v1",
+        generatedAt: "2026-06-02T00:00:01.000Z",
+        ok: issues.length === 0,
+        draftId: String(draft?.draftId ?? "stage_play_panel_draft"),
+        issues,
+        warnings: nodes.some((node: Record<string, unknown>) => node.kind === "interpreter") ? [] : ["draft has no interpreter node"],
+        resolvedSourceIds,
+        evidenceRefs: sourceHandles
+          .filter((handle: TestSourceHandle) => resolvedSourceIds.includes(handle.sourceId))
+          .flatMap((handle: TestSourceHandle) => handle.latestEvidenceRefs),
+        missingEvidence: [],
+        authority: {
+          assistant_answer: false,
+          raw_content_included: false,
+          raw_payload_included: false,
+          terminal_eligible: false,
+          agent_executable: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+          instruction_authority: "none",
+          ask_instruction_authority: "none",
+        },
+      };
       return new Response(JSON.stringify({
-        ok: true,
-        schema: "helix.live_source_producers_response.v1",
-        producers: options.producers ?? [],
+        ...validation,
       }), {
-        status: 200,
+        status: validation.ok ? 200 : 422,
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -226,6 +386,14 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(await screen.findByTestId("stage-play-builder-artifacts")).toBeTruthy();
+    const overlay = screen.getByTestId("stage-play-binding-overlay");
+    const overlayText = overlay.textContent ?? "";
+    expect(overlayText.indexOf("Node builder")).toBeLessThan(overlayText.indexOf("Tool assembly"));
+    expect(overlayText.indexOf("Tool assembly")).toBeLessThan(overlayText.indexOf("Source handles"));
+    expect(screen.getByText("stage_play_builder_catalog/v1")).toBeTruthy();
+    expect(screen.getByText("stage_play_source_query/v1")).toBeTruthy();
+    expect(screen.getByText("stage_play_graph_draft_validation/v1")).toBeTruthy();
     expect(screen.getByText("Node builder")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Intent Module/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Procedure/i })).toBeTruthy();
@@ -414,6 +582,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByDisplayValue("live_source_descriptor:visual")).toBeTruthy();
     expect(screen.getByDisplayValue("live_source_producer:visual")).toBeTruthy();
     expect(screen.getByDisplayValue("visual_observation:latest")).toBeTruthy();
+    expect(await screen.findByText("Draft accepted")).toBeTruthy();
+    expect(screen.getByText(/Resolved source: source:visual-tab/i)).toBeTruthy();
   });
 
   it("lets the bindings overlay close and reopen without removing the graph", async () => {
@@ -473,12 +643,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
-    const graphUrl = vi.mocked(fetch).mock.calls
-      .map((call) => String(call[0]))
-      .find((url) => url.includes("/api/helix/stage-play/graph?")) ?? "";
+    const graphUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/graph?")) ?? "";
     expect(graphUrl).toContain("/api/helix/stage-play/graph?");
     expect(graphUrl).toContain("threadId=helix-ask%3Adesktop");
     expect(graphUrl).toContain("roomId=room%3Aminecraft-env");
     expect(graphUrl).toContain("environmentId=live_env%3Aui");
+    const builderUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/builder?")) ?? "";
+    expect(builderUrl).toContain("/api/helix/stage-play/builder?");
+    expect(builderUrl).toContain("threadId=helix-ask%3Adesktop");
+    expect(builderUrl).toContain("environmentId=live_env%3Aui");
   });
 });
