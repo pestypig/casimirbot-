@@ -34,6 +34,10 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("fruition-calculator")).toBe(true);
   });
 
+  it("includes the Stage Play Badge Graph in launch panels", () => {
+    expect(isUserLaunchPanel("stage-play-badge-graph")).toBe(true);
+  });
+
   it("keeps Essence Console as a legacy/debug panel outside default launch", () => {
     expect(isUserLaunchPanel("agi-essence-console")).toBe(false);
     expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);

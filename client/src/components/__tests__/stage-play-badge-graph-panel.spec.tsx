@@ -171,6 +171,15 @@ function renderPanel() {
   );
 }
 
+function dispatchPointer(target: EventTarget, type: string, clientX: number, clientY: number) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    clientX: { value: clientX },
+    clientY: { value: clientY },
+  });
+  fireEvent(target, event);
+}
+
 afterEach(() => {
   useStagePlayBadgeGraphPanelStore.getState().resetPanelMemory();
   useLiveAnswerEnvironmentStore.setState({
@@ -189,16 +198,135 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
-    expect(screen.getAllByText("Defensive Retreat Barrier").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.getByText("Node builder")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Intent Module/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Procedure/i })).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Defensive Retreat Barrier" })[0]);
 
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
     expect(screen.getByText("Procedural Binding")).toBeTruthy();
-    expect(screen.getByText(/retreat \+ intent.move_away \+ intent.maintain_line_of_sight \+ intent.place_block/i)).toBeTruthy();
+    expect(screen.getAllByText(/retreat \+ intent.move_away \+ intent.maintain_line_of_sight \+ intent.place_block/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Admission")).toBeTruthy();
     expect(screen.getByText(/Candidate: retreat while tracking threat/i)).toBeTruthy();
     expect(screen.getByText(/agent executable: false/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /execute|run command|auto move|auto place/i })).toBeNull();
+  });
+
+  it("adds matching live nodes from the builder palette into the selected trace", async () => {
+    renderPanel();
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Intent Module/i }));
+
+    expect(screen.getByText("intent module nodes")).toBeTruthy();
+    expect(screen.getAllByText(/move_away/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/maintain_line_of_sight/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/place_block/i).length).toBeGreaterThan(0);
+  });
+
+  it("drags a builder node onto the graph as a local draft node", async () => {
+    renderPanel();
+
+    const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
+    Object.defineProperty(scrollport, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 900,
+        bottom: 600,
+        width: 900,
+        height: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(scrollport, "scrollLeft", { configurable: true, value: 40 });
+    Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 20 });
+    scrollport.scrollBy = vi.fn();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    dispatchPointer(screen.getByRole("button", { name: /Hazard/i }), "pointerdown", 120, 160);
+
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+    expect(screen.getByTestId("stage-play-held-builder-node")).toBeTruthy();
+
+    dispatchPointer(window, "pointermove", 890, 590);
+    expect(scrollport.scrollBy).toHaveBeenCalled();
+
+    dispatchPointer(window, "pointerup", 240, 220);
+
+    expect(screen.queryByTestId("stage-play-held-builder-node")).toBeNull();
+    expect(screen.getByTestId("stage-play-draft-node")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
+    expect(screen.getByDisplayValue("hazard_type")).toBeTruthy();
+    expect(screen.getByDisplayValue("severity")).toBeTruthy();
+    expect(screen.getByDisplayValue("radius_or_position")).toBeTruthy();
+  });
+
+  it("edits and adds local draft node parameters", async () => {
+    renderPanel();
+
+    const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
+    Object.defineProperty(scrollport, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 0,
+        top: 0,
+        right: 900,
+        bottom: 600,
+        width: 900,
+        height: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    });
+    Object.defineProperty(scrollport, "scrollLeft", { configurable: true, value: 0 });
+    Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 0 });
+    scrollport.scrollBy = vi.fn();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    dispatchPointer(screen.getByRole("button", { name: /Actor/i }), "pointerdown", 120, 160);
+    dispatchPointer(window, "pointerup", 240, 220);
+
+    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Parameter value entity_id"), {
+      target: { value: "player:dan" },
+    });
+
+    expect(screen.getByDisplayValue("player:dan")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add parameter" }));
+
+    expect(screen.getByDisplayValue("parameter")).toBeTruthy();
+  });
+
+  it("lets the bindings overlay close and reopen without removing the graph", async () => {
+    renderPanel();
+
+    expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close Stage Play bindings" }));
+
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+    expect(screen.getByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
   });
 
   it("requests the transient graph with live thread, room, and environment identifiers", async () => {
