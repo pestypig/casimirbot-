@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import StagePlayBadgeGraphPanel from "../panels/StagePlayBadgeGraphPanel";
 import { useStagePlayBadgeGraphPanelStore } from "@/store/useStagePlayBadgeGraphPanelStore";
@@ -919,13 +919,30 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("0 missing checks")).toBeTruthy();
     expect(screen.getByText(/checkpoint queue: Meaningful Perturbation \/ queued/i)).toBeTruthy();
     expect(screen.getByTestId("stage-play-run-checkpoint")).toBeTruthy();
+    const promptEvents: CustomEvent[] = [];
+    window.addEventListener("helix-ask:prompt", ((event: Event) => {
+      promptEvents.push(event as CustomEvent);
+    }) as EventListener);
     fireEvent.click(screen.getByTestId("stage-play-run-checkpoint"));
-    const checkpointQueueBody = fetchJsonBodies("/api/helix/stage-play/checkpoint-queue/action").at(-1);
-    expect(checkpointQueueBody).toEqual(expect.objectContaining({
-      jobId: "stage_play_job:ui",
-      checkpointRequestId: "stage_play_checkpoint_request:ui",
-      action: "run",
-    }));
+    await waitFor(() => {
+      const checkpointQueueBody = fetchJsonBodies("/api/helix/stage-play/checkpoint-queue/action").at(-1);
+      expect(checkpointQueueBody).toEqual(expect.objectContaining({
+        jobId: "stage_play_job:ui",
+        checkpointRequestId: "stage_play_checkpoint_request:ui",
+        action: "run",
+      }));
+      expect(promptEvents).toHaveLength(1);
+    });
+    expect(promptEvents[0]?.detail).toMatchObject({
+      autoSubmit: true,
+      panelId: "stage-play-badge-graph",
+      forceReasoningDispatch: true,
+      suppressWorkstationPayloadActions: true,
+    });
+    expect(String(promptEvents[0]?.detail?.question)).toContain("Use the Stage Play reflection capability live_env.reflect_stage_play_context");
+    expect(String(promptEvents[0]?.detail?.question)).toContain("Reflect the active Stage Play Badge Graph");
+    expect(String(promptEvents[0]?.detail?.question)).toContain("stage_play_checkpoint_request:ui");
+    expect(String(promptEvents[0]?.detail?.question)).toContain("Leave visual/audio capture cadence unchanged.");
     expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-compact_observation")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-stage_bounds")).toBeTruthy();

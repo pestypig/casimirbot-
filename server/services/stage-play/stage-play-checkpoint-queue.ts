@@ -538,6 +538,45 @@ export function applyStagePlayCheckpointQueueAction(input: {
   return queueActionResult(input, updateRequestStatus(target.request, nextStatus), "updated");
 }
 
+export function completeStagePlayCheckpointRequestForGraph(input: {
+  graphId?: string | null;
+  checkpointRequestId?: string | null;
+  now?: string | Date | null;
+}): StagePlayCheckpointQueueActionResult | null {
+  const graphId = String(input.graphId ?? "").trim();
+  const checkpointRequestId = String(input.checkpointRequestId ?? "").trim();
+  if (!graphId && !checkpointRequestId) return null;
+  const now = nowIso(input.now);
+  for (const [jobId, entries] of requestsByJob.entries()) {
+    const target =
+      sortEntries(entries).find((entry) =>
+        Boolean(checkpointRequestId) &&
+        entry.request.checkpointRequestId === checkpointRequestId &&
+        (entry.request.status === "running" || entry.request.status === "queued")
+      ) ??
+      sortEntries(entries).find((entry) =>
+        Boolean(graphId) &&
+        entry.request.graphId === graphId &&
+        entry.request.status === "running"
+      ) ??
+      sortEntries(entries).find((entry) =>
+        Boolean(graphId) &&
+        entry.request.graphId === graphId &&
+        entry.request.status === "queued"
+      );
+    if (!target) continue;
+    const completed = updateRequestStatus(target.request, "completed");
+    writeEntriesForJob(jobId, entries.map((entry) =>
+      entry.request.checkpointRequestId === target.request.checkpointRequestId
+        ? { ...entry, updatedAt: now, request: completed }
+        : entry
+    ));
+    setJobState(jobId, { lastCheckpointAt: now }, now);
+    return queueActionResult({ jobId, action: "complete" }, completed, "updated");
+  }
+  return null;
+}
+
 function queueActionResult(
   input: {
     jobId: string;

@@ -3,6 +3,7 @@ import { buildStagePlayBadgeGraphV1, type StagePlayBadgeGraphV1 } from "@shared/
 import { buildStagePlayPerturbationEventV1 } from "@shared/contracts/stage-play-perturbation-event.v1";
 import {
   applyStagePlayCheckpointQueueAction,
+  completeStagePlayCheckpointRequestForGraph,
   enqueueManualStagePlayCheckpointRequest,
   getStagePlayCheckpointQueue,
   recordStagePlayCheckpointRequestFromPerturbation,
@@ -194,5 +195,43 @@ describe("Stage Play checkpoint queue", () => {
     });
     expect(runAutomatic.ok).toBe(false);
     expect(runAutomatic.reason).toBe("running_request_exists");
+  });
+
+  it("completes the matching running checkpoint when a model-reviewed Ask receipt is stored", () => {
+    const graph = graphFixture();
+    const manual = enqueueManualStagePlayCheckpointRequest({
+      jobId: "stage_play_job:queue",
+      graph,
+      objective: "Checkpoint the current visual scene.",
+      userPromptRef: "user_prompt:queue",
+      now: "2026-06-03T10:00:02.000Z",
+    });
+    const runManual = applyStagePlayCheckpointQueueAction({
+      jobId: "stage_play_job:queue",
+      action: "run",
+      checkpointRequestId: manual.checkpointRequestId,
+      now: "2026-06-03T10:00:03.000Z",
+    });
+    expect(runManual.request?.status).toBe("running");
+
+    const completion = completeStagePlayCheckpointRequestForGraph({
+      graphId: graph.graphId,
+      now: "2026-06-03T10:00:04.000Z",
+    });
+
+    expect(completion).toMatchObject({
+      ok: true,
+      action: "complete",
+      request: expect.objectContaining({
+        checkpointRequestId: manual.checkpointRequestId,
+        status: "completed",
+      }),
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    expect(getStagePlayCheckpointQueue({ jobId: "stage_play_job:queue" }).requests[0]).toMatchObject({
+      checkpointRequestId: manual.checkpointRequestId,
+      status: "completed",
+    });
   });
 });

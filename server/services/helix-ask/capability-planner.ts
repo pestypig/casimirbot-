@@ -61,6 +61,13 @@ const classifySourceFamily = (input: {
   if (input.sourceTarget === "docs_viewer" || input.sourceTarget === "active_doc" || /\b(?:docs?|document|white paper|whitepaper|paper)\b/.test(prompt)) {
     return "docs";
   }
+  if (
+    input.sourceTarget === "live_environment" ||
+    input.admittedFamilies.includes("live_environment") ||
+    /\b(?:stage\s*play|stage_play|reflect_stage_play_context|live\s+interpretation|answer\s+snapshot|checkpoint\s+freshness|narrative_stage_play)\b/.test(prompt)
+  ) {
+    return "live_environment";
+  }
   if (input.sourceTarget === "visual_capture" || /\b(?:screen|visual|capture|screenshot|frame)\b/.test(prompt)) {
     return "visual_capture";
   }
@@ -69,7 +76,6 @@ const classifySourceFamily = (input: {
   }
   if (input.sourceTarget === "repo_code" || input.admittedFamilies.includes("repo_code")) return "repo_evidence";
   if (input.sourceTarget === "process_graph" || input.admittedFamilies.includes("process_graph")) return "process_graph";
-  if (input.sourceTarget === "live_environment" || input.admittedFamilies.includes("live_environment")) return "live_environment";
   if (input.sourceTarget === "live_pipeline" || input.admittedFamilies.includes("live_pipeline")) return "live_source";
   if (/^(?:please\s+)?(?:click|press|tap|close|start|stop|select|choose|submit)\b/i.test(input.promptText.trim())) {
     return "workstation_action";
@@ -92,7 +98,12 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
     if (/\b(?:set|change|interval|rate|cadence|start|stop)\b/.test(prompt)) return "control_live_source";
     return "inspect_live_source";
   }
-  if (family === "live_environment") return "query_live_environment";
+  if (family === "live_environment") {
+    if (/\b(?:stage\s*play|stage_play|reflect_stage_play_context|live\s+interpretation|answer\s+snapshot|checkpoint\s+freshness|narrative_stage_play)\b/.test(prompt)) {
+      return "reflect_stage_play_context";
+    }
+    return "query_live_environment";
+  }
   if (family === "visual_capture") return "review_current_visual_state";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
   if (family === "repo_evidence") return "repo-code.search_concept";

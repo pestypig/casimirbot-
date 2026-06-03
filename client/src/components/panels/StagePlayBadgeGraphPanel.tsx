@@ -32,6 +32,7 @@ import {
   startVisualFrameProducerInterval,
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
+import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 
@@ -175,6 +176,8 @@ type StagePlayCheckpointQueueStatus = {
   updatedAt: string;
   ok: boolean;
 } | null;
+
+type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointRequests"]>[number];
 
 type StagePlayLaneId =
   | "observer"
@@ -1026,6 +1029,38 @@ function StagePlayToolActivityStrip({
       </div>
     </div>
   );
+}
+
+function buildStagePlayCheckpointAskQuestion(input: {
+  request: StagePlayCheckpointRequest;
+  graph: StagePlayBadgeGraphV1;
+  environmentId?: string | null;
+  roomId?: string | null;
+}): string {
+  const checkpointFocus = input.request.question
+    .replace(/\bproduce\b/gi, "summarize")
+    .replace(/\brequest(?:ed)?\b/gi, "asked about")
+    .replace(/\bqueue(?:d)?|enqueue(?:d)?\b/gi, "tracked")
+    .replace(/\brun\b/gi, "review")
+    .replace(/\bstart\b/gi, "begin")
+    .replace(/\bcreate|make\b/gi, "describe");
+  const sourceRefs = [
+    ...input.graph.sourceWindow.latestObservationRefs,
+    ...input.graph.sourceWindow.latestSnapshotRefs,
+    ...input.graph.sourceWindow.latestNavigationRefs,
+  ].filter(Boolean).slice(0, 6);
+  return [
+    "Use the Stage Play reflection capability live_env.reflect_stage_play_context.",
+    "Reflect the active Stage Play Badge Graph and project the current Live Interpretation.",
+    `Stage Play checkpoint handle: ${input.request.checkpointRequestId}.`,
+    `Stage Play graph handle: ${input.graph.graphId}.`,
+    input.environmentId ? `Live Interpretation environment handle: ${input.environmentId}.` : "",
+    input.roomId ? `Stage room handle: ${input.roomId}.` : "",
+    sourceRefs.length > 0 ? `Stage Play evidence handles: ${sourceRefs.join(", ")}.` : "",
+    `Checkpoint focus: ${checkpointFocus}`,
+    "Report checkpoint freshness, missing evidence, and whether a current model-reviewed Answer Snapshot exists after the reflection.",
+    "Leave visual/audio capture cadence unchanged.",
+  ].filter(Boolean).join("\n");
 }
 
 const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
@@ -3781,10 +3816,31 @@ export default function StagePlayBadgeGraphPanel() {
         action,
         checkpointRequestId: requestId ?? request?.checkpointRequestId ?? null,
       });
+      const resultRequest =
+        result.request && typeof result.request === "object" && !Array.isArray(result.request)
+          ? (result.request as StagePlayCheckpointRequest)
+          : request;
+      const launchedAskCheckpoint = action === "run" && Boolean(result.ok && resultRequest && graph);
+      if (launchedAskCheckpoint && resultRequest && graph) {
+        launchHelixAskPrompt({
+          question: buildStagePlayCheckpointAskQuestion({
+            request: resultRequest,
+            graph,
+            environmentId,
+            roomId,
+          }),
+          autoSubmit: true,
+          panelId: "stage-play-badge-graph",
+          forceReasoningDispatch: true,
+          suppressWorkstationPayloadActions: true,
+        });
+      }
       setCheckpointQueueStatus({
         action,
         reason: String(result.reason ?? "updated"),
-        message: `${labelize(action)}: ${labelize(String(result.reason ?? "updated"))}`,
+        message: launchedAskCheckpoint
+          ? "Run checkpoint: visible Helix Ask checkpoint turn launched."
+          : `${labelize(action)}: ${labelize(String(result.reason ?? "updated"))}`,
         updatedAt: new Date().toISOString(),
         ok: Boolean(result.ok),
       });

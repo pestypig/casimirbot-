@@ -287,8 +287,16 @@ describe("Helix Ask Stage Play routing", () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
       .send({
-        question:
-          "Use the routed visual source in narrative_stage_play to predict next scene. Reflect the active Stage Play Badge Graph, project/update Live Interpretation from Stage Play, and tell me the checkpoint freshness before this can become a model-reviewed answer snapshot.",
+        question: [
+          "Use the Stage Play reflection capability live_env.reflect_stage_play_context.",
+          "Reflect the active Stage Play Badge Graph and project the current Live Interpretation.",
+          "Stage Play checkpoint handle: stage_play_checkpoint_request:ui-handoff.",
+          "Stage Play graph handle: stage_play_badge_graph:ui-handoff.",
+          "Stage Play evidence handles: live_source_descriptor:stage-play-routing, live_source_producer:stage-play-routing, visual_observation:stage-play-routing.",
+          "Checkpoint focus: Given the first usable Stage Play observation, what checkpoint answer should be summarized for the active visual evidence?",
+          "Report checkpoint freshness, missing evidence, and whether a current model-reviewed Answer Snapshot exists after the reflection.",
+          "Leave visual/audio capture cadence unchanged.",
+        ].join("\n"),
         sessionId: threadId,
         workspace_context_snapshot: {
           visual_context_capability: {
@@ -308,6 +316,12 @@ describe("Helix Ask Stage Play routing", () => {
       selectedAction: response.body?.selected_action,
       workstationPlan: response.body?.workstation_tool_plan,
       actionEnvelope: response.body?.action_envelope,
+      capabilityPlan: response.body?.capability_plan,
+      capabilityResult: response.body?.capability_result,
+      capabilityLifecycleLedger: response.body?.capability_lifecycle_ledger,
+      solverControllerDecision: response.body?.solver_controller_decision,
+      goalSatisfaction: response.body?.goal_satisfaction_evaluation,
+      terminalAuthority: response.body?.terminal_answer_authority,
       answer: response.body?.answer,
     }, null, 2);
 
@@ -384,7 +398,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(liveToolArtifact.payload.observation.liveAnswerProjection.changedLineKeys).toEqual(
       expect.arrayContaining(["risk", "possibilities", "unknowns", "next_check"]),
     );
-    expect(response.body?.answer).toContain("Stage Play tool receipt: live_env.reflect_stage_play_context");
+    expect(response.body?.answer, routeDebug).toContain("Stage Play tool receipt: live_env.reflect_stage_play_context");
     expect(response.body?.answer).toContain("visual source status:");
     expect(response.body?.answer).toContain("Source refs:");
     expect(response.body?.answer).toContain("output projection keys:");
