@@ -251,7 +251,7 @@ describe("live_env.reflect_stage_play_context", () => {
       raw_content_included: false,
     });
     expect(observation.summary).toBe(
-      "Built Stage Play graph but did not project Live Answer lines: no_live_answer_environment.",
+      "Built Stage Play graph but did not project Live Answer lines: no_active_environment.",
     );
     expect(wrappedObservation).toMatchObject({
       schema: "stage_play_reflection_result/v1",
@@ -260,12 +260,12 @@ describe("live_env.reflect_stage_play_context", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
       liveAnswerProjection: {
-        attempted: false,
+        attempted: true,
         projected: false,
         deltaId: null,
         environmentId: null,
         changedLineKeys: [],
-        reason: "no_live_answer_environment",
+        reason: "no_active_environment",
       },
     });
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual(expect.arrayContaining([

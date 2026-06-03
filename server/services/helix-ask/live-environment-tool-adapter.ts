@@ -4,6 +4,7 @@ import {
   type HelixLiveEnvironmentToolName,
   type HelixLiveEnvironmentToolObservation,
 } from "@shared/helix-live-agent-step";
+import { validateStagePlayBadgeGraphV1 } from "@shared/contracts/stage-play-badge-graph.v1";
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
 import type {
   HelixLiveEnvironmentCommentaryKind,
@@ -48,6 +49,14 @@ type ExecuteLiveEnvironmentToolInput = {
   thread_id: string;
   environment_id?: string | null;
 };
+
+type StagePlayLiveAnswerProjectionReason =
+  | "projected"
+  | "no_active_environment"
+  | "line_schema_mismatch"
+  | "no_line_changes"
+  | "graph_invalid"
+  | "environment_not_active";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -425,6 +434,8 @@ export function executeLiveEnvironmentTool(
       graph,
       generatedAt,
     });
+    const graphValidationIssues = validateStagePlayBadgeGraphV1(graph);
+    const graphValid = graphValidationIssues.length === 0;
     const graphSourceEvidenceRefs = [
       ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
       ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
@@ -440,7 +451,7 @@ export function executeLiveEnvironmentTool(
       missingBefore: string[];
       addedLineKeys: string[];
     } | null = null;
-    if (hasSourceEvidence && (!draftValidation || draftValidation.ok)) {
+    if (graphValid && hasSourceEvidence && (!draftValidation || draftValidation.ok)) {
       const selectedSourceIds = Array.from(new Set([
         sourceId,
         ...graph.sourceWindow.sources
@@ -465,7 +476,7 @@ export function executeLiveEnvironmentTool(
         addedLineKeys: ensured.addedLineKeys,
       };
     }
-    const liveAnswerLineReduction = environment && hasSourceEvidence && (!draftValidation || draftValidation.ok)
+    const liveAnswerLineReduction = graphValid && environment && hasSourceEvidence && (!draftValidation || draftValidation.ok)
       ? reduceLiveAnswerEnvironmentFromStagePlayGraph({
           environment,
           graph,
@@ -479,18 +490,14 @@ export function executeLiveEnvironmentTool(
       .filter((lane) => lane.lineUpdateAllowed)
       .map((lane) => lane.lineKey)
       .filter((lineKey) => !environmentLineKeys.has(lineKey));
-    const liveAnswerProjectionReason = liveAnswerLineReduction
-      ? skippedLineKeys.length > 0
-        ? "projected_with_skipped_lines"
-        : "projected"
-      : draftValidation && !draftValidation.ok
-        ? "draft_validation_failed"
+    const liveAnswerProjectionReason: StagePlayLiveAnswerProjectionReason = liveAnswerLineReduction
+      ? "projected"
+      : !graphValid || (draftValidation && !draftValidation.ok)
+        ? "graph_invalid"
         : !environment
-          ? "no_live_answer_environment"
+          ? "no_active_environment"
           : environment.status !== "active"
             ? "environment_not_active"
-            : !hasSourceEvidence
-              ? "no_source_evidence"
             : skippedLineKeys.length > 0
               ? "line_schema_mismatch"
               : "no_line_changes";
@@ -499,7 +506,7 @@ export function executeLiveEnvironmentTool(
       graph,
       outputLaneProjection: projectedOutputLaneProjection,
       liveAnswerProjection: {
-        attempted: Boolean(environment),
+        attempted: true,
         projected: Boolean(liveAnswerLineReduction),
         deltaId: liveAnswerLineReduction?.delta.delta_id ?? null,
         environmentId: liveAnswerLineReduction?.environment.environment_id ?? environment?.environment_id ?? null,
@@ -520,7 +527,7 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       environmentId: liveAnswerLineReduction?.environment.environment_id ?? environment?.environment_id ?? input.environment_id,
       toolName: input.tool_name,
-      ok: draftValidation ? draftValidation.ok : true,
+      ok: graphValid && (draftValidation ? draftValidation.ok : true),
       summary: liveAnswerLineReduction
         ? `Built Stage Play graph and projected ${projectedLineKeys.length} Live Answer line(s).`
         : `Built Stage Play graph but did not project Live Answer lines: ${liveAnswerProjectionReason}.`,

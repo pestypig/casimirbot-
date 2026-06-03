@@ -1,3 +1,5 @@
+import { isStagePlayReflectionPrompt } from "./stage-play-prompt-intent";
+
 export type HelixLiveSourceContinuationIntentKind =
   | "live_source_continuation"
   | "live_pipeline_control"
@@ -83,6 +85,15 @@ export const isLiveSourceCadenceControlPrompt = (prompt: string): boolean => {
   );
 };
 
+const isStagePlayCaptureCadenceControlPrompt = (prompt: string): boolean => {
+  const text = normalize(prompt);
+  if (!text || !isStagePlayReflectionPrompt(prompt)) return false;
+  const captureControl =
+    /\b(?:start|enable|turn\s+on|set|change|update|pause|resume|stop|keep|continue|maintain)\b/.test(text) &&
+    /\b(?:visual\s+interval|capture\s+(?:cadence|interval|source)|screen\s+capture|tab\s+capture|frame\s+capture|visual\s+capture|visual\s+source|capture\s+every|every\s+\d{1,3})\b/.test(text);
+  return captureControl && isLiveSourceCadenceControlPrompt(prompt);
+};
+
 export const readLiveSourceRequestedRateMs = (text: string): number | null =>
   isContextualLiveSourceCadenceMention(text) ? null : extractLiveSourceRequestedRateMs(text);
 
@@ -93,6 +104,9 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const contextualCadence = isContextualLiveSourceCadenceMention(prompt);
   const cadenceControl = isLiveSourceCadenceControlPrompt(prompt);
   const requestedRateMs = readLiveSourceRequestedRateMs(prompt);
+  const stagePlayReflection = isStagePlayReflectionPrompt(prompt);
+  const stagePlayCaptureControl = isStagePlayCaptureCadenceControlPrompt(prompt);
+  if (stagePlayReflection && !stagePlayCaptureControl) return null;
 
   const procedureEpochComparison =
     /\b(?:what\s+changed|changed\s+since|compare|compared|difference|different)\b/.test(text) &&

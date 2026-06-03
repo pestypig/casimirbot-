@@ -16,6 +16,7 @@ import {
   resetLiveSourceDescriptorsForTest,
   upsertLiveSourceDescriptor,
 } from "../services/situation-room/live-source-descriptor-builder";
+import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
 import { STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA } from "../services/stage-play/stage-play-output-lane-reducer";
 
 const threadId = "helix-ask:desktop";
@@ -37,6 +38,27 @@ beforeEach(() => {
 });
 
 describe("Helix Ask Stage Play routing", () => {
+  it("keeps Stage Play reflection prompts out of live source continuation", () => {
+    expect(
+      classifyLiveSourceContinuationIntent(
+        "Use the active Stage Play Badge Graph for the current visual source. Reflect the source, project/update Live Answer from Stage Play, and tell me what evidence is still missing before this can become a model-reviewed answer snapshot.",
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps explicit Stage Play capture cadence prompts on live source control", () => {
+    const intent = classifyLiveSourceContinuationIntent(
+      "Start Stage Play visual capture every 10 seconds.",
+    );
+
+    expect(intent).toMatchObject({
+      kind: "live_pipeline_control",
+      requested_rate_ms: 10_000,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("prefers reflect_stage_play_context over generic visual Live Answer setup", async () => {
     const { environment } = createLiveAnswerEnvironment({
       thread_id: threadId,
@@ -78,7 +100,7 @@ describe("Helix Ask Stage Play routing", () => {
       .post("/api/agi/ask/turn")
       .send({
         question:
-          "Project/update Live Answer from Stage Play: reflect the current narrative_stage_play visual source into the Stage Play Badge Graph and procedural bindings.",
+          "Use the active Stage Play Badge Graph for the current visual source. Reflect the source, project/update Live Answer from Stage Play, and tell me what evidence is still missing before this can become a model-reviewed answer snapshot.",
         sessionId: threadId,
         debug: true,
       })
@@ -98,6 +120,8 @@ describe("Helix Ask Stage Play routing", () => {
       goal_kind: "live_environment_review",
       required_terminal_kind: "direct_answer_text",
     });
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("live_source_continuation");
+    expect(response.body?.live_source_continuation_intent, routeDebug).toBeFalsy();
     expect(response.body?.source_target_intent).toMatchObject({
       target_source: "live_environment",
       target_kind: "live_environment",
@@ -113,6 +137,12 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
       iteration?.chosen_capability === "live_env.reflect_stage_play_context"
     )).toBe(true);
+    const dynamicToolActionNames = response.body?.current_turn_artifact_ledger
+      ?.filter((artifact: any) => artifact?.kind === "dynamic_tool_call")
+      ?.map((artifact: any) => artifact?.payload?.tool_action_name ?? artifact?.payload?.action_name ?? artifact?.payload?.name)
+      ?? [];
+    expect(dynamicToolActionNames, routeDebug).not.toContain("situation-room.pipeline.compose");
+    expect(dynamicToolActionNames, routeDebug).not.toContain("situation-room.pipeline.execute");
 
     const liveToolArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
       artifact?.kind === "live_environment_tool_observation" &&
@@ -135,7 +165,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer).toContain("Live Answer line");
     expect(response.body?.answer).toContain("post-observation summary");
     expect(response.body?.answer).not.toContain("\"artifactId\":\"stage_play_badge_graph\"");
-    expect(response.body?.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(["direct_answer_text", "model_synthesized_answer"]).toContain(response.body?.terminal_artifact_kind);
     expect(response.body?.final_answer_source).toMatch(/universal_composer|final_answer_draft|artifact_synthesis/);
   }, 60_000);
 });

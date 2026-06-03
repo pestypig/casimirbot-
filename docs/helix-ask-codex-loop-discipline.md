@@ -234,6 +234,49 @@ commands only when the primary intent and route product contract explicitly
 allow that receipt kind. All other tool outputs must either continue the loop,
 ask the user, repair, or fail closed.
 
+### Exact Source-Target Contracts
+
+When a prompt names an exact source, the shared loop boundary must carry that
+identity all the way to terminal authority. Retrieval, route scoring, and panel
+receipts may find candidate material, but they do not by themselves prove that
+the requested source was inspected.
+
+Exact source-target prompts include requests naming a path, heading, line
+range, symbol, note title, note id, panel id, live-source id, route artifact id,
+or quoted source label. A patch that supports one of those prompts must expose
+an exact-source contract before synthesis:
+
+```txt
+source_target_exact_contract
+requested_source_kind
+requested_source_identity
+extraction_status
+evidence_refs
+evidence_hash
+required_terms | required_claims
+unsupported_terms | unsupported_claims
+terminal_allowed
+```
+
+The exact-source contract should be represented in or linked from
+`source_target_intent`, then normalized into `agent_step_observation_packet`
+with `assistant_answer=false` and `terminal_eligible=false`. If the exact source
+is missing, ambiguous, unsupported, or only weakly retrieved, the turn must ask
+the user, run an admitted repair, or fail closed. It must not synthesize from a
+neighboring source as though the requested identity had been satisfied.
+
+The coverage gate for exact-source answers must check at least:
+
+- requested identity preserved in the evidence packet
+- evidence refs and hashes present
+- required terms or claims present when the user asked for them
+- unsupported or invented terms absent from the terminal draft
+- terminal artifact kind allowed by the route product contract
+
+Only a terminal candidate that consumes the exact-source contract and passes the
+coverage gate may supersede stale continuations, typed failures, receipt text,
+or panel projections.
+
 ## Codex-Owned Responsibilities
 
 Do not recreate these in Helix Ask unless Codex cannot expose the capability:

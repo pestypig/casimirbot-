@@ -123,7 +123,7 @@ const artifactKindMatchesCapability = (
     return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
   if (capability === "helix_ask.reflect_stage_play_context") {
-    return /stage_play_badge_graph|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph|live_env\.reflect_stage_play_context/i.test(joined);
+    return /stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph|live_env\.reflect_stage_play_context/i.test(joined);
   }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
@@ -191,7 +191,7 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
   }
-  if (/stage_play_badge_graph|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph/i.test(joined)) {
+  if (/stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph/i.test(joined)) {
     return "helix_ask.reflect_stage_play_context";
   }
   if (/dottie_observer_subscription_receipt|helix\.dottie_observer_subscription\.v1|observer\.attach|observer\.detach|observer_subscription/i.test(joined)) {
@@ -616,6 +616,38 @@ const livePipelineReceiptTerminalAllowed = (payload: Record<string, unknown>): b
   return true;
 };
 
+const payloadHasStagePlayCapabilityOrObservation = (payload: Record<string, unknown>): boolean => {
+  const topLevelDecision = readRecord(payload.agent_step_decision);
+  const topLevelCapability =
+    readString(topLevelDecision?.chosen_capability) ??
+    readString(readRecord(topLevelDecision?.model_decision)?.chosen_capability);
+  if (/^(?:helix_ask\.reflect_stage_play_context|live_env\.reflect_stage_play_context)$/.test(topLevelCapability ?? "")) {
+    return true;
+  }
+  const loop = readRecord(payload.agent_runtime_loop);
+  if (readArray(loop?.iterations).some((iteration) => {
+    const record = readRecord(iteration);
+    const capability = readString(record?.chosen_capability);
+    return /^(?:helix_ask\.reflect_stage_play_context|live_env\.reflect_stage_play_context)$/.test(capability ?? "");
+  })) {
+    return true;
+  }
+  return readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact))
+    .some((artifact) => artifactKindMatchesCapability("helix_ask.reflect_stage_play_context", artifact));
+};
+
+const stagePlayReceiptSelectedAsTerminal = (payload: Record<string, unknown>): boolean => {
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  const selected = `${terminalKind ?? ""} ${finalAnswerSource ?? ""}`;
+  if (/stage_play_badge_graph|stage_play_output_lane_projection|stage_play_reflection_result/i.test(selected)) {
+    return true;
+  }
+  return /live_environment_tool_observation/i.test(selected) && payloadHasStagePlayCapabilityOrObservation(payload);
+};
+
 export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>): boolean {
   const goalSatisfaction =
     readRecord(payload.goal_satisfaction_evaluation) ??
@@ -667,6 +699,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const terminalKind = readString(payload.terminal_artifact_kind);
   const finalAnswerSource = readString(payload.final_answer_source);
   const livePipelineReceiptAllowed = livePipelineReceiptTerminalAllowed(payload);
+  const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
   const checks = {
     agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
     agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
@@ -678,6 +711,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const requiresRuntimeLoop = sourceCapabilityDiagnosticTurn && terminalKind !== "typed_failure" && !livePipelineReceiptAllowed;
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
+    if (stagePlayReceiptTerminal) blockingReasons.push("stage_play_receipt_terminal_without_model_review");
     if (!checks.goal_satisfaction_allows_terminal && !livePipelineReceiptAllowed) blockingReasons.push("goal_satisfaction_not_terminal");
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");

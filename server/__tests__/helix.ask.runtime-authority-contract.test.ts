@@ -817,6 +817,171 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toContain("post_observation_model_decision_missing");
   });
 
+  it("allows Stage Play terminal answers only after observation re-entry and model review", () => {
+    const payload = {
+      turn_id: "turn-stage-play-reviewed",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        decision_id: "agent-step-stage-play-terminal-review",
+        decision_authority: "llm",
+        decision_timing: "terminal_review",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+        model_decision: {
+          next_step: "answer",
+          chosen_capability: "model.direct_answer",
+        },
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stage-play-tool",
+            decision_authority: "llm",
+            decision_timing: "tool_selection",
+            chosen_capability: "helix_ask.reflect_stage_play_context",
+            observed_artifact_refs: ["stage-play-observation-1"],
+          },
+          {
+            decision_id: "agent-step-stage-play-answer",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["stage-play-observation-1", "final-answer-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage-play-observation-1",
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.reflect_stage_play_context",
+            observation: {
+              schema: "stage_play_reflection_result/v1",
+              graph: { artifactId: "stage_play_badge_graph", schemaVersion: "stage_play_badge_graph/v1" },
+              outputLaneProjection: { artifactId: "stage_play_output_lane_projection" },
+              liveAnswerProjection: {
+                attempted: true,
+                projected: true,
+                changedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+                skippedLineKeys: [],
+                reason: "projected",
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+              context_role: "tool_evidence",
+              ask_context_policy: "evidence_only",
+            },
+          },
+        },
+        {
+          artifact_id: "final-answer-1",
+          kind: "final_answer_draft",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "Stage Play reflected the source and projected Live Answer lines; audio evidence is still missing.",
+          },
+        },
+      ],
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.checks.agent_runtime_loop).toBe(true);
+    expect(report.checks.agent_step_decision).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.checks.post_observation_model_decision).toBe(true);
+    expect(report.eligible).toBe(true);
+    expect(report.blocking_reasons).toEqual([]);
+  });
+
+  it("blocks Stage Play graph or projection receipts from becoming final authority", () => {
+    const payload = {
+      turn_id: "turn-stage-play-receipt-terminal",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "live_environment_tool_observation",
+      final_answer_source: "live_environment_tool_observation",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        decision_id: "agent-step-stage-play-terminal-review",
+        decision_authority: "llm",
+        decision_timing: "terminal_review",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stage-play-tool",
+            decision_authority: "llm",
+            decision_timing: "tool_selection",
+            chosen_capability: "helix_ask.reflect_stage_play_context",
+            observed_artifact_refs: ["stage-play-observation-1"],
+          },
+          {
+            decision_id: "agent-step-stage-play-answer",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["stage-play-observation-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage-play-observation-1",
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.reflect_stage_play_context",
+            observation: {
+              schema: "stage_play_reflection_result/v1",
+              graph: { artifactId: "stage_play_badge_graph", schemaVersion: "stage_play_badge_graph/v1" },
+              outputLaneProjection: { artifactId: "stage_play_output_lane_projection" },
+              liveAnswerProjection: {
+                attempted: true,
+                projected: true,
+                changedLineKeys: ["risk"],
+                skippedLineKeys: [],
+                reason: "projected",
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+              context_role: "tool_evidence",
+              ask_context_policy: "evidence_only",
+            },
+          },
+        },
+      ],
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.checks.agent_runtime_loop).toBe(true);
+    expect(report.checks.agent_step_decision).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.checks.post_observation_model_decision).toBe(true);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("stage_play_receipt_terminal_without_model_review");
+  });
+
   it("suggests the Stage Play capability when a selected capability observes a Stage Play graph", () => {
     const observation = buildCapabilityBindingMismatchObservation({
       canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
