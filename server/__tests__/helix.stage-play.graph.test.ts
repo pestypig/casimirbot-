@@ -1,7 +1,11 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { helixStagePlayRouter } from "../routes/helix/stage-play";
+import {
+  createLiveAnswerEnvironment,
+  resetLiveAnswerEnvironments,
+} from "../services/situation-room/live-answer-environment-store";
 
 function makeApp() {
   const app = express();
@@ -9,6 +13,10 @@ function makeApp() {
   app.use("/api/helix/stage-play", helixStagePlayRouter);
   return app;
 }
+
+beforeEach(() => {
+  resetLiveAnswerEnvironments();
+});
 
 describe("GET /api/helix/stage-play/graph", () => {
   it("returns a stage_play_badge_graph/v1 artifact", async () => {
@@ -116,5 +124,214 @@ describe("GET /api/helix/stage-play/graph", () => {
       terminal_eligible: false,
       agent_executable: false,
     });
+  });
+
+  it("projects Stage Play output lanes into a created compatible Live Answer environment", async () => {
+    const app = makeApp();
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:stage-project",
+        objective: "Project the current Stage Play graph into Live Answer.",
+        createIfMissing: true,
+        ensureStagePlayLineSchema: true,
+        preferredPreset: "custom",
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_live_answer_projection_response/v1",
+      reason: "projected",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      terminal_eligible: false,
+    });
+    expect(response.body.graph.artifactId).toBe("stage_play_badge_graph");
+    expect(response.body.outputLaneProjection).toMatchObject({
+      artifactId: "stage_play_output_lane_projection",
+      assistant_answer: false,
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+    });
+    expect(response.body.environmentEnsure).toMatchObject({
+      created: true,
+      repairedLineSchema: false,
+    });
+    expect(response.body.environmentEnsure.addedLineKeys).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "resources",
+      "affordances",
+      "risk",
+      "possibilities",
+      "rehearsal",
+      "recommendation",
+      "unknowns",
+      "next_check",
+      "debug_basis",
+    ]));
+    expect(response.body.liveAnswerEnvironment.lines.map((line: { key: string }) => line.key)).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "resources",
+      "affordances",
+      "risk",
+      "possibilities",
+      "rehearsal",
+      "recommendation",
+      "unknowns",
+      "debug_basis",
+    ]));
+    expect(response.body.projectedLineKeys).toEqual(expect.arrayContaining(["situation", "actor_state", "risk"]));
+    expect(response.body.projectedLineKeys).not.toContain("recommendation");
+    expect(response.body.liveAnswerDelta).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      model_invoked: false,
+    });
+  });
+
+  it("reports a line schema mismatch instead of partially projecting incompatible Live Answer lines", async () => {
+    const app = makeApp();
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "thread:stage-schema-mismatch",
+      created_turn_id: "turn:generic",
+      objective: "Generic visual live answer.",
+      preset: "custom",
+      now: "2026-06-02T14:00:00.000Z",
+    });
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:stage-schema-mismatch",
+        environmentId: environment.environment_id,
+        objective: "Try to project without changing the line schema.",
+        ensureStagePlayLineSchema: false,
+      })
+      .expect(200);
+
+    expect(response.body.reason).toBe("line_schema_mismatch");
+    expect(response.body.liveAnswerDelta).toBeNull();
+    expect(response.body.projectedLineKeys).toEqual([]);
+    expect(response.body.skippedLineKeys).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "possibilities",
+      "unknowns",
+    ]));
+    expect(response.body.liveAnswerEnvironment.environment_id).toBe(environment.environment_id);
+  });
+
+  it("repairs an explicitly selected generic environment with Stage Play line keys", async () => {
+    const app = makeApp();
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "thread:stage-explicit-repair",
+      created_turn_id: "turn:generic",
+      objective: "Generic visual live answer.",
+      preset: "custom",
+      now: "2026-06-02T14:10:00.000Z",
+    });
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:stage-explicit-repair",
+        environmentId: environment.environment_id,
+        objective: "Repair this selected environment for Stage Play output.",
+        ensureStagePlayLineSchema: true,
+      })
+      .expect(200);
+
+    expect(response.body.reason).toBe("projected");
+    expect(response.body.liveAnswerEnvironment.environment_id).toBe(environment.environment_id);
+    expect(response.body.environmentEnsure).toMatchObject({
+      created: false,
+      repairedLineSchema: true,
+    });
+    expect(response.body.environmentEnsure.missingBefore).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "possibilities",
+      "unknowns",
+      "debug_basis",
+    ]));
+    expect(response.body.environmentEnsure.addedLineKeys).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "resources",
+      "affordances",
+      "risk",
+      "possibilities",
+      "rehearsal",
+      "recommendation",
+      "unknowns",
+      "debug_basis",
+    ]));
+    expect(response.body.liveAnswerEnvironment.lines.map((line: { key: string }) => line.key)).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "debug_basis",
+    ]));
+    expect(response.body.liveAnswerEnvironment.lines.find((line: { key: string; visibility: string }) =>
+      line.key === "debug_basis"
+    )?.visibility).toBe("situation_panel");
+    expect(response.body.liveAnswerDelta).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      model_invoked: false,
+    });
+  });
+
+  it("creates a Stage Play environment instead of repairing a generic active environment when none is explicit", async () => {
+    const app = makeApp();
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: "thread:stage-generic-active",
+      created_turn_id: "turn:generic",
+      objective: "Generic visual live answer.",
+      preset: "custom",
+      now: "2026-06-02T14:20:00.000Z",
+    });
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:stage-generic-active",
+        objective: "Create a Stage Play surface for this thread.",
+        createIfMissing: true,
+        ensureStagePlayLineSchema: true,
+      })
+      .expect(200);
+
+    expect(response.body.reason).toBe("projected");
+    expect(response.body.liveAnswerEnvironment.environment_id).not.toBe(environment.environment_id);
+    expect(response.body.environmentEnsure).toMatchObject({
+      created: true,
+      repairedLineSchema: false,
+    });
+    expect(response.body.environmentEnsure.missingBefore).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "possibilities",
+      "unknowns",
+      "debug_basis",
+    ]));
+    expect(response.body.liveAnswerEnvironment.lines.map((line: { key: string }) => line.key)).toEqual(expect.arrayContaining([
+      "situation",
+      "actor_state",
+      "resources",
+      "affordances",
+      "risk",
+      "possibilities",
+      "rehearsal",
+      "recommendation",
+      "unknowns",
+      "next_check",
+      "debug_basis",
+    ]));
   });
 });

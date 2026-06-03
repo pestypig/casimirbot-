@@ -132,6 +132,32 @@ type StagePlayRawSessionBufferListResponse = {
   context_role: "audit_buffer_not_graph";
 };
 
+type StagePlayProjectLiveAnswerResponse = {
+  ok: boolean;
+  schema: "stage_play_live_answer_projection_response/v1";
+  projectedLineKeys: string[];
+  skippedLineKeys: string[];
+  reason:
+    | "projected"
+    | "no_active_environment"
+    | "line_schema_mismatch"
+    | "no_line_changes"
+    | "graph_invalid"
+    | "environment_not_active";
+  assistant_answer: false;
+  raw_content_included: false;
+  context_role: "tool_evidence";
+  terminal_eligible: false;
+};
+
+type StagePlayProjectionStatus = {
+  projectedLineKeys: string[];
+  skippedLineKeys: string[];
+  reason: StagePlayProjectLiveAnswerResponse["reason"] | "request_failed";
+  updatedAt: string;
+  message: string;
+};
+
 type StagePlayLaneId =
   | "observer"
   | "compact_observations"
@@ -262,6 +288,34 @@ async function fetchStagePlayRawSessionBuffer(input: {
     throw new Error(`Stage Play raw session buffer request failed: ${response.status}`);
   }
   return await response.json() as StagePlayRawSessionBufferListResponse;
+}
+
+async function projectStagePlayLiveAnswer(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  objective?: string | null;
+}): Promise<StagePlayProjectLiveAnswerResponse> {
+  const response = await fetch("/api/helix/stage-play/project-live-answer", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      threadId: input.threadId,
+      roomId: input.roomId,
+      environmentId: input.environmentId,
+      objective: input.objective,
+      ensureStagePlayLineSchema: true,
+      createIfMissing: true,
+      preferredPreset: "minecraft_run_monitor",
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play projection failed: ${response.status}`);
+  }
+  return await response.json() as StagePlayProjectLiveAnswerResponse;
 }
 
 async function validateStagePlayDraft(input: {
@@ -538,13 +592,18 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
 function StagePlayToolActivityStrip({
   graph,
   diff,
+  projectionStatus,
 }: {
   graph: StagePlayBadgeGraphV1;
   diff: StagePlayGraphDiff | null;
+  projectionStatus: StagePlayProjectionStatus | null;
 }) {
   const sourceFreshnessChanged = diff?.sourceWindowChanged === true;
   const missingCount = graph.summary.missingEvidenceCount;
   const summaryText = `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`;
+  const skippedText = projectionStatus?.skippedLineKeys
+    .map((key) => key === "recommendation" ? "recommendation requires model review" : key)
+    .join(", ");
   return (
     <div
       data-testid="stage-play-tool-activity-strip"
@@ -569,6 +628,14 @@ function StagePlayToolActivityStrip({
         {diff && hasStagePlayGraphDiff(diff) ? (
           <span className="font-mono text-[11px] text-emerald-200">
             +{diff.addedBadgeIds.length} / ~{diff.updatedBadgeIds.length} / -{diff.removedBadgeIds.length}
+          </span>
+        ) : null}
+        {projectionStatus ? (
+          <span className="basis-full text-center font-mono text-[11px] text-emerald-100">
+            Projected {projectionStatus.projectedLineKeys.length} lines: {projectionStatus.projectedLineKeys.join(", ") || "none"}
+            {projectionStatus.skippedLineKeys.length > 0 ? (
+              <span className="text-amber-100"> | Skipped: {skippedText}</span>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -838,7 +905,7 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function floatingTooltipPosition(rect: DOMRect, input: {
+function floatingTooltipPosition(rect: DOMRect | null | undefined, input: {
   width?: number;
   estimatedHeight?: number;
 } = {}): StagePlayTooltipPosition {
@@ -846,6 +913,14 @@ function floatingTooltipPosition(rect: DOMRect, input: {
   const width = Math.min(input.width ?? 256, Math.max(220, window.innerWidth - margin * 2));
   const maxHeight = Math.max(140, window.innerHeight - margin * 2);
   const estimatedHeight = Math.min(input.estimatedHeight ?? 240, maxHeight);
+  if (!rect) {
+    return {
+      left: margin,
+      top: margin,
+      width,
+      maxHeight,
+    };
+  }
   const preferredBelow = rect.bottom + 8;
   const preferredAbove = rect.top - estimatedHeight - 8;
   const top = preferredBelow + estimatedHeight <= window.innerHeight - margin
@@ -963,6 +1038,7 @@ function StagePlayGraphCanvas({
   scrollportRef,
   onSelect,
   onSelectDraftNode,
+  onProjectLiveAnswer,
 }: {
   graph: StagePlayBadgeGraphV1;
   graphDiff: StagePlayGraphDiff | null;
@@ -974,6 +1050,7 @@ function StagePlayGraphCanvas({
   scrollportRef: React.RefObject<HTMLDivElement>;
   onSelect: (badgeId: string) => void;
   onSelectDraftNode: (nodeId: string) => void;
+  onProjectLiveAnswer: () => void;
 }) {
   const outputNodes = useMemo(() => outputNodesForGraph(graph), [graph]);
   const [floatingTooltip, setFloatingTooltip] = useState<StagePlayFloatingTooltip | null>(null);
@@ -1103,6 +1180,7 @@ function StagePlayGraphCanvas({
           const selectedObserverSourceCount = observerSources.filter((source) => source.selectedForStagePlay).length;
           const isBlocked = badge.kind === "blocked_affordance" || badge.status === "blocked";
           const isMissing = badge.kind === "missing_evidence" || badge.status === "missing_evidence";
+          const canProjectFromBadge = badge.id === "interpreter.stage_play_reflection";
           const isNew = addedBadgeIds.has(badge.id);
           const isUpdated = updatedBadgeIds.has(badge.id) || (badge.kind === "observer" && graphDiff?.sourceWindowChanged === true);
           const pulseClass = isNew
@@ -1135,14 +1213,14 @@ function StagePlayGraphCanvas({
                   badge,
                   observerSources,
                   position: floatingTooltipPosition(
-                    event.currentTarget.getBoundingClientRect(),
+                    event.currentTarget?.getBoundingClientRect(),
                     { estimatedHeight: badge.kind === "observer" ? 340 : 230 },
                   ),
                 });
               }}
               onMouseMove={(event) => {
                 const key = `badge:${badge.id}`;
-                const rect = event.currentTarget.getBoundingClientRect();
+                const rect = event.currentTarget?.getBoundingClientRect();
                 setFloatingTooltip((current) => current?.key === key
                   ? {
                       ...current,
@@ -1203,6 +1281,19 @@ function StagePlayGraphCanvas({
                   </>
                 ) : null}
               </button>
+              {canProjectFromBadge ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onProjectLiveAnswer();
+                  }}
+                  className="mt-1 w-32 rounded border border-emerald-700 bg-emerald-950/70 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 shadow-lg hover:border-emerald-400"
+                  data-testid="stage-play-project-live-answer-interpreter"
+                >
+                  Project to Live Answer
+                </button>
+              ) : null}
             </div>
           );
         })}
@@ -1244,56 +1335,67 @@ function StagePlayGraphCanvas({
             : node.status === "missing_evidence"
               ? "animate-pulse"
               : "";
+          const left = point.x - (node.kind === "live_answer" ? 80 : node.kind === "prediction" ? 68 : 56);
+          const top = point.y - (node.kind === "live_answer" ? 40 : 28);
           return (
-            <button
-              type="button"
-              key={node.id}
-              onClick={() => {
-                if (node.relatedBadgeIds[0]) onSelect(node.relatedBadgeIds[0]);
-              }}
-              className={`absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
-              style={{
-                left: point.x - (node.kind === "live_answer" ? 80 : node.kind === "prediction" ? 68 : 56),
-                top: point.y - (node.kind === "live_answer" ? 40 : 28),
-              }}
-              aria-label={node.title}
-              data-testid="stage-play-output-node"
-              onMouseEnter={(event) => {
-                const key = `output:${node.id}`;
-                setFloatingTooltip({
-                  key,
-                  kind: "output",
-                  node,
-                  position: floatingTooltipPosition(event.currentTarget.getBoundingClientRect(), { estimatedHeight: 190 }),
-                });
-              }}
-              onMouseMove={(event) => {
-                const key = `output:${node.id}`;
-                const rect = event.currentTarget.getBoundingClientRect();
-                setFloatingTooltip((current) => current?.key === key
-                  ? {
-                      ...current,
-                      position: floatingTooltipPosition(rect, { estimatedHeight: 190 }),
-                    }
-                  : current);
-              }}
-              onMouseLeave={() => {
-                const key = `output:${node.id}`;
-                setFloatingTooltip((current) => current?.key === key ? null : current);
-              }}
-            >
-              {node.kind === "validation" ? (
-                <span className="text-base" aria-hidden="true">{node.status === "blocked" ? "x" : "ok"}</span>
-              ) : node.kind === "prediction" ? (
-                <span aria-hidden="true">-&gt;</span>
-              ) : node.kind === "live_answer" ? (
-                <span className="font-mono text-[10px]" aria-hidden="true">OUT</span>
-              ) : node.status === "missing_evidence" ? (
-                <span aria-hidden="true">?</span>
-              ) : (
-                <span aria-hidden="true">.</span>
-              )}
-            </button>
+            <React.Fragment key={node.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (node.relatedBadgeIds[0]) onSelect(node.relatedBadgeIds[0]);
+                }}
+                className={`absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
+                style={{ left, top }}
+                aria-label={node.title}
+                data-testid="stage-play-output-node"
+                onMouseEnter={(event) => {
+                  const key = `output:${node.id}`;
+                  setFloatingTooltip({
+                    key,
+                    kind: "output",
+                    node,
+                    position: floatingTooltipPosition(event.currentTarget?.getBoundingClientRect(), { estimatedHeight: 190 }),
+                  });
+                }}
+                onMouseMove={(event) => {
+                  const key = `output:${node.id}`;
+                  const rect = event.currentTarget?.getBoundingClientRect();
+                  setFloatingTooltip((current) => current?.key === key
+                    ? {
+                        ...current,
+                        position: floatingTooltipPosition(rect, { estimatedHeight: 190 }),
+                      }
+                    : current);
+                }}
+                onMouseLeave={() => {
+                  const key = `output:${node.id}`;
+                  setFloatingTooltip((current) => current?.key === key ? null : current);
+                }}
+              >
+                {node.kind === "validation" ? (
+                  <span className="text-base" aria-hidden="true">{node.status === "blocked" ? "x" : "ok"}</span>
+                ) : node.kind === "prediction" ? (
+                  <span aria-hidden="true">-&gt;</span>
+                ) : node.kind === "live_answer" ? (
+                  <span className="font-mono text-[10px]" aria-hidden="true">OUT</span>
+                ) : node.status === "missing_evidence" ? (
+                  <span aria-hidden="true">?</span>
+                ) : (
+                  <span aria-hidden="true">.</span>
+                )}
+              </button>
+              {node.kind === "live_answer" ? (
+                <button
+                  type="button"
+                  onClick={onProjectLiveAnswer}
+                  className="absolute w-40 rounded border border-emerald-700 bg-emerald-950/80 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 shadow-lg hover:border-emerald-400"
+                  style={{ left, top: top + 86 }}
+                  data-testid="stage-play-project-live-answer-output"
+                >
+                  Project to Live Answer
+                </button>
+              ) : null}
+            </React.Fragment>
           );
         })}
         {draftNodes.map((node) => (
@@ -1315,12 +1417,12 @@ function StagePlayGraphCanvas({
                 key,
                 kind: "draft",
                 node,
-                position: floatingTooltipPosition(event.currentTarget.getBoundingClientRect(), { width: 224, estimatedHeight: 130 }),
+                position: floatingTooltipPosition(event.currentTarget?.getBoundingClientRect(), { width: 224, estimatedHeight: 130 }),
               });
             }}
             onMouseMove={(event) => {
               const key = `draft:${node.id}`;
-              const rect = event.currentTarget.getBoundingClientRect();
+              const rect = event.currentTarget?.getBoundingClientRect();
               setFloatingTooltip((current) => current?.key === key
                 ? {
                     ...current,
@@ -1538,6 +1640,7 @@ function StagePlayBindingOverlay({
   onStartVisualSourceSetup,
   onAttachAudioTranscriptSource,
   onPauseVisualSourceSetup,
+  onProjectLiveAnswer,
   sourceAuditSelection,
   rawSessionBufferEntries,
   rawSessionBufferLoading,
@@ -1571,6 +1674,7 @@ function StagePlayBindingOverlay({
   onStartVisualSourceSetup: (surface: StagePlayVisualCaptureSurface) => void;
   onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
   onPauseVisualSourceSetup: () => void;
+  onProjectLiveAnswer: () => void;
   sourceAuditSelection: StagePlaySourceAuditSelection;
   rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
   rawSessionBufferLoading: boolean;
@@ -1584,7 +1688,6 @@ function StagePlayBindingOverlay({
     : "Click badges in the map to assemble a procedural trace.";
   const liveNodeGroups = activeFilterKind ? groupedBadges : [];
   const visibleBadges = liveNodeGroups.flatMap((group) => group.badges);
-  const selectedBadgeIsObserver = selectedBadge?.kind === "observer";
 
   function addNodeType(kind: StagePlayBadgeV1["kind"]) {
     const matchingIds = graph.badges.filter((badge) => badge.kind === kind).map((badge) => badge.id);
@@ -1601,8 +1704,8 @@ function StagePlayBindingOverlay({
     >
       <div className="flex items-start justify-between gap-3 border-b border-slate-800 p-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Stage Builder</div>
-          <div className="mt-0.5 text-base font-semibold leading-tight">Node library</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Stage Console</div>
+          <div className="mt-0.5 text-base font-semibold leading-tight">Builder Palette</div>
           <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
             Add node types, watch live evidence fill them, and assemble procedures without granting execution.
           </div>
@@ -1611,7 +1714,7 @@ function StagePlayBindingOverlay({
           type="button"
           onClick={onClose}
           className="rounded border border-slate-700 p-1.5 text-slate-300 hover:border-slate-500 hover:text-slate-100"
-          aria-label="Close Stage Play bindings"
+          aria-label="Close Stage Play console"
         >
           <PanelLeftClose className="h-4 w-4" />
         </button>
@@ -1630,7 +1733,7 @@ function StagePlayBindingOverlay({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <Section title="Node builder">
+        <Section title="Builder Palette">
           <div className="space-y-2">
             {STAGE_PLAY_NODE_BUILDER_TYPES.map((nodeType) => {
               const count = graph.summary.kindCounts[nodeType.kind] ?? 0;
@@ -1661,30 +1764,6 @@ function StagePlayBindingOverlay({
             })}
           </div>
         </Section>
-
-        {selectedBadgeIsObserver ? (
-          <div className="mt-3">
-            <Inspector
-              badge={selectedBadge}
-              relatedEdges={relatedEdges}
-              relatedBadges={relatedBadges}
-              relatedActions={relatedActions}
-              observerSources={graph.sourceWindow.sources}
-              onObserverDraftAction={onObserverDraftAction}
-              sourceSetupCadenceMs={sourceSetupCadenceMs}
-              sourceSetupStatus={sourceSetupStatus}
-              onSetSourceSetupCadenceMs={onSetSourceSetupCadenceMs}
-              onStartVisualSourceSetup={onStartVisualSourceSetup}
-              onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
-              onPauseVisualSourceSetup={onPauseVisualSourceSetup}
-              sourceAuditSelection={sourceAuditSelection}
-              rawSessionBufferEntries={rawSessionBufferEntries}
-              rawSessionBufferLoading={rawSessionBufferLoading}
-              onOpenSourceAudit={onOpenSourceAudit}
-              onClearRawSessionBuffer={onClearRawSessionBuffer}
-            />
-          </div>
-        ) : null}
 
         <Section title="Tool assembly">
           <div data-testid="stage-play-builder-artifacts" className="space-y-2 text-xs">
@@ -1750,7 +1829,7 @@ function StagePlayBindingOverlay({
           </div>
         </Section>
 
-        <Section title="Selected trace">
+        <Section title="Procedure Trace">
           <div className="font-mono text-xs leading-relaxed text-cyan-100">{selectedExpression}</div>
           <div className="mt-2 flex flex-wrap gap-1">
             {selectedBadges.map((badge) => (
@@ -1764,7 +1843,7 @@ function StagePlayBindingOverlay({
         <div className="mt-3 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {activeFilterKind ? `${labelize(activeFilterKind)} nodes` : "Live nodes"}
+              {activeFilterKind ? `${labelize(activeFilterKind)} evidence nodes` : "Evidence Nodes"}
             </div>
             {activeFilterKind ? (
               <button
@@ -1778,7 +1857,7 @@ function StagePlayBindingOverlay({
           </div>
           {!activeFilterKind ? (
             <div className="rounded-md border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-500">
-              Choose a node type above to stage matching live nodes onto the graph assembly.
+              Choose a builder palette type above to stage matching evidence nodes onto the graph assembly.
             </div>
           ) : visibleBadges.length === 0 ? (
             <div className="rounded-md border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-500">
@@ -1801,7 +1880,6 @@ function StagePlayBindingOverlay({
           ))}
         </div>
 
-        {!selectedBadgeIsObserver ? (
         <div className="mt-3">
           <Inspector
             badge={selectedBadge}
@@ -1816,6 +1894,7 @@ function StagePlayBindingOverlay({
             onStartVisualSourceSetup={onStartVisualSourceSetup}
             onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
             onPauseVisualSourceSetup={onPauseVisualSourceSetup}
+            onProjectLiveAnswer={onProjectLiveAnswer}
             sourceAuditSelection={sourceAuditSelection}
             rawSessionBufferEntries={rawSessionBufferEntries}
             rawSessionBufferLoading={rawSessionBufferLoading}
@@ -1823,7 +1902,6 @@ function StagePlayBindingOverlay({
             onClearRawSessionBuffer={onClearRawSessionBuffer}
           />
         </div>
-        ) : null}
       </div>
     </aside>
   );
@@ -1842,6 +1920,7 @@ function Inspector({
   onStartVisualSourceSetup,
   onAttachAudioTranscriptSource,
   onPauseVisualSourceSetup,
+  onProjectLiveAnswer,
   sourceAuditSelection,
   rawSessionBufferEntries,
   rawSessionBufferLoading,
@@ -1860,6 +1939,7 @@ function Inspector({
   onStartVisualSourceSetup: (surface: StagePlayVisualCaptureSurface) => void;
   onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
   onPauseVisualSourceSetup: () => void;
+  onProjectLiveAnswer: () => void;
   sourceAuditSelection: StagePlaySourceAuditSelection;
   rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
   rawSessionBufferLoading: boolean;
@@ -1875,6 +1955,13 @@ function Inspector({
   }
 
   const expression = proceduralExpression(badge);
+  const sourceControl = badge.kind === "source"
+    ? observerSources.find((source) =>
+      badge.subjects.includes(source.sourceId) ||
+      badge.evidenceRefs.some((ref) => source.evidenceRefs.includes(ref)) ||
+      badge.sourceRefs.some((ref) => source.evidenceRefs.includes(ref.id))
+    ) ?? null
+    : null;
 
   return (
     <aside className="min-h-0 overflow-y-auto rounded-md border border-slate-800 bg-slate-950/75 p-4">
@@ -1971,6 +2058,14 @@ function Inspector({
                   className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
                 >
                   Pause source
+                </button>
+                <button
+                  type="button"
+                  onClick={onProjectLiveAnswer}
+                  className="col-span-2 rounded border border-emerald-700 bg-emerald-950/25 px-2 py-1.5 text-[10px] font-semibold text-emerald-100 hover:border-emerald-400"
+                  data-testid="stage-play-project-live-answer"
+                >
+                  Project to Live Answer
                 </button>
               </div>
 
@@ -2165,6 +2260,132 @@ function Inspector({
           </>
         ) : null}
 
+        {badge.kind === "source" && sourceControl ? (
+          <Section title="Source Route Controls">
+            <div className="space-y-2 text-xs">
+              <div className="rounded border border-slate-800 bg-black/20 p-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-slate-100">{labelize(sourceControl.modality)}</div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{sourceControl.sourceId}</div>
+                  </div>
+                  <Badge variant="outline" className={statusTone(sourceControl.status === "active" ? "observed" : sourceControl.status === "configured_missing" ? "missing_evidence" : sourceControl.status)}>
+                    {labelize(sourceControl.status)}
+                  </Badge>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                  <div>Route: <span className="font-mono text-amber-100">{sourceControl.routeTo}</span></div>
+                  <div>Selected: <span className="font-mono text-slate-200">{sourceControl.selectedForStagePlay ? "yes" : "no"}</span></div>
+                  <div>Fidelity: <span className="font-mono text-slate-200">{sourceControl.fidelityScore.toFixed(2)}</span></div>
+                  <div>Cadence: <span className="font-mono text-slate-200">{sourceControl.cadenceMs ? `${sourceControl.cadenceMs}ms` : "none"}</span></div>
+                </div>
+                <div className="mt-2 text-[11px] leading-relaxed text-slate-400">{sourceControl.contribution}</div>
+              </div>
+
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => onObserverDraftAction(sourceControl, "use_for_stage_play")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Use for Stage Play
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onObserverDraftAction(sourceControl, "route_to_narrative")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Route to Narrative
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onObserverDraftAction(sourceControl, "route_to_minecraft_world")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Route to Minecraft World
+                </button>
+                {sourceControl.modality === "visual_frame" ? (
+                  <button
+                    type="button"
+                    onClick={() => onObserverDraftAction(sourceControl, "start_visual_interval")}
+                    className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                  >
+                    Start visual interval
+                  </button>
+                ) : null}
+                {sourceControl.modality === "audio_transcript" ? (
+                  <button
+                    type="button"
+                    onClick={() => onObserverDraftAction(sourceControl, "attach_audio_transcript")}
+                    className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                  >
+                    Attach audio transcript
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => onObserverDraftAction(sourceControl, "pause_source")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Pause source
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenSourceAudit(sourceControl, "source_evidence")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Review source evidence
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenSourceAudit(sourceControl, "compact_observation")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Open compact observation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenSourceAudit(sourceControl, "raw_buffer")}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                >
+                  Open raw buffer preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onClearRawSessionBuffer(sourceControl)}
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-amber-500 hover:text-amber-100"
+                >
+                  Clear raw buffer
+                </button>
+              </div>
+
+              {sourceControl.missingReason || sourceControl.nextRequiredAction ? (
+                <div className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
+                  {sourceControl.missingReason ?? sourceControl.nextRequiredAction}
+                </div>
+              ) : null}
+            </div>
+          </Section>
+        ) : null}
+
+        {badge.id === "interpreter.stage_play_reflection" ? (
+          <Section title="Live Answer Projection">
+            <div className="space-y-2 text-xs">
+              <p className="text-slate-400">
+                Project current Stage Play evidence lanes into the Live Answer environment. This is a deterministic evidence projection, not assistant answer authority.
+              </p>
+              <button
+                type="button"
+                onClick={onProjectLiveAnswer}
+                className="w-full rounded border border-emerald-700 bg-emerald-950/25 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
+                data-testid="stage-play-project-live-answer-inspector"
+              >
+                Project to Live Answer
+              </button>
+            </div>
+          </Section>
+        ) : null}
+
         <Section title="Live Bindings">
           {badge.liveBindings.length > 0 ? (
             <div className="space-y-2">
@@ -2300,6 +2521,7 @@ export default function StagePlayBadgeGraphPanel() {
     level: "idle",
     message: "",
   });
+  const [projectionStatus, setProjectionStatus] = useState<StagePlayProjectionStatus | null>(null);
   const [sourceAuditSelection, setSourceAuditSelection] = useState<StagePlaySourceAuditSelection>(null);
   const [graphDiff, setGraphDiff] = useState<StagePlayGraphDiff | null>(null);
   const [removedBadgeGhosts, setRemovedBadgeGhosts] = useState<StagePlayRemovedBadgeGhost[]>([]);
@@ -2312,6 +2534,7 @@ export default function StagePlayBadgeGraphPanel() {
   const activeEnvironment = useLiveAnswerEnvironmentStore((state) =>
     selectActiveLiveAnswerEnvironment(state, STAGE_PLAY_PANEL_THREAD_ID),
   );
+  const loadLiveAnswerEnvironment = useLiveAnswerEnvironmentStore((state) => state.loadLiveAnswerEnvironment);
   const threadId = activeEnvironment?.thread_id ?? STAGE_PLAY_PANEL_THREAD_ID;
   const roomId = activeEnvironment?.room_id ?? null;
   const environmentId = activeEnvironment?.environment_id ?? null;
@@ -2460,7 +2683,7 @@ export default function StagePlayBadgeGraphPanel() {
     toggleSelectedBadgeId(badgeId);
     if (badge?.kind === "observer") {
       setActiveFilterKind("observer");
-      setBindingOverlayOpen(true);
+      setBindingOverlayOpen(false);
     } else if (badge?.kind) {
       setActiveFilterKind(badge.kind);
     }
@@ -2672,6 +2895,54 @@ export default function StagePlayBadgeGraphPanel() {
     addObserverDraftAction(source, action);
     if (source) {
       void persistObserverSourceRoute(source, action);
+    }
+  }
+
+  async function handleProjectLiveAnswer() {
+    setSourceSetupStatus({
+      level: "working",
+      message: "Projecting Stage Play evidence lanes into Live Answer...",
+    });
+    try {
+      const result = await projectStagePlayLiveAnswer({
+        threadId,
+        roomId,
+        environmentId,
+        objective: activeEnvironment?.objective ?? graph?.description ?? graph?.title ?? "Project Stage Play graph into Live Answer.",
+      });
+      const message = result.reason === "projected"
+        ? `Projected ${result.projectedLineKeys.length} Stage Play line(s) to Live Answer.`
+        : result.reason === "no_line_changes"
+          ? "Stage Play projection ran; no Live Answer lines changed."
+          : `${labelize(result.reason)}: ${result.skippedLineKeys.slice(0, 4).join(", ")}`;
+      setProjectionStatus({
+        projectedLineKeys: result.projectedLineKeys,
+        skippedLineKeys: result.skippedLineKeys,
+        reason: result.reason,
+        updatedAt: new Date().toISOString(),
+        message,
+      });
+      setSourceSetupStatus({
+        level: result.reason === "projected" || result.reason === "no_line_changes" ? "ok" : "error",
+        message,
+      });
+      await Promise.all([
+        graphQuery.refetch(),
+        builderContextQuery.refetch(),
+        loadLiveAnswerEnvironment(threadId),
+      ]);
+    } catch (error) {
+      setSourceSetupStatus({
+        level: "error",
+        message: error instanceof Error ? error.message : "stage_play_live_answer_projection_failed",
+      });
+      setProjectionStatus({
+        projectedLineKeys: [],
+        skippedLineKeys: [],
+        reason: "request_failed",
+        updatedAt: new Date().toISOString(),
+        message: error instanceof Error ? error.message : "stage_play_live_answer_projection_failed",
+      });
     }
   }
 
@@ -2997,10 +3268,10 @@ export default function StagePlayBadgeGraphPanel() {
             type="button"
             onClick={() => setBindingOverlayOpen(true)}
             className="absolute left-3 top-3 z-30 flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950/90 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cyan-100 shadow-xl hover:border-cyan-500"
-            aria-label="Open Stage Play bindings"
+            aria-label="Open Stage Play console"
           >
             <PanelLeftOpen className="h-4 w-4" />
-            Bindings
+            Console
           </button>
         ) : null}
 
@@ -3032,6 +3303,7 @@ export default function StagePlayBadgeGraphPanel() {
             onStartVisualSourceSetup={startVisualSourceSetup}
             onAttachAudioTranscriptSource={attachAudioTranscriptSource}
             onPauseVisualSourceSetup={pauseVisualSourceSetup}
+            onProjectLiveAnswer={handleProjectLiveAnswer}
             sourceAuditSelection={sourceAuditSelection}
             rawSessionBufferEntries={rawSessionBufferQuery.data?.entries ?? []}
             rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
@@ -3052,7 +3324,7 @@ export default function StagePlayBadgeGraphPanel() {
           </div>
         ) : null}
 
-        <StagePlayToolActivityStrip graph={graph} diff={graphDiff} />
+        <StagePlayToolActivityStrip graph={graph} diff={graphDiff} projectionStatus={projectionStatus} />
 
         {selectedDraftNodeId ? (
           (() => {
@@ -3073,6 +3345,75 @@ export default function StagePlayBadgeGraphPanel() {
           })()
         ) : null}
 
+        {selectedBadge && (selectedBadge.kind === "observer" || selectedBadge.kind === "source" || selectedBadge.id === "interpreter.stage_play_reflection") ? (
+          <aside
+            className={`absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[380px] overflow-y-auto rounded-md border bg-slate-950/95 p-2 shadow-2xl ${
+              selectedBadge.kind === "observer"
+                ? "border-amber-800/80"
+                : selectedBadge.kind === "source"
+                  ? "border-sky-800/80"
+                  : "border-fuchsia-800/80"
+            }`}
+            data-testid={
+              selectedBadge.kind === "observer"
+                ? "stage-play-observer-node-controls"
+                : selectedBadge.kind === "source"
+                  ? "stage-play-source-node-controls"
+                  : "stage-play-interpreter-node-controls"
+            }
+          >
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <div className={`text-xs font-semibold uppercase tracking-wide ${
+                selectedBadge.kind === "observer"
+                  ? "text-amber-100"
+                  : selectedBadge.kind === "source"
+                    ? "text-sky-100"
+                    : "text-fuchsia-100"
+              }`}>
+                {selectedBadge.kind === "observer"
+                  ? "Observer node controls"
+                  : selectedBadge.kind === "source"
+                    ? "Source node controls"
+                    : "Interpreter node controls"}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBadgeId(null)}
+                className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:border-slate-500"
+                aria-label={
+                  selectedBadge.kind === "observer"
+                    ? "Close Observer node controls"
+                    : selectedBadge.kind === "source"
+                      ? "Close Source node controls"
+                      : "Close Interpreter node controls"
+                }
+              >
+                Close
+              </button>
+            </div>
+            <Inspector
+              badge={selectedBadge}
+              relatedEdges={relatedEdges}
+              relatedBadges={relatedBadges}
+              relatedActions={relatedActions}
+              observerSources={graph.sourceWindow.sources}
+              onObserverDraftAction={handleObserverDraftAction}
+              sourceSetupCadenceMs={sourceSetupCadenceMs}
+              sourceSetupStatus={sourceSetupStatus}
+              onSetSourceSetupCadenceMs={setSourceSetupCadenceMs}
+              onStartVisualSourceSetup={startVisualSourceSetup}
+              onAttachAudioTranscriptSource={attachAudioTranscriptSource}
+              onPauseVisualSourceSetup={pauseVisualSourceSetup}
+              onProjectLiveAnswer={handleProjectLiveAnswer}
+              sourceAuditSelection={sourceAuditSelection}
+              rawSessionBufferEntries={rawSessionBufferQuery.data?.entries ?? []}
+              rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
+              onOpenSourceAudit={openSourceAudit}
+              onClearRawSessionBuffer={clearRawSessionBuffer}
+            />
+          </aside>
+        ) : null}
+
         <main className="flex h-full min-h-0 flex-col">
           <StagePlayGraphCanvas
             graph={graph}
@@ -3085,6 +3426,7 @@ export default function StagePlayBadgeGraphPanel() {
             scrollportRef={graphScrollportRef}
             onSelect={selectGraphBadge}
             onSelectDraftNode={setSelectedDraftNodeId}
+            onProjectLiveAnswer={handleProjectLiveAnswer}
           />
         </main>
       </div>

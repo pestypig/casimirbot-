@@ -11,6 +11,7 @@ export type HelixRouteProductSourceTarget =
   | "repo_code"
   | "runtime_evidence"
   | "live_pipeline"
+  | "live_environment"
   | "situation_epoch"
   | "visual_scene_memory"
   | "process_graph"

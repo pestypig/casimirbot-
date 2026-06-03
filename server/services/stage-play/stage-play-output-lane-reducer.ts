@@ -1,6 +1,7 @@
 import type {
   LiveAnswerEnvironment,
   LiveAnswerEnvironmentDelta,
+  LiveAnswerLineDefinition,
   LiveAnswerLineState,
 } from "@shared/helix-live-answer-environment";
 import type {
@@ -9,7 +10,10 @@ import type {
   StagePlayBadgeKindV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
-import { updateLiveAnswerEnvironment } from "../situation-room/live-answer-environment-store";
+import {
+  setLiveAnswerEnvironmentLineSchema,
+  updateLiveAnswerEnvironment,
+} from "../situation-room/live-answer-environment-store";
 
 export type StagePlayOutputLaneV1 = {
   laneId:
@@ -43,6 +47,38 @@ export type StagePlayLiveAnswerLineKey =
   | "unknowns"
   | "next_check"
   | "debug_basis";
+
+const stagePlayAnswerLine = (
+  key: StagePlayLiveAnswerLineKey,
+  label: string,
+  update_policy: LiveAnswerLineDefinition["update_policy"],
+  description?: string,
+  priority: LiveAnswerLineDefinition["priority"] = "info",
+): LiveAnswerLineDefinition => ({
+  key,
+  label,
+  description,
+  update_policy,
+  visibility: key === "debug_basis" ? "situation_panel" : "answer_card",
+  priority,
+});
+
+export const STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA: LiveAnswerLineDefinition[] = [
+  stagePlayAnswerLine("situation", "Situation", "episode_based", "Current compact Stage Play bounds."),
+  stagePlayAnswerLine("actor_state", "Actor", "episode_based", "Observed actor state and source-bound live bindings."),
+  stagePlayAnswerLine("resources", "Resources", "episode_based", "Relevant props, resources, and tools."),
+  stagePlayAnswerLine("affordances", "Affordances", "episode_based", "Currently available action affordances."),
+  stagePlayAnswerLine("risk", "Risk", "salience_only", "Hazards and blocked moves.", "warn"),
+  stagePlayAnswerLine("possibilities", "Possibilities", "projection_only", "Candidate procedural bindings, not final guidance."),
+  stagePlayAnswerLine("rehearsal", "Rehearsal", "simulation_stream", "Prediction or dry-run checks when available."),
+  stagePlayAnswerLine("recommendation", "Recommendation", "model_reviewed", "Post-tool model-reviewed guidance only.", "action"),
+  stagePlayAnswerLine("unknowns", "Unknowns", "projection_only", "Missing evidence and source gaps.", "warn"),
+  stagePlayAnswerLine("next_check", "Next check", "episode_based", "Recommended next observation/check.", "action"),
+  stagePlayAnswerLine("debug_basis", "Debug basis", "projection_only", "Evidence refs and Stage Play reducer basis."),
+];
+
+export const STAGE_PLAY_LIVE_ANSWER_LINE_KEYS: StagePlayLiveAnswerLineKey[] =
+  STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA.map((line) => line.key as StagePlayLiveAnswerLineKey);
 
 export type StagePlayOutputLineProjectionV1 = StagePlayOutputLaneV1 & {
   lineKey: StagePlayLiveAnswerLineKey;
@@ -460,6 +496,38 @@ export function buildStagePlayLiveAnswerLineValuesV1(
     };
   }
   return lineValues;
+}
+
+export function ensureLiveAnswerEnvironmentHasStagePlayLines(input: {
+  environment: LiveAnswerEnvironment | null;
+  now?: string;
+}): {
+  environment: LiveAnswerEnvironment;
+  delta: LiveAnswerEnvironmentDelta | null;
+} | null {
+  if (!input.environment) return null;
+  const existingKeys = new Set(input.environment.lines.map((line) => line.key));
+  const hasAllStagePlayLines = STAGE_PLAY_LIVE_ANSWER_LINE_KEYS.every((key) => existingKeys.has(key));
+  if (hasAllStagePlayLines) {
+    return {
+      environment: input.environment,
+      delta: null,
+    };
+  }
+  const updated = setLiveAnswerEnvironmentLineSchema({
+    environment_id: input.environment.environment_id,
+    line_schema: STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA,
+    now: input.now,
+  });
+  return updated
+    ? {
+        environment: updated.environment,
+        delta: updated.delta,
+      }
+    : {
+        environment: input.environment,
+        delta: null,
+      };
 }
 
 export function reduceLiveAnswerEnvironmentFromStagePlayGraph(input: {

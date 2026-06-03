@@ -218,6 +218,64 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(JSON.stringify(rejected.observation)).not.toMatch(/agent[_ -]?executable\s*[:=]\s*true/i);
   });
 
+  it("reports Live Answer projection status when no environment is available", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.reflect_stage_play_context",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        objective: "reflect the current stage without an attached live answer card",
+      },
+    });
+    const wrappedObservation = observation.observation as {
+      schema: "stage_play_reflection_result/v1";
+      liveAnswerProjection: {
+        attempted: boolean;
+        projected: boolean;
+        deltaId: string | null;
+        environmentId: string | null;
+        changedLineKeys: string[];
+        skippedLineKeys: string[];
+        reason: string;
+      };
+      assistant_answer: false;
+      raw_content_included: false;
+      context_role: "tool_evidence";
+      ask_context_policy: "evidence_only";
+    };
+
+    expect(observation).toMatchObject({
+      tool_name: "live_env.reflect_stage_play_context",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(observation.summary).toBe(
+      "Built Stage Play graph but did not project Live Answer lines: no_live_answer_environment.",
+    );
+    expect(wrappedObservation).toMatchObject({
+      schema: "stage_play_reflection_result/v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      liveAnswerProjection: {
+        attempted: false,
+        projected: false,
+        deltaId: null,
+        environmentId: null,
+        changedLineKeys: [],
+        reason: "no_live_answer_environment",
+      },
+    });
+    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual(expect.arrayContaining([
+      "situation",
+      "risk",
+      "possibilities",
+      "next_check",
+    ]));
+  });
+
   it("wraps Stage Play graph reflection as a non-authoritative tool observation", () => {
     const environment = createLiveAnswerEnvironment({
       thread_id: threadId,
@@ -334,7 +392,24 @@ describe("live_env.reflect_stage_play_context", () => {
         objective: "move forward without stepping into the drop",
       },
     });
-    const graph = observation.observation as StagePlayBadgeGraphV1;
+    const wrappedObservation = observation.observation as {
+      schema: "stage_play_reflection_result/v1";
+      graph: StagePlayBadgeGraphV1;
+      outputLaneProjection: { artifactId: string; assistant_answer: false; terminal_eligible: false };
+      liveAnswerProjection: {
+        attempted: boolean;
+        projected: boolean;
+        deltaId: string | null;
+        environmentId: string | null;
+        changedLineKeys: string[];
+        skippedLineKeys: string[];
+        reason: string;
+      };
+      assistant_answer: false;
+      raw_content_included: false;
+      terminal_eligible: false;
+    };
+    const graph = wrappedObservation.graph;
 
     expect(observation).toMatchObject({
       schema: "helix.live_environment_tool_observation.v1",
@@ -347,7 +422,36 @@ describe("live_env.reflect_stage_play_context", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(observation.summary).toMatch(/Built Stage Play Badge Graph with \d+ badge\(s\)/);
+    expect(observation.summary).toMatch(/Built Stage Play graph and projected \d+ Live Answer line\(s\)\./);
+    expect(wrappedObservation).toMatchObject({
+      schema: "stage_play_reflection_result/v1",
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      outputLaneProjection: {
+        artifactId: "stage_play_output_lane_projection",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      liveAnswerProjection: {
+        attempted: true,
+        projected: true,
+        environmentId: environment.environment_id,
+        reason: "projected_with_skipped_lines",
+      },
+    });
+    expect(wrappedObservation.liveAnswerProjection.deltaId).toMatch(/^live_answer_delta:/);
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+      "unknowns",
+      "next_check",
+    ]));
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+    ]));
+    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual(["debug_basis"]);
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(graph.artifactId).toBe("stage_play_badge_graph");
     expect(graph.sourceWindow.latestObservationRefs).toEqual([

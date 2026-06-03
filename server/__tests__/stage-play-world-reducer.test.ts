@@ -28,6 +28,10 @@ import {
 import { resetMinecraftWorldDeltaOverlaysForTest } from "../services/situation-room/minecraft-world-delta-overlay";
 import { resetMinecraftWorldSenseWindows } from "../services/situation-room/minecraft-world-sense-window";
 import {
+  resetStagePlaySourceRouteOverridesForTest,
+  upsertStagePlaySourceRouteOverride,
+} from "../services/situation-room/stage-play-source-window";
+import {
   buildStagePlayGraphFromWorld,
   buildStagePlayRecommendedActionAdmissionV1,
 } from "../services/stage-play/stage-play-badge-graph-builder";
@@ -43,6 +47,7 @@ beforeEach(() => {
   resetMinecraftWorldDeltaOverlaysForTest();
   resetMinecraftNavigationStateStoreForTest();
   resetMinecraftWorldSenseWindows();
+  resetStagePlaySourceRouteOverridesForTest();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
   resetSituationSourceCapabilitiesForTest();
@@ -757,6 +762,17 @@ describe("Stage Play world-state badge reducer", () => {
       latestChunkId: "live_source_chunk:visual-only",
       now: "2026-06-02T13:20:01.500Z",
     });
+    const routeOverride = upsertStagePlaySourceRouteOverride({
+      threadId,
+      roomId,
+      environmentId: "env:visual-only",
+      sourceId: "source:visual-tab",
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: ["evidence:visual-only"],
+      now: "2026-06-02T13:20:01.750Z",
+    });
 
     const graph = buildStagePlayGraphFromWorld({
       threadId,
@@ -772,7 +788,7 @@ describe("Stage Play world-state badge reducer", () => {
         sourceId: "source:visual-tab",
         modality: "visual_frame",
         selected: true,
-        routeTo: "visual_context",
+        routeTo: "narrative_stage_play",
       }),
       expect.objectContaining({
         modality: "audio_transcript",
@@ -790,7 +806,107 @@ describe("Stage Play world-state badge reducer", () => {
           "Attach browser audio transcript or microphone transcript for narrative Stage Play fusion.",
         ]),
       }),
+      expect.objectContaining({
+        id: "setting.visual_scene",
+        kind: "setting",
+        status: "candidate",
+        missingEvidence: expect.arrayContaining([
+          "Attach audio transcript or declare a narrative objective before treating the scene as fully grounded.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "actor.observed_subject",
+        kind: "actor",
+        status: "candidate",
+        missingEvidence: expect.arrayContaining([
+          "Confirm actor identity or role before using this as a named narrative actor.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "affordance.observe",
+        kind: "affordance",
+        status: "available",
+      }),
+      expect.objectContaining({
+        id: "intent.observe",
+        kind: "intent_module",
+        status: "candidate",
+      }),
+      expect.objectContaining({
+        id: "intent.seek_confirmation",
+        kind: "intent_module",
+        status: "candidate",
+      }),
+      expect.objectContaining({
+        id: "intent.compare_next_frame",
+        kind: "intent_module",
+        status: "candidate",
+      }),
+      expect.objectContaining({
+        id: "missing_evidence.audio_transcript",
+        kind: "missing_evidence",
+        status: "missing_evidence",
+        missingEvidence: expect.arrayContaining([
+          "Audio/transcript source is needed for narrative intent.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "recommended_check.attach_audio_transcript",
+        kind: "recommended_check",
+        status: "candidate",
+        missingEvidence: expect.arrayContaining([
+          "Audio/transcript source is needed for narrative intent.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "binding.scene_checkpoint",
+        kind: "procedural_binding",
+        status: "candidate",
+      }),
+      expect.objectContaining({
+        id: "binding.narrative_context_gap",
+        kind: "procedural_binding",
+        status: "candidate",
+      }),
+      expect.objectContaining({
+        id: "binding.continuity_check",
+        kind: "procedural_binding",
+        status: "candidate",
+      }),
     ]));
+    expect(graph.recommendedActions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "stage-action:attach-audio-transcript",
+        label: "Attach audio transcript for narrative intent and dialogue.",
+        actionType: "observe_more",
+        admission: "auto",
+        agentExecutable: false,
+        reasonCodes: expect.arrayContaining(["visual_active_audio_missing", "narrative_stage_play"]),
+        missingEvidence: expect.arrayContaining([
+          "Audio/transcript source is needed for narrative intent.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "stage-action:capture-compare-next-frame",
+        label: "Capture and compare the next visual frame.",
+        actionType: "safe_diagnostic_overlay",
+        admission: "auto",
+        agentExecutable: false,
+        reasonCodes: expect.arrayContaining(["visual_continuity_check", "narrative_stage_play"]),
+      }),
+      expect.objectContaining({
+        id: "stage-action:ask-user-objective",
+        label: "Ask user what narrative question or prediction target to track.",
+        actionType: "ask_user",
+        admission: "ask_user",
+        agentExecutable: false,
+        reasonCodes: expect.arrayContaining(["missing_user_objective", "narrative_stage_play"]),
+        missingEvidence: expect.arrayContaining([
+          "User objective for narrative prediction is not set.",
+        ]),
+      }),
+    ]));
+    expect(JSON.stringify(graph)).toContain(routeOverride.overrideId);
     expect(graph.authority.agent_executable).toBe(false);
   });
 });

@@ -10,7 +10,11 @@ import type {
   HelixLiveEnvironmentCommentaryStatus,
   HelixLiveEnvironmentCommentarySubject,
 } from "@shared/helix-live-environment-commentary";
-import { getActiveLiveAnswerEnvironmentForThread, getLiveAnswerEnvironment } from "../situation-room/live-answer-environment-store";
+import {
+  getActiveLiveAnswerEnvironmentForSource,
+  getActiveLiveAnswerEnvironmentForThread,
+  getLiveAnswerEnvironment,
+} from "../situation-room/live-answer-environment-store";
 import { queryEventWindow } from "../situation-room/event-window-query";
 import { appendInterpretedEvent, listInterpretedEvents } from "../situation-room/interpreted-event-log-store";
 import {
@@ -19,7 +23,11 @@ import {
 } from "../situation-room/live-environment-commentary-store";
 import { queryMinecraftNavigationState } from "../situation-room/minecraft-navigation-state-store";
 import { buildStagePlayGraphFromWorld as buildStagePlayBadgeGraphFromLiveWindow } from "../stage-play/stage-play-badge-graph-builder";
-import { reduceLiveAnswerEnvironmentFromStagePlayGraph } from "../stage-play/stage-play-output-lane-reducer";
+import {
+  buildStagePlayOutputLaneProjectionV1,
+  reduceLiveAnswerEnvironmentFromStagePlayGraph,
+} from "../stage-play/stage-play-output-lane-reducer";
+import { ensureStagePlayLiveAnswerEnvironment } from "../stage-play/stage-play-live-answer-projector";
 import {
   buildStagePlayBuilderCatalog,
   buildStagePlaySourceQuery,
@@ -186,9 +194,13 @@ export function executeLiveEnvironmentTool(
   input: ExecuteLiveEnvironmentToolInput,
 ): HelixLiveEnvironmentToolObservation {
   const args = input.args ?? {};
-  const environment =
+  const explicitSourceId = readString(args.source_id) ?? readString(args.sourceId);
+  let environment =
     (input.environment_id ? getLiveAnswerEnvironment(input.environment_id) : null) ??
-    getActiveLiveAnswerEnvironmentForThread(input.thread_id);
+    (explicitSourceId ? getActiveLiveAnswerEnvironmentForSource(explicitSourceId) : null) ??
+    getActiveLiveAnswerEnvironmentForThread(input.thread_id) ??
+    getActiveLiveAnswerEnvironmentForThread("helix-ask:desktop");
+  const effectiveThreadId = environment?.thread_id ?? input.thread_id;
   const roomId = readString(args.room_id) ?? environment?.room_id ?? null;
 
   if (input.tool_name === "live_env.read_card") {
@@ -388,15 +400,17 @@ export function executeLiveEnvironmentTool(
     //
     // The graph is the set designer, not the actor: it paints the stage, labels the trapdoors,
     // and points at the papier-mache dragon. The agent still decides what line to speak.
+    const draftSourceId = sourceIdsFromStagePlayDraft({
+      draft: args.draft,
+      threadId: effectiveThreadId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+    })[0] ?? null;
+    const sourceId = explicitSourceId ?? draftSourceId;
     const graph = buildStagePlayBadgeGraphFromLiveWindow({
-      threadId: input.thread_id,
+      threadId: effectiveThreadId,
       roomId,
-      environmentId: input.environment_id ?? null,
-      sourceId: readString(args.source_id) ?? sourceIdsFromStagePlayDraft({
-        draft: args.draft,
-        threadId: input.thread_id,
-        environmentId: input.environment_id ?? null,
-      })[0] ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId,
       objective: readString(args.objective),
     });
     const draftValidation = args.draft
@@ -406,34 +420,115 @@ export function executeLiveEnvironmentTool(
           draft: args.draft,
         })
       : null;
-    const liveAnswerLineReduction = environment && (!draftValidation || draftValidation.ok)
+    const generatedAt = new Date().toISOString();
+    const outputLaneProjection = buildStagePlayOutputLaneProjectionV1({
+      graph,
+      generatedAt,
+    });
+    const graphSourceEvidenceRefs = [
+      ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
+      ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
+      ...graph.sourceWindow.latestObservationRefs,
+      ...graph.sourceWindow.latestSnapshotRefs,
+      ...graph.sourceWindow.latestDeltaOverlayRefs,
+      ...graph.sourceWindow.latestNavigationRefs,
+    ];
+    const hasSourceEvidence = graphSourceEvidenceRefs.length > 0;
+    let environmentEnsure: {
+      created: boolean;
+      repairedLineSchema: boolean;
+      missingBefore: string[];
+      addedLineKeys: string[];
+    } | null = null;
+    if (hasSourceEvidence && (!draftValidation || draftValidation.ok)) {
+      const selectedSourceIds = Array.from(new Set([
+        sourceId,
+        ...graph.sourceWindow.sources
+          .filter((source) => source.selectedForStagePlay || source.evidenceRefs.length > 0)
+          .map((source) => source.sourceId),
+        ...(environment?.source_ids ?? []),
+      ].filter((entry): entry is string => Boolean(entry))));
+      const ensured = ensureStagePlayLiveAnswerEnvironment({
+        threadId: effectiveThreadId,
+        roomId,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        objective: readString(args.objective),
+        sourceIds: selectedSourceIds,
+        graphId: graph.graphId,
+        now: generatedAt,
+      });
+      environment = ensured.environment;
+      environmentEnsure = {
+        created: ensured.created,
+        repairedLineSchema: ensured.repairedLineSchema,
+        missingBefore: ensured.missingBefore,
+        addedLineKeys: ensured.addedLineKeys,
+      };
+    }
+    const liveAnswerLineReduction = environment && hasSourceEvidence && (!draftValidation || draftValidation.ok)
       ? reduceLiveAnswerEnvironmentFromStagePlayGraph({
           environment,
           graph,
-          now: new Date().toISOString(),
+          now: generatedAt,
         })
       : null;
+    const projectedOutputLaneProjection = liveAnswerLineReduction?.projection ?? outputLaneProjection;
+    const projectedLineKeys = liveAnswerLineReduction?.delta.changed_line_keys ?? [];
+    const environmentLineKeys = new Set(environment?.lines.map((line) => line.key) ?? []);
+    const skippedLineKeys = projectedOutputLaneProjection.lanes
+      .filter((lane) => lane.lineUpdateAllowed && lane.lineKey !== "recommendation")
+      .map((lane) => lane.lineKey)
+      .filter((lineKey) => !environmentLineKeys.has(lineKey));
+    const liveAnswerProjectionReason = liveAnswerLineReduction
+      ? skippedLineKeys.length > 0
+        ? "projected_with_skipped_lines"
+        : "projected"
+      : draftValidation && !draftValidation.ok
+        ? "draft_validation_failed"
+        : !environment
+          ? "no_live_answer_environment"
+          : environment.status !== "active"
+            ? "environment_not_active"
+            : !hasSourceEvidence
+              ? "no_source_evidence"
+            : skippedLineKeys.length > 0
+              ? "line_schema_mismatch"
+              : "no_line_changes";
+    const observationPayload = {
+      schema: "stage_play_reflection_result/v1",
+      graph,
+      outputLaneProjection: projectedOutputLaneProjection,
+      liveAnswerProjection: {
+        attempted: Boolean(environment),
+        projected: Boolean(liveAnswerLineReduction),
+        deltaId: liveAnswerLineReduction?.delta.delta_id ?? null,
+        environmentId: liveAnswerLineReduction?.environment.environment_id ?? environment?.environment_id ?? null,
+        changedLineKeys: projectedLineKeys,
+        skippedLineKeys,
+        reason: liveAnswerProjectionReason,
+        environmentEnsure,
+      },
+      draftValidation,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      terminal_eligible: false,
+      post_tool_model_step_required: true,
+    };
     return makeObservation({
       threadId: input.thread_id,
-      environmentId: input.environment_id,
+      environmentId: liveAnswerLineReduction?.environment.environment_id ?? environment?.environment_id ?? input.environment_id,
       toolName: input.tool_name,
       ok: draftValidation ? draftValidation.ok : true,
-      summary: draftValidation && !draftValidation.ok
-        ? `Stage Play draft was rejected with ${draftValidation.issues.length} issue(s); graph remains diagnostic evidence.`
-        : `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`,
-      observation: draftValidation
-        ? {
-            schema: "stage_play_reflection_with_draft/v1",
-            graph,
-            draftValidation,
-            assistant_answer: false,
-            raw_content_included: false,
-            context_role: "tool_evidence",
-            ask_context_policy: "evidence_only",
-          }
-        : graph,
+      summary: liveAnswerLineReduction
+        ? `Built Stage Play graph and projected ${projectedLineKeys.length} Live Answer line(s).`
+        : `Built Stage Play graph but did not project Live Answer lines: ${liveAnswerProjectionReason}.`,
+      observation: observationPayload,
       evidenceRefs: [
         ...(draftValidation?.evidenceRefs ?? []),
+        projectedOutputLaneProjection.graphId,
+        ...projectedOutputLaneProjection.evidenceRefs,
         ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
         ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
         ...graph.sourceWindow.latestObservationRefs,

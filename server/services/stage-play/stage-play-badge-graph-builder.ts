@@ -882,6 +882,44 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       reasonCodes: ["gateway_blocks_visible"],
     })));
   }
+  const narrativeSources = sourceWindow.sources.filter((source) =>
+    source.selectedForStagePlay && source.routeTo === "narrative_stage_play"
+  );
+  const activeVisualNarrativeSources = narrativeSources.filter((source) =>
+    modalityMatches(source, /visual|screen|frame/) && source.status === "active"
+  );
+  const activeAudioNarrativeSources = narrativeSources.filter((source) =>
+    modalityMatches(source, /audio|transcript/) && source.status === "active"
+  );
+  const hasNarrativeVisual = activeVisualNarrativeSources.length > 0;
+  const hasNarrativeAudio = activeAudioNarrativeSources.length > 0;
+  const hasVisualNarrativeSource = hasNarrativeVisual;
+  const hasVisualOnlyNarrativeSource = hasNarrativeVisual && !hasNarrativeAudio;
+  if (hasVisualNarrativeSource) {
+    settingIds.push(pushBadge(badges, badge({
+      id: "setting.visual_scene",
+      title: "visual scene window",
+      plainMeaning: "A compact visual source window is available for narrative Stage Play setup.",
+      whyItMatters: "Visual-only Stage Play can bound setting and continuity checks, but it still needs dialogue or objective evidence before strong narrative claims.",
+      kind: "setting",
+      status: "candidate",
+      tags: ["narrative_stage_play", "visual_scene", "compact_observation_window"],
+      sourceRefs,
+      evidenceRefs: unique([
+        ...evidenceRefs,
+        ...activeVisualNarrativeSources.flatMap((source) => source.evidenceRefs),
+      ]),
+      liveBindings: activeVisualNarrativeSources.map((source) =>
+        makeBinding("source_modality", source.evidenceRefs, `${source.modality}:${source.routeTo}:${source.status}`)
+      ),
+      confidence: hasVisualOnlyNarrativeSource ? 0.62 : 0.72,
+      missingEvidence: hasVisualOnlyNarrativeSource
+        ? ["Attach audio transcript or declare a narrative objective before treating the scene as fully grounded."]
+        : [],
+      reasonCodes: ["visual_narrative_source_window"],
+      admission: "auto",
+    })));
+  }
 
   const actorId = pushBadge(badges, badge({
     id: "actor.player",
@@ -904,6 +942,48 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     evidenceRefs,
     reasonCodes: ["interpreter_actor_binding"],
   });
+  if (hasVisualNarrativeSource) {
+    const observedSubjectId = pushBadge(badges, badge({
+      id: "actor.observed_subject",
+      title: "observed subject",
+      plainMeaning: "A subject is visually present enough to anchor a narrative Stage Play window.",
+      whyItMatters: "This bounds the stage to observable participants without naming or judging them from visual evidence alone.",
+      kind: "actor",
+      status: "candidate",
+      subjects: activeVisualNarrativeSources.map((source) => source.sourceId),
+      tags: ["narrative_stage_play", "visual_subject", "needs_identity_confirmation"],
+      sourceRefs,
+      evidenceRefs: unique([
+        ...evidenceRefs,
+        ...activeVisualNarrativeSources.flatMap((source) => source.evidenceRefs),
+      ]),
+      liveBindings: activeVisualNarrativeSources.map((source) =>
+        makeBinding("source_modality", source.evidenceRefs, `${source.modality}:${source.status}`)
+      ),
+      confidence: 0.58,
+      missingEvidence: ["Confirm actor identity or role before using this as a named narrative actor."],
+      reasonCodes: ["visual_subject_anchor", "identity_confirmation_missing"],
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: interpreterId,
+      to: observedSubjectId,
+      relation: "interprets",
+      label: "interpreter creates a visual subject anchor",
+      evidenceRefs,
+      reasonCodes: ["visual_subject_anchor"],
+    });
+    if (settingIds.includes("setting.visual_scene")) {
+      pushEdge(edges, {
+        from: observedSubjectId,
+        to: "setting.visual_scene",
+        relation: "observes",
+        label: "visual subject is bounded by the visual scene window",
+        evidenceRefs,
+        reasonCodes: ["visual_subject_scene_binding"],
+      });
+    }
+  }
   for (const entity of snapshot?.object_state?.nearby_entities ?? []) {
     const id = classifyEntityBadgeId(entity);
     const entityId = pushBadge(badges, badge({
@@ -1090,7 +1170,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   const canJump = movementRequirements.includes("jump") || allCells.some((cell) => hasCellTag(cell, /step_up|jump/));
   const canStepUp = allCells.some((cell) => hasCellTag(cell, /step_up|stairs|slab/)) || movementRequirements.includes("ascend");
   const affordanceSpecs: Array<[string, boolean, string, StagePlayIntentVerbV1, string[]]> = [
-    ["affordance.observe", sourceRefs.length > 0, "observe", "observe", ["evidence_available"]],
+    ["affordance.observe", sourceRefs.length > 0 || hasNarrativeVisual, "observe", "observe", ["evidence_available"]],
     ["affordance.move_forward", traversable, "move forward", "move", ["traversable_cells"]],
     ["affordance.step_up", canStepUp, "step up", "step_up", ["step_up_candidate"]],
     ["affordance.jump", canJump, "jump", "jump", ["jump_candidate"]],
@@ -1198,6 +1278,131 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     verb: "move",
     requires: ["updated passability"],
   });
+  if (hasVisualNarrativeSource) {
+    const intentObserve = addIntent(badges, sourceRefs, evidenceRefs, {
+      id: "intent.observe",
+      title: "observe",
+      verb: "observe",
+      requires: ["fresh visual frame"],
+    });
+    const intentSeekConfirmation = addIntent(badges, sourceRefs, evidenceRefs, {
+      id: "intent.seek_confirmation",
+      title: "seek confirmation",
+      verb: "seek_confirmation",
+      requires: ["missing narrative grounding"],
+    });
+    const intentCompareNextFrame = addIntent(badges, sourceRefs, evidenceRefs, {
+      id: "intent.compare_next_frame",
+      title: "compare next frame",
+      verb: "observe",
+      requires: ["next visual frame"],
+    });
+    addBinding(badges, edges, sourceRefs, evidenceRefs, {
+      id: "binding.scene_checkpoint",
+      title: "scene checkpoint",
+      components: [intentObserve, "affordance.observe", intentSeekConfirmation],
+      verb: "observe",
+      reasonCode: "observe+seek_confirmation=scene_checkpoint",
+      preserves: ["source custody", "claim accuracy"],
+      requires: ["fresh visual frame"],
+    });
+    if (hasVisualOnlyNarrativeSource) {
+      const missingAudioId = pushBadge(badges, badge({
+        id: "missing_evidence.audio_transcript",
+        title: "audio transcript missing",
+        plainMeaning: "Visual narrative Stage Play is active, but no active audio/transcript source is routed into the stage.",
+        whyItMatters: "Narrative intent and dialogue should not be inferred from visual frames alone when transcript evidence is missing.",
+        kind: "missing_evidence",
+        status: "missing_evidence",
+        subjects: activeVisualNarrativeSources.map((source) => source.sourceId),
+        tags: ["narrative_stage_play", "audio_transcript", "missing_modality"],
+        sourceRefs,
+        evidenceRefs: unique([
+          ...evidenceRefs,
+          ...activeVisualNarrativeSources.flatMap((source) => source.evidenceRefs),
+        ]),
+        confidence: 0.78,
+        missingEvidence: ["Audio/transcript source is needed for narrative intent."],
+        reasonCodes: ["visual_active_audio_missing", "narrative_stage_play"],
+        admission: "auto",
+      }));
+      const audioCheckId = pushBadge(badges, badge({
+        id: "recommended_check.attach_audio_transcript",
+        title: "attach audio transcript",
+        plainMeaning: "Attach audio/transcript evidence before treating dialogue or intent as grounded.",
+        whyItMatters: "The graph can still do visual continuity checks, but narrative claims need transcript grounding.",
+        kind: "recommended_check",
+        status: "candidate",
+        subjects: activeVisualNarrativeSources.map((source) => source.sourceId),
+        tags: ["narrative_stage_play", "audio_transcript", "recommended_check"],
+        sourceRefs,
+        evidenceRefs: unique([
+          ...evidenceRefs,
+          ...activeVisualNarrativeSources.flatMap((source) => source.evidenceRefs),
+        ]),
+        confidence: 0.76,
+        missingEvidence: ["Audio/transcript source is needed for narrative intent."],
+        reasonCodes: ["visual_active_audio_missing", "narrative_stage_play"],
+        admission: "auto",
+      }));
+      addBinding(badges, edges, sourceRefs, evidenceRefs, {
+        id: "binding.narrative_context_gap",
+        title: "narrative context gap",
+        components: [intentObserve, missingAudioId, audioCheckId],
+        verb: "seek_confirmation",
+        reasonCode: "observe+missing_audio_check=narrative_context_gap",
+        preserves: ["claim accuracy"],
+        requires: ["audio transcript"],
+      });
+      pushEdge(edges, {
+        from: audioCheckId,
+        to: missingAudioId,
+        relation: "needs_check",
+        label: "audio transcript check addresses missing narrative modality",
+        evidenceRefs,
+        reasonCodes: ["visual_active_audio_missing", "narrative_stage_play"],
+      });
+      recommendedActions.push({
+        id: "stage-action:attach-audio-transcript",
+        label: "Attach audio transcript for narrative intent and dialogue.",
+        actionType: "observe_more",
+        admission: "auto",
+        agentExecutable: false,
+        reasonCodes: ["visual_active_audio_missing", "narrative_stage_play"],
+        evidenceRefs,
+        missingEvidence: ["Audio/transcript source is needed for narrative intent."],
+      });
+      recommendedActions.push({
+        id: "stage-action:ask-user-objective",
+        label: "Ask user what narrative question or prediction target to track.",
+        actionType: "ask_user",
+        admission: "ask_user",
+        agentExecutable: false,
+        reasonCodes: ["missing_user_objective", "narrative_stage_play"],
+        evidenceRefs,
+        missingEvidence: ["User objective for narrative prediction is not set."],
+      });
+    }
+    addBinding(badges, edges, sourceRefs, evidenceRefs, {
+      id: "binding.continuity_check",
+      title: "continuity check",
+      components: [intentObserve, intentCompareNextFrame, "affordance.observe"],
+      verb: "observe",
+      reasonCode: "observe+compare_next_frame=continuity_check",
+      preserves: ["scene continuity", "claim accuracy"],
+      requires: ["next visual frame"],
+    });
+    recommendedActions.push({
+      id: "stage-action:capture-compare-next-frame",
+      label: "Capture and compare the next visual frame.",
+      actionType: "safe_diagnostic_overlay",
+      admission: "auto",
+      agentExecutable: false,
+      reasonCodes: ["visual_continuity_check", "narrative_stage_play"],
+      evidenceRefs,
+      missingEvidence: [],
+    });
+  }
 
   if (hasHostile || hasVoid || hasLava) {
     addBinding(badges, edges, sourceRefs, evidenceRefs, {

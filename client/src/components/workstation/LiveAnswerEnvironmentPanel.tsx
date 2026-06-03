@@ -511,8 +511,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     ? navigationRead.latest_solver_observations as Array<Record<string, unknown>>
     : [];
   const loadEnvironment = useLiveAnswerEnvironmentStore((state: LiveAnswerEnvironmentState) => state.loadLiveAnswerEnvironment);
-  const environmentSourceIds = Array.isArray(environment?.source_ids) ? environment.source_ids : [];
-  const environmentLines = Array.isArray(environment?.lines) ? environment.lines : [];
+  const environmentSourceIds = useMemo(
+    () => Array.isArray(environment?.source_ids) ? environment.source_ids : [],
+    [environment?.environment_id, environment?.source_ids, environment?.updated_at],
+  );
+  const environmentLines = useMemo(
+    () => Array.isArray(environment?.lines) ? environment.lines : [],
+    [environment?.environment_id, environment?.lines, environment?.updated_at],
+  );
   const sourceIds = useMemo(() => new Set(environmentSourceIds), [environmentSourceIds]);
   const relevantSources = useMemo(
     () => sources.filter((source: WorkstationLiveSource) => sourceIds.size === 0 || sourceIds.has(source.source_id) || source.environment_id === environment?.environment_id),
@@ -560,7 +566,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     let cancelled = false;
     const ids = environmentSourceIds.filter((sourceId: string) => sourceId.startsWith("source:"));
     if (ids.length === 0) {
-      setSourceAvailabilities([]);
+      setSourceAvailabilities((current) => current.length > 0 ? [] : current);
       return () => {
         cancelled = true;
       };

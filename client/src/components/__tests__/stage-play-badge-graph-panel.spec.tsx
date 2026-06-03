@@ -65,6 +65,20 @@ const sourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
       nextRequiredAction: "Attach audio transcript",
       evidenceRefs: [],
     },
+    {
+      sourceId: "source:live-answer",
+      modality: "live_answer_output",
+      status: "active",
+      contribution: "Live Answer output receives projected Stage Play evidence lanes after explicit projection.",
+      fidelityScore: 0.7,
+      selectedForStagePlay: false,
+      routeTo: "live_answer_output",
+      cadenceMs: null,
+      lastEventTs: "2026-06-02T00:00:01.000Z",
+      missingReason: null,
+      nextRequiredAction: null,
+      evidenceRefs: ["live_answer_environment:ui"],
+    },
   ],
   latestSnapshotRefs: ["environment_snapshot:ui"],
   latestDeltaOverlayRefs: [],
@@ -130,6 +144,50 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         intentModule: undefined,
         evidenceRefs: ["live_source_observation:ui"],
         reasonCodes: ["observer_source_custody"],
+      }),
+      badge({
+        id: "source.visual_tab",
+        title: "Visual Tab Source",
+        plainMeaning: "Visual source handle routed into the Stage Play graph.",
+        whyItMatters: "Source nodes make live-source custody selectable from the graph instead of buried in the console.",
+        kind: "source",
+        status: "observed",
+        subjects: ["source:visual-tab"],
+        tags: ["source", "visual_frame"],
+        sourceRefs: [
+          { kind: "live_source_observation", id: "live_source_observation:ui" },
+          { kind: "stage_play_raw_session_buffer_entry", id: "stage_play_raw_session_buffer_entry:ui" },
+        ],
+        liveBindings: [{
+          bindingKind: "source_modality",
+          sourceRefIds: ["live_source_observation:ui"],
+          freshness: "fresh",
+          confidence: 0.84,
+          compactValue: "visual_frame:active:visual_context",
+        }],
+        intentModule: undefined,
+        evidenceRefs: ["live_source_observation:ui", "stage_play_raw_session_buffer_entry:ui"],
+        reasonCodes: ["source_handle"],
+      }),
+      badge({
+        id: "interpreter.stage_play_reflection",
+        title: "Stage Play interpreter",
+        plainMeaning: "A compact interpretation job can reduce selected sources into stage facts and procedural bindings.",
+        whyItMatters: "The interpreter may produce evidence projections, but it cannot answer or act.",
+        kind: "interpreter",
+        status: "candidate",
+        subjects: ["thread:stage-play-ui", "room:minecraft"],
+        tags: ["interpreter", "reflect_stage_play_context", "evidence_only"],
+        liveBindings: [{
+          bindingKind: "source_status",
+          sourceRefIds: ["live_source_observation:ui"],
+          freshness: "fresh",
+          confidence: 0.76,
+          compactValue: "fresh",
+        }],
+        intentModule: undefined,
+        evidenceRefs: ["live_source_observation:ui"],
+        reasonCodes: ["stage_play_interpreter", "compact_source_window"],
       }),
       badge({
         id: "actor.player",
@@ -277,6 +335,16 @@ function sourceIdFromDraftNode(node: Record<string, unknown>): string {
 function fetchCallUrls(): string[] {
   const calls = vi.mocked(fetch).mock.calls as Array<[RequestInfo | URL, RequestInit?]>;
   return calls.map((call: [RequestInfo | URL, RequestInit?]) => String(call[0]));
+}
+
+function fetchJsonBodies(pathPart: string): Array<Record<string, unknown>> {
+  const calls = vi.mocked(fetch).mock.calls as Array<[RequestInfo | URL, RequestInit?]>;
+  return calls
+    .filter((call) => String(call[0]).includes(pathPart))
+    .map((call) => {
+      const body = call[1]?.body;
+      return typeof body === "string" ? JSON.parse(body) as Record<string, unknown> : {};
+    });
 }
 
 function renderPanel(options: {
@@ -445,6 +513,57 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/project-live-answer")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_live_answer_projection_response/v1",
+        graph,
+        outputLaneProjection: {
+          artifactId: "stage_play_output_lane_projection",
+          schemaVersion: "stage_play_output_lane_projection/v1",
+          graphId: graph.graphId,
+          generatedAt: graph.generatedAt,
+          lanes: [],
+          evidenceRefs: ["live_source_observation:ui"],
+          context_role: "tool_evidence",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          post_tool_model_step_required: true,
+        },
+        liveAnswerDelta: {
+          changed_line_keys: ["situation", "risk"],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          model_invoked: false,
+        },
+        liveAnswerEnvironment: null,
+        projectedLineKeys: ["situation", "affordances", "risk", "possibilities", "unknowns", "next_check"],
+        skippedLineKeys: ["recommendation"],
+        reason: "projected",
+        assistant_answer: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        terminal_eligible: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/agi/situation/live-answer-environment")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "helix.live_answer_environment_read.v1",
+        environment: null,
+        deltas: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.includes("/api/agi/situation/visual-source/start")) {
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
       const sourceId = typeof body.source_id === "string" ? body.source_id : "source:visual-tab";
@@ -534,7 +653,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
     expect(screen.getByText("Latest reflect_stage_play_context")).toBeTruthy();
-    expect(screen.getByText("6 badges")).toBeTruthy();
+    expect(screen.getByText("8 badges")).toBeTruthy();
     expect(screen.getByText("0 missing checks")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-compact_observations")).toBeTruthy();
@@ -548,30 +667,43 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-output-node").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
     expect(await screen.findByTestId("stage-play-builder-artifacts")).toBeTruthy();
     const overlay = screen.getByTestId("stage-play-binding-overlay");
     const overlayText = overlay.textContent ?? "";
-    expect(overlayText.indexOf("Node builder")).toBeLessThan(overlayText.indexOf("Tool assembly"));
+    expect(overlayText.indexOf("Builder Palette")).toBeLessThan(overlayText.indexOf("Tool assembly"));
     expect(overlayText.indexOf("Tool assembly")).toBeLessThan(overlayText.indexOf("Source handles"));
     expect(screen.getByText("stage_play_builder_catalog/v1")).toBeTruthy();
     expect(screen.getByText("stage_play_source_query/v1")).toBeTruthy();
     expect(screen.getByText("stage_play_graph_draft_validation/v1")).toBeTruthy();
-    expect(screen.getByText("Node builder")).toBeTruthy();
+    expect(screen.getAllByText("Builder Palette").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Observer" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Fusion\b/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Intent Module/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Procedure/i })).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Close Stage Play console" }));
     fireEvent.click(screen.getByRole("button", { name: "Observer" }));
+    expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
     expect(screen.getByText("Observer Source Routes")).toBeTruthy();
     expect(screen.getAllByText("visual frame").length).toBeGreaterThan(0);
     expect(screen.getAllByText("audio transcript").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("stage-play-project-live-answer")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("stage-play-project-live-answer"));
+    expect(await screen.findByText(/Projected 6 Stage Play line\(s\) to Live Answer/i)).toBeTruthy();
+    expect(screen.getByText(/Projected 6 lines: situation, affordances, risk, possibilities, unknowns, next_check/i)).toBeTruthy();
+    expect(screen.getByText(/Skipped: recommendation requires model review/i)).toBeTruthy();
+    expect(fetchJsonBodies("/api/helix/stage-play/project-live-answer").at(-1)).toEqual(expect.objectContaining({
+      ensureStagePlayLineSchema: true,
+      createIfMissing: true,
+      preferredPreset: "minecraft_run_monitor",
+    }));
     fireEvent.click(screen.getAllByRole("button", { name: "Use for Stage Play" })[0]);
     expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
     expect(screen.getByDisplayValue("use_for_stage_play")).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Defensive Retreat Barrier" })[0]);
 
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
@@ -581,6 +713,50 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Candidate: retreat while tracking threat/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/agent executable: false/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /execute|run command|auto move|auto place/i })).toBeNull();
+  });
+
+  it("shows Observer controls in the Stage Console inspector when Observer is selected", async () => {
+    useStagePlayBadgeGraphPanelStore.setState({
+      selectedBadgeId: "observer.live_sources",
+      selectedBadgeIds: ["observer.live_sources"],
+    });
+    renderPanel();
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
+
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.getAllByText("Observer Source Routes").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Source Setup").length).toBeGreaterThan(0);
+  });
+
+  it("shows source route controls when a Source node is selected", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Visual Tab Source" }));
+
+    expect(screen.getByTestId("stage-play-source-node-controls")).toBeTruthy();
+    expect(screen.getByText("Source Route Controls")).toBeTruthy();
+    expect(screen.getByText("Route to Narrative")).toBeTruthy();
+    expect(screen.getByText("Review source evidence")).toBeTruthy();
+    expect(screen.getByText("Open raw buffer preview")).toBeTruthy();
+  });
+
+  it("projects from the Interpreter node and Live Answer output node controls", async () => {
+    renderPanel();
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+    fireEvent.click(screen.getByTestId("stage-play-project-live-answer-interpreter"));
+
+    expect(await screen.findByText(/Projected 6 lines: situation, affordances, risk, possibilities, unknowns, next_check/i)).toBeTruthy();
+    expect(screen.getByText(/Skipped: recommendation requires model review/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stage Play interpreter" }));
+    expect(screen.getByText("Live Answer Projection")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-project-live-answer-inspector")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("stage-play-project-live-answer-output"));
+    expect(fetchJsonBodies("/api/helix/stage-play/project-live-answer").length).toBeGreaterThanOrEqual(2);
   });
 
   it("starts visual source setup through the visual producer from the Observer panel", async () => {
@@ -597,8 +773,8 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Open Stage Play bindings" }));
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
+    expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
     expect(screen.getByText("Source Setup")).toBeTruthy();
     expect(screen.getByText("Narrative test defaults")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "30s" }));
@@ -623,7 +799,8 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
 
-    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+    expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
     expect(screen.getByText("Source Setup")).toBeTruthy();
     expect(screen.getByText("Observer Source Routes")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Capture browser tab visual" })).toBeTruthy();
@@ -633,8 +810,8 @@ describe("StagePlayBadgeGraphPanel", () => {
   it("opens raw buffer previews from Observer source evidence without graph ownership", async () => {
     renderPanel();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Open Stage Play bindings" }));
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
+    expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "Open raw buffer preview" })[0]);
 
     expect(await screen.findByText("Source Evidence Audit")).toBeTruthy();
@@ -651,11 +828,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
 
     fireEvent.click(screen.getByRole("button", { name: /Intent Module/i }));
 
-    expect(screen.getByText("intent module nodes")).toBeTruthy();
+    expect(screen.getByText("intent module evidence nodes")).toBeTruthy();
     expect(screen.getAllByText(/move_away/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/maintain_line_of_sight/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/place_block/i).length).toBeGreaterThan(0);
@@ -683,7 +860,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 20 });
     scrollport.scrollBy = vi.fn();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     dispatchPointer(screen.getByRole("button", { name: /Hazard/i }), "pointerdown", 120, 160);
 
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
@@ -729,7 +906,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 0 });
     scrollport.scrollBy = vi.fn();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     dispatchPointer(screen.getByRole("button", { name: /Actor/i }), "pointerdown", 120, 160);
     dispatchPointer(window, "pointerup", 240, 220);
 
@@ -808,7 +985,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     Object.defineProperty(scrollport, "scrollTop", { configurable: true, value: 0 });
     scrollport.scrollBy = vi.fn();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     dispatchPointer(screen.getByRole("button", { name: /Source Class/i }), "pointerdown", 120, 160);
     dispatchPointer(window, "pointerup", 240, 220);
 
@@ -835,15 +1012,15 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close Stage Play console" }));
 
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
     expect(screen.getByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play bindings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
 
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
   });

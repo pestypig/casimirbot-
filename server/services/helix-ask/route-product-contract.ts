@@ -116,6 +116,7 @@ const normalizeSourceTarget = (
     sourceTarget === "active_doc" ||
     sourceTarget === "docs_viewer" ||
     sourceTarget === "live_pipeline" ||
+    sourceTarget === "live_environment" ||
     sourceTarget === "active_note" ||
     sourceTarget === "calculator_stream" ||
     sourceTarget === "repo_code" ||
@@ -199,7 +200,17 @@ export function buildRouteProductContract(input: {
   promptText?: string | null;
 }): HelixRouteProductContract {
   const promptText = input.promptText ?? "";
-  const sourceTarget = isStructuredDocsViewerPrompt(promptText)
+  const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
+  const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
+    ? sourceTargetRecord.requested_outputs
+    : [];
+  const stagePlayReflectionTarget =
+    requestedOutputs.includes("stage_play_badge_graph") ||
+    requestedOutputs.includes("stage_play_output_lane_projection") ||
+    requestedOutputs.includes("stage_play_live_answer_projection");
+  const sourceTarget = stagePlayReflectionTarget
+    ? "live_environment"
+    : isStructuredDocsViewerPrompt(promptText)
     ? "docs_viewer"
     : isActiveDocSummaryPrompt(promptText)
       ? "active_doc"
@@ -210,10 +221,6 @@ export function buildRouteProductContract(input: {
             ? "calculator_stream"
             : "live_pipeline"
           : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
-  const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
-  const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
-    ? sourceTargetRecord.requested_outputs
-    : [];
   const targetKind = normalizeSourceTarget(sourceTargetRecord?.target_kind);
   const procedureRecallRule = matchProcedureRecallPrompt(promptText);
   const strictProcedureEpochReplay =
@@ -435,6 +442,37 @@ export function buildRouteProductContract(input: {
       allowedExtra: ["visual_producer_cadence_receipt", "live_workstation_pipeline_receipt", "workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation"],
       forbiddenExtra: ["visual_context_pack", "doc_summary", "active_doc_identity", "doc_location_matches", "doc_evidence_location", "no_tool_direct", "model_only_concept"],
       precedenceReason: "live_pipeline_source_target_allows_only_receipt_terminal_products",
+    });
+  }
+
+  if (sourceTarget === "live_environment") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "live_environment",
+      allowedCore: ["live_environment_tool_observation"],
+      allowedExtra: ["direct_answer_text", "model_synthesized_answer", "turn_final_text", "source_binding_status", "source_binding_repair_candidate"],
+      forbiddenExtra: [
+        "live_pipeline_receipt",
+        "visual_producer_cadence_receipt",
+        "workspace_action_receipt",
+        "visual_context_pack",
+        "situation_context_pack",
+        "doc_summary",
+        "active_doc_identity",
+        "doc_location_matches",
+        "doc_evidence_location",
+        "process_graph_overview",
+        "no_tool_direct",
+        "model_only_concept",
+        "panel_generated_answer",
+      ],
+      sideArtifactKindsAllowed: [
+        "stage_play_badge_graph",
+        "stage_play_output_lane_projection",
+        "live_answer_environment_delta",
+      ],
+      precedenceReason: "live_environment_source_target_requires_tool_observation_then_model_synthesis",
     });
   }
 

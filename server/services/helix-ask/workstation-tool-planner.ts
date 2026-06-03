@@ -870,9 +870,17 @@ function isCompoundCalculatorPlanningPrompt(prompt: string): boolean {
 function isPhysicsCalculationContextPrompt(prompt: string): boolean {
   if (isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  if (hasStagePlayReflectionCue(prompt)) return false;
   return /\b(?:theory\s+(?:map|badge|atlas)|physics\s+atlas|badge\s+graph|first\s+principles|unit\s+signature|dimension(?:al)?\s+consistency|curvature|collapse|qei|stress[-\s]?energy|starsim|stellar|fusion\s+channel|solar\s+spectrum|h[-\s]?alpha|doppler|redshift|blueshift|casimir|cavity|tokamak|plasma|nhm2|warp|general\s+relativity|\bgr\b|galactic|cosmic\s+distance|cepheid|hubble|zeeman)\b/i.test(
     prompt,
   );
+}
+
+function hasStagePlayReflectionCue(prompt: string): boolean {
+  if (/\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition|ideology\s+(?:tree|graph|map)|theory\s+badge\s+graph|theory\s+graph|physics\s+badge\s+graph)\b/i.test(prompt)) {
+    return false;
+  }
+  return /\b(?:stage\s*play|stage\s*builder|narrative_stage_play|procedural\s+bindings?|affordance\s+graph|observer\s*\/?\s*source\s+routing)\b/i.test(prompt);
 }
 
 function userExplicitlyDisallowsPanelsOrTools(prompt: string): boolean {
@@ -888,6 +896,7 @@ function userExplicitlyDisallowsZenGraphTools(prompt: string): boolean {
 }
 
 function userExplicitlyRequestsTheoryGraphPanel(prompt: string): boolean {
+  if (hasStagePlayReflectionCue(prompt)) return false;
   return (
     /\b(?:open|display|bring\s+up|pull\s+up)\b[\s\S]{0,80}\b(?:theory\s+(?:badge\s+)?graph|badge\s+graph|theory\s+panel|theory\s+map)\b/i.test(
       prompt,
@@ -949,6 +958,7 @@ function hasInlineEquationWithPhysicsDomain(prompt: string): boolean {
 function isTheoryContextReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  if (hasStagePlayReflectionCue(prompt)) return false;
   if (hasReflectionCue(prompt)) return true;
   if (hasInlineEquationWithPhysicsDomain(prompt) && !/\b(?:calculate|compute|solve|evaluate|verify|check)\b/i.test(prompt)) {
     return true;

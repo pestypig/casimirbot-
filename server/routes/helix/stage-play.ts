@@ -19,6 +19,10 @@ import {
   upsertStagePlaySourceRouteOverride,
 } from "../../services/situation-room/stage-play-source-window";
 import {
+  projectStagePlayLiveAnswer,
+  type StagePlayProjectLiveAnswerPreferredPreset,
+} from "../../services/stage-play/stage-play-live-answer-projector";
+import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
   STAGE_PLAY_RAW_SESSION_BUFFER_RETENTION_POLICIES,
   type StagePlayRawSessionBufferRawKindV1,
@@ -71,6 +75,11 @@ helixStagePlayRouter.options("/source-route", (_req, res) => {
   res.status(200).end();
 });
 
+helixStagePlayRouter.options("/project-live-answer", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 const isRawKind = (value: unknown): value is StagePlayRawSessionBufferRawKindV1 =>
   typeof value === "string" && STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS.includes(value as StagePlayRawSessionBufferRawKindV1);
 
@@ -93,6 +102,11 @@ const readOptionalBoolean = (value: unknown): boolean | undefined =>
     : typeof value === "string" && /^(true|false)$/i.test(value.trim())
       ? value.trim().toLowerCase() === "true"
       : undefined;
+
+const readPreferredPreset = (value: unknown): StagePlayProjectLiveAnswerPreferredPreset | undefined =>
+  value === "minecraft_run_monitor" || value === "environment_run_monitor" || value === "custom"
+    ? value
+    : undefined;
 
 helixStagePlayRouter.get("/graph", (req: Request, res: Response) => {
   setCors(res);
@@ -267,6 +281,38 @@ helixStagePlayRouter.post("/source-route", (req: Request, res: Response) => {
     assistant_answer: false,
     context_role: "ui_request_not_instruction",
   });
+});
+
+helixStagePlayRouter.post("/project-live-answer", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+
+  try {
+    const result = projectStagePlayLiveAnswer({
+      threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? undefined,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId),
+      objective: readQueryString(body.objective) ?? readQueryString(req.query.objective),
+      ensureStagePlayLineSchema: readOptionalBoolean(body.ensureStagePlayLineSchema ?? body.ensure_stage_play_line_schema) ?? false,
+      createIfMissing: readOptionalBoolean(body.createIfMissing ?? body.create_if_missing) ?? false,
+      preferredPreset: readPreferredPreset(body.preferredPreset ?? body.preferred_preset),
+    });
+
+    return res.status(result.reason === "graph_invalid" ? 422 : 200).json(result);
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      schema: "stage_play_live_answer_projection_response/v1",
+      error: "stage-play-live-answer-projection-failed",
+      message: err instanceof Error ? err.message : String(err),
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      terminal_eligible: false,
+    });
+  }
 });
 
 helixStagePlayRouter.get("/builder", (req: Request, res: Response) => {

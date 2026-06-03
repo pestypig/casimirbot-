@@ -8,6 +8,7 @@ import {
   buildStagePlayLiveAnswerLineValuesV1,
   buildStagePlayOutputLaneProjectionV1,
   reduceLiveAnswerEnvironmentFromStagePlayGraph,
+  STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA,
 } from "../services/stage-play/stage-play-output-lane-reducer";
 import {
   createLiveAnswerEnvironment,
@@ -164,6 +165,12 @@ beforeEach(() => {
 });
 
 describe("stage-play output lane reducer", () => {
+  it("keeps debug basis in the situation panel line schema", () => {
+    expect(STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA.find((line) =>
+      line.key === "debug_basis"
+    )?.visibility).toBe("situation_panel");
+  });
+
   it("projects graph state into evidence-only output lanes", () => {
     const graph = graphFixture();
     const projection = buildStagePlayOutputLaneProjectionV1({ graph });

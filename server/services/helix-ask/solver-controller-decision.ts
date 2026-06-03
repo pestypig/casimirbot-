@@ -397,7 +397,8 @@ export function buildSolverControllerDecision(input: {
     (
       canonicalGoalKind === "model_only_concept" ||
       canonicalGoalKind === "workspace_help" ||
-      canonicalGoalKind === "conversation"
+      canonicalGoalKind === "conversation" ||
+      canonicalGoalKind === "live_environment_review"
     );
   const capabilityGuardRequired =
     !modelDirectAnswerTerminal &&

@@ -108,6 +108,10 @@ const classifyViolations = (input: {
   const codes: HelixRouteAuthorityViolationCode[] = [];
   const visualContentPrompt = isVisualContentPrompt(input.promptText);
   const procedureMemoryPrompt = isProcedureMemoryPrompt(input.promptText);
+  const procedureMemoryAuthorityApplies =
+    sourceTarget === "procedure_memory" ||
+    targetKind === "situation_epoch" ||
+    (procedureMemoryPrompt && sourceTarget !== "live_environment");
   const livePipelineProcedureReceipt =
     terminal === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, route);
@@ -115,13 +119,13 @@ const classifyViolations = (input: {
   if ((sourceTarget === "visual_capture" || visualContentPrompt || /visual|screen|capture/i.test(route)) && terminal === "process_graph_overview") {
     codes.push("process_graph_used_as_visual_evidence");
   }
-  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && terminal === "live_pipeline_receipt") {
+  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryAuthorityApplies) && terminal === "live_pipeline_receipt") {
     codes.push("receipt_used_as_content_answer");
   }
-  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryPrompt) && route === "live_pipeline_control") {
+  if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || visualContentPrompt || procedureMemoryAuthorityApplies) && route === "live_pipeline_control") {
     codes.push("pipeline_status_used_as_live_cognition");
   }
-  if ((sourceTarget === "procedure_memory" || targetKind === "situation_epoch" || procedureMemoryPrompt) && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
+  if (procedureMemoryAuthorityApplies && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
     codes.push("procedure_memory_bypassed");
   }
   if ((sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") && terminal !== "repo_code_evidence_answer" && terminal !== "repo_entity_definition" && terminal !== "typed_failure") {
