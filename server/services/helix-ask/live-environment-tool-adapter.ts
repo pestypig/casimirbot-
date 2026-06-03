@@ -134,7 +134,7 @@ const visualStagePlaySourceStatuses = (graph: StagePlayBadgeGraphV1): Array<{
 }> =>
   graph.sourceWindow.sources
     .filter((source) =>
-      /\b(?:visual|screen|frame|tab)\b/i.test(`${source.modality}\n${source.sourceId}\n${source.contribution}`),
+      /(?:visual|screen|frame|tab)/i.test(`${source.modality}\n${source.sourceId}\n${source.contribution}`),
     )
     .map((source) => ({
       sourceId: source.sourceId,

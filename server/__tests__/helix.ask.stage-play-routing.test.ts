@@ -25,7 +25,7 @@ import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/sta
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
-const sourceId = "source:stage-play-visual-tab";
+const sourceId = "visual_source:stage_play_visual_tab";
 
 const createApp = (): express.Express => {
   const app = express();
