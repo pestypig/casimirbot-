@@ -18,6 +18,7 @@ import {
 } from "../services/situation-room/live-source-descriptor-builder";
 import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
 import { STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA } from "../services/stage-play/stage-play-output-lane-reducer";
+import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -160,12 +161,26 @@ describe("Helix Ask Stage Play routing", () => {
       raw_content_included: false,
       context_role: "tool_evidence",
     });
-    expect(liveToolArtifact.payload.observation.liveAnswerProjection.changedLineKeys.length).toBeGreaterThan(0);
-    expect(response.body?.answer).toContain("Stage Play reflected the live source into the badge graph");
-    expect(response.body?.answer).toContain("Live Answer line");
-    expect(response.body?.answer).toContain("post-observation summary");
+    expect(liveToolArtifact.payload.observation.liveAnswerProjection.changedLineKeys).toEqual(
+      expect.arrayContaining(["risk", "possibilities", "unknowns", "next_check"]),
+    );
+    expect(response.body?.answer).toContain("Stage Play reflected the active visual source");
+    expect(response.body?.answer).toContain("projected risk, possibilities, unknowns, and next_check into Live Answer");
+    expect(response.body?.answer).toContain("audio/transcript grounding");
+    expect(response.body?.answer).toContain("user objective/prediction target");
+    expect(response.body?.answer).toContain("post-observation synthesis");
     expect(response.body?.answer).not.toContain("\"artifactId\":\"stage_play_badge_graph\"");
-    expect(["direct_answer_text", "model_synthesized_answer"]).toContain(response.body?.terminal_artifact_kind);
-    expect(response.body?.final_answer_source).toMatch(/universal_composer|final_answer_draft|artifact_synthesis/);
+    expect(response.body?.final_answer_source).not.toBe("typed_failure");
+    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
+    expect(response.body?.final_answer_source).not.toBe("panel_generated_answer");
+    expect(response.body?.final_answer_source).not.toBe("client_projection");
+    expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
+    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    const boundaryReport = evaluateTerminalBoundaryEligibility(response.body as Record<string, unknown>);
+    expect(boundaryReport.checks.agent_runtime_loop).toBe(true);
+    expect(boundaryReport.checks.agent_step_decision).toBe(true);
+    expect(boundaryReport.checks.selected_capability_observation).toBe(true);
+    expect(boundaryReport.checks.post_observation_model_decision).toBe(true);
+    expect(boundaryReport.eligible).toBe(true);
   }, 60_000);
 });

@@ -29,6 +29,7 @@ export type RepoEvidenceRelevanceGate = {
   coverage: "strong" | "adequate" | "weak" | "none";
   violations: Array<
     | "exact_match_files_found_but_not_selected"
+    | "exact_source_contract_failed"
     | "weak_fuzzy_only"
     | "alias_not_normalized"
     | "codebase_anchor_ignored"
@@ -39,6 +40,15 @@ export type RepoEvidenceRelevanceGate = {
   >;
   repair_required: boolean;
   terminal_allowed: boolean;
+  source_target_exact_contract?: {
+    contract_id?: string;
+    requested_source_kind?: string;
+    requested_source_identity?: string;
+    extraction_status?: string;
+    evidence_refs?: unknown[];
+    evidence_hash?: string;
+    terminal_allowed?: boolean;
+  };
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -101,6 +111,7 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   concept: string;
   query: string;
   observation: HelixRepoCodeEvidenceObservation;
+  sourceTargetExactContract?: Record<string, unknown> | null;
   repoRoot?: string;
 }): RepoEvidenceRelevanceGate {
   const repoRoot = input.repoRoot ?? process.cwd();
@@ -145,6 +156,13 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   if (selectedDocsOnly && /\b(?:codebase|repo|repository|source|implementation|helix ask|this app)\b/i.test(input.query)) {
     violations.push("docs_only_for_codebase_question");
   }
+  const sourceTargetExactContract =
+    input.sourceTargetExactContract ??
+    (input.observation.source_target_exact_contract as Record<string, unknown> | undefined) ??
+    null;
+  if (sourceTargetExactContract && sourceTargetExactContract.terminal_allowed !== true) {
+    violations.push("exact_source_contract_failed");
+  }
   const coverage: RepoEvidenceRelevanceGate["coverage"] =
     selectedPaths.length === 0
       ? "none"
@@ -175,6 +193,23 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
     violations: unique(violations),
     repair_required: !terminalAllowed,
     terminal_allowed: terminalAllowed,
+    ...(sourceTargetExactContract
+      ? {
+          source_target_exact_contract: {
+            contract_id: typeof sourceTargetExactContract.contract_id === "string" ? sourceTargetExactContract.contract_id : undefined,
+            requested_source_kind:
+              typeof sourceTargetExactContract.requested_source_kind === "string" ? sourceTargetExactContract.requested_source_kind : undefined,
+            requested_source_identity:
+              typeof sourceTargetExactContract.requested_source_identity === "string" ? sourceTargetExactContract.requested_source_identity : undefined,
+            extraction_status:
+              typeof sourceTargetExactContract.extraction_status === "string" ? sourceTargetExactContract.extraction_status : undefined,
+            evidence_refs: Array.isArray(sourceTargetExactContract.evidence_refs) ? sourceTargetExactContract.evidence_refs : undefined,
+            evidence_hash:
+              typeof sourceTargetExactContract.evidence_hash === "string" ? sourceTargetExactContract.evidence_hash : undefined,
+            terminal_allowed: sourceTargetExactContract.terminal_allowed === true,
+          },
+        }
+      : {}),
     assistant_answer: false,
     raw_content_included: false,
   };

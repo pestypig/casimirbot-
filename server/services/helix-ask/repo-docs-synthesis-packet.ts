@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { HelixRepoCodeEvidenceObservation } from "@shared/helix-repo-code-evidence-observation";
@@ -51,6 +52,30 @@ export type HelixRepoDocsAnswerCoveragePoint =
   | "workflow_or_surfaces"
   | "evidence_or_authority_boundary";
 
+export type HelixSourceTargetExactContract = {
+  schema: "helix.source_target_exact_contract.v1";
+  contract_id: string;
+  turn_id: string;
+  requested_source_kind:
+    | "repo_heading_section"
+    | "repo_path"
+    | "repo_symbol"
+    | "repo_source";
+  requested_source_identity: string;
+  requested_path?: string;
+  requested_heading?: string;
+  extraction_status: "found" | "ambiguous" | "missing" | "unsupported";
+  evidence_refs: string[];
+  evidence_hash: string;
+  required_terms: string[];
+  required_claims: string[];
+  unsupported_terms: string[];
+  unsupported_claims: string[];
+  terminal_allowed: boolean;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixRepoDocsSynthesisPacket = {
   schema: typeof HELIX_REPO_DOCS_SYNTHESIS_PACKET_SCHEMA;
   turn_id: string;
@@ -83,10 +108,13 @@ export type HelixRepoDocsSynthesisPacket = {
     contract_kind: "field_list";
     requested_path?: string;
     requested_heading?: string;
+    extraction_status?: "found" | "ambiguous" | "missing" | "unsupported";
     required_terms: string[];
     evidence_refs: string[];
+    evidence_hash?: string;
     evidence_missing: boolean;
   };
+  source_target_exact_contract?: HelixSourceTargetExactContract;
   compact_evidence: Array<{
     ref: string;
     path: string;
@@ -129,6 +157,9 @@ const clip = (value: unknown, max = 620): string => {
 };
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const hashContractEvidence = (value: unknown): string =>
+  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 const normalizePath = (value: string): string =>
   value.replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/[.,;:!?]+$/g, "").trim().toLowerCase();
@@ -185,13 +216,71 @@ const buildExactSectionContract = (input: {
     : input.evidence.filter((entry) => requestedPath ? normalizePath(entry.path).includes(requestedPath) : true);
   const requiredTerms = unique(fallbackCandidates.flatMap((entry) => extractRequiredFieldTerms(entry.excerpt)));
   if (!requestedPath && !requestedHeading && requiredTerms.length === 0) return undefined;
+  const evidenceRefs = fallbackCandidates.map((entry) => entry.ref);
+  const extractionStatus: HelixSourceTargetExactContract["extraction_status"] =
+    requiredTerms.length > 0 && evidenceRefs.length > 0 ? "found" : "missing";
   return {
     contract_kind: "field_list",
     requested_path: requestedPath,
     requested_heading: requestedHeading,
+    extraction_status: extractionStatus,
     required_terms: requiredTerms,
-    evidence_refs: fallbackCandidates.map((entry) => entry.ref),
+    evidence_refs: evidenceRefs,
+    evidence_hash: hashContractEvidence({
+      requestedPath,
+      requestedHeading,
+      evidenceRefs,
+      requiredTerms,
+    }),
     evidence_missing: requiredTerms.length === 0,
+  };
+};
+
+const buildSourceTargetExactContract = (input: {
+  turnId: string;
+  exactSectionContract?: HelixRepoDocsSynthesisPacket["exact_section_contract"];
+}): HelixSourceTargetExactContract | undefined => {
+  const exact = input.exactSectionContract;
+  if (!exact) return undefined;
+  const requestedPath = exact.requested_path;
+  const requestedHeading = exact.requested_heading;
+  const requestedSourceKind: HelixSourceTargetExactContract["requested_source_kind"] =
+    requestedPath && requestedHeading
+      ? "repo_heading_section"
+      : requestedPath
+        ? "repo_path"
+        : "repo_source";
+  const requestedSourceIdentity =
+    requestedPath && requestedHeading
+      ? `${requestedPath}#${requestedHeading}`
+      : requestedPath ?? requestedHeading ?? "repo_source";
+  const extractionStatus =
+    exact.extraction_status ??
+    (exact.evidence_missing || exact.required_terms.length === 0 || exact.evidence_refs.length === 0 ? "missing" : "found");
+  const evidenceHash = exact.evidence_hash ?? hashContractEvidence({
+    requestedSourceKind,
+    requestedSourceIdentity,
+    evidenceRefs: exact.evidence_refs,
+    requiredTerms: exact.required_terms,
+  });
+  return {
+    schema: "helix.source_target_exact_contract.v1",
+    contract_id: `${input.turnId}:source_target_exact_contract`,
+    turn_id: input.turnId,
+    requested_source_kind: requestedSourceKind,
+    requested_source_identity: requestedSourceIdentity,
+    ...(requestedPath ? { requested_path: requestedPath } : {}),
+    ...(requestedHeading ? { requested_heading: requestedHeading } : {}),
+    extraction_status: extractionStatus,
+    evidence_refs: exact.evidence_refs,
+    evidence_hash: evidenceHash,
+    required_terms: exact.required_terms,
+    required_claims: [],
+    unsupported_terms: [],
+    unsupported_claims: [],
+    terminal_allowed: extractionStatus === "found" && exact.evidence_refs.length > 0 && exact.required_terms.length > 0,
+    assistant_answer: false,
+    raw_content_included: false,
   };
 };
 
@@ -415,6 +504,10 @@ export function buildRepoDocsSynthesisPacket(input: {
     promptText: input.promptText,
     evidence: compactEvidence,
   });
+  const sourceTargetExactContract = buildSourceTargetExactContract({
+    turnId: input.turnId,
+    exactSectionContract,
+  });
   const files = unique(compactEvidence.map((entry) => entry.path));
   const hasCodeEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_code" || /\.(?:ts|tsx|js|jsx|py)$/i.test(entry.path));
   const hasDocEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_doc" || /\.(?:md|mdx|txt)$/i.test(entry.path));
@@ -470,6 +563,7 @@ export function buildRepoDocsSynthesisPacket(input: {
       guidance: answerDepthGuidance,
     },
     ...(exactSectionContract ? { exact_section_contract: exactSectionContract } : {}),
+    ...(sourceTargetExactContract ? { source_target_exact_contract: sourceTargetExactContract } : {}),
     compact_evidence: compactEvidence,
     evidence_summary: {
       files_considered: files.length,
@@ -492,6 +586,9 @@ export function buildRepoDocsSynthesisPacket(input: {
       exactSectionContract
         ? "For exact section field-list questions, copy only required_terms from exact_section_contract; do not invent field names, aliases, or adjacent contract labels."
         : "",
+      sourceTargetExactContract
+        ? "The source_target_exact_contract is the exact source identity gate. Synthesize only after honoring its requested_source_identity, evidence_refs, required_terms, and terminal_allowed state."
+        : "",
       citationInstruction,
       dottieInstruction,
       input.routeFamily === "repo_evidence"
@@ -507,6 +604,7 @@ export function collectRepoDocsSynthesisPacketSupportRefs(packet: HelixRepoDocsS
   return unique([
     ...packet.compact_evidence.map((entry) => entry.ref),
     ...packet.source_observation_refs,
+    ...(packet.source_target_exact_contract ? [packet.source_target_exact_contract.contract_id] : []),
   ]).slice(0, 12);
 }
 
@@ -594,11 +692,12 @@ export function buildRepoDocsSynthesisRepairInstruction(input: {
     violations.has("missing_exact_section_terms") ||
     violations.has("unsupported_exact_section_terms")
   ) {
-    const terms = input.packet?.exact_section_contract?.required_terms.join(", ");
+    const terms = input.packet?.source_target_exact_contract?.required_terms.join(", ") ??
+      input.packet?.exact_section_contract?.required_terms.join(", ");
     const termSentence = terms
       ? ` The exact section requires these terms: ${terms}.`
       : "";
-    return `${prefix}${common}${evidenceSentence}${termSentence} The previous answer did not stay bound to the requested section. Rewrite from the exact heading/path evidence only, include every required field term, and remove any invented field names or adjacent contract labels.`;
+    return `${prefix}${common}${evidenceSentence}${termSentence} The previous answer did not stay bound to the requested exact-source contract. Rewrite from the exact heading/path evidence only, include every required field term, and remove any invented field names or adjacent contract labels.`;
   }
   if (violations.has("missing_support_refs")) {
     return `${prefix}${common}${evidenceSentence} The previous answer lacked support refs; attach refs from the synthesis packet.`;

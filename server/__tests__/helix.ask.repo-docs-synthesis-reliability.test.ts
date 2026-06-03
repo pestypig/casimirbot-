@@ -8,6 +8,7 @@ import {
   repoDocsSynthesisTerminalErrorCode,
 } from "../services/helix-ask/repo-docs-synthesis-packet";
 import { evaluateRepoAnswerTextQualityGate } from "../services/helix-ask/repo-answer-text-quality-gate";
+import { evaluateRepoEvidenceRelevanceGate } from "../services/helix-ask/repo-evidence-relevance-gate";
 import { getHelixCausalTurnTimeline } from "../services/helix-ask/causal-turn-timeline";
 
 const turnId = "ask:test:repo-docs-synthesis";
@@ -313,8 +314,18 @@ describe("repo/docs synthesis reliability", () => {
       contract_kind: "field_list",
       requested_path: "docs/helix-ask-codex-loop-discipline.md",
       requested_heading: "Shared Tool Family Boundary",
+      extraction_status: "found",
       evidence_missing: false,
     });
+    expect(packet.source_target_exact_contract).toMatchObject({
+      schema: "helix.source_target_exact_contract.v1",
+      requested_source_kind: "repo_heading_section",
+      requested_source_identity: "docs/helix-ask-codex-loop-discipline.md#Shared Tool Family Boundary",
+      extraction_status: "found",
+      terminal_allowed: true,
+      assistant_answer: false,
+    });
+    expect(packet.source_target_exact_contract?.evidence_hash).toMatch(/^[a-f0-9]{64}$/);
     expect(packet.exact_section_contract?.required_terms).toEqual(
       expect.arrayContaining([
         "source_target_intent",
@@ -357,6 +368,12 @@ describe("repo/docs synthesis reliability", () => {
 
     expect(packet.compact_evidence[0]?.ref).toMatch(/docs\/helix-ask-codex-loop-discipline\.md:\d+-\d+/);
     expect(packet.exact_section_contract?.evidence_missing).toBe(false);
+    expect(packet.source_target_exact_contract).toMatchObject({
+      requested_source_identity: "docs/helix-ask-codex-loop-discipline.md#Shared Tool Family Boundary",
+      extraction_status: "found",
+      terminal_allowed: true,
+    });
+    expect(packet.source_target_exact_contract?.evidence_refs?.[0]).toMatch(/docs\/helix-ask-codex-loop-discipline\.md:\d+-\d+/);
     expect(packet.exact_section_contract?.required_terms).toEqual(
       expect.arrayContaining([
         "source_target_intent",
@@ -367,6 +384,57 @@ describe("repo/docs synthesis reliability", () => {
     );
     expect(packet.exact_section_contract?.required_terms).not.toContain("ask_user");
     expect(packet.exact_section_contract?.required_terms).not.toContain("terminal_eligible");
+  });
+
+  it("blocks terminal eligibility when an exact source contract is missing evidence", () => {
+    const exactTurnId = "ask:test:shared-tool-boundary-missing-exact-source";
+    const weakObservation = {
+      schema: "helix.repo_code_evidence_observation.v1",
+      artifact_id: `${exactTurnId}:repo_code_evidence_observation`,
+      turn_id: exactTurnId,
+      concept: "Missing Exact Heading",
+      query:
+        'Read repo path docs/helix-ask-codex-loop-discipline.md. Find the heading "No Such Shared Boundary". List the required fields under that heading.',
+      evidence_refs: ["docs/helix-ask-codex-loop-discipline.md"],
+      spans: [
+        {
+          ref: "docs/helix-ask-codex-loop-discipline.md:1",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_kind: "repo_doc",
+          sanitized_excerpt: "The loop discipline document describes Codex and Helix Ask ownership boundaries.",
+          reason: "Weak retrieval hit for the correct document but not the requested heading.",
+        },
+      ],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: exactTurnId,
+      promptText: weakObservation.query,
+      routeFamily: "repo_evidence",
+      artifactLedger: [{ artifact_id: weakObservation.artifact_id, kind: "repo_code_evidence_observation", payload: weakObservation }],
+    });
+    const observationWithContract = {
+      ...weakObservation,
+      source_target_exact_contract: packet.source_target_exact_contract,
+    };
+    const relevanceGate = evaluateRepoEvidenceRelevanceGate({
+      turnId: exactTurnId,
+      concept: "Missing Exact Heading",
+      query: weakObservation.query,
+      observation: observationWithContract as any,
+      sourceTargetExactContract: packet.source_target_exact_contract as any,
+    });
+
+    expect(packet.source_target_exact_contract).toMatchObject({
+      requested_source_identity: "docs/helix-ask-codex-loop-discipline.md#No Such Shared Boundary",
+      extraction_status: "missing",
+      terminal_allowed: false,
+    });
+    expect(relevanceGate.terminal_allowed).toBe(false);
+    expect(relevanceGate.violations).toContain("exact_source_contract_failed");
   });
 
   it("rejects exact-section answers that invent field names or omit required terms", () => {

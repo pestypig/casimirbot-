@@ -208,10 +208,19 @@ const exactSectionTermCoverage = (input: {
   | "unsupported_exact_section_terms"
 > => {
   const packet = readRecord(input.payload.repo_docs_synthesis_packet);
-  const contract = readRecord(packet?.exact_section_contract);
-  if (readString(contract?.contract_kind) !== "field_list") return [];
+  const exactSourceContract =
+    readRecord(packet?.source_target_exact_contract) ??
+    readRecord(input.payload.source_target_exact_contract);
+  const sectionContract = readRecord(packet?.exact_section_contract);
+  const contract = exactSourceContract ?? sectionContract;
+  if (!exactSourceContract && readString(sectionContract?.contract_kind) !== "field_list") return [];
   const requiredTerms = unique(readArray(contract?.required_terms).map(readString).filter(Boolean));
-  if (contract?.evidence_missing === true || requiredTerms.length === 0) {
+  if (
+    contract?.terminal_allowed === false ||
+    contract?.evidence_missing === true ||
+    readString(contract?.extraction_status) !== "" && readString(contract?.extraction_status) !== "found" ||
+    requiredTerms.length === 0
+  ) {
     return ["exact_section_evidence_missing"];
   }
   const normalizedText = input.text.toLowerCase();
@@ -273,6 +282,7 @@ export function evaluateRepoAnswerTextQualityGate(input: {
     if (relevanceGate.terminal_allowed !== true) violations.push("weak_repo_evidence");
     const gateViolations = readArray(relevanceGate.violations).map(readString);
     if (gateViolations.includes("exact_match_files_found_but_not_selected")) violations.push("exact_evidence_not_selected");
+    if (gateViolations.includes("exact_source_contract_failed")) violations.push("exact_section_evidence_missing");
     if (gateViolations.includes("codebase_anchor_ignored")) violations.push("codebase_anchor_ignored");
     if (gateViolations.includes("alias_not_normalized")) violations.push("alias_not_normalized");
   }

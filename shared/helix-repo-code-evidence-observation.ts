@@ -41,6 +41,25 @@ export type HelixRepoCodeEvidenceObservation = {
     source_kind: "repo_code" | "repo_doc";
     score: number;
   }>;
+  source_target_exact_contract?: {
+    schema: "helix.source_target_exact_contract.v1";
+    contract_id: string;
+    turn_id: string;
+    requested_source_kind: string;
+    requested_source_identity: string;
+    requested_path?: string;
+    requested_heading?: string;
+    extraction_status: "found" | "ambiguous" | "missing" | "unsupported";
+    evidence_refs: string[];
+    evidence_hash: string;
+    required_terms: string[];
+    required_claims: string[];
+    unsupported_terms: string[];
+    unsupported_claims: string[];
+    terminal_allowed: boolean;
+    assistant_answer: false;
+    raw_content_included: false;
+  };
   selected_for_answer: boolean;
   assistant_answer: false;
   raw_content_included: false;

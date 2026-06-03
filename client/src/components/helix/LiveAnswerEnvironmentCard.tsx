@@ -28,6 +28,72 @@ const postEnvironmentAction = (environmentId: string, action: "pause" | "resume"
 const lineValue = (lines: LiveAnswerLineState[], key: string): string =>
   cleanLine(lines.find((line: LiveAnswerLineState) => line.key === key) ?? { key, label: key, value: "" } as LiveAnswerLineState).toLowerCase();
 
+const STAGE_PLAY_LINE_ORDER = [
+  "situation",
+  "actor_state",
+  "resources",
+  "affordances",
+  "risk",
+  "possibilities",
+  "unknowns",
+  "next_check",
+  "answer_snapshot",
+  "voice_output",
+] as const;
+
+const STAGE_PLAY_SPECIFIC_LINE_KEYS = new Set<string>([
+  "situation",
+  "actor_state",
+  "resources",
+  "affordances",
+  "possibilities",
+  "unknowns",
+  "answer_snapshot",
+  "voice_output",
+]);
+
+const lineStateToPresentLine = (entry: LiveAnswerLineState): HelixPresentStateCardLine => ({
+  key: entry.key,
+  label: entry.label,
+  value: cleanLine(entry),
+  evidence_refs: entry.evidence_refs,
+  confidence: null,
+  updated_at: entry.updated_at,
+});
+
+const isStagePlayBackedEnvironment = (environment: LiveAnswerEnvironment, lines: LiveAnswerLineState[]): boolean => {
+  const graphId = String(environment.graph_id ?? "");
+  const stagePlayText = [
+    environment.objective,
+    environment.preset,
+    environment.latest_summary,
+    graphId,
+  ].join("\n");
+  if (/stage[_\s-]*play/i.test(stagePlayText)) return true;
+  const schemaKeys = Array.isArray(environment.line_schema)
+    ? environment.line_schema
+        .map((entry: unknown) =>
+          entry && typeof entry === "object" && !Array.isArray(entry)
+            ? String((entry as { key?: unknown }).key ?? "")
+            : "",
+        )
+        .filter(Boolean)
+    : [];
+  const keys = Array.from(new Set([
+    ...lines.map((line: LiveAnswerLineState) => line.key),
+    ...schemaKeys,
+  ]));
+  return keys.filter((key: string) => STAGE_PLAY_SPECIFIC_LINE_KEYS.has(key)).length >= 2;
+};
+
+const stagePlayPreferredLines = (answerLines: LiveAnswerLineState[]): HelixPresentStateCardLine[] => {
+  const byKey = new Map(answerLines.map((line: LiveAnswerLineState) => [line.key, line]));
+  return STAGE_PLAY_LINE_ORDER
+    .map((key) => byKey.get(key))
+    .filter((line): line is LiveAnswerLineState => Boolean(line))
+    .map(lineStateToPresentLine);
+};
+
 const environmentPolicyBadges = (environment: LiveAnswerEnvironment): Array<{ label: string; value: string }> => {
   const lines = Array.isArray(environment.lines) ? environment.lines : [];
   const sourceIds = Array.isArray(environment.source_ids) ? environment.source_ids : [];
@@ -171,16 +237,14 @@ export function LiveAnswerEnvironmentCard({
   }, [environment.updated_at, sourceIds]);
   const answerLines = lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
   const presentLines = presentStateCard?.lines ?? [];
-  const visibleLines = presentLines.length > 0
-    ? presentLines
-    : answerLines.map((entry: LiveAnswerLineState): HelixPresentStateCardLine => ({
-        key: entry.key,
-        label: entry.label,
-        value: cleanLine(entry),
-        evidence_refs: entry.evidence_refs,
-        confidence: null,
-        updated_at: entry.updated_at,
-      }));
+  const preferredStagePlayLines = isStagePlayBackedEnvironment(environment, lines)
+    ? stagePlayPreferredLines(answerLines)
+    : [];
+  const visibleLines = preferredStagePlayLines.length > 0
+    ? preferredStagePlayLines
+    : presentLines.length > 0
+      ? presentLines
+      : answerLines.map(lineStateToPresentLine);
   const procedureLines = lines.filter((line: LiveAnswerLineState) =>
     line.key === "possibilities" ||
     line.key === "rehearsal" ||

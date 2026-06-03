@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LiveAnswerEnvironmentCard } from "@/components/helix/LiveAnswerEnvironmentCard";
 import type { LiveAnswerEnvironment, LiveAnswerEnvironmentDelta } from "@shared/helix-live-answer-environment";
@@ -71,6 +71,7 @@ const delta: LiveAnswerEnvironmentDelta = {
 describe("LiveAnswerEnvironmentCard", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("renders answer-card lines only and opens delta trace", () => {
@@ -89,5 +90,133 @@ describe("LiveAnswerEnvironmentCard", () => {
     render(<LiveAnswerEnvironmentCard environment={environment} onAskHelix={onAskHelix} />);
     fireEvent.click(screen.getByRole("button", { name: "Ask about this" }));
     expect(onAskHelix).toHaveBeenCalledWith(expect.stringContaining("live answer environment"));
+  });
+
+  it("prefers Stage Play answer lines over generic visual present-state lines", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/agi/situation/present-state-card")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            card: {
+              lines: [
+                {
+                  key: "scene",
+                  label: "Scene",
+                  value: "Generic visual scene should not be foregrounded.",
+                  evidence_refs: ["visual:generic"],
+                  confidence: 0.5,
+                  updated_at: "2026-05-08T16:00:00.000Z",
+                },
+              ],
+            },
+          }),
+        } as Response);
+      }
+      return Promise.resolve({ ok: false, json: async () => null } as Response);
+    }));
+
+    const stagePlayEnvironment: LiveAnswerEnvironment = {
+      ...environment,
+      environment_id: "live_answer:stage-play",
+      objective: "Project Stage Play graph into Live Answer.",
+      graph_id: "stage_play_badge_graph:test",
+      line_schema: [
+        { key: "situation", label: "Situation", update_policy: "episode_based", visibility: "answer_card" },
+        { key: "actor_state", label: "Actor", update_policy: "episode_based", visibility: "answer_card" },
+        { key: "resources", label: "Resources", update_policy: "episode_based", visibility: "answer_card" },
+        { key: "affordances", label: "Affordances", update_policy: "episode_based", visibility: "answer_card" },
+        { key: "risk", label: "Risk", update_policy: "salience_only", visibility: "answer_card" },
+        { key: "possibilities", label: "Possibilities", update_policy: "projection_only", visibility: "answer_card" },
+        { key: "unknowns", label: "Unknowns", update_policy: "projection_only", visibility: "answer_card" },
+        { key: "next_check", label: "Next check", update_policy: "episode_based", visibility: "answer_card" },
+      ],
+      lines: [
+        {
+          key: "scene",
+          label: "Scene",
+          update_policy: "episode_based",
+          visibility: "answer_card",
+          value: "Scene: Generic line should not be foregrounded.",
+          confidence: 0.7,
+          evidence_refs: ["visual:generic"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+        {
+          key: "situation",
+          label: "Situation",
+          update_policy: "episode_based",
+          visibility: "answer_card",
+          value: "Situation: Stage scene built from graph.",
+          confidence: 0.86,
+          evidence_refs: ["stage:graph"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+        {
+          key: "risk",
+          label: "Risk",
+          update_policy: "salience_only",
+          visibility: "answer_card",
+          value: "Risk: Audio grounding is missing.",
+          confidence: 0.76,
+          evidence_refs: ["stage:risk"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+        {
+          key: "possibilities",
+          label: "Possibilities",
+          update_policy: "projection_only",
+          visibility: "answer_card",
+          value: "Possibilities: Continue visual comparison.",
+          confidence: 0.8,
+          evidence_refs: ["stage:possibilities"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+        {
+          key: "unknowns",
+          label: "Unknowns",
+          update_policy: "projection_only",
+          visibility: "answer_card",
+          value: "Unknowns: Audio/transcript grounding and prediction target.",
+          confidence: 0.9,
+          evidence_refs: ["stage:unknowns"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+        {
+          key: "next_check",
+          label: "Next check",
+          update_policy: "episode_based",
+          visibility: "answer_card",
+          value: "Next check: Attach transcript or set prediction target.",
+          confidence: 0.9,
+          evidence_refs: ["stage:next"],
+          updated_at: "2026-05-08T16:00:00.000Z",
+          source: "deterministic_reducer",
+          model_invoked: false,
+        },
+      ],
+    };
+
+    render(<LiveAnswerEnvironmentCard environment={stagePlayEnvironment} />);
+
+    expect(screen.getByText("Stage scene built from graph.")).toBeTruthy();
+    expect(screen.getByText("Audio grounding is missing.")).toBeTruthy();
+    expect(screen.queryByText("Generic line should not be foregrounded.")).toBeNull();
+
+    await waitFor(() => {
+      expect(screen.queryByText("Generic visual scene should not be foregrounded.")).toBeNull();
+      expect(screen.getByText("Stage scene built from graph.")).toBeTruthy();
+    });
   });
 });
