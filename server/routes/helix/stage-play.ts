@@ -237,6 +237,7 @@ helixStagePlayRouter.get("/graph", (req: Request, res: Response) => {
       threadId: readQueryString(req.query.threadId) ?? "stage-play-panel",
       roomId: readQueryString(req.query.roomId),
       environmentId: readQueryString(req.query.environmentId),
+      sourceId: readQueryString(req.query.sourceId),
       objective: readQueryString(req.query.objective),
     });
     const issues = validateStagePlayBadgeGraphV1(graph);

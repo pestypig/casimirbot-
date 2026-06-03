@@ -7005,6 +7005,14 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
     if (!record) continue;
+    const finalAnswerDraft = readAgentLoopAuditRecord(record.final_answer_draft);
+    const finalAnswerDraftAuthority =
+      typeof finalAnswerDraft?.authority === "string" && finalAnswerDraft.authority.trim()
+        ? finalAnswerDraft.authority.trim()
+        : null;
+    if (finalAnswerDraftAuthority === "deterministic_receipt_fallback") {
+      return "deterministic receipt fallback";
+    }
     const directSource =
       typeof record.final_answer_source === "string" && record.final_answer_source.trim()
         ? record.final_answer_source.trim()

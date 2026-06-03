@@ -3058,7 +3058,7 @@ function Inspector({
                 Clear session buffer
               </button>
               <div className="text-[11px] leading-relaxed text-slate-500">
-                Routing controls create local draft requests. Audit controls operate on the separate raw session buffer; the graph updates only after source capability or evidence refs exist.
+                Routing controls persist source custody overrides. Capture and audit controls remain local setup requests until source capability or evidence refs exist.
               </div>
             </div>
           </Section>
@@ -3767,10 +3767,11 @@ export default function StagePlayBadgeGraphPanel() {
   }
 
   function handleObserverDraftAction(source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) {
-    addObserverDraftAction(source, action);
-    if (source) {
+    if (source && routeTargetForObserverAction(source, action)) {
       void persistObserverSourceRoute(source, action);
+      return;
     }
+    addObserverDraftAction(source, action);
   }
 
   async function handleProjectLiveAnswer() {

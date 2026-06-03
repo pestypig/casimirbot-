@@ -400,6 +400,8 @@ describe("Helix Ask Stage Play routing", () => {
     );
     expect(response.body?.answer, routeDebug).toContain("Stage Play tool receipt: live_env.reflect_stage_play_context");
     expect(response.body?.answer).toContain("visual source status:");
+    expect(response.body?.answer).toContain(`${sourceId} active`);
+    expect(response.body?.answer).not.toContain("no visual source status reported");
     expect(response.body?.answer).toContain("Source refs:");
     expect(response.body?.answer).toContain("output projection keys:");
     expect(response.body?.answer).toContain("checkpoint freshness: no_checkpoint");
@@ -418,6 +420,12 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.final_answer_source).not.toBe("client_projection");
     expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
     expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(response.body?.stage_play_checkpoint_queue_completion).toMatchObject({
+      request: expect.objectContaining({
+        checkpointRequestId: liveToolArtifact.payload.observation.debugReceipt.checkpointRequestId,
+        status: "completed",
+      }),
+    });
     const boundaryReport = evaluateTerminalBoundaryEligibility(response.body as Record<string, unknown>);
     expect(boundaryReport.checks.agent_runtime_loop).toBe(true);
     expect(boundaryReport.checks.agent_step_decision).toBe(true);

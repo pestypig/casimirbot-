@@ -234,6 +234,70 @@ describe("Stage Play world-state badge reducer", () => {
     ]));
   });
 
+  it("applies source route overrides across later room and environment binding", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:route-fallback",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:route-fallback",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+    const override = upsertStagePlaySourceRouteOverride({
+      threadId,
+      sourceId: "visual_source:route-fallback",
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: ["ui:source-route"],
+      now: "2026-06-02T12:09:56.000Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: "live_env:route-fallback",
+      sourceId: "visual_source:route-fallback",
+      now: new Date("2026-06-02T12:10:00.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.sourceWindow.latestSourceProducerRefs).toEqual([producer.producer_id]);
+    expect(graph.sourceWindow.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "visual_source:route-fallback",
+        modality: "visual_frame",
+        status: "active",
+        routeTo: "narrative_stage_play",
+        selectedForStagePlay: true,
+        evidenceRefs: expect.arrayContaining([
+          producer.producer_id,
+          override.overrideId,
+          "ui:source-route",
+        ]),
+      }),
+    ]));
+    expect(graph.badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "binding.scene_checkpoint",
+        kind: "procedural_binding",
+      }),
+      expect.objectContaining({
+        id: "binding.narrative_context_gap",
+        kind: "procedural_binding",
+      }),
+    ]));
+    expect(graph.recommendedActions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "stage-action:attach-audio-transcript",
+        admission: "auto",
+        agentExecutable: false,
+      }),
+    ]));
+  });
+
   it("prioritizes current-graph checkpoint requests over stale queued requests", () => {
     recordLiveSourceObservation({
       schema: "helix.live_source_observation.v1",

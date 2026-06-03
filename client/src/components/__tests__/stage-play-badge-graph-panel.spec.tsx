@@ -697,6 +697,35 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/source-route")) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_source_route_override_response/v1",
+        override: {
+          schemaVersion: "stage_play_source_route_override/v1",
+          overrideId: "stage_play_source_route_override:ui",
+          threadId: body.threadId ?? null,
+          roomId: body.roomId ?? null,
+          environmentId: body.environmentId ?? null,
+          sourceId: body.sourceId,
+          modality: body.modality,
+          routeTo: body.routeTo,
+          selectedForStagePlay: body.selectedForStagePlay,
+          updatedAt: "2026-06-02T00:00:01.000Z",
+          evidenceRefs: body.evidenceRefs ?? [],
+          assistant_answer: false,
+          context_role: "ui_request_not_instruction",
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        terminal_eligible: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.includes("/api/helix/stage-play/raw-session-buffer/clear")) {
       return new Response(JSON.stringify({
         ok: true,
@@ -1007,8 +1036,16 @@ describe("StagePlayBadgeGraphPanel", () => {
       preferredPreset: "minecraft_run_monitor",
     }));
     fireEvent.click(screen.getAllByRole("button", { name: "Use for Stage Play" })[0]);
-    expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
-    expect(screen.getByDisplayValue("use_for_stage_play")).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchJsonBodies("/api/helix/stage-play/source-route").at(-1)).toEqual(expect.objectContaining({
+        threadId: "helix-ask:desktop",
+        sourceId: "source:visual-tab",
+        modality: "visual_frame",
+        routeTo: "visual_context",
+        selectedForStagePlay: true,
+      }));
+    });
+    expect(screen.queryByTestId("stage-play-draft-parameter-editor")).toBeNull();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Defensive Retreat Barrier" })[0]);
 
@@ -1094,6 +1131,17 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("Route to Narrative")).toBeTruthy();
     expect(screen.getByText("Review source evidence")).toBeTruthy();
     expect(screen.getByText("Open raw buffer preview")).toBeTruthy();
+    fireEvent.click(screen.getByText("Route to Narrative"));
+    await waitFor(() => {
+      expect(fetchJsonBodies("/api/helix/stage-play/source-route").at(-1)).toEqual(expect.objectContaining({
+        threadId: "helix-ask:desktop",
+        sourceId: "source:visual-tab",
+        modality: "visual_frame",
+        routeTo: "narrative_stage_play",
+        selectedForStagePlay: true,
+      }));
+    });
+    expect(screen.queryByTestId("stage-play-draft-parameter-editor")).toBeNull();
   });
 
   it("switches the Stage Console to node-specific interaction surfaces", async () => {

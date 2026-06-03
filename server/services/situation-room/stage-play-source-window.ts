@@ -248,6 +248,32 @@ export function getStagePlaySourceRouteOverride(input: {
   return sourceRouteOverrides.get(routeOverrideKey(input)) ?? null;
 }
 
+function getStagePlaySourceRouteOverrideForContext(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  modality: string;
+}): StagePlaySourceRouteOverrideV1 | null {
+  const candidates: Array<{
+    threadId?: string | null;
+    roomId?: string | null;
+    environmentId?: string | null;
+    sourceId: string;
+    modality: string;
+  }> = [
+    input,
+    { ...input, environmentId: null },
+    { ...input, roomId: null },
+    { ...input, roomId: null, environmentId: null },
+  ];
+  for (const candidate of candidates) {
+    const override = getStagePlaySourceRouteOverride(candidate);
+    if (override) return override;
+  }
+  return null;
+}
+
 export function resetStagePlaySourceRouteOverridesForTest(): void {
   sourceRouteOverrides.clear();
 }
@@ -480,7 +506,7 @@ const applyRouteOverride = (
     environmentId?: string | null;
   },
 ): StagePlaySourceRoutingEntryV1 => {
-  const override = getStagePlaySourceRouteOverride({
+  const override = getStagePlaySourceRouteOverrideForContext({
     ...context,
     sourceId: source.sourceId,
     modality: source.modality,
