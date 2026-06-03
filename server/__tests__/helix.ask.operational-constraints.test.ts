@@ -5,6 +5,7 @@ import {
   buildOperationalSatisfactionEvaluation,
   buildTurnOperationalConstraints,
 } from "../services/helix-ask/operational-constraints";
+import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 
 describe("Helix Ask operational constraints", () => {
   it("preserves forbidden image tools and local visual-capture meaning", () => {
@@ -39,6 +40,23 @@ describe("Helix Ask operational constraints", () => {
     expect(packet.surface_satisfaction_required).toBe(true);
     expect(packet.fallback_equivalence_policy).toBe("diagnostic_only");
     expect(packet.allowed_fallback_surfaces).toEqual(expect.arrayContaining(["backend_api_probe", "codex_in_app_browser"]));
+  });
+
+  it("projects operational constraints into tool admission decisions", () => {
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:test:admission",
+      promptText:
+        "Do not call the GPT image 2. Through the localhost 5050 Chrome tab with the Codex extension, check visual capture.",
+      sourceTargetIntent: {
+        target_source: "visual_capture",
+        target_kind: "visual_capture",
+      },
+    });
+
+    expect(admission.operational_constraints_ref).toBe("ask:test:admission:turn_operational_constraints");
+    expect(admission.forbidden_tools).toContain("gpt-image-2");
+    expect(admission.forbidden_tool_families).toContain("image_generation");
+    expect(admission.required_surface).toBe("chrome_extension_localhost_5050_tab");
   });
 
   it("separates proposed, rejected, executed, and fallback capabilities", () => {

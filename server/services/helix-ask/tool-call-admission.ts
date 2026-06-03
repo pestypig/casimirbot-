@@ -6,6 +6,7 @@ import {
   type HelixToolCallAdmissionFamily,
 } from "@shared/helix-tool-call-admission";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { buildTurnOperationalConstraints } from "./operational-constraints";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -60,6 +61,16 @@ export function buildToolCallAdmissionDecision(input: {
     ? (input.sourceTargetIntent as Record<string, unknown>).suppressed_routes as string[]
     : [];
   const promptText = String(input.promptText ?? "");
+  const operationalConstraints = buildTurnOperationalConstraints({
+    turnId: input.turnId,
+    promptText,
+  });
+  const operationalFields = {
+    operational_constraints_ref: `${input.turnId}:turn_operational_constraints`,
+    forbidden_tools: operationalConstraints.forbidden_tools,
+    forbidden_tool_families: operationalConstraints.forbidden_tool_families,
+    required_surface: operationalConstraints.required_surface,
+  };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   if (contextualSuppression) {
     return {
@@ -73,6 +84,7 @@ export function buildToolCallAdmissionDecision(input: {
       reason: "contextual_tool_reference_suppressed",
       tool_admission_suppressed: true,
       suppression_reason: contextualSuppression.suppression_reason,
+      ...operationalFields,
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -192,6 +204,7 @@ export function buildToolCallAdmissionDecision(input: {
       ...extraForbiddenRoutes,
       ...(required ? ["model_only_concept", "no_tool_direct"] : []),
     ]),
+    ...operationalFields,
     reason,
     assistant_answer: false,
     raw_content_included: false,
