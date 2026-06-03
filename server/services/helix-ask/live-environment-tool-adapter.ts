@@ -476,7 +476,7 @@ export function executeLiveEnvironmentTool(
     const projectedLineKeys = liveAnswerLineReduction?.delta.changed_line_keys ?? [];
     const environmentLineKeys = new Set(environment?.lines.map((line) => line.key) ?? []);
     const skippedLineKeys = projectedOutputLaneProjection.lanes
-      .filter((lane) => lane.lineUpdateAllowed && lane.lineKey !== "recommendation")
+      .filter((lane) => lane.lineUpdateAllowed)
       .map((lane) => lane.lineKey)
       .filter((lineKey) => !environmentLineKeys.has(lineKey));
     const liveAnswerProjectionReason = liveAnswerLineReduction

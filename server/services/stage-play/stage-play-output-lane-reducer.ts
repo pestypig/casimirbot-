@@ -23,6 +23,8 @@ export type StagePlayOutputLaneV1 = {
     | "prediction"
     | "validation"
     | "rehearsal"
+    | "answer_snapshot"
+    | "voice_output"
     | "debug_basis";
   label: string;
   status: "ready" | "candidate" | "blocked" | "missing_evidence" | "stale";
@@ -44,6 +46,8 @@ export type StagePlayLiveAnswerLineKey =
   | "possibilities"
   | "rehearsal"
   | "recommendation"
+  | "answer_snapshot"
+  | "voice_output"
   | "unknowns"
   | "next_check"
   | "debug_basis";
@@ -72,6 +76,8 @@ export const STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA: LiveAnswerLineDefinition[] = [
   stagePlayAnswerLine("possibilities", "Possibilities", "projection_only", "Candidate procedural bindings, not final guidance."),
   stagePlayAnswerLine("rehearsal", "Rehearsal", "simulation_stream", "Prediction or dry-run checks when available."),
   stagePlayAnswerLine("recommendation", "Recommendation", "model_reviewed", "Post-tool model-reviewed guidance only.", "action"),
+  stagePlayAnswerLine("answer_snapshot", "Answer snapshot", "model_reviewed", "Model-reviewed answer snapshot only.", "action"),
+  stagePlayAnswerLine("voice_output", "Voice output", "model_reviewed", "Model-reviewed and voice-policy-eligible output only.", "action"),
   stagePlayAnswerLine("unknowns", "Unknowns", "projection_only", "Missing evidence and source gaps.", "warn"),
   stagePlayAnswerLine("next_check", "Next check", "episode_based", "Recommended next observation/check.", "action"),
   stagePlayAnswerLine("debug_basis", "Debug basis", "projection_only", "Evidence refs and Stage Play reducer basis."),
@@ -126,10 +132,19 @@ type LaneSpec = Omit<
 
 const LANE_TEXT_LIMIT = 360;
 
+const STAGE_PLAY_MODEL_REVIEWED_LINE_KEYS = new Set<StagePlayLiveAnswerLineKey>([
+  "recommendation",
+  "answer_snapshot",
+  "voice_output",
+]);
+
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string =>
     typeof value === "string" && value.trim().length > 0
   ).map((value) => value.trim())));
+
+const isNonEmptyText = (value: string | null | undefined): value is string =>
+  typeof value === "string" && value.trim().length > 0;
 
 const clampConfidence = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
@@ -275,6 +290,40 @@ const missingEvidenceText = (
     : "No explicit missing-evidence badge is projected by Stage Play.";
 };
 
+const outputTextFrom = (
+  badges: StagePlayBadgeV1[],
+  fallback: string,
+): string => {
+  const text = badges
+    .map((badge) => badge.output?.text ?? badge.dataTray?.summary ?? null)
+    .find(isNonEmptyText);
+  return text ? compactText(text) : fallback;
+};
+
+const hasModelReviewedCheckpoint = (graph: StagePlayBadgeGraphV1): boolean =>
+  graph.badges.some((badge) =>
+    badge.kind === "ask_checkpoint" &&
+    badge.checkpoint?.modelReviewed === true
+  );
+
+const modelReviewedOutputBadges = (
+  graph: StagePlayBadgeGraphV1,
+  kind: Extract<StagePlayBadgeKindV1, "answer_snapshot" | "live_output" | "voice_output">,
+): StagePlayBadgeV1[] => {
+  if (!hasModelReviewedCheckpoint(graph)) return [];
+  return graph.badges.filter((badge) =>
+    badge.kind === kind &&
+    badge.output?.state === "model_reviewed" &&
+    isNonEmptyText(badge.output.text)
+  );
+};
+
+const hasExplicitVoicePolicy = (badge: StagePlayBadgeV1): boolean =>
+  badge.output?.voiceEligible === true &&
+  [...badge.tags, ...badge.reasonCodes].some((value) =>
+    /(?:explicit_)?voice(?:_output)?_(?:policy|eligible|allowed)|voice_policy/i.test(value)
+  );
+
 export function buildStagePlayOutputLaneProjectionV1(
   input: LaneBuildInput,
 ): StagePlayOutputLaneProjectionV1 {
@@ -306,6 +355,16 @@ export function buildStagePlayOutputLaneProjectionV1(
   const missingEvidenceActions = graph.recommendedActions.filter((action) =>
     action.missingEvidence.length > 0
   );
+  const answerSnapshotBadges = modelReviewedOutputBadges(graph, "answer_snapshot");
+  const liveOutputBadges = modelReviewedOutputBadges(graph, "live_output");
+  const recommendationBadges = answerSnapshotBadges.length > 0
+    ? answerSnapshotBadges
+    : liveOutputBadges;
+  const voiceOutputBadges = modelReviewedOutputBadges(graph, "voice_output")
+    .filter((badge) => answerSnapshotBadges.length > 0 && hasExplicitVoicePolicy(badge));
+  const hasReviewedAnswerSnapshot = answerSnapshotBadges.length > 0;
+  const hasReviewedRecommendation = recommendationBadges.length > 0;
+  const hasVoiceOutput = voiceOutputBadges.length > 0;
   const sourceSummary = graph.sourceWindow.sources.length > 0
     ? graph.sourceWindow.sources
         .slice(0, 5)
@@ -327,7 +386,7 @@ export function buildStagePlayOutputLaneProjectionV1(
         `Objective bounds: ${badgeTitles(goals, graph.title || graph.description || "no objective badge yet")}.`,
       ].join(" "),
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: [...settings, ...actors, ...goals],
       fallbackConfidence: 0.58,
     }),
@@ -338,7 +397,7 @@ export function buildStagePlayOutputLaneProjectionV1(
       status: actors.length > 0 ? staleStatusFor(graph) : "missing_evidence",
       text: badgeBindingTitles(actors, "No actor badge or actor live binding is projected yet."),
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: actors,
       fallbackConfidence: 0.45,
     }),
@@ -349,7 +408,7 @@ export function buildStagePlayOutputLaneProjectionV1(
       status: resources.length > 0 ? staleStatusFor(graph) : "missing_evidence",
       text: badgeBindingTitles(resources, "No resource or prop badge is projected yet."),
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: resources,
       fallbackConfidence: 0.44,
     }),
@@ -360,7 +419,7 @@ export function buildStagePlayOutputLaneProjectionV1(
       status: affordances.length > 0 ? staleStatusFor(graph) : "missing_evidence",
       text: badgeTitles(affordances, "No available affordance badge is projected yet.", 8),
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: affordances,
       fallbackConfidence: 0.44,
     }),
@@ -395,7 +454,7 @@ export function buildStagePlayOutputLaneProjectionV1(
       status: predictionBadges.length > 0 ? "candidate" : "missing_evidence",
       text: badgeTitles(predictionBadges, "No prediction or dry-run validation has been attached to this graph yet.", 5),
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: predictionBadges,
       fallbackConfidence: predictionBadges.length > 0 ? 0.64 : 0.36,
     }),
@@ -433,7 +492,7 @@ export function buildStagePlayOutputLaneProjectionV1(
       status: staleStatusFor(graph),
       text: `Stage Play used ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), ${graph.summary.blockedAffordanceCount} blocked move(s), ${graph.summary.proceduralBindingCount} procedural binding(s). Sources: ${sourceSummary}.`,
       admission: "auto",
-      lineUpdateAllowed: true,
+      lineUpdateAllowed: false,
       badges: graph.badges.filter((badge) => badge.kind === "observer" || badge.kind === "source" || badge.kind === "interpreter"),
       fallbackConfidence: 0.66,
     }),
@@ -441,13 +500,51 @@ export function buildStagePlayOutputLaneProjectionV1(
       laneId: "live_answer",
       lineKey: "recommendation",
       label: "Recommendation",
-      status: "blocked",
-      text: "Stage Play did not produce a final recommendation. A post-tool model-reviewed answer is required before this line can become assistant guidance.",
-      admission: "blocked",
-      lineUpdateAllowed: false,
+      status: hasReviewedRecommendation ? "ready" : "missing_evidence",
+      text: outputTextFrom(
+        recommendationBadges,
+        "Stage Play did not produce a final recommendation. A post-tool model-reviewed answer is required before this line can become assistant guidance.",
+      ),
+      admission: hasReviewedRecommendation ? "auto" : "blocked",
+      lineUpdateAllowed: hasReviewedRecommendation,
       modelReviewRequired: true,
-      actions: graph.recommendedActions.filter((action) => action.admission === "blocked"),
-      fallbackConfidence: 1,
+      badges: recommendationBadges,
+      actions: hasReviewedRecommendation
+        ? []
+        : graph.recommendedActions.filter((action) => action.admission === "blocked"),
+      fallbackConfidence: hasReviewedRecommendation ? 0.82 : 1,
+    }),
+    makeLane(graph, {
+      laneId: "answer_snapshot",
+      lineKey: "answer_snapshot",
+      label: "Answer snapshot",
+      status: hasReviewedAnswerSnapshot ? "ready" : "missing_evidence",
+      text: outputTextFrom(
+        answerSnapshotBadges,
+        "No model-reviewed answer snapshot is available for this stage yet.",
+      ),
+      admission: hasReviewedAnswerSnapshot ? "auto" : "blocked",
+      lineUpdateAllowed: hasReviewedAnswerSnapshot,
+      modelReviewRequired: true,
+      badges: answerSnapshotBadges,
+      fallbackConfidence: hasReviewedAnswerSnapshot ? 0.82 : 0.34,
+    }),
+    makeLane(graph, {
+      laneId: "voice_output",
+      lineKey: "voice_output",
+      label: "Voice output",
+      status: hasVoiceOutput ? "ready" : "missing_evidence",
+      text: outputTextFrom(
+        voiceOutputBadges,
+        hasReviewedAnswerSnapshot
+          ? "Voice output is not eligible until an explicit voice policy allows this model-reviewed answer snapshot."
+          : "Voice output requires a model-reviewed answer snapshot first.",
+      ),
+      admission: hasVoiceOutput ? "auto" : "blocked",
+      lineUpdateAllowed: hasVoiceOutput,
+      modelReviewRequired: true,
+      badges: voiceOutputBadges,
+      fallbackConfidence: hasVoiceOutput ? 0.8 : 0.3,
     }),
   ];
 
@@ -481,8 +578,9 @@ export function buildStagePlayLiveAnswerLineValuesV1(
     : null;
   const lineValues: Record<string, LineValue> = {};
   for (const lane of projection.lanes) {
-    if (!lane.lineUpdateAllowed || lane.lineKey === "recommendation") continue;
+    if (!lane.lineUpdateAllowed) continue;
     if (availableLines && !availableLines.has(lane.lineKey)) continue;
+    const modelReviewedLine = STAGE_PLAY_MODEL_REVIEWED_LINE_KEYS.has(lane.lineKey);
     lineValues[lane.lineKey] = {
       value: lane.text,
       confidence: lane.confidence,
@@ -490,9 +588,9 @@ export function buildStagePlayLiveAnswerLineValuesV1(
       source_event_ids: projection.evidenceRefs.filter((ref) =>
         /live_source_observation|world_event|source_event/i.test(ref)
       ).slice(-12),
-      source: "deterministic_reducer",
-      model_invoked: false,
-      deterministic: true,
+      source: modelReviewedLine ? "model_review" : "deterministic_reducer",
+      model_invoked: modelReviewedLine,
+      deterministic: !modelReviewedLine,
     };
   }
   return lineValues;

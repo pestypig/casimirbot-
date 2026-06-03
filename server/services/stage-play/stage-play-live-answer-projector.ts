@@ -219,6 +219,7 @@ const skippedLineKeysFor = (
 ): string[] => {
   const environmentKeys = new Set(environment?.lines.map((line) => line.key) ?? []);
   return uniqueStrings(projection.lanes
+    .filter((lane) => lane.lineUpdateAllowed)
     .map((lane) => lane.lineKey)
     .filter((key) => !environmentKeys.has(key)));
 };
@@ -226,13 +227,7 @@ const skippedLineKeysFor = (
 const updateAllowedSkippedLineKeysFor = (
   projection: StagePlayOutputLaneProjectionV1,
   environment: LiveAnswerEnvironment | null,
-): string[] => {
-  const environmentKeys = new Set(environment?.lines.map((line) => line.key) ?? []);
-  return uniqueStrings(projection.lanes
-    .filter((lane) => lane.lineUpdateAllowed && lane.lineKey !== "recommendation")
-    .map((lane) => lane.lineKey)
-    .filter((key) => !environmentKeys.has(key)));
-};
+): string[] => skippedLineKeysFor(projection, environment);
 
 export function projectStagePlayLiveAnswer(
   input: StagePlayProjectLiveAnswerRequest & { now?: Date | string },

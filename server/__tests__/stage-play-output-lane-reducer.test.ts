@@ -65,11 +65,14 @@ const badge = (overrides: Partial<StagePlayBadgeV1>): StagePlayBadgeV1 => ({
   confidence: overrides.confidence ?? 0.8,
   missingEvidence: overrides.missingEvidence ?? [],
   reasonCodes: overrides.reasonCodes ?? ["fixture"],
+  dataTray: overrides.dataTray,
+  checkpoint: overrides.checkpoint,
+  output: overrides.output,
   intentModule: overrides.intentModule,
   admission: overrides.admission ?? "auto",
 });
 
-const graphFixture = (): StagePlayBadgeGraphV1 =>
+const graphFixture = (extraBadges: StagePlayBadgeV1[] = []): StagePlayBadgeGraphV1 =>
   buildStagePlayBadgeGraphV1({
     graphId: "stage_play_badge_graph:stage-output",
     title: "Move safely through a hostile area",
@@ -105,6 +108,7 @@ const graphFixture = (): StagePlayBadgeGraphV1 =>
         missingEvidence: ["exact hostile distance"],
       }),
       badge({ id: "check.observe_threat", title: "observe threat distance", kind: "recommended_check", status: "candidate" }),
+      ...extraBadges,
     ],
     edges: [
       {
@@ -160,6 +164,55 @@ const graphFixture = (): StagePlayBadgeGraphV1 =>
     ],
   });
 
+const reviewedOutputBadges = (includeVoicePolicy = false): StagePlayBadgeV1[] => [
+  badge({
+    id: "helix_ask.checkpoint.latest",
+    title: "Helix Ask checkpoint",
+    kind: "ask_checkpoint",
+    status: "observed",
+    confidence: 0.9,
+    reasonCodes: ["completed_solver_path"],
+    evidenceRefs: ["ask:turn:stage-output", "ask_turn_solver_trace:stage-output"],
+    checkpoint: {
+      askTurnId: "ask:turn:stage-output",
+      solverTraceRef: "ask_turn_solver_trace:stage-output",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      modelReviewed: true,
+    },
+  }),
+  badge({
+    id: "answer_snapshot.latest",
+    title: "answer snapshot",
+    kind: "answer_snapshot",
+    status: "observed",
+    confidence: 0.86,
+    evidenceRefs: ["ask:turn:stage-output"],
+    output: {
+      lineKey: "recommendation",
+      text: "Use the barrier retreat plan only after checking exact hostile distance.",
+      state: "model_reviewed",
+      voiceEligible: false,
+    },
+  }),
+  badge({
+    id: "voice_output.current",
+    title: "voice output",
+    kind: "voice_output",
+    status: "observed",
+    tags: includeVoicePolicy ? ["voice_policy"] : [],
+    reasonCodes: includeVoicePolicy ? ["explicit_voice_policy"] : ["model_reviewed_output"],
+    confidence: 0.8,
+    evidenceRefs: ["ask:turn:stage-output"],
+    output: {
+      lineKey: "voice_output",
+      text: "Check hostile distance before using the barrier retreat plan.",
+      state: "model_reviewed",
+      voiceEligible: true,
+    },
+  }),
+];
+
 beforeEach(() => {
   resetLiveAnswerEnvironments();
 });
@@ -202,12 +255,32 @@ describe("stage-play output lane reducer", () => {
     });
     expect(laneByKey.next_check.supportingActionIds).toContain("stage-action:observe-threat");
     expect(laneByKey.recommendation).toMatchObject({
-      status: "blocked",
+      status: "missing_evidence",
       admission: "blocked",
       lineUpdateAllowed: false,
       modelReviewRequired: true,
       assistant_answer: false,
     });
+    expect(laneByKey.answer_snapshot).toMatchObject({
+      status: "missing_evidence",
+      admission: "blocked",
+      lineUpdateAllowed: false,
+      modelReviewRequired: true,
+      assistant_answer: false,
+    });
+    expect(laneByKey.voice_output).toMatchObject({
+      status: "missing_evidence",
+      admission: "blocked",
+      lineUpdateAllowed: false,
+      modelReviewRequired: true,
+      assistant_answer: false,
+    });
+    for (const key of ["situation", "actor_state", "resources", "affordances", "rehearsal", "debug_basis"]) {
+      expect(laneByKey[key].lineUpdateAllowed).toBe(false);
+    }
+    for (const key of ["risk", "possibilities", "unknowns", "next_check"]) {
+      expect(laneByKey[key].lineUpdateAllowed).toBe(true);
+    }
     for (const lane of projection.lanes) {
       expect(Number.isFinite(lane.confidence)).toBe(true);
       expect(lane.confidence).toBeGreaterThanOrEqual(0);
@@ -221,6 +294,14 @@ describe("stage-play output lane reducer", () => {
     const lineValues = buildStagePlayLiveAnswerLineValuesV1(projection);
 
     expect(lineValues.recommendation).toBeUndefined();
+    expect(lineValues.answer_snapshot).toBeUndefined();
+    expect(lineValues.voice_output).toBeUndefined();
+    expect(lineValues.situation).toBeUndefined();
+    expect(lineValues.actor_state).toBeUndefined();
+    expect(lineValues.resources).toBeUndefined();
+    expect(lineValues.affordances).toBeUndefined();
+    expect(lineValues.rehearsal).toBeUndefined();
+    expect(lineValues.debug_basis).toBeUndefined();
     expect(lineValues.risk?.value).toContain("close-range engagement blocked");
     expect(lineValues.possibilities?.value).toContain("defensive retreat barrier");
     expect(lineValues.unknowns?.value).toContain("exact hostile distance");
@@ -230,6 +311,41 @@ describe("stage-play output lane reducer", () => {
       expect(value.model_invoked).toBe(false);
       expect(value.deterministic).toBe(true);
     }
+  });
+
+  it("writes recommendation and answer snapshot only from model-reviewed checkpoint output", () => {
+    const projection = buildStagePlayOutputLaneProjectionV1({
+      graph: graphFixture(reviewedOutputBadges(false)),
+    });
+    const lineValues = buildStagePlayLiveAnswerLineValuesV1(projection);
+
+    expect(lineValues.recommendation?.value).toBe(
+      "Use the barrier retreat plan only after checking exact hostile distance.",
+    );
+    expect(lineValues.answer_snapshot?.value).toBe(
+      "Use the barrier retreat plan only after checking exact hostile distance.",
+    );
+    expect(lineValues.recommendation?.source).toBe("model_review");
+    expect(lineValues.recommendation?.model_invoked).toBe(true);
+    expect(lineValues.recommendation?.deterministic).toBe(false);
+    expect(lineValues.voice_output).toBeUndefined();
+  });
+
+  it("writes voice output only with model-reviewed answer snapshot and explicit voice policy", () => {
+    const noPolicyProjection = buildStagePlayOutputLaneProjectionV1({
+      graph: graphFixture(reviewedOutputBadges(false)),
+    });
+    const policyProjection = buildStagePlayOutputLaneProjectionV1({
+      graph: graphFixture(reviewedOutputBadges(true)),
+    });
+
+    expect(buildStagePlayLiveAnswerLineValuesV1(noPolicyProjection).voice_output).toBeUndefined();
+    expect(buildStagePlayLiveAnswerLineValuesV1(policyProjection).voice_output).toMatchObject({
+      value: "Check hostile distance before using the barrier retreat plan.",
+      source: "model_review",
+      model_invoked: true,
+      deterministic: false,
+    });
   });
 
   it("updates active Live Answer lines while preserving model-reviewed recommendation authority", () => {

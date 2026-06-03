@@ -30,6 +30,17 @@ export type BuildStagePlayGraphFromWorldInput = {
   sourceId?: string | null;
   objective?: string | null;
   now?: Date;
+  askCheckpointReceipt?: StagePlayAskCheckpointReceiptV1 | null;
+};
+
+export type StagePlayAskCheckpointReceiptV1 = {
+  askTurnId?: string | null;
+  solverTraceRef?: string | null;
+  terminalArtifactKind?: string | null;
+  finalAnswerSource?: string | null;
+  completedSolverPath: boolean;
+  answerText?: string | null;
+  evidenceRefs?: string[];
 };
 
 export type BuildStagePlayRecommendedActionAdmissionInput = {
@@ -45,6 +56,9 @@ const hashShort = (value: unknown, size = 18): string =>
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
 const lower = (value: string | null | undefined): string => String(value ?? "").toLowerCase();
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
 
 const hasText = (value: string | null | undefined, pattern: RegExp): boolean => pattern.test(lower(value));
 
@@ -109,6 +123,9 @@ const badge = (input: {
   blocks?: string[];
   missingEvidence?: string[];
   admission?: StagePlayBadgeV1["admission"];
+  dataTray?: StagePlayBadgeV1["dataTray"];
+  checkpoint?: StagePlayBadgeV1["checkpoint"];
+  output?: StagePlayBadgeV1["output"];
 }): StagePlayBadgeV1 => ({
   id: input.id,
   title: input.title,
@@ -124,6 +141,9 @@ const badge = (input: {
   confidence: input.confidence ?? 0.74,
   missingEvidence: input.missingEvidence ?? [],
   reasonCodes: input.reasonCodes ?? [],
+  dataTray: input.dataTray,
+  checkpoint: input.checkpoint,
+  output: input.output,
   intentModule: input.intentVerb
     ? {
         verb: input.intentVerb,
@@ -177,6 +197,350 @@ const pushEdge = (
       reasonCodes: input.reasonCodes ?? [],
     });
   }
+};
+
+const isCompletedAskCheckpointReceipt = (
+  receipt: StagePlayAskCheckpointReceiptV1 | null | undefined,
+): receipt is StagePlayAskCheckpointReceiptV1 =>
+  Boolean(
+    receipt &&
+    receipt.completedSolverPath === true &&
+    (isNonEmptyString(receipt.askTurnId) || isNonEmptyString(receipt.solverTraceRef)),
+  );
+
+const addPipelineSkeleton = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  input: {
+    observerId: string;
+    interpreterId?: string | null;
+    sourceRefs: StagePlayBadgeSourceRefV1[];
+    evidenceRefs: string[];
+    sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+    generatedAt: string;
+    askCheckpointReceipt?: StagePlayAskCheckpointReceiptV1 | null;
+  },
+): void => {
+  if (input.sources.length === 0) return;
+
+  const selectedCount = input.sources.filter((source) => source.selectedForStagePlay).length;
+  const activeCount = input.sources.filter((source) => source.status === "active").length;
+  const sourceEvidenceRefs = unique([
+    ...input.evidenceRefs,
+    ...input.sources.flatMap((source) => source.evidenceRefs),
+  ]);
+  const skeletonEvidenceRefs = sourceEvidenceRefs.length > 0 ? sourceEvidenceRefs : input.evidenceRefs;
+  const hasCompactEvidence = skeletonEvidenceRefs.length > 0;
+  const existingStageBoundCount = badges.filter((entry) =>
+    [
+      "setting",
+      "actor",
+      "prop",
+      "resource",
+      "hazard",
+      "constraint",
+      "goal",
+      "world_state",
+      "fusion",
+    ].includes(entry.kind)
+  ).length;
+  const existingProceduralBindings = badges.filter((entry) =>
+    entry.kind === "procedural_binding" && entry.id !== "procedural_binding.active"
+  );
+  const completedCheckpoint = isCompletedAskCheckpointReceipt(input.askCheckpointReceipt)
+    ? input.askCheckpointReceipt
+    : null;
+  const checkpointEvidenceRefs = unique([
+    ...skeletonEvidenceRefs,
+    ...(completedCheckpoint?.evidenceRefs ?? []),
+    ...(completedCheckpoint?.askTurnId ? [completedCheckpoint.askTurnId] : []),
+    ...(completedCheckpoint?.solverTraceRef ? [completedCheckpoint.solverTraceRef] : []),
+  ]);
+  const answerText = completedCheckpoint?.answerText?.trim() ?? "";
+
+  const compactObservationId = pushBadge(badges, badge({
+    id: "compact_observation.latest",
+    title: "compact observation",
+    plainMeaning: "Latest compact source-window evidence available to Stage Play.",
+    whyItMatters: "Compact observations carry source evidence into the stage while keeping large source payloads outside the graph.",
+    kind: "compact_observation",
+    status: hasCompactEvidence ? "observed" : "missing_evidence",
+    subjects: input.sources.map((source) => source.sourceId),
+    tags: ["pipeline", "compact_observation", ...unique(input.sources.map((source) => source.modality))],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: skeletonEvidenceRefs,
+    confidence: hasCompactEvidence ? 0.76 : 0.35,
+    missingEvidence: hasCompactEvidence ? [] : ["Admitted compact source observation evidence is not available yet."],
+    reasonCodes: ["stage_play_pipeline_skeleton", "compact_source_window"],
+    dataTray: {
+      title: "Latest compact window",
+      summary: hasCompactEvidence
+        ? `Observed ${activeCount} active source(s), ${selectedCount} selected for Stage Play.`
+        : "Waiting for admitted compact observation evidence.",
+      updatedAt: input.generatedAt,
+      freshness: hasCompactEvidence ? "fresh" : "missing",
+      confidence: hasCompactEvidence ? 0.76 : 0.35,
+      evidenceRefs: skeletonEvidenceRefs,
+    },
+    admission: "auto",
+  }));
+
+  const stageInterpretationId = pushBadge(badges, badge({
+    id: "stage_interpretation.current",
+    title: "stage interpretation",
+    plainMeaning: "Current interpreted stage bounds derived from compact observations.",
+    whyItMatters: "Stage interpretation is the boundary between observed source facts and the procedural space the agent can review.",
+    kind: "stage_interpretation",
+    status: existingStageBoundCount > 0 ? "observed" : "missing_evidence",
+    subjects: input.sources.map((source) => source.sourceId),
+    tags: ["pipeline", "stage_interpretation"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: skeletonEvidenceRefs,
+    confidence: existingStageBoundCount > 0 ? 0.74 : 0.38,
+    missingEvidence: existingStageBoundCount > 0 ? [] : ["Interpreted stage bounds have not been assembled yet."],
+    reasonCodes: ["stage_play_pipeline_skeleton", "stage_bounds_projection"],
+    dataTray: {
+      title: "Current stage bounds",
+      summary: existingStageBoundCount > 0
+        ? `${existingStageBoundCount} interpreted bound badge(s) are active in this stage.`
+        : "No interpreted stage bounds are active yet.",
+      updatedAt: input.generatedAt,
+      freshness: hasCompactEvidence ? "fresh" : "missing",
+      confidence: existingStageBoundCount > 0 ? 0.74 : 0.38,
+      evidenceRefs: skeletonEvidenceRefs,
+    },
+    admission: "auto",
+  }));
+
+  const activeProcedureId = pushBadge(badges, badge({
+    id: "procedural_binding.active",
+    title: "active procedure",
+    plainMeaning: "Aggregate view of the procedural bindings currently assembled from the stage.",
+    whyItMatters: "The active procedure node shows whether the graph has combined observations into traceable action-language candidates.",
+    kind: "procedural_binding",
+    status: existingProceduralBindings.length > 0 ? "candidate" : "missing_evidence",
+    subjects: existingProceduralBindings.map((entry) => entry.id),
+    tags: ["pipeline", "procedural_binding", "active_procedure"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: unique([
+      ...skeletonEvidenceRefs,
+      ...existingProceduralBindings.flatMap((entry) => entry.evidenceRefs),
+    ]),
+    confidence: existingProceduralBindings.length > 0 ? 0.72 : 0.36,
+    missingEvidence: existingProceduralBindings.length > 0 ? [] : ["No procedural bindings have been assembled for this stage yet."],
+    reasonCodes: ["stage_play_pipeline_skeleton", "procedural_binding_aggregate"],
+    dataTray: {
+      title: "Active procedure",
+      summary: existingProceduralBindings.length > 0
+        ? `${existingProceduralBindings.length} procedural binding(s) are available for review.`
+        : "No procedural bindings have been assembled for this stage yet.",
+      updatedAt: input.generatedAt,
+      freshness: hasCompactEvidence ? "fresh" : "missing",
+      confidence: existingProceduralBindings.length > 0 ? 0.72 : 0.36,
+      evidenceRefs: unique([
+        ...skeletonEvidenceRefs,
+        ...existingProceduralBindings.flatMap((entry) => entry.evidenceRefs),
+      ]),
+    },
+    admission: "auto",
+  }));
+
+  const checkpointId = pushBadge(badges, badge({
+    id: "helix_ask.checkpoint.latest",
+    title: "Helix Ask checkpoint",
+    plainMeaning: completedCheckpoint
+      ? "Helix Ask completed a model-reviewed checkpoint over the Stage Play evidence."
+      : "No completed Helix Ask checkpoint has reviewed this stage yet.",
+    whyItMatters: "Checkpoint badges distinguish evidence projection from an upheld answer produced after the agent observes the graph.",
+    kind: "ask_checkpoint",
+    status: completedCheckpoint ? "observed" : "missing_evidence",
+    subjects: [completedCheckpoint?.askTurnId ?? "helix_ask"],
+    tags: ["pipeline", "helix_ask", "checkpoint", completedCheckpoint ? "model_reviewed" : "missing_checkpoint"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: checkpointEvidenceRefs,
+    confidence: completedCheckpoint ? 0.86 : 0.34,
+    missingEvidence: completedCheckpoint ? [] : ["A completed Ask turn/debug receipt with solver completion is required."],
+    reasonCodes: [
+      "stage_play_pipeline_skeleton",
+      completedCheckpoint ? "completed_solver_path" : "missing_model_reviewed_checkpoint",
+    ],
+    dataTray: {
+      title: "Latest Ask checkpoint",
+      summary: completedCheckpoint
+        ? "Model-reviewed checkpoint is available for this stage."
+        : "No model-reviewed checkpoint has been produced for this stage yet.",
+      updatedAt: input.generatedAt,
+      freshness: completedCheckpoint ? "fresh" : "missing",
+      confidence: completedCheckpoint ? 0.86 : 0.34,
+      evidenceRefs: checkpointEvidenceRefs,
+    },
+    checkpoint: {
+      askTurnId: completedCheckpoint?.askTurnId ?? null,
+      solverTraceRef: completedCheckpoint?.solverTraceRef ?? null,
+      terminalArtifactKind: completedCheckpoint?.terminalArtifactKind ?? null,
+      finalAnswerSource: completedCheckpoint?.finalAnswerSource ?? null,
+      modelReviewed: Boolean(completedCheckpoint),
+    },
+    admission: "auto",
+  }));
+
+  const answerSnapshotId = pushBadge(badges, badge({
+    id: "answer_snapshot.latest",
+    title: "answer snapshot",
+    plainMeaning: completedCheckpoint
+      ? "Latest upheld answer snapshot from a model-reviewed checkpoint."
+      : "Answer snapshot is waiting for a model-reviewed checkpoint.",
+    whyItMatters: "Answer snapshots keep output text separate from source observations and diagnostic graph projection.",
+    kind: "answer_snapshot",
+    status: completedCheckpoint ? "observed" : "missing_evidence",
+    subjects: [completedCheckpoint?.askTurnId ?? "helix_ask"],
+    tags: ["pipeline", "answer_snapshot", completedCheckpoint ? "model_reviewed" : "missing_checkpoint"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: checkpointEvidenceRefs,
+    confidence: completedCheckpoint ? 0.82 : 0.32,
+    missingEvidence: completedCheckpoint ? [] : ["A model-reviewed Ask checkpoint is required before an answer snapshot is upheld."],
+    reasonCodes: [
+      "stage_play_pipeline_skeleton",
+      completedCheckpoint ? "answer_snapshot_from_checkpoint" : "missing_answer_snapshot",
+    ],
+    dataTray: {
+      title: "Upheld answer",
+      summary: completedCheckpoint
+        ? answerText || "Model-reviewed checkpoint is available; no answer text was supplied to the graph builder."
+        : "No upheld answer snapshot is available yet.",
+      updatedAt: input.generatedAt,
+      freshness: completedCheckpoint ? "fresh" : "missing",
+      confidence: completedCheckpoint ? 0.82 : 0.32,
+      evidenceRefs: checkpointEvidenceRefs,
+    },
+    output: {
+      lineKey: "recommendation",
+      text: completedCheckpoint
+        ? answerText || "Model-reviewed checkpoint is available."
+        : "No model-reviewed answer snapshot is available for this stage yet.",
+      state: completedCheckpoint ? "model_reviewed" : "stale",
+      voiceEligible: false,
+    },
+    admission: "auto",
+  }));
+
+  const liveOutputId = pushBadge(badges, badge({
+    id: "live_output.current",
+    title: "live output",
+    plainMeaning: completedCheckpoint
+      ? "Current live output can display the model-reviewed answer snapshot."
+      : "Current live output is waiting for a model-reviewed answer snapshot.",
+    whyItMatters: "Live output is the display target for reviewed answer snapshots; it is not produced directly from source evidence.",
+    kind: "live_output",
+    status: completedCheckpoint ? "observed" : "missing_evidence",
+    subjects: ["live_answer"],
+    tags: ["pipeline", "live_output", completedCheckpoint ? "model_reviewed" : "waiting_for_checkpoint"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: checkpointEvidenceRefs,
+    confidence: completedCheckpoint ? 0.8 : 0.32,
+    missingEvidence: completedCheckpoint ? [] : ["Live output requires a model-reviewed answer snapshot."],
+    reasonCodes: [
+      "stage_play_pipeline_skeleton",
+      completedCheckpoint ? "live_output_from_answer_snapshot" : "missing_live_output_checkpoint",
+    ],
+    dataTray: {
+      title: "Current live output",
+      summary: completedCheckpoint
+        ? "Live output is backed by the latest model-reviewed answer snapshot."
+        : "Waiting for answer snapshot before displaying an upheld live response.",
+      updatedAt: input.generatedAt,
+      freshness: completedCheckpoint ? "fresh" : "missing",
+      confidence: completedCheckpoint ? 0.8 : 0.32,
+      evidenceRefs: checkpointEvidenceRefs,
+    },
+    output: {
+      lineKey: "live_output",
+      text: completedCheckpoint
+        ? answerText || "Model-reviewed answer snapshot is available."
+        : "No model-reviewed live output is available for this stage yet.",
+      state: completedCheckpoint ? "model_reviewed" : "stale",
+      voiceEligible: false,
+    },
+    admission: "auto",
+  }));
+
+  pushEdge(edges, {
+    from: input.observerId,
+    to: compactObservationId,
+    relation: "feeds",
+    label: "observer source custody feeds compact observation",
+    evidenceRefs: skeletonEvidenceRefs,
+    reasonCodes: ["pipeline_observer_compact_observation"],
+  });
+  if (input.interpreterId) {
+    pushEdge(edges, {
+      from: compactObservationId,
+      to: input.interpreterId,
+      relation: "feeds",
+      label: "compact observation feeds Stage Play interpreter",
+      evidenceRefs: skeletonEvidenceRefs,
+      reasonCodes: ["pipeline_compact_interpreter"],
+    });
+    pushEdge(edges, {
+      from: input.interpreterId,
+      to: stageInterpretationId,
+      relation: "interprets",
+      label: "interpreter produces current stage interpretation",
+      evidenceRefs: skeletonEvidenceRefs,
+      reasonCodes: ["pipeline_interpreter_stage_interpretation"],
+    });
+  } else {
+    pushEdge(edges, {
+      from: compactObservationId,
+      to: stageInterpretationId,
+      relation: "interprets",
+      label: "compact observation seeds current stage interpretation",
+      evidenceRefs: skeletonEvidenceRefs,
+      reasonCodes: ["pipeline_compact_stage_interpretation"],
+    });
+  }
+  pushEdge(edges, {
+    from: stageInterpretationId,
+    to: activeProcedureId,
+    relation: "produces",
+    label: "stage interpretation produces active procedural binding aggregate",
+    evidenceRefs: skeletonEvidenceRefs,
+    reasonCodes: ["pipeline_stage_procedure"],
+  });
+  for (const procedural of existingProceduralBindings.slice(0, 12)) {
+    pushEdge(edges, {
+      from: procedural.id,
+      to: activeProcedureId,
+      relation: "composes_with",
+      label: "specific procedural binding contributes to active procedure",
+      evidenceRefs: procedural.evidenceRefs,
+      reasonCodes: ["pipeline_specific_procedure_aggregate"],
+    });
+  }
+  pushEdge(edges, {
+    from: activeProcedureId,
+    to: checkpointId,
+    relation: "feeds",
+    label: "active procedure feeds Helix Ask checkpoint review",
+    evidenceRefs: checkpointEvidenceRefs,
+    reasonCodes: ["pipeline_procedure_checkpoint"],
+  });
+  pushEdge(edges, {
+    from: checkpointId,
+    to: answerSnapshotId,
+    relation: "produces",
+    label: "model-reviewed checkpoint produces answer snapshot",
+    evidenceRefs: checkpointEvidenceRefs,
+    reasonCodes: ["pipeline_checkpoint_answer_snapshot"],
+  });
+  pushEdge(edges, {
+    from: answerSnapshotId,
+    to: liveOutputId,
+    relation: "produces",
+    label: "answer snapshot produces current live output",
+    evidenceRefs: checkpointEvidenceRefs,
+    reasonCodes: ["pipeline_answer_live_output"],
+  });
 };
 
 const dimensionSettingId = (snapshot: HelixEnvironmentStateSnapshot | null): "setting.overworld" | "setting.nether" | "setting.end" | null => {
@@ -615,6 +979,21 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     ...(sourceWindow.latestRawSessionBufferRefs ?? []),
   ].length > 0;
   if (!roomId && !hasAdmittedSourceWindowRefs) {
+    const missingBadges: StagePlayBadgeV1[] = [];
+    const missingEdges: StagePlayBadgeGraphV1["edges"] = [];
+    const missingObserverId = pushBadge(missingBadges, observerBadge({
+      sourceRefs: [],
+      evidenceRefs: [],
+      sources: sourceWindow.sources,
+    }));
+    addPipelineSkeleton(missingBadges, missingEdges, {
+      observerId: missingObserverId,
+      sourceRefs: [],
+      evidenceRefs: [],
+      sources: sourceWindow.sources,
+      generatedAt: resolvedAt,
+      askCheckpointReceipt: input.askCheckpointReceipt,
+    });
     return buildStagePlayBadgeGraphV1({
       generatedAt: resolvedAt,
       graphId: `stage_play_badge_graph:${hashShort([input.threadId, "missing-room", resolvedAt])}`,
@@ -638,8 +1017,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
         latestNavigationRefs: [],
         freshness: "missing" as const,
       },
-      badges: [observerBadge({ sourceRefs: [], evidenceRefs: [], sources: sourceWindow.sources })],
-      edges: [],
+      badges: missingBadges,
+      edges: missingEdges,
       recommendedActions: [],
     });
   }
@@ -1544,6 +1923,16 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       missingEvidence,
     });
   }
+
+  addPipelineSkeleton(badges, edges, {
+    observerId,
+    interpreterId,
+    sourceRefs,
+    evidenceRefs,
+    sources: sourceWindow.sources,
+    generatedAt: resolvedAt,
+    askCheckpointReceipt: input.askCheckpointReceipt,
+  });
 
   return buildStagePlayBadgeGraphV1({
     generatedAt: resolvedAt,

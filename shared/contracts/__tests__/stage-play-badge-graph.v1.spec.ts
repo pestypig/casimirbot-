@@ -127,6 +127,71 @@ const interpreterBadge: StagePlayBadgeV1 = {
   admission: "auto",
 };
 
+const askCheckpointBadge: StagePlayBadgeV1 = {
+  id: "ask_checkpoint:latest",
+  title: "Helix Ask checkpoint",
+  plainMeaning: "Helix Ask reviewed Stage Play evidence and produced a bounded checkpoint receipt.",
+  whyItMatters: "Checkpoint badges distinguish model-reviewed answer snapshots from evidence projection.",
+  kind: "ask_checkpoint",
+  status: "observed",
+  subjects: ["thread:stage-play"],
+  tags: ["helix_ask", "checkpoint", "model_reviewed"],
+  liveBindings: [],
+  sourceRefs: [{ kind: "synthetic_evidence", id: "ask_turn_solver_trace:123" }],
+  evidenceRefs: ["ask:turn:123", "ask_turn_solver_trace:123"],
+  confidence: 0.88,
+  missingEvidence: [],
+  reasonCodes: ["completed_solver_path", "model_reviewed_checkpoint"],
+  dataTray: {
+    title: "Latest Ask checkpoint",
+    summary: "Solver path completed and route authority passed.",
+    updatedAt: "2026-06-02T12:00:02.000Z",
+    freshness: "fresh",
+    confidence: 0.88,
+    evidenceRefs: ["ask:turn:123", "ask_turn_solver_trace:123"],
+  },
+  checkpoint: {
+    askTurnId: "ask:turn:123",
+    solverTraceRef: "ask_turn_solver_trace:123",
+    terminalArtifactKind: "model_synthesized_answer",
+    finalAnswerSource: "final_answer_draft",
+    modelReviewed: true,
+  },
+  admission: "auto",
+};
+
+const answerSnapshotBadge: StagePlayBadgeV1 = {
+  id: "answer_snapshot:latest",
+  title: "Answer snapshot",
+  plainMeaning: "The latest upheld answer snapshot came from a model-reviewed checkpoint.",
+  whyItMatters: "Answer snapshots keep output text separate from raw source observations and graph projections.",
+  kind: "answer_snapshot",
+  status: "observed",
+  subjects: ["thread:stage-play"],
+  tags: ["answer_snapshot", "model_reviewed"],
+  liveBindings: [],
+  sourceRefs: [{ kind: "synthetic_evidence", id: "ask:turn:123" }],
+  evidenceRefs: ["ask:turn:123", "ask_turn_solver_trace:123"],
+  confidence: 0.84,
+  missingEvidence: [],
+  reasonCodes: ["answer_snapshot_from_checkpoint"],
+  dataTray: {
+    title: "Upheld answer",
+    summary: "Use the visual source as narrative context and attach audio to resolve dialogue intent.",
+    updatedAt: "2026-06-02T12:00:02.000Z",
+    freshness: "fresh",
+    confidence: 0.84,
+    evidenceRefs: ["ask:turn:123"],
+  },
+  output: {
+    lineKey: "recommendation",
+    text: "Attach audio/transcript before treating the narrative intent as resolved.",
+    state: "model_reviewed",
+    voiceEligible: false,
+  },
+  admission: "auto",
+};
+
 const buildFixture = (overrides: Partial<StagePlayBadgeGraphV1> = {}): StagePlayBadgeGraphV1 =>
   buildStagePlayBadgeGraphV1({
     generatedAt: "2026-06-02T12:00:02.000Z",
@@ -209,6 +274,40 @@ describe("stage_play_badge_graph/v1", () => {
     expect(graph.summary.kindCounts.interpreter).toBe(1);
     expect(graph.authority.agent_executable).toBe(false);
     expect(JSON.stringify(graph)).not.toMatch(/agent[_ -]?executable\s*[:=]\s*true/i);
+  });
+
+  it("accepts checkpoint and output badges without granting graph authority", () => {
+    const graph = buildFixture({
+      badges: [sourceBadge, interpreterBadge, askCheckpointBadge, answerSnapshotBadge],
+      edges: [
+        {
+          id: "edge:interpreter:produces:checkpoint",
+          from: interpreterBadge.id,
+          to: askCheckpointBadge.id,
+          relation: "produces",
+          label: "interpreter evidence is reviewed by Ask checkpoint",
+          evidenceRefs: askCheckpointBadge.evidenceRefs,
+          reasonCodes: ["checkpoint_from_interpreter"],
+        },
+        {
+          id: "edge:checkpoint:produces:answer",
+          from: askCheckpointBadge.id,
+          to: answerSnapshotBadge.id,
+          relation: "produces",
+          label: "model-reviewed checkpoint produces answer snapshot",
+          evidenceRefs: answerSnapshotBadge.evidenceRefs,
+          reasonCodes: ["answer_snapshot_from_checkpoint"],
+        },
+      ],
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.summary.kindCounts.ask_checkpoint).toBe(1);
+    expect(graph.summary.kindCounts.answer_snapshot).toBe(1);
+    expect(askCheckpointBadge.checkpoint?.modelReviewed).toBe(true);
+    expect(graph.authority.assistant_answer).toBe(false);
+    expect(graph.authority.agent_executable).toBe(false);
+    expect(graph.authority.terminal_eligible).toBe(false);
   });
 
   it("allows raw session buffer ids as refs without allowing raw content in the graph", () => {
@@ -344,6 +443,46 @@ describe("stage_play_badge_graph/v1", () => {
 
     expect(issues).toMatch(/recommendedActions\[0\]\.agentExecutable must be false/);
     expect(issues).toMatch(/authority\.terminal_eligible must be false/);
+  });
+
+  it("rejects invalid checkpoint and output badge fields", () => {
+    const graph = buildFixture({
+      badges: [
+        {
+          ...actorBadge,
+          dataTray: {
+            title: "",
+            summary: "Invalid tray",
+            freshness: "hot",
+            confidence: 2,
+            evidenceRefs: ["snapshot:1"],
+          },
+          checkpoint: {
+            askTurnId: 12,
+            modelReviewed: "yes",
+          },
+          output: {
+            lineKey: 3,
+            text: "",
+            state: "spoken",
+            voiceEligible: "yes",
+          },
+        } as unknown as StagePlayBadgeV1,
+      ],
+    });
+    const issues = validateStagePlayBadgeGraphV1(graph).join("\n");
+
+    expect(issues).toMatch(/badges\[0\]\.dataTray\.title must be a non-empty string/);
+    expect(issues).toMatch(/badges\[0\]\.dataTray\.freshness is invalid/);
+    expect(issues).toMatch(/badges\[0\]\.dataTray\.confidence must be between 0 and 1/);
+    expect(issues).toMatch(/badges\[0\]\.checkpoint\.askTurnId must be a string or null/);
+    expect(issues).toMatch(/badges\[0\]\.checkpoint\.modelReviewed must be boolean/);
+    expect(issues).toMatch(/badges\[0\]\.checkpoint may only appear on ask_checkpoint or answer_snapshot badges/);
+    expect(issues).toMatch(/badges\[0\]\.output\.lineKey must be a string or null/);
+    expect(issues).toMatch(/badges\[0\]\.output\.text must be a non-empty string/);
+    expect(issues).toMatch(/badges\[0\]\.output\.state is invalid/);
+    expect(issues).toMatch(/badges\[0\]\.output\.voiceEligible must be boolean/);
+    expect(issues).toMatch(/badges\[0\]\.output may only appear on answer_snapshot, live_output, or voice_output badges/);
   });
 
   it("rejects recommended actions that reference execution tooling", () => {

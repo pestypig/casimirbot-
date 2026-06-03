@@ -101,7 +101,121 @@ describe("Stage Play world-state badge reducer", () => {
         subjects: ["visual_source:live-answer"],
         evidenceRefs: expect.arrayContaining([producer.producer_id]),
       }),
+      expect.objectContaining({
+        id: "compact_observation.latest",
+        kind: "compact_observation",
+      }),
+      expect.objectContaining({
+        id: "stage_interpretation.current",
+        kind: "stage_interpretation",
+      }),
+      expect.objectContaining({
+        id: "procedural_binding.active",
+        kind: "procedural_binding",
+      }),
+      expect.objectContaining({
+        id: "helix_ask.checkpoint.latest",
+        kind: "ask_checkpoint",
+        status: "missing_evidence",
+        checkpoint: expect.objectContaining({
+          modelReviewed: false,
+        }),
+        dataTray: expect.objectContaining({
+          summary: "No model-reviewed checkpoint has been produced for this stage yet.",
+        }),
+      }),
+      expect.objectContaining({
+        id: "answer_snapshot.latest",
+        kind: "answer_snapshot",
+        status: "missing_evidence",
+      }),
+      expect.objectContaining({
+        id: "live_output.current",
+        kind: "live_output",
+        status: "missing_evidence",
+        output: expect.objectContaining({
+          state: "stale",
+          voiceEligible: false,
+        }),
+      }),
     ]));
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "observer.live_sources",
+        to: "compact_observation.latest",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "helix_ask.checkpoint.latest",
+        to: "answer_snapshot.latest",
+        relation: "produces",
+      }),
+      expect.objectContaining({
+        from: "answer_snapshot.latest",
+        to: "live_output.current",
+        relation: "produces",
+      }),
+    ]));
+  });
+
+  it("marks the Ask checkpoint as model reviewed only with a completed Ask receipt", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:live-answer",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:10:00.000Z"),
+      askCheckpointReceipt: {
+        askTurnId: "ask:turn:stage-play",
+        solverTraceRef: "ask_turn_solver_trace:stage-play",
+        terminalArtifactKind: "model_synthesized_answer",
+        finalAnswerSource: "final_answer_draft",
+        completedSolverPath: true,
+        answerText: "The next useful check is to compare the next visual frame and attach audio.",
+        evidenceRefs: [producer.producer_id, "ask_turn_solver_trace:stage-play"],
+      },
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
+      kind: "ask_checkpoint",
+      status: "observed",
+      checkpoint: {
+        askTurnId: "ask:turn:stage-play",
+        solverTraceRef: "ask_turn_solver_trace:stage-play",
+        terminalArtifactKind: "model_synthesized_answer",
+        finalAnswerSource: "final_answer_draft",
+        modelReviewed: true,
+      },
+      dataTray: expect.objectContaining({
+        summary: "Model-reviewed checkpoint is available for this stage.",
+      }),
+    });
+    expect(graph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
+      kind: "answer_snapshot",
+      status: "observed",
+      output: expect.objectContaining({
+        text: "The next useful check is to compare the next visual frame and attach audio.",
+        state: "model_reviewed",
+        voiceEligible: false,
+      }),
+    });
+    expect(graph.badges.find((badge) => badge.id === "live_output.current")).toMatchObject({
+      kind: "live_output",
+      status: "observed",
+      output: expect.objectContaining({
+        state: "model_reviewed",
+        voiceEligible: false,
+      }),
+    });
   });
 
   it("assembles world facts into deterministic Stage Play badges and procedural bindings", () => {
@@ -356,6 +470,12 @@ describe("Stage Play world-state badge reducer", () => {
       "binding.bridge_forward",
       "binding.tunnel_advance",
       "binding.defensive_retreat_barrier",
+      "compact_observation.latest",
+      "stage_interpretation.current",
+      "procedural_binding.active",
+      "helix_ask.checkpoint.latest",
+      "answer_snapshot.latest",
+      "live_output.current",
     ]));
     const observerBadge = graph.badges.find((badge) => badge.id === "observer.live_sources");
     expect(observerBadge).toMatchObject({
@@ -416,11 +536,43 @@ describe("Stage Play world-state badge reducer", () => {
       kind: "interpreter",
       admission: "auto",
     });
+    expect(graph.badges.find((badge) => badge.id === "procedural_binding.active")).toMatchObject({
+      kind: "procedural_binding",
+      status: "candidate",
+      dataTray: expect.objectContaining({
+        summary: "4 procedural binding(s) are available for review.",
+      }),
+    });
+    expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
+      kind: "ask_checkpoint",
+      status: "missing_evidence",
+      checkpoint: expect.objectContaining({
+        modelReviewed: false,
+      }),
+      dataTray: expect.objectContaining({
+        summary: "No model-reviewed checkpoint has been produced for this stage yet.",
+      }),
+    });
+    expect(graph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
+      kind: "answer_snapshot",
+      status: "missing_evidence",
+      output: expect.objectContaining({
+        state: "stale",
+        voiceEligible: false,
+      }),
+    });
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({ relation: "observes", from: "observer.live_sources" }),
       expect.objectContaining({ relation: "feeds", to: "interpreter.stage_play_reflection" }),
       expect.objectContaining({ relation: "feeds", from: "observer.live_sources", to: "interpreter.stage_play_reflection" }),
       expect.objectContaining({ relation: "interprets", from: "interpreter.stage_play_reflection", to: "actor.player" }),
+      expect.objectContaining({ relation: "feeds", from: "observer.live_sources", to: "compact_observation.latest" }),
+      expect.objectContaining({ relation: "feeds", from: "compact_observation.latest", to: "interpreter.stage_play_reflection" }),
+      expect.objectContaining({ relation: "interprets", from: "interpreter.stage_play_reflection", to: "stage_interpretation.current" }),
+      expect.objectContaining({ relation: "produces", from: "stage_interpretation.current", to: "procedural_binding.active" }),
+      expect.objectContaining({ relation: "feeds", from: "procedural_binding.active", to: "helix_ask.checkpoint.latest" }),
+      expect.objectContaining({ relation: "produces", from: "helix_ask.checkpoint.latest", to: "answer_snapshot.latest" }),
+      expect.objectContaining({ relation: "produces", from: "answer_snapshot.latest", to: "live_output.current" }),
     ]));
     expect(graph.sourceWindow.latestSourceDescriptorRefs).toEqual([descriptor.descriptor_id]);
     expect(graph.sourceWindow.latestSourceProducerRefs).toEqual([producer.producer_id]);

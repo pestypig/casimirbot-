@@ -206,6 +206,54 @@ The key rule is:
 Receipts are observations, not final answers.
 ```
 
+#### Shared Tool Loop Boundary
+
+Every new tool family should prove the same loop fields before it can affect
+the visible answer. A tool-specific evaluator or synthesizer may add useful
+domain judgment, but it is only a candidate until the shared solver path accepts
+it.
+
+Required evidence for source-backed, capability-backed, or multi-step tool
+turns:
+
+- `source_target_intent`: the requested source, target kind, strength, and
+  whether direct/no-tool answering is allowed.
+- `tool_call_admission_decision`: admitted tool families, forbidden routes, and
+  forbidden terminal artifact kinds.
+- `agent_step_decision`: the next step chosen from model-visible state.
+- `runtime_tool_call`: the validated capability call, arguments, risk policy,
+  and confirmation requirements.
+- `agent_step_observation_packet`: the non-terminal receipt or observation,
+  status, artifact refs, missing requirements, and suggested next steps.
+- `goal_satisfaction_evaluation`: whether the observation satisfies the user
+  goal, needs another tool, needs the user, or must fail closed.
+- `final_answer_draft`, `request_user_input`, or `typed_failure`: the terminal
+  candidate produced after evidence re-entry.
+- `route_product_contract`, `product_authority_guard`, and
+  `terminal_answer_authority`: proof that the terminal candidate is allowed for
+  the route and source-target intent.
+- `terminal_authority_single_writer` and `terminal_presentation`: the selected
+  visible artifact and the client-safe presentation of that artifact.
+
+The shared boundary for multi-step tools is:
+
+```text
+tool result
+-> observation packet
+-> goal / coverage evaluation
+-> next-step decision
+-> answer, ask_user, repair, or fail_closed candidate
+-> route authority and terminal authority
+-> one visible answer, request_user_input, or typed_failure
+```
+
+If a tool action succeeds but the shared fields are incomplete, the correct
+terminal product is not the receipt text. The turn should either continue with a
+post-tool model step, ask the user for missing input, run an admitted repair, or
+fail closed with a typed reason. Receipt terminals are allowed only for admitted
+control/status/procedure commands whose route product contract explicitly
+permits that receipt kind.
+
 For example, `docs-viewer.open`, `docs-viewer.locate_in_doc`, `workstation-notes.append_to_note`, `scientific-calculator.solve_expression`, `repo-code.search_concept`, and `voice_delivery.propose_from_trace` can prove that work happened. They should not independently write the user-visible terminal answer. Instead, their output feeds a later synthesis, pending-input decision, or precise typed failure.
 
 The main failure class this design addresses is internal success / visible failure drift:

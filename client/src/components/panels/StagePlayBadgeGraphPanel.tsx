@@ -160,14 +160,13 @@ type StagePlayProjectionStatus = {
 
 type StagePlayLaneId =
   | "observer"
-  | "compact_observations"
+  | "compact_observation"
   | "stage_bounds"
-  | "affordance_space"
-  | "intent_modules"
+  | "affordances_missing_checks"
   | "procedural_bindings"
-  | "predictions_next_checks"
-  | "validation_feedback"
-  | "live_answer_outputs";
+  | "helix_ask_checkpoint"
+  | "answer_snapshot"
+  | "live_voice_output";
 
 type StagePlayOutputNodeKind =
   | "live_answer"
@@ -227,16 +226,25 @@ type StagePlayFloatingTooltip =
     };
 
 const STAGE_PLAY_LANES: Array<{ id: StagePlayLaneId; title: string }> = [
-  { id: "observer", title: "Observer / Sources" },
-  { id: "compact_observations", title: "Compact Observations" },
+  { id: "observer", title: "Observer" },
+  { id: "compact_observation", title: "Compact Observation" },
   { id: "stage_bounds", title: "Stage Bounds" },
-  { id: "affordance_space", title: "Affordances / Blocked Moves" },
-  { id: "intent_modules", title: "Intent Modules" },
+  { id: "affordances_missing_checks", title: "Affordances / Missing Checks" },
   { id: "procedural_bindings", title: "Procedural Bindings" },
-  { id: "predictions_next_checks", title: "Predictions / Next Checks" },
-  { id: "validation_feedback", title: "Validation Feedback" },
-  { id: "live_answer_outputs", title: "Live Answer Outputs" },
+  { id: "helix_ask_checkpoint", title: "Helix Ask Checkpoint" },
+  { id: "answer_snapshot", title: "Answer Snapshot" },
+  { id: "live_voice_output", title: "Live / Voice Output" },
 ];
+
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 88;
+const DATA_TRAY_HEIGHT = 74;
+const ROW_GAP = 36;
+const LANE_GAP = 96;
+const CANVAS_PADDING_X = 72;
+const CANVAS_PADDING_Y = 64;
+const NODE_SLOT_HEIGHT = NODE_HEIGHT + DATA_TRAY_HEIGHT + ROW_GAP;
+const LANE_STRIDE = NODE_WIDTH + LANE_GAP;
 
 async function fetchStagePlayBadgeGraph(input: {
   threadId: string;
@@ -409,8 +417,9 @@ function kindTone(kind: string): string {
 
 function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
   if (badge.kind === "observer" || badge.kind === "source") return "observer";
-  if (badge.kind === "fusion") return "compact_observations";
-  if (badge.kind === "interpreter") return "compact_observations";
+  if (badge.kind === "compact_observation" || badge.kind === "fusion" || badge.kind === "interpreter") {
+    return "compact_observation";
+  }
   if (
     badge.kind === "setting" ||
     badge.kind === "actor" ||
@@ -421,12 +430,17 @@ function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
     badge.kind === "goal" ||
     badge.kind === "world_state"
   ) return "stage_bounds";
-  if (badge.kind === "affordance" || badge.kind === "blocked_affordance") return "affordance_space";
-  if (badge.kind === "intent_module") return "intent_modules";
-  if (badge.kind === "procedural_binding") return "procedural_bindings";
-  if (badge.kind === "recommended_check" || badge.kind === "missing_evidence" || badge.kind === "admission_gate") {
-    return "predictions_next_checks";
-  }
+  if (
+    badge.kind === "affordance" ||
+    badge.kind === "blocked_affordance" ||
+    badge.kind === "recommended_check" ||
+    badge.kind === "missing_evidence" ||
+    badge.kind === "admission_gate"
+  ) return "affordances_missing_checks";
+  if (badge.kind === "intent_module" || badge.kind === "procedural_binding") return "procedural_bindings";
+  if (badge.kind === "ask_checkpoint") return "helix_ask_checkpoint";
+  if (badge.kind === "answer_snapshot") return "answer_snapshot";
+  if (badge.kind === "live_output" || badge.kind === "voice_output") return "live_voice_output";
   return "stage_bounds";
 }
 
@@ -508,7 +522,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const compactNodes: StagePlaySyntheticNode[] = compactObservationRefs.slice(0, 10).map((ref) => ({
     id: `synthetic:compact:${ref}`,
     kind: "compact_observation",
-    lane: "compact_observations",
+    lane: "compact_observation",
     title: compactRefTitle(ref),
     status: "observed",
     evidenceRefs: [ref],
@@ -519,7 +533,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const predictionNodes: StagePlaySyntheticNode[] = predictionRefs.slice(0, 8).map((ref) => ({
     id: `synthetic:prediction:${ref}`,
     kind: "prediction",
-    lane: "predictions_next_checks",
+    lane: "affordances_missing_checks",
     title: compactRefTitle(ref),
     status: "candidate",
     evidenceRefs: [ref],
@@ -528,7 +542,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const validationNodes: StagePlaySyntheticNode[] = validationRefs.slice(0, 8).map((ref) => ({
     id: `synthetic:validation:${ref}`,
     kind: "validation",
-    lane: "validation_feedback",
+    lane: "answer_snapshot",
     title: compactRefTitle(ref),
     status: /missed|blocked|fail/i.test(ref) ? "blocked" : "observed",
     evidenceRefs: [ref],
@@ -537,7 +551,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const nextCheckNodes: StagePlaySyntheticNode[] = graph.recommendedActions.map((action) => ({
     id: `synthetic:action:${action.id}`,
     kind: action.admission === "ask_user" ? "handoff" : "next_check",
-    lane: "predictions_next_checks",
+    lane: "affordances_missing_checks",
     title: action.label,
     status: action.admission === "blocked"
       ? "blocked"
@@ -555,7 +569,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const liveAnswerNodes: StagePlaySyntheticNode[] = liveAnswerSources.map((source) => ({
     id: `synthetic:live-answer:${source.sourceId}:${source.modality}`,
     kind: "live_answer",
-    lane: "live_answer_outputs",
+    lane: "live_voice_output",
     title: labelize(source.modality),
     status: source.status === "active" ? "observed" : source.status === "configured_missing" ? "missing_evidence" : "candidate",
     evidenceRefs: source.evidenceRefs,
@@ -579,6 +593,11 @@ function proceduralExpression(badge: StagePlayBadgeV1): string {
 function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "Source custody and routing";
   if (badge.kind === "source") return "Routed live source";
+  if (badge.kind === "compact_observation") return "Compact source window";
+  if (badge.kind === "stage_interpretation") return "Current interpreted stage bounds";
+  if (badge.kind === "ask_checkpoint") return "Model checkpoint boundary";
+  if (badge.kind === "answer_snapshot") return "Model-reviewed answer snapshot";
+  if (badge.kind === "live_output" || badge.kind === "voice_output") return "Reviewed output lane";
   if (badge.kind === "fusion") return "Source fusion state";
   if (badge.kind === "procedural_binding") return `Assembles: ${proceduralExpression(badge)}`;
   if (badge.kind === "intent_module") return `Verb: ${proceduralExpression(badge)}`;
@@ -587,6 +606,38 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "hazard") return "Constrains possible moves";
   if (badge.kind === "resource" || badge.kind === "prop") return "Can support or block a procedure";
   return "Observed stage condition";
+}
+
+function compactTrayText(value: string | null | undefined, fallback: string): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
+  return text.length > 120 ? `${text.slice(0, 117).trimEnd()}...` : text;
+}
+
+function badgeTrayTitle(badge: StagePlayBadgeV1): string {
+  return badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind);
+}
+
+function badgeTraySummary(badge: StagePlayBadgeV1): string {
+  const binding = badge.liveBindings.find((entry) =>
+    entry.compactValue !== null && entry.compactValue !== undefined && entry.compactValue !== ""
+  );
+  return compactTrayText(
+    badge.dataTray?.summary ??
+      badge.output?.text ??
+      (binding ? `${labelize(binding.bindingKind)}: ${String(binding.compactValue)}` : null) ??
+      badge.missingEvidence[0] ??
+      badge.reasonCodes[0] ??
+      badge.plainMeaning,
+    "No compact tray data yet.",
+  );
+}
+
+function syntheticNodeTraySummary(node: StagePlaySyntheticNode): string {
+  return compactTrayText(
+    node.evidenceRefs[0] ??
+      (node.relatedBadgeIds.length > 0 ? `${node.relatedBadgeIds.length} related badge(s)` : null),
+    "Synthetic output from graph evidence.",
+  );
 }
 
 function StagePlayToolActivityStrip({
@@ -1064,9 +1115,11 @@ function StagePlayGraphCanvas({
     const map = new Map<string, { x: number; y: number }>();
     lanes.forEach((lane, laneIndex) => {
       lane.badges.forEach((badge, rowIndex) => {
+        const left = CANVAS_PADDING_X + laneIndex * LANE_STRIDE;
+        const top = CANVAS_PADDING_Y + rowIndex * NODE_SLOT_HEIGHT;
         map.set(badge.id, {
-          x: 100 + laneIndex * 218,
-          y: 96 + rowIndex * 92,
+          x: left + NODE_WIDTH / 2,
+          y: top + NODE_HEIGHT / 2,
         });
       });
     });
@@ -1077,9 +1130,11 @@ function StagePlayGraphCanvas({
     const map = new Map<string, { x: number; y: number }>();
     lanes.forEach((lane, laneIndex) => {
       lane.outputNodes.forEach((node, outputIndex) => {
+        const left = CANVAS_PADDING_X + laneIndex * LANE_STRIDE;
+        const top = CANVAS_PADDING_Y + (lane.badges.length + outputIndex) * NODE_SLOT_HEIGHT;
         map.set(node.id, {
-          x: 100 + laneIndex * 218,
-          y: 96 + (lane.badges.length + outputIndex) * 92,
+          x: left + NODE_WIDTH / 2,
+          y: top + NODE_HEIGHT / 2,
         });
       });
     });
@@ -1088,13 +1143,13 @@ function StagePlayGraphCanvas({
 
   const width = Math.max(
     1900,
-    STAGE_PLAY_LANES.length * 218 + 120,
-    ...draftNodes.map((node) => node.x + 180),
+    CANVAS_PADDING_X * 2 + STAGE_PLAY_LANES.length * NODE_WIDTH + (STAGE_PLAY_LANES.length - 1) * LANE_GAP,
+    ...draftNodes.map((node) => node.x + NODE_WIDTH),
   );
   const height = Math.max(
     520,
-    Math.max(...lanes.map((lane) => lane.badges.length + lane.outputNodes.length), 1) * 92 + 160,
-    ...draftNodes.map((node) => node.y + 140),
+    CANVAS_PADDING_Y * 2 + Math.max(...lanes.map((lane) => lane.badges.length + lane.outputNodes.length), 1) * NODE_SLOT_HEIGHT,
+    ...draftNodes.map((node) => node.y + NODE_HEIGHT + DATA_TRAY_HEIGHT),
   );
   const selectedSet = new Set(selectedBadgeIds);
   const addedBadgeIds = new Set(graphDiff?.addedBadgeIds ?? []);
@@ -1130,8 +1185,8 @@ function StagePlayGraphCanvas({
           const active = relatedEdgeIds.has(edge.id) || selectedSet.has(edge.from) || selectedSet.has(edge.to);
           const forward = to.x >= from.x;
           const curve = Math.max(42, Math.abs(to.x - from.x) * 0.48);
-          const startX = from.x + (forward ? 54 : -54);
-          const endX = to.x - (forward ? 54 : -54);
+          const startX = from.x + (forward ? NODE_WIDTH / 2 : -NODE_WIDTH / 2);
+          const endX = to.x - (forward ? NODE_WIDTH / 2 : -NODE_WIDTH / 2);
           return (
             <g key={edge.id}>
               <path
@@ -1152,7 +1207,7 @@ function StagePlayGraphCanvas({
           return (
             <path
               key={`${node.id}:${badgeId}`}
-              d={`M ${from.x + 54} ${from.y} C ${from.x + 88} ${from.y}, ${to.x - 88} ${to.y}, ${to.x - 54} ${to.y}`}
+              d={`M ${from.x + NODE_WIDTH / 2} ${from.y} C ${from.x + NODE_WIDTH / 2 + 34} ${from.y}, ${to.x - NODE_WIDTH / 2 - 34} ${to.y}, ${to.x - NODE_WIDTH / 2} ${to.y}`}
               fill="none"
               stroke={active ? "rgb(251 191 36)" : "rgb(120 113 108)"}
               strokeDasharray="4 4"
@@ -1166,8 +1221,8 @@ function StagePlayGraphCanvas({
         {lanes.map((lane, laneIndex) => (
           <div
             key={lane.id}
-            className="pointer-events-none absolute bottom-0 top-0"
-            style={{ left: 18 + laneIndex * 218, width: 196 }}
+            className="pointer-events-none absolute bottom-0 top-0 border-l border-slate-900/55"
+            style={{ left: CANVAS_PADDING_X + laneIndex * LANE_STRIDE - LANE_GAP / 2, width: NODE_WIDTH + LANE_GAP }}
             data-testid={`stage-play-lane-${lane.id}`}
             aria-hidden="true"
           />
@@ -1190,21 +1245,22 @@ function StagePlayGraphCanvas({
               : isMissing
                 ? "animate-pulse"
                 : "";
-          const nodeSize =
-            badge.kind === "observer"
-              ? "h-20 w-40 rounded-lg"
-            : badge.kind === "procedural_binding"
-                ? "h-[72px] w-44 rounded-md"
-                : badge.kind === "intent_module"
-                  ? "h-16 w-32 rounded-md"
-                  : badge.kind === "affordance" || badge.kind === "blocked_affordance" || badge.kind === "setting" || badge.kind === "actor"
-                    ? "h-14 w-20 rounded-full"
-                    : "h-14 w-28 rounded-md";
+          const trayTone = isMissing
+            ? "border-amber-800/70 bg-amber-950/25 text-amber-100"
+            : isBlocked
+              ? "border-rose-800/70 bg-rose-950/25 text-rose-100"
+              : "border-slate-800 bg-slate-950/80 text-slate-300";
           return (
             <div
               key={badge.id}
               className="absolute"
-              style={{ left: point.x - (badge.kind === "observer" ? 80 : badge.kind === "procedural_binding" ? 88 : badge.kind === "intent_module" ? 64 : badge.kind === "affordance" || badge.kind === "blocked_affordance" || badge.kind === "setting" || badge.kind === "actor" ? 40 : 56), top: point.y - 28 }}
+              data-testid="stage-play-node-slot"
+              style={{
+                left: point.x - NODE_WIDTH / 2,
+                top: point.y - NODE_HEIGHT / 2,
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT + DATA_TRAY_HEIGHT,
+              }}
               onMouseEnter={(event) => {
                 const key = `badge:${badge.id}`;
                 setFloatingTooltip({
@@ -1239,7 +1295,7 @@ function StagePlayGraphCanvas({
               <button
                 type="button"
                 onClick={() => onSelect(badge.id)}
-                className={`relative flex ${nodeSize} flex-col items-center justify-center border px-2 text-center text-xs transition ${
+                className={`relative flex flex-col items-center justify-center rounded-md border px-3 text-center text-xs transition ${
                   active
                     ? "border-cyan-400 bg-cyan-950/70 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.2)]"
                     : isBlocked
@@ -1248,7 +1304,9 @@ function StagePlayGraphCanvas({
                         ? "border-amber-600 bg-amber-950/35 text-amber-100 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.18)] hover:border-amber-400"
                       : `${kindTone(badge.kind)} text-slate-200 hover:border-slate-500`
                 } ${pulseClass}`}
+                style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
                 aria-label={badge.title}
+                data-testid="stage-play-graph-node"
               >
                 {isBlocked ? (
                   <span
@@ -1281,33 +1339,55 @@ function StagePlayGraphCanvas({
                   </>
                 ) : null}
               </button>
-              {canProjectFromBadge ? (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onProjectLiveAnswer();
-                  }}
-                  className="mt-1 w-32 rounded border border-emerald-700 bg-emerald-950/70 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 shadow-lg hover:border-emerald-400"
-                  data-testid="stage-play-project-live-answer-interpreter"
-                >
-                  Project to Live Answer
-                </button>
-              ) : null}
+              <div
+                className={`mt-2 overflow-hidden rounded-md border px-2 py-1.5 text-[10px] shadow-[0_8px_18px_rgba(2,6,23,0.28)] ${trayTone}`}
+                style={{ width: NODE_WIDTH, height: DATA_TRAY_HEIGHT }}
+                data-testid="stage-play-data-tray"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold uppercase tracking-wide">{badgeTrayTitle(badge)}</span>
+                  <span className="shrink-0 font-mono text-[9px] text-slate-500">{badge.confidence.toFixed(2)}</span>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
+                  {badgeTraySummary(badge)}
+                </div>
+                {canProjectFromBadge ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onProjectLiveAnswer();
+                    }}
+                    className="mt-1 h-5 w-full rounded border border-emerald-700 bg-emerald-950/70 px-2 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
+                    data-testid="stage-play-project-live-answer-interpreter"
+                  >
+                    Project to Live Answer
+                  </button>
+                ) : (
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{badge.evidenceRefs.length} evidence ref(s)</div>
+                )}
+              </div>
             </div>
           );
         })}
         {removedBadgeGhosts.map((ghost) => {
           const laneIndex = STAGE_PLAY_LANES.findIndex((lane) => lane.id === ghost.lane);
+          const left = CANVAS_PADDING_X + Math.max(0, laneIndex) * LANE_STRIDE;
+          const top = CANVAS_PADDING_Y + ghost.rowIndex * NODE_SLOT_HEIGHT;
           const point = {
-            x: 100 + Math.max(0, laneIndex) * 218,
-            y: 96 + ghost.rowIndex * 92,
+            x: left + NODE_WIDTH / 2,
+            y: top + NODE_HEIGHT / 2,
           };
           return (
             <div
               key={`removed:${ghost.id}`}
-              className="pointer-events-none absolute flex h-12 w-28 items-center justify-center rounded-md border border-slate-700 bg-slate-900/45 px-2 text-center text-[10px] uppercase tracking-wide text-slate-400 opacity-50 shadow-[0_0_18px_rgba(148,163,184,0.16)]"
-              style={{ left: point.x - 56, top: point.y - 26 }}
+              className="pointer-events-none absolute flex items-center justify-center rounded-md border border-slate-700 bg-slate-900/45 px-2 text-center text-[10px] uppercase tracking-wide text-slate-400 opacity-50 shadow-[0_0_18px_rgba(148,163,184,0.16)]"
+              style={{
+                left: point.x - NODE_WIDTH / 2,
+                top: point.y - NODE_HEIGHT / 2,
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT,
+              }}
               data-testid="stage-play-removed-ghost"
             >
               <span className="truncate">removed {labelize(ghost.kind)}</span>
@@ -1317,16 +1397,6 @@ function StagePlayGraphCanvas({
         {outputNodes.map((node) => {
           const point = outputPositions.get(node.id);
           if (!point) return null;
-          const shapeClass =
-            node.kind === "prediction"
-              ? "h-14 w-36 rounded-full"
-              : node.kind === "validation"
-                ? "h-14 w-28 rounded-sm"
-                : node.kind === "live_answer"
-                  ? "h-20 w-40 rounded-md"
-                  : node.status === "missing_evidence"
-                    ? "h-14 w-28 rounded-md border-dashed"
-                    : "h-12 w-28 rounded-md";
           const actionId = node.id.startsWith("synthetic:action:")
             ? node.id.replace("synthetic:action:", "")
             : null;
@@ -1335,17 +1405,27 @@ function StagePlayGraphCanvas({
             : node.status === "missing_evidence"
               ? "animate-pulse"
               : "";
-          const left = point.x - (node.kind === "live_answer" ? 80 : node.kind === "prediction" ? 68 : 56);
-          const top = point.y - (node.kind === "live_answer" ? 40 : 28);
+          const left = point.x - NODE_WIDTH / 2;
+          const top = point.y - NODE_HEIGHT / 2;
+          const trayTone = node.status === "missing_evidence"
+            ? "border-amber-800/70 bg-amber-950/25 text-amber-100"
+            : node.status === "blocked"
+              ? "border-rose-800/70 bg-rose-950/25 text-rose-100"
+              : "border-slate-800 bg-slate-950/80 text-slate-300";
           return (
-            <React.Fragment key={node.id}>
+            <div
+              key={node.id}
+              className="absolute"
+              data-testid="stage-play-node-slot"
+              style={{ left, top, width: NODE_WIDTH, height: NODE_HEIGHT + DATA_TRAY_HEIGHT }}
+            >
               <button
                 type="button"
                 onClick={() => {
                   if (node.relatedBadgeIds[0]) onSelect(node.relatedBadgeIds[0]);
                 }}
-                className={`absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
-                style={{ left, top }}
+                className={`flex items-center justify-center rounded-md border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
+                style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
                 aria-label={node.title}
                 data-testid="stage-play-output-node"
                 onMouseEnter={(event) => {
@@ -1384,18 +1464,32 @@ function StagePlayGraphCanvas({
                   <span aria-hidden="true">.</span>
                 )}
               </button>
-              {node.kind === "live_answer" ? (
-                <button
-                  type="button"
-                  onClick={onProjectLiveAnswer}
-                  className="absolute w-40 rounded border border-emerald-700 bg-emerald-950/80 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 shadow-lg hover:border-emerald-400"
-                  style={{ left, top: top + 86 }}
-                  data-testid="stage-play-project-live-answer-output"
-                >
-                  Project to Live Answer
-                </button>
-              ) : null}
-            </React.Fragment>
+              <div
+                className={`mt-2 overflow-hidden rounded-md border px-2 py-1.5 text-[10px] shadow-[0_8px_18px_rgba(2,6,23,0.28)] ${trayTone}`}
+                style={{ width: NODE_WIDTH, height: DATA_TRAY_HEIGHT }}
+                data-testid="stage-play-data-tray"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold uppercase tracking-wide">{labelize(node.kind)}</span>
+                  <span className="shrink-0 font-mono text-[9px] text-slate-500">{labelize(node.status)}</span>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
+                  {syntheticNodeTraySummary(node)}
+                </div>
+                {node.kind === "live_answer" ? (
+                  <button
+                    type="button"
+                    onClick={onProjectLiveAnswer}
+                    className="mt-1 h-5 w-full rounded border border-emerald-700 bg-emerald-950/80 px-2 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
+                    data-testid="stage-play-project-live-answer-output"
+                  >
+                    Project to Live Answer
+                  </button>
+                ) : (
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{node.evidenceRefs.length} evidence ref(s)</div>
+                )}
+              </div>
+            </div>
           );
         })}
         {draftNodes.map((node) => (

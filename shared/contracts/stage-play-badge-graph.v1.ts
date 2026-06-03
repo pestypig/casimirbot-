@@ -7,8 +7,10 @@ export const STAGE_PLAY_BADGE_GRAPH_SCHEMA_VERSION =
 export const STAGE_PLAY_BADGE_KINDS = [
   "observer",
   "source",
+  "compact_observation",
   "fusion",
   "interpreter",
+  "stage_interpretation",
   "setting",
   "actor",
   "prop",
@@ -24,6 +26,10 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "recommended_check",
   "admission_gate",
   "missing_evidence",
+  "ask_checkpoint",
+  "answer_snapshot",
+  "live_output",
+  "voice_output",
 ] as const;
 
 export const STAGE_PLAY_SOURCE_ROUTING_STATUSES = [
@@ -218,6 +224,30 @@ export type StagePlayLiveBindingV1 = {
   compactValue?: string | number | boolean | null;
 };
 
+export type StagePlayBadgeDataTrayV1 = {
+  title: string;
+  summary: string;
+  updatedAt?: string | null;
+  freshness?: "fresh" | "stale" | "missing" | "unknown";
+  confidence?: number | null;
+  evidenceRefs: string[];
+};
+
+export type StagePlayBadgeCheckpointV1 = {
+  askTurnId?: string | null;
+  solverTraceRef?: string | null;
+  terminalArtifactKind?: string | null;
+  finalAnswerSource?: string | null;
+  modelReviewed: boolean;
+};
+
+export type StagePlayBadgeOutputV1 = {
+  lineKey?: string | null;
+  text: string;
+  state: "draft" | "projected" | "model_reviewed" | "blocked" | "stale";
+  voiceEligible: boolean;
+};
+
 export type StagePlayBadgeV1 = {
   id: string;
   title: string;
@@ -233,6 +263,9 @@ export type StagePlayBadgeV1 = {
   confidence: number;
   missingEvidence: string[];
   reasonCodes: string[];
+  dataTray?: StagePlayBadgeDataTrayV1;
+  checkpoint?: StagePlayBadgeCheckpointV1;
+  output?: StagePlayBadgeOutputV1;
   intentModule?: {
     verb: StagePlayIntentVerbV1;
     actorId?: string | null;
@@ -529,6 +562,58 @@ function validateSourceRoute(prefix: string, value: unknown, issues: string[]): 
   }
 }
 
+function validateDataTray(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  if (!isNonEmptyString(value.title)) issues.push(`${prefix}.title must be a non-empty string`);
+  if (!isNonEmptyString(value.summary)) issues.push(`${prefix}.summary must be a non-empty string`);
+  if (value.updatedAt != null && typeof value.updatedAt !== "string") {
+    issues.push(`${prefix}.updatedAt must be a string or null`);
+  }
+  if (value.freshness != null && !["fresh", "stale", "missing", "unknown"].includes(String(value.freshness))) {
+    issues.push(`${prefix}.freshness is invalid`);
+  }
+  if (value.confidence != null && !isConfidence(value.confidence)) {
+    issues.push(`${prefix}.confidence must be between 0 and 1`);
+  }
+  if (!isStringArray(value.evidenceRefs)) issues.push(`${prefix}.evidenceRefs must be strings`);
+}
+
+function validateCheckpoint(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["askTurnId", "solverTraceRef", "terminalArtifactKind", "finalAnswerSource"] as const) {
+    const maybe = value[field];
+    if (maybe != null && typeof maybe !== "string") {
+      issues.push(`${prefix}.${field} must be a string or null`);
+    }
+  }
+  if (typeof value.modelReviewed !== "boolean") {
+    issues.push(`${prefix}.modelReviewed must be boolean`);
+  }
+}
+
+function validateOutput(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  if (value.lineKey != null && typeof value.lineKey !== "string") {
+    issues.push(`${prefix}.lineKey must be a string or null`);
+  }
+  if (!isNonEmptyString(value.text)) issues.push(`${prefix}.text must be a non-empty string`);
+  if (!["draft", "projected", "model_reviewed", "blocked", "stale"].includes(String(value.state ?? ""))) {
+    issues.push(`${prefix}.state is invalid`);
+  }
+  if (typeof value.voiceEligible !== "boolean") {
+    issues.push(`${prefix}.voiceEligible must be boolean`);
+  }
+}
+
 export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   const issues: string[] = [];
   if (!isRecord(value)) return ["graph must be an object"];
@@ -684,6 +769,21 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
     }
     if (rawBadge.admission != null && !["auto", "ask_user", "blocked"].includes(String(rawBadge.admission))) {
       issues.push(`${prefix}.admission is invalid`);
+    }
+    if (rawBadge.dataTray != null) {
+      validateDataTray(`${prefix}.dataTray`, rawBadge.dataTray, issues);
+    }
+    if (rawBadge.checkpoint != null) {
+      validateCheckpoint(`${prefix}.checkpoint`, rawBadge.checkpoint, issues);
+      if (rawBadge.kind !== "ask_checkpoint" && rawBadge.kind !== "answer_snapshot") {
+        issues.push(`${prefix}.checkpoint may only appear on ask_checkpoint or answer_snapshot badges`);
+      }
+    }
+    if (rawBadge.output != null) {
+      validateOutput(`${prefix}.output`, rawBadge.output, issues);
+      if (!["answer_snapshot", "live_output", "voice_output"].includes(String(rawBadge.kind))) {
+        issues.push(`${prefix}.output may only appear on answer_snapshot, live_output, or voice_output badges`);
+      }
     }
     if (rawBadge.admission === "auto" && rawBadge.kind === "blocked_affordance") {
       issues.push(`${prefix}.blocked affordance must not auto-admit as executable action`);

@@ -168,6 +168,72 @@ A normal final answer requires:
 - terminal artifact matches goal contract
 - runtime authority audit passes
 
+## Shared Tool Family Boundary
+
+Every source-backed, capability-backed, or multi-step tool family must expose
+the same loop evidence before it can influence the visible answer. Tool-specific
+evaluators, deterministic validators, and panel receipts may provide candidate
+judgment, but they are not terminal authority.
+
+Required fields for a tool-family patch:
+
+```txt
+source_target_intent
+tool_call_admission_decision
+agent_step_decision
+runtime_tool_call
+agent_step_observation_packet
+goal_satisfaction_evaluation
+final_answer_draft | request_user_input | typed_failure
+route_product_contract
+product_authority_guard
+terminal_answer_authority
+terminal_authority_single_writer
+terminal_presentation
+```
+
+The shared loop boundary is:
+
+```txt
+tool result
+-> observation packet
+-> goal / coverage evaluation
+-> next-step decision
+-> answer, ask_user, repair, or fail_closed candidate
+-> route authority and terminal authority
+-> one visible answer, request_user_input, or typed_failure
+```
+
+Patch instructions for tool-family work:
+
+1. Classify the tool as read-only evidence, observation-only action,
+   control/status receipt, or mutating action.
+2. Add or update `tool_call_admission_decision` so contextual, negated,
+   historical, future, quoted, screen-visible, and mixed-intent prompts do not
+   execute tools from lexical cues.
+3. Convert the raw tool result into `agent_step_observation_packet` with
+   `assistant_answer=false`, `terminal_eligible=false`, status, artifact refs,
+   missing requirements, and suggested next steps.
+4. Run goal satisfaction after the observation. A successful receipt is not the
+   same thing as a satisfied user goal.
+5. Require evidence re-entry before any content answer. Deterministic
+   synthesizers may create `final_answer_draft` candidates only when the route
+   contract allows that product; otherwise they must stay as observations or
+   typed failures.
+6. Let terminal authority select the only visible artifact. Do not write
+   `payload.text`, `payload.answer`, `assistant_answer`,
+   `selected_final_answer`, or `terminal_presentation.concise_text` from a
+   receipt, panel projection, route branch, or fallback path before terminal
+   authority.
+7. Add tests for success, missing input, blocked/failed receipt, and partial
+   multi-step recovery. For shortcut-like rules, include the adversarial cue
+   classes listed in the patch-time checklist.
+
+Receipt terminal products remain valid for admitted control/status/procedure
+commands only when the primary intent and route product contract explicitly
+allow that receipt kind. All other tool outputs must either continue the loop,
+ask the user, repair, or fail closed.
+
 ## Codex-Owned Responsibilities
 
 Do not recreate these in Helix Ask unless Codex cannot expose the capability:

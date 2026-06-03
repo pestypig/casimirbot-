@@ -269,11 +269,13 @@ describe("live_env.reflect_stage_play_context", () => {
       },
     });
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual(expect.arrayContaining([
-      "situation",
       "risk",
       "possibilities",
+      "unknowns",
       "next_check",
     ]));
+    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).not.toContain("situation");
+    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).not.toContain("debug_basis");
   });
 
   it("wraps Stage Play graph reflection as a non-authoritative tool observation", () => {
@@ -437,7 +439,7 @@ describe("live_env.reflect_stage_play_context", () => {
         attempted: true,
         projected: true,
         environmentId: environment.environment_id,
-        reason: "projected_with_skipped_lines",
+        reason: "projected",
       },
     });
     expect(wrappedObservation.liveAnswerProjection.deltaId).toMatch(/^live_answer_delta:/);
@@ -447,11 +449,9 @@ describe("live_env.reflect_stage_play_context", () => {
       "unknowns",
       "next_check",
     ]));
-    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).toEqual(expect.arrayContaining([
-      "risk",
-      "possibilities",
-    ]));
-    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual(["debug_basis"]);
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("debug_basis");
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("situation");
+    expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual([]);
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(graph.artifactId).toBe("stage_play_badge_graph");
     expect(graph.sourceWindow.latestObservationRefs).toEqual([

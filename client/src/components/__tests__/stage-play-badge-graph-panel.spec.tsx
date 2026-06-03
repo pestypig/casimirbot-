@@ -656,14 +656,17 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("8 badges")).toBeTruthy();
     expect(screen.getByText("0 missing checks")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-compact_observations")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-compact_observation")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-stage_bounds")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-affordance_space")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-intent_modules")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-affordances_missing_checks")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-procedural_bindings")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-predictions_next_checks")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-validation_feedback")).toBeTruthy();
-    expect(screen.getByTestId("stage-play-lane-live_answer_outputs")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-helix_ask_checkpoint")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-answer_snapshot")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-live_voice_output")).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-data-tray").length).toBeGreaterThanOrEqual(8);
+    const nodeSlots = screen.getAllByTestId("stage-play-node-slot");
+    const occupiedSlots = nodeSlots.map((slot) => `${slot.style.left}:${slot.style.top}`);
+    expect(new Set(occupiedSlots).size).toBe(occupiedSlots.length);
     expect(screen.getAllByTestId("stage-play-output-node").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
 

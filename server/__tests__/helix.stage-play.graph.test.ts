@@ -169,6 +169,8 @@ describe("GET /api/helix/stage-play/graph", () => {
       "possibilities",
       "rehearsal",
       "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "next_check",
       "debug_basis",
@@ -182,11 +184,22 @@ describe("GET /api/helix/stage-play/graph", () => {
       "possibilities",
       "rehearsal",
       "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "debug_basis",
     ]));
-    expect(response.body.projectedLineKeys).toEqual(expect.arrayContaining(["situation", "actor_state", "risk"]));
+    expect(response.body.projectedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+      "unknowns",
+      "next_check",
+    ]));
+    expect(response.body.projectedLineKeys).not.toContain("situation");
+    expect(response.body.projectedLineKeys).not.toContain("actor_state");
     expect(response.body.projectedLineKeys).not.toContain("recommendation");
+    expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
+    expect(response.body.projectedLineKeys).not.toContain("voice_output");
     expect(response.body.liveAnswerDelta).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
@@ -219,11 +232,14 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.liveAnswerDelta).toBeNull();
     expect(response.body.projectedLineKeys).toEqual([]);
     expect(response.body.skippedLineKeys).toEqual(expect.arrayContaining([
-      "situation",
-      "actor_state",
+      "risk",
       "possibilities",
       "unknowns",
     ]));
+    expect(response.body.skippedLineKeys).not.toContain("next_check");
+    expect(response.body.skippedLineKeys).not.toContain("recommendation");
+    expect(response.body.skippedLineKeys).not.toContain("answer_snapshot");
+    expect(response.body.skippedLineKeys).not.toContain("voice_output");
     expect(response.body.liveAnswerEnvironment.environment_id).toBe(environment.environment_id);
   });
 
@@ -257,6 +273,9 @@ describe("GET /api/helix/stage-play/graph", () => {
       "situation",
       "actor_state",
       "possibilities",
+      "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "debug_basis",
     ]));
@@ -269,14 +288,28 @@ describe("GET /api/helix/stage-play/graph", () => {
       "possibilities",
       "rehearsal",
       "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "debug_basis",
     ]));
     expect(response.body.liveAnswerEnvironment.lines.map((line: { key: string }) => line.key)).toEqual(expect.arrayContaining([
       "situation",
       "actor_state",
+      "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "debug_basis",
     ]));
+    expect(response.body.projectedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+      "unknowns",
+      "next_check",
+    ]));
+    expect(response.body.projectedLineKeys).not.toContain("recommendation");
+    expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
+    expect(response.body.projectedLineKeys).not.toContain("voice_output");
     expect(response.body.liveAnswerEnvironment.lines.find((line: { key: string; visibility: string }) =>
       line.key === "debug_basis"
     )?.visibility).toBe("situation_panel");
@@ -317,6 +350,9 @@ describe("GET /api/helix/stage-play/graph", () => {
       "situation",
       "actor_state",
       "possibilities",
+      "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "debug_basis",
     ]));
@@ -329,9 +365,20 @@ describe("GET /api/helix/stage-play/graph", () => {
       "possibilities",
       "rehearsal",
       "recommendation",
+      "answer_snapshot",
+      "voice_output",
       "unknowns",
       "next_check",
       "debug_basis",
     ]));
+    expect(response.body.projectedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+      "unknowns",
+      "next_check",
+    ]));
+    expect(response.body.projectedLineKeys).not.toContain("recommendation");
+    expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
+    expect(response.body.projectedLineKeys).not.toContain("voice_output");
   });
 });
