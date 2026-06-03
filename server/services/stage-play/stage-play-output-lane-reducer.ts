@@ -358,7 +358,9 @@ export function buildStagePlayOutputLaneProjectionV1(
   const resources = badgesOfKind(graph, ["resource", "prop"]);
   const affordances = badgesOfKind(graph, ["affordance"]);
   const risks = badgesOfKind(graph, ["hazard", "blocked_affordance"]);
-  const proceduralBindings = badgesOfKind(graph, ["procedural_binding"]);
+  const proceduralBindings = badgesOfKind(graph, ["procedural_binding"]).filter((badge) =>
+    badge.id !== "procedural_binding.active"
+  );
   const predictionBadges = graph.badges.filter((badge) =>
     badge.sourceRefs.some((ref) =>
       ref.kind === "stage_play_prediction_hypothesis" ||

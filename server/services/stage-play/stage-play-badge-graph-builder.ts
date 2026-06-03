@@ -22,6 +22,7 @@ import type {
 } from "@shared/helix-environment-state-snapshot";
 import { getLatestEnvironmentStateSnapshot } from "../situation-room/environment-state-snapshot-window";
 import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
+import { getLatestStagePlayAskCheckpointReceipt } from "./stage-play-ask-checkpoint-store";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -1038,6 +1039,11 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     sourceId: input.sourceId ?? null,
     now: resolvedAt,
   });
+  const askCheckpointReceipt = input.askCheckpointReceipt ?? getLatestStagePlayAskCheckpointReceipt({
+    threadId: input.threadId,
+    roomId,
+    environmentId: sourceWindow.environmentId ?? input.environmentId ?? null,
+  });
   const hasAdmittedSourceWindowRefs = [
     ...sourceWindow.latestObservationRefs,
     ...sourceWindow.latestSnapshotRefs,
@@ -1061,7 +1067,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       evidenceRefs: [],
       sources: sourceWindow.sources,
       generatedAt: resolvedAt,
-      askCheckpointReceipt: input.askCheckpointReceipt,
+      askCheckpointReceipt,
     });
     return buildStagePlayBadgeGraphV1({
       generatedAt: resolvedAt,
@@ -2000,7 +2006,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     evidenceRefs,
     sources: sourceWindow.sources,
     generatedAt: resolvedAt,
-    askCheckpointReceipt: input.askCheckpointReceipt,
+    askCheckpointReceipt,
   });
 
   return buildStagePlayBadgeGraphV1({

@@ -19,6 +19,8 @@ import {
 import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
 import { STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA } from "../services/stage-play/stage-play-output-lane-reducer";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
+import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-badge-graph-builder";
+import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-play/stage-play-ask-checkpoint-store";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -36,6 +38,7 @@ beforeEach(() => {
   resetLiveSourceObservationStoreForTest();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetStagePlayAskCheckpointReceiptsForTest();
 });
 
 describe("Helix Ask Stage Play routing", () => {
@@ -182,5 +185,36 @@ describe("Helix Ask Stage Play routing", () => {
     expect(boundaryReport.checks.selected_capability_observation).toBe(true);
     expect(boundaryReport.checks.post_observation_model_decision).toBe(true);
     expect(boundaryReport.eligible).toBe(true);
+
+    const refreshedGraph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: environment.environment_id,
+      now: new Date("2026-06-02T12:30:03.000Z"),
+    });
+    expect(refreshedGraph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
+      status: "observed",
+      checkpoint: expect.objectContaining({
+        askTurnId: expect.any(String),
+        solverTraceRef: expect.stringContaining("ask_turn_solver_trace"),
+        terminalArtifactKind: expect.stringMatching(/model_synthesized_answer|direct_answer_text/),
+        finalAnswerSource: "final_answer_draft",
+        modelReviewed: true,
+      }),
+    });
+    expect(refreshedGraph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
+      status: "observed",
+      output: expect.objectContaining({
+        state: "model_reviewed",
+        text: expect.stringContaining("Stage Play reflected the active visual source"),
+      }),
+    });
+    expect(refreshedGraph.badges.find((badge) => badge.id === "live_output.current")).toMatchObject({
+      status: "observed",
+      output: expect.objectContaining({
+        state: "model_reviewed",
+        voiceEligible: false,
+      }),
+    });
   }, 60_000);
 });

@@ -35,6 +35,10 @@ import {
   buildStagePlayGraphFromWorld,
   buildStagePlayRecommendedActionAdmissionV1,
 } from "../services/stage-play/stage-play-badge-graph-builder";
+import {
+  recordStagePlayAskCheckpointReceipt,
+  resetStagePlayAskCheckpointReceiptsForTest,
+} from "../services/stage-play/stage-play-ask-checkpoint-store";
 import { resetStagePlayRawSessionBufferForTest } from "../services/stage-play/stage-play-raw-session-buffer-store";
 
 const threadId = "thread:stage-play-reducer";
@@ -52,6 +56,7 @@ beforeEach(() => {
   resetLiveSourceChunkBufferForTest();
   resetSituationSourceCapabilitiesForTest();
   resetStagePlayRawSessionBufferForTest();
+  resetStagePlayAskCheckpointReceiptsForTest();
   clearEventJournalForTest();
 });
 
@@ -217,6 +222,53 @@ describe("Stage Play world-state badge reducer", () => {
       }),
     });
     expect(graph.badges.find((badge) => badge.id === "voice_output.current")).toBeUndefined();
+  });
+
+  it("re-enters the latest stored Ask checkpoint receipt when rebuilding the graph", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:live-answer",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+
+    recordStagePlayAskCheckpointReceipt({
+      threadId,
+      askTurnId: "ask:turn:stored-stage-play",
+      solverTraceRef: "ask:turn:stored-stage-play:ask_turn_solver_trace",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      completedSolverPath: true,
+      answerText: "Stage Play projected the current risk and next check from the active source.",
+      evidenceRefs: [producer.producer_id, "ask:turn:stored-stage-play:final_answer_draft"],
+      sourceArtifactRefs: ["ask:turn:stored-stage-play:live_env_tool_observation"],
+      createdAt: "2026-06-02T12:10:05.000Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:10:06.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
+      status: "observed",
+      checkpoint: {
+        askTurnId: "ask:turn:stored-stage-play",
+        modelReviewed: true,
+      },
+    });
+    expect(graph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
+      status: "observed",
+      output: expect.objectContaining({
+        state: "model_reviewed",
+        text: "Stage Play projected the current risk and next check from the active source.",
+      }),
+    });
   });
 
   it("emits policy-gated voice output when the Ask checkpoint receipt allows voice", () => {

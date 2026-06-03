@@ -234,6 +234,50 @@ commands only when the primary intent and route product contract explicitly
 allow that receipt kind. All other tool outputs must either continue the loop,
 ask the user, repair, or fail closed.
 
+### Operational Constraints And Surface Satisfaction
+
+User constraints about tool families, browser surfaces, and local vocabulary are
+turn artifacts. They are not optional commentary and they are not execution by
+themselves.
+
+Every turn that mentions a required operational surface, forbidden tool, or
+local term binding should expose:
+
+```txt
+turn_operational_constraints
+model_proposed_capability
+policy_admitted_capability
+executed_capability
+rejected_capability
+fallback_capability
+fallback_authority_scope
+operational_satisfaction_evaluation
+```
+
+Operational constraints cover:
+
+- forbidden tools and tool families
+- required surfaces such as a Chrome extension tab, in-app browser, backend API,
+  Helix tab capture, or a localhost target
+- local term bindings such as `visual capture = Helix tab capture`
+- fallback surfaces and whether they are diagnostic-only or terminal-equivalent
+
+The rule of thumb extends to operational paths:
+
+```txt
+Tool names in the prompt are constraints, not execution.
+Required surfaces are part of the goal, not incidental metadata.
+Fallbacks are diagnostic unless explicitly equivalent.
+Only the completed solver path can answer from an admitted surface/tool path.
+```
+
+If the user requested a Chrome extension tab but the solver used backend API or
+the in-app browser, the fallback may support diagnosis but must not be reported
+as satisfying the requested path unless the operational satisfaction evaluation
+marks it equivalent. A forbidden tool family must remain visible in
+`tool_call_admission_decision` and must fail closed if it is proposed or
+executed.
+
 ### Exact Source-Target Contracts
 
 When a prompt names an exact source, the shared loop boundary must carry that

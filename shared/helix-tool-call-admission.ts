@@ -25,6 +25,10 @@ export type HelixToolCallAdmissionDecision = {
   admitted_tool_families: HelixToolCallAdmissionFamily[];
   forbidden_terminal_artifact_kinds: string[];
   forbidden_routes: string[];
+  forbidden_tools?: string[];
+  forbidden_tool_families?: string[];
+  operational_constraints_ref?: string;
+  required_surface?: string | null;
   reason: string;
   tool_admission_suppressed?: boolean;
   suppression_reason?: string;
