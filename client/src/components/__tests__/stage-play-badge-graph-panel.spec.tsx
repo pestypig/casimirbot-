@@ -144,6 +144,14 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         intentModule: undefined,
         evidenceRefs: ["live_source_observation:ui"],
         reasonCodes: ["observer_source_custody"],
+        dataTray: {
+          title: "Observer",
+          summary: "latest scene summary available",
+          updatedAt: "2026-06-02T00:00:01.000Z",
+          freshness: "fresh",
+          confidence: 0.84,
+          evidenceRefs: ["live_source_observation:ui"],
+        },
       }),
       badge({
         id: "source.visual_tab",
@@ -188,6 +196,165 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         intentModule: undefined,
         evidenceRefs: ["live_source_observation:ui"],
         reasonCodes: ["stage_play_interpreter", "compact_source_window"],
+      }),
+      badge({
+        id: "compact_observation.latest",
+        title: "Latest Compact Observation",
+        plainMeaning: "The latest compact observation summarizes source facts without raw transcript or frames.",
+        whyItMatters: "Compact observations are the source-window facts that downstream stage badges can cite.",
+        kind: "compact_observation",
+        status: "observed",
+        subjects: ["source:visual-tab"],
+        tags: ["compact_observation", "visual_context"],
+        sourceRefs: [{ kind: "stage_play_compact_observation", id: "stage_play_compact_observation:ui" }],
+        liveBindings: [{
+          bindingKind: "source_status",
+          sourceRefIds: ["stage_play_compact_observation:ui"],
+          freshness: "fresh",
+          confidence: 0.76,
+          compactValue: "scene window: player visible",
+        }],
+        intentModule: undefined,
+        admission: null,
+        confidence: 0.76,
+        evidenceRefs: ["stage_play_compact_observation:ui"],
+        reasonCodes: ["compact_source_window"],
+        dataTray: {
+          title: "Compact observation",
+          summary: "latest compact fact summary",
+          updatedAt: "2026-06-02T00:00:01.000Z",
+          freshness: "fresh",
+          confidence: 0.76,
+          evidenceRefs: ["stage_play_compact_observation:ui"],
+        },
+      }),
+      badge({
+        id: "helix_ask.checkpoint.latest",
+        title: "Latest Ask Checkpoint",
+        plainMeaning: "The latest Ask checkpoint records whether the solver completed a model-reviewed path.",
+        whyItMatters: "Only completed model-reviewed checkpoints can uphold an answer snapshot.",
+        kind: "ask_checkpoint",
+        status: "observed",
+        subjects: ["thread:stage-play-ui"],
+        tags: ["ask_checkpoint", "model_reviewed"],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: null,
+        confidence: 0.92,
+        evidenceRefs: ["ask_turn_solver_trace:ui"],
+        reasonCodes: ["completed_solver_path", "route_authority_passed"],
+        checkpoint: {
+          askTurnId: "ask-turn:ui",
+          solverTraceRef: "ask_turn_solver_trace:ui",
+          terminalArtifactKind: "workstation_tool_evaluation",
+          finalAnswerSource: "model",
+          modelReviewed: true,
+        },
+        dataTray: {
+          title: "Ask checkpoint",
+          summary: "solver completed; model reviewed",
+          updatedAt: "2026-06-02T00:00:02.000Z",
+          freshness: "fresh",
+          confidence: 0.92,
+          evidenceRefs: ["ask_turn_solver_trace:ui"],
+        },
+      }),
+      badge({
+        id: "answer_snapshot.latest",
+        title: "Latest Answer Snapshot",
+        plainMeaning: "The latest upheld answer snapshot came from a model-reviewed Ask checkpoint.",
+        whyItMatters: "Answer snapshots separate reviewed output from evidence projections.",
+        kind: "answer_snapshot",
+        status: "observed",
+        subjects: ["thread:stage-play-ui"],
+        tags: ["answer_snapshot", "model_reviewed"],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: null,
+        confidence: 0.9,
+        evidenceRefs: ["ask_turn_solver_trace:ui", "stage_play_badge_graph:ui-fixture"],
+        reasonCodes: ["model_reviewed_answer_snapshot"],
+        checkpoint: {
+          askTurnId: "ask-turn:ui",
+          solverTraceRef: "ask_turn_solver_trace:ui",
+          terminalArtifactKind: "workstation_tool_evaluation",
+          finalAnswerSource: "model",
+          modelReviewed: true,
+        },
+        output: {
+          lineKey: "answer_snapshot",
+          text: "Hold position until the next observation confirms the scene.",
+          state: "model_reviewed",
+          voiceEligible: false,
+        },
+        dataTray: {
+          title: "Answer snapshot",
+          summary: "latest upheld answer",
+          updatedAt: "2026-06-02T00:00:03.000Z",
+          freshness: "fresh",
+          confidence: 0.9,
+          evidenceRefs: ["ask_turn_solver_trace:ui"],
+        },
+      }),
+      badge({
+        id: "live_output.current",
+        title: "Current Live Output",
+        plainMeaning: "Live output can display reviewed or projected answer lines without becoming tool authority.",
+        whyItMatters: "The output lane shows what the workstation can present after the right authority boundary.",
+        kind: "live_output",
+        status: "candidate",
+        subjects: ["thread:stage-play-ui"],
+        tags: ["live_output"],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: null,
+        confidence: 0.7,
+        evidenceRefs: ["live_answer_environment:ui"],
+        reasonCodes: ["live_answer_projection"],
+        output: {
+          lineKey: "possibilities",
+          text: "Project Stage Play possibilities into Live Answer.",
+          state: "projected",
+          voiceEligible: false,
+        },
+        dataTray: {
+          title: "Live output",
+          summary: "possibilities projected",
+          updatedAt: "2026-06-02T00:00:04.000Z",
+          freshness: "fresh",
+          confidence: 0.7,
+          evidenceRefs: ["live_answer_environment:ui"],
+        },
+      }),
+      badge({
+        id: "voice_output.current",
+        title: "Current Voice Output",
+        plainMeaning: "Voice output can speak only from a model-reviewed answer snapshot.",
+        whyItMatters: "Voice certainty must be no stronger than the reviewed answer boundary.",
+        kind: "voice_output",
+        status: "observed",
+        subjects: ["thread:stage-play-ui"],
+        tags: ["voice_output", "model_reviewed"],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: null,
+        confidence: 0.86,
+        evidenceRefs: ["answer_snapshot.latest", "ask_turn_solver_trace:ui"],
+        reasonCodes: ["voice_cites_answer_snapshot"],
+        output: {
+          lineKey: "voice_callout",
+          text: "Hold position until the next observation confirms the scene.",
+          state: "model_reviewed",
+          voiceEligible: true,
+        },
+        dataTray: {
+          title: "Voice output",
+          summary: "reviewed answer eligible for voice",
+          updatedAt: "2026-06-02T00:00:05.000Z",
+          freshness: "fresh",
+          confidence: 0.86,
+          evidenceRefs: ["answer_snapshot.latest"],
+        },
       }),
       badge({
         id: "actor.player",
@@ -653,7 +820,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
     expect(screen.getByText("Latest reflect_stage_play_context")).toBeTruthy();
-    expect(screen.getByText("8 badges")).toBeTruthy();
+    expect(screen.getByText("13 badges")).toBeTruthy();
     expect(screen.getByText("0 missing checks")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-compact_observation")).toBeTruthy();
@@ -663,7 +830,15 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-lane-helix_ask_checkpoint")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-answer_snapshot")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-live_voice_output")).toBeTruthy();
-    expect(screen.getAllByTestId("stage-play-data-tray").length).toBeGreaterThanOrEqual(8);
+    expect(screen.getAllByTestId("stage-play-data-tray").length).toBeGreaterThanOrEqual(12);
+    expect(screen.getByText(/visual frame active - latest scene summary available/i)).toBeTruthy();
+    expect(screen.getByText(/latest compact fact summary/i)).toBeTruthy();
+    expect(screen.getAllByText(/confidence 0\.76/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/solver completed; model reviewed/i)).toBeTruthy();
+    expect(screen.getByText(/route authority passed/i)).toBeTruthy();
+    expect(screen.getAllByText(/Hold position until the next observation confirms the scene/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/model reviewed/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Project Stage Play possibilities into Live Answer/i)).toBeTruthy();
     const nodeSlots = screen.getAllByTestId("stage-play-node-slot");
     const occupiedSlots = nodeSlots.map((slot) => `${slot.style.left}:${slot.style.top}`);
     expect(new Set(occupiedSlots).size).toBe(occupiedSlots.length);
@@ -706,10 +881,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-draft-parameter-editor")).toBeTruthy();
     expect(screen.getByDisplayValue("use_for_stage_play")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Defensive Retreat Barrier" })[0]);
 
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-procedural-binding-node-controls")).toBeTruthy();
     expect(screen.getByText("Procedural Binding")).toBeTruthy();
     expect(screen.getAllByText(/retreat \+ intent.move_away \+ intent.maintain_line_of_sight \+ intent.place_block/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Admission")).toBeTruthy();
@@ -743,6 +918,50 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("Route to Narrative")).toBeTruthy();
     expect(screen.getByText("Review source evidence")).toBeTruthy();
     expect(screen.getByText("Open raw buffer preview")).toBeTruthy();
+  });
+
+  it("switches the Stage Console to node-specific interaction surfaces", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Latest Compact Observation" }));
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-compact-observation-node-controls")).toBeTruthy();
+    expect(screen.getByText("Compact Observation Evidence")).toBeTruthy();
+    expect(screen.getByText("Evidence Refs")).toBeTruthy();
+    expect(screen.getByText("Audit Links")).toBeTruthy();
+    expect(screen.getByText("Open raw buffer preview")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Latest Ask Checkpoint" }));
+    expect(screen.getByTestId("stage-play-ask-checkpoint-node-controls")).toBeTruthy();
+    expect(screen.getByText("Ask Checkpoint")).toBeTruthy();
+    expect(screen.getByText("Ask Prompt")).toBeTruthy();
+    expect(screen.getByText("Tool Observation")).toBeTruthy();
+    expect(screen.getByText("Solver / Debug Status")).toBeTruthy();
+    expect(screen.getByText(/Raw prompt text is not embedded/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Latest Answer Snapshot" }));
+    expect(screen.getByTestId("stage-play-answer-snapshot-node-controls")).toBeTruthy();
+    expect(screen.getByText("Upheld Answer")).toBeTruthy();
+    expect(screen.getAllByText(/Hold position until the next observation confirms the scene/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("Source Refs")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Current Live Output" }));
+    expect(screen.getByTestId("stage-play-live-output-node-controls")).toBeTruthy();
+    expect(screen.getByText("Projection State")).toBeTruthy();
+    expect(screen.getByText("Voice Boundary")).toBeTruthy();
+    expect(screen.getByText("Output Text")).toBeTruthy();
+    expect(screen.getByText(/Voice eligible:/i)).toBeTruthy();
+    expect(screen.getByText(/Answer snapshot citation:/i)).toBeTruthy();
+    expect(screen.getByTestId("stage-play-voice-boundary-locked")).toBeTruthy();
+    expect(screen.queryByTestId("stage-play-speak-reviewed-answer")).toBeNull();
+    expect(screen.getAllByText(/Project Stage Play possibilities into Live Answer/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Current Voice Output" }));
+    expect(screen.getByTestId("stage-play-voice-output-node-controls")).toBeTruthy();
+    expect(screen.getByText("Voice Boundary")).toBeTruthy();
+    expect(screen.getAllByText(/answer_snapshot\.latest/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("stage-play-speak-reviewed-answer")).toBeTruthy();
+    expect(screen.queryByTestId("stage-play-voice-boundary-locked")).toBeNull();
   });
 
   it("projects from the Interpreter node and Live Answer output node controls", async () => {
@@ -802,7 +1021,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
 
-    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
     expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
     expect(screen.getByText("Source Setup")).toBeTruthy();
     expect(screen.getByText("Observer Source Routes")).toBeTruthy();

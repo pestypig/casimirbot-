@@ -264,6 +264,280 @@ describe("repo/docs synthesis reliability", () => {
     expect(gate.violations).not.toContain("file_list_only");
   });
 
+  it("builds exact-section contracts for requested field lists", () => {
+    const exactTurnId = "ask:test:shared-tool-boundary-exact-section";
+    const observation = {
+      schema: "helix.repo_code_evidence_observation.v1",
+      artifact_id: `${exactTurnId}:repo_code_evidence_observation`,
+      turn_id: exactTurnId,
+      concept: "Shared Tool Family Boundary",
+      evidence_refs: ["docs/helix-ask-codex-loop-discipline.md:171-194"],
+      spans: [
+        {
+          ref: "docs/helix-ask-codex-loop-discipline.md:171-194",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_kind: "repo_doc",
+          sanitized_excerpt: [
+            "## Shared Tool Family Boundary",
+            "Required fields for a tool-family patch:",
+            "source_target_intent",
+            "tool_call_admission_decision",
+            "agent_step_decision",
+            "runtime_tool_call",
+            "agent_step_observation_packet",
+            "goal_satisfaction_evaluation",
+            "final_answer_draft | request_user_input | typed_failure",
+            "route_product_contract",
+            "product_authority_guard",
+            "terminal_answer_authority",
+            "terminal_authority_single_writer",
+            "terminal_presentation",
+          ].join("\n"),
+          reason: "Exact heading block lists the shared tool-family fields.",
+        },
+      ],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: exactTurnId,
+      promptText:
+        'Read repo path docs/helix-ask-codex-loop-discipline.md. Find the heading "Shared Tool Family Boundary". List the required fields under that heading.',
+      routeFamily: "repo_evidence",
+      artifactLedger: [{ artifact_id: observation.artifact_id, kind: "repo_code_evidence_observation", payload: observation }],
+    });
+
+    expect(packet.exact_section_contract).toMatchObject({
+      contract_kind: "field_list",
+      requested_path: "docs/helix-ask-codex-loop-discipline.md",
+      requested_heading: "Shared Tool Family Boundary",
+      evidence_missing: false,
+    });
+    expect(packet.exact_section_contract?.required_terms).toEqual(
+      expect.arrayContaining([
+        "source_target_intent",
+        "tool_call_admission_decision",
+        "agent_step_observation_packet",
+        "terminal_authority_single_writer",
+      ]),
+    );
+  });
+
+  it("supplements weak retrieval with the requested repo heading section", () => {
+    const exactTurnId = "ask:test:shared-tool-boundary-file-fallback";
+    const weakObservation = {
+      schema: "helix.repo_code_evidence_observation.v1",
+      artifact_id: `${exactTurnId}:repo_code_evidence_observation`,
+      turn_id: exactTurnId,
+      concept: "Shared Tool Family Boundary",
+      evidence_refs: ["docs/helix-ask-codex-loop-discipline.md"],
+      spans: [
+        {
+          ref: "docs/helix-ask-codex-loop-discipline.md:1",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_kind: "repo_doc",
+          sanitized_excerpt: "The loop discipline document describes Codex and Helix Ask ownership boundaries.",
+          reason: "Weak retrieval hit for the correct document.",
+        },
+      ],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: exactTurnId,
+      promptText:
+        'Read repo path docs/helix-ask-codex-loop-discipline.md. Find the heading "Shared Tool Family Boundary". List the required fields under that heading.',
+      routeFamily: "repo_evidence",
+      artifactLedger: [{ artifact_id: weakObservation.artifact_id, kind: "repo_code_evidence_observation", payload: weakObservation }],
+    });
+
+    expect(packet.compact_evidence[0]?.ref).toMatch(/docs\/helix-ask-codex-loop-discipline\.md:\d+-\d+/);
+    expect(packet.exact_section_contract?.evidence_missing).toBe(false);
+    expect(packet.exact_section_contract?.required_terms).toEqual(
+      expect.arrayContaining([
+        "source_target_intent",
+        "agent_step_observation_packet",
+        "goal_satisfaction_evaluation",
+        "terminal_authority_single_writer",
+      ]),
+    );
+  });
+
+  it("rejects exact-section answers that invent field names or omit required terms", () => {
+    const exactTurnId = "ask:test:shared-tool-boundary-bad-answer";
+    const observation = {
+      schema: "helix.repo_code_evidence_observation.v1",
+      artifact_id: `${exactTurnId}:repo_code_evidence_observation`,
+      turn_id: exactTurnId,
+      concept: "Shared Tool Family Boundary",
+      evidence_refs: ["docs/helix-ask-codex-loop-discipline.md:171-194"],
+      spans: [
+        {
+          ref: "docs/helix-ask-codex-loop-discipline.md:171-194",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_kind: "repo_doc",
+          sanitized_excerpt: [
+            "## Shared Tool Family Boundary",
+            "Required fields for a tool-family patch:",
+            "source_target_intent",
+            "tool_call_admission_decision",
+            "agent_step_decision",
+            "runtime_tool_call",
+            "agent_step_observation_packet",
+            "goal_satisfaction_evaluation",
+            "final_answer_draft | request_user_input | typed_failure",
+            "route_product_contract",
+            "product_authority_guard",
+            "terminal_answer_authority",
+            "terminal_authority_single_writer",
+            "terminal_presentation",
+          ].join("\n"),
+          reason: "Exact heading block lists the shared tool-family fields.",
+        },
+      ],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: exactTurnId,
+      promptText:
+        'Read repo path docs/helix-ask-codex-loop-discipline.md. Find the heading "Shared Tool Family Boundary". List the required fields under that heading.',
+      routeFamily: "repo_evidence",
+      artifactLedger: [{ artifact_id: observation.artifact_id, kind: "repo_code_evidence_observation", payload: observation }],
+    });
+    const payload = {
+      repo_docs_synthesis_packet: packet,
+      repo_code_evidence_answer: {
+        schema: "helix.repo_code_evidence_answer.v1",
+        support_refs: packet.compact_evidence.map((entry) => entry.ref),
+        model_authored: true,
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        synthesis_attempt_ref: `${exactTurnId}:repo_evidence_synthesis_attempt`,
+      },
+      final_answer_draft: {
+        authority: "llm_post_observation_composer",
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        artifact_refs: packet.compact_evidence.map((entry) => entry.ref),
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: observation.artifact_id, kind: "repo_code_evidence_observation", payload: observation },
+        {
+          artifact_id: `${exactTurnId}:repo_evidence_synthesis_attempt`,
+          kind: "repo_evidence_synthesis_attempt",
+          payload: {
+            schema: "helix.repo_evidence_synthesis_attempt.v1",
+            model_step_capability: "model.synthesize_from_repo_evidence",
+          },
+        },
+      ],
+    };
+
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId: exactTurnId,
+      answerRef: "candidate:bad-exact-section",
+      answerText:
+        'Under "Shared Tool Family Boundary," the fields include implementation_location, route_trace, tool_call_eligibility, and terminal_contract. Receipts cannot directly become final answers.',
+      payload,
+    });
+    const instruction = buildRepoDocsSynthesisRepairInstruction({
+      violations: gate.violations,
+      packet,
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("missing_exact_section_terms");
+    expect(gate.violations).toContain("unsupported_exact_section_terms");
+    expect(instruction).toMatch(/exact section/i);
+    expect(instruction).toMatch(/source_target_intent/);
+  });
+
+  it("accepts exact-section answers that cover every required field and no invented fields", () => {
+    const exactTurnId = "ask:test:shared-tool-boundary-good-answer";
+    const observation = {
+      schema: "helix.repo_code_evidence_observation.v1",
+      artifact_id: `${exactTurnId}:repo_code_evidence_observation`,
+      turn_id: exactTurnId,
+      concept: "Shared Tool Family Boundary",
+      evidence_refs: ["docs/helix-ask-codex-loop-discipline.md:171-194"],
+      spans: [
+        {
+          ref: "docs/helix-ask-codex-loop-discipline.md:171-194",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+          source_kind: "repo_doc",
+          sanitized_excerpt: [
+            "## Shared Tool Family Boundary",
+            "Required fields for a tool-family patch:",
+            "source_target_intent",
+            "tool_call_admission_decision",
+            "agent_step_decision",
+            "runtime_tool_call",
+            "agent_step_observation_packet",
+            "goal_satisfaction_evaluation",
+            "final_answer_draft | request_user_input | typed_failure",
+            "route_product_contract",
+            "product_authority_guard",
+            "terminal_answer_authority",
+            "terminal_authority_single_writer",
+            "terminal_presentation",
+          ].join("\n"),
+          reason: "Exact heading block lists the shared tool-family fields.",
+        },
+      ],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: exactTurnId,
+      promptText:
+        'Read repo path docs/helix-ask-codex-loop-discipline.md. Find the heading "Shared Tool Family Boundary". List the required fields under that heading.',
+      routeFamily: "repo_evidence",
+      artifactLedger: [{ artifact_id: observation.artifact_id, kind: "repo_code_evidence_observation", payload: observation }],
+    });
+    const payload = {
+      repo_docs_synthesis_packet: packet,
+      repo_code_evidence_answer: {
+        schema: "helix.repo_code_evidence_answer.v1",
+        support_refs: packet.compact_evidence.map((entry) => entry.ref),
+        model_authored: true,
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        synthesis_attempt_ref: `${exactTurnId}:repo_evidence_synthesis_attempt`,
+      },
+      final_answer_draft: {
+        authority: "llm_post_observation_composer",
+        model_step_capability: "model.synthesize_from_repo_evidence",
+        artifact_refs: packet.compact_evidence.map((entry) => entry.ref),
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: observation.artifact_id, kind: "repo_code_evidence_observation", payload: observation },
+        {
+          artifact_id: `${exactTurnId}:repo_evidence_synthesis_attempt`,
+          kind: "repo_evidence_synthesis_attempt",
+          payload: {
+            schema: "helix.repo_evidence_synthesis_attempt.v1",
+            model_step_capability: "model.synthesize_from_repo_evidence",
+          },
+        },
+      ],
+    };
+
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId: exactTurnId,
+      answerRef: "candidate:good-exact-section",
+      answerText:
+        "The required fields are source_target_intent, tool_call_admission_decision, agent_step_decision, runtime_tool_call, agent_step_observation_packet, goal_satisfaction_evaluation, final_answer_draft, request_user_input, typed_failure, route_product_contract, product_authority_guard, terminal_answer_authority, terminal_authority_single_writer, and terminal_presentation. Receipts cannot directly become final answers; they must remain observations unless the route contract explicitly permits a receipt terminal.",
+      payload,
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).toEqual([]);
+  });
+
   it("rejects shallow broad-concept repo answers even when they have model synthesis and refs", () => {
     const packet = buildRepoDocsSynthesisPacket({
       turnId,

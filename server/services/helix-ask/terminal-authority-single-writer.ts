@@ -242,24 +242,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   };
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] = [];
-  const solverContinuationPending =
+  const rawSolverContinuationPending =
     readRecord(input.payload.solver_continuation_observation)?.schema === "helix.solver_continuation_observation.v1" &&
     readString(readRecord(input.payload.solver_continuation_observation)?.required_next_step) !== "typed_failure";
-  if (solverContinuationPending) {
-    const pendingText =
-      "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
-    rejectedCandidates.push({
-      kind: readString(input.payload.terminal_artifact_kind) ?? "direct_answer_text",
-      reason: "solver_continuation_pending",
-    });
-    input.payload.terminal_artifact_kind = "typed_failure";
-    input.payload.final_answer_source = "typed_failure";
-    input.payload.terminal_error_code = "solver_continuation_pending";
-    input.payload.selected_final_answer = pendingText;
-    input.payload.answer = pendingText;
-    input.payload.text = pendingText;
-    input.payload.assistant_answer = pendingText;
-  }
   const draftMaterialization = materializeFinalAnswerDraftTerminal({
     turnId: input.turnId,
     payload: input.payload,
@@ -291,6 +276,35 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materialization_ok: draftMaterialization.ok,
       materialization_blocked_reason: draftMaterialization.blocked_reason ?? null,
     };
+  }
+  const goalEvaluation = readRecord(input.payload.goal_satisfaction_evaluation);
+  const goalAllowsTerminal =
+    readString(goalEvaluation?.satisfaction) === "satisfied" ||
+    readString(goalEvaluation?.next_decision) === "allow_terminal";
+  const repoTerminalMaterialized =
+    draftMaterialization?.ok === true &&
+    draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
+  const solverContinuationPending =
+    rawSolverContinuationPending && !(repoTerminalMaterialized && goalAllowsTerminal);
+  if (solverContinuationPending) {
+    const pendingText =
+      "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
+    rejectedCandidates.push({
+      kind: readString(input.payload.terminal_artifact_kind) ?? "direct_answer_text",
+      reason: "solver_continuation_pending",
+    });
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = "solver_continuation_pending";
+    input.payload.selected_final_answer = pendingText;
+    input.payload.answer = pendingText;
+    input.payload.text = pendingText;
+    input.payload.assistant_answer = pendingText;
+  } else if (rawSolverContinuationPending && repoTerminalMaterialized && goalAllowsTerminal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_repo_terminal",
+    });
   }
   const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);
   const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);

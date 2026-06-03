@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Waypoints } from "lucide-react";
+import { AlertTriangle, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -608,36 +608,250 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
   return "Observed stage condition";
 }
 
+function selectedNodeConsoleTitle(badge: StagePlayBadgeV1 | null): string {
+  if (!badge) return "Builder Palette";
+  if (badge.kind === "observer") return "Observer Source Setup";
+  if (badge.kind === "source") return "Source Routing";
+  if (badge.kind === "compact_observation") return "Compact Observation Evidence";
+  if (badge.kind === "procedural_binding") return "Procedural Binding";
+  if (badge.kind === "ask_checkpoint") return "Ask Checkpoint";
+  if (badge.kind === "answer_snapshot") return "Answer Snapshot";
+  if (badge.kind === "live_output") return "Live Output";
+  if (badge.kind === "voice_output") return "Voice Output";
+  if (badge.id === "interpreter.stage_play_reflection") return "Stage Interpreter";
+  return labelize(badge.kind);
+}
+
+function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string {
+  if (!badge) {
+    return "Add node types, watch live evidence fill them, and assemble procedures without granting execution.";
+  }
+  if (badge.kind === "observer") return "Configure source custody, routing, cadence, and audit buffers.";
+  if (badge.kind === "source") return "Route this source into Stage Play and inspect its evidence custody.";
+  if (badge.kind === "compact_observation") return "Inspect compact facts, evidence refs, and raw-buffer audit links.";
+  if (badge.kind === "procedural_binding") return "Inspect the expression and badges that support this procedure.";
+  if (badge.kind === "ask_checkpoint") return "Inspect Ask turn refs, tool observation refs, and solver/debug status.";
+  if (badge.kind === "answer_snapshot") return "Inspect the upheld model-reviewed answer and supporting refs.";
+  if (badge.kind === "live_output" || badge.kind === "voice_output") {
+    return "Inspect projection state, output text, refs, and voice eligibility.";
+  }
+  if (badge.id === "interpreter.stage_play_reflection") {
+    return "Project current Stage Play evidence lanes into Live Answer without creating answer authority.";
+  }
+  return "Inspect the selected node without mixing in unrelated builder controls.";
+}
+
+function inspectorTestIdForBadge(badge: StagePlayBadgeV1): string {
+  if (badge.kind === "observer") return "stage-play-observer-node-controls";
+  if (badge.kind === "source") return "stage-play-source-node-controls";
+  if (badge.kind === "compact_observation") return "stage-play-compact-observation-node-controls";
+  if (badge.kind === "procedural_binding") return "stage-play-procedural-binding-node-controls";
+  if (badge.kind === "ask_checkpoint") return "stage-play-ask-checkpoint-node-controls";
+  if (badge.kind === "answer_snapshot") return "stage-play-answer-snapshot-node-controls";
+  if (badge.kind === "live_output") return "stage-play-live-output-node-controls";
+  if (badge.kind === "voice_output") return "stage-play-voice-output-node-controls";
+  if (badge.id === "interpreter.stage_play_reflection") return "stage-play-interpreter-node-controls";
+  return "stage-play-selected-node-controls";
+}
+
+function badgeReferenceTokens(badge: StagePlayBadgeV1): Set<string> {
+  return new Set([
+    badge.id,
+    ...badge.evidenceRefs,
+    ...(badge.dataTray?.evidenceRefs ?? []),
+    ...badge.sourceRefs.map((ref) => ref.id),
+    ...badge.sourceRefs.map((ref) => `${ref.kind}:${ref.id}`),
+  ]);
+}
+
+function isModelReviewedAnswerSnapshot(badge: StagePlayBadgeV1): boolean {
+  return (
+    badge.kind === "answer_snapshot" &&
+    badge.checkpoint?.modelReviewed === true &&
+    badge.output?.state === "model_reviewed"
+  );
+}
+
+function findCitedModelReviewedAnswerSnapshot(
+  badge: StagePlayBadgeV1,
+  answerSnapshots: StagePlayBadgeV1[],
+): StagePlayBadgeV1 | null {
+  const refs = badgeReferenceTokens(badge);
+  return answerSnapshots.find((snapshot) => {
+    if (!isModelReviewedAnswerSnapshot(snapshot)) return false;
+    const snapshotRefs = badgeReferenceTokens(snapshot);
+    return refs.has(snapshot.id) ||
+      refs.has(`badge:${snapshot.id}`) ||
+      refs.has(`stage_play_badge:${snapshot.id}`) ||
+      Array.from(snapshotRefs).some((ref) => refs.has(ref) && /answer_snapshot/i.test(ref));
+  }) ?? null;
+}
+
 function compactTrayText(value: string | null | undefined, fallback: string): string {
   const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
   return text.length > 120 ? `${text.slice(0, 117).trimEnd()}...` : text;
 }
 
-function badgeTrayTitle(badge: StagePlayBadgeV1): string {
-  return badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind);
+type StagePlayBadgeTrayView = {
+  title: string;
+  metric: string;
+  summary: string;
+  detail: string;
+};
+
+function compactTrayMetric(value: string | number | null | undefined, fallback: string): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
+  return text.length > 34 ? `${text.slice(0, 31).trimEnd()}...` : text;
 }
 
-function badgeTraySummary(badge: StagePlayBadgeV1): string {
+function firstLiveBindingSummary(badge: StagePlayBadgeV1): string | null {
   const binding = badge.liveBindings.find((entry) =>
     entry.compactValue !== null && entry.compactValue !== undefined && entry.compactValue !== ""
   );
-  return compactTrayText(
-    badge.dataTray?.summary ??
-      badge.output?.text ??
-      (binding ? `${labelize(binding.bindingKind)}: ${String(binding.compactValue)}` : null) ??
-      badge.missingEvidence[0] ??
-      badge.reasonCodes[0] ??
-      badge.plainMeaning,
-    "No compact tray data yet.",
+  return binding ? `${labelize(binding.bindingKind)}: ${String(binding.compactValue)}` : null;
+}
+
+function routeAuthorityPassed(badge: StagePlayBadgeV1): boolean {
+  return badge.reasonCodes.some((code) =>
+    /route_authority|terminal_authority|completed_solver_path|model_authored|solver_completed/i.test(code)
   );
 }
 
-function syntheticNodeTraySummary(node: StagePlaySyntheticNode): string {
-  return compactTrayText(
-    node.evidenceRefs[0] ??
-      (node.relatedBadgeIds.length > 0 ? `${node.relatedBadgeIds.length} related badge(s)` : null),
-    "Synthetic output from graph evidence.",
-  );
+function observerTrayView(badge: StagePlayBadgeV1, sources: StagePlayObserverSource[]): StagePlayBadgeTrayView {
+  const visualSource = sources.find((source) => /visual|frame|screen/i.test(source.modality));
+  const sceneSource = sources.find((source) => source.contribution.trim().length > 0);
+  const selectedCount = sources.filter((source) => source.selectedForStagePlay).length;
+  const activeCount = sources.filter((source) => source.status === "active").length;
+  const evidenceCount = new Set([
+    ...badge.evidenceRefs,
+    ...(badge.dataTray?.evidenceRefs ?? []),
+    ...sources.flatMap((source) => source.evidenceRefs),
+  ]).size;
+  const visualStatus = visualSource
+    ? `${labelize(visualSource.modality)} ${labelize(visualSource.status)}`
+    : "visual frame missing";
+  return {
+    title: badge.dataTray?.title ?? "Observer",
+    metric: compactTrayMetric(badge.dataTray?.freshness ?? `${selectedCount}/${sources.length} routed`, "unknown"),
+    summary: compactTrayText(
+      `${visualStatus} - ${badge.dataTray?.summary ?? sceneSource?.contribution ?? badge.plainMeaning}`,
+      "No live source summary yet.",
+    ),
+    detail: compactTrayText(
+      `${activeCount} active | ${evidenceCount} refs | freshness ${badge.dataTray?.freshness ?? "unknown"}`,
+      "No source custody state.",
+    ),
+  };
+}
+
+function compactObservationTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
+  return {
+    title: badge.dataTray?.title ?? "Compact observation",
+    metric: compactTrayMetric(
+      badge.dataTray?.confidence !== undefined && badge.dataTray?.confidence !== null
+        ? `confidence ${badge.dataTray.confidence.toFixed(2)}`
+        : `confidence ${badge.confidence.toFixed(2)}`,
+      "confidence unknown",
+    ),
+    summary: compactTrayText(
+      badge.dataTray?.summary ?? firstLiveBindingSummary(badge) ?? badge.plainMeaning,
+      "No compact fact summary yet.",
+    ),
+    detail: compactTrayText(
+      badge.sourceRefs[0]?.id ?? badge.evidenceRefs[0] ?? "source window pending",
+      "source window pending",
+    ),
+  };
+}
+
+function askCheckpointTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
+  const checkpoint = badge.checkpoint;
+  const solverState = checkpoint?.modelReviewed ? "solver completed" : "solver pending";
+  const routeState = routeAuthorityPassed(badge) || checkpoint?.modelReviewed ? "route authority passed" : "route authority pending";
+  return {
+    title: badge.dataTray?.title ?? "Ask checkpoint",
+    metric: compactTrayMetric(checkpoint?.askTurnId ?? "no turn", "no turn"),
+    summary: compactTrayText(
+      badge.dataTray?.summary ?? `${solverState}; ${checkpoint?.modelReviewed ? "model reviewed" : "not reviewed"}`,
+      "No model-reviewed checkpoint has been produced for this stage yet.",
+    ),
+    detail: compactTrayText(
+      `${routeState} | ${checkpoint?.terminalArtifactKind ?? "no terminal artifact"}`,
+      "route authority pending",
+    ),
+  };
+}
+
+function answerSnapshotTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
+  return {
+    title: badge.dataTray?.title ?? "Answer snapshot",
+    metric: compactTrayMetric(badge.dataTray?.updatedAt ? formatStagePlayClock(badge.dataTray.updatedAt) : "no update", "no update"),
+    summary: compactTrayText(
+      badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
+      "No upheld answer snapshot yet.",
+    ),
+    detail: compactTrayText(
+      `${badge.evidenceRefs.length} refs | ${badge.output?.state ? labelize(badge.output.state) : "not projected"}`,
+      "0 refs",
+    ),
+  };
+}
+
+function outputTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
+  const outputState = badge.output?.state ?? "draft";
+  return {
+    title: badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind),
+    metric: compactTrayMetric(labelize(outputState), "draft"),
+    summary: compactTrayText(
+      badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
+      "No output text projected yet.",
+    ),
+    detail: compactTrayText(
+      `${badge.evidenceRefs.length} refs | voice ${badge.output?.voiceEligible ? "eligible" : "locked"}`,
+      "voice locked",
+    ),
+  };
+}
+
+function badgeTrayView(badge: StagePlayBadgeV1, observerSources: StagePlayObserverSource[]): StagePlayBadgeTrayView {
+  if (badge.kind === "observer") return observerTrayView(badge, observerSources);
+  if (badge.kind === "compact_observation") return compactObservationTrayView(badge);
+  if (badge.kind === "ask_checkpoint") return askCheckpointTrayView(badge);
+  if (badge.kind === "answer_snapshot") return answerSnapshotTrayView(badge);
+  if (badge.kind === "live_output" || badge.kind === "voice_output") return outputTrayView(badge);
+  return {
+    title: badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind),
+    metric: compactTrayMetric(
+      badge.dataTray?.freshness ?? badge.output?.state ?? badge.confidence.toFixed(2),
+      badge.confidence.toFixed(2),
+    ),
+    summary: compactTrayText(
+      badge.dataTray?.summary ??
+        badge.output?.text ??
+        firstLiveBindingSummary(badge) ??
+        badge.missingEvidence[0] ??
+        badge.reasonCodes[0] ??
+        badge.plainMeaning,
+      "No compact tray data yet.",
+    ),
+    detail: compactTrayText(
+      `${badge.evidenceRefs.length} evidence ref(s)`,
+      "0 evidence ref(s)",
+    ),
+  };
+}
+
+function syntheticNodeTrayView(node: StagePlaySyntheticNode): StagePlayBadgeTrayView {
+  return {
+    title: labelize(node.kind),
+    metric: compactTrayMetric(labelize(node.status), "unknown"),
+    summary: compactTrayText(
+      node.evidenceRefs[0] ??
+        (node.relatedBadgeIds.length > 0 ? `${node.relatedBadgeIds.length} related badge(s)` : null),
+      "Synthetic output from graph evidence.",
+    ),
+    detail: compactTrayText(`${node.evidenceRefs.length} evidence ref(s)`, "0 evidence ref(s)"),
+  };
 }
 
 function StagePlayToolActivityStrip({
@@ -737,6 +951,8 @@ function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftSta
   const presets: Record<StagePlayBadgeV1["kind"], [string, string][]> = {
     observer: [["role", "source_custody"], ["route_policy", "evidence_only"], ["selected_sources", ""]],
     source: [["source_class", ""], ["source_id", ""], ["status", ""], ["descriptor_ref", ""], ["producer_ref", ""], ["latest_ref", ""]],
+    compact_observation: [["window", ""], ["fact_summary", ""], ["evidence_refs", ""]],
+    stage_interpretation: [["bounds", ""], ["interpretation", ""], ["source_refs", ""]],
     fusion: [["fusion_rule", ""], ["input_modalities", ""], ["result", ""]],
     interpreter: [["tool", "live_env.reflect_stage_play_context"], ["cadence", ""], ["input_sources", ""], ["output", "stage_play_badge_graph"]],
     setting: [["dimension", ""], ["biome_or_area", ""], ["bounds", ""]],
@@ -751,6 +967,10 @@ function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftSta
     blocked_affordance: [["blocked_action", ""], ["blocked_by", ""], ["missing_check", ""]],
     intent_module: [["verb", ""], ["target", ""], ["preserves", ""]],
     procedural_binding: [["expression", ""], ["requires", ""], ["possible_result", ""]],
+    ask_checkpoint: [["ask_turn_id", ""], ["solver_trace_ref", ""], ["model_reviewed", "false"]],
+    answer_snapshot: [["line_key", "answer_snapshot"], ["answer_text", ""], ["model_reviewed", "false"]],
+    live_output: [["line_key", ""], ["state", "draft"], ["voice_eligible", "false"]],
+    voice_output: [["line_key", ""], ["state", "draft"], ["voice_eligible", "false"]],
     recommended_check: [["check", ""], ["evidence_needed", ""], ["status", ""]],
     admission_gate: [["gate", ""], ["admission", ""], ["authority", "evidence_only"]],
     missing_evidence: [["question", ""], ["needed_ref", ""], ["status", "missing"]],
@@ -1238,6 +1458,7 @@ function StagePlayGraphCanvas({
           const canProjectFromBadge = badge.id === "interpreter.stage_play_reflection";
           const isNew = addedBadgeIds.has(badge.id);
           const isUpdated = updatedBadgeIds.has(badge.id) || (badge.kind === "observer" && graphDiff?.sourceWindowChanged === true);
+          const tray = badgeTrayView(badge, observerSources);
           const pulseClass = isNew
             ? "animate-pulse ring-2 ring-emerald-300/70 shadow-[0_0_26px_rgba(52,211,153,0.28)]"
             : isUpdated
@@ -1345,11 +1566,11 @@ function StagePlayGraphCanvas({
                 data-testid="stage-play-data-tray"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-semibold uppercase tracking-wide">{badgeTrayTitle(badge)}</span>
-                  <span className="shrink-0 font-mono text-[9px] text-slate-500">{badge.confidence.toFixed(2)}</span>
+                  <span className="truncate font-semibold uppercase tracking-wide">{tray.title}</span>
+                  <span className="shrink-0 truncate font-mono text-[9px] text-slate-500">{tray.metric}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
-                  {badgeTraySummary(badge)}
+                  {tray.summary}
                 </div>
                 {canProjectFromBadge ? (
                   <button
@@ -1364,7 +1585,7 @@ function StagePlayGraphCanvas({
                     Project to Live Answer
                   </button>
                 ) : (
-                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{badge.evidenceRefs.length} evidence ref(s)</div>
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{tray.detail}</div>
                 )}
               </div>
             </div>
@@ -1412,6 +1633,7 @@ function StagePlayGraphCanvas({
             : node.status === "blocked"
               ? "border-rose-800/70 bg-rose-950/25 text-rose-100"
               : "border-slate-800 bg-slate-950/80 text-slate-300";
+          const tray = syntheticNodeTrayView(node);
           return (
             <div
               key={node.id}
@@ -1470,11 +1692,11 @@ function StagePlayGraphCanvas({
                 data-testid="stage-play-data-tray"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-semibold uppercase tracking-wide">{labelize(node.kind)}</span>
-                  <span className="shrink-0 font-mono text-[9px] text-slate-500">{labelize(node.status)}</span>
+                  <span className="truncate font-semibold uppercase tracking-wide">{tray.title}</span>
+                  <span className="shrink-0 truncate font-mono text-[9px] text-slate-500">{tray.metric}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
-                  {syntheticNodeTraySummary(node)}
+                  {tray.summary}
                 </div>
                 {node.kind === "live_answer" ? (
                   <button
@@ -1486,7 +1708,7 @@ function StagePlayGraphCanvas({
                     Project to Live Answer
                   </button>
                 ) : (
-                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{node.evidenceRefs.length} evidence ref(s)</div>
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{tray.detail}</div>
                 )}
               </div>
             </div>
@@ -1740,6 +1962,7 @@ function StagePlayBindingOverlay({
   rawSessionBufferLoading,
   onOpenSourceAudit,
   onClearRawSessionBuffer,
+  onClearSelectedBadge,
   onClose,
 }: {
   graph: StagePlayBadgeGraphV1;
@@ -1774,6 +1997,7 @@ function StagePlayBindingOverlay({
   rawSessionBufferLoading: boolean;
   onOpenSourceAudit: (source: StagePlayObserverSource, mode: StagePlaySourceAuditMode) => void;
   onClearRawSessionBuffer: (source: StagePlayObserverSource | null) => void;
+  onClearSelectedBadge: () => void;
   onClose: () => void;
 }) {
   const selectedBadges = graph.badges.filter((badge) => selectedBadgeIds.includes(badge.id));
@@ -1790,6 +2014,8 @@ function StagePlayBindingOverlay({
       setSelectedBadgeIds(Array.from(new Set([...selectedBadgeIds, ...matchingIds])));
     }
   }
+  const consoleTitle = selectedNodeConsoleTitle(selectedBadge);
+  const consoleDescription = selectedNodeConsoleDescription(selectedBadge);
 
   return (
     <aside
@@ -1799,9 +2025,9 @@ function StagePlayBindingOverlay({
       <div className="flex items-start justify-between gap-3 border-b border-slate-800 p-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Stage Console</div>
-          <div className="mt-0.5 text-base font-semibold leading-tight">Builder Palette</div>
+          <div className="mt-0.5 text-base font-semibold leading-tight">{consoleTitle}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-slate-400">
-            Add node types, watch live evidence fill them, and assemble procedures without granting execution.
+            {consoleDescription}
           </div>
         </div>
         <button
@@ -1814,19 +2040,59 @@ function StagePlayBindingOverlay({
         </button>
       </div>
 
-      <div className="border-b border-slate-800 p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search live badges"
-            className="h-9 border-slate-800 bg-slate-950 pl-8 text-slate-100 placeholder:text-slate-600"
-          />
+      {!selectedBadge ? (
+        <div className="border-b border-slate-800 p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search live badges"
+              className="h-9 border-slate-800 bg-slate-950 pl-8 text-slate-100 placeholder:text-slate-600"
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 border-b border-slate-800 p-3">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-slate-100">{selectedBadge.title}</div>
+            <div className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{selectedBadge.id}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClearSelectedBadge}
+            className="shrink-0 rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:border-cyan-500 hover:text-cyan-100"
+          >
+            Builder Palette
+          </button>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {selectedBadge ? (
+          <Inspector
+            badge={selectedBadge}
+            relatedEdges={relatedEdges}
+            relatedBadges={relatedBadges}
+            relatedActions={relatedActions}
+            observerSources={graph.sourceWindow.sources}
+            answerSnapshots={graph.badges.filter((entry) => entry.kind === "answer_snapshot")}
+            onObserverDraftAction={onObserverDraftAction}
+            sourceSetupCadenceMs={sourceSetupCadenceMs}
+            sourceSetupStatus={sourceSetupStatus}
+            onSetSourceSetupCadenceMs={onSetSourceSetupCadenceMs}
+            onStartVisualSourceSetup={onStartVisualSourceSetup}
+            onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
+            onPauseVisualSourceSetup={onPauseVisualSourceSetup}
+            onProjectLiveAnswer={onProjectLiveAnswer}
+            sourceAuditSelection={sourceAuditSelection}
+            rawSessionBufferEntries={rawSessionBufferEntries}
+            rawSessionBufferLoading={rawSessionBufferLoading}
+            onOpenSourceAudit={onOpenSourceAudit}
+            onClearRawSessionBuffer={onClearRawSessionBuffer}
+          />
+        ) : (
+          <>
         <Section title="Builder Palette">
           <div className="space-y-2">
             {STAGE_PLAY_NODE_BUILDER_TYPES.map((nodeType) => {
@@ -1974,28 +2240,8 @@ function StagePlayBindingOverlay({
           ))}
         </div>
 
-        <div className="mt-3">
-          <Inspector
-            badge={selectedBadge}
-            relatedEdges={relatedEdges}
-            relatedBadges={relatedBadges}
-            relatedActions={relatedActions}
-            observerSources={graph.sourceWindow.sources}
-            onObserverDraftAction={onObserverDraftAction}
-            sourceSetupCadenceMs={sourceSetupCadenceMs}
-            sourceSetupStatus={sourceSetupStatus}
-            onSetSourceSetupCadenceMs={onSetSourceSetupCadenceMs}
-            onStartVisualSourceSetup={onStartVisualSourceSetup}
-            onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
-            onPauseVisualSourceSetup={onPauseVisualSourceSetup}
-            onProjectLiveAnswer={onProjectLiveAnswer}
-            sourceAuditSelection={sourceAuditSelection}
-            rawSessionBufferEntries={rawSessionBufferEntries}
-            rawSessionBufferLoading={rawSessionBufferLoading}
-            onOpenSourceAudit={onOpenSourceAudit}
-            onClearRawSessionBuffer={onClearRawSessionBuffer}
-          />
-        </div>
+          </>
+        )}
       </div>
     </aside>
   );
@@ -2007,6 +2253,7 @@ function Inspector({
   relatedBadges,
   relatedActions,
   observerSources,
+  answerSnapshots,
   onObserverDraftAction,
   sourceSetupCadenceMs,
   sourceSetupStatus,
@@ -2026,6 +2273,7 @@ function Inspector({
   relatedBadges: StagePlayBadgeV1[];
   relatedActions: StagePlayBadgeGraphRecommendedActionV1[];
   observerSources: StagePlayObserverSource[];
+  answerSnapshots: StagePlayBadgeV1[];
   onObserverDraftAction: (source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) => void;
   sourceSetupCadenceMs: number;
   sourceSetupStatus: StagePlaySourceSetupStatus;
@@ -2056,9 +2304,49 @@ function Inspector({
       badge.sourceRefs.some((ref) => source.evidenceRefs.includes(ref.id))
     ) ?? null
     : null;
+  const matchingObserverSources = observerSources.filter((source) =>
+    badge.evidenceRefs.some((ref) => source.evidenceRefs.includes(ref)) ||
+    badge.sourceRefs.some((ref) => source.evidenceRefs.includes(ref.id) || ref.id === source.sourceId) ||
+    badge.subjects.includes(source.sourceId)
+  );
+  const displayEvidenceRefs = uniqueSorted([
+    ...badge.evidenceRefs,
+    ...(badge.dataTray?.evidenceRefs ?? []),
+    ...badge.sourceRefs.map((ref) => `${ref.kind}:${ref.id}`),
+  ]);
+  const isOutputNode = badge.kind === "answer_snapshot" || badge.kind === "live_output" || badge.kind === "voice_output";
+  const citedAnswerSnapshot = badge.kind === "live_output" || badge.kind === "voice_output"
+    ? findCitedModelReviewedAnswerSnapshot(badge, answerSnapshots)
+    : null;
+  const voiceBoundaryPassed = Boolean(
+    citedAnswerSnapshot &&
+    badge.output?.voiceEligible === true &&
+    badge.output.state === "model_reviewed",
+  );
+  const isSelectedSpecificNode = [
+    "observer",
+    "source",
+    "compact_observation",
+    "procedural_binding",
+    "ask_checkpoint",
+    "answer_snapshot",
+    "live_output",
+    "voice_output",
+  ].includes(badge.kind) || badge.id === "interpreter.stage_play_reflection";
+  const showGenericLiveBindings = !isSelectedSpecificNode && badge.liveBindings.length > 0;
+  const showAffordanceSection = badge.kind === "affordance" || badge.kind === "blocked_affordance";
+  const showIntentSection = badge.kind === "intent_module";
+  const showMissingEvidenceSection = badge.kind === "missing_evidence" || badge.missingEvidence.length > 0;
+  const showAdmissionSection = !isOutputNode && (Boolean(badge.admission) || relatedActions.length > 0);
+  const showGenericSourceRefs = !isSelectedSpecificNode && badge.sourceRefs.length > 0;
+  const showGenericRelatedBadges = !["compact_observation", "ask_checkpoint", "answer_snapshot", "live_output", "voice_output"].includes(badge.kind) &&
+    (relatedEdges.length > 0 || relatedBadges.length > 0);
 
   return (
-    <aside className="min-h-0 overflow-y-auto rounded-md border border-slate-800 bg-slate-950/75 p-4">
+    <aside
+      className="min-h-0 overflow-y-auto rounded-md border border-slate-800 bg-slate-950/75 p-4"
+      data-testid={inspectorTestIdForBadge(badge)}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-lg font-semibold text-slate-50">{badge.title}</div>
@@ -2074,6 +2362,196 @@ function Inspector({
           <p>{badge.plainMeaning}</p>
           <p className="mt-2 text-xs text-slate-400">{badge.whyItMatters}</p>
         </Section>
+
+        {badge.kind === "compact_observation" ? (
+          <>
+            <Section title="Evidence Refs">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No evidence refs recorded.</span>}
+              </div>
+            </Section>
+            <Section title="Audit Links">
+              <div className="space-y-2 text-xs">
+                {badge.dataTray?.summary ? (
+                  <div className="rounded border border-slate-800 bg-black/20 p-2 text-slate-300">
+                    {badge.dataTray.summary}
+                  </div>
+                ) : null}
+                {matchingObserverSources.length > 0 ? matchingObserverSources.map((source) => (
+                  <div key={`${source.sourceId}:audit`} className="rounded border border-slate-800 bg-black/20 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-semibold text-slate-100">{labelize(source.modality)}</span>
+                      <Badge variant="outline" className={statusTone(source.status === "active" ? "observed" : source.status === "configured_missing" ? "missing_evidence" : source.status)}>
+                        {labelize(source.status)}
+                      </Badge>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onOpenSourceAudit(source, "source_evidence")}
+                        className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                      >
+                        Review source evidence
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSourceAudit(source, "compact_observation")}
+                        className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                      >
+                        Open compact observation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSourceAudit(source, "raw_buffer")}
+                        className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+                      >
+                        Open raw buffer preview
+                      </button>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded border border-slate-800 bg-black/20 p-2 text-slate-500">
+                    No routed source matched this compact observation yet.
+                  </div>
+                )}
+              </div>
+            </Section>
+          </>
+        ) : null}
+
+        {badge.kind === "procedural_binding" ? (
+          <>
+            <Section title="Expression">
+              <div className="rounded border border-slate-800 bg-black/30 p-2 font-mono text-xs text-cyan-100">
+                {expression || "No procedural expression for this badge."}
+              </div>
+            </Section>
+            <Section title="Supporting Badges">
+              <div className="space-y-2">
+                {relatedEdges.map((edge) => (
+                  <div key={edge.id} className="rounded border border-slate-800 bg-black/20 p-2 text-xs">
+                    <div className="flex items-center gap-2 text-slate-200">
+                      <Link2 className="h-3.5 w-3.5 text-slate-500" />
+                      {labelize(edge.relation)}: {edge.label}
+                    </div>
+                  </div>
+                ))}
+                {relatedBadges.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {relatedBadges.map((related) => (
+                      <Badge key={related.id} variant="outline" className="border-slate-700 text-slate-300">
+                        {related.title}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500">No supporting badge edges recorded.</span>
+                )}
+              </div>
+            </Section>
+          </>
+        ) : null}
+
+        {badge.kind === "ask_checkpoint" ? (
+          <>
+            <Section title="Ask Prompt">
+              <div className="space-y-2 text-xs">
+                <div>Turn id: <span className="font-mono text-slate-200">{badge.checkpoint?.askTurnId ?? "none"}</span></div>
+                <div className="rounded border border-slate-800 bg-black/20 p-2 text-slate-500">
+                  Raw prompt text is not embedded in the Stage Play graph; use the Ask turn/debug refs for audit.
+                </div>
+              </div>
+            </Section>
+            <Section title="Tool Observation">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No tool observation refs recorded.</span>}
+              </div>
+            </Section>
+            <Section title="Solver / Debug Status">
+              <div className="space-y-2 text-xs">
+                <div>Model reviewed: <span className="font-mono text-slate-200">{badge.checkpoint?.modelReviewed ? "yes" : "no"}</span></div>
+                <div>Solver trace: <span className="font-mono text-slate-200">{badge.checkpoint?.solverTraceRef ?? "none"}</span></div>
+                <div>Terminal artifact: <span className="font-mono text-slate-200">{badge.checkpoint?.terminalArtifactKind ?? "none"}</span></div>
+                <div>Final answer source: <span className="font-mono text-slate-200">{badge.checkpoint?.finalAnswerSource ?? "none"}</span></div>
+                <div className="flex flex-wrap gap-1">
+                  {badge.reasonCodes.map((code) => (
+                    <Badge key={code} variant="outline" className="border-slate-700 text-slate-300">{code}</Badge>
+                  ))}
+                </div>
+              </div>
+            </Section>
+          </>
+        ) : null}
+
+        {badge.kind === "answer_snapshot" ? (
+          <>
+            <Section title="Upheld Answer">
+              <div className="rounded border border-slate-800 bg-black/30 p-2 text-sm leading-relaxed text-slate-100">
+                {badge.output?.text ?? badge.dataTray?.summary ?? "No upheld answer text recorded."}
+              </div>
+            </Section>
+            <Section title="Source Refs">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No answer source refs recorded.</span>}
+              </div>
+            </Section>
+          </>
+        ) : null}
+
+        {badge.kind === "live_output" || badge.kind === "voice_output" ? (
+          <>
+            <Section title="Projection State">
+              <div className="space-y-2 text-xs">
+                <div>Line key: <span className="font-mono text-slate-200">{badge.output?.lineKey ?? "none"}</span></div>
+                <div>State: <span className="font-mono text-slate-200">{badge.output?.state ?? "draft"}</span></div>
+                <div>Voice eligible: <span className="font-mono text-slate-200">{badge.output?.voiceEligible ? "yes" : "no"}</span></div>
+              </div>
+            </Section>
+            <Section title="Voice Boundary">
+              <div className="space-y-2 text-xs">
+                <div>
+                  Answer snapshot citation:{" "}
+                  <span className="font-mono text-slate-200">{citedAnswerSnapshot?.id ?? "missing"}</span>
+                </div>
+                {voiceBoundaryPassed ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-2 rounded border border-emerald-700 bg-emerald-950/30 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
+                    data-testid="stage-play-speak-reviewed-answer"
+                  >
+                    <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    Speak reviewed answer
+                  </button>
+                ) : (
+                  <div
+                    className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-amber-100"
+                    data-testid="stage-play-voice-boundary-locked"
+                  >
+                    Voice locked until this output cites a model-reviewed answer snapshot. Raw Stage Play projections and Observer refs cannot speak.
+                  </div>
+                )}
+              </div>
+            </Section>
+            <Section title="Output Text">
+              <div className="rounded border border-slate-800 bg-black/30 p-2 text-sm leading-relaxed text-slate-100">
+                {badge.output?.text ?? badge.dataTray?.summary ?? "No output text projected yet."}
+              </div>
+            </Section>
+            <Section title="Source Refs">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No output source refs recorded.</span>}
+              </div>
+            </Section>
+          </>
+        ) : null}
 
         {badge.kind === "observer" ? (
           <>
@@ -2480,6 +2958,7 @@ function Inspector({
           </Section>
         ) : null}
 
+        {showGenericLiveBindings ? (
         <Section title="Live Bindings">
           {badge.liveBindings.length > 0 ? (
             <div className="space-y-2">
@@ -2502,7 +2981,9 @@ function Inspector({
             <span className="text-slate-500">No live binding attached to this badge.</span>
           )}
         </Section>
+        ) : null}
 
+        {showAffordanceSection ? (
         <Section title="Affordance / Blocked Move">
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline" className="border-slate-700 text-slate-300">
@@ -2515,7 +2996,9 @@ function Inspector({
             ) : null}
           </div>
         </Section>
+        ) : null}
 
+        {showIntentSection ? (
         <Section title="Intent Module">
           {badge.intentModule ? (
             <div className="space-y-2 text-xs">
@@ -2531,13 +3014,17 @@ function Inspector({
             <span className="text-slate-500">No intent verb is attached to this badge.</span>
           )}
         </Section>
+        ) : null}
 
+        {!isSelectedSpecificNode && badge.kind !== "procedural_binding" ? (
         <Section title="Procedural Binding">
           <div className="rounded border border-slate-800 bg-black/30 p-2 font-mono text-xs text-cyan-100">
             {expression || "No procedural expression for this badge."}
           </div>
         </Section>
+        ) : null}
 
+        {showMissingEvidenceSection ? (
         <Section title="Missing Evidence">
           {badge.missingEvidence.length > 0 ? (
             <ul className="list-inside list-disc space-y-1 text-xs text-amber-100">
@@ -2547,7 +3034,9 @@ function Inspector({
             <span className="text-slate-500">No missing evidence recorded.</span>
           )}
         </Section>
+        ) : null}
 
+        {showAdmissionSection ? (
         <Section title="Admission">
           <div className="space-y-2 text-xs">
             <div>Badge admission: <span className="font-mono text-slate-200">{badge.admission ?? "none"}</span></div>
@@ -2569,7 +3058,9 @@ function Inspector({
             ))}
           </div>
         </Section>
+        ) : null}
 
+        {showGenericSourceRefs ? (
         <Section title="Source Refs">
           <div className="space-y-1 font-mono text-xs text-slate-400">
             {badge.sourceRefs.length > 0 ? badge.sourceRefs.map((ref) => (
@@ -2577,7 +3068,9 @@ function Inspector({
             )) : <span>No source refs.</span>}
           </div>
         </Section>
+        ) : null}
 
+        {showGenericRelatedBadges ? (
         <Section title="Related Badges">
           <div className="space-y-2">
             {relatedEdges.map((edge) => (
@@ -2599,6 +3092,7 @@ function Inspector({
             ) : null}
           </div>
         </Section>
+        ) : null}
       </div>
     </aside>
   );
@@ -2777,9 +3271,10 @@ export default function StagePlayBadgeGraphPanel() {
     toggleSelectedBadgeId(badgeId);
     if (badge?.kind === "observer") {
       setActiveFilterKind("observer");
-      setBindingOverlayOpen(false);
+      setBindingOverlayOpen(true);
     } else if (badge?.kind) {
       setActiveFilterKind(badge.kind);
+      setBindingOverlayOpen(true);
     }
   }
   const relatedEdges = useMemo(
@@ -3403,6 +3898,11 @@ export default function StagePlayBadgeGraphPanel() {
             rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
             onOpenSourceAudit={openSourceAudit}
             onClearRawSessionBuffer={clearRawSessionBuffer}
+            onClearSelectedBadge={() => {
+              setSelectedBadgeId(null);
+              setSelectedBadgeIds([]);
+              setActiveFilterKind(null);
+            }}
             onClose={() => setBindingOverlayOpen(false)}
           />
         ) : null}
@@ -3437,75 +3937,6 @@ export default function StagePlayBadgeGraphPanel() {
               />
             ) : null;
           })()
-        ) : null}
-
-        {selectedBadge && (selectedBadge.kind === "observer" || selectedBadge.kind === "source" || selectedBadge.id === "interpreter.stage_play_reflection") ? (
-          <aside
-            className={`absolute right-3 top-3 z-40 max-h-[calc(100%-1.5rem)] w-[380px] overflow-y-auto rounded-md border bg-slate-950/95 p-2 shadow-2xl ${
-              selectedBadge.kind === "observer"
-                ? "border-amber-800/80"
-                : selectedBadge.kind === "source"
-                  ? "border-sky-800/80"
-                  : "border-fuchsia-800/80"
-            }`}
-            data-testid={
-              selectedBadge.kind === "observer"
-                ? "stage-play-observer-node-controls"
-                : selectedBadge.kind === "source"
-                  ? "stage-play-source-node-controls"
-                  : "stage-play-interpreter-node-controls"
-            }
-          >
-            <div className="mb-2 flex items-center justify-between gap-2 px-1">
-              <div className={`text-xs font-semibold uppercase tracking-wide ${
-                selectedBadge.kind === "observer"
-                  ? "text-amber-100"
-                  : selectedBadge.kind === "source"
-                    ? "text-sky-100"
-                    : "text-fuchsia-100"
-              }`}>
-                {selectedBadge.kind === "observer"
-                  ? "Observer node controls"
-                  : selectedBadge.kind === "source"
-                    ? "Source node controls"
-                    : "Interpreter node controls"}
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedBadgeId(null)}
-                className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:border-slate-500"
-                aria-label={
-                  selectedBadge.kind === "observer"
-                    ? "Close Observer node controls"
-                    : selectedBadge.kind === "source"
-                      ? "Close Source node controls"
-                      : "Close Interpreter node controls"
-                }
-              >
-                Close
-              </button>
-            </div>
-            <Inspector
-              badge={selectedBadge}
-              relatedEdges={relatedEdges}
-              relatedBadges={relatedBadges}
-              relatedActions={relatedActions}
-              observerSources={graph.sourceWindow.sources}
-              onObserverDraftAction={handleObserverDraftAction}
-              sourceSetupCadenceMs={sourceSetupCadenceMs}
-              sourceSetupStatus={sourceSetupStatus}
-              onSetSourceSetupCadenceMs={setSourceSetupCadenceMs}
-              onStartVisualSourceSetup={startVisualSourceSetup}
-              onAttachAudioTranscriptSource={attachAudioTranscriptSource}
-              onPauseVisualSourceSetup={pauseVisualSourceSetup}
-              onProjectLiveAnswer={handleProjectLiveAnswer}
-              sourceAuditSelection={sourceAuditSelection}
-              rawSessionBufferEntries={rawSessionBufferQuery.data?.entries ?? []}
-              rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
-              onOpenSourceAudit={openSourceAudit}
-              onClearRawSessionBuffer={clearRawSessionBuffer}
-            />
-          </aside>
         ) : null}
 
         <main className="flex h-full min-h-0 flex-col">

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { HelixRepoCodeEvidenceObservation } from "@shared/helix-repo-code-evidence-observation";
 import {
   findRepoConceptAliasEntry,
@@ -36,6 +38,9 @@ export type HelixRepoDocsSynthesisViolation =
   | "unsupported_repo_claim"
   | "wrong_model_step_identity"
   | "policy_claim_inversion"
+  | "exact_section_evidence_missing"
+  | "missing_exact_section_terms"
+  | "unsupported_exact_section_terms"
   | "shallow_broad_concept_answer"
   | "missing_broad_concept_coverage"
   | "insufficient_evidence_role_coverage";
@@ -73,6 +78,14 @@ export type HelixRepoDocsSynthesisPacket = {
     required_coverage_points: HelixRepoDocsAnswerCoveragePoint[];
     required_evidence_roles: RepoConceptEvidenceRole[];
     guidance: string;
+  };
+  exact_section_contract?: {
+    contract_kind: "field_list";
+    requested_path?: string;
+    requested_heading?: string;
+    required_terms: string[];
+    evidence_refs: string[];
+    evidence_missing: boolean;
   };
   compact_evidence: Array<{
     ref: string;
@@ -116,6 +129,123 @@ const clip = (value: unknown, max = 620): string => {
 };
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const normalizePath = (value: string): string =>
+  value.replace(/\\/g, "/").replace(/^\.\/+/, "").replace(/[.,;:!?]+$/g, "").trim().toLowerCase();
+
+const promptPathHint = (promptText: string): string | undefined => {
+  const match = promptText.match(/\b((?:docs|server|client|shared|README)\b[^\s"',)]*)/i);
+  return match?.[1] ? normalizePath(match[1]) : undefined;
+};
+
+const promptHeadingHint = (promptText: string): string | undefined => {
+  const quotedHeading = promptText.match(/\bheading\s+["']([^"']{3,120})["']/i)?.[1];
+  if (quotedHeading) return quotedHeading.trim();
+  const afterHeading = promptText.match(/\bheading\s+([A-Z][A-Za-z0-9 /_-]{3,120})(?:\.|,|\?|$)/)?.[1];
+  return afterHeading?.trim();
+};
+
+const exactFieldListPrompt = (promptText: string): boolean =>
+  /\b(?:list|what|which|find)\b[\s\S]{0,180}\b(?:required\s+fields?|fields?\s+under|loop\s+fields?)\b/i.test(promptText) ||
+  /\brequired\s+fields?\b/i.test(promptText);
+
+const extractSnakeTerms = (text: string): string[] =>
+  unique((text.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? []))
+    .filter((term) => term.length >= 5)
+    .slice(0, 40);
+
+const buildExactSectionContract = (input: {
+  promptText: string;
+  evidence: HelixRepoDocsSynthesisPacket["compact_evidence"];
+}): HelixRepoDocsSynthesisPacket["exact_section_contract"] | undefined => {
+  if (!exactFieldListPrompt(input.promptText)) return undefined;
+  const requestedPath = promptPathHint(input.promptText);
+  const requestedHeading = promptHeadingHint(input.promptText);
+  const headingNeedle = requestedHeading?.toLowerCase();
+  const candidates = input.evidence.filter((entry) => {
+    const pathOk = requestedPath ? normalizePath(entry.path).includes(requestedPath) : true;
+    const headingOk = headingNeedle ? entry.excerpt.toLowerCase().includes(headingNeedle) : true;
+    return pathOk && headingOk;
+  });
+  const fallbackCandidates = candidates.length > 0
+    ? candidates
+    : input.evidence.filter((entry) => requestedPath ? normalizePath(entry.path).includes(requestedPath) : true);
+  const requiredTerms = unique(fallbackCandidates.flatMap((entry) => extractSnakeTerms(entry.excerpt)));
+  if (!requestedPath && !requestedHeading && requiredTerms.length === 0) return undefined;
+  return {
+    contract_kind: "field_list",
+    requested_path: requestedPath,
+    requested_heading: requestedHeading,
+    required_terms: requiredTerms,
+    evidence_refs: fallbackCandidates.map((entry) => entry.ref),
+    evidence_missing: requiredTerms.length === 0,
+  };
+};
+
+const safeRepoRelativePath = (value: string | undefined): string | null => {
+  if (!value) return null;
+  const normalized = normalizePath(value);
+  if (!/^(?:docs|server|client|shared|README)(?:\/|\.|$)/i.test(normalized)) return null;
+  if (normalized.includes("..") || path.isAbsolute(normalized)) return null;
+  return normalized;
+};
+
+const readExactHeadingSection = (input: {
+  requestedPath?: string;
+  requestedHeading?: string;
+}): HelixRepoDocsSynthesisPacket["compact_evidence"][number] | null => {
+  const repoPath = safeRepoRelativePath(input.requestedPath);
+  if (!repoPath || !input.requestedHeading) return null;
+  const root = process.cwd();
+  const absolutePath = path.resolve(root, repoPath);
+  if (!absolutePath.toLowerCase().startsWith(path.resolve(root).toLowerCase())) return null;
+  if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) return null;
+  const lines = fs.readFileSync(absolutePath, "utf8").split(/\r?\n/);
+  const escapedHeading = input.requestedHeading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const headingRe = new RegExp(`^(#{1,6})\\s+${escapedHeading}\\s*$`, "i");
+  const startIndex = lines.findIndex((line) => headingRe.test(line.trim()));
+  if (startIndex < 0) return null;
+  const headingLevel = lines[startIndex]?.trim().match(/^(#{1,6})/)?.[1]?.length ?? 6;
+  let endIndex = lines.length;
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const heading = lines[index]?.trim().match(/^(#{1,6})\s+\S/);
+    if (heading && heading[1].length <= headingLevel) {
+      endIndex = index;
+      break;
+    }
+  }
+  const sectionLines = lines.slice(startIndex, endIndex);
+  const excerpt = sectionLines.join("\n").trim();
+  if (!excerpt) return null;
+  const ref = `${repoPath}:${startIndex + 1}-${endIndex}`;
+  return {
+    ref,
+    path: repoPath,
+    source_kind: "repo_doc",
+    role: "definition",
+    excerpt: excerpt.length > 1600 ? `${excerpt.slice(0, 1599).trim()}...` : excerpt,
+    why_relevant: `Exact heading section "${input.requestedHeading}" from ${repoPath}.`,
+  };
+};
+
+const supplementExactSectionEvidence = (input: {
+  promptText: string;
+  evidence: HelixRepoDocsSynthesisPacket["compact_evidence"];
+  maxEvidenceItems: number;
+}): HelixRepoDocsSynthesisPacket["compact_evidence"] => {
+  if (!exactFieldListPrompt(input.promptText)) return input.evidence;
+  const requestedPath = promptPathHint(input.promptText);
+  const requestedHeading = promptHeadingHint(input.promptText);
+  const contract = buildExactSectionContract({
+    promptText: input.promptText,
+    evidence: input.evidence,
+  });
+  if (contract && contract.required_terms.length > 0) return input.evidence;
+  const exactEvidence = readExactHeadingSection({ requestedPath, requestedHeading });
+  if (!exactEvidence) return input.evidence;
+  const withoutDuplicate = input.evidence.filter((entry) => entry.ref !== exactEvidence.ref);
+  return [exactEvidence, ...withoutDuplicate].slice(0, Math.max(1, input.maxEvidenceItems));
+};
 
 const artifactPayload = (artifact: ArtifactLike): RecordLike | null => readRecord(artifact.payload);
 
@@ -262,7 +392,16 @@ export function buildRepoDocsSynthesisPacket(input: {
       if (!byRef.has(evidence.ref)) byRef.set(evidence.ref, evidence);
     }
   }
-  const compactEvidence = selectRoleDiverseEvidence(Array.from(byRef.values()), maxEvidenceItems);
+  let compactEvidence = selectRoleDiverseEvidence(Array.from(byRef.values()), maxEvidenceItems);
+  compactEvidence = supplementExactSectionEvidence({
+    promptText: input.promptText,
+    evidence: compactEvidence,
+    maxEvidenceItems,
+  });
+  const exactSectionContract = buildExactSectionContract({
+    promptText: input.promptText,
+    evidence: compactEvidence,
+  });
   const files = unique(compactEvidence.map((entry) => entry.path));
   const hasCodeEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_code" || /\.(?:ts|tsx|js|jsx|py)$/i.test(entry.path));
   const hasDocEvidence = compactEvidence.some((entry) => entry.source_kind === "repo_doc" || /\.(?:md|mdx|txt)$/i.test(entry.path));
@@ -317,6 +456,7 @@ export function buildRepoDocsSynthesisPacket(input: {
       required_evidence_roles: requiredEvidenceRoles,
       guidance: answerDepthGuidance,
     },
+    ...(exactSectionContract ? { exact_section_contract: exactSectionContract } : {}),
     compact_evidence: compactEvidence,
     evidence_summary: {
       files_considered: files.length,
@@ -336,6 +476,9 @@ export function buildRepoDocsSynthesisPacket(input: {
       "Preserve authority claims exactly: receipts are observations/supporting artifacts, not final-answer authority.",
       "Do not claim evidence is missing when compact_evidence is non-empty.",
       "Use compact refs from compact_evidence as support_refs for terminal authority.",
+      exactSectionContract
+        ? "For exact section field-list questions, copy only required_terms from exact_section_contract; do not invent field names, aliases, or adjacent contract labels."
+        : "",
       citationInstruction,
       dottieInstruction,
       input.routeFamily === "repo_evidence"
@@ -433,6 +576,17 @@ export function buildRepoDocsSynthesisRepairInstruction(input: {
   if (violations.has("policy_claim_inversion")) {
     return `${prefix}${common}${evidenceSentence} The previous answer inverted an authority rule. Preserve this doctrine when supported by evidence: receipts/tool outputs are observations or support, while final answers require model synthesis and terminal authority.`;
   }
+  if (
+    violations.has("exact_section_evidence_missing") ||
+    violations.has("missing_exact_section_terms") ||
+    violations.has("unsupported_exact_section_terms")
+  ) {
+    const terms = input.packet?.exact_section_contract?.required_terms.join(", ");
+    const termSentence = terms
+      ? ` The exact section requires these terms: ${terms}.`
+      : "";
+    return `${prefix}${common}${evidenceSentence}${termSentence} The previous answer did not stay bound to the requested section. Rewrite from the exact heading/path evidence only, include every required field term, and remove any invented field names or adjacent contract labels.`;
+  }
   if (violations.has("missing_support_refs")) {
     return `${prefix}${common}${evidenceSentence} The previous answer lacked support refs; attach refs from the synthesis packet.`;
   }
@@ -465,6 +619,13 @@ export function repoDocsSynthesisTerminalErrorCode(input: {
   }
   if (input.status === "unsupported_claims") return `repo_docs_synthesis_refusal_after_evidence${suffix}`;
   if (violations.has("policy_claim_inversion")) return `repo_docs_synthesis_policy_claim_inversion${suffix}`;
+  if (
+    violations.has("exact_section_evidence_missing") ||
+    violations.has("missing_exact_section_terms") ||
+    violations.has("unsupported_exact_section_terms")
+  ) {
+    return `repo_docs_synthesis_exact_section_mismatch${suffix}`;
+  }
   if (
     violations.has("shallow_broad_concept_answer") ||
     violations.has("missing_broad_concept_coverage") ||

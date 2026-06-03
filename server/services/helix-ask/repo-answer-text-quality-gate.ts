@@ -19,6 +19,9 @@ export type HelixRepoAnswerTextQualityGate = {
     | "exact_evidence_not_selected"
     | "codebase_anchor_ignored"
     | "alias_not_normalized"
+    | "exact_section_evidence_missing"
+    | "missing_exact_section_terms"
+    | "unsupported_exact_section_terms"
     | "shallow_broad_concept_answer"
     | "missing_broad_concept_coverage"
     | "insufficient_evidence_role_coverage"
@@ -41,6 +44,10 @@ const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const snakeTerms = (text: string): string[] =>
+  unique(text.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? [])
+    .filter((term) => term.length >= 5);
 
 const wordCount = (text: string): number =>
   text.replace(/[^\w\s'-]/g, " ").split(/\s+/).filter(Boolean).length;
@@ -192,6 +199,37 @@ const hasModelSynthesis = (payload: RecordLike): boolean => {
   return readString(draft?.authority) === "llm_post_observation_composer" && hasRepoSynthesisStepIdentity(payload);
 };
 
+const exactSectionTermCoverage = (input: {
+  text: string;
+  payload: RecordLike;
+}): Array<
+  | "exact_section_evidence_missing"
+  | "missing_exact_section_terms"
+  | "unsupported_exact_section_terms"
+> => {
+  const packet = readRecord(input.payload.repo_docs_synthesis_packet);
+  const contract = readRecord(packet?.exact_section_contract);
+  if (readString(contract?.contract_kind) !== "field_list") return [];
+  const requiredTerms = unique(readArray(contract?.required_terms).map(readString).filter(Boolean));
+  if (contract?.evidence_missing === true || requiredTerms.length === 0) {
+    return ["exact_section_evidence_missing"];
+  }
+  const normalizedText = input.text.toLowerCase();
+  const missing = requiredTerms.filter((term) => !normalizedText.includes(term.toLowerCase()));
+  const allowed = new Set(requiredTerms.map((term) => term.toLowerCase()));
+  const unsupported = snakeTerms(input.text)
+    .map((term) => term.toLowerCase())
+    .filter((term) => !allowed.has(term));
+  const violations: Array<
+    | "exact_section_evidence_missing"
+    | "missing_exact_section_terms"
+    | "unsupported_exact_section_terms"
+  > = [];
+  if (missing.length > 0) violations.push("missing_exact_section_terms");
+  if (unsupported.length > 0) violations.push("unsupported_exact_section_terms");
+  return violations;
+};
+
 export function evaluateRepoAnswerTextQualityGate(input: {
   turnId: string;
   answerRef?: string | null;
@@ -210,6 +248,7 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
   if (collectSupportRefs(input.payload).length === 0) violations.push("missing_support_refs");
+  violations.push(...exactSectionTermCoverage({ text, payload: input.payload }));
   const synthesisPacket = readRecord(input.payload.repo_docs_synthesis_packet);
   const depthContract = readRecord(synthesisPacket?.answer_depth_contract);
   if (readString(depthContract?.depth_mode) === "internal_concept_overview") {

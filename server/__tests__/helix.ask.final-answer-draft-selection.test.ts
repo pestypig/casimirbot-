@@ -215,6 +215,79 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.repo_answer_text_quality_gate).toMatchObject({ ok: true });
   });
 
+  it("publishes a valid repo evidence answer instead of a stale continuation failure", () => {
+    const turnId = "ask:test:repo-draft-over-stale-continuation";
+    const draftText = "Helix Ask requires tool receipts to re-enter the solver as observations before terminal authority can select a visible answer.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:repo_obs`,
+        kind: "repo_code_evidence_observation",
+        payload: {
+          schema: "helix.repo_code_evidence_observation.v1",
+          evidence_refs: ["docs/helix-ask-codex-loop-discipline.md"],
+          spans: [{ ref: "docs/helix-ask-codex-loop-discipline.md:171" }],
+        },
+      },
+      {
+        artifact_id: `${turnId}:synthesis_attempt`,
+        kind: "repo_evidence_synthesis_attempt",
+        payload: {
+          schema: "helix.repo_evidence_synthesis_attempt.v1",
+          model_step_capability: "model.synthesize_from_repo_evidence",
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_repo_evidence",
+          artifact_refs: [`${turnId}:repo_obs`],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: repoContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "repo_code_evidence_question",
+        required_terminal_kind: "repo_code_evidence_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not complete this Ask turn because solver authority failed (poison_clean_but_authority_failed).",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "answer",
+      },
+    };
+    addRepoRuntimeProof(payload, `${turnId}:repo_obs`);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(result.visible_text).toBe(draftText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "typed_failure",
+          reason: "stale_solver_continuation_superseded_by_repo_terminal",
+        }),
+      ]),
+    );
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+  });
+
   it("rejects fallback-like final drafts as successful terminals", () => {
     const gate = evaluateFinalAnswerDraftQualityGate({
       turnId: "ask:test:fallback-draft",
