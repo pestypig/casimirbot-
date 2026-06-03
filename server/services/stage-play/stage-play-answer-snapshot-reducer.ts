@@ -229,6 +229,11 @@ const isModelAuthoredTerminal = (kind: string | null, source: string | null): bo
     (source && MODEL_AUTHORED_FINAL_SOURCES.has(source)),
   );
 
+const isStagePlayReceiptFallbackAnswerText = (value: string | null): boolean =>
+  /^(?:SOURCE:\s*DETERMINISTIC RECEIPT FALLBACK\s*)?Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b/i.test(
+    value ?? "",
+  );
+
 export function reduceStagePlayAnswerSnapshot(
   input: BuildStagePlayAnswerSnapshotInput,
 ): StagePlayAnswerSnapshotReducerOutput {
@@ -239,9 +244,10 @@ export function reduceStagePlayAnswerSnapshot(
   const terminalKind = terminalArtifactKind(debug, trace);
   const answerSource = finalAnswerSource(debug, trace);
   const answerText = selectedAnswerText(debug);
+  const fallbackReceiptText = isStagePlayReceiptFallbackAnswerText(answerText);
   const completedSolverPath = readBoolean(trace?.completed_solver_path) === true;
   const modelAuthored = isModelAuthoredTerminal(terminalKind, answerSource);
-  const hasAnswerText = Boolean(answerText);
+  const hasAnswerText = Boolean(answerText) && !fallbackReceiptText;
   const generatedAt = input.generatedAt ?? input.graph.generatedAt;
   const askRefs = uniqueStrings([
     turnId,
@@ -306,6 +312,7 @@ export function reduceStagePlayAnswerSnapshot(
     missingEvidence: modelReviewed ? [] : [
       !completedSolverPath ? "Completed Ask solver path is required." : null,
       !modelAuthored ? "A model-authored terminal artifact is required." : null,
+      fallbackReceiptText ? "Deterministic Stage Play receipt fallback is not an answer snapshot." : null,
       !hasAnswerText ? "Selected final answer text is required." : null,
       modelReviewedBeforeFreshness && !checkpointFreshness.fresh ? "A fresh checkpoint matching the current Stage Play source window is required." : null,
       ...checkpointFreshness.staleBecause,
@@ -460,12 +467,15 @@ export function reduceStagePlayAnswerSnapshot(
         missingEvidence: [
           "Completed Ask solver path",
           "Model-authored terminal artifact",
+          fallbackReceiptText ? "Deterministic Stage Play receipt fallback is not an answer snapshot." : null,
           "Selected final answer text",
           "Fresh checkpoint matching current source window",
-        ].filter((item) =>
+        ].filter((item): item is string => Boolean(item)).filter((item) =>
           item !== "Completed Ask solver path" || !completedSolverPath
         ).filter((item) =>
           item !== "Model-authored terminal artifact" || !modelAuthored
+        ).filter((item) =>
+          item !== "Deterministic Stage Play receipt fallback is not an answer snapshot." || fallbackReceiptText
         ).filter((item) =>
           item !== "Selected final answer text" || !hasAnswerText
         ).filter((item) =>
@@ -475,6 +485,7 @@ export function reduceStagePlayAnswerSnapshot(
           "stage_play_answer_snapshot_reducer",
           completedSolverPath ? "solver_path_completed" : "solver_path_missing",
           modelAuthored ? "model_authored_terminal_present" : "model_authored_terminal_missing",
+          fallbackReceiptText ? "receipt_fallback_text_rejected" : "receipt_fallback_text_absent",
           hasAnswerText ? "answer_text_present" : "answer_text_missing",
           `checkpoint_freshness_${checkpointFreshness.reason}`,
         ],

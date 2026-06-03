@@ -234,4 +234,35 @@ describe("Stage Play checkpoint queue", () => {
       status: "completed",
     });
   });
+
+  it("completes by exact checkpoint request id even when the graph id has shifted", () => {
+    const graph = graphFixture();
+    const manual = enqueueManualStagePlayCheckpointRequest({
+      jobId: "stage_play_job:queue",
+      graph,
+      objective: "Checkpoint after Observer route changes.",
+      userPromptRef: "user_prompt:queue",
+      now: "2026-06-03T10:01:02.000Z",
+    });
+    applyStagePlayCheckpointQueueAction({
+      jobId: "stage_play_job:queue",
+      action: "run",
+      checkpointRequestId: manual.checkpointRequestId,
+      now: "2026-06-03T10:01:03.000Z",
+    });
+
+    const completion = completeStagePlayCheckpointRequestForGraph({
+      graphId: "stage_play_badge_graph:route-shifted",
+      checkpointRequestId: manual.checkpointRequestId,
+      now: "2026-06-03T10:01:04.000Z",
+    });
+
+    expect(completion).toMatchObject({
+      ok: true,
+      request: expect.objectContaining({
+        checkpointRequestId: manual.checkpointRequestId,
+        status: "completed",
+      }),
+    });
+  });
 });

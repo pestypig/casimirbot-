@@ -8,6 +8,7 @@ export type HelixCapabilityFamily =
   | "visual_capture"
   | "procedure_memory"
   | "repo_evidence"
+  | "scholarly_research"
   | "process_graph"
   | "debug_export"
   | "subagent_runtime_adapter";

@@ -70,6 +70,69 @@ describe("Helix Ask Stage Play routing", () => {
     });
   });
 
+  it("answers Stage Play panel concept questions from repo/product evidence instead of live environment state", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "ok what is the stage play panel?",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      canonical: response.body?.canonical_goal_frame,
+      sourceTarget: response.body?.source_target_intent,
+      evidenceTargetArbitration: response.body?.evidence_target_arbitration,
+      availableCapabilities: response.body?.available_capabilities,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      terminalArtifactKind: response.body?.terminal_artifact_kind,
+      finalAnswerSource: response.body?.final_answer_source,
+    }, null, 2);
+
+    expect(response.body?.evidence_target_arbitration, routeDebug).toMatchObject({
+      schema: "helix.ask_evidence_target_arbitration.v1",
+      selected_target_source: "repo_code",
+      selected_target_kind: "repo_code",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body?.evidence_target_arbitration?.evidence_target_candidates, routeDebug).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          target_source: "repo_code",
+          capability_keys: expect.arrayContaining(["repo-code.search_concept"]),
+        }),
+        expect.objectContaining({
+          target_source: "live_environment",
+          reason_codes: expect.arrayContaining(["stage_play_lexical_candidate_only"]),
+        }),
+      ]),
+    );
+    expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
+      goal_kind: "repo_entity_definition",
+      required_terminal_kind: "repo_code_evidence_answer",
+    });
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("repo-code.search_concept");
+    expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+      iteration?.chosen_capability === "repo-code.search_concept"
+    ), routeDebug).toBe(true);
+    expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
+      String(iteration?.chosen_capability ?? "").startsWith("live_env.")
+    ), routeDebug).toBe(false);
+    expect(response.body?.terminal_artifact_kind, routeDebug).toBe("repo_code_evidence_answer");
+    expect(response.body?.answer, routeDebug).toMatch(/Stage Play|stage_play|Badge Graph/i);
+    expect(response.body?.answer, routeDebug).not.toMatch(/currently not accessible|absence of a live answer environment/i);
+  }, 60_000);
+
   it("plans a Stage Play visual prediction job instead of treating attach as live-source control", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")

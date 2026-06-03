@@ -26,6 +26,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "situation_epoch",
   "visual_scene_memory",
   "repo_code",
+  "scholarly_research",
   "runtime_evidence",
   "docs_viewer",
   "active_doc",
@@ -118,6 +119,33 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
     reason = "docs_viewer_requires_document_tool_path";
+  } else if (sourceTarget === "scholarly_research") {
+    admittedToolFamilies = ["scholarly_research"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "no_tool_direct",
+      "model_only_concept",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "active_doc_identity",
+      "doc_open_receipt",
+      "doc_summary",
+      "doc_location_result",
+      "repo_code_evidence_answer",
+      "repo_entity_definition",
+    ];
+    extraForbiddenRoutes = [
+      "active_doc_identity",
+      "active_doc_summary",
+      "doc_open_best",
+      "repo_code_evidence_question",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    reason = "scholarly_research_requires_external_paper_evidence_path";
   } else if (
     sourceTarget === "unknown" &&
     /\b(?:open|show|pull\s+up|bring\s+up)\b[\s\S]{0,120}\b(?:docs?|docks|document|white\s*paper|whitepaper|paper)\b/i.test(promptText)

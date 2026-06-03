@@ -142,7 +142,7 @@ describe("live_env.reflect_stage_play_context", () => {
         }),
       ],
       checkpointPolicy: {
-        triggerOnFirstObservation: false,
+        triggerOnFirstObservation: true,
         triggerOnSceneChange: true,
         triggerOnPredictionHorizonExpired: true,
         minMsSinceLastCheckpoint: 15_000,

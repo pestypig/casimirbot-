@@ -7,6 +7,7 @@ export type HelixToolCallAdmissionFamily =
   | "visual_scene_memory"
   | "docs_viewer"
   | "repo_code"
+  | "scholarly_research"
   | "runtime_evidence"
   | "live_environment"
   | "live_pipeline"

@@ -7064,6 +7064,34 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
   return null;
 }
 
+export type HelixAskFinalAnswerPresentation = {
+  heading: "Final answer" | "Checkpoint receipt";
+  sourceLabel: string | null;
+  isDeterministicReceiptFallback: boolean;
+};
+
+export function isHelixAskDeterministicReceiptFallbackLabel(value: unknown): boolean {
+  return /^deterministic[\s_-]+receipt[\s_-]+fallback$/i.test(coerceText(value).trim());
+}
+
+export function resolveHelixAskFinalAnswerPresentation(
+  sourceLabel: string | null | undefined,
+): HelixAskFinalAnswerPresentation {
+  if (isHelixAskDeterministicReceiptFallbackLabel(sourceLabel)) {
+    return {
+      heading: "Checkpoint receipt",
+      sourceLabel: "checkpoint receipt (not reviewed)",
+      isDeterministicReceiptFallback: true,
+    };
+  }
+  const normalized = coerceText(sourceLabel).trim();
+  return {
+    heading: "Final answer",
+    sourceLabel: normalized || null,
+    isDeterministicReceiptFallback: false,
+  };
+}
+
 function resolveHelixAskVisibleTerminal(value: unknown, fallbackContent?: string | null): HelixAskVisibleTerminalResolution {
   const terminal = resolveHelixVisibleTerminalCore(value, fallbackContent);
   return {
@@ -7822,6 +7850,140 @@ function readStagePlayLedgerRecordArray(value: unknown): Record<string, unknown>
 
 function uniqueStagePlayLedgerStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+export type LiveAnswerTurnBridgeTone = "cyan" | "amber" | "emerald" | "slate";
+
+export type LiveAnswerTurnBridgePill = {
+  label: string;
+  tone: LiveAnswerTurnBridgeTone;
+};
+
+export type LiveAnswerTurnBridgeState = {
+  title: string;
+  detail: string;
+  meta: string;
+  tone: LiveAnswerTurnBridgeTone;
+  evidenceRefs: string[];
+  pills: LiveAnswerTurnBridgePill[];
+  status:
+    | "answer_snapshot_ready"
+    | "checkpoint_queued"
+    | "checkpoint_waiting"
+    | "receipt_fallback"
+    | "live_state_available";
+};
+
+export function buildLiveAnswerTurnBridgeState({
+  hasLiveState,
+  stagePlayEvents,
+  finalAnswerPresentation,
+}: {
+  hasLiveState: boolean;
+  stagePlayEvents: StagePlayChatLedgerEvent[];
+  finalAnswerPresentation: HelixAskFinalAnswerPresentation;
+}): LiveAnswerTurnBridgeState | null {
+  const evidenceRefs = uniqueStagePlayLedgerStrings(stagePlayEvents.flatMap((event) => event.evidenceRefs));
+  const checkpointRequest = stagePlayEvents.find((event) => event.kind === "checkpoint_request") ?? null;
+  const askCheckpoint = stagePlayEvents.find((event) => event.kind === "ask_checkpoint") ?? null;
+  const answerSnapshot = stagePlayEvents.find((event) => event.kind === "answer_snapshot") ?? null;
+  const liveOutput = stagePlayEvents.find((event) => event.kind === "live_output") ?? null;
+  const modelReviewed =
+    askCheckpoint?.status === "model_reviewed" ||
+    Boolean(answerSnapshot && !/\b(?:missing|stale|invalid|not_reviewed)\b/i.test(answerSnapshot.status ?? ""));
+  const checkpointPill: LiveAnswerTurnBridgePill = modelReviewed
+    ? { label: "checkpoint reviewed", tone: "emerald" }
+    : checkpointRequest
+      ? { label: "checkpoint queued", tone: "amber" }
+      : { label: "checkpoint waiting", tone: "slate" };
+  const snapshotPill: LiveAnswerTurnBridgePill = modelReviewed
+    ? { label: "snapshot reviewed", tone: "emerald" }
+    : { label: "snapshot pending", tone: "slate" };
+  const voicePill: LiveAnswerTurnBridgePill = modelReviewed
+    ? { label: "voice snapshot-bound", tone: "emerald" }
+    : { label: "voice waiting", tone: "slate" };
+  const pills: LiveAnswerTurnBridgePill[] = [
+    { label: liveOutput || hasLiveState ? "live evidence" : "no live evidence", tone: hasLiveState ? "cyan" : "slate" },
+    checkpointPill,
+    snapshotPill,
+    voicePill,
+  ];
+
+  if (modelReviewed) {
+    return {
+      title: "Answer snapshot ready",
+      detail: "Live state was consumed by a model-reviewed checkpoint; terminal answer and voice lanes can bind to that snapshot.",
+      meta: `refs ${evidenceRefs.length} | ${answerSnapshot?.meta ?? askCheckpoint?.meta ?? "checkpoint reviewed"}`,
+      tone: "emerald",
+      evidenceRefs,
+      pills,
+      status: "answer_snapshot_ready",
+    };
+  }
+
+  if (checkpointRequest) {
+    return {
+      title: "Checkpoint queued",
+      detail: clipText(checkpointRequest.detail, 240),
+      meta: `refs ${evidenceRefs.length} | ${checkpointRequest.meta}`,
+      tone: "amber",
+      evidenceRefs,
+      pills,
+      status: "checkpoint_queued",
+    };
+  }
+
+  if (askCheckpoint?.status === "missing_evidence") {
+    return {
+      title: "Waiting for model-reviewed checkpoint",
+      detail: clipText(askCheckpoint.detail, 240),
+      meta: `refs ${evidenceRefs.length} | ${askCheckpoint.meta}`,
+      tone: "slate",
+      evidenceRefs,
+      pills,
+      status: "checkpoint_waiting",
+    };
+  }
+
+  if (finalAnswerPresentation.isDeterministicReceiptFallback) {
+    return {
+      title: "Receipt fallback is evidence",
+      detail: "A deterministic receipt was produced for this turn; it is displayed as checkpoint bridge material until Ask creates a reviewed answer snapshot.",
+      meta: `refs ${evidenceRefs.length} | not reviewed`,
+      tone: "amber",
+      evidenceRefs,
+      pills,
+      status: "receipt_fallback",
+    };
+  }
+
+  if (hasLiveState || stagePlayEvents.length > 0) {
+    return {
+      title: "Live state available",
+      detail: "Live interpretation lanes are present for this turn; no reviewed answer snapshot has been emitted yet.",
+      meta: `refs ${evidenceRefs.length} | ${liveOutput?.meta ?? "staging"}`,
+      tone: "cyan",
+      evidenceRefs,
+      pills,
+      status: "live_state_available",
+    };
+  }
+
+  return null;
+}
+
+function readLiveAnswerTurnBridgeClassName(tone: LiveAnswerTurnBridgeTone): string {
+  if (tone === "emerald") return "border-emerald-300/25 bg-emerald-950/15 text-emerald-50";
+  if (tone === "amber") return "border-amber-300/25 bg-amber-950/20 text-amber-50";
+  if (tone === "slate") return "border-slate-500/25 bg-slate-950/35 text-slate-100";
+  return "border-cyan-300/25 bg-cyan-950/20 text-cyan-50";
+}
+
+function readLiveAnswerTurnBridgePillClassName(tone: LiveAnswerTurnBridgeTone): string {
+  if (tone === "emerald") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-100";
+  if (tone === "amber") return "border-amber-300/35 bg-amber-400/10 text-amber-100";
+  if (tone === "slate") return "border-slate-400/25 bg-black/20 text-slate-200";
+  return "border-cyan-300/35 bg-cyan-400/10 text-cyan-100";
 }
 
 function labelizeStagePlayLedgerValue(value: unknown): string {
@@ -31622,6 +31784,7 @@ export function HelixAskPill({
               agentLoopAudit,
               runtimeSummary,
             ) ?? visibleResolvedTurn.primary_source_label;
+            const finalAnswerPresentation = resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel);
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
             const stagePlayChatLedgerEvents = buildStagePlayChatLedgerEvents(reply);
             const causalTurnTraceRows = buildHelixCausalTurnTraceRows(reply);
@@ -31709,6 +31872,11 @@ export function HelixAskPill({
                 /\b(?:live answer environment|live workstation pipeline|live browser tab|live transcript|transcript|sentence summary|track this video|follow this research session|watch my minecraft run|claims?|evidence|contradictions?|prime(?:s)?|calculator|computation|simulation|live source|live stream|generator)\b/i.test(
                   `${reply.question ?? ""}\n${reply.content ?? ""}`,
                 ));
+            const liveAnswerTurnBridge = buildLiveAnswerTurnBridgeState({
+              hasLiveState: stagePlayChatLedgerEvents.length > 0,
+              stagePlayEvents: stagePlayChatLedgerEvents,
+              finalAnswerPresentation,
+            });
             const historySummary = clipText(
               transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
               180,
@@ -31748,22 +31916,6 @@ export function HelixAskPill({
                       </span>
                     </div>
                   </div>
-                ) : null}
-                {shouldRenderLiveSituationProjection ? (
-                  <HelixAskLiveSituationProjection
-                    threadId={liveSituationThreadId}
-                    initialArtifact={liveSituationArtifact}
-                    onAskHelix={(prompt) => syncAskDraftValue(prompt, { focus: true, forceMoodHint: true })}
-                    onOpenSituation={() => openPanelById("situation-room-pipelines")}
-                  />
-                ) : null}
-                {shouldRenderLiveAnswerEnvironmentProjection ? (
-                  <HelixAskLiveAnswerEnvironmentProjection
-                    threadId={liveSituationThreadId}
-                    initialEnvironment={liveAnswerEnvironment}
-                    onAskHelix={(prompt) => syncAskDraftValue(prompt, { focus: true, forceMoodHint: true })}
-                    onOpenSituation={() => openPanelById("situation-room-pipelines")}
-                  />
                 ) : null}
                 <div className="space-y-3">
                   {reply.question ? (
@@ -31816,7 +31968,6 @@ export function HelixAskPill({
                   ) : null}
                   {stagePlayChatLedgerEvents.length > 0 ? (
                     <details
-                      open
                       className="rounded-2xl border border-violet-300/20 bg-violet-950/20 px-3 py-2 text-xs text-violet-50"
                       data-testid={isLatestReply ? "helix-ask-latest-stage-play-ledger" : undefined}
                     >
@@ -31894,6 +32045,40 @@ export function HelixAskPill({
                       </div>
                     </details>
                   ) : null}
+                  {liveAnswerTurnBridge ? (
+                    <div
+                      className={`rounded-2xl border px-3 py-2 text-xs ${readLiveAnswerTurnBridgeClassName(liveAnswerTurnBridge.tone)}`}
+                      data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}
+                      data-live-turn-bridge-status={liveAnswerTurnBridge.status}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-[0.2em] opacity-75">Live turn bridge</p>
+                          <p className="mt-1 break-words font-semibold">{liveAnswerTurnBridge.title}</p>
+                        </div>
+                        <div className="flex max-w-full flex-wrap gap-1">
+                          {liveAnswerTurnBridge.pills.map((pill) => (
+                            <span
+                              key={`${liveAnswerTurnBridge.status}-${pill.label}`}
+                              className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${readLiveAnswerTurnBridgePillClassName(pill.tone)}`}
+                            >
+                              {pill.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="mt-2 break-words leading-relaxed">{liveAnswerTurnBridge.detail}</p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] opacity-65">
+                        {liveAnswerTurnBridge.meta}
+                      </p>
+                      {liveAnswerTurnBridge.evidenceRefs.length > 0 ? (
+                        <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal opacity-60">
+                          {liveAnswerTurnBridge.evidenceRefs.slice(0, 4).join(" | ")}
+                          {liveAnswerTurnBridge.evidenceRefs.length > 4 ? " | ..." : ""}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {causalTurnTraceRows.length > 0 ? (
                     <details
                       open={askBusy || causalTraceHasIssue}
@@ -31944,9 +32129,16 @@ export function HelixAskPill({
                     data-reasoning-stage-balance={replyBattleAnswerTint?.label ?? ""}
                     data-visible-terminal-source={transcriptTerminal.source}
                     data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? ""}
+                    data-final-answer-authority={
+                      finalAnswerPresentation.isDeterministicReceiptFallback
+                        ? "receipt_fallback_not_reviewed"
+                        : "terminal"
+                    }
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">Final answer</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">
+                        {finalAnswerPresentation.heading}
+                      </p>
                       <span
                         className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
                           terminalMismatchForReply
@@ -31956,8 +32148,8 @@ export function HelixAskPill({
                       >
                         {terminalMismatchForReply
                           ? "terminal mismatch"
-                          : finalAnswerSourceLabel
-                            ? `source: ${finalAnswerSourceLabel}`
+                          : finalAnswerPresentation.sourceLabel
+                            ? `source: ${finalAnswerPresentation.sourceLabel}`
                             : `source: ${transcriptTerminal.source}`}
                       </span>
                     </div>

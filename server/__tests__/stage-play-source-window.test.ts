@@ -26,6 +26,7 @@ import {
   resetMinecraftWorldDeltaOverlaysForTest,
 } from "../services/situation-room/minecraft-world-delta-overlay";
 import { ingestMinecraftWorldSenseEvent, resetMinecraftWorldSenseWindows } from "../services/situation-room/minecraft-world-sense-window";
+import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
 import {
   resetStagePlaySourceRouteOverridesForTest,
   resolveStagePlaySourceWindow,
@@ -48,6 +49,7 @@ beforeEach(() => {
   resetMinecraftWorldSenseWindows();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetSituationSourceCapabilitiesForTest();
   resetStagePlaySourceRouteOverridesForTest();
   resetStagePlayRawSessionBufferForTest();
   clearEventJournalForTest();
@@ -416,6 +418,78 @@ describe("Stage Play source window resolver", () => {
         modality: "visual_frame",
         routeTo: "narrative_stage_play",
         selected: true,
+      }),
+    ]));
+  });
+
+  it("keeps active producer freshness even before a compact observation row appears", () => {
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-freshness",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 15000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-freshness",
+      now: "2026-06-02T12:10:00.000Z",
+    });
+
+    const window = resolveStagePlaySourceWindow({
+      threadId,
+      now: "2026-06-02T12:10:01.000Z",
+    });
+
+    expect(window.freshness).toBe("fresh");
+    expect(window.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-freshness",
+        modality: "visual_frame",
+        status: "active",
+        selectedForStagePlay: true,
+      }),
+    ]));
+  });
+
+  it("uses source-level route override fallback when thread or environment context changes", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "source:visual-cross-context",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 15000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-cross-context",
+      now: "2026-06-02T12:20:00.000Z",
+    });
+    const override = upsertStagePlaySourceRouteOverride({
+      threadId: "thread:stage-play-ui-context",
+      environmentId: "live_answer:ui-context",
+      sourceId: "source:visual-cross-context",
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: ["ui:source-route"],
+      now: "2026-06-02T12:20:01.000Z",
+    });
+
+    const window = resolveStagePlaySourceWindow({
+      threadId,
+      sourceId: "source:visual-cross-context",
+      now: "2026-06-02T12:20:02.000Z",
+    });
+
+    expect(window.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-cross-context",
+        modality: "visual_frame",
+        status: "active",
+        routeTo: "narrative_stage_play",
+        selectedForStagePlay: true,
+        evidenceRefs: expect.arrayContaining([
+          producer.producer_id,
+          override.overrideId,
+          "ui:source-route",
+        ]),
       }),
     ]));
   });

@@ -319,7 +319,7 @@ const outputTextFrom = (
 
 const hasModelReviewedCheckpoint = (graph: StagePlayBadgeGraphV1): boolean =>
   graph.badges.some((badge) =>
-    badge.kind === "ask_checkpoint" &&
+    (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") &&
     badge.checkpoint?.modelReviewed === true
   );
 
@@ -334,6 +334,22 @@ const modelReviewedOutputBadges = (
     isNonEmptyText(badge.output.text)
   );
 };
+
+const reviewedOutputStatusFor = (
+  graph: StagePlayBadgeGraphV1,
+  hasReviewedOutput: boolean,
+): StagePlayOutputLaneV1["status"] => {
+  if (!hasReviewedOutput) return "missing_evidence";
+  return staleStatusFor(graph) === "stale" ? "stale" : "ready";
+};
+
+const reviewedOutputAdmissionFor = (
+  graph: StagePlayBadgeGraphV1,
+  hasReviewedOutput: boolean,
+): StagePlayOutputLaneV1["admission"] =>
+  hasReviewedOutput && reviewedOutputStatusFor(graph, hasReviewedOutput) === "ready"
+    ? "auto"
+    : "blocked";
 
 const hasExplicitVoicePolicy = (badge: StagePlayBadgeV1): boolean =>
   badge.output?.voiceEligible === true &&
@@ -547,12 +563,12 @@ export function buildStagePlayOutputLaneProjectionV1(
       laneId: "live_answer",
       lineKey: "recommendation",
       label: "Checkpoint Recommendation",
-      status: hasReviewedRecommendation ? "ready" : "missing_evidence",
+      status: reviewedOutputStatusFor(graph, hasReviewedRecommendation),
       text: outputTextFrom(
         recommendationBadges,
         "No checkpoint recommendation is available. A post-tool model-reviewed answer is required before this line can become assistant guidance.",
       ),
-      admission: hasReviewedRecommendation ? "auto" : "blocked",
+      admission: reviewedOutputAdmissionFor(graph, hasReviewedRecommendation),
       lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: recommendationBadges,
@@ -565,12 +581,12 @@ export function buildStagePlayOutputLaneProjectionV1(
       laneId: "answer_snapshot",
       lineKey: "answer_snapshot",
       label: "Answer Snapshot",
-      status: hasReviewedAnswerSnapshot ? "ready" : "missing_evidence",
+      status: reviewedOutputStatusFor(graph, hasReviewedAnswerSnapshot),
       text: outputTextFrom(
         answerSnapshotBadges,
         "No answer snapshot yet.",
       ),
-      admission: hasReviewedAnswerSnapshot ? "auto" : "blocked",
+      admission: reviewedOutputAdmissionFor(graph, hasReviewedAnswerSnapshot),
       lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: answerSnapshotBadges,
@@ -580,14 +596,14 @@ export function buildStagePlayOutputLaneProjectionV1(
       laneId: "voice_output",
       lineKey: "voice_output",
       label: "Voice output",
-      status: hasVoiceOutput ? "ready" : "missing_evidence",
+      status: reviewedOutputStatusFor(graph, hasVoiceOutput),
       text: outputTextFrom(
         voiceOutputBadges,
         hasReviewedAnswerSnapshot
           ? "Voice output is not eligible until an explicit voice policy allows this model-reviewed answer snapshot."
           : "Voice output requires a model-reviewed answer snapshot first.",
       ),
-      admission: hasVoiceOutput ? "auto" : "blocked",
+      admission: reviewedOutputAdmissionFor(graph, hasVoiceOutput),
       lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: voiceOutputBadges,

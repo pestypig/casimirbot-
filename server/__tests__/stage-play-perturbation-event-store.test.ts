@@ -11,6 +11,8 @@ const graphFixture = (input: {
   observationRef: string;
   visualLastEventTs: string;
   sourceRoute?: "narrative_stage_play" | "visual_context";
+  includeMissingEvidenceBadge?: boolean;
+  includeAnswerSnapshot?: boolean;
 }): StagePlayBadgeGraphV1 =>
   buildStagePlayBadgeGraphV1({
     generatedAt: input.visualLastEventTs,
@@ -76,7 +78,47 @@ const graphFixture = (input: {
       missingEvidence: [],
       reasonCodes: ["compact_source_window"],
       admission: "auto",
-    }],
+    },
+    ...(input.includeMissingEvidenceBadge ? [{
+      id: "missing_evidence.audio_transcript",
+      title: "Audio transcript missing",
+      plainMeaning: "Audio transcript is missing.",
+      whyItMatters: "Narrative intent should not be overclaimed.",
+      kind: "missing_evidence" as const,
+      status: "missing_evidence" as const,
+      subjects: ["visual_source:tab"],
+      tags: ["missing_evidence"],
+      liveBindings: [],
+      sourceRefs: [{ kind: "live_source_observation" as const, id: input.observationRef }],
+      evidenceRefs: [input.observationRef],
+      confidence: 0.7,
+      missingEvidence: ["Audio transcript source is needed for narrative intent."],
+      reasonCodes: ["visual_active_audio_missing"],
+      admission: "auto" as const,
+    }] : []),
+    ...(input.includeAnswerSnapshot ? [{
+      id: "answer_snapshot.latest",
+      title: "Answer snapshot",
+      plainMeaning: "Latest model-reviewed answer snapshot.",
+      whyItMatters: "The current checkpoint output should not stale itself.",
+      kind: "answer_snapshot" as const,
+      status: "observed" as const,
+      subjects: ["turn:stage-play"],
+      tags: ["answer_snapshot", "model_reviewed"],
+      liveBindings: [],
+      sourceRefs: [{ kind: "synthetic_evidence" as const, id: "turn:stage-play" }],
+      evidenceRefs: [input.observationRef, "turn:stage-play"],
+      confidence: 0.86,
+      missingEvidence: [],
+      reasonCodes: ["answer_snapshot_from_checkpoint"],
+      output: {
+        lineKey: "answer_snapshot",
+        text: "Model-reviewed checkpoint is available.",
+        state: "model_reviewed" as const,
+        voiceEligible: false,
+      },
+      admission: "auto" as const,
+    }] : [])],
     edges: [],
     recommendedActions: [],
   });
@@ -132,5 +174,34 @@ describe("Stage Play perturbation event store", () => {
       staleAnswerSnapshotIds: [],
     });
     expect(listStagePlayPerturbationEvents({ jobId: "stage_play_job:test", limit: 10 })).toHaveLength(2);
+  });
+
+  it("does not stale a model-reviewed answer snapshot when the checkpoint itself resolves missing evidence", () => {
+    recordStagePlayPerturbationFromGraph({
+      jobId: "stage_play_job:test",
+      graph: graphFixture({
+        observationRef: "live_source_observation:first",
+        visualLastEventTs: "2026-06-03T12:00:00.000Z",
+        includeMissingEvidenceBadge: true,
+      }),
+      now: "2026-06-03T12:00:00.000Z",
+    });
+
+    const result = recordStagePlayPerturbationFromGraph({
+      jobId: "stage_play_job:test",
+      graph: graphFixture({
+        observationRef: "live_source_observation:first",
+        visualLastEventTs: "2026-06-03T12:00:05.000Z",
+        includeAnswerSnapshot: true,
+      }),
+      now: "2026-06-03T12:00:05.000Z",
+    });
+
+      expect(result.event).toMatchObject({
+        reason: "missing_evidence_resolved",
+        materiality: "minor",
+        checkpointSuggested: false,
+        staleAnswerSnapshotIds: [],
+      });
   });
 });

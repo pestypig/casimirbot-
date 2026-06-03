@@ -4,6 +4,7 @@ export const HELIX_MODEL_OBSERVATION_PACKET_SCHEMA =
 export type HelixModelObservationSource =
   | "tool"
   | "repo_code"
+  | "scholarly_research"
   | "docs"
   | "active_doc"
   | "visual_capture"

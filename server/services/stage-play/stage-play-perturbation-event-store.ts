@@ -98,6 +98,7 @@ const materialityForReason = (
 const affectedBadgeIdsForReason = (
   graph: StagePlayBadgeGraphV1,
   reason: StagePlayPerturbationReasonV1,
+  materiality: StagePlayPerturbationMaterialityV1 = materialityForReason(reason),
 ): string[] => {
   const kindsByReason: Partial<Record<StagePlayPerturbationReasonV1, StagePlayBadgeV1["kind"][]>> = {
     first_usable_observation: ["observer", "source", "compact_observation", "interpreter", "stage_interpretation"],
@@ -118,19 +119,28 @@ const affectedBadgeIdsForReason = (
     .map((badge) => badge.id);
   return uniqueStrings([
     ...affected,
-    ...(materialityForReason(reason) === "minor" ? [] : ["helix_ask.checkpoint.latest", "answer_snapshot.latest", "live_output.current"]),
+    ...(materiality === "minor" ? [] : ["helix_ask.checkpoint.latest", "answer_snapshot.latest", "live_output.current"]),
   ]).filter((badgeId) => graph.badges.some((badge) => badge.id === badgeId));
 };
 
 const staleAnswerSnapshotIdsForReason = (
   graph: StagePlayBadgeGraphV1,
+  reason: StagePlayPerturbationReasonV1,
   materiality: StagePlayPerturbationMaterialityV1,
 ): string[] => {
   if (materiality === "minor") return [];
+  if (reason === "missing_evidence_resolved" && hasModelReviewedAnswerSnapshot(graph)) return [];
   return graph.badges
     .filter((badge) => badge.kind === "answer_snapshot" && badge.output?.state === "model_reviewed")
     .map((badge) => badge.id);
 };
+
+const hasModelReviewedAnswerSnapshot = (graph: StagePlayBadgeGraphV1): boolean =>
+  graph.badges.some((badge) =>
+    badge.kind === "answer_snapshot" &&
+    badge.output?.state === "model_reviewed" &&
+    badge.status === "observed"
+  );
 
 const reasonForStateTransition = (
   previous: StagePlayPerturbationJobState | null,
@@ -166,9 +176,12 @@ export function recordStagePlayPerturbationFromGraph(input: {
     };
   }
 
-  const materiality = materialityForReason(reason);
-  const affectedBadgeIds = affectedBadgeIdsForReason(input.graph, reason);
-  const staleAnswerSnapshotIds = staleAnswerSnapshotIdsForReason(input.graph, materiality);
+  const checkpointResolvedMissingEvidence =
+    reason === "missing_evidence_resolved" && hasModelReviewedAnswerSnapshot(input.graph);
+  const materiality = checkpointResolvedMissingEvidence ? "minor" : materialityForReason(reason);
+  const affectedBadgeIds = affectedBadgeIdsForReason(input.graph, reason, materiality);
+  const checkpointSuggested = materiality !== "minor";
+  const staleAnswerSnapshotIds = staleAnswerSnapshotIdsForReason(input.graph, reason, materiality);
   const event = buildStagePlayPerturbationEventV1({
     perturbationId: `stage_play_perturbation_event:${hashShort([
       input.jobId,
@@ -186,7 +199,7 @@ export function recordStagePlayPerturbationFromGraph(input: {
     affectedBadgeIds,
     staleAnswerSnapshotIds,
     materiality,
-    checkpointSuggested: materiality !== "minor",
+    checkpointSuggested,
     evidenceRefs: uniqueStrings([
       ...current.sourceRefs,
       ...affectedBadgeIds,

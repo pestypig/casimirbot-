@@ -57,7 +57,7 @@ describe("stage_play_job_plan/v1", () => {
         },
       ],
       checkpointPolicy: {
-        triggerOnFirstObservation: false,
+        triggerOnFirstObservation: true,
         triggerOnSceneChange: true,
         triggerOnPredictionHorizonExpired: true,
         minMsSinceLastCheckpoint: 15_000,

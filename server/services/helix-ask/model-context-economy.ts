@@ -283,6 +283,62 @@ export const compactRepoEvidenceArtifactForModel = (input: {
   };
 };
 
+export const compactScholarlyResearchArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const cfg = config();
+  const papers = readArray(payload.papers).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const evidenceRefs = readArray(payload.evidence_refs).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const supportRefs = unique([
+    readString(artifact?.artifact_id),
+    readString(payload.artifact_id),
+    ...evidenceRefs.map((entry) => readString(entry.ref)),
+    ...papers.flatMap((entry) => readStringArray(entry.evidence_refs)),
+  ], 96);
+  const found = papers.length
+    ? papers.slice(0, cfg.observationMaxFindings).map((paper) => {
+        const title = readString(paper.title) ?? "Untitled paper";
+        const venue = readString(paper.venue);
+        const year = typeof paper.year === "number" ? paper.year : null;
+        return compactText([title, venue, year].filter(Boolean).join(" - "), 300);
+      })
+    : [compactText(`No scholarly paper records were returned for ${readString(payload.query) ?? "the requested query"}.`, 300)];
+  const proves = papers.length
+    ? papers.slice(0, cfg.observationMaxProves).map((paper) => {
+        const title = readString(paper.title) ?? "paper";
+        const citations = typeof paper.citation_count === "number" ? `${paper.citation_count} citation(s)` : null;
+        const references = typeof paper.reference_count === "number" ? `${paper.reference_count} reference(s)` : null;
+        const identifiers = readRecord(paper.identifiers);
+        const doi = readString(identifiers?.doi);
+        return compactText([title, doi ? `DOI ${doi}` : null, citations, references].filter(Boolean).join("; "), 300);
+      })
+    : [];
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? `${input.turnId}:scholarly_research_observation`,
+    source: "scholarly_research",
+    source_target: "scholarly_research",
+    capability_key: "scholarly-research.lookup_papers",
+    status: papers.length > 0 ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? readString(payload.query) ?? "", 320),
+    found,
+    proves: proves.length ? proves : ["Scholarly research lookup completed, but no paper metadata was selected for synthesis."],
+    support_refs: supportRefs,
+    missing_or_uncertain: readStringArray(payload.missing_requirements),
+    suggested_next_steps: papers.length ? ["answer", "repair"] : ["repair", "use_another_tool", "fail_closed"],
+    raw_debug_ref: `${readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? input.turnId}:raw_scholarly_payload`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const compactRouteOrTerminalContractForModel = (
   value: unknown,
   options: { includeForbidden?: boolean; failedValidation?: boolean } = {},
@@ -401,6 +457,13 @@ export const buildHelixModelPromptContext = (input: {
           artifact,
           userRequested: input.userGoal,
           requiresExactExcerpts: input.requiresExactExcerpts,
+        });
+      }
+      if (/scholarly_research_observation/i.test(kind ?? "")) {
+        return compactScholarlyResearchArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
         });
       }
       if (/agent_step_observation_packet|runtime_tool_observation|tool_observation/i.test(kind ?? "")) {

@@ -83,6 +83,8 @@ let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill"
 let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
 let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPill").buildHelixCausalTurnTraceRows;
 let buildStagePlayChatLedgerEvents: typeof import("@/components/helix/HelixAskPill").buildStagePlayChatLedgerEvents;
+let buildLiveAnswerTurnBridgeState: typeof import("@/components/helix/HelixAskPill").buildLiveAnswerTurnBridgeState;
+let resolveHelixAskFinalAnswerPresentation: typeof import("@/components/helix/HelixAskPill").resolveHelixAskFinalAnswerPresentation;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
@@ -170,6 +172,8 @@ beforeAll(async () => {
     buildHelixTurnTranscriptRows,
     buildHelixCausalTurnTraceRows,
     buildStagePlayChatLedgerEvents,
+    buildLiveAnswerTurnBridgeState,
+    resolveHelixAskFinalAnswerPresentation,
     readReasoningTheaterHardFailureSignals,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
@@ -561,6 +565,85 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY__");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__");
     expect(source).toContain("clipboard_debug_copy_required_for_prompt_submission: false");
+  });
+
+  it("renders Live Answer as a turn bridge before terminal output", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain('data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}');
+    expect(source).toContain("data-live-turn-bridge-status={liveAnswerTurnBridge.status}");
+    expect(source).toContain("data-final-answer-authority=");
+    expect(source).toContain("receipt_fallback_not_reviewed");
+    expect(source).toContain("resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel)");
+    expect(source).toContain("finalAnswerPresentation.heading");
+    expect(source).not.toContain("<HelixAskLiveAnswerEnvironmentProjection");
+    expect(source).not.toContain("<HelixAskLiveSituationProjection");
+    expect(source).not.toMatch(/<details\s+open\s+className="rounded-2xl border border-violet-300\/20/);
+    expect(source).not.toContain("`source: ${finalAnswerSourceLabel}`");
+    expect(source.indexOf("helix-ask-latest-live-turn-bridge")).toBeGreaterThan(source.indexOf("Stage Play ledger"));
+    expect(source.indexOf("helix-ask-latest-live-turn-bridge")).toBeLessThan(
+      source.indexOf("data-testid={latestFinalAnswerTestId}"),
+    );
+  });
+
+  it("demotes deterministic receipt fallback to checkpoint receipt presentation", () => {
+    const presentation = resolveHelixAskFinalAnswerPresentation("deterministic receipt fallback");
+    expect(presentation).toEqual({
+      heading: "Checkpoint receipt",
+      sourceLabel: "checkpoint receipt (not reviewed)",
+      isDeterministicReceiptFallback: true,
+    });
+    const bridge = buildLiveAnswerTurnBridgeState({
+      hasLiveState: true,
+      stagePlayEvents: [],
+      finalAnswerPresentation: presentation,
+    });
+    expect(bridge).toMatchObject({
+      title: "Receipt fallback is evidence",
+      status: "receipt_fallback",
+      tone: "amber",
+    });
+  });
+
+  it("does not show the live bridge for ambient live state without current-turn Stage Play evidence", () => {
+    const bridge = buildLiveAnswerTurnBridgeState({
+      hasLiveState: false,
+      stagePlayEvents: [],
+      finalAnswerPresentation: resolveHelixAskFinalAnswerPresentation("model direct answer"),
+    });
+    expect(bridge).toBeNull();
+  });
+
+  it("marks model-reviewed Stage Play output as snapshot-bound for answer and voice lanes", () => {
+    const bridge = buildLiveAnswerTurnBridgeState({
+      hasLiveState: true,
+      finalAnswerPresentation: resolveHelixAskFinalAnswerPresentation("model_answer"),
+      stagePlayEvents: [
+        {
+          key: "checkpoint",
+          kind: "ask_checkpoint",
+          title: "Helix Ask checkpoint completed.",
+          detail: "Model-reviewed checkpoint available.",
+          meta: "ask-turn-1 | model reviewed",
+          evidenceRefs: ["visual_frame:1"],
+          status: "model_reviewed",
+        },
+        {
+          key: "snapshot",
+          kind: "answer_snapshot",
+          title: "Answer Snapshot, checkpoint only.",
+          detail: "Reviewed output.",
+          meta: "fresh | refs 1",
+          evidenceRefs: ["answer_snapshot:1"],
+          status: "fresh",
+        },
+      ],
+    });
+    expect(bridge).toMatchObject({
+      title: "Answer snapshot ready",
+      status: "answer_snapshot_ready",
+      tone: "emerald",
+    });
+    expect(bridge?.pills.map((pill) => pill.label)).toContain("voice snapshot-bound");
   });
 
   it("does not let calculator Ask prompts bypass the unified backend turn owner", () => {

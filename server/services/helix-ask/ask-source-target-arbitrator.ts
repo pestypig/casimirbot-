@@ -21,7 +21,9 @@ import {
   isLiveSourceCadenceControlPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
+import { buildAskEvidenceTargetArbitration } from "./evidence-target-arbitration";
 import {
   isStagePlayCheckpointRequestPrompt,
   isStagePlayJobPlanningPrompt,
@@ -485,6 +487,73 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  const evidenceTargetArbitration = buildAskEvidenceTargetArbitration({
+    turnId: input.turnId,
+    threadId: input.threadId,
+    promptText: prompt,
+  });
+  const selectedEvidenceCandidate = evidenceTargetArbitration.evidence_target_candidates.find(
+    (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
+  );
+  if (selectedEvidenceCandidate?.target_source === "repo_code") {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "repo_code",
+      targetKind: "repo_code",
+      strength: selectedEvidenceCandidate.strength,
+      explicitCues: selectedEvidenceCandidate.reason_codes,
+      reasons: [
+        "evidence_target_arbitration_selected_repo_code",
+        ...selectedEvidenceCandidate.reason_codes,
+      ],
+      requestedOutputs: selectedEvidenceCandidate.requested_outputs.length > 0
+        ? selectedEvidenceCandidate.requested_outputs
+        : ["repo_code", "file_path"],
+      suppressedRoutes: [
+        "situation_context_question",
+        "visual_deictic",
+        "visual_frame_evidence",
+        "active_doc_identity",
+        "active_doc_summary",
+        "active_note",
+        "doc_open_best",
+        "live_environment_review",
+      ],
+      precedenceReason: "evidence_target_arbitration_selected_repo_code",
+      confidence: selectedEvidenceCandidate.score,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (selectedEvidenceCandidate?.target_source === "scholarly_research") {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "scholarly_research",
+      targetKind: "scholarly_research",
+      strength: selectedEvidenceCandidate.strength,
+      explicitCues: selectedEvidenceCandidate.reason_codes,
+      reasons: [
+        "evidence_target_arbitration_selected_scholarly_research",
+        ...selectedEvidenceCandidate.reason_codes,
+      ],
+      requestedOutputs: selectedEvidenceCandidate.requested_outputs,
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "docs_viewer_receipt",
+        "repo_code_evidence_question",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "evidence_target_arbitration_selected_scholarly_research",
+      confidence: selectedEvidenceCandidate.score,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isStagePlayCheckpointRequestPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
@@ -631,6 +700,32 @@ export function arbitrateAskSourceTarget(input: {
       confidence: 0.9,
       allowClientShortcut: false,
       allowNoToolDirect: true,
+    });
+  }
+  const scholarlyResearchIntent = detectScholarlyResearchIntent(prompt);
+  if (scholarlyResearchIntent.researchRequested) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "scholarly_research",
+      targetKind: "scholarly_research",
+      strength: scholarlyResearchIntent.strength,
+      explicitCues: scholarlyResearchIntent.explicitCues,
+      reasons: scholarlyResearchIntent.reasons,
+      requestedOutputs: scholarlyResearchIntent.requestedOutputs,
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "docs_viewer_receipt",
+        "repo_code_evidence_question",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "external_scholarly_research_source_target",
+      confidence: scholarlyResearchIntent.strength === "hard" ? 0.96 : 0.86,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
     });
   }
   if (isDocsPanelOpenPrompt(prompt)) {

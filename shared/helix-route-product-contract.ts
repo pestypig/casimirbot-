@@ -9,6 +9,7 @@ export type HelixRouteProductSourceTarget =
   | "active_note"
   | "calculator_stream"
   | "repo_code"
+  | "scholarly_research"
   | "runtime_evidence"
   | "live_pipeline"
   | "live_environment"

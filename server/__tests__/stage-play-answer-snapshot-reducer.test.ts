@@ -343,4 +343,31 @@ describe("Stage Play answer snapshot reducer", () => {
       "model_authored_terminal_missing",
     ]));
   });
+
+  it("does not create an answer snapshot from deterministic Stage Play receipt fallback text", () => {
+    const result = reduceStagePlayAnswerSnapshot({
+      graph: graphFixture(),
+      askTurnDebug: completedDebugExport({
+        selected_final_answer:
+          "Stage Play tool receipt: live_env.reflect_stage_play_context; graph stage_play_badge_graph:test; visual source status: active.",
+      }),
+      liveAnswerEnvironment: liveAnswerEnvironmentFixture(),
+      generatedAt: "2026-06-03T12:00:10.000Z",
+    });
+
+    expect(result.checkpointBadge.checkpoint).toMatchObject({
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      modelReviewed: false,
+    });
+    expect(result.answerSnapshotBadge).toBeNull();
+    expect(result.liveOutputBadge).toBeNull();
+    expect(result.missingCheckBadge?.missingEvidence).toEqual(expect.arrayContaining([
+      "Deterministic Stage Play receipt fallback is not an answer snapshot.",
+    ]));
+    expect(result.missingCheckBadge?.reasonCodes).toEqual(expect.arrayContaining([
+      "receipt_fallback_text_rejected",
+      "answer_text_missing",
+    ]));
+  });
 });

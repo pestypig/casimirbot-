@@ -4,8 +4,10 @@ import {
   type HelixCapabilityFamily,
   type HelixCapabilityPlan,
 } from "@shared/helix-capability-plan";
+import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -46,6 +48,13 @@ const classifySourceFamily = (input: {
     return "debug_export";
   }
   if (input.sourceTarget === "runtime_evidence") return "debug_export";
+  if (
+    input.sourceTarget === "scholarly_research" ||
+    input.admittedFamilies.includes("scholarly_research") ||
+    detectScholarlyResearchIntent(input.promptText).researchRequested
+  ) {
+    return "scholarly_research";
+  }
   if (
     input.sourceTarget === "workstation_panel" ||
     input.sourceTarget === "workspace_panel" ||
@@ -107,6 +116,7 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
   if (family === "visual_capture") return "review_current_visual_state";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
   if (family === "repo_evidence") return "repo-code.search_concept";
+  if (family === "scholarly_research") return HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
   return "diagnose_debug_or_runtime_evidence";
@@ -138,6 +148,7 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "visual_capture") return admittedFamilies.includes("situation_run");
   if (family === "procedure_memory") return admittedFamilies.includes("procedure_memory") || admittedFamilies.includes("situation_run");
   if (family === "repo_evidence") return admittedFamilies.includes("repo_code");
+  if (family === "scholarly_research") return admittedFamilies.includes("scholarly_research");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
   if (family === "live_environment") return admittedFamilies.includes("live_environment");
@@ -183,6 +194,7 @@ const admissionFor = (input: {
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
     input.family === "live_environment" ||
+    input.family === "scholarly_research" ||
     input.family === "repo_evidence" ||
     input.sourceTarget === "runtime_evidence"
   ) {

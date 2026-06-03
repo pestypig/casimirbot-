@@ -218,6 +218,16 @@ const reviewedOutputBadges = (includeVoicePolicy = false): StagePlayBadgeV1[] =>
   }),
 ];
 
+const reviewedOutputBadgesWithHelixCheckpoint = (): StagePlayBadgeV1[] =>
+  reviewedOutputBadges(false).map((entry) =>
+    entry.id === "helix_ask.checkpoint.latest"
+      ? {
+          ...entry,
+          kind: "helix_ask_checkpoint",
+        }
+      : entry
+  );
+
 beforeEach(() => {
   resetLiveAnswerEnvironments();
 });
@@ -371,6 +381,51 @@ describe("stage-play output lane reducer", () => {
     expect(lineValues.recommendation).toBeUndefined();
     expect(lineValues.answer_snapshot).toBeUndefined();
     expect(lineValues.voice_output).toBeUndefined();
+  });
+
+  it("accepts canonical helix_ask_checkpoint badges as the reviewed checkpoint boundary", () => {
+    const projection = buildStagePlayOutputLaneProjectionV1({
+      graph: graphFixture(reviewedOutputBadgesWithHelixCheckpoint()),
+    });
+    const laneByKey = Object.fromEntries(projection.lanes.map((lane) => [lane.lineKey, lane]));
+
+    expect(laneByKey.recommendation).toMatchObject({
+      status: "ready",
+      admission: "auto",
+      text: "Use the barrier retreat plan only after checking exact hostile distance.",
+      modelReviewRequired: true,
+    });
+    expect(laneByKey.answer_snapshot).toMatchObject({
+      status: "ready",
+      admission: "auto",
+      text: "Use the barrier retreat plan only after checking exact hostile distance.",
+      modelReviewRequired: true,
+    });
+    expect(buildStagePlayLiveAnswerLineValuesV1(projection).answer_snapshot).toBeUndefined();
+  });
+
+  it("marks reviewed output lanes stale when the source window is stale", () => {
+    const projection = buildStagePlayOutputLaneProjectionV1({
+      graph: {
+        ...graphFixture(reviewedOutputBadgesWithHelixCheckpoint()),
+        sourceWindow: {
+          ...sourceWindow,
+          freshness: "stale",
+        },
+      },
+    });
+    const laneByKey = Object.fromEntries(projection.lanes.map((lane) => [lane.lineKey, lane]));
+
+    expect(laneByKey.recommendation).toMatchObject({
+      status: "stale",
+      admission: "blocked",
+      modelReviewRequired: true,
+    });
+    expect(laneByKey.answer_snapshot).toMatchObject({
+      status: "stale",
+      admission: "blocked",
+      modelReviewRequired: true,
+    });
   });
 
   it("does not project voice output through deterministic interpretation lanes", () => {

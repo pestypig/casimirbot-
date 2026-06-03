@@ -9,6 +9,7 @@ export type HelixVisibleAnswerPolicyFaithfulnessGate = {
     | "tool_observation_promoted_to_answer"
     | "voice_proposal_promoted_to_spoken"
     | "repo_evidence_claim_inverted"
+    | "source_evidence_claim_inverted"
   >;
   repair_allowed: boolean;
   assistant_answer: false;
@@ -33,8 +34,8 @@ export function evaluateVisibleAnswerPolicyFaithfulnessGate(input: {
   const terminalKind = readString(input.payload?.terminal_artifact_kind);
   const sourceTarget = readString(readRecord(input.payload?.source_target_intent)?.target_source);
   const applies = Boolean(text) && (
-    /repo|doc|tool|receipt|voice|dottie/i.test(text) ||
-    /repo|doc|tool|voice|situation/i.test(`${terminalKind} ${sourceTarget}`)
+    /repo|doc|tool|receipt|voice|dottie|paper|scholarly|doi|journal|citation/i.test(text) ||
+    /repo|doc|tool|voice|situation|scholarly/i.test(`${terminalKind} ${sourceTarget}`)
   );
   const violations: HelixVisibleAnswerPolicyFaithfulnessGate["violations"] = [];
   if (/\breceipts?\b.{0,140}\b(validat(?:e|es|ing)|authoriz(?:e|es|ing)|confirm(?:s|ing)?|derive[sd]?|determine)\b.{0,140}\b(final|terminal|visible)\s+answers?\b/i.test(text)) {
@@ -54,6 +55,9 @@ export function evaluateVisibleAnswerPolicyFaithfulnessGate(input: {
   }
   if (/\bno\s+(?:repo|repository|code)\s+evidence\b/i.test(text) && /repo_code_evidence_observation|repo_docs_synthesis_packet/i.test(JSON.stringify(input.payload ?? {}).slice(0, 6000))) {
     violations.push("repo_evidence_claim_inverted");
+  }
+  if (/\bno\s+(?:paper|scholarly|citation|doi|journal)\s+evidence\b/i.test(text) && /scholarly_research_observation|helix\.scholarly_research_observation\.v1/i.test(JSON.stringify(input.payload ?? {}).slice(0, 6000))) {
+    violations.push("source_evidence_claim_inverted");
   }
   const uniqueViolations = Array.from(new Set(violations));
   return {

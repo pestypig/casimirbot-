@@ -91,7 +91,7 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     const kind = readString(artifact.kind);
     const payload = readRecord(artifact.payload);
     const schema = readString(payload?.schema);
-    return /repo_code_evidence_observation/i.test([kind, schema].join(" "));
+    return /repo_code_evidence_observation|scholarly_research_observation/i.test([kind, schema].join(" "));
   })) {
     return "repo_evidence";
   }
@@ -109,7 +109,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),

@@ -177,8 +177,19 @@ export function LiveAnswerEnvironmentCard({
 }) {
   const [traceOpen, setTraceOpen] = useState(false);
   const [presentStateCard, setPresentStateCard] = useState<HelixPresentStateCard | null>(null);
-  const sourceIds = Array.isArray(environment.source_ids) ? environment.source_ids : [];
-  const lines = Array.isArray(environment.lines) ? environment.lines : [];
+  const sourceIds = useMemo(
+    () => Array.isArray(environment.source_ids) ? environment.source_ids : [],
+    [environment.source_ids],
+  );
+  const lines = useMemo(
+    () => Array.isArray(environment.lines) ? environment.lines : [],
+    [environment.lines],
+  );
+  const sourceIdsKey = useMemo(() => sourceIds.join("\u001f"), [sourceIds]);
+  const lineKeysKey = useMemo(
+    () => lines.map((line: LiveAnswerLineState) => line.key).join("\u001f"),
+    [lines],
+  );
   const [sourceAvailabilities, setSourceAvailabilities] = useState<HelixRehearsalSpaceAvailabilityInput[]>([]);
   const rehearsalCatalog = useMemo(() => buildRehearsalSpaceCatalog({
     sourceIds,
@@ -186,7 +197,7 @@ export function LiveAnswerEnvironmentCard({
     objective: environment.objective,
     preset: environment.preset,
     sourceAvailabilities,
-  }), [environment.objective, environment.preset, lines, sourceAvailabilities, sourceIds]);
+  }), [environment.objective, environment.preset, lineKeysKey, sourceAvailabilities, sourceIdsKey]);
   const [selectedRehearsalSpaceId, setSelectedRehearsalSpaceId] = useState<HelixRehearsalSpaceId | null>(
     rehearsalCatalog.selected_space_id,
   );
@@ -234,7 +245,7 @@ export function LiveAnswerEnvironmentCard({
     return () => {
       cancelled = true;
     };
-  }, [environment.updated_at, sourceIds]);
+  }, [environment.updated_at, sourceIdsKey]);
   const answerLines = lines.filter((line: LiveAnswerLineState) => line.visibility === "answer_card");
   const presentLines = presentStateCard?.lines ?? [];
   const preferredStagePlayLines = isStagePlayBackedEnvironment(environment, lines)

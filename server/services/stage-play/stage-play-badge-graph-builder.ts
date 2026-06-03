@@ -32,6 +32,7 @@ import {
 } from "./stage-play-perturbation-event-store";
 import type { StagePlayPerturbationEventV1 } from "@shared/contracts/stage-play-perturbation-event.v1";
 import {
+  completeStagePlayCheckpointRequestForGraph,
   listStagePlayCheckpointRequests,
   recordStagePlayCheckpointRequestFromPerturbation,
 } from "./stage-play-checkpoint-queue";
@@ -53,6 +54,7 @@ export type StagePlayAskCheckpointReceiptV1 = {
   terminalArtifactKind?: string | null;
   finalAnswerSource?: string | null;
   graphId?: string | null;
+  checkpointRequestId?: string | null;
   createdAt?: string | null;
   sourceWindowRefs?: string[];
   sourceArtifactRefs?: string[];
@@ -1573,6 +1575,12 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
         roomId,
         sourceWindow.latestSnapshotRefs,
         sourceWindow.latestObservationRefs,
+        sourceWindow.sourceRoutes.map((route) => [
+          route.sourceId,
+          route.modality,
+          route.routeTo,
+          route.selected,
+        ]),
         input.objective ?? null,
       ])}`;
   const jobId = `stage_play_job:${hashShort([
@@ -1627,6 +1635,13 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
     });
     const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
+    if (askCheckpointReceipt) {
+      completeStagePlayCheckpointRequestForGraph({
+        graphId,
+        checkpointRequestId: askCheckpointReceipt.checkpointRequestId,
+        now: resolvedAt,
+      });
+    }
     addPipelineSkeleton(missingBadges, missingEdges, {
       observerId: missingObserverId,
       sourceRefs: [],
@@ -2625,6 +2640,13 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
   });
   const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
+  if (askCheckpointReceipt) {
+    completeStagePlayCheckpointRequestForGraph({
+      graphId,
+      checkpointRequestId: askCheckpointReceipt.checkpointRequestId,
+      now: resolvedAt,
+    });
+  }
 
   addPipelineSkeleton(badges, edges, {
     observerId,

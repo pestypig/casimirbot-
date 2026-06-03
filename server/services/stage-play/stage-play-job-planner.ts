@@ -244,7 +244,7 @@ export function planStagePlayJob(input: PlanStagePlayJobInput): StagePlayJobPlan
     missingSetup,
     readinessChecks,
     checkpointPolicy: {
-      triggerOnFirstObservation: false,
+      triggerOnFirstObservation: true,
       triggerOnSceneChange: true,
       triggerOnPredictionHorizonExpired: predictionPolicy?.enabled === true,
       minMsSinceLastCheckpoint: 15_000,

@@ -88,6 +88,7 @@ export function recordStagePlayAskCheckpointReceipt(
     roomId: cleanString(input.roomId) ?? null,
     environmentId: cleanString(input.environmentId) ?? null,
     graphId: cleanString(input.graphId) ?? null,
+    checkpointRequestId: cleanString(input.checkpointRequestId),
     askTurnId: cleanString(input.askTurnId),
     solverTraceRef: cleanString(input.solverTraceRef),
     terminalArtifactKind: cleanString(input.terminalArtifactKind),

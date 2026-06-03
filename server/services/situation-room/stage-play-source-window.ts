@@ -271,7 +271,23 @@ function getStagePlaySourceRouteOverrideForContext(input: {
     const override = getStagePlaySourceRouteOverride(candidate);
     if (override) return override;
   }
-  return null;
+  return Array.from(sourceRouteOverrides.values())
+    .filter((override) =>
+      override.sourceId === input.sourceId &&
+      override.modality === input.modality
+    )
+    .sort((a, b) => {
+      const aScope =
+        Number(a.threadId === input.threadId) +
+        Number(a.roomId === input.roomId) +
+        Number(a.environmentId === input.environmentId);
+      const bScope =
+        Number(b.threadId === input.threadId) +
+        Number(b.roomId === input.roomId) +
+        Number(b.environmentId === input.environmentId);
+      if (aScope !== bScope) return bScope - aScope;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    })[0] ?? null;
 }
 
 export function resetStagePlaySourceRouteOverridesForTest(): void {
@@ -335,6 +351,34 @@ const freshnessFor = (observations: LiveSourceObservation[]): StagePlaySourceWin
   if (statuses.length === 0) return "unknown";
   if (statuses.length > 1) return "mixed";
   return statuses[0] === "blocked" ? "missing" : statuses[0] as StagePlaySourceWindowV1["freshness"];
+};
+
+const freshnessFromSourceStatus = (
+  status: StagePlaySourceRoutingStatusV1,
+): StagePlaySourceWindowV1["freshness"] => {
+  if (status === "active") return "fresh";
+  if (status === "stale" || status === "paused") return "stale";
+  if (status === "configured_missing" || status === "permission_required" || status === "waiting_for_client" || status === "error" || status === "stopped") {
+    return "missing";
+  }
+  return "unknown";
+};
+
+const freshnessForRoutedSources = (
+  observations: LiveSourceObservation[],
+  sources: StagePlaySourceRoutingEntryV1[],
+): StagePlaySourceWindowV1["freshness"] => {
+  const observationFreshness = freshnessFor(observations);
+  const selectedSources = sources.filter((source) => source.selectedForStagePlay);
+  const routedSources = selectedSources.length > 0
+    ? selectedSources
+    : sources.filter((source) => source.evidenceRefs.length > 0);
+  if (routedSources.length === 0) return observationFreshness;
+  const statuses = uniqueStrings(routedSources.map((source) => freshnessFromSourceStatus(source.status)));
+  if (statuses.length === 0) return observationFreshness;
+  if (statuses.length === 1) return statuses[0] === "unknown" ? observationFreshness : statuses[0];
+  if (statuses.includes("fresh") && observationFreshness === "fresh") return "fresh";
+  return "mixed";
 };
 
 const chunkSampleRefFor = (snapshot: HelixEnvironmentStateSnapshot): string | null => {
@@ -954,7 +998,7 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     worldId,
     environmentId: input.environmentId ?? observations.at(-1)?.environment_id ?? null,
     actorLabel: input.actorLabel ?? snapshot?.actor_label ?? navigationQuery.actor_label ?? null,
-    freshness: freshnessFor(observations),
+    freshness: freshnessForRoutedSources(observations, sources),
     latestSourceDescriptorRefs: descriptors.map((descriptor) => descriptor.descriptor_id),
     latestSourceProducerRefs: producers.map((producer) => producer.producer_id),
     latestObservationRefs: observations.map((observation) => observation.observation_id),

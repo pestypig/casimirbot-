@@ -77,7 +77,7 @@ const isDirectAnswerArtifact = (artifact: ArtifactLike): boolean =>
   artifactSchema(artifact) === "helix.direct_answer_text.v1";
 
 const isRepoEvidenceObservation = (artifact: ArtifactLike): boolean =>
-  /repo_code_evidence_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+  /repo_code_evidence_observation|scholarly_research_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
 
 export const findLatestFinalAnswerDraftCandidate = (
   artifacts: ArtifactLike[],

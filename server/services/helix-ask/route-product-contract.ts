@@ -16,6 +16,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "live_pipeline_receipt",
   "doc_location_result",
   "repo_code_evidence_answer",
+  "scholarly_research_answer",
   "process_graph_overview",
   "audio_transcript_context_pack",
   "note_context_pack",
@@ -120,6 +121,7 @@ const normalizeSourceTarget = (
     sourceTarget === "active_note" ||
     sourceTarget === "calculator_stream" ||
     sourceTarget === "repo_code" ||
+    sourceTarget === "scholarly_research" ||
     sourceTarget === "runtime_evidence" ||
     sourceTarget === "situation_epoch" ||
     sourceTarget === "visual_scene_memory" ||
@@ -388,6 +390,38 @@ export function buildRouteProductContract(input: {
         "repo_answer_text_quality_gate",
         "repo_claim_support",
         "repo_claim_observation_gate",
+      ],
+    });
+  }
+
+  if (sourceTarget === "scholarly_research") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: ["scholarly_research_answer"],
+      allowedExtra: [],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "doc_location_result",
+        "repo_code_evidence_answer",
+        "repo_entity_definition",
+      ],
+      precedenceReason: "scholarly_research_source_target_allows_only_external_paper_evidence_terminal_products",
+      sideArtifactKindsAllowed: [
+        "scholarly_research_observation",
+        "scholarly_research_synthesis_attempt",
+        "scholarly_research_claim_support",
       ],
     });
   }

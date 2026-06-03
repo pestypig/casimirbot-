@@ -116,6 +116,7 @@ const artifactKindMatchesCapability = (
   const joined = [kind, payloadKind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
 
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
+  if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
   }
@@ -188,6 +189,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";
   }
+  if (/scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined)) {
+    return "scholarly-research.lookup_papers";
+  }
   if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
   }
@@ -236,7 +240,7 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
   capability: string,
   artifacts: Record<string, unknown>[],
 ): boolean => {
-  if (capability !== "repo-code.search_concept") return false;
+  if (capability !== "repo-code.search_concept" && capability !== "scholarly-research.lookup_papers") return false;
   return artifacts.some((artifact) => {
     const sourceScope = readString(artifact.source_scope);
     if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;

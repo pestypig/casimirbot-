@@ -1,0 +1,249 @@
+import type {
+  HelixAskEvidenceTargetArbitration,
+  HelixAskEvidenceTargetCandidate,
+} from "@shared/helix-ask-evidence-target-arbitration";
+import { HELIX_ASK_EVIDENCE_TARGET_ARBITRATION_SCHEMA } from "@shared/helix-ask-evidence-target-arbitration";
+import type {
+  HelixAskSourceTarget,
+  HelixAskSourceTargetRequestedOutput,
+  HelixAskSourceTargetStrength,
+} from "@shared/helix-ask-source-target-intent";
+import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
+import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import {
+  isStagePlayCheckpointRequestPrompt,
+  isStagePlayJobPlanningPrompt,
+  isStagePlayReflectionPrompt,
+} from "./stage-play-prompt-intent";
+
+const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const clampScore = (value: number): number =>
+  Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+
+const confidenceForScore = (score: number): "high" | "medium" | "low" =>
+  score >= 0.86 ? "high" : score >= 0.58 ? "medium" : "low";
+
+const hasStagePlayLexicalCue = (prompt: string): boolean =>
+  /\b(?:stage\s*play|stage_play|badge\s+graph|stage\s*builder|answer\s+snapshot|checkpoint\s+(?:freshness|request|queue)|live\s+interpretation|reflect_stage_play_context|narrative_stage_play)\b/i.test(
+    prompt,
+  );
+
+const hasStagePlayOperationalCue = (prompt: string): boolean =>
+  /\blive_env\.reflect_stage_play_context\b/i.test(prompt) ||
+  /\b(?:use|reflect|project|update|route|consume|request|queue|run|start|plan|setup|set\s+up|configure)\b[\s\S]{0,120}\b(?:stage\s*play|stage_play|badge\s+graph|live\s+interpretation|answer\s+snapshot|checkpoint)\b/i.test(prompt) ||
+  /\b(?:stage\s*play|stage_play|badge\s+graph|live\s+interpretation|answer\s+snapshot|checkpoint)\b[\s\S]{0,120}\b(?:reflect|project|update|active|current|latest|source|visual|checkpoint|freshness|request|queue|run|plan|setup|set\s+up)\b/i.test(prompt) ||
+  /\b(?:active|current|latest)\s+stage\s*play\s+(?:graph|context|source|reflection)\b/i.test(prompt) ||
+  /\bcheckpoint\s+(?:focus|handle|request|queue|freshness)\b/i.test(prompt);
+
+const hasStagePlayNegativeCue = (prompt: string): boolean =>
+  /\b(?:do\s+not|don't|dont|without|no)\b[\s\S]{0,80}\b(?:stage\s*play|stage_play|badge\s+graph|reflect_stage_play_context)\b/i.test(prompt) ||
+  /\b(?:stage\s*play|stage_play|badge\s+graph|reflect_stage_play_context)\b[\s\S]{0,80}\b(?:do\s+not|don't|dont|without|no)\b/i.test(prompt);
+
+const makeCandidate = (input: {
+  candidateId: string;
+  targetSource: HelixAskSourceTarget;
+  targetKind?: HelixAskSourceTarget;
+  strength: HelixAskSourceTargetStrength;
+  score: number;
+  reasonCodes: string[];
+  requestedOutputs?: HelixAskSourceTargetRequestedOutput[];
+  capabilityKeys?: string[];
+  terminalProductConstraints?: string[];
+  disallowed?: boolean;
+  disallowedReason?: string | null;
+}): HelixAskEvidenceTargetCandidate => {
+  const score = clampScore(input.score);
+  return {
+    candidate_id: input.candidateId,
+    target_source: input.targetSource,
+    target_kind: input.targetKind ?? input.targetSource,
+    strength: input.strength,
+    score,
+    confidence: confidenceForScore(score),
+    reason_codes: unique(input.reasonCodes.filter(Boolean)),
+    requested_outputs: unique(input.requestedOutputs ?? []),
+    capability_keys: unique(input.capabilityKeys ?? []),
+    terminal_product_constraints: unique(input.terminalProductConstraints ?? []),
+    disallowed: input.disallowed === true,
+    disallowed_reason: input.disallowedReason ?? null,
+  };
+};
+
+const repoRequestedOutputs = (
+  values: ReturnType<typeof detectRepoCodeEvidenceIntent>["requestedOutputs"],
+): HelixAskSourceTargetRequestedOutput[] =>
+  unique(values.flatMap((value) => {
+    if (value === "file_path") return ["file_path" as const];
+    if (value === "line_backed_source") return ["line_backed_source" as const];
+    if (value === "implementation_location") return ["implementation_location" as const];
+    if (value === "route_trace") return ["route_trace" as const];
+    if (value === "tool_call_eligibility") return ["tool_call_eligibility" as const];
+    if (value === "terminal_contract") return ["terminal_contract" as const];
+    if (value === "codex_comparison") return ["codex_comparison" as const];
+    return ["repo_code" as const];
+  }));
+
+export function buildAskEvidenceTargetArbitration(input: {
+  turnId: string;
+  threadId: string;
+  promptText: string;
+}): HelixAskEvidenceTargetArbitration {
+  const prompt = input.promptText.trim();
+  const candidates: HelixAskEvidenceTargetCandidate[] = [];
+  const promptIntentCandidates: string[] = [];
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const repoIntent = detectRepoCodeEvidenceIntent(prompt);
+  const scholarlyIntent = detectScholarlyResearchIntent(prompt);
+  const stagePlayNegative = hasStagePlayNegativeCue(prompt);
+  const stagePlayLexical = hasStagePlayLexicalCue(prompt);
+  const stagePlayOperational =
+    !stagePlayNegative &&
+    (
+      isStagePlayCheckpointRequestPrompt(prompt) ||
+      isStagePlayJobPlanningPrompt(prompt) ||
+      (isStagePlayReflectionPrompt(prompt) && hasStagePlayOperationalCue(prompt))
+    );
+
+  if (contextualSuppression) {
+    promptIntentCandidates.push("contextual_tool_reference");
+    candidates.push(makeCandidate({
+      candidateId: "model_only.contextual_tool_reference",
+      targetSource: "model_only",
+      targetKind: "general_background",
+      strength: "soft",
+      score: 0.86,
+      reasonCodes: ["contextual_tool_reference_suppressed", contextualSuppression.suppression_reason],
+      terminalProductConstraints: ["direct_answer_text"],
+    }));
+  }
+  if (stagePlayNegative) {
+    promptIntentCandidates.push("negative_stage_play_scope");
+    candidates.push(makeCandidate({
+      candidateId: "model_only.negative_stage_play_scope",
+      targetSource: "model_only",
+      targetKind: "general_background",
+      strength: "soft",
+      score: 0.72,
+      reasonCodes: ["negative_stage_play_scope", "stage_play_tools_disallowed"],
+      terminalProductConstraints: ["direct_answer_text"],
+    }));
+  }
+
+  if (repoIntent.repoEvidenceRequested) {
+    promptIntentCandidates.push("repo_code_evidence");
+    candidates.push(makeCandidate({
+      candidateId: "repo_code.project_concept_or_code_evidence",
+      targetSource: "repo_code",
+      targetKind: "repo_code",
+      strength: repoIntent.strength,
+      score: repoIntent.strength === "hard" ? 0.96 : stagePlayLexical ? 0.91 : 0.84,
+      reasonCodes: repoIntent.reasons,
+      requestedOutputs: repoRequestedOutputs(repoIntent.requestedOutputs),
+      capabilityKeys: ["repo-code.search_concept"],
+      terminalProductConstraints: ["repo_code_evidence_observation", "repo_code_evidence_answer"],
+    }));
+  }
+
+  if (scholarlyIntent.researchRequested) {
+    promptIntentCandidates.push("scholarly_research");
+    candidates.push(makeCandidate({
+      candidateId: "scholarly_research.external_sources",
+      targetSource: "scholarly_research",
+      targetKind: "scholarly_research",
+      strength: scholarlyIntent.strength,
+      score: scholarlyIntent.strength === "hard" ? 0.94 : 0.76,
+      reasonCodes: scholarlyIntent.reasons,
+      requestedOutputs: scholarlyIntent.requestedOutputs,
+      capabilityKeys: ["scholarly_research.lookup"],
+      terminalProductConstraints: ["scholarly_research_observation", "scholarly_research_answer"],
+    }));
+  }
+
+  if (stagePlayLexical || stagePlayOperational || stagePlayNegative) {
+    promptIntentCandidates.push(stagePlayOperational ? "stage_play_operation" : "stage_play_lexical");
+    candidates.push(makeCandidate({
+      candidateId: stagePlayOperational
+        ? "live_environment.stage_play_operation"
+        : "live_environment.stage_play_lexical_candidate",
+      targetSource: "live_environment",
+      targetKind: "live_environment",
+      strength: stagePlayOperational ? "hard" : "soft",
+      score: stagePlayOperational ? 0.97 : 0.43,
+      reasonCodes: stagePlayOperational
+        ? ["stage_play_operational_cue", "requires_live_environment_tool_observation"]
+        : stagePlayNegative
+          ? ["stage_play_negative_scope", "stage_play_candidate_suppressed"]
+          : ["stage_play_lexical_candidate_only"],
+      requestedOutputs: stagePlayOperational
+        ? ["stage_play_badge_graph", "stage_play_output_lane_projection", "stage_play_live_answer_projection", "typed_failure"]
+        : ["stage_play_badge_graph", "typed_failure"],
+      capabilityKeys: ["live_env.reflect_stage_play_context"],
+      terminalProductConstraints: ["live_environment_tool_observation", "model_synthesized_answer", "typed_failure"],
+      disallowed: stagePlayNegative,
+      disallowedReason: stagePlayNegative ? "negative_stage_play_scope" : null,
+    }));
+  }
+
+  if (/\b(?:screen|visual|capture|screenshot|frame)\b/i.test(prompt)) {
+    promptIntentCandidates.push("visual_capture");
+    candidates.push(makeCandidate({
+      candidateId: "visual_capture.current_visual_state",
+      targetSource: "visual_capture",
+      targetKind: "visual_capture",
+      strength: /\b(?:current|latest|right\s+now|what\s+is\s+happening|what\s+is\s+visible)\b/i.test(prompt)
+        ? "hard"
+        : "soft",
+      score: /\b(?:current|latest|right\s+now|what\s+is\s+happening|what\s+is\s+visible)\b/i.test(prompt)
+        ? 0.88
+        : 0.58,
+      reasonCodes: ["visual_capture_candidate"],
+      requestedOutputs: ["current_visual_state", "field_evaluation_refs", "interpretation_refs", "typed_failure"],
+      capabilityKeys: ["situation-room.describe_visual_capture"],
+      terminalProductConstraints: ["situation_context_pack", "visual_context_pack", "typed_failure"],
+    }));
+  }
+
+  if (candidates.length === 0) {
+    candidates.push(makeCandidate({
+      candidateId: "unknown.no_explicit_evidence_target",
+      targetSource: "unknown",
+      targetKind: "unknown",
+      strength: "none",
+      score: 0.2,
+      reasonCodes: ["no_explicit_evidence_target"],
+      terminalProductConstraints: ["direct_answer_text"],
+    }));
+  }
+
+  const orderedCandidates = [...candidates].sort((a, b) => b.score - a.score);
+  const selected = orderedCandidates.find((candidate) => !candidate.disallowed) ?? orderedCandidates[0] ?? null;
+  const hardSourceTarget =
+    selected !== null &&
+    selected.target_source !== "unknown" &&
+    selected.target_source !== "model_only" &&
+    selected.target_kind !== "general_background";
+
+  return {
+    schema: HELIX_ASK_EVIDENCE_TARGET_ARBITRATION_SCHEMA,
+    turn_id: input.turnId,
+    thread_id: input.threadId,
+    prompt_intent_candidates: unique(promptIntentCandidates),
+    evidence_target_candidates: orderedCandidates,
+    source_targets: unique(orderedCandidates.map((candidate) => candidate.target_source)),
+    available_capabilities: unique(orderedCandidates.flatMap((candidate) => candidate.disallowed ? [] : candidate.capability_keys)),
+    disallowed_capabilities: unique(orderedCandidates.flatMap((candidate) => candidate.disallowed ? candidate.capability_keys : [])),
+    selected_candidate_id: selected?.candidate_id ?? null,
+    selected_target_source: selected?.target_source ?? "unknown",
+    selected_target_kind: selected?.target_kind ?? "unknown",
+    confidence: selected?.confidence ?? "low",
+    reason_codes: selected?.reason_codes ?? ["no_explicit_evidence_target"],
+    must_enter_backend_ask: Boolean(hardSourceTarget && selected?.strength === "hard"),
+    allow_no_tool_direct: !hardSourceTarget || selected?.strength !== "hard",
+    terminal_product_constraints: selected?.terminal_product_constraints ?? ["direct_answer_text"],
+    assistant_answer: false,
+    raw_content_included: false,
+    context_role: "admission_control",
+  };
+}

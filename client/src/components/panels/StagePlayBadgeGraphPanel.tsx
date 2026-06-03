@@ -182,6 +182,15 @@ type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointR
 const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
   request.status === "queued" || request.status === "running";
 
+const graphHasCurrentModelReviewedAnswerSnapshot = (
+  graph: StagePlayBadgeGraphV1 | null | undefined,
+): boolean =>
+  Boolean(graph?.badges.some((badge) =>
+    badge.kind === "answer_snapshot" &&
+    badge.status === "observed" &&
+    badge.output?.state === "model_reviewed"
+  ));
+
 const stagePlayCheckpointRequestMatchesGraph = (
   request: StagePlayCheckpointRequest,
   graph: StagePlayBadgeGraphV1,
@@ -207,7 +216,14 @@ const selectStagePlayVisibleCheckpointRequest = (
 ): StagePlayCheckpointRequest | null => {
   const indexedRequests = (graph?.checkpointRequests ?? [])
     .map((request, index) => ({ request, index }))
-    .filter((entry) => isActiveStagePlayCheckpointRequest(entry.request));
+    .filter((entry) => isActiveStagePlayCheckpointRequest(entry.request))
+    .filter((entry) =>
+      !(
+        graphHasCurrentModelReviewedAnswerSnapshot(graph) &&
+        entry.request.status === "running" &&
+        stagePlayCheckpointRequestMatchesGraph(entry.request, graph as StagePlayBadgeGraphV1)
+      )
+    );
   if (!graph || indexedRequests.length === 0) return null;
   indexedRequests.sort((left, right) => {
     const priorityDelta =
