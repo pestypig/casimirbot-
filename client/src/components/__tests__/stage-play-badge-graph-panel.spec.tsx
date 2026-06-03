@@ -616,6 +616,20 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByDisplayValue("session_ttl")).toBeTruthy();
   });
 
+  it("opens Observer source setup when the graph Observer badge is clicked", async () => {
+    renderPanel();
+
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
+
+    expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    expect(screen.getByText("Source Setup")).toBeTruthy();
+    expect(screen.getByText("Observer Source Routes")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Capture browser tab visual" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Attach browser audio transcript" })).toBeTruthy();
+  });
+
   it("opens raw buffer previews from Observer source evidence without graph ownership", async () => {
     renderPanel();
 
@@ -686,6 +700,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByDisplayValue("hazard_type")).toBeTruthy();
     expect(screen.getByDisplayValue("severity")).toBeTruthy();
     expect(screen.getByDisplayValue("radius_or_position")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove draft node" }));
+
+    expect(screen.queryByTestId("stage-play-draft-node")).toBeNull();
+    expect(screen.queryByTestId("stage-play-draft-parameter-editor")).toBeNull();
   });
 
   it("edits and adds local draft node parameters", async () => {

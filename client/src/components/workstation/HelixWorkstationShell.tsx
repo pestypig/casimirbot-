@@ -153,7 +153,7 @@ export function HelixWorkstationShell({
           </p>
         </div>
       </div>
-      <div className="relative col-start-1 row-start-2 min-h-0 min-w-0">
+      <div className="relative col-start-1 row-start-2 h-full min-h-0 min-w-0">
         <WorkstationStage />
         {sessionListOpen ? (
           <div className="absolute inset-0 z-30 overflow-hidden bg-slate-950/82 backdrop-blur-md">
@@ -219,7 +219,7 @@ export function HelixWorkstationShell({
           </div>
         ) : null}
       </div>
-      <div className="col-start-2 row-start-2 min-h-0">
+      <div className="col-start-2 row-start-2 h-full min-h-0">
         <WorkstationResizeRail
           onResize={(deltaX) => {
             if (chatDock.collapsed) return;
@@ -227,7 +227,7 @@ export function HelixWorkstationShell({
           }}
         />
       </div>
-      <div className="col-start-3 row-span-2 row-start-1 min-h-0">
+      <div className="col-start-3 row-span-2 row-start-1 h-full min-h-0">
         <HelixAskDock
           widthPx={visibleWidth}
           collapsed={chatDock.collapsed}

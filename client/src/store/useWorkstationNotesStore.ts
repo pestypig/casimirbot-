@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { recordWorkstationTimelineEntry } from "@/store/useWorkstationWorkflowTimelineStore";
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 const WORKSTATION_NOTES_STORAGE_KEY = "workstation-notes:v1";
 
@@ -85,6 +86,19 @@ const buildManualNoteId = (title: string, existingIds: string[]): string => {
   return `${base}-${Date.now()}`;
 };
 
+function registerNoteMemoryArtifact(note: WorkstationNote) {
+  useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+    artifact_id: `workstation-note:${note.id}`,
+    artifact_type: "workstation_note",
+    storage_key: WORKSTATION_NOTES_STORAGE_KEY,
+    storage_backend: "localStorage",
+    owner_scope: "browser_guest",
+    sync_status: "profile_candidate",
+    title: note.title.trim() || "Untitled note",
+    updated_at: note.updated_at,
+  });
+}
+
 export const useWorkstationNotesStore = create<WorkstationNotesState>()(
   persist(
     (set, get) => ({
@@ -123,6 +137,7 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
           order: [note.id, ...state.order.filter((entry) => entry !== note.id)],
           active_note_id: note.id,
         }));
+        registerNoteMemoryArtifact(note);
         recordWorkstationTimelineEntry({
           lane: "notes",
           label: `Saved note "${note.title}"`,
@@ -215,14 +230,16 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
         set((state) => {
           const current = state.notes[noteId];
           if (!current) return state;
+          const updated = {
+            ...current,
+            body,
+            updated_at: new Date().toISOString(),
+          };
+          registerNoteMemoryArtifact(updated);
           return {
             notes: {
               ...state.notes,
-              [noteId]: {
-                ...current,
-                body,
-                updated_at: new Date().toISOString(),
-              },
+              [noteId]: updated,
             },
           };
         }),
@@ -230,20 +247,23 @@ export const useWorkstationNotesStore = create<WorkstationNotesState>()(
         set((state) => {
           const current = state.notes[noteId];
           if (!current) return state;
+          const updated = {
+            ...current,
+            title,
+            updated_at: new Date().toISOString(),
+          };
+          registerNoteMemoryArtifact(updated);
           return {
             notes: {
               ...state.notes,
-              [noteId]: {
-                ...current,
-                title,
-                updated_at: new Date().toISOString(),
-              },
+              [noteId]: updated,
             },
           };
         }),
       deleteNote: (noteId) =>
         set((state) => {
           if (!state.notes[noteId]) return state;
+          useWorkspaceMemoryRegistryStore.getState().removeArtifact(`workstation-note:${noteId}`);
           const nextNotes = { ...state.notes };
           delete nextNotes[noteId];
           const nextOrder = state.order.filter((entry) => entry !== noteId);

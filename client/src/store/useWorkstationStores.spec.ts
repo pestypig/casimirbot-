@@ -6,6 +6,7 @@ import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { useWorkstationWorkflowTimelineStore } from "@/store/useWorkstationWorkflowTimelineStore";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 describe("workstation stores", () => {
   beforeEach(() => {
@@ -29,6 +30,7 @@ describe("workstation stores", () => {
     useWorkstationClipboardStore.setState({ receipts: [] });
     useWorkstationSessionMemoryStore.setState({ panelScroll: {}, drafts: {} });
     useWorkstationWorkflowTimelineStore.setState({ entries: [] });
+    useWorkspaceMemoryRegistryStore.setState({ artifacts: {} });
   });
 
   it("creates and activates notes via upsertWorkflowNote", () => {
@@ -184,6 +186,65 @@ describe("workstation stores", () => {
     state.clearDraft("scientific-calculator:input");
     expect(useWorkstationSessionMemoryStore.getState().readDraft("scientific-calculator:input")).toBe("");
     expect(useWorkstationSessionMemoryStore.getState().readDraft("situation-room:pipeline-draft")).toBe("monitor voice chat");
+  });
+
+  it("registers workspace memory artifacts by storage and ownership scope", () => {
+    const notes = useWorkstationNotesStore.getState();
+    const note = notes.createManualNote({ title: "Registry note" });
+    notes.updateNoteBody(note.id, "body");
+
+    const chats = useAgiChatStore.getState();
+    const sessionId = chats.newSession("New chat", "helix-ask-chat:registry");
+    chats.addMessage(sessionId, {
+      role: "user",
+      content: "Registry chat",
+    });
+
+    const memory = useWorkstationSessionMemoryStore.getState();
+    memory.rememberDraft(`workstation-notes:${note.id}:body`, "<p>body</p>");
+
+    const layout = useWorkstationLayoutStore.getState();
+    const snapshot = layout.captureLayoutSnapshot();
+    useHelixAskWorkspaceSessionStore.getState().saveLayoutSnapshot(sessionId, snapshot);
+
+    const registry = useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot();
+    expect(registry.artifacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifact_id: `workstation-note:${note.id}`,
+          artifact_type: "workstation_note",
+          owner_scope: "browser_guest",
+          storage_backend: "localStorage",
+          sync_status: "profile_candidate",
+        }),
+        expect.objectContaining({
+          artifact_id: `helix-chat-session:${sessionId}`,
+          artifact_type: "helix_chat_session",
+          owner_scope: "browser_guest",
+          storage_backend: "localStorage",
+          sync_status: "profile_candidate",
+          chat_session_id: sessionId,
+          title: "Registry chat",
+        }),
+        expect.objectContaining({
+          artifact_id: `workstation-session-draft:workstation-notes:${note.id}:body`,
+          artifact_type: "workstation_session_draft",
+          owner_scope: "surface_session_only",
+          storage_backend: "sessionStorage",
+          sync_status: "local_only",
+        }),
+        expect.objectContaining({
+          artifact_id: `helix-chat-layout:${sessionId}`,
+          artifact_type: "helix_chat_layout",
+          owner_scope: "browser_guest",
+          storage_backend: "localStorage",
+          sync_status: "local_only",
+          chat_session_id: sessionId,
+        }),
+      ]),
+    );
+    expect(registry.profile_ready_artifact_count).toBe(2);
+    expect(registry.session_only_artifact_count).toBe(1);
   });
 
   it("titles a fresh Helix Ask chat from the first user message", () => {

@@ -21,10 +21,7 @@ import type {
   HelixEnvironmentStateSnapshot,
 } from "@shared/helix-environment-state-snapshot";
 import { getLatestEnvironmentStateSnapshot } from "../situation-room/environment-state-snapshot-window";
-import {
-  buildDefaultStagePlayRoutingSources,
-  resolveStagePlaySourceWindow,
-} from "../situation-room/stage-play-source-window";
+import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -601,48 +598,6 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   const now = input.now ?? new Date();
   const resolvedAt = now.toISOString();
   const roomId = input.roomId ?? null;
-  const defaultSources = buildDefaultStagePlayRoutingSources({
-    threadId: input.threadId,
-    environmentId: input.environmentId ?? null,
-  });
-  const emptySourceWindow = {
-    threadId: input.threadId,
-    roomId,
-    worldId: null,
-    environmentId: input.environmentId ?? null,
-    fromTs: null,
-    toTs: resolvedAt,
-    latestObservationRefs: [],
-    latestSourceDescriptorRefs: [],
-    latestSourceProducerRefs: [],
-    latestRawSessionBufferRefs: [],
-    sources: defaultSources,
-    sourceRoutes: defaultSources.map((source) => source.route ?? {
-      sourceId: source.sourceId,
-      modality: source.modality,
-      routeTo: source.routeTo,
-      selected: source.selectedForStagePlay,
-      confidence: source.fidelityScore,
-      freshness: source.status,
-    }),
-    latestSnapshotRefs: [],
-    latestDeltaOverlayRefs: [],
-    latestNavigationRefs: [],
-    freshness: "missing" as const,
-  };
-  if (!roomId) {
-    return buildStagePlayBadgeGraphV1({
-      generatedAt: resolvedAt,
-      graphId: `stage_play_badge_graph:${hashShort([input.threadId, "missing-room", resolvedAt])}`,
-      title: "Stage Play Badge Graph",
-      description: "No room source window has been admitted yet.",
-      sourceWindow: emptySourceWindow,
-      badges: [observerBadge({ sourceRefs: [], evidenceRefs: [], sources: defaultSources })],
-      edges: [],
-      recommendedActions: [],
-    });
-  }
-
   const sourceWindow = resolveStagePlaySourceWindow({
     threadId: input.threadId,
     roomId,
@@ -650,7 +605,46 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     sourceId: input.sourceId ?? null,
     now: resolvedAt,
   });
-  const snapshot = getLatestEnvironmentStateSnapshot(roomId);
+  const hasAdmittedSourceWindowRefs = [
+    ...sourceWindow.latestObservationRefs,
+    ...sourceWindow.latestSnapshotRefs,
+    ...sourceWindow.latestDeltaOverlayRefs,
+    ...sourceWindow.latestNavigationRefs,
+    ...(sourceWindow.latestSourceDescriptorRefs ?? []),
+    ...(sourceWindow.latestSourceProducerRefs ?? []),
+    ...(sourceWindow.latestRawSessionBufferRefs ?? []),
+  ].length > 0;
+  if (!roomId && !hasAdmittedSourceWindowRefs) {
+    return buildStagePlayBadgeGraphV1({
+      generatedAt: resolvedAt,
+      graphId: `stage_play_badge_graph:${hashShort([input.threadId, "missing-room", resolvedAt])}`,
+      title: "Stage Play Badge Graph",
+      description: "No room source window has been admitted yet.",
+      sourceWindow: {
+        threadId: input.threadId,
+        roomId,
+        worldId: null,
+        environmentId: input.environmentId ?? null,
+        fromTs: null,
+        toTs: resolvedAt,
+        latestObservationRefs: [],
+        latestSourceDescriptorRefs: [],
+        latestSourceProducerRefs: [],
+        latestRawSessionBufferRefs: [],
+        sources: sourceWindow.sources,
+        sourceRoutes: sourceWindow.sourceRoutes,
+        latestSnapshotRefs: [],
+        latestDeltaOverlayRefs: [],
+        latestNavigationRefs: [],
+        freshness: "missing" as const,
+      },
+      badges: [observerBadge({ sourceRefs: [], evidenceRefs: [], sources: sourceWindow.sources })],
+      edges: [],
+      recommendedActions: [],
+    });
+  }
+
+  const snapshot = roomId ? getLatestEnvironmentStateSnapshot(roomId) : null;
   const sourceRefs = makeSourceRefs({
     sourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
     sourceProducerRefs: sourceWindow.latestSourceProducerRefs,
@@ -758,7 +752,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     whyItMatters: "The interpreter node is the continual reflection boundary: it may produce evidence, but it cannot answer or act.",
     kind: "interpreter",
     status: sourceRefs.length > 0 ? "candidate" : "missing_evidence",
-    subjects: [input.threadId, roomId],
+    subjects: [input.threadId, roomId].filter((subject): subject is string => Boolean(subject)),
     tags: ["interpreter", "reflect_stage_play_context", "evidence_only"],
     sourceRefs,
     evidenceRefs,

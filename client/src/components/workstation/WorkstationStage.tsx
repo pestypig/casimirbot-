@@ -10,7 +10,7 @@ export function WorkstationStage({
   const stagePadding = layoutVariant === "mobile" ? "p-2 pb-0" : "p-3";
 
   return (
-    <main className={`min-h-0 min-w-0 overflow-hidden ${stagePadding}`}>
+    <main className={`h-full min-h-0 min-w-0 overflow-hidden ${stagePadding}`}>
       <WorkstationPanelGroupBox groupId={root.groupId} />
     </main>
   );

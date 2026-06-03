@@ -172,6 +172,34 @@ type StagePlayRemovedBadgeGhost = {
   rowIndex: number;
 };
 
+type StagePlayTooltipPosition = {
+  left: number;
+  top: number;
+  width: number;
+  maxHeight: number;
+};
+
+type StagePlayFloatingTooltip =
+  | {
+      key: string;
+      kind: "badge";
+      position: StagePlayTooltipPosition;
+      badge: StagePlayBadgeV1;
+      observerSources: StagePlayObserverSource[];
+    }
+  | {
+      key: string;
+      kind: "output";
+      position: StagePlayTooltipPosition;
+      node: StagePlaySyntheticNode;
+    }
+  | {
+      key: string;
+      kind: "draft";
+      position: StagePlayTooltipPosition;
+      node: DraftStagePlayNode;
+    };
+
 const STAGE_PLAY_LANES: Array<{ id: StagePlayLaneId; title: string }> = [
   { id: "observer", title: "Observer / Sources" },
   { id: "compact_observations", title: "Compact Observations" },
@@ -806,6 +834,124 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function floatingTooltipPosition(rect: DOMRect, input: {
+  width?: number;
+  estimatedHeight?: number;
+} = {}): StagePlayTooltipPosition {
+  const margin = 12;
+  const width = Math.min(input.width ?? 256, Math.max(220, window.innerWidth - margin * 2));
+  const maxHeight = Math.max(140, window.innerHeight - margin * 2);
+  const estimatedHeight = Math.min(input.estimatedHeight ?? 240, maxHeight);
+  const preferredBelow = rect.bottom + 8;
+  const preferredAbove = rect.top - estimatedHeight - 8;
+  const top = preferredBelow + estimatedHeight <= window.innerHeight - margin
+    ? preferredBelow
+    : preferredAbove >= margin
+      ? preferredAbove
+      : clampNumber(rect.top + rect.height / 2 - estimatedHeight / 2, margin, window.innerHeight - margin - estimatedHeight);
+  return {
+    left: clampNumber(rect.left + rect.width / 2 - width / 2, margin, window.innerWidth - margin - width),
+    top,
+    width,
+    maxHeight,
+  };
+}
+
+function StagePlayFloatingTooltipView({ tooltip }: { tooltip: StagePlayFloatingTooltip | null }) {
+  if (!tooltip) return null;
+  if (tooltip.kind === "badge") {
+    const { badge, observerSources } = tooltip;
+    return (
+      <div
+        className="pointer-events-none fixed z-[80] overflow-y-auto rounded-md border border-cyan-700/70 bg-slate-950/95 p-3 text-left text-xs text-slate-100 shadow-2xl"
+        style={{
+          left: tooltip.position.left,
+          top: tooltip.position.top,
+          width: tooltip.position.width,
+          maxHeight: tooltip.position.maxHeight,
+        }}
+        data-testid="stage-play-floating-tooltip"
+      >
+        <div className="font-semibold text-cyan-100">{badge.title}</div>
+        <div className="mt-1 text-slate-300">{badgeActionLine(badge)}</div>
+        <div className="mt-2 font-mono text-[11px] leading-snug text-cyan-100">
+          {proceduralExpression(badge) || labelize(badge.kind)}
+        </div>
+        <div className="mt-2 text-[11px] leading-relaxed text-slate-400">{badge.plainMeaning}</div>
+        {badge.kind === "observer" ? (
+          <div className="mt-2 space-y-1">
+            {observerSources.slice(0, 5).map((source) => (
+              <div key={`${source.sourceId}:${source.modality}`} className="rounded border border-slate-800 bg-black/20 px-2 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[10px] text-slate-200">{labelize(source.modality)}</span>
+                  <span className="text-[10px] text-slate-500">{labelize(source.status)}</span>
+                </div>
+                <div className="mt-0.5 truncate font-mono text-[10px] text-amber-100">
+                  {source.routeTo} {source.cadenceMs ? `@ ${source.cadenceMs}ms` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-2 flex flex-wrap gap-1">
+          <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.kind)}</span>
+          <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.status)}</span>
+          {badge.admission ? (
+            <span className="rounded border border-amber-700 px-1.5 py-0.5 text-[10px] text-amber-100">{labelize(badge.admission)}</span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+  if (tooltip.kind === "output") {
+    const { node } = tooltip;
+    return (
+      <div
+        className="pointer-events-none fixed z-[80] overflow-y-auto rounded-md border border-amber-700/70 bg-slate-950/95 p-3 text-left text-xs text-slate-100 shadow-2xl"
+        style={{
+          left: tooltip.position.left,
+          top: tooltip.position.top,
+          width: tooltip.position.width,
+          maxHeight: tooltip.position.maxHeight,
+        }}
+        data-testid="stage-play-floating-tooltip"
+      >
+        <div className="font-semibold text-amber-100">{node.title}</div>
+        <div className="mt-1 text-slate-300">{labelize(node.kind)}</div>
+        <div className="mt-2 flex flex-wrap gap-1">
+          <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(node.status)}</span>
+          <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{node.evidenceRefs.length} ref(s)</span>
+        </div>
+        <div className="mt-2 space-y-1 font-mono text-[10px] text-slate-500">
+          {node.evidenceRefs.slice(0, 4).map((ref) => <div key={ref} className="truncate">{ref}</div>)}
+        </div>
+      </div>
+    );
+  }
+  const { node } = tooltip;
+  return (
+    <div
+      className="pointer-events-none fixed z-[80] overflow-y-auto rounded-md border border-cyan-700/70 bg-slate-950/95 p-2 text-left text-xs text-slate-100 shadow-2xl"
+      style={{
+        left: tooltip.position.left,
+        top: tooltip.position.top,
+        width: tooltip.position.width,
+        maxHeight: tooltip.position.maxHeight,
+      }}
+      data-testid="stage-play-floating-tooltip"
+    >
+      <div className="font-semibold text-cyan-100">{node.label}</div>
+      <div className="mt-1 text-slate-300">{node.role}</div>
+      <div className="mt-1 font-mono text-[10px] text-cyan-100">draft.{node.kind} / {laneForDraftNode(node)}</div>
+      <div className="mt-1 text-[10px] text-slate-400">{node.parameters.length} parameter(s)</div>
+    </div>
+  );
+}
+
 function StagePlayGraphCanvas({
   graph,
   graphDiff,
@@ -830,6 +976,7 @@ function StagePlayGraphCanvas({
   onSelectDraftNode: (nodeId: string) => void;
 }) {
   const outputNodes = useMemo(() => outputNodesForGraph(graph), [graph]);
+  const [floatingTooltip, setFloatingTooltip] = useState<StagePlayFloatingTooltip | null>(null);
   const lanes = useMemo(() => STAGE_PLAY_LANES.map((lane) => ({
     ...lane,
     badges: graph.badges.filter((badge) => laneForBadge(badge) === lane.id),
@@ -942,14 +1089,11 @@ function StagePlayGraphCanvas({
         {lanes.map((lane, laneIndex) => (
           <div
             key={lane.id}
-            className="absolute bottom-0 top-0 rounded-md border border-slate-900/70 bg-slate-950/35"
+            className="pointer-events-none absolute bottom-0 top-0"
             style={{ left: 18 + laneIndex * 218, width: 196 }}
             data-testid={`stage-play-lane-${lane.id}`}
-          >
-            <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/90 px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-              {lane.title}
-            </div>
-          </div>
+            aria-hidden="true"
+          />
         ))}
         {graph.badges.map((badge: StagePlayBadgeV1) => {
           const point = positions.get(badge.id);
@@ -981,8 +1125,38 @@ function StagePlayGraphCanvas({
           return (
             <div
               key={badge.id}
-              className="group absolute"
+              className="absolute"
               style={{ left: point.x - (badge.kind === "observer" ? 80 : badge.kind === "procedural_binding" ? 88 : badge.kind === "intent_module" ? 64 : badge.kind === "affordance" || badge.kind === "blocked_affordance" || badge.kind === "setting" || badge.kind === "actor" ? 40 : 56), top: point.y - 28 }}
+              onMouseEnter={(event) => {
+                const key = `badge:${badge.id}`;
+                setFloatingTooltip({
+                  key,
+                  kind: "badge",
+                  badge,
+                  observerSources,
+                  position: floatingTooltipPosition(
+                    event.currentTarget.getBoundingClientRect(),
+                    { estimatedHeight: badge.kind === "observer" ? 340 : 230 },
+                  ),
+                });
+              }}
+              onMouseMove={(event) => {
+                const key = `badge:${badge.id}`;
+                const rect = event.currentTarget.getBoundingClientRect();
+                setFloatingTooltip((current) => current?.key === key
+                  ? {
+                      ...current,
+                      position: floatingTooltipPosition(
+                        rect,
+                        { estimatedHeight: badge.kind === "observer" ? 340 : 230 },
+                      ),
+                    }
+                  : current);
+              }}
+              onMouseLeave={() => {
+                const key = `badge:${badge.id}`;
+                setFloatingTooltip((current) => current?.key === key ? null : current);
+              }}
             >
               <button
                 type="button"
@@ -1029,36 +1203,6 @@ function StagePlayGraphCanvas({
                   </>
                 ) : null}
               </button>
-              <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-64 -translate-x-1/2 rounded-md border border-cyan-700/70 bg-slate-950/95 p-3 text-left text-xs text-slate-100 shadow-2xl group-hover:block">
-                <div className="font-semibold text-cyan-100">{badge.title}</div>
-                <div className="mt-1 text-slate-300">{badgeActionLine(badge)}</div>
-                <div className="mt-2 font-mono text-[11px] leading-snug text-cyan-100">
-                  {proceduralExpression(badge) || labelize(badge.kind)}
-                </div>
-                <div className="mt-2 line-clamp-3 text-[11px] leading-relaxed text-slate-400">{badge.plainMeaning}</div>
-                {badge.kind === "observer" ? (
-                  <div className="mt-2 space-y-1">
-                    {observerSources.slice(0, 5).map((source) => (
-                      <div key={`${source.sourceId}:${source.modality}`} className="rounded border border-slate-800 bg-black/20 px-2 py-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-[10px] text-slate-200">{labelize(source.modality)}</span>
-                          <span className="text-[10px] text-slate-500">{labelize(source.status)}</span>
-                        </div>
-                        <div className="mt-0.5 truncate font-mono text-[10px] text-amber-100">
-                          {source.routeTo} {source.cadenceMs ? `@ ${source.cadenceMs}ms` : ""}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.kind)}</span>
-                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(badge.status)}</span>
-                  {badge.admission ? (
-                    <span className="rounded border border-amber-700 px-1.5 py-0.5 text-[10px] text-amber-100">{labelize(badge.admission)}</span>
-                  ) : null}
-                </div>
-              </div>
             </div>
           );
         })}
@@ -1107,13 +1251,36 @@ function StagePlayGraphCanvas({
               onClick={() => {
                 if (node.relatedBadgeIds[0]) onSelect(node.relatedBadgeIds[0]);
               }}
-              className={`group absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
+              className={`absolute flex ${shapeClass} items-center justify-center border px-2 text-center text-[10px] font-semibold uppercase tracking-wide transition ${syntheticNodeTone(node)} hover:border-cyan-400 ${outputPulse}`}
               style={{
                 left: point.x - (node.kind === "live_answer" ? 80 : node.kind === "prediction" ? 68 : 56),
                 top: point.y - (node.kind === "live_answer" ? 40 : 28),
               }}
               aria-label={node.title}
               data-testid="stage-play-output-node"
+              onMouseEnter={(event) => {
+                const key = `output:${node.id}`;
+                setFloatingTooltip({
+                  key,
+                  kind: "output",
+                  node,
+                  position: floatingTooltipPosition(event.currentTarget.getBoundingClientRect(), { estimatedHeight: 190 }),
+                });
+              }}
+              onMouseMove={(event) => {
+                const key = `output:${node.id}`;
+                const rect = event.currentTarget.getBoundingClientRect();
+                setFloatingTooltip((current) => current?.key === key
+                  ? {
+                      ...current,
+                      position: floatingTooltipPosition(rect, { estimatedHeight: 190 }),
+                    }
+                  : current);
+              }}
+              onMouseLeave={() => {
+                const key = `output:${node.id}`;
+                setFloatingTooltip((current) => current?.key === key ? null : current);
+              }}
             >
               {node.kind === "validation" ? (
                 <span className="text-base" aria-hidden="true">{node.status === "blocked" ? "x" : "ok"}</span>
@@ -1126,17 +1293,6 @@ function StagePlayGraphCanvas({
               ) : (
                 <span aria-hidden="true">.</span>
               )}
-              <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-64 -translate-x-1/2 rounded-md border border-amber-700/70 bg-slate-950/95 p-3 text-left text-xs normal-case tracking-normal text-slate-100 shadow-2xl group-hover:block">
-                <div className="font-semibold text-amber-100">{node.title}</div>
-                <div className="mt-1 text-slate-300">{labelize(node.kind)}</div>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{labelize(node.status)}</span>
-                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">{node.evidenceRefs.length} ref(s)</span>
-                </div>
-                <div className="mt-2 space-y-1 font-mono text-[10px] text-slate-500">
-                  {node.evidenceRefs.slice(0, 4).map((ref) => <div key={ref} className="truncate">{ref}</div>)}
-                </div>
-              </div>
             </button>
           );
         })}
@@ -1144,7 +1300,7 @@ function StagePlayGraphCanvas({
           <button
             type="button"
             key={node.id}
-            className={`group absolute flex h-12 w-12 items-center justify-center rounded-sm border-2 shadow-lg transition ${
+            className={`absolute flex h-12 w-12 items-center justify-center rounded-sm border-2 shadow-lg transition ${
               selectedDraftNodeId === node.id
                 ? "border-cyan-300 bg-cyan-950/70 shadow-[0_0_24px_rgba(34,211,238,0.25)]"
                 : kindTone(node.kind)
@@ -1153,19 +1309,37 @@ function StagePlayGraphCanvas({
             aria-label={`Draft ${node.label} node`}
             data-testid="stage-play-draft-node"
             onClick={() => onSelectDraftNode(node.id)}
+            onMouseEnter={(event) => {
+              const key = `draft:${node.id}`;
+              setFloatingTooltip({
+                key,
+                kind: "draft",
+                node,
+                position: floatingTooltipPosition(event.currentTarget.getBoundingClientRect(), { width: 224, estimatedHeight: 130 }),
+              });
+            }}
+            onMouseMove={(event) => {
+              const key = `draft:${node.id}`;
+              const rect = event.currentTarget.getBoundingClientRect();
+              setFloatingTooltip((current) => current?.key === key
+                ? {
+                    ...current,
+                    position: floatingTooltipPosition(rect, { width: 224, estimatedHeight: 130 }),
+                  }
+                : current);
+            }}
+            onMouseLeave={() => {
+              const key = `draft:${node.id}`;
+              setFloatingTooltip((current) => current?.key === key ? null : current);
+            }}
           >
             <span
               aria-hidden="true"
               className="h-5 w-5 rounded-sm border border-cyan-200 bg-cyan-400/80"
             />
-            <div className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-40 hidden w-56 -translate-x-1/2 rounded-md border border-cyan-700/70 bg-slate-950/95 p-2 text-left text-xs text-slate-100 shadow-2xl group-hover:block">
-              <div className="font-semibold text-cyan-100">{node.label}</div>
-              <div className="mt-1 text-slate-300">{node.role}</div>
-              <div className="mt-1 font-mono text-[10px] text-cyan-100">draft.{node.kind} / {laneForDraftNode(node)}</div>
-              <div className="mt-1 text-[10px] text-slate-400">{node.parameters.length} parameter(s)</div>
-            </div>
           </button>
         ))}
+        <StagePlayFloatingTooltipView tooltip={floatingTooltip} />
       </div>
     </div>
   );
@@ -1176,6 +1350,7 @@ function DraftNodeParameterEditor({
   sourceOptions,
   draftValidation,
   onClose,
+  onRemove,
   onUpdateParameter,
   onAddParameter,
   onSetSourceClass,
@@ -1185,6 +1360,7 @@ function DraftNodeParameterEditor({
   sourceOptions: StagePlaySourceOption[];
   draftValidation?: StagePlayGraphDraftValidationV1 | null;
   onClose: () => void;
+  onRemove: (nodeId: string) => void;
   onUpdateParameter: (nodeId: string, parameterId: string, field: "key" | "value", value: string) => void;
   onAddParameter: (nodeId: string) => void;
   onSetSourceClass: (nodeId: string, sourceClass: string) => void;
@@ -1210,14 +1386,24 @@ function DraftNodeParameterEditor({
           <div className="mt-0.5 text-base font-semibold leading-tight">{node.label}</div>
           <div className="mt-1 font-mono text-[11px] text-slate-500">draft.{node.kind}</div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:border-slate-500"
-          aria-label="Close draft parameters"
-        >
-          Close
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onRemove(node.id)}
+            className="rounded border border-rose-800/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-rose-200 hover:border-rose-500"
+            aria-label="Remove draft node"
+          >
+            Remove
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-slate-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 hover:border-slate-500"
+            aria-label="Close draft parameters"
+          >
+            Close
+          </button>
+        </div>
       </div>
 
       {node.kind === "source" ? (
@@ -1398,6 +1584,7 @@ function StagePlayBindingOverlay({
     : "Click badges in the map to assemble a procedural trace.";
   const liveNodeGroups = activeFilterKind ? groupedBadges : [];
   const visibleBadges = liveNodeGroups.flatMap((group) => group.badges);
+  const selectedBadgeIsObserver = selectedBadge?.kind === "observer";
 
   function addNodeType(kind: StagePlayBadgeV1["kind"]) {
     const matchingIds = graph.badges.filter((badge) => badge.kind === kind).map((badge) => badge.id);
@@ -1474,6 +1661,30 @@ function StagePlayBindingOverlay({
             })}
           </div>
         </Section>
+
+        {selectedBadgeIsObserver ? (
+          <div className="mt-3">
+            <Inspector
+              badge={selectedBadge}
+              relatedEdges={relatedEdges}
+              relatedBadges={relatedBadges}
+              relatedActions={relatedActions}
+              observerSources={graph.sourceWindow.sources}
+              onObserverDraftAction={onObserverDraftAction}
+              sourceSetupCadenceMs={sourceSetupCadenceMs}
+              sourceSetupStatus={sourceSetupStatus}
+              onSetSourceSetupCadenceMs={onSetSourceSetupCadenceMs}
+              onStartVisualSourceSetup={onStartVisualSourceSetup}
+              onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
+              onPauseVisualSourceSetup={onPauseVisualSourceSetup}
+              sourceAuditSelection={sourceAuditSelection}
+              rawSessionBufferEntries={rawSessionBufferEntries}
+              rawSessionBufferLoading={rawSessionBufferLoading}
+              onOpenSourceAudit={onOpenSourceAudit}
+              onClearRawSessionBuffer={onClearRawSessionBuffer}
+            />
+          </div>
+        ) : null}
 
         <Section title="Tool assembly">
           <div data-testid="stage-play-builder-artifacts" className="space-y-2 text-xs">
@@ -1590,6 +1801,7 @@ function StagePlayBindingOverlay({
           ))}
         </div>
 
+        {!selectedBadgeIsObserver ? (
         <div className="mt-3">
           <Inspector
             badge={selectedBadge}
@@ -1611,6 +1823,7 @@ function StagePlayBindingOverlay({
             onClearRawSessionBuffer={onClearRawSessionBuffer}
           />
         </div>
+        ) : null}
       </div>
     </aside>
   );
@@ -2242,6 +2455,16 @@ export default function StagePlayBadgeGraphPanel() {
     () => graph?.badges.find((badge) => badge.id === selectedBadgeId) ?? null,
     [graph?.badges, selectedBadgeId],
   );
+  function selectGraphBadge(badgeId: string) {
+    const badge = graph?.badges.find((entry) => entry.id === badgeId) ?? null;
+    toggleSelectedBadgeId(badgeId);
+    if (badge?.kind === "observer") {
+      setActiveFilterKind("observer");
+      setBindingOverlayOpen(true);
+    } else if (badge?.kind) {
+      setActiveFilterKind(badge.kind);
+    }
+  }
   const relatedEdges = useMemo(
     () => graph && selectedBadge
       ? graph.edges.filter((edge) => edge.from === selectedBadge.id || edge.to === selectedBadge.id)
@@ -2335,6 +2558,11 @@ export default function StagePlayBadgeGraphPanel() {
     );
   }
 
+  function removeDraftNode(nodeId: string) {
+    setDraftNodes((nodes) => nodes.filter((node) => node.id !== nodeId));
+    setSelectedDraftNodeId((current) => current === nodeId ? null : current);
+  }
+
   function setDraftSourceClass(nodeId: string, sourceClass: string) {
     setDraftNodes((nodes) =>
       nodes.map((node) => node.id === nodeId ? setDraftParameterValue(node, "source_class", sourceClass) : node),
@@ -2400,6 +2628,51 @@ export default function StagePlayBadgeGraphPanel() {
     };
     setDraftNodes((nodes) => [...nodes, nextNode]);
     setSelectedDraftNodeId(nextNode.id);
+  }
+
+  function routeTargetForObserverAction(source: StagePlayObserverSource, action: StagePlayObserverDraftAction): string | null {
+    if (action === "route_to_narrative") return "narrative_stage_play";
+    if (action === "route_to_minecraft_world") return "world_stage_play";
+    if (action === "use_for_stage_play") return source.routeTo;
+    return null;
+  }
+
+  async function persistObserverSourceRoute(source: StagePlayObserverSource, action: StagePlayObserverDraftAction) {
+    const routeTo = routeTargetForObserverAction(source, action);
+    if (!routeTo) return;
+    setSourceSetupStatus({
+      level: "working",
+      message: `Updating ${labelize(source.modality)} route for Stage Play...`,
+    });
+    try {
+      await postJson("/api/helix/stage-play/source-route", {
+        threadId,
+        roomId,
+        environmentId,
+        sourceId: source.sourceId,
+        modality: source.modality,
+        routeTo,
+        selectedForStagePlay: true,
+        evidenceRefs: source.evidenceRefs.slice(-6),
+      });
+      setSourceSetupStatus({
+        level: "ok",
+        message: `${labelize(source.modality)} routed to ${routeTo}.`,
+      });
+      await Promise.all([graphQuery.refetch(), builderContextQuery.refetch()]);
+    } catch (error) {
+      setSourceSetupStatus({
+        level: "error",
+        message: error instanceof Error ? error.message : "stage_play_source_route_update_failed",
+      });
+    }
+  }
+
+  function handleObserverDraftAction(source: StagePlayObserverSource | null, action: StagePlayObserverDraftAction) {
+    addObserverDraftAction(source, action);
+    if (source) {
+      void persistObserverSourceRoute(source, action);
+    }
   }
 
   async function postJson(path: string, body?: Record<string, unknown>): Promise<any> {
@@ -2752,7 +3025,7 @@ export default function StagePlayBadgeGraphPanel() {
             relatedBadges={relatedBadges}
             relatedActions={relatedActions}
             onStartBuilderDrag={startBuilderDrag}
-            onObserverDraftAction={addObserverDraftAction}
+            onObserverDraftAction={handleObserverDraftAction}
             sourceSetupCadenceMs={sourceSetupCadenceMs}
             sourceSetupStatus={sourceSetupStatus}
             onSetSourceSetupCadenceMs={setSourceSetupCadenceMs}
@@ -2790,6 +3063,7 @@ export default function StagePlayBadgeGraphPanel() {
                 sourceOptions={sourceOptions}
                 draftValidation={draftValidation}
                 onClose={() => setSelectedDraftNodeId(null)}
+                onRemove={removeDraftNode}
                 onUpdateParameter={updateDraftParameter}
                 onAddParameter={addDraftParameter}
                 onSetSourceClass={setDraftSourceClass}
@@ -2809,7 +3083,7 @@ export default function StagePlayBadgeGraphPanel() {
             draftNodes={draftNodes}
             selectedDraftNodeId={selectedDraftNodeId}
             scrollportRef={graphScrollportRef}
-            onSelect={toggleSelectedBadgeId}
+            onSelect={selectGraphBadge}
             onSelectDraftNode={setSelectedDraftNodeId}
           />
         </main>

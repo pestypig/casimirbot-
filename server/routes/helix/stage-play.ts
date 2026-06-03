@@ -15,6 +15,10 @@ import {
   stagePlayRawSessionId,
 } from "../../services/stage-play/stage-play-raw-session-buffer-store";
 import {
+  isStagePlaySourceRouteTarget,
+  upsertStagePlaySourceRouteOverride,
+} from "../../services/situation-room/stage-play-source-window";
+import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
   STAGE_PLAY_RAW_SESSION_BUFFER_RETENTION_POLICIES,
   type StagePlayRawSessionBufferRawKindV1,
@@ -62,6 +66,11 @@ helixStagePlayRouter.options("/raw-session-buffer/:entryId", (_req, res) => {
   res.status(200).end();
 });
 
+helixStagePlayRouter.options("/source-route", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 const isRawKind = (value: unknown): value is StagePlayRawSessionBufferRawKindV1 =>
   typeof value === "string" && STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS.includes(value as StagePlayRawSessionBufferRawKindV1);
 
@@ -77,6 +86,13 @@ const readOptionalNumber = (value: unknown): number | null =>
     : typeof value === "string" && Number.isFinite(Number(value))
       ? Number(value)
       : null;
+
+const readOptionalBoolean = (value: unknown): boolean | undefined =>
+  typeof value === "boolean"
+    ? value
+    : typeof value === "string" && /^(true|false)$/i.test(value.trim())
+      ? value.trim().toLowerCase() === "true"
+      : undefined;
 
 helixStagePlayRouter.get("/graph", (req: Request, res: Response) => {
   setCors(res);
@@ -216,6 +232,40 @@ helixStagePlayRouter.post("/raw-session-buffer/clear", (req: Request, res: Respo
     ...result,
     assistant_answer: false,
     context_role: "audit_buffer_not_graph",
+  });
+});
+
+helixStagePlayRouter.post("/source-route", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+  const sourceId = readQueryString(body.sourceId) ?? readQueryString(body.source_id);
+  const modality = readQueryString(body.modality);
+  const routeTo = body.routeTo ?? body.route_to;
+  if (!sourceId || !modality || !isStagePlaySourceRouteTarget(routeTo)) {
+    return res.status(400).json({
+      ok: false,
+      error: "invalid_stage_play_source_route",
+      assistant_answer: false,
+      context_role: "ui_request_not_instruction",
+    });
+  }
+  const override = upsertStagePlaySourceRouteOverride({
+    threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId),
+    roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+    environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+    sourceId,
+    modality,
+    routeTo,
+    selectedForStagePlay: readOptionalBoolean(body.selectedForStagePlay ?? body.selected_for_stage_play),
+    evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
+  });
+  return res.json({
+    ok: true,
+    schema: "stage_play_source_route_override_response/v1",
+    override,
+    assistant_answer: false,
+    context_role: "ui_request_not_instruction",
   });
 });
 

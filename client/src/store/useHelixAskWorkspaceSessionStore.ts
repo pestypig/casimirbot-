@@ -1,6 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { persist } from "zustand/middleware";
 import type { WorkstationLayoutSnapshot } from "@/store/useWorkstationLayoutStore";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 type HelixAskWorkspaceSessionState = {
   layoutSnapshots: Record<string, WorkstationLayoutSnapshot>;
@@ -17,6 +18,16 @@ export const useHelixAskWorkspaceSessionStore = createWithEqualityFn<HelixAskWor
       saveLayoutSnapshot: (sessionId, snapshot) => {
         const key = sessionId.trim();
         if (!key) return;
+        useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+          artifact_id: `helix-chat-layout:${key}`,
+          artifact_type: "helix_chat_layout",
+          storage_key: STORAGE_KEY,
+          storage_backend: "localStorage",
+          owner_scope: "browser_guest",
+          sync_status: "local_only",
+          chat_session_id: key,
+          title: "Workstation layout",
+        });
         set((state) => ({
           layoutSnapshots: {
             ...state.layoutSnapshots,

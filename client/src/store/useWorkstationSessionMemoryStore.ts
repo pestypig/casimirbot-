@@ -4,6 +4,7 @@ import {
   HELIX_WORKSTATION_MEMORY_SCHEMA,
   type HelixWorkstationMemorySnapshot,
 } from "@shared/helix-workstation-memory";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 const WORKSTATION_SESSION_MEMORY_KEY = "workstation-session-memory:v1";
 
@@ -69,6 +70,15 @@ export const useWorkstationSessionMemoryStore = create<WorkstationSessionMemoryS
       rememberPanelScroll: (key, scroll) => {
         const normalizedKey = normalizeKey(key);
         if (!normalizedKey) return;
+        useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+          artifact_id: `workstation-panel-scroll:${normalizedKey}`,
+          artifact_type: "workstation_panel_scroll",
+          storage_key: WORKSTATION_SESSION_MEMORY_KEY,
+          storage_backend: "sessionStorage",
+          owner_scope: "surface_session_only",
+          sync_status: "local_only",
+          title: normalizedKey,
+        });
         set((state) => ({
           panelScroll: {
             ...state.panelScroll,
@@ -89,6 +99,15 @@ export const useWorkstationSessionMemoryStore = create<WorkstationSessionMemoryS
       rememberDraft: (key, text) => {
         const normalizedKey = normalizeKey(key);
         if (!normalizedKey) return;
+        useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+          artifact_id: `workstation-session-draft:${normalizedKey}`,
+          artifact_type: "workstation_session_draft",
+          storage_key: WORKSTATION_SESSION_MEMORY_KEY,
+          storage_backend: "sessionStorage",
+          owner_scope: "surface_session_only",
+          sync_status: "local_only",
+          title: normalizedKey,
+        });
         set((state) => ({
           drafts: {
             ...state.drafts,
@@ -111,6 +130,9 @@ export const useWorkstationSessionMemoryStore = create<WorkstationSessionMemoryS
           if (!state.drafts[normalizedKey]) return state;
           const drafts = { ...state.drafts };
           delete drafts[normalizedKey];
+          useWorkspaceMemoryRegistryStore.getState().removeArtifact(
+            `workstation-session-draft:${normalizedKey}`,
+          );
           return { drafts };
         });
       },

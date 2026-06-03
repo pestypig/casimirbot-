@@ -1,6 +1,7 @@
 import { createWithEqualityFn } from "zustand/traditional";
 import { persist } from "zustand/middleware";
 import type { ChatMessage, ChatRole, ChatSession } from "@shared/agi-chat";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 
 export type { ChatMessage, ChatRole, ChatSession };
 
@@ -47,6 +48,20 @@ function titleFromFirstMessage(content: string): string {
   return normalized.length > 64 ? `${normalized.slice(0, 61)}...` : normalized;
 }
 
+function registerChatMemoryArtifact(session: ChatSession) {
+  useWorkspaceMemoryRegistryStore.getState().upsertArtifact({
+    artifact_id: `helix-chat-session:${session.id}`,
+    artifact_type: "helix_chat_session",
+    storage_key: STORAGE_KEY,
+    storage_backend: "localStorage",
+    owner_scope: "browser_guest",
+    sync_status: "profile_candidate",
+    chat_session_id: session.id,
+    title: session.title,
+    updated_at: session.updatedAt,
+  });
+}
+
 export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
   persist(
     (set, get) => ({
@@ -68,6 +83,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           sessions: { ...state.sessions, [id]: session },
           activeId: id
         }));
+        registerChatMemoryArtifact(session);
         return id;
       },
       setActive: (id: string) => set({ activeId: id }),
@@ -81,20 +97,22 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         set((state) => {
           const target = state.sessions[sessionId];
           if (!target) return state;
+          const updatedSession = {
+            ...target,
+            title:
+              partial.role === "user" &&
+              target.messages.length === 0 &&
+              (DEFAULT_CHAT_TITLES.has(target.title) || target.title === target.contextId)
+                ? titleFromFirstMessage(partial.content)
+                : target.title,
+            messages: [...target.messages, complete],
+            updatedAt: complete.at
+          };
+          registerChatMemoryArtifact(updatedSession);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: {
-                ...target,
-                title:
-                  partial.role === "user" &&
-                  target.messages.length === 0 &&
-                  (DEFAULT_CHAT_TITLES.has(target.title) || target.title === target.contextId)
-                    ? titleFromFirstMessage(partial.content)
-                    : target.title,
-                messages: [...target.messages, complete],
-                updatedAt: complete.at
-              }
+              [sessionId]: updatedSession
             }
           };
         });
@@ -123,6 +141,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
         set((state) => ({
           sessions: { ...state.sessions, [id]: session }
         }));
+        registerChatMemoryArtifact(session);
         return id;
       },
       getThreadForContext: (contextId) => {
@@ -146,10 +165,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           const target = state.sessions[sessionId];
           if (!target) return state;
           const updatedAt = new Date().toISOString();
+          const updatedSession = { ...target, personaId, updatedAt };
+          registerChatMemoryArtifact(updatedSession);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, personaId, updatedAt }
+              [sessionId]: updatedSession
             }
           };
         }),
@@ -158,10 +179,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           const target = state.sessions[sessionId];
           if (!target) return state;
           const updatedAt = new Date().toISOString();
+          const updatedSession = { ...target, messages: [], updatedAt };
+          registerChatMemoryArtifact(updatedSession);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, messages: [], updatedAt }
+              [sessionId]: updatedSession
             }
           };
         }),
@@ -170,6 +193,8 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           if (!state.sessions[sessionId]) return state;
           const nextSessions = { ...state.sessions };
           delete nextSessions[sessionId];
+          useWorkspaceMemoryRegistryStore.getState().removeArtifact(`helix-chat-session:${sessionId}`);
+          useWorkspaceMemoryRegistryStore.getState().removeArtifact(`helix-chat-layout:${sessionId}`);
           const nextActive =
             state.activeId === sessionId ? Object.keys(nextSessions)[0] : state.activeId;
           return {
@@ -182,10 +207,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           const target = state.sessions[sessionId];
           if (!target) return state;
           const updatedAt = new Date().toISOString();
+          const updatedSession = { ...target, title, updatedAt };
+          registerChatMemoryArtifact(updatedSession);
           return {
             sessions: {
               ...state.sessions,
-              [sessionId]: { ...target, title, updatedAt }
+              [sessionId]: updatedSession
             }
           };
         }),
@@ -205,6 +232,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
             const existing = sessions[session.id];
             if (!existing) {
               sessions[session.id] = session;
+              registerChatMemoryArtifact(session);
               activeId = activeId ?? session.id;
               continue;
             }
@@ -224,6 +252,7 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
                     ? incomingMessages
                     : existing.messages
               };
+              registerChatMemoryArtifact(sessions[session.id]);
             }
           }
           return { sessions, activeId };

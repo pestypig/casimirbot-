@@ -1,6 +1,7 @@
 import React from "react";
-import { Archive, ChevronDown, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, ChevronDown, Database, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
 
@@ -132,6 +133,9 @@ export default function AccountSessionPanel() {
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
   const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
   const [categorizationJobs, setCategorizationJobs] = React.useState<CategorizationJobView[]>([]);
+  const memoryRegistrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
+    state.buildRegistrySnapshot(),
+  );
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -386,6 +390,50 @@ export default function AccountSessionPanel() {
                   <span className="break-all text-slate-400">{account.display_name || account.external_id}</span>
                   <span className="text-slate-300">{account.status}</span>
                   <span className="text-slate-300">{account.authority ?? "viewer"}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <Database className="h-3.5 w-3.5" />
+            Workspace Memory
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Local registry for notes, Helix Ask chats, layout snapshots, and browser-session drafts.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+            <Metric label="Artifacts" value={memoryRegistrySnapshot.artifacts.length} />
+            <Metric label="Profile-ready" value={memoryRegistrySnapshot.profile_ready_artifact_count} />
+            <Metric label="Local only" value={memoryRegistrySnapshot.local_only_artifact_count} />
+            <Metric label="Session only" value={memoryRegistrySnapshot.session_only_artifact_count} />
+          </div>
+          <div className="mt-3 space-y-1.5">
+            {memoryRegistrySnapshot.artifacts.length === 0 ? (
+              <p className="text-xs text-slate-500">No workspace memory artifacts have been registered yet.</p>
+            ) : (
+              memoryRegistrySnapshot.artifacts.slice(0, 8).map((artifact) => (
+                <div
+                  key={artifact.artifact_id}
+                  className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs lg:grid-cols-[1fr_130px_130px_130px]"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-slate-200">
+                      {artifact.title || artifact.artifact_id}
+                    </div>
+                    <div className="mt-1 truncate text-slate-500">{artifact.artifact_type}</div>
+                  </div>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    {artifact.owner_scope}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    {artifact.storage_backend}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
+                    {artifact.sync_status}
+                  </span>
                 </div>
               ))
             )}

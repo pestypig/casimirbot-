@@ -5,6 +5,7 @@ import type { HelixMinecraftWorldSenseContext } from "@shared/helix-minecraft-wo
 import type { HelixLiveSourceDescriptor } from "@shared/helix-live-source-descriptor";
 import type { HelixLiveSourceProducer } from "@shared/helix-live-source-producer";
 import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
+import { STAGE_PLAY_SOURCE_ROUTES } from "@shared/contracts/stage-play-badge-graph.v1";
 import type {
   StagePlaySourceRouteTargetV1,
   StagePlaySourceRouteV1,
@@ -25,11 +26,27 @@ import { listStagePlayRawSessionBufferEntries } from "../stage-play/stage-play-r
 
 export const STAGE_PLAY_SOURCE_WINDOW_SCHEMA = "stage_play_source_window/v1" as const;
 
+export type StagePlaySourceRouteOverrideV1 = {
+  schemaVersion: "stage_play_source_route_override/v1";
+  overrideId: string;
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  modality: string;
+  routeTo: StagePlaySourceRouteTargetV1;
+  selectedForStagePlay?: boolean;
+  updatedAt: string;
+  evidenceRefs: string[];
+  assistant_answer: false;
+  context_role: "ui_request_not_instruction";
+};
+
 export type StagePlaySourceWindowV1 = {
   schemaVersion: typeof STAGE_PLAY_SOURCE_WINDOW_SCHEMA;
   resolvedAt: string;
   threadId?: string | null;
-  roomId: string;
+  roomId?: string | null;
   worldId?: string | null;
   environmentId?: string | null;
   actorLabel?: string | null;
@@ -171,8 +188,72 @@ export type StagePlaySourceWindowV1 = {
   };
 };
 
+const sourceRouteOverrides = new Map<string, StagePlaySourceRouteOverrideV1>();
+
+const routeOverrideKey = (input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  modality: string;
+}): string => [
+  input.threadId ?? "",
+  input.roomId ?? "",
+  input.environmentId ?? "",
+  input.sourceId,
+  input.modality,
+].join("\u001f");
+
+export const isStagePlaySourceRouteTarget = (value: unknown): value is StagePlaySourceRouteTargetV1 =>
+  typeof value === "string" && STAGE_PLAY_SOURCE_ROUTES.includes(value as StagePlaySourceRouteTargetV1);
+
+export function upsertStagePlaySourceRouteOverride(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  modality: string;
+  routeTo: StagePlaySourceRouteTargetV1;
+  selectedForStagePlay?: boolean;
+  evidenceRefs?: string[];
+  now?: string;
+}): StagePlaySourceRouteOverrideV1 {
+  const updatedAt = input.now ?? new Date().toISOString();
+  const override: StagePlaySourceRouteOverrideV1 = {
+    schemaVersion: "stage_play_source_route_override/v1",
+    overrideId: `stage_play_source_route_override:${Buffer.from(routeOverrideKey(input)).toString("base64url")}`,
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId,
+    modality: input.modality,
+    routeTo: input.routeTo,
+    selectedForStagePlay: input.selectedForStagePlay,
+    updatedAt,
+    evidenceRefs: uniqueStrings(input.evidenceRefs ?? []),
+    assistant_answer: false,
+    context_role: "ui_request_not_instruction",
+  };
+  sourceRouteOverrides.set(routeOverrideKey(input), override);
+  return override;
+}
+
+export function getStagePlaySourceRouteOverride(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  modality: string;
+}): StagePlaySourceRouteOverrideV1 | null {
+  return sourceRouteOverrides.get(routeOverrideKey(input)) ?? null;
+}
+
+export function resetStagePlaySourceRouteOverridesForTest(): void {
+  sourceRouteOverrides.clear();
+}
+
 export type ResolveStagePlaySourceWindowInput = {
-  roomId: string;
+  roomId?: string | null;
   threadId?: string | null;
   sourceId?: string | null;
   sourceKind?: string | null;
@@ -391,6 +472,41 @@ const routeFromSource = (source: StagePlaySourceRoutingEntryV1): StagePlaySource
   freshness: source.status,
 });
 
+const applyRouteOverride = (
+  source: StagePlaySourceRoutingEntryV1,
+  context: {
+    threadId?: string | null;
+    roomId?: string | null;
+    environmentId?: string | null;
+  },
+): StagePlaySourceRoutingEntryV1 => {
+  const override = getStagePlaySourceRouteOverride({
+    ...context,
+    sourceId: source.sourceId,
+    modality: source.modality,
+  });
+  if (!override) return source;
+  const canSelectSource =
+    source.evidenceRefs.length > 0 &&
+    (source.status === "active" || source.status === "stale") &&
+    override.routeTo !== "debug_only" &&
+    override.routeTo !== "live_answer_output";
+  const updated: StagePlaySourceRoutingEntryV1 = {
+    ...source,
+    routeTo: override.routeTo,
+    selectedForStagePlay: override.selectedForStagePlay === false
+      ? false
+      : override.selectedForStagePlay === true
+        ? canSelectSource
+        : selectedForStagePlay(source.status, override.routeTo, source.evidenceRefs),
+    evidenceRefs: uniqueStrings([...source.evidenceRefs, override.overrideId, ...override.evidenceRefs]),
+  };
+  return {
+    ...updated,
+    route: routeFromSource(updated),
+  };
+};
+
 export function buildDefaultStagePlayRoutingSources(input: {
   threadId?: string | null;
   environmentId?: string | null;
@@ -501,6 +617,9 @@ const compactRoutedSource = (input: {
 };
 
 function buildStagePlayRoutingSources(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
   descriptors: HelixLiveSourceDescriptor[];
   producers: HelixLiveSourceProducer[];
   observations: LiveSourceObservation[];
@@ -654,10 +773,16 @@ function buildStagePlayRoutingSources(input: {
     }
   }
 
-  return Array.from(byKey.values()).map((source) => ({
-    ...source,
-    route: routeFromSource(source),
-  })).sort((a, b) =>
+  return Array.from(byKey.values()).map((source) =>
+    applyRouteOverride({
+      ...source,
+      route: routeFromSource(source),
+    }, {
+      threadId: input.threadId,
+      roomId: input.roomId,
+      environmentId: input.environmentId,
+    })
+  ).sort((a, b) =>
     Number(b.selectedForStagePlay) - Number(a.selectedForStagePlay) ||
     a.routeTo.localeCompare(b.routeTo) ||
     a.modality.localeCompare(b.modality) ||
@@ -666,59 +791,75 @@ function buildStagePlayRoutingSources(input: {
 }
 
 export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindowInput): StagePlaySourceWindowV1 {
+  const roomId = input.roomId ?? null;
   const descriptors = listLiveSourceDescriptors({
     threadId: input.threadId ?? null,
     sourceId: input.sourceId ?? null,
     environmentId: input.environmentId ?? null,
     limit: 24,
   });
-  const descriptorSourceIds = new Set(descriptors.map((descriptor) => descriptor.source_id));
   const producers = listLiveSourceProducers({
     threadId: input.threadId ?? null,
   }).filter((producer) =>
-    (!input.sourceId || producer.source_id === input.sourceId) &&
-    (descriptorSourceIds.size === 0 || descriptorSourceIds.has(producer.source_id))
+    !input.sourceId || producer.source_id === input.sourceId
   ).slice(-24);
   const observations = listLiveSourceObservations({
     threadId: input.threadId ?? null,
     sourceId: input.sourceId ?? null,
     sourceKind: input.sourceKind ?? null,
     limit: input.observationLimit ?? 8,
-  }).filter((observation) => observation.room_id === input.roomId || !observation.room_id);
-  const snapshot = getLatestEnvironmentStateSnapshot(input.roomId);
+  }).filter((observation) => (roomId ? observation.room_id === roomId || !observation.room_id : !observation.room_id));
+  const snapshot = roomId ? getLatestEnvironmentStateSnapshot(roomId) : null;
   const resolvedAt = input.now ?? new Date().toISOString();
   const capabilities = buildSituationSourceCapabilities({
     threadId: input.threadId ?? "helix-ask:desktop",
-    roomId: input.roomId,
+    roomId,
     includeDefaults: false,
     now: resolvedAt,
   });
   const rawSessionBufferEntries = listStagePlayRawSessionBufferEntries({
     threadId: input.threadId ?? "helix-ask:desktop",
-    roomId: input.roomId,
+    roomId: roomId ?? undefined,
     limit: 50,
     now: new Date(resolvedAt),
   });
   const worldId = input.worldId ?? snapshot?.world_id ?? null;
-  const overlay = listMinecraftWorldDeltaOverlaysForRoom(input.roomId)
+  const overlay = roomId ? listMinecraftWorldDeltaOverlaysForRoom(roomId)
     .filter((entry) => !worldId || entry.world_id === worldId)
     .sort((a, b) => a.ts.localeCompare(b.ts) || a.overlay_id.localeCompare(b.overlay_id))
-    .at(-1) ?? null;
-  const navigationQuery = queryMinecraftNavigationState({
-    roomId: input.roomId,
-    worldId,
-    actorLabel: input.actorLabel ?? snapshot?.actor_label ?? null,
-    limit: 6,
-  });
-  const worldSense = getLatestMinecraftWorldSenseContextForRoom(input.roomId);
-  const eventWindow = queryEventWindow({
-    source_family: "minecraft",
-    room_id: input.roomId,
-    world_id: worldId,
-    thread_id: input.threadId ?? null,
-    limit: input.eventLimit ?? 12,
-    include_raw_events: false,
-  });
+    .at(-1) ?? null : null;
+  const navigationQuery = roomId
+    ? queryMinecraftNavigationState({
+        roomId,
+        worldId,
+        actorLabel: input.actorLabel ?? snapshot?.actor_label ?? null,
+        limit: 6,
+      })
+    : {
+        room_id: null,
+        world_id: worldId,
+        actor_label: input.actorLabel ?? null,
+        navigation_state: null,
+        latest_solver_observations: [],
+        missing_evidence: [],
+        evidence_refs: [],
+      };
+  const worldSense = roomId ? getLatestMinecraftWorldSenseContextForRoom(roomId) : null;
+  const eventWindow = roomId
+    ? queryEventWindow({
+        source_family: "minecraft",
+        room_id: roomId,
+        world_id: worldId,
+        thread_id: input.threadId ?? null,
+        limit: input.eventLimit ?? 12,
+        include_raw_events: false,
+      })
+    : {
+        query_id: `event_window:stage-play-thread-only:${input.threadId ?? "unknown"}`,
+        matched_count: 0,
+        returned_count: 0,
+        events: [],
+      };
   const chunkSampleRef = snapshot ? chunkSampleRefFor(snapshot) : null;
   const latestNavigationRefs = uniqueStrings([
     navigationQuery.navigation_state?.state_id,
@@ -766,14 +907,24 @@ export function resolveStagePlaySourceWindow(input: ResolveStagePlaySourceWindow
     worldSense: compactWorldSense(worldSense),
     eventWindow: compactEventWindow(eventWindow),
   };
-  const sources = buildStagePlayRoutingSources({ descriptors, producers, observations, snapshot, capabilities, rawSessionBufferEntries });
+  const sources = buildStagePlayRoutingSources({
+    threadId: input.threadId ?? null,
+    roomId,
+    environmentId: input.environmentId ?? null,
+    descriptors,
+    producers,
+    observations,
+    snapshot,
+    capabilities,
+    rawSessionBufferEntries,
+  });
   const sourceRoutes = sources.map(routeFromSource);
 
   return {
     schemaVersion: STAGE_PLAY_SOURCE_WINDOW_SCHEMA,
     resolvedAt,
     threadId: input.threadId ?? null,
-    roomId: input.roomId,
+    roomId,
     worldId,
     environmentId: input.environmentId ?? observations.at(-1)?.environment_id ?? null,
     actorLabel: input.actorLabel ?? snapshot?.actor_label ?? navigationQuery.actor_label ?? null,

@@ -11,6 +11,14 @@ import {
   resetEnvironmentStateSnapshotWindowsForTest,
 } from "../services/situation-room/environment-state-snapshot-window";
 import { clearEventJournalForTest, recordEventJournalEvent } from "../services/situation-room/event-journal-store";
+import {
+  resetLiveSourceChunkBufferForTest,
+  upsertLiveSourceProducer,
+} from "../services/situation-room/live-source-chunk-buffer";
+import {
+  resetLiveSourceDescriptorsForTest,
+  upsertLiveSourceDescriptor,
+} from "../services/situation-room/live-source-descriptor-builder";
 import { recordMinecraftRouteSolverObservation, resetMinecraftNavigationStateStoreForTest } from "../services/situation-room/minecraft-navigation-state-store";
 import {
   persistMinecraftWorldDeltaOverlay,
@@ -18,7 +26,11 @@ import {
   resetMinecraftWorldDeltaOverlaysForTest,
 } from "../services/situation-room/minecraft-world-delta-overlay";
 import { ingestMinecraftWorldSenseEvent, resetMinecraftWorldSenseWindows } from "../services/situation-room/minecraft-world-sense-window";
-import { resolveStagePlaySourceWindow } from "../services/situation-room/stage-play-source-window";
+import {
+  resetStagePlaySourceRouteOverridesForTest,
+  resolveStagePlaySourceWindow,
+  upsertStagePlaySourceRouteOverride,
+} from "../services/situation-room/stage-play-source-window";
 import {
   recordStagePlayRawSessionBufferEntry,
   resetStagePlayRawSessionBufferForTest,
@@ -34,6 +46,9 @@ beforeEach(() => {
   resetMinecraftWorldDeltaOverlaysForTest();
   resetMinecraftNavigationStateStoreForTest();
   resetMinecraftWorldSenseWindows();
+  resetLiveSourceDescriptorsForTest();
+  resetLiveSourceChunkBufferForTest();
+  resetStagePlaySourceRouteOverridesForTest();
   resetStagePlayRawSessionBufferForTest();
   clearEventJournalForTest();
 });
@@ -302,5 +317,106 @@ describe("Stage Play source window resolver", () => {
     expect(JSON.stringify(window)).not.toContain("raw_event");
     expect(JSON.stringify(window)).not.toContain("block_deltas");
     expect(JSON.stringify(window)).not.toContain("Player position update admitted as compact observation.");
+  });
+
+  it("retains active visual producers even when unrelated source descriptors exist", () => {
+    const descriptor = upsertLiveSourceDescriptor({
+      source_id: "source:audio-live-answer",
+      thread_id: threadId,
+      modality: "audio_transcript",
+      current_state: "active",
+      cadence_ms: 10000,
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "workstation_panel",
+      },
+      latest_observation_refs: ["live_source_observation:audio-live-answer"],
+    });
+    const producer = upsertLiveSourceProducer({
+      sourceId: "source:visual-live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-live-answer",
+      now: "2026-06-02T12:00:07.000Z",
+    });
+
+    const window = resolveStagePlaySourceWindow({
+      roomId,
+      threadId,
+      now: "2026-06-02T12:00:08.000Z",
+    });
+
+    expect(window.latestSourceDescriptorRefs).toEqual([descriptor.descriptor_id]);
+    expect(window.latestSourceProducerRefs).toEqual([producer.producer_id]);
+    expect(window.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:audio-live-answer",
+        modality: "audio_transcript",
+      }),
+      expect.objectContaining({
+        sourceId: "source:visual-live-answer",
+        modality: "visual_frame",
+        status: "active",
+        cadenceMs: 10000,
+        evidenceRefs: expect.arrayContaining([
+          producer.producer_id,
+          "live_source_chunk:visual-live-answer",
+        ]),
+      }),
+    ]));
+  });
+
+  it("applies user source route overrides to active visual producers", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "source:visual-live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-live-answer",
+      now: "2026-06-02T12:00:07.000Z",
+    });
+    const override = upsertStagePlaySourceRouteOverride({
+      threadId,
+      roomId,
+      sourceId: "source:visual-live-answer",
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: [producer.producer_id],
+      now: "2026-06-02T12:00:08.000Z",
+    });
+
+    const window = resolveStagePlaySourceWindow({
+      roomId,
+      threadId,
+      now: "2026-06-02T12:00:09.000Z",
+    });
+
+    expect(window.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-live-answer",
+        modality: "visual_frame",
+        status: "active",
+        routeTo: "narrative_stage_play",
+        selectedForStagePlay: true,
+        evidenceRefs: expect.arrayContaining([
+          producer.producer_id,
+          override.overrideId,
+        ]),
+      }),
+    ]));
+    expect(window.sourceRoutes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "source:visual-live-answer",
+        modality: "visual_frame",
+        routeTo: "narrative_stage_play",
+        selected: true,
+      }),
+    ]));
   });
 });

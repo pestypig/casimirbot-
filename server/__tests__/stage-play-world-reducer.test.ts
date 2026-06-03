@@ -51,6 +51,54 @@ beforeEach(() => {
 });
 
 describe("Stage Play world-state badge reducer", () => {
+  it("renders thread-only visual producers in Observer source custody before a room is bound", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:live-answer",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:10:00.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.description).toBe("Deterministic badge graph reducer over the compact Stage Play source window.");
+    expect(graph.sourceWindow.roomId).toBeNull();
+    expect(graph.sourceWindow.latestSourceProducerRefs).toEqual([producer.producer_id]);
+    expect(graph.sourceWindow.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "visual_source:live-answer",
+        modality: "visual_frame",
+        status: "active",
+        selectedForStagePlay: true,
+        cadenceMs: 10000,
+        evidenceRefs: expect.arrayContaining([
+          producer.producer_id,
+          "live_source_chunk:live-answer",
+        ]),
+      }),
+    ]));
+    expect(graph.badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "observer.live_sources",
+        kind: "observer",
+        status: "observed",
+      }),
+      expect.objectContaining({
+        kind: "source",
+        subjects: ["visual_source:live-answer"],
+        evidenceRefs: expect.arrayContaining([producer.producer_id]),
+      }),
+    ]));
+  });
+
   it("assembles world facts into deterministic Stage Play badges and procedural bindings", () => {
     const snapshot = normalizeEnvironmentStateSnapshot({
       threadId,
