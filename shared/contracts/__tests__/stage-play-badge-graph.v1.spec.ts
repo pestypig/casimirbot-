@@ -599,7 +599,7 @@ describe("stage_play_badge_graph/v1", () => {
     expect(issues).toMatch(/badges\[0\]\.dataTray\.confidence must be between 0 and 1/);
     expect(issues).toMatch(/badges\[0\]\.checkpoint\.askTurnId must be a string or null/);
     expect(issues).toMatch(/badges\[0\]\.checkpoint\.modelReviewed must be boolean/);
-    expect(issues).toMatch(/badges\[0\]\.checkpoint may only appear on ask_checkpoint or answer_snapshot badges/);
+    expect(issues).toMatch(/badges\[0\]\.checkpoint may only appear on ask_checkpoint, helix_ask_checkpoint, or answer_snapshot badges/);
     expect(issues).toMatch(/badges\[0\]\.output\.lineKey must be a string or null/);
     expect(issues).toMatch(/badges\[0\]\.output\.text must be a non-empty string/);
     expect(issues).toMatch(/badges\[0\]\.output\.state is invalid/);

@@ -891,7 +891,7 @@ describe("helix ask runtime authority contract", () => {
           source_scope: "current_turn",
           payload: {
             schema: "helix.final_answer_draft.v1",
-            text: "Stage Play reflected the source and projected Live Answer lines; audio evidence is still missing.",
+            text: "Stage Play reflected the source and projected Live Interpretation lanes; audio evidence is still missing.",
           },
         },
       ],
@@ -976,6 +976,91 @@ describe("helix ask runtime authority contract", () => {
     const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.checks.agent_runtime_loop).toBe(true);
     expect(report.checks.agent_step_decision).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.checks.post_observation_model_decision).toBe(true);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("stage_play_receipt_terminal_without_model_review");
+  });
+
+  it("blocks Stage Play checkpoint request receipts from becoming final authority", () => {
+    const payload = {
+      turn_id: "turn-stage-play-checkpoint-receipt-terminal",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "live_environment_tool_observation",
+      final_answer_source: "live_environment_tool_observation",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        decision_id: "agent-step-stage-play-checkpoint-terminal-review",
+        decision_authority: "llm",
+        decision_timing: "terminal_review",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stage-play-checkpoint-tool",
+            decision_authority: "llm",
+            decision_timing: "tool_selection",
+            chosen_capability: "live_env.request_stage_play_checkpoint",
+            observed_artifact_refs: ["stage-play-checkpoint-observation-1"],
+          },
+          {
+            decision_id: "agent-step-stage-play-checkpoint-answer",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: ["stage-play-checkpoint-observation-1"],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage-play-checkpoint-observation-1",
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.request_stage_play_checkpoint",
+            observation: {
+              schema: "stage_play_checkpoint_request_result/v1",
+              checkpointRequest: {
+                artifactId: "stage_play_checkpoint_request",
+                schemaVersion: "stage_play_checkpoint_request/v1",
+                checkpointRequestId: "stage_play_checkpoint_request:test",
+                jobId: "stage_play_job:test",
+                graphId: "stage_play_badge_graph:test",
+                status: "queued",
+                assistant_answer: false,
+                context_role: "tool_evidence",
+              },
+              queueState: {
+                schema: "stage_play_checkpoint_queue/v1",
+                requests: [],
+                assistant_answer: false,
+                context_role: "tool_evidence",
+              },
+              readyToRun: true,
+              reason: "queued",
+              assistant_answer: false,
+              context_role: "tool_evidence",
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = buildPostToolAuthorityBridge({ turnId: "turn-stage-play-checkpoint-receipt-terminal", payload });
+    expect(bridge.tool_observation_refs).toEqual(["stage-play-checkpoint-observation-1"]);
+    expect(bridge.observation_support_status).toBe("not_enough_information");
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.checks.selected_capability_observation).toBe(true);
     expect(report.checks.post_observation_model_decision).toBe(true);
     expect(report.eligible).toBe(false);

@@ -116,7 +116,7 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   const haystack = `${goalKind} ${capability} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
   if (/voice_delivery|confirm_speak|read.+out loud|voice/i.test(haystack)) return "voice_delivery";
-  if (/dottie|situation-room|minecraft|live_pipeline|stage_play_badge_graph|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context/i.test(haystack)) return "situation_room_setup";
+  if (/dottie|situation-room|minecraft|live_pipeline|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint/i.test(haystack)) return "situation_room_setup";
   if (/repo|doc_summary|doc_evidence|search_docs/i.test(haystack)) return "repo_docs";
   if (/docs-viewer|doc_open|docs_panel/i.test(haystack)) return "docs_panel";
   if (capability.includes(".")) return "workstation_panel";
@@ -129,7 +129,7 @@ export function buildPostToolAuthorityBridge(input: {
 }): HelixPostToolAuthorityBridge {
   const capability = selectedCapability(input.payload);
   const routeFamily = inferRouteFamily(input.payload, capability);
-  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
+  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
   const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer/);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });
   if (calculatorSupport.supports_goal) {

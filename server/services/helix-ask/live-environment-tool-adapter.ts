@@ -4,7 +4,15 @@ import {
   type HelixLiveEnvironmentToolName,
   type HelixLiveEnvironmentToolObservation,
 } from "@shared/helix-live-agent-step";
-import { validateStagePlayBadgeGraphV1 } from "@shared/contracts/stage-play-badge-graph.v1";
+import {
+  validateStagePlayBadgeGraphV1,
+  type StagePlayBadgeGraphV1,
+} from "@shared/contracts/stage-play-badge-graph.v1";
+import {
+  buildStagePlayCheckpointRequestResultV1,
+  type StagePlayCheckpointRequestResultReasonV1,
+} from "@shared/contracts/stage-play-checkpoint-request-result.v1";
+import type { StagePlayCheckpointRequestReasonV1 } from "@shared/contracts/stage-play-checkpoint-request.v1";
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
 import type {
   HelixLiveEnvironmentCommentaryKind,
@@ -26,6 +34,7 @@ import { queryMinecraftNavigationState } from "../situation-room/minecraft-navig
 import { buildStagePlayGraphFromWorld as buildStagePlayBadgeGraphFromLiveWindow } from "../stage-play/stage-play-badge-graph-builder";
 import {
   buildStagePlayOutputLaneProjectionV1,
+  checkpointOnlySkippedLineKeysForStagePlayProjection,
   reduceLiveAnswerEnvironmentFromStagePlayGraph,
 } from "../stage-play/stage-play-output-lane-reducer";
 import { ensureStagePlayLiveAnswerEnvironment } from "../stage-play/stage-play-live-answer-projector";
@@ -35,6 +44,11 @@ import {
   sourceIdsFromStagePlayDraft,
   validateStagePlayBuilderDraft,
 } from "../stage-play/stage-play-builder-compiler";
+import { planStagePlayJob } from "../stage-play/stage-play-job-planner";
+import {
+  enqueueStagePlayCheckpointRequestFromGraph,
+  getStagePlayCheckpointQueue,
+} from "../stage-play/stage-play-checkpoint-queue";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -77,6 +91,103 @@ const evidenceRefsFrom = (value: unknown): string[] => {
   const record = value as Record<string, unknown>;
   return readStringArray(record.evidence_refs);
 };
+
+const readCheckpointRequestReason = (value: unknown): StagePlayCheckpointRequestReasonV1 | null => {
+  const raw = readString(value);
+  if (
+    raw === "first_usable_observation" ||
+    raw === "meaningful_perturbation" ||
+    raw === "prediction_horizon_expired" ||
+    raw === "prediction_validation_needed" ||
+    raw === "user_requested_checkpoint" ||
+    raw === "missing_evidence_resolved"
+  ) {
+    return raw;
+  }
+  return null;
+};
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
+
+const collectStagePlayGraphSourceRefs = (graph: StagePlayBadgeGraphV1): string[] =>
+  uniqueStrings([
+    ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
+    ...(graph.sourceWindow.latestSourceProducerRefs ?? []),
+    ...graph.sourceWindow.latestObservationRefs,
+    ...graph.sourceWindow.latestSnapshotRefs,
+    ...graph.sourceWindow.latestDeltaOverlayRefs,
+    ...graph.sourceWindow.latestNavigationRefs,
+    ...(graph.sourceWindow.latestRawSessionBufferRefs ?? []),
+    ...graph.sourceWindow.sources.flatMap((source) => source.evidenceRefs),
+  ]);
+
+const visualStagePlaySourceStatuses = (graph: StagePlayBadgeGraphV1): Array<{
+  sourceId: string;
+  modality: string;
+  status: string;
+  selectedForStagePlay: boolean;
+  routeTo: string;
+  cadenceMs?: number | null;
+  lastEventTs?: string | null;
+  evidenceRefs: string[];
+}> =>
+  graph.sourceWindow.sources
+    .filter((source) =>
+      /\b(?:visual|screen|frame|tab)\b/i.test(`${source.modality}\n${source.sourceId}\n${source.contribution}`),
+    )
+    .map((source) => ({
+      sourceId: source.sourceId,
+      modality: source.modality,
+      status: source.status,
+      selectedForStagePlay: source.selectedForStagePlay,
+      routeTo: source.routeTo,
+      cadenceMs: source.cadenceMs ?? null,
+      lastEventTs: source.lastEventTs ?? null,
+      evidenceRefs: source.evidenceRefs,
+    }));
+
+const checkpointFreshnessFromStagePlayGraph = (graph: StagePlayBadgeGraphV1): {
+  reason: string;
+  modelReviewed: boolean;
+  fresh: boolean;
+  checkpointId: string | null;
+} => {
+  const checkpointBadge = graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest") ?? null;
+  const reasonCode = checkpointBadge?.reasonCodes.find((code) => /^checkpoint_freshness[:_]/.test(code));
+  const reason = reasonCode
+    ? reasonCode.replace(/^checkpoint_freshness[:_]/, "")
+    : "no_checkpoint";
+  const modelReviewed = checkpointBadge?.checkpoint?.modelReviewed === true;
+  return {
+    reason,
+    modelReviewed,
+    fresh: checkpointBadge?.status === "observed" && modelReviewed,
+    checkpointId: checkpointBadge?.checkpoint?.askTurnId ?? null,
+  };
+};
+
+const buildStagePlayToolReceiptDebug = (input: {
+  toolName: HelixLiveEnvironmentToolName;
+  graph: StagePlayBadgeGraphV1;
+  outputProjectionKeys?: string[];
+  skippedProjectionKeys?: string[];
+  checkpointRequestId?: string | null;
+}) => ({
+  schema: "stage_play_tool_receipt_debug/v1",
+  toolName: input.toolName,
+  graphId: input.graph.graphId,
+  sourceRefs: collectStagePlayGraphSourceRefs(input.graph),
+  visualSourceStatus: visualStagePlaySourceStatuses(input.graph),
+  outputProjectionKeys: uniqueStrings(input.outputProjectionKeys ?? []),
+  skippedProjectionKeys: uniqueStrings(input.skippedProjectionKeys ?? []),
+  checkpointFreshness: checkpointFreshnessFromStagePlayGraph(input.graph),
+  checkpointRequestId: input.checkpointRequestId ?? input.graph.checkpointRequests[0]?.checkpointRequestId ?? null,
+  assistant_answer: false,
+  raw_content_included: false,
+  context_role: "tool_evidence",
+  ask_context_policy: "evidence_only",
+});
 
 const makeObservation = (input: {
   threadId: string;
@@ -391,6 +502,126 @@ export function executeLiveEnvironmentTool(
     });
   }
 
+  if (input.tool_name === "live_env.plan_stage_play_job") {
+    const plan = planStagePlayJob({
+      threadId: effectiveThreadId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId: explicitSourceId,
+      objective: readString(args.objective) ?? readString(args.user_intent) ?? readString(args.intent),
+    });
+    const needed = plan.requiredSources
+      .filter((source) => source.required)
+      .map((source) => source.label);
+    const optional = plan.requiredSources
+      .filter((source) => !source.required)
+      .map((source) => source.label);
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Planned ${plan.domain} Stage Play job with ${plan.nodeChain.length} node(s); needed: ${needed.join(", ") || "none"}; optional: ${optional.join(", ") || "none"}.`,
+      observation: plan,
+      evidenceRefs: [],
+    });
+  }
+
+  if (input.tool_name === "live_env.request_stage_play_checkpoint") {
+    const draftSourceId = sourceIdsFromStagePlayDraft({
+      draft: args.draft,
+      threadId: effectiveThreadId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+    })[0] ?? null;
+    const sourceId = explicitSourceId ?? draftSourceId;
+    const graph = buildStagePlayBadgeGraphFromLiveWindow({
+      threadId: effectiveThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId,
+      objective: readString(args.objective),
+    });
+    const graphIssues = validateStagePlayBadgeGraphV1(graph);
+    const graphValid = graphIssues.length === 0;
+    const generatedAt = new Date().toISOString();
+    const jobId =
+      readString(args.job_id) ??
+      readString(args.jobId) ??
+      graph.checkpointRequests[0]?.jobId ??
+      `stage_play_job:${hashShort([
+        effectiveThreadId,
+        roomId,
+        environment?.environment_id ?? input.environment_id ?? null,
+        sourceId,
+      ])}`;
+    const perturbationRefs = readStringArray(args.perturbation_refs ?? args.perturbationRefs);
+    const checkpointRequest = enqueueStagePlayCheckpointRequestFromGraph({
+      jobId,
+      graph,
+      objective: readString(args.objective),
+      userPromptRef: readString(args.user_prompt_ref) ?? readString(args.userPromptRef),
+      reason: readCheckpointRequestReason(args.reason) ?? (perturbationRefs.length > 0 ? "meaningful_perturbation" : "user_requested_checkpoint"),
+      perturbationRefs,
+      now: generatedAt,
+      userTyping: args.user_typing === true || args.userTyping === true,
+      manualAskTurnActive: args.manual_ask_turn_active === true || args.manualAskTurnActive === true,
+    });
+    const queueState = getStagePlayCheckpointQueue({ jobId, limit: 10 });
+    const jobState = queueState.jobState;
+    const lastCheckpointAtMs = typeof jobState?.lastCheckpointAt === "string"
+      ? Date.parse(jobState.lastCheckpointAt)
+      : Number.NaN;
+    const nowMs = Date.parse(generatedAt);
+    const throttled =
+      Number.isFinite(lastCheckpointAtMs) &&
+      Number.isFinite(nowMs) &&
+      nowMs - lastCheckpointAtMs < checkpointRequest.checkpointPolicy.minMsSinceLastCheckpoint;
+    const manualPriority = Boolean(jobState?.userTyping || jobState?.manualAskTurnActive);
+    const blockedMissingEvidence = !graphValid || checkpointRequest.missingEvidence.length > 0;
+    const reason: StagePlayCheckpointRequestResultReasonV1 =
+      blockedMissingEvidence
+        ? "blocked_missing_evidence"
+        : throttled
+          ? "throttled"
+          : manualPriority
+            ? "manual_user_priority"
+            : "queued";
+    const readyToRun = reason === "queued" && checkpointRequest.status === "queued";
+    const result = {
+      ...buildStagePlayCheckpointRequestResultV1({
+        checkpointRequest,
+        queueState,
+        readyToRun,
+        reason,
+      }),
+      debugReceipt: buildStagePlayToolReceiptDebug({
+        toolName: input.tool_name,
+        graph,
+        checkpointRequestId: checkpointRequest.checkpointRequestId,
+      }),
+    };
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: graphValid,
+      summary: readyToRun
+        ? `Queued Stage Play checkpoint request ${checkpointRequest.checkpointRequestId}.`
+        : `Queued Stage Play checkpoint request ${checkpointRequest.checkpointRequestId}; not ready to run: ${reason}.`,
+      observation: result,
+      evidenceRefs: [
+        checkpointRequest.checkpointRequestId,
+        graph.graphId,
+        ...checkpointRequest.currentGraphRefs,
+        ...checkpointRequest.compactObservationRefs,
+        ...checkpointRequest.perturbationRefs,
+        ...checkpointRequest.priorAnswerSnapshotRefs,
+        ...graph.sourceWindow.latestObservationRefs,
+        ...graph.sourceWindow.latestSnapshotRefs,
+        ...graph.sourceWindow.latestNavigationRefs,
+      ],
+    });
+  }
+
   if (input.tool_name === "live_env.reflect_stage_play_context") {
     // Stage Play Badge Graph is an evidence-only reflection surface.
     // It may summarize admitted live-world state, expose setting/actors/props/resources/hazards,
@@ -485,6 +716,7 @@ export function executeLiveEnvironmentTool(
       : null;
     const projectedOutputLaneProjection = liveAnswerLineReduction?.projection ?? outputLaneProjection;
     const projectedLineKeys = liveAnswerLineReduction?.delta.changed_line_keys ?? [];
+    const checkpointOnlySkipped = checkpointOnlySkippedLineKeysForStagePlayProjection(projectedOutputLaneProjection);
     const environmentLineKeys = new Set(environment?.lines.map((line) => line.key) ?? []);
     const skippedLineKeys = projectedOutputLaneProjection.lanes
       .filter((lane) => lane.lineUpdateAllowed)
@@ -512,10 +744,17 @@ export function executeLiveEnvironmentTool(
         environmentId: liveAnswerLineReduction?.environment.environment_id ?? environment?.environment_id ?? null,
         changedLineKeys: projectedLineKeys,
         skippedLineKeys,
+        checkpointOnlySkipped,
         reason: liveAnswerProjectionReason,
         environmentEnsure,
       },
       draftValidation,
+      debugReceipt: buildStagePlayToolReceiptDebug({
+        toolName: input.tool_name,
+        graph,
+        outputProjectionKeys: projectedLineKeys,
+        skippedProjectionKeys: skippedLineKeys,
+      }),
       assistant_answer: false,
       raw_content_included: false,
       context_role: "tool_evidence",
@@ -529,8 +768,8 @@ export function executeLiveEnvironmentTool(
       toolName: input.tool_name,
       ok: graphValid && (draftValidation ? draftValidation.ok : true),
       summary: liveAnswerLineReduction
-        ? `Built Stage Play graph and projected ${projectedLineKeys.length} Live Answer line(s).`
-        : `Built Stage Play graph but did not project Live Answer lines: ${liveAnswerProjectionReason}.`,
+        ? `Built Stage Play graph and projected ${projectedLineKeys.length} Live Interpretation lane(s).`
+        : `Built Stage Play graph but did not project Live Interpretation lanes: ${liveAnswerProjectionReason}.`,
       observation: observationPayload,
       evidenceRefs: [
         ...(draftValidation?.evidenceRefs ?? []),

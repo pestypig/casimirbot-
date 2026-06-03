@@ -6,16 +6,23 @@ import {
   createLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
+import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
+import {
+  resetLiveSourceChunkBufferForTest,
+  upsertLiveSourceProducer,
+} from "../services/situation-room/live-source-chunk-buffer";
 
 function makeApp() {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "1mb" }));
   app.use("/api/helix/stage-play", helixStagePlayRouter);
   return app;
 }
 
 beforeEach(() => {
   resetLiveAnswerEnvironments();
+  resetStagePlayCheckpointQueueForTest();
+  resetLiveSourceChunkBufferForTest();
 });
 
 describe("GET /api/helix/stage-play/graph", () => {
@@ -57,6 +64,61 @@ describe("GET /api/helix/stage-play/graph", () => {
       roomId: "room:ui-live",
       environmentId: "live_env:ui-live",
     });
+  });
+
+  it("exposes checkpoint queue controls as evidence-only route actions", async () => {
+    const app = makeApp();
+    upsertLiveSourceProducer({
+      sourceId: "visual_source:queue-route",
+      threadId: "thread:queue-route",
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:queue-route",
+      now: "2026-06-03T12:00:00.000Z",
+    });
+
+    const graphResponse = await request(app)
+      .get("/api/helix/stage-play/graph")
+      .query({ threadId: "thread:queue-route" })
+      .expect(200);
+    const requestId = graphResponse.body.checkpointRequests[0]?.checkpointRequestId;
+    const jobId = graphResponse.body.checkpointRequests[0]?.jobId;
+    expect(requestId).toMatch(/^stage_play_checkpoint_request:/);
+    expect(jobId).toMatch(/^stage_play_job:/);
+
+    const queueResponse = await request(app)
+      .get("/api/helix/stage-play/checkpoint-queue")
+      .query({ jobId })
+      .expect(200);
+    expect(queueResponse.body).toMatchObject({
+      schema: "stage_play_checkpoint_queue/v1",
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    expect(queueResponse.body.requests[0]).toMatchObject({
+      checkpointRequestId: requestId,
+      status: "queued",
+    });
+
+    const runResponse = await request(app)
+      .post("/api/helix/stage-play/checkpoint-queue/action")
+      .send({
+        jobId,
+        checkpointRequestId: requestId,
+        action: "run",
+      })
+      .expect(200);
+    expect(runResponse.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_checkpoint_queue_action_response/v1",
+      action: "run",
+      reason: "updated",
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    expect(runResponse.body.request.status).toBe("running");
   });
 
   it("returns builder catalog and source-query artifacts for the panel", async () => {
@@ -200,6 +262,10 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.projectedLineKeys).not.toContain("recommendation");
     expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
     expect(response.body.projectedLineKeys).not.toContain("voice_output");
+    expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
     expect(response.body.liveAnswerDelta).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
@@ -208,7 +274,47 @@ describe("GET /api/helix/stage-play/graph", () => {
     });
   });
 
-  it("reports a line schema mismatch instead of partially projecting incompatible Live Answer lines", async () => {
+  it("returns evidence-only JSON errors for oversized debug projection payloads", async () => {
+    const app = makeApp();
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:oversized-stage-play-probe",
+        objective: "x".repeat(300_000),
+      })
+      .expect(413);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      error: "stage_play_request_body_too_large",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      terminal_eligible: false,
+      limitBytes: 262144,
+    });
+    expect(response.body.receivedBytes).toBeGreaterThan(262144);
+
+    const followup = await request(app)
+      .post("/api/helix/stage-play/project-live-answer")
+      .send({
+        threadId: "thread:oversized-stage-play-probe",
+        objective: "Server should still answer after a rejected probe.",
+        createIfMissing: true,
+        ensureStagePlayLineSchema: true,
+      })
+      .expect(200);
+
+    expect(followup.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_live_answer_projection_response/v1",
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+  });
+
+  it("reports a line schema mismatch instead of partially projecting incompatible Live Interpretation lanes", async () => {
     const app = makeApp();
     const { environment } = createLiveAnswerEnvironment({
       thread_id: "thread:stage-schema-mismatch",
@@ -240,6 +346,10 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.skippedLineKeys).not.toContain("recommendation");
     expect(response.body.skippedLineKeys).not.toContain("answer_snapshot");
     expect(response.body.skippedLineKeys).not.toContain("voice_output");
+    expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
     expect(response.body.liveAnswerEnvironment.environment_id).toBe(environment.environment_id);
   });
 
@@ -310,6 +420,10 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.projectedLineKeys).not.toContain("recommendation");
     expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
     expect(response.body.projectedLineKeys).not.toContain("voice_output");
+    expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
     expect(response.body.liveAnswerEnvironment.lines.find((line: { key: string; visibility: string }) =>
       line.key === "debug_basis"
     )?.visibility).toBe("situation_panel");
@@ -380,5 +494,9 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.projectedLineKeys).not.toContain("recommendation");
     expect(response.body.projectedLineKeys).not.toContain("answer_snapshot");
     expect(response.body.projectedLineKeys).not.toContain("voice_output");
+    expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
   });
 });

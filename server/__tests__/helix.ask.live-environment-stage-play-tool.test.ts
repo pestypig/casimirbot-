@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { validateStagePlayBadgeGraphV1 } from "../../shared/contracts/stage-play-badge-graph.v1";
 import type { StagePlayBadgeGraphV1 } from "../../shared/contracts/stage-play-badge-graph.v1";
+import { validateStagePlayCheckpointRequestResultV1 } from "../../shared/contracts/stage-play-checkpoint-request-result.v1";
+import { validateStagePlayJobPlanV1 } from "../../shared/contracts/stage-play-job-plan.v1";
 import {
   recordLiveSourceObservation,
   resetLiveSourceObservationStoreForTest,
@@ -18,6 +20,7 @@ import {
   resetEnvironmentStateSnapshotWindowsForTest,
 } from "../services/situation-room/environment-state-snapshot-window";
 import { clearEventJournalForTest } from "../services/situation-room/event-journal-store";
+import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
@@ -43,6 +46,7 @@ beforeEach(() => {
   resetMinecraftWorldSenseWindows();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetStagePlayCheckpointQueueForTest();
   clearEventJournalForTest();
 });
 
@@ -80,8 +84,181 @@ describe("live_env.reflect_stage_play_context", () => {
         requires_user_confirmation: false,
         can_run_automatically: true,
       }),
+      expect.objectContaining({
+        tool_id: "live_env.plan_stage_play_job",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.request_stage_play_checkpoint",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
     ]));
     expect(packet.policy.may_mutate_sources).toBe(false);
+  });
+
+  it("plans a narrative Stage Play job without starting capture or answering", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.plan_stage_play_job",
+      thread_id: threadId,
+      args: {
+        objective: "I'm about to attach a YouTube tab and I want you to predict what happens next based on visual capture.",
+      },
+    });
+
+    expect(observation).toMatchObject({
+      tool_name: "live_env.plan_stage_play_job",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toMatch(/Planned narrative_media Stage Play job/);
+    expect(observation.summary).toContain("Browser tab visual source");
+    expect(validateStagePlayJobPlanV1(observation.observation)).toEqual([]);
+    expect(observation.observation).toMatchObject({
+      artifactId: "stage_play_job_plan",
+      schemaVersion: "stage_play_job_plan/v1",
+      domain: "narrative_media",
+      requiredSources: [
+        expect.objectContaining({
+          modality: "visual_frame",
+          required: true,
+          recommendedCadenceMs: 10_000,
+          routeTo: "narrative_stage_play",
+        }),
+        expect.objectContaining({
+          modality: "audio_transcript",
+          required: false,
+          routeTo: "narrative_stage_play",
+        }),
+      ],
+      checkpointPolicy: {
+        triggerOnFirstObservation: false,
+        triggerOnSceneChange: true,
+        triggerOnPredictionHorizonExpired: true,
+        minMsSinceLastCheckpoint: 15_000,
+        manualUserPriority: true,
+      },
+      predictionPolicy: {
+        enabled: true,
+        horizon: "next_scene_beat",
+        validateAgainstNextWindow: true,
+      },
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    const plan = observation.observation as {
+      nodeChain: Array<{ nodeId: string; nodeKind: string }>;
+      missingSetup: string[];
+      readinessChecks: Array<{ nextAction?: string | null }>;
+    };
+    expect(plan.nodeChain.map((node) => node.nodeId)).toEqual(expect.arrayContaining([
+      "observer.live_sources",
+      "source.visual_frame.active",
+      "compact_observation.latest_visual",
+      "interpreter.visual_scene",
+      "checkpoint_request.queued",
+      "helix_ask.checkpoint.latest",
+      "answer_snapshot.latest",
+      "live_output.current",
+    ]));
+    expect(plan.nodeChain.find((node) => node.nodeId === "helix_ask.checkpoint.latest")?.nodeKind).toBe("helix_ask_checkpoint");
+    expect(plan.missingSetup).toEqual(expect.arrayContaining([
+      "Browser tab visual source is needed for this Stage Play job.",
+    ]));
+    expect(plan.readinessChecks.map((check) => check.nextAction).filter(Boolean)).toContain(
+      "Attach browser tab visual capture at 10s cadence.",
+    );
+    expect(JSON.stringify(observation)).not.toMatch(/assistant[_ -]?answer["']?\s*:\s*true/i);
+    expect(JSON.stringify(observation)).not.toMatch(/capture_started|active_interval_started|live_pipeline_receipt/i);
+  });
+
+  it("queues a Stage Play checkpoint request without producing an answer", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_stage_play_checkpoint",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        job_id: "stage_play_job:checkpoint-tool-test",
+        objective: "Create a bounded checkpoint for the current Stage Play graph.",
+        reason: "user_requested_checkpoint",
+        user_prompt_ref: "prompt:checkpoint-tool-test",
+      },
+    });
+    const result = observation.observation as {
+      schema: "stage_play_checkpoint_request_result/v1";
+      checkpointRequest: {
+        artifactId: string;
+        schemaVersion: string;
+        checkpointRequestId: string;
+        jobId: string;
+        objective: string;
+        currentGraphRefs: string[];
+        status: string;
+        assistant_answer: false;
+        context_role: "tool_evidence";
+      };
+      queueState: {
+        schema: "stage_play_checkpoint_queue/v1";
+        requests: unknown[];
+        assistant_answer: false;
+        context_role: "tool_evidence";
+      };
+      readyToRun: boolean;
+      reason: string;
+      assistant_answer: false;
+      context_role: "tool_evidence";
+    };
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.request_stage_play_checkpoint",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toMatch(/Queued Stage Play checkpoint request/);
+    expect(validateStagePlayCheckpointRequestResultV1(result)).toEqual([]);
+    expect(result).toMatchObject({
+      schema: "stage_play_checkpoint_request_result/v1",
+      checkpointRequest: {
+        artifactId: "stage_play_checkpoint_request",
+        schemaVersion: "stage_play_checkpoint_request/v1",
+        jobId: "stage_play_job:checkpoint-tool-test",
+        objective: "Create a bounded checkpoint for the current Stage Play graph.",
+        status: "queued",
+        assistant_answer: false,
+        context_role: "tool_evidence",
+      },
+      queueState: {
+        schema: "stage_play_checkpoint_queue/v1",
+        assistant_answer: false,
+        context_role: "tool_evidence",
+      },
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    expect(["queued", "blocked_missing_evidence", "throttled", "manual_user_priority"]).toContain(result.reason);
+    expect(result.queueState.requests).toHaveLength(1);
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      result.checkpointRequest.checkpointRequestId,
+      result.checkpointRequest.currentGraphRefs[0],
+    ]));
+    expect(JSON.stringify(observation)).not.toMatch(/assistant[_ -]?answer["']?\s*:\s*true/i);
+    expect(JSON.stringify(observation)).not.toMatch(/final_answer|model_reviewed_answer|live_pipeline_receipt/i);
   });
 
   it("lets the model work through Stage Builder grammar, sources, and draft validation", () => {
@@ -236,6 +413,7 @@ describe("live_env.reflect_stage_play_context", () => {
         environmentId: string | null;
         changedLineKeys: string[];
         skippedLineKeys: string[];
+        checkpointOnlySkipped: string[];
         reason: string;
       };
       assistant_answer: false;
@@ -251,7 +429,7 @@ describe("live_env.reflect_stage_play_context", () => {
       raw_content_included: false,
     });
     expect(observation.summary).toBe(
-      "Built Stage Play graph but did not project Live Answer lines: no_active_environment.",
+      "Built Stage Play graph but did not project Live Interpretation lanes: no_active_environment.",
     );
     expect(wrappedObservation).toMatchObject({
       schema: "stage_play_reflection_result/v1",
@@ -276,6 +454,10 @@ describe("live_env.reflect_stage_play_context", () => {
     ]));
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).not.toContain("situation");
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).not.toContain("debug_basis");
+    expect(wrappedObservation.liveAnswerProjection.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
   });
 
   it("wraps Stage Play graph reflection as a non-authoritative tool observation", () => {
@@ -405,6 +587,7 @@ describe("live_env.reflect_stage_play_context", () => {
         environmentId: string | null;
         changedLineKeys: string[];
         skippedLineKeys: string[];
+        checkpointOnlySkipped: string[];
         reason: string;
       };
       assistant_answer: false;
@@ -424,7 +607,7 @@ describe("live_env.reflect_stage_play_context", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(observation.summary).toMatch(/Built Stage Play graph and projected \d+ Live Answer line\(s\)\./);
+    expect(observation.summary).toMatch(/Built Stage Play graph and projected \d+ Live Interpretation lane\(s\)\./);
     expect(wrappedObservation).toMatchObject({
       schema: "stage_play_reflection_result/v1",
       assistant_answer: false,
@@ -452,6 +635,10 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("debug_basis");
     expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("situation");
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual([]);
+    expect(wrappedObservation.liveAnswerProjection.checkpointOnlySkipped).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(graph.artifactId).toBe("stage_play_badge_graph");
     expect(graph.sourceWindow.latestObservationRefs).toEqual([

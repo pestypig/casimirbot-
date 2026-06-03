@@ -1,4 +1,8 @@
-import { isStagePlayReflectionPrompt } from "./stage-play-prompt-intent";
+import {
+  isStagePlayCheckpointRequestPrompt,
+  isStagePlayJobPlanningPrompt,
+  isStagePlayReflectionPrompt,
+} from "./stage-play-prompt-intent";
 
 export type HelixLiveSourceContinuationIntentKind =
   | "live_source_continuation"
@@ -105,7 +109,11 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   const cadenceControl = isLiveSourceCadenceControlPrompt(prompt);
   const requestedRateMs = readLiveSourceRequestedRateMs(prompt);
   const stagePlayReflection = isStagePlayReflectionPrompt(prompt);
+  const stagePlayJobPlanning = isStagePlayJobPlanningPrompt(prompt);
+  const stagePlayCheckpointRequest = isStagePlayCheckpointRequestPrompt(prompt);
   const stagePlayCaptureControl = isStagePlayCaptureCadenceControlPrompt(prompt);
+  if (stagePlayCheckpointRequest) return null;
+  if (stagePlayJobPlanning && !stagePlayCaptureControl) return null;
   if (stagePlayReflection && !stagePlayCaptureControl) return null;
 
   const procedureEpochComparison =

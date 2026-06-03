@@ -23,6 +23,19 @@ import type {
 import { getLatestEnvironmentStateSnapshot } from "../situation-room/environment-state-snapshot-window";
 import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
 import { getLatestStagePlayAskCheckpointReceipt } from "./stage-play-ask-checkpoint-store";
+import {
+  evaluateStagePlayCheckpointFreshness,
+  type StagePlayCheckpointFreshnessV1,
+} from "./stage-play-checkpoint-freshness";
+import {
+  recordStagePlayPerturbationFromGraph,
+} from "./stage-play-perturbation-event-store";
+import type { StagePlayPerturbationEventV1 } from "@shared/contracts/stage-play-perturbation-event.v1";
+import {
+  listStagePlayCheckpointRequests,
+  recordStagePlayCheckpointRequestFromPerturbation,
+} from "./stage-play-checkpoint-queue";
+import type { StagePlayCheckpointRequestV1 } from "@shared/contracts/stage-play-checkpoint-request.v1";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -39,6 +52,10 @@ export type StagePlayAskCheckpointReceiptV1 = {
   solverTraceRef?: string | null;
   terminalArtifactKind?: string | null;
   finalAnswerSource?: string | null;
+  graphId?: string | null;
+  createdAt?: string | null;
+  sourceWindowRefs?: string[];
+  sourceArtifactRefs?: string[];
   completedSolverPath: boolean;
   answerText?: string | null;
   evidenceRefs?: string[];
@@ -205,6 +222,253 @@ const pushEdge = (
   }
 };
 
+const perturbationTitle = (reason: StagePlayPerturbationEventV1["reason"]): string =>
+  reason.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+
+const perturbationBadgeId = (event: StagePlayPerturbationEventV1): string =>
+  `perturbation.${event.perturbationId.split(":").pop() ?? hashShort(event.perturbationId, 10)}`;
+
+const addPerturbationBadges = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  perturbations: StagePlayPerturbationEventV1[],
+): void => {
+  const existingBadgeIds = new Set(badges.map((entry) => entry.id));
+  for (const event of perturbations.filter((entry) => entry.materiality !== "minor").slice(0, 6)) {
+    const badgeId = perturbationBadgeId(event);
+    const affectedBadgeIds = event.affectedBadgeIds.filter((badgeId) => existingBadgeIds.has(badgeId));
+    pushBadge(badges, badge({
+      id: badgeId,
+      title: perturbationTitle(event.reason),
+      plainMeaning: "A material source-window change has perturbed the current Stage Play interpretation.",
+      whyItMatters: "Perturbations show why a prior interpretation or answer snapshot may need a fresh checkpoint instead of being treated as current.",
+      kind: "perturbation",
+      status: event.materiality === "critical" ? "blocked" : "candidate",
+      subjects: affectedBadgeIds,
+      tags: ["perturbation", event.reason, event.materiality, event.checkpointSuggested ? "checkpoint_suggested" : "pulse_only"],
+      sourceRefs: [{ kind: "stage_play_perturbation_event", id: event.perturbationId }],
+      evidenceRefs: unique([event.perturbationId, ...event.evidenceRefs]),
+      confidence: event.materiality === "critical" ? 0.86 : 0.74,
+      missingEvidence: event.checkpointSuggested
+        ? ["A fresh Helix Ask checkpoint is suggested before treating output as current."]
+        : [],
+      reasonCodes: [
+        "stage_play_perturbation_event",
+        `perturbation_${event.reason}`,
+        `materiality_${event.materiality}`,
+      ],
+      dataTray: {
+        title: "Perturbation",
+        summary: `${perturbationTitle(event.reason)} changed ${affectedBadgeIds.length} badge(s); checkpoint ${event.checkpointSuggested ? "suggested" : "not requested"}.`,
+        updatedAt: event.createdAt,
+        freshness: "fresh",
+        confidence: event.materiality === "critical" ? 0.86 : 0.74,
+        evidenceRefs: unique([event.perturbationId, ...event.evidenceRefs]),
+      },
+      admission: "auto",
+    }));
+    for (const affectedBadgeId of affectedBadgeIds.slice(0, 12)) {
+      pushEdge(edges, {
+        from: badgeId,
+        to: affectedBadgeId,
+        relation: "needs_check",
+        label: "perturbs",
+        evidenceRefs: [event.perturbationId],
+        reasonCodes: [`perturbation_${event.reason}`],
+      });
+    }
+    for (const answerSnapshotId of event.staleAnswerSnapshotIds.filter((badgeId) => existingBadgeIds.has(badgeId))) {
+      pushEdge(edges, {
+        from: badgeId,
+        to: answerSnapshotId,
+        relation: "supersedes",
+        label: "supersedes answer snapshot",
+        evidenceRefs: [event.perturbationId],
+        reasonCodes: ["answer_snapshot_requires_recheck"],
+      });
+    }
+    existingBadgeIds.add(badgeId);
+  }
+};
+
+const addLatestPerturbationNode = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  perturbations: StagePlayPerturbationEventV1[],
+): string | null => {
+  const latest = [...perturbations].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+  if (!latest) return null;
+  const evidenceRefs = unique([latest.perturbationId, ...latest.evidenceRefs]);
+  const badgeId = pushBadge(badges, badge({
+    id: "perturbation.latest",
+    title: "latest perturbation",
+    plainMeaning: "Stable node for the latest source-window perturbation affecting this Stage Play job.",
+    whyItMatters: "Frame-level changes stream through this node; only meaningful perturbations are promoted into separate perturbation badges.",
+    kind: "perturbation",
+    status: latest.materiality === "critical" ? "blocked" : latest.checkpointSuggested ? "candidate" : "observed",
+    subjects: latest.affectedBadgeIds,
+    tags: ["pipeline", "perturbation", "latest", latest.reason, latest.materiality],
+    sourceRefs: [{ kind: "stage_play_perturbation_event", id: latest.perturbationId }],
+    evidenceRefs,
+    confidence: latest.materiality === "critical" ? 0.86 : latest.materiality === "meaningful" ? 0.74 : 0.58,
+    missingEvidence: latest.checkpointSuggested
+      ? ["A bounded Helix Ask checkpoint is suggested before treating answer output as current."]
+      : [],
+    reasonCodes: [
+      "stage_play_latest_perturbation",
+      `perturbation_${latest.reason}`,
+      `materiality_${latest.materiality}`,
+    ],
+    dataTray: {
+      title: "Latest perturbation",
+      summary: `${perturbationTitle(latest.reason)} (${latest.materiality}); checkpoint ${latest.checkpointSuggested ? "suggested" : "not requested"}.`,
+      updatedAt: latest.createdAt,
+      freshness: "fresh",
+      confidence: latest.materiality === "minor" ? 0.58 : 0.74,
+      evidenceRefs,
+    },
+    admission: "auto",
+  }));
+  for (const affectedBadgeId of latest.affectedBadgeIds.slice(0, 10)) {
+    if (!badges.some((entry) => entry.id === affectedBadgeId)) continue;
+    pushEdge(edges, {
+      from: badgeId,
+      to: affectedBadgeId,
+      relation: "needs_check",
+      label: "latest perturbation affects node",
+      evidenceRefs: [latest.perturbationId],
+      reasonCodes: ["latest_perturbation_affects_badge"],
+    });
+  }
+  if (badges.some((entry) => entry.id === "possibilities.current")) {
+    pushEdge(edges, {
+      from: badgeId,
+      to: "possibilities.current",
+      relation: "feeds",
+      label: "latest perturbation updates current possibilities",
+      evidenceRefs: [latest.perturbationId],
+      reasonCodes: ["latest_perturbation_updates_possibilities"],
+    });
+  }
+  return badgeId;
+};
+
+const checkpointRequestTitle = (reason: StagePlayCheckpointRequestV1["reason"]): string =>
+  reason.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+
+const checkpointRequestBadgeId = (request: StagePlayCheckpointRequestV1): string =>
+  `checkpoint_request.${request.checkpointRequestId.split(":").pop() ?? hashShort(request.checkpointRequestId, 10)}`;
+
+const addCheckpointRequestBadges = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  checkpointRequests: StagePlayCheckpointRequestV1[],
+  perturbations: StagePlayPerturbationEventV1[],
+): void => {
+  const existingBadgeIds = new Set(badges.map((entry) => entry.id));
+  const perturbationBadgeIdsByRef = new Map(perturbations.map((event) => [event.perturbationId, perturbationBadgeId(event)]));
+  for (const [index, request] of checkpointRequests
+    .filter((entry) => entry.status === "queued" || entry.status === "running" || entry.status === "blocked")
+    .slice(0, 6)
+    .entries()) {
+    const badgeId = index === 0 && (request.status === "queued" || request.status === "running")
+      ? "checkpoint_request.queued"
+      : checkpointRequestBadgeId(request);
+    const status = request.status === "running"
+      ? "observed"
+      : request.status === "blocked"
+        ? "blocked"
+        : "ask_user_required";
+    pushBadge(badges, badge({
+      id: badgeId,
+      title: `Checkpoint Request: ${checkpointRequestTitle(request.reason)}`,
+      plainMeaning: "A bounded Helix Ask checkpoint has been requested for the current Stage Play job.",
+      whyItMatters: "Checkpoint requests bridge continuous observation into visible Ask turns without creating a hidden reasoning loop.",
+      kind: "checkpoint_request",
+      status,
+      subjects: [request.jobId, request.graphId],
+      tags: [
+        "checkpoint_request",
+        request.reason,
+        request.status,
+        request.checkpointPolicy.autoRunEligible ? "auto_run_eligible" : "manual_run_first",
+      ],
+      sourceRefs: [{ kind: "stage_play_checkpoint_request", id: request.checkpointRequestId }],
+      evidenceRefs: unique([
+        request.checkpointRequestId,
+        ...request.currentGraphRefs,
+        ...request.compactObservationRefs,
+        ...request.perturbationRefs,
+        ...request.priorAnswerSnapshotRefs,
+      ]),
+      confidence: request.status === "running" ? 0.82 : request.status === "blocked" ? 0.54 : 0.72,
+      missingEvidence: request.missingEvidence,
+      reasonCodes: [
+        "stage_play_checkpoint_request",
+        `checkpoint_reason_${request.reason}`,
+        `checkpoint_status_${request.status}`,
+        request.checkpointPolicy.requiresUserApproval ? "requires_user_approval" : "auto_policy",
+      ],
+      dataTray: {
+        title: "Checkpoint request",
+        summary: `${checkpointRequestTitle(request.reason)} is ${request.status}; ${request.checkpointPolicy.autoRunEligible ? "auto eligible" : "visible queue first"}.`,
+        freshness: request.status === "queued" || request.status === "running" ? "fresh" : "stale",
+        confidence: request.status === "running" ? 0.82 : 0.72,
+        evidenceRefs: unique([
+          request.checkpointRequestId,
+          ...request.currentGraphRefs,
+          ...request.perturbationRefs,
+        ]),
+      },
+      admission: "ask_user",
+    }));
+    for (const perturbationRef of request.perturbationRefs) {
+      const sourceBadgeId = perturbationBadgeIdsByRef.get(perturbationRef);
+      if (sourceBadgeId && existingBadgeIds.has(sourceBadgeId)) {
+        pushEdge(edges, {
+          from: sourceBadgeId,
+          to: badgeId,
+          relation: "recommends",
+          label: "queues checkpoint",
+          evidenceRefs: [request.checkpointRequestId, perturbationRef],
+          reasonCodes: ["perturbation_checkpoint_request"],
+        });
+      }
+    }
+    if (existingBadgeIds.has("helix_ask.checkpoint.latest")) {
+      if (existingBadgeIds.has("possibilities.current")) {
+        pushEdge(edges, {
+          from: "possibilities.current",
+          to: badgeId,
+          relation: "recommends",
+          label: "current possibilities request a bounded checkpoint",
+          evidenceRefs: [request.checkpointRequestId],
+          reasonCodes: ["possibilities_checkpoint_request"],
+        });
+      }
+      if (existingBadgeIds.has("perturbation.latest") && request.perturbationRefs.length > 0) {
+        pushEdge(edges, {
+          from: "perturbation.latest",
+          to: badgeId,
+          relation: "recommends",
+          label: "latest perturbation requests bounded checkpoint",
+          evidenceRefs: [request.checkpointRequestId, ...request.perturbationRefs],
+          reasonCodes: ["latest_perturbation_checkpoint_request"],
+        });
+      }
+      pushEdge(edges, {
+        from: badgeId,
+        to: "helix_ask.checkpoint.latest",
+        relation: "needs_check",
+        label: "awaits Ask checkpoint",
+        evidenceRefs: [request.checkpointRequestId],
+        reasonCodes: ["checkpoint_request_awaits_ask"],
+      });
+    }
+    existingBadgeIds.add(badgeId);
+  }
+};
+
 const isCompletedAskCheckpointReceipt = (
   receipt: StagePlayAskCheckpointReceiptV1 | null | undefined,
 ): receipt is StagePlayAskCheckpointReceiptV1 =>
@@ -213,6 +477,20 @@ const isCompletedAskCheckpointReceipt = (
     receipt.completedSolverPath === true &&
     (isNonEmptyString(receipt.askTurnId) || isNonEmptyString(receipt.solverTraceRef)),
   );
+
+const checkpointCandidateFromReceipt = (
+  receipt: StagePlayAskCheckpointReceiptV1 | null | undefined,
+) => receipt
+  ? {
+      checkpointId: receipt.askTurnId ?? receipt.solverTraceRef ?? null,
+      graphId: receipt.graphId ?? null,
+      createdAt: receipt.createdAt ?? null,
+      modelReviewed: isCompletedAskCheckpointReceipt(receipt),
+      sourceWindowRefs: receipt.sourceWindowRefs ?? null,
+      sourceArtifactRefs: receipt.sourceArtifactRefs ?? null,
+      evidenceRefs: receipt.evidenceRefs ?? null,
+    }
+  : null;
 
 const addPipelineSkeleton = (
   badges: StagePlayBadgeV1[],
@@ -225,6 +503,7 @@ const addPipelineSkeleton = (
     sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
     generatedAt: string;
     askCheckpointReceipt?: StagePlayAskCheckpointReceiptV1 | null;
+    checkpointFreshness?: StagePlayCheckpointFreshnessV1 | null;
   },
 ): void => {
   if (input.sources.length === 0) return;
@@ -253,11 +532,29 @@ const addPipelineSkeleton = (
   const existingProceduralBindings = badges.filter((entry) =>
     entry.kind === "procedural_binding" && entry.id !== "procedural_binding.active"
   );
-  const completedCheckpoint = isCompletedAskCheckpointReceipt(input.askCheckpointReceipt)
+  const checkpointFreshness = input.checkpointFreshness ?? null;
+  const completedCheckpoint = checkpointFreshness?.fresh === true && isCompletedAskCheckpointReceipt(input.askCheckpointReceipt)
     ? input.askCheckpointReceipt
     : null;
+  const checkpointCandidateWasRejected = Boolean(
+    checkpointFreshness &&
+    !checkpointFreshness.fresh &&
+    checkpointFreshness.reason !== "no_checkpoint",
+  );
+  const checkpointMissingSummary = checkpointCandidateWasRejected
+    ? "No current model-reviewed checkpoint."
+    : "No answer snapshot yet.";
+  const checkpointMissingEvidence = completedCheckpoint
+    ? []
+    : unique([
+        checkpointFreshness?.reason === "no_checkpoint"
+          ? "A completed Ask turn/debug receipt with solver completion is required."
+          : `Checkpoint freshness failed: ${checkpointFreshness?.reason ?? "no_checkpoint"}.`,
+        ...(checkpointFreshness?.staleBecause ?? []),
+      ]);
   const checkpointEvidenceRefs = unique([
     ...skeletonEvidenceRefs,
+    ...(checkpointFreshness ? [`checkpoint_freshness:${checkpointFreshness.reason}`] : []),
     ...(completedCheckpoint?.evidenceRefs ?? []),
     ...(completedCheckpoint?.askTurnId ? [completedCheckpoint.askTurnId] : []),
     ...(completedCheckpoint?.solverTraceRef ? [completedCheckpoint.solverTraceRef] : []),
@@ -359,23 +656,24 @@ const addPipelineSkeleton = (
       ? "Helix Ask completed a model-reviewed checkpoint over the Stage Play evidence."
       : "No completed Helix Ask checkpoint has reviewed this stage yet.",
     whyItMatters: "Checkpoint badges distinguish evidence projection from an upheld answer produced after the agent observes the graph.",
-    kind: "ask_checkpoint",
+    kind: "helix_ask_checkpoint",
     status: completedCheckpoint ? "observed" : "missing_evidence",
     subjects: [completedCheckpoint?.askTurnId ?? "helix_ask"],
-    tags: ["pipeline", "helix_ask", "checkpoint", completedCheckpoint ? "model_reviewed" : "missing_checkpoint"],
+    tags: ["pipeline", "helix_ask", "checkpoint", completedCheckpoint ? "model_reviewed" : "missing_checkpoint", ...(checkpointCandidateWasRejected ? ["stale_checkpoint"] : [])],
     sourceRefs: input.sourceRefs,
     evidenceRefs: checkpointEvidenceRefs,
     confidence: completedCheckpoint ? 0.86 : 0.34,
-    missingEvidence: completedCheckpoint ? [] : ["A completed Ask turn/debug receipt with solver completion is required."],
+    missingEvidence: checkpointMissingEvidence,
     reasonCodes: [
       "stage_play_pipeline_skeleton",
       completedCheckpoint ? "completed_solver_path" : "missing_model_reviewed_checkpoint",
+      ...(checkpointFreshness ? [`checkpoint_freshness_${checkpointFreshness.reason}`] : []),
     ],
     dataTray: {
       title: "Latest Ask checkpoint",
       summary: completedCheckpoint
         ? "Model-reviewed checkpoint is available for this stage."
-        : "No model-reviewed checkpoint has been produced for this stage yet.",
+        : checkpointMissingSummary,
       updatedAt: input.generatedAt,
       freshness: completedCheckpoint ? "fresh" : "missing",
       confidence: completedCheckpoint ? 0.86 : 0.34,
@@ -424,7 +722,7 @@ const addPipelineSkeleton = (
       lineKey: "recommendation",
       text: completedCheckpoint
         ? answerText || "Model-reviewed checkpoint is available."
-        : "No model-reviewed answer snapshot is available for this stage yet.",
+        : checkpointMissingSummary,
       state: completedCheckpoint ? "model_reviewed" : "stale",
       voiceEligible: false,
     },
@@ -609,6 +907,191 @@ const addPipelineSkeleton = (
         ...(completedCheckpoint.voicePolicy?.evidenceRefs ?? []),
       ]),
       reasonCodes: ["pipeline_answer_voice_output", "explicit_voice_policy"],
+    });
+  }
+};
+
+const addVisualCaptureCheckpointChain = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  input: {
+    observerId: string;
+    sourceRefs: StagePlayBadgeSourceRefV1[];
+    evidenceRefs: string[];
+    sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+    generatedAt: string;
+  },
+): void => {
+  const visualSources = input.sources.filter((source) =>
+    source.selectedForStagePlay &&
+    source.status === "active" &&
+    /visual|screen|frame/i.test(source.modality)
+  );
+  if (visualSources.length === 0) return;
+  const visualEvidenceRefs = unique([
+    ...input.evidenceRefs,
+    ...visualSources.flatMap((source) => source.evidenceRefs),
+  ]);
+  const sourceId = pushBadge(badges, badge({
+    id: "source.visual_frame.active",
+    title: "visual frame source",
+    plainMeaning: "A selected active visual source is feeding the Stage Play graph.",
+    whyItMatters: "This stable source node shows visual custody before any scene interpretation or checkpoint request.",
+    kind: "source",
+    status: "observed",
+    subjects: visualSources.map((source) => source.sourceId),
+    tags: ["pipeline", "visual_capture_job", "visual_frame", "active_source"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: visualEvidenceRefs,
+    liveBindings: visualSources.map((source) =>
+      makeBinding("source_modality", source.evidenceRefs, `${source.modality}:${source.status}:${source.cadenceMs ?? "cadence_unknown"}`)
+    ),
+    confidence: 0.82,
+    reasonCodes: ["visual_capture_source_active"],
+    dataTray: {
+      title: "Visual source",
+      summary: `${visualSources.length} active visual source(s); cadence ${visualSources[0]?.cadenceMs ? `${visualSources[0]?.cadenceMs}ms` : "unknown"}.`,
+      updatedAt: input.generatedAt,
+      freshness: "fresh",
+      confidence: 0.82,
+      evidenceRefs: visualEvidenceRefs,
+    },
+    admission: "auto",
+  }));
+  const compactVisualId = pushBadge(badges, badge({
+    id: "compact_observation.latest_visual",
+    title: "latest visual compact observation",
+    plainMeaning: "The latest visual source evidence has been compacted for Stage Play interpretation.",
+    whyItMatters: "The graph can cite visual compact facts without embedding raw frames or transcripts.",
+    kind: "compact_observation",
+    status: visualEvidenceRefs.length > 0 ? "observed" : "missing_evidence",
+    subjects: visualSources.map((source) => source.sourceId),
+    tags: ["pipeline", "visual_capture_job", "compact_observation", "latest_visual"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: visualEvidenceRefs,
+    liveBindings: visualSources.map((source) =>
+      makeBinding("source_status", source.evidenceRefs, `${source.sourceId}:visual_compact_window`)
+    ),
+    confidence: visualEvidenceRefs.length > 0 ? 0.76 : 0.35,
+    missingEvidence: visualEvidenceRefs.length > 0 ? [] : ["Latest compact visual observation is not available yet."],
+    reasonCodes: ["latest_visual_compact_observation"],
+    dataTray: {
+      title: "Latest visual",
+      summary: "Latest visual frame compacted into Stage Play evidence.",
+      updatedAt: input.generatedAt,
+      freshness: visualEvidenceRefs.length > 0 ? "fresh" : "missing",
+      confidence: visualEvidenceRefs.length > 0 ? 0.76 : 0.35,
+      evidenceRefs: visualEvidenceRefs,
+    },
+    admission: "auto",
+  }));
+  const visualInterpreterId = pushBadge(badges, badge({
+    id: "interpreter.visual_scene",
+    title: "visual scene interpreter",
+    plainMeaning: "Interpreter slot that reduces compact visual evidence into scene bounds.",
+    whyItMatters: "This is the checkpoint setup work: visual facts are interpreted before Helix Ask reasons over them.",
+    kind: "interpreter",
+    status: "candidate",
+    subjects: visualSources.map((source) => source.sourceId),
+    tags: ["pipeline", "visual_capture_job", "visual_scene_interpreter", "evidence_only"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: visualEvidenceRefs,
+    liveBindings: visualSources.map((source) =>
+      makeBinding("source_status", source.evidenceRefs, `${source.modality}:interpreting`)
+    ),
+    confidence: 0.72,
+    reasonCodes: ["visual_scene_interpreter"],
+    dataTray: {
+      title: "Visual interpreter",
+      summary: "Ready to reduce the latest visual compact observation into scene bounds.",
+      updatedAt: input.generatedAt,
+      freshness: "fresh",
+      confidence: 0.72,
+      evidenceRefs: visualEvidenceRefs,
+    },
+    admission: "auto",
+  }));
+  const supportingPossibilities = badges.filter((entry) =>
+    entry.kind === "procedural_binding" && entry.id !== "possibilities.current"
+  );
+  const possibilityId = pushBadge(badges, badge({
+    id: "possibilities.current",
+    title: "current possibilities",
+    plainMeaning: "Stable aggregate of possible next checks and procedural bindings from the visual stage.",
+    whyItMatters: "Possibilities are the bounded action space Helix Ask can reason over; they are not a final answer.",
+    kind: "procedural_binding",
+    status: supportingPossibilities.length > 0 ? "candidate" : "missing_evidence",
+    subjects: supportingPossibilities.map((entry) => entry.id),
+    tags: ["pipeline", "visual_capture_job", "possibilities", "current"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: unique([
+      ...visualEvidenceRefs,
+      ...supportingPossibilities.flatMap((entry) => entry.evidenceRefs),
+    ]),
+    confidence: supportingPossibilities.length > 0 ? 0.72 : 0.42,
+    missingEvidence: supportingPossibilities.length > 0 ? [] : ["No procedural possibilities have been assembled from the visual scene yet."],
+    reasonCodes: ["visual_stage_possibility_aggregate"],
+    dataTray: {
+      title: "Possibilities",
+      summary: supportingPossibilities.length > 0
+        ? `${supportingPossibilities.length} procedural possibility node(s) are active.`
+        : "Waiting for interpreted scene bounds to assemble possibilities.",
+      updatedAt: input.generatedAt,
+      freshness: "fresh",
+      confidence: supportingPossibilities.length > 0 ? 0.72 : 0.42,
+      evidenceRefs: unique([
+        ...visualEvidenceRefs,
+        ...supportingPossibilities.flatMap((entry) => entry.evidenceRefs),
+      ]),
+    },
+    admission: "auto",
+  }));
+
+  pushEdge(edges, {
+    from: input.observerId,
+    to: sourceId,
+    relation: "feeds",
+    label: "observer routes active visual source",
+    evidenceRefs: visualEvidenceRefs,
+    reasonCodes: ["visual_chain_observer_source"],
+  });
+  pushEdge(edges, {
+    from: sourceId,
+    to: compactVisualId,
+    relation: "feeds",
+    label: "visual source feeds latest compact visual observation",
+    evidenceRefs: visualEvidenceRefs,
+    reasonCodes: ["visual_chain_source_compact"],
+  });
+  pushEdge(edges, {
+    from: compactVisualId,
+    to: visualInterpreterId,
+    relation: "feeds",
+    label: "latest visual compact observation feeds visual scene interpreter",
+    evidenceRefs: visualEvidenceRefs,
+    reasonCodes: ["visual_chain_compact_interpreter"],
+  });
+  for (const targetId of ["setting.visual_scene", "actor.observed_subject"]) {
+    if (!badges.some((entry) => entry.id === targetId)) continue;
+    pushEdge(edges, {
+      from: visualInterpreterId,
+      to: targetId,
+      relation: "interprets",
+      label: "visual scene interpreter produces scene-bound node",
+      evidenceRefs: visualEvidenceRefs,
+      reasonCodes: ["visual_chain_interpreter_bound"],
+    });
+  }
+  const possibilitySources = ["setting.visual_scene", "actor.observed_subject", "stage_interpretation.current"]
+    .filter((id) => badges.some((entry) => entry.id === id));
+  for (const source of possibilitySources) {
+    pushEdge(edges, {
+      from: source,
+      to: possibilityId,
+      relation: "produces",
+      label: "scene bound contributes to current possibilities",
+      evidenceRefs: visualEvidenceRefs,
+      reasonCodes: ["visual_chain_bound_possibility"],
     });
   }
 };
@@ -1039,11 +1522,6 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     sourceId: input.sourceId ?? null,
     now: resolvedAt,
   });
-  const askCheckpointReceipt = input.askCheckpointReceipt ?? getLatestStagePlayAskCheckpointReceipt({
-    threadId: input.threadId,
-    roomId,
-    environmentId: sourceWindow.environmentId ?? input.environmentId ?? null,
-  });
   const hasAdmittedSourceWindowRefs = [
     ...sourceWindow.latestObservationRefs,
     ...sourceWindow.latestSnapshotRefs,
@@ -1053,6 +1531,27 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     ...(sourceWindow.latestSourceProducerRefs ?? []),
     ...(sourceWindow.latestRawSessionBufferRefs ?? []),
   ].length > 0;
+  const graphId = !roomId && !hasAdmittedSourceWindowRefs
+    ? `stage_play_badge_graph:${hashShort([input.threadId, "missing-room", resolvedAt])}`
+    : `stage_play_badge_graph:${hashShort([
+        input.threadId,
+        roomId,
+        sourceWindow.latestSnapshotRefs,
+        sourceWindow.latestObservationRefs,
+        input.objective ?? null,
+      ])}`;
+  const jobId = `stage_play_job:${hashShort([
+    input.threadId,
+    roomId,
+    sourceWindow.environmentId ?? input.environmentId ?? null,
+    input.sourceId ?? null,
+  ])}`;
+  const askCheckpointReceiptCandidate = input.askCheckpointReceipt ?? getLatestStagePlayAskCheckpointReceipt({
+    threadId: input.threadId,
+    roomId,
+    environmentId: sourceWindow.environmentId ?? input.environmentId ?? null,
+    graphId,
+  });
   if (!roomId && !hasAdmittedSourceWindowRefs) {
     const missingBadges: StagePlayBadgeV1[] = [];
     const missingEdges: StagePlayBadgeGraphV1["edges"] = [];
@@ -1061,6 +1560,38 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       evidenceRefs: [],
       sources: sourceWindow.sources,
     }));
+    const missingGraphSourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
+      threadId: input.threadId,
+      roomId,
+      worldId: null,
+      environmentId: input.environmentId ?? null,
+      fromTs: null,
+      toTs: resolvedAt,
+      latestObservationRefs: [],
+      latestSourceDescriptorRefs: [],
+      latestSourceProducerRefs: [],
+      latestRawSessionBufferRefs: [],
+      sources: sourceWindow.sources,
+      sourceRoutes: sourceWindow.sourceRoutes,
+      latestSnapshotRefs: [],
+      latestDeltaOverlayRefs: [],
+      latestNavigationRefs: [],
+      freshness: "missing" as const,
+    };
+    const checkpointFreshness = evaluateStagePlayCheckpointFreshness({
+      graph: buildStagePlayBadgeGraphV1({
+        generatedAt: resolvedAt,
+        graphId,
+        title: "Stage Play Badge Graph",
+        description: "No room source window has been admitted yet.",
+        sourceWindow: missingGraphSourceWindow,
+        badges: [],
+        edges: [],
+        recommendedActions: [],
+      }),
+      checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
+    });
+    const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
     addPipelineSkeleton(missingBadges, missingEdges, {
       observerId: missingObserverId,
       sourceRefs: [],
@@ -1068,33 +1599,52 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       sources: sourceWindow.sources,
       generatedAt: resolvedAt,
       askCheckpointReceipt,
+      checkpointFreshness,
     });
-    return buildStagePlayBadgeGraphV1({
+    addVisualCaptureCheckpointChain(missingBadges, missingEdges, {
+      observerId: missingObserverId,
+      sourceRefs: [],
+      evidenceRefs: [],
+      sources: sourceWindow.sources,
       generatedAt: resolvedAt,
-      graphId: `stage_play_badge_graph:${hashShort([input.threadId, "missing-room", resolvedAt])}`,
+    });
+    const baseGraph = buildStagePlayBadgeGraphV1({
+      generatedAt: resolvedAt,
+      graphId,
       title: "Stage Play Badge Graph",
       description: "No room source window has been admitted yet.",
-      sourceWindow: {
-        threadId: input.threadId,
-        roomId,
-        worldId: null,
-        environmentId: input.environmentId ?? null,
-        fromTs: null,
-        toTs: resolvedAt,
-        latestObservationRefs: [],
-        latestSourceDescriptorRefs: [],
-        latestSourceProducerRefs: [],
-        latestRawSessionBufferRefs: [],
-        sources: sourceWindow.sources,
-        sourceRoutes: sourceWindow.sourceRoutes,
-        latestSnapshotRefs: [],
-        latestDeltaOverlayRefs: [],
-        latestNavigationRefs: [],
-        freshness: "missing" as const,
-      },
+      sourceWindow: missingGraphSourceWindow,
       badges: missingBadges,
       edges: missingEdges,
       recommendedActions: [],
+    });
+    const perturbationResult = recordStagePlayPerturbationFromGraph({
+      jobId,
+      graph: baseGraph,
+      now: resolvedAt,
+    });
+    recordStagePlayCheckpointRequestFromPerturbation({
+      jobId,
+      graph: baseGraph,
+      perturbation: perturbationResult.event,
+      objective: input.objective ?? baseGraph.description,
+      now: resolvedAt,
+    });
+    const checkpointRequests = listStagePlayCheckpointRequests({ jobId, limit: 10 });
+    addLatestPerturbationNode(missingBadges, missingEdges, perturbationResult.latestEvents);
+    addPerturbationBadges(missingBadges, missingEdges, perturbationResult.latestEvents);
+    addCheckpointRequestBadges(missingBadges, missingEdges, checkpointRequests, perturbationResult.latestEvents);
+    return buildStagePlayBadgeGraphV1({
+      generatedAt: resolvedAt,
+      graphId,
+      title: "Stage Play Badge Graph",
+      description: "No room source window has been admitted yet.",
+      sourceWindow: missingGraphSourceWindow,
+      badges: missingBadges,
+      edges: missingEdges,
+      recommendedActions: [],
+      perturbations: perturbationResult.latestEvents,
+      checkpointRequests,
     });
   }
 
@@ -1999,6 +2549,45 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     });
   }
 
+  const graphSourceWindow: StagePlayBadgeGraphV1["sourceWindow"] = {
+    threadId: input.threadId,
+    roomId,
+    worldId: sourceWindow.worldId ?? null,
+    environmentId: sourceWindow.environmentId ?? input.environmentId ?? null,
+    fromTs: sourceWindow.compactFacts.observations[0]?.observedAt ?? snapshot?.ts ?? null,
+    toTs: sourceWindow.compactFacts.eventWindow.latestEventTs ?? snapshot?.ts ?? resolvedAt,
+    latestObservationRefs: sourceWindow.latestObservationRefs,
+    latestSourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
+    latestSourceProducerRefs: sourceWindow.latestSourceProducerRefs,
+    latestRawSessionBufferRefs: sourceWindow.latestRawSessionBufferRefs,
+    sources: sourceWindow.sources,
+    sourceRoutes: sourceWindow.sourceRoutes,
+    latestSnapshotRefs: sourceWindow.latestSnapshotRefs,
+    latestDeltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
+    latestNavigationRefs: unique([
+      ...sourceWindow.latestNavigationRefs,
+      ...sourceWindow.latestRouteSolverObservationRefs,
+      ...sourceWindow.latestWorldSenseContextRefs,
+      ...sourceWindow.latestChunkSnapshotSampleRefs,
+      ...sourceWindow.latestEventWindowRefs,
+    ]),
+    freshness: sourceWindow.freshness,
+  };
+  const checkpointFreshness = evaluateStagePlayCheckpointFreshness({
+    graph: buildStagePlayBadgeGraphV1({
+      generatedAt: resolvedAt,
+      graphId,
+      title: "Stage Play Badge Graph",
+      description: "Deterministic badge graph reducer over the compact Stage Play source window.",
+      sourceWindow: graphSourceWindow,
+      badges: [],
+      edges: [],
+      recommendedActions: [],
+    }),
+    checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
+  });
+  const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
+
   addPipelineSkeleton(badges, edges, {
     observerId,
     interpreterId,
@@ -2007,45 +2596,52 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     sources: sourceWindow.sources,
     generatedAt: resolvedAt,
     askCheckpointReceipt,
+    checkpointFreshness,
   });
-
-  return buildStagePlayBadgeGraphV1({
+  addVisualCaptureCheckpointChain(badges, edges, {
+    observerId,
+    sourceRefs,
+    evidenceRefs,
+    sources: sourceWindow.sources,
     generatedAt: resolvedAt,
-    graphId: `stage_play_badge_graph:${hashShort([
-      input.threadId,
-      roomId,
-      sourceWindow.latestSnapshotRefs,
-      sourceWindow.latestObservationRefs,
-      input.objective ?? null,
-    ])}`,
+  });
+  const baseGraph = buildStagePlayBadgeGraphV1({
+    generatedAt: resolvedAt,
+    graphId,
     title: "Stage Play Badge Graph",
     description: "Deterministic badge graph reducer over the compact Stage Play source window.",
-    sourceWindow: {
-      threadId: input.threadId,
-      roomId,
-      worldId: sourceWindow.worldId ?? null,
-      environmentId: sourceWindow.environmentId ?? input.environmentId ?? null,
-      fromTs: sourceWindow.compactFacts.observations[0]?.observedAt ?? snapshot?.ts ?? null,
-      toTs: sourceWindow.compactFacts.eventWindow.latestEventTs ?? snapshot?.ts ?? resolvedAt,
-      latestObservationRefs: sourceWindow.latestObservationRefs,
-      latestSourceDescriptorRefs: sourceWindow.latestSourceDescriptorRefs,
-      latestSourceProducerRefs: sourceWindow.latestSourceProducerRefs,
-      latestRawSessionBufferRefs: sourceWindow.latestRawSessionBufferRefs,
-      sources: sourceWindow.sources,
-      sourceRoutes: sourceWindow.sourceRoutes,
-      latestSnapshotRefs: sourceWindow.latestSnapshotRefs,
-      latestDeltaOverlayRefs: sourceWindow.latestDeltaOverlayRefs,
-      latestNavigationRefs: unique([
-        ...sourceWindow.latestNavigationRefs,
-        ...sourceWindow.latestRouteSolverObservationRefs,
-        ...sourceWindow.latestWorldSenseContextRefs,
-        ...sourceWindow.latestChunkSnapshotSampleRefs,
-        ...sourceWindow.latestEventWindowRefs,
-      ]),
-      freshness: sourceWindow.freshness,
-    },
+    sourceWindow: graphSourceWindow,
     badges,
     edges,
     recommendedActions,
+  });
+  const perturbationResult = recordStagePlayPerturbationFromGraph({
+    jobId,
+    graph: baseGraph,
+    now: resolvedAt,
+  });
+  recordStagePlayCheckpointRequestFromPerturbation({
+    jobId,
+    graph: baseGraph,
+    perturbation: perturbationResult.event,
+    objective: input.objective ?? baseGraph.description,
+    now: resolvedAt,
+  });
+  const checkpointRequests = listStagePlayCheckpointRequests({ jobId, limit: 10 });
+  addLatestPerturbationNode(badges, edges, perturbationResult.latestEvents);
+  addPerturbationBadges(badges, edges, perturbationResult.latestEvents);
+  addCheckpointRequestBadges(badges, edges, checkpointRequests, perturbationResult.latestEvents);
+
+  return buildStagePlayBadgeGraphV1({
+    generatedAt: resolvedAt,
+    graphId,
+    title: "Stage Play Badge Graph",
+    description: "Deterministic badge graph reducer over the compact Stage Play source window.",
+    sourceWindow: graphSourceWindow,
+    badges,
+    edges,
+    recommendedActions,
+    perturbations: perturbationResult.latestEvents,
+    checkpointRequests,
   });
 }

@@ -15,6 +15,7 @@ import {
 import { buildStagePlayGraphFromWorld } from "./stage-play-badge-graph-builder";
 import {
   buildStagePlayOutputLaneProjectionV1,
+  checkpointOnlySkippedLineKeysForStagePlayProjection,
   ensureLiveAnswerEnvironmentHasStagePlayLines,
   reduceLiveAnswerEnvironmentFromStagePlayGraph,
   STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA,
@@ -54,6 +55,7 @@ export type StagePlayProjectLiveAnswerResponse = {
   liveAnswerEnvironment: LiveAnswerEnvironment | null;
   projectedLineKeys: string[];
   skippedLineKeys: string[];
+  checkpointOnlySkipped: string[];
   reason: StagePlayProjectLiveAnswerReason;
   validationIssues?: string[];
   lineSchemaDelta?: LiveAnswerEnvironmentDelta | null;
@@ -120,7 +122,7 @@ const createStagePlayLiveAnswerEnvironment = (input: {
 }): LiveAnswerEnvironment => createLiveAnswerEnvironment({
   thread_id: input.threadId,
   created_turn_id: "turn:stage-play-projection",
-  objective: input.objective ?? input.graph?.title ?? "Project Stage Play evidence to Live Answer.",
+  objective: input.objective ?? input.graph?.title ?? "Project Stage Play evidence to Live Interpretation.",
   room_id: input.roomId ?? input.graph?.sourceWindow.roomId ?? null,
   source_ids: input.sourceIds,
   graph_id: input.graphId ?? input.graph?.graphId ?? null,
@@ -250,6 +252,7 @@ export function projectStagePlayLiveAnswer(
     graph,
     generatedAt: now,
   });
+  const checkpointOnlySkipped = checkpointOnlySkippedLineKeysForStagePlayProjection(outputLaneProjection);
   const validationIssues = validateStagePlayBadgeGraphV1(graph);
   const baseAuthority = {
     assistant_answer: false as const,
@@ -267,7 +270,8 @@ export function projectStagePlayLiveAnswer(
       liveAnswerDelta: null,
       liveAnswerEnvironment: null,
       projectedLineKeys: [],
-      skippedLineKeys: outputLaneProjection.lanes.map((lane) => lane.lineKey),
+      skippedLineKeys: skippedLineKeysFor(outputLaneProjection, null),
+      checkpointOnlySkipped,
       reason: "graph_invalid",
       validationIssues,
       lineSchemaDelta: null,
@@ -313,6 +317,7 @@ export function projectStagePlayLiveAnswer(
       liveAnswerEnvironment: null,
       projectedLineKeys: [],
       skippedLineKeys: skippedLineKeysFor(outputLaneProjection, null),
+      checkpointOnlySkipped,
       reason: "no_active_environment",
       lineSchemaDelta: null,
       environmentEnsure,
@@ -330,6 +335,7 @@ export function projectStagePlayLiveAnswer(
       liveAnswerEnvironment,
       projectedLineKeys: [],
       skippedLineKeys: skippedLineKeysFor(outputLaneProjection, liveAnswerEnvironment),
+      checkpointOnlySkipped,
       reason: "environment_not_active",
       lineSchemaDelta: null,
       environmentEnsure,
@@ -360,6 +366,7 @@ export function projectStagePlayLiveAnswer(
       liveAnswerEnvironment,
       projectedLineKeys: [],
       skippedLineKeys: skippedLineKeysFor(outputLaneProjection, liveAnswerEnvironment),
+      checkpointOnlySkipped,
       reason: "line_schema_mismatch",
       lineSchemaDelta,
       environmentEnsure,
@@ -382,6 +389,7 @@ export function projectStagePlayLiveAnswer(
     liveAnswerEnvironment: reduction?.environment ?? liveAnswerEnvironment,
     projectedLineKeys: reduction?.delta.changed_line_keys ?? [],
     skippedLineKeys: skippedLineKeysFor(outputLaneProjection, reduction?.environment ?? liveAnswerEnvironment),
+    checkpointOnlySkipped,
     reason: reduction ? "projected" : "no_line_changes",
     lineSchemaDelta,
     environmentEnsure,

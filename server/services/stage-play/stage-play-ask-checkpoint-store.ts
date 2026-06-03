@@ -9,6 +9,7 @@ export type StoredStagePlayAskCheckpointReceiptV1 = StagePlayAskCheckpointReceip
   environmentId?: string | null;
   graphId?: string | null;
   createdAt: string;
+  sourceWindowRefs?: string[];
   sourceArtifactRefs: string[];
   assistant_answer: false;
   raw_content_included: false;
@@ -21,6 +22,7 @@ export type RecordStagePlayAskCheckpointReceiptInput = StagePlayAskCheckpointRec
   environmentId?: string | null;
   graphId?: string | null;
   createdAt?: string | Date | null;
+  sourceWindowRefs?: string[];
   sourceArtifactRefs?: string[];
 };
 
@@ -93,6 +95,7 @@ export function recordStagePlayAskCheckpointReceipt(
     completedSolverPath: input.completedSolverPath === true,
     answerText: cleanString(input.answerText),
     evidenceRefs: cleanStrings(input.evidenceRefs),
+    sourceWindowRefs: cleanStrings(input.sourceWindowRefs),
     voicePolicy: input.voicePolicy
       ? {
           voiceEligible: input.voicePolicy.voiceEligible === true,
@@ -125,7 +128,6 @@ export function getLatestStagePlayAskCheckpointReceipt(
 
   const scored = receipts
     .map((receipt) => ({ receipt, score: scoreReceiptMatch(receipt, input) }))
-    .filter((entry) => entry.score > 0 || (!input.environmentId && !input.roomId && !input.graphId))
     .sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score;
       return b.receipt.createdAt.localeCompare(a.receipt.createdAt);

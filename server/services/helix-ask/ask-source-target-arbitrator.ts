@@ -22,9 +22,17 @@ import {
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
-import { isStagePlayReflectionPrompt } from "./stage-play-prompt-intent";
+import {
+  isStagePlayCheckpointRequestPrompt,
+  isStagePlayJobPlanningPrompt,
+  isStagePlayReflectionPrompt,
+} from "./stage-play-prompt-intent";
 
-export { isStagePlayReflectionPrompt } from "./stage-play-prompt-intent";
+export {
+  isStagePlayCheckpointRequestPrompt,
+  isStagePlayJobPlanningPrompt,
+  isStagePlayReflectionPrompt,
+} from "./stage-play-prompt-intent";
 
 type CueRule = {
   target: HelixAskSourceTarget;
@@ -477,6 +485,70 @@ export function arbitrateAskSourceTarget(input: {
   activeWorkspaceSourceResolution?: HelixActiveWorkspaceSourceResolution | Record<string, unknown> | null;
 }): HelixAskSourceTargetIntent {
   const prompt = input.promptText.trim();
+  if (isStagePlayCheckpointRequestPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["stage_play_checkpoint_request"],
+      reasons: ["explicit_stage_play_checkpoint_request_source_target"],
+      requestedOutputs: [
+        "stage_play_checkpoint_request",
+        "stage_play_checkpoint_queue",
+        "stage_play_badge_graph",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "visual_deictic",
+        "visual_frame_evidence",
+        "visual_capture_describe",
+        "live_pipeline_control",
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "explicit_stage_play_checkpoint_request_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isStagePlayJobPlanningPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["stage_play_job_planning"],
+      reasons: ["explicit_stage_play_job_planning_source_target"],
+      requestedOutputs: [
+        "stage_play_job_plan",
+        "stage_play_builder_catalog",
+        "stage_play_source_query",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "visual_deictic",
+        "visual_frame_evidence",
+        "visual_capture_describe",
+        "live_pipeline_control",
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "explicit_stage_play_job_planning_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isStagePlayReflectionPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

@@ -137,6 +137,7 @@ type StagePlayProjectLiveAnswerResponse = {
   schema: "stage_play_live_answer_projection_response/v1";
   projectedLineKeys: string[];
   skippedLineKeys: string[];
+  checkpointOnlySkipped: string[];
   reason:
     | "projected"
     | "no_active_environment"
@@ -153,10 +154,27 @@ type StagePlayProjectLiveAnswerResponse = {
 type StagePlayProjectionStatus = {
   projectedLineKeys: string[];
   skippedLineKeys: string[];
+  checkpointOnlySkipped: string[];
   reason: StagePlayProjectLiveAnswerResponse["reason"] | "request_failed";
   updatedAt: string;
   message: string;
 };
+
+type StagePlayCheckpointQueueAction =
+  | "run"
+  | "skip"
+  | "pause_job"
+  | "resume_job"
+  | "clear_queued"
+  | "end_live_job";
+
+type StagePlayCheckpointQueueStatus = {
+  action: StagePlayCheckpointQueueAction;
+  reason: string;
+  message: string;
+  updatedAt: string;
+  ok: boolean;
+} | null;
 
 type StagePlayLaneId =
   | "observer"
@@ -166,6 +184,7 @@ type StagePlayLaneId =
   | "procedural_bindings"
   | "helix_ask_checkpoint"
   | "answer_snapshot"
+  | "validation_feedback"
   | "live_voice_output";
 
 type StagePlayOutputNodeKind =
@@ -233,6 +252,7 @@ const STAGE_PLAY_LANES: Array<{ id: StagePlayLaneId; title: string }> = [
   { id: "procedural_bindings", title: "Procedural Bindings" },
   { id: "helix_ask_checkpoint", title: "Helix Ask Checkpoint" },
   { id: "answer_snapshot", title: "Answer Snapshot" },
+  { id: "validation_feedback", title: "Validation Feedback" },
   { id: "live_voice_output", title: "Live / Voice Output" },
 ];
 
@@ -438,7 +458,7 @@ function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
     badge.kind === "admission_gate"
   ) return "affordances_missing_checks";
   if (badge.kind === "intent_module" || badge.kind === "procedural_binding") return "procedural_bindings";
-  if (badge.kind === "ask_checkpoint") return "helix_ask_checkpoint";
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint" || badge.kind === "checkpoint_request" || badge.kind === "perturbation") return "helix_ask_checkpoint";
   if (badge.kind === "answer_snapshot") return "answer_snapshot";
   if (badge.kind === "live_output" || badge.kind === "voice_output") return "live_voice_output";
   return "stage_bounds";
@@ -542,7 +562,7 @@ function outputNodesForGraph(graph: StagePlayBadgeGraphV1): StagePlaySyntheticNo
   const validationNodes: StagePlaySyntheticNode[] = validationRefs.slice(0, 8).map((ref) => ({
     id: `synthetic:validation:${ref}`,
     kind: "validation",
-    lane: "answer_snapshot",
+    lane: "validation_feedback",
     title: compactRefTitle(ref),
     status: /missed|blocked|fail/i.test(ref) ? "blocked" : "observed",
     evidenceRefs: [ref],
@@ -595,9 +615,11 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "source") return "Routed live source";
   if (badge.kind === "compact_observation") return "Compact source window";
   if (badge.kind === "stage_interpretation") return "Current interpreted stage bounds";
-  if (badge.kind === "ask_checkpoint") return "Model checkpoint boundary";
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Model checkpoint boundary";
+  if (badge.kind === "checkpoint_request") return "Queued checkpoint request";
   if (badge.kind === "answer_snapshot") return "Model-reviewed answer snapshot";
   if (badge.kind === "live_output" || badge.kind === "voice_output") return "Reviewed output lane";
+  if (badge.kind === "perturbation") return "Source-window perturbation";
   if (badge.kind === "fusion") return "Source fusion state";
   if (badge.kind === "procedural_binding") return `Assembles: ${proceduralExpression(badge)}`;
   if (badge.kind === "intent_module") return `Verb: ${proceduralExpression(badge)}`;
@@ -614,10 +636,12 @@ function selectedNodeConsoleTitle(badge: StagePlayBadgeV1 | null): string {
   if (badge.kind === "source") return "Source Routing";
   if (badge.kind === "compact_observation") return "Compact Observation Evidence";
   if (badge.kind === "procedural_binding") return "Procedural Binding";
-  if (badge.kind === "ask_checkpoint") return "Ask Checkpoint";
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Helix Ask Checkpoint";
+  if (badge.kind === "checkpoint_request") return "Checkpoint Request";
   if (badge.kind === "answer_snapshot") return "Answer Snapshot";
   if (badge.kind === "live_output") return "Live Output";
   if (badge.kind === "voice_output") return "Voice Output";
+  if (badge.kind === "perturbation") return "Perturbation";
   if (badge.id === "interpreter.stage_play_reflection") return "Stage Interpreter";
   return labelize(badge.kind);
 }
@@ -630,13 +654,15 @@ function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string 
   if (badge.kind === "source") return "Route this source into Stage Play and inspect its evidence custody.";
   if (badge.kind === "compact_observation") return "Inspect compact facts, evidence refs, and raw-buffer audit links.";
   if (badge.kind === "procedural_binding") return "Inspect the expression and badges that support this procedure.";
-  if (badge.kind === "ask_checkpoint") return "Inspect Ask turn refs, tool observation refs, and solver/debug status.";
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Inspect Ask turn refs, tool observation refs, and solver/debug status.";
+  if (badge.kind === "checkpoint_request") return "Inspect the queued checkpoint request and live-job queue controls.";
   if (badge.kind === "answer_snapshot") return "Inspect the upheld model-reviewed answer and supporting refs.";
+  if (badge.kind === "perturbation") return "Inspect source-window changes, affected badges, and whether a checkpoint is suggested.";
   if (badge.kind === "live_output" || badge.kind === "voice_output") {
     return "Inspect projection state, output text, refs, and voice eligibility.";
   }
   if (badge.id === "interpreter.stage_play_reflection") {
-    return "Project current Stage Play evidence lanes into Live Answer without creating answer authority.";
+    return "Project current Stage Play evidence lanes into Live Interpretation without creating answer snapshot authority.";
   }
   return "Inspect the selected node without mixing in unrelated builder controls.";
 }
@@ -646,10 +672,12 @@ function inspectorTestIdForBadge(badge: StagePlayBadgeV1): string {
   if (badge.kind === "source") return "stage-play-source-node-controls";
   if (badge.kind === "compact_observation") return "stage-play-compact-observation-node-controls";
   if (badge.kind === "procedural_binding") return "stage-play-procedural-binding-node-controls";
-  if (badge.kind === "ask_checkpoint") return "stage-play-ask-checkpoint-node-controls";
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "stage-play-ask-checkpoint-node-controls";
+  if (badge.kind === "checkpoint_request") return "stage-play-checkpoint-request-node-controls";
   if (badge.kind === "answer_snapshot") return "stage-play-answer-snapshot-node-controls";
   if (badge.kind === "live_output") return "stage-play-live-output-node-controls";
   if (badge.kind === "voice_output") return "stage-play-voice-output-node-controls";
+  if (badge.kind === "perturbation") return "stage-play-perturbation-node-controls";
   if (badge.id === "interpreter.stage_play_reflection") return "stage-play-interpreter-node-controls";
   return "stage-play-selected-node-controls";
 }
@@ -776,7 +804,7 @@ function askCheckpointTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView 
     metric: compactTrayMetric(checkpoint?.askTurnId ?? "no turn", "no turn"),
     summary: compactTrayText(
       badge.dataTray?.summary ?? `${solverState}; ${checkpoint?.modelReviewed ? "model reviewed" : "not reviewed"}`,
-      "No model-reviewed checkpoint has been produced for this stage yet.",
+      "No answer snapshot yet.",
     ),
     detail: compactTrayText(
       `${routeState} | ${checkpoint?.terminalArtifactKind ?? "no terminal artifact"}`,
@@ -819,7 +847,7 @@ function outputTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
 function badgeTrayView(badge: StagePlayBadgeV1, observerSources: StagePlayObserverSource[]): StagePlayBadgeTrayView {
   if (badge.kind === "observer") return observerTrayView(badge, observerSources);
   if (badge.kind === "compact_observation") return compactObservationTrayView(badge);
-  if (badge.kind === "ask_checkpoint") return askCheckpointTrayView(badge);
+  if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return askCheckpointTrayView(badge);
   if (badge.kind === "answer_snapshot") return answerSnapshotTrayView(badge);
   if (badge.kind === "live_output" || badge.kind === "voice_output") return outputTrayView(badge);
   return {
@@ -861,16 +889,31 @@ function StagePlayToolActivityStrip({
   graph,
   diff,
   projectionStatus,
+  checkpointQueueStatus,
+  onCheckpointQueueAction,
 }: {
   graph: StagePlayBadgeGraphV1;
   diff: StagePlayGraphDiff | null;
   projectionStatus: StagePlayProjectionStatus | null;
+  checkpointQueueStatus: StagePlayCheckpointQueueStatus;
+  onCheckpointQueueAction: (action: StagePlayCheckpointQueueAction, requestId?: string | null) => void;
 }) {
   const sourceFreshnessChanged = diff?.sourceWindowChanged === true;
   const missingCount = graph.summary.missingEvidenceCount;
+  const latestPerturbations = (graph.perturbations ?? []).slice(0, 5);
+  const latestCheckpointPerturbation = latestPerturbations.find((event) => event.checkpointSuggested);
+  const activeCheckpointRequests = (graph.checkpointRequests ?? []).filter((request) =>
+    request.status === "queued" || request.status === "running"
+  );
+  const firstQueuedCheckpointRequest = activeCheckpointRequests.find((request) => request.status === "queued") ?? null;
+  const runningCheckpointRequest = activeCheckpointRequests.find((request) => request.status === "running") ?? null;
+  const visibleCheckpointRequest = runningCheckpointRequest ?? firstQueuedCheckpointRequest;
   const summaryText = `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`;
   const skippedText = projectionStatus?.skippedLineKeys
     .map((key) => key === "recommendation" ? "recommendation requires model review" : key)
+    .join(", ");
+  const checkpointOnlyText = projectionStatus?.checkpointOnlySkipped
+    .map((key) => key === "recommendation" ? "checkpoint recommendation" : labelize(key))
     .join(", ");
   return (
     <div
@@ -898,11 +941,85 @@ function StagePlayToolActivityStrip({
             +{diff.addedBadgeIds.length} / ~{diff.updatedBadgeIds.length} / -{diff.removedBadgeIds.length}
           </span>
         ) : null}
+        {latestPerturbations.length > 0 ? (
+          <span className={latestCheckpointPerturbation ? "font-mono text-[11px] text-amber-100" : "font-mono text-[11px] text-cyan-100"}>
+            perturbations: {latestPerturbations.map((event) => `${labelize(event.reason)}:${event.materiality}`).join(" | ")}
+          </span>
+        ) : null}
+        {latestCheckpointPerturbation ? (
+          <span className="basis-full text-center text-[11px] text-amber-100">
+            Checkpoint suggested after {labelize(latestCheckpointPerturbation.reason)}; affected {latestCheckpointPerturbation.affectedBadgeIds.length} badge(s).
+          </span>
+        ) : null}
+        {visibleCheckpointRequest ? (
+          <span className="basis-full flex flex-wrap items-center justify-center gap-2 text-[11px] text-cyan-100">
+            <span className="font-mono">
+              checkpoint queue: {labelize(visibleCheckpointRequest.reason)} / {visibleCheckpointRequest.status}
+            </span>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("run", visibleCheckpointRequest.checkpointRequestId)}
+              disabled={visibleCheckpointRequest.status !== "queued"}
+              className="rounded border border-cyan-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="stage-play-run-checkpoint"
+            >
+              Run checkpoint
+            </button>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("skip", visibleCheckpointRequest.checkpointRequestId)}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-amber-500 hover:text-amber-100"
+              data-testid="stage-play-skip-checkpoint"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("pause_job")}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-amber-500 hover:text-amber-100"
+              data-testid="stage-play-pause-checkpoint-job"
+            >
+              Pause job
+            </button>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("resume_job")}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-emerald-500 hover:text-emerald-100"
+              data-testid="stage-play-resume-checkpoint-job"
+            >
+              Resume job
+            </button>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("clear_queued")}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-rose-500 hover:text-rose-100"
+              data-testid="stage-play-clear-checkpoint-queue"
+            >
+              Clear queued checkpoints
+            </button>
+            <button
+              type="button"
+              onClick={() => onCheckpointQueueAction("end_live_job")}
+              className="rounded border border-rose-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-100 hover:border-rose-500"
+              data-testid="stage-play-end-checkpoint-job"
+            >
+              End live job
+            </button>
+          </span>
+        ) : null}
+        {checkpointQueueStatus ? (
+          <span className={checkpointQueueStatus.ok ? "basis-full text-center text-[11px] text-emerald-100" : "basis-full text-center text-[11px] text-amber-100"}>
+            {checkpointQueueStatus.message}
+          </span>
+        ) : null}
         {projectionStatus ? (
           <span className="basis-full text-center font-mono text-[11px] text-emerald-100">
-            Projected {projectionStatus.projectedLineKeys.length} lines: {projectionStatus.projectedLineKeys.join(", ") || "none"}
+            Projected {projectionStatus.projectedLineKeys.length} interpretation lanes: {projectionStatus.projectedLineKeys.join(", ") || "none"}
             {projectionStatus.skippedLineKeys.length > 0 ? (
               <span className="text-amber-100"> | Skipped: {skippedText}</span>
+            ) : null}
+            {projectionStatus.checkpointOnlySkipped.length > 0 ? (
+              <span className="text-amber-100"> | Checkpoint-only: {checkpointOnlyText}</span>
             ) : null}
           </span>
         ) : null}
@@ -930,6 +1047,9 @@ const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [
   { kind: "procedural_binding", label: "Procedure", role: "combined action pattern" },
   { kind: "recommended_check", label: "Check", role: "missing validation step" },
   { kind: "admission_gate", label: "Gate", role: "permission boundary" },
+  { kind: "perturbation", label: "Perturbation", role: "source-window change that may stale output" },
+  { kind: "checkpoint_request", label: "Checkpoint Request", role: "queued bounded Ask checkpoint" },
+  { kind: "helix_ask_checkpoint", label: "Helix Ask Checkpoint", role: "visible model reasoning boundary" },
   { kind: "missing_evidence", label: "Missing Evidence", role: "unknown fact to resolve" },
 ];
 
@@ -971,11 +1091,14 @@ function defaultDraftParametersForNode(node: StagePlayNodeBuilderType): DraftSta
     intent_module: [["verb", ""], ["target", ""], ["preserves", ""]],
     procedural_binding: [["expression", ""], ["requires", ""], ["possible_result", ""]],
     ask_checkpoint: [["ask_turn_id", ""], ["solver_trace_ref", ""], ["model_reviewed", "false"]],
+    helix_ask_checkpoint: [["ask_turn_id", ""], ["solver_trace_ref", ""], ["model_reviewed", "false"]],
     answer_snapshot: [["line_key", "answer_snapshot"], ["answer_text", ""], ["model_reviewed", "false"]],
     live_output: [["line_key", ""], ["state", "draft"], ["voice_eligible", "false"]],
     voice_output: [["line_key", ""], ["state", "draft"], ["voice_eligible", "false"]],
     recommended_check: [["check", ""], ["evidence_needed", ""], ["status", ""]],
     admission_gate: [["gate", ""], ["admission", ""], ["authority", "evidence_only"]],
+    perturbation: [["reason", ""], ["materiality", ""], ["affected_badges", ""]],
+    checkpoint_request: [["reason", ""], ["status", "queued"], ["question", ""]],
     missing_evidence: [["question", ""], ["needed_ref", ""], ["status", "missing"]],
   };
 
@@ -1378,6 +1501,9 @@ function StagePlayGraphCanvas({
   const addedBadgeIds = new Set(graphDiff?.addedBadgeIds ?? []);
   const updatedBadgeIds = new Set(graphDiff?.updatedBadgeIds ?? []);
   const updatedActionIds = new Set(graphDiff?.updatedActionIds ?? []);
+  const perturbedBadgeIds = new Set(
+    (graph.perturbations ?? []).slice(0, 5).flatMap((event) => event.affectedBadgeIds),
+  );
   const relatedEdgeIds = new Set(
     graph.edges
       .filter((edge: StagePlayBadgeEdgeV1) =>
@@ -1460,7 +1586,9 @@ function StagePlayGraphCanvas({
           const isMissing = badge.kind === "missing_evidence" || badge.status === "missing_evidence";
           const canProjectFromBadge = badge.id === "interpreter.stage_play_reflection";
           const isNew = addedBadgeIds.has(badge.id);
-          const isUpdated = updatedBadgeIds.has(badge.id) || (badge.kind === "observer" && graphDiff?.sourceWindowChanged === true);
+          const isUpdated = updatedBadgeIds.has(badge.id) ||
+            perturbedBadgeIds.has(badge.id) ||
+            (badge.kind === "observer" && graphDiff?.sourceWindowChanged === true);
           const tray = badgeTrayView(badge, observerSources);
           const pulseClass = isNew
             ? "animate-pulse ring-2 ring-emerald-300/70 shadow-[0_0_26px_rgba(52,211,153,0.28)]"
@@ -1585,7 +1713,7 @@ function StagePlayGraphCanvas({
                     className="mt-1 h-5 w-full rounded border border-emerald-700 bg-emerald-950/70 px-2 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
                     data-testid="stage-play-project-live-answer-interpreter"
                   >
-                    Project to Live Answer
+                    Project Interpretation
                   </button>
                 ) : (
                   <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{tray.detail}</div>
@@ -1708,7 +1836,7 @@ function StagePlayGraphCanvas({
                     className="mt-1 h-5 w-full rounded border border-emerald-700 bg-emerald-950/80 px-2 text-[9px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
                     data-testid="stage-play-project-live-answer-output"
                   >
-                    Project to Live Answer
+                    Project Interpretation
                   </button>
                 ) : (
                   <div className="mt-1 truncate font-mono text-[9px] text-slate-600">{tray.detail}</div>
@@ -1960,6 +2088,7 @@ function StagePlayBindingOverlay({
   onAttachAudioTranscriptSource,
   onPauseVisualSourceSetup,
   onProjectLiveAnswer,
+  onCheckpointQueueAction,
   sourceAuditSelection,
   rawSessionBufferEntries,
   rawSessionBufferLoading,
@@ -1995,6 +2124,7 @@ function StagePlayBindingOverlay({
   onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
   onPauseVisualSourceSetup: () => void;
   onProjectLiveAnswer: () => void;
+  onCheckpointQueueAction: (action: StagePlayCheckpointQueueAction, requestId?: string | null) => void;
   sourceAuditSelection: StagePlaySourceAuditSelection;
   rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
   rawSessionBufferLoading: boolean;
@@ -2088,6 +2218,7 @@ function StagePlayBindingOverlay({
             onAttachAudioTranscriptSource={onAttachAudioTranscriptSource}
             onPauseVisualSourceSetup={onPauseVisualSourceSetup}
             onProjectLiveAnswer={onProjectLiveAnswer}
+            onCheckpointQueueAction={onCheckpointQueueAction}
             sourceAuditSelection={sourceAuditSelection}
             rawSessionBufferEntries={rawSessionBufferEntries}
             rawSessionBufferLoading={rawSessionBufferLoading}
@@ -2265,6 +2396,7 @@ function Inspector({
   onAttachAudioTranscriptSource,
   onPauseVisualSourceSetup,
   onProjectLiveAnswer,
+  onCheckpointQueueAction,
   sourceAuditSelection,
   rawSessionBufferEntries,
   rawSessionBufferLoading,
@@ -2285,6 +2417,7 @@ function Inspector({
   onAttachAudioTranscriptSource: (source: StagePlayAudioTranscriptSource) => void;
   onPauseVisualSourceSetup: () => void;
   onProjectLiveAnswer: () => void;
+  onCheckpointQueueAction: (action: StagePlayCheckpointQueueAction, requestId?: string | null) => void;
   sourceAuditSelection: StagePlaySourceAuditSelection;
   rawSessionBufferEntries: StagePlayRawSessionBufferEntryV1[];
   rawSessionBufferLoading: boolean;
@@ -2326,12 +2459,17 @@ function Inspector({
     badge.output?.voiceEligible === true &&
     badge.output.state === "model_reviewed",
   );
+  const checkpointRequestId = badge.sourceRefs.find((ref) => ref.kind === "stage_play_checkpoint_request")?.id ??
+    badge.evidenceRefs.find((ref) => ref.startsWith("stage_play_checkpoint_request:")) ??
+    null;
   const isSelectedSpecificNode = [
     "observer",
     "source",
     "compact_observation",
     "procedural_binding",
     "ask_checkpoint",
+    "helix_ask_checkpoint",
+    "checkpoint_request",
     "answer_snapshot",
     "live_output",
     "voice_output",
@@ -2342,7 +2480,7 @@ function Inspector({
   const showMissingEvidenceSection = badge.kind === "missing_evidence" || badge.missingEvidence.length > 0;
   const showAdmissionSection = !isOutputNode && (Boolean(badge.admission) || relatedActions.length > 0);
   const showGenericSourceRefs = !isSelectedSpecificNode && badge.sourceRefs.length > 0;
-  const showGenericRelatedBadges = !["compact_observation", "ask_checkpoint", "answer_snapshot", "live_output", "voice_output"].includes(badge.kind) &&
+  const showGenericRelatedBadges = !["compact_observation", "ask_checkpoint", "helix_ask_checkpoint", "checkpoint_request", "answer_snapshot", "live_output", "voice_output"].includes(badge.kind) &&
     (relatedEdges.length > 0 || relatedBadges.length > 0);
 
   return (
@@ -2457,7 +2595,7 @@ function Inspector({
           </>
         ) : null}
 
-        {badge.kind === "ask_checkpoint" ? (
+        {badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint" ? (
           <>
             <Section title="Ask Prompt">
               <div className="space-y-2 text-xs">
@@ -2485,6 +2623,80 @@ function Inspector({
                     <Badge key={code} variant="outline" className="border-slate-700 text-slate-300">{code}</Badge>
                   ))}
                 </div>
+              </div>
+            </Section>
+          </>
+        ) : null}
+
+        {badge.kind === "checkpoint_request" ? (
+          <>
+            <Section title="Checkpoint Request">
+              <div className="space-y-2 text-xs">
+                <div>Status: <span className="font-mono text-slate-200">{labelize(badge.status)}</span></div>
+                <div>Request ref: <span className="font-mono text-slate-200">{checkpointRequestId ?? "missing"}</span></div>
+                <div className="rounded border border-slate-800 bg-black/20 p-2 leading-relaxed text-slate-300">
+                  {badge.dataTray?.summary ?? "Queued checkpoint request waits for a bounded visible Ask turn."}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {badge.reasonCodes.map((code) => (
+                    <Badge key={code} variant="outline" className="border-slate-700 text-slate-300">{code}</Badge>
+                  ))}
+                </div>
+              </div>
+            </Section>
+            <Section title="Queue Controls">
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("run", checkpointRequestId)}
+                  className="rounded border border-cyan-800 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:border-cyan-400"
+                  data-testid="stage-play-run-checkpoint-inspector"
+                >
+                  Run checkpoint
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("skip", checkpointRequestId)}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-amber-500 hover:text-amber-100"
+                  data-testid="stage-play-skip-checkpoint-inspector"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("pause_job")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-amber-500 hover:text-amber-100"
+                >
+                  Pause job
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("resume_job")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-emerald-500 hover:text-emerald-100"
+                >
+                  Resume job
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("clear_queued")}
+                  className="rounded border border-slate-700 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 hover:border-rose-500 hover:text-rose-100"
+                >
+                  Clear queued checkpoints
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCheckpointQueueAction("end_live_job")}
+                  className="rounded border border-rose-900 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-rose-100 hover:border-rose-500"
+                >
+                  End live job
+                </button>
+              </div>
+            </Section>
+            <Section title="Checkpoint Evidence">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No checkpoint request refs recorded.</span>}
               </div>
             </Section>
           </>
@@ -2640,7 +2852,7 @@ function Inspector({
                   className="col-span-2 rounded border border-emerald-700 bg-emerald-950/25 px-2 py-1.5 text-[10px] font-semibold text-emerald-100 hover:border-emerald-400"
                   data-testid="stage-play-project-live-answer"
                 >
-                  Project to Live Answer
+                  Project Interpretation
                 </button>
               </div>
 
@@ -2944,10 +3156,10 @@ function Inspector({
         ) : null}
 
         {badge.id === "interpreter.stage_play_reflection" ? (
-          <Section title="Live Answer Projection">
+          <Section title="Live Interpretation Projection">
             <div className="space-y-2 text-xs">
               <p className="text-slate-400">
-                Project current Stage Play evidence lanes into the Live Answer environment. This is a deterministic evidence projection, not assistant answer authority.
+                Project current Stage Play evidence lanes into Live Interpretation. This is deterministic observation projection, not answer snapshot authority.
               </p>
               <button
                 type="button"
@@ -2955,7 +3167,7 @@ function Inspector({
                 className="w-full rounded border border-emerald-700 bg-emerald-950/25 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100 hover:border-emerald-400"
                 data-testid="stage-play-project-live-answer-inspector"
               >
-                Project to Live Answer
+                Project Interpretation
               </button>
             </div>
           </Section>
@@ -3113,6 +3325,7 @@ export default function StagePlayBadgeGraphPanel() {
     message: "",
   });
   const [projectionStatus, setProjectionStatus] = useState<StagePlayProjectionStatus | null>(null);
+  const [checkpointQueueStatus, setCheckpointQueueStatus] = useState<StagePlayCheckpointQueueStatus>(null);
   const [sourceAuditSelection, setSourceAuditSelection] = useState<StagePlaySourceAuditSelection>(null);
   const [graphDiff, setGraphDiff] = useState<StagePlayGraphDiff | null>(null);
   const [removedBadgeGhosts, setRemovedBadgeGhosts] = useState<StagePlayRemovedBadgeGhost[]>([]);
@@ -3493,23 +3706,24 @@ export default function StagePlayBadgeGraphPanel() {
   async function handleProjectLiveAnswer() {
     setSourceSetupStatus({
       level: "working",
-      message: "Projecting Stage Play evidence lanes into Live Answer...",
+      message: "Projecting Stage Play evidence lanes into Live Interpretation...",
     });
     try {
       const result = await projectStagePlayLiveAnswer({
         threadId,
         roomId,
         environmentId,
-        objective: activeEnvironment?.objective ?? graph?.description ?? graph?.title ?? "Project Stage Play graph into Live Answer.",
+        objective: activeEnvironment?.objective ?? graph?.description ?? graph?.title ?? "Project Stage Play graph into Live Interpretation.",
       });
       const message = result.reason === "projected"
-        ? `Projected ${result.projectedLineKeys.length} Stage Play line(s) to Live Answer.`
+        ? `Projected ${result.projectedLineKeys.length} Live Interpretation lane(s).`
         : result.reason === "no_line_changes"
-          ? "Stage Play projection ran; no Live Answer lines changed."
+          ? "Stage Play projection ran; no Live Interpretation lanes changed."
           : `${labelize(result.reason)}: ${result.skippedLineKeys.slice(0, 4).join(", ")}`;
       setProjectionStatus({
         projectedLineKeys: result.projectedLineKeys,
         skippedLineKeys: result.skippedLineKeys,
+        checkpointOnlySkipped: result.checkpointOnlySkipped ?? [],
         reason: result.reason,
         updatedAt: new Date().toISOString(),
         message,
@@ -3531,9 +3745,57 @@ export default function StagePlayBadgeGraphPanel() {
       setProjectionStatus({
         projectedLineKeys: [],
         skippedLineKeys: [],
+        checkpointOnlySkipped: [],
         reason: "request_failed",
         updatedAt: new Date().toISOString(),
         message: error instanceof Error ? error.message : "stage_play_live_answer_projection_failed",
+      });
+    }
+  }
+
+  async function handleCheckpointQueueAction(action: StagePlayCheckpointQueueAction, requestId?: string | null) {
+    const request = requestId
+      ? graph?.checkpointRequests?.find((entry) => entry.checkpointRequestId === requestId) ?? null
+      : graph?.checkpointRequests?.find((entry) => entry.status === "queued" || entry.status === "running") ?? null;
+    const jobId = request?.jobId ?? graph?.checkpointRequests?.[0]?.jobId ?? null;
+    if (!jobId) {
+      setCheckpointQueueStatus({
+        action,
+        reason: "no_request",
+        message: "No checkpoint request queue is active for this graph yet.",
+        updatedAt: new Date().toISOString(),
+        ok: false,
+      });
+      return;
+    }
+    setCheckpointQueueStatus({
+      action,
+      reason: "working",
+      message: `${labelize(action)} checkpoint queue...`,
+      updatedAt: new Date().toISOString(),
+      ok: true,
+    });
+    try {
+      const result = await postJson("/api/helix/stage-play/checkpoint-queue/action", {
+        jobId,
+        action,
+        checkpointRequestId: requestId ?? request?.checkpointRequestId ?? null,
+      });
+      setCheckpointQueueStatus({
+        action,
+        reason: String(result.reason ?? "updated"),
+        message: `${labelize(action)}: ${labelize(String(result.reason ?? "updated"))}`,
+        updatedAt: new Date().toISOString(),
+        ok: Boolean(result.ok),
+      });
+      await graphQuery.refetch();
+    } catch (error) {
+      setCheckpointQueueStatus({
+        action,
+        reason: "request_failed",
+        message: error instanceof Error ? error.message : "stage_play_checkpoint_queue_action_failed",
+        updatedAt: new Date().toISOString(),
+        ok: false,
       });
     }
   }
@@ -3896,6 +4158,7 @@ export default function StagePlayBadgeGraphPanel() {
             onAttachAudioTranscriptSource={attachAudioTranscriptSource}
             onPauseVisualSourceSetup={pauseVisualSourceSetup}
             onProjectLiveAnswer={handleProjectLiveAnswer}
+            onCheckpointQueueAction={handleCheckpointQueueAction}
             sourceAuditSelection={sourceAuditSelection}
             rawSessionBufferEntries={rawSessionBufferQuery.data?.entries ?? []}
             rawSessionBufferLoading={rawSessionBufferQuery.isLoading}
@@ -3921,7 +4184,13 @@ export default function StagePlayBadgeGraphPanel() {
           </div>
         ) : null}
 
-        <StagePlayToolActivityStrip graph={graph} diff={graphDiff} projectionStatus={projectionStatus} />
+        <StagePlayToolActivityStrip
+          graph={graph}
+          diff={graphDiff}
+          projectionStatus={projectionStatus}
+          checkpointQueueStatus={checkpointQueueStatus}
+          onCheckpointQueueAction={handleCheckpointQueueAction}
+        />
 
         {selectedDraftNodeId ? (
           (() => {

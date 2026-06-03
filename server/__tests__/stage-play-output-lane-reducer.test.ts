@@ -7,6 +7,9 @@ import {
 import {
   buildStagePlayLiveAnswerLineValuesV1,
   buildStagePlayOutputLaneProjectionV1,
+  checkpointOnlySkippedLineKeysForStagePlayProjection,
+  CHECKPOINT_ONLY_LINE_KEYS,
+  DETERMINISTIC_STAGE_PLAY_LINE_KEYS,
   reduceLiveAnswerEnvironmentFromStagePlayGraph,
   STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA,
 } from "../services/stage-play/stage-play-output-lane-reducer";
@@ -226,6 +229,33 @@ describe("stage-play output lane reducer", () => {
     )?.visibility).toBe("situation_panel");
   });
 
+  it("declares deterministic and checkpoint-only lane boundaries", () => {
+    expect(DETERMINISTIC_STAGE_PLAY_LINE_KEYS).toEqual([
+      "situation",
+      "actor_state",
+      "resources",
+      "affordances",
+      "risk",
+      "possibilities",
+      "rehearsal",
+      "unknowns",
+      "next_check",
+      "debug_basis",
+    ]);
+    expect(CHECKPOINT_ONLY_LINE_KEYS).toEqual([
+      "recommendation",
+      "answer_snapshot",
+      "voice_output",
+      "final_answer",
+    ]);
+    expect(checkpointOnlySkippedLineKeysForStagePlayProjection(
+      buildStagePlayOutputLaneProjectionV1({ graph: graphFixture() }),
+    )).toEqual(expect.arrayContaining([
+      "recommendation",
+      "answer_snapshot",
+    ]));
+  });
+
   it("projects graph state into evidence-only output lanes", () => {
     const graph = graphFixture();
     const projection = buildStagePlayOutputLaneProjectionV1({ graph });
@@ -291,7 +321,7 @@ describe("stage-play output lane reducer", () => {
     }
   });
 
-  it("builds Live Answer line values without writing a final recommendation", () => {
+  it("builds Live Interpretation line values without writing checkpoint-only outputs", () => {
     const projection = buildStagePlayOutputLaneProjectionV1({ graph: graphFixture() });
     const lineValues = buildStagePlayLiveAnswerLineValuesV1(projection);
 
@@ -315,39 +345,51 @@ describe("stage-play output lane reducer", () => {
     }
   });
 
-  it("writes recommendation and answer snapshot only from model-reviewed checkpoint output", () => {
+  it("does not project checkpoint recommendation or answer snapshot from deterministic interpretation", () => {
     const projection = buildStagePlayOutputLaneProjectionV1({
       graph: graphFixture(reviewedOutputBadges(false)),
     });
     const lineValues = buildStagePlayLiveAnswerLineValuesV1(projection);
+    const laneByKey = Object.fromEntries(projection.lanes.map((lane) => [lane.lineKey, lane]));
 
-    expect(lineValues.recommendation?.value).toBe(
+    expect(laneByKey.recommendation.text).toBe(
       "Use the barrier retreat plan only after checking exact hostile distance.",
     );
-    expect(lineValues.answer_snapshot?.value).toBe(
+    expect(laneByKey.answer_snapshot.text).toBe(
       "Use the barrier retreat plan only after checking exact hostile distance.",
     );
-    expect(lineValues.recommendation?.source).toBe("model_review");
-    expect(lineValues.recommendation?.model_invoked).toBe(true);
-    expect(lineValues.recommendation?.deterministic).toBe(false);
+    expect(laneByKey.recommendation).toMatchObject({
+      label: "Checkpoint Recommendation",
+      lineUpdateAllowed: false,
+      modelReviewRequired: true,
+    });
+    expect(laneByKey.answer_snapshot).toMatchObject({
+      label: "Answer Snapshot",
+      lineUpdateAllowed: false,
+      modelReviewRequired: true,
+    });
+    expect(lineValues.recommendation).toBeUndefined();
+    expect(lineValues.answer_snapshot).toBeUndefined();
     expect(lineValues.voice_output).toBeUndefined();
   });
 
-  it("writes voice output only with model-reviewed answer snapshot and explicit voice policy", () => {
+  it("does not project voice output through deterministic interpretation lanes", () => {
     const noPolicyProjection = buildStagePlayOutputLaneProjectionV1({
       graph: graphFixture(reviewedOutputBadges(false)),
     });
     const policyProjection = buildStagePlayOutputLaneProjectionV1({
       graph: graphFixture(reviewedOutputBadges(true)),
     });
+    const policyVoiceLane = policyProjection.lanes.find((lane) => lane.lineKey === "voice_output");
 
     expect(buildStagePlayLiveAnswerLineValuesV1(noPolicyProjection).voice_output).toBeUndefined();
-    expect(buildStagePlayLiveAnswerLineValuesV1(policyProjection).voice_output).toMatchObject({
-      value: "Check hostile distance before using the barrier retreat plan.",
-      source: "model_review",
-      model_invoked: true,
-      deterministic: false,
+    expect(policyVoiceLane).toMatchObject({
+      status: "ready",
+      lineUpdateAllowed: false,
+      modelReviewRequired: true,
     });
+    expect(policyVoiceLane?.text).toBe("Check hostile distance before using the barrier retreat plan.");
+    expect(buildStagePlayLiveAnswerLineValuesV1(policyProjection).voice_output).toBeUndefined();
   });
 
   it("does not write voice output when policy exists but answer snapshot citation is missing", () => {
@@ -363,7 +405,7 @@ describe("stage-play output lane reducer", () => {
     expect(buildStagePlayLiveAnswerLineValuesV1(projection).voice_output).toBeUndefined();
   });
 
-  it("updates active Live Answer lines while preserving model-reviewed recommendation authority", () => {
+  it("updates active Live Interpretation lines while preserving checkpoint-only recommendation authority", () => {
     const { environment } = createLiveAnswerEnvironment({
       thread_id: "thread:stage-output",
       created_turn_id: "turn:stage-output",

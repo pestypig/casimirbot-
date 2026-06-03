@@ -82,6 +82,7 @@ let syncDocViewerStateFromWorkstationAction: typeof import("@/components/helix/H
 let copyDebugPayloadToClipboard: typeof import("@/components/helix/HelixAskPill").copyDebugPayloadToClipboard;
 let buildHelixTurnTranscriptRows: typeof import("@/components/helix/HelixAskPill").buildHelixTurnTranscriptRows;
 let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPill").buildHelixCausalTurnTraceRows;
+let buildStagePlayChatLedgerEvents: typeof import("@/components/helix/HelixAskPill").buildStagePlayChatLedgerEvents;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
@@ -168,6 +169,7 @@ beforeAll(async () => {
     copyDebugPayloadToClipboard,
     buildHelixTurnTranscriptRows,
     buildHelixCausalTurnTraceRows,
+    buildStagePlayChatLedgerEvents,
     readReasoningTheaterHardFailureSignals,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
@@ -312,6 +314,182 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("resolved_turn_summary");
     expect(source).toContain("resolvedRouteLabel");
     expect(source).toContain("Route: ${resolvedRouteLabel}");
+  });
+
+  it("builds a visible Stage Play chat ledger from tool receipts and graph artifacts", () => {
+    const reply = {
+      id: "reply-stage-play",
+      content: "Stage Play reflected the active visual source.",
+      debug: {
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.plan_stage_play_job",
+              observation: {
+                artifactId: "stage_play_job_plan",
+                schemaVersion: "stage_play_job_plan/v1",
+                domain: "narrative_media",
+                requiredSources: [
+                  {
+                    modality: "visual_frame",
+                    label: "Visual frame",
+                    required: true,
+                    routeTo: "narrative_stage_play",
+                  },
+                  {
+                    modality: "audio_transcript",
+                    label: "Audio transcript",
+                    required: false,
+                    routeTo: "narrative_stage_play",
+                  },
+                ],
+                nodeChain: [
+                  { nodeId: "observer.live_sources", nodeKind: "observer" },
+                  { nodeId: "answer_snapshot.latest", nodeKind: "answer_snapshot" },
+                ],
+              },
+            },
+          },
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.reflect_stage_play_context",
+              observation: {
+                schema: "stage_play_reflection_result/v1",
+                graph: {
+                  graphId: "stage_play_badge_graph:test",
+                  badges: [
+                    {
+                      id: "compact_observation.latest_visual",
+                      kind: "compact_observation",
+                      status: "observed",
+                      evidenceRefs: ["visual_observation:test"],
+                      dataTray: {
+                        summary: "First compact observation ready.",
+                        evidenceRefs: ["visual_observation:test"],
+                      },
+                    },
+                    {
+                      id: "helix_ask.checkpoint.latest",
+                      kind: "helix_ask_checkpoint",
+                      status: "observed",
+                      checkpoint: {
+                        askTurnId: "ask_turn:test",
+                        modelReviewed: true,
+                      },
+                      evidenceRefs: ["ask_turn_solver_trace:test"],
+                    },
+                    {
+                      id: "answer_snapshot.latest",
+                      kind: "answer_snapshot",
+                      status: "observed",
+                      output: {
+                        lineKey: "answer_snapshot",
+                        state: "model_reviewed",
+                        text: "The likely next scene beat is controlled delay.",
+                      },
+                      evidenceRefs: ["ask_turn:test"],
+                    },
+                    {
+                      id: "live_output.current",
+                      kind: "live_output",
+                      status: "candidate",
+                      output: {
+                        lineKey: "live_output",
+                        state: "projected",
+                        text: "Projected Stage Play interpretation.",
+                      },
+                      evidenceRefs: ["stage_play_output_lane_projection:test"],
+                    },
+                  ],
+                  checkpointRequests: [
+                    {
+                      checkpointRequestId: "stage_play_checkpoint_request:test",
+                      reason: "first_usable_observation",
+                      status: "queued",
+                      currentGraphRefs: ["stage_play_badge_graph:test"],
+                      compactObservationRefs: ["visual_observation:test"],
+                      perturbationRefs: [],
+                      priorAnswerSnapshotRefs: [],
+                    },
+                  ],
+                  perturbations: [
+                    {
+                      perturbationId: "stage_play_perturbation_event:test",
+                      reason: "scene_change",
+                      materiality: "meaningful",
+                      affectedBadgeIds: ["setting.visual_scene"],
+                      staleAnswerSnapshotIds: ["answer_snapshot:old"],
+                      evidenceRefs: ["visual_observation:next"],
+                    },
+                  ],
+                },
+                liveAnswerProjection: {
+                  changedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+                  reason: "projected",
+                },
+                debugReceipt: {
+                  schema: "stage_play_tool_receipt_debug/v1",
+                  graphId: "stage_play_badge_graph:test",
+                  sourceRefs: ["visual_observation:test"],
+                  visualSourceStatus: [
+                    {
+                      sourceId: "browser_tab_visual:test",
+                      modality: "visual_frame",
+                      status: "active",
+                      cadenceMs: 10000,
+                      selectedForStagePlay: true,
+                      routeTo: "narrative_stage_play",
+                      evidenceRefs: ["visual_observation:test"],
+                    },
+                  ],
+                  checkpointFreshness: {
+                    reason: "checkpoint_model_reviewed_and_source_window_matches",
+                    modelReviewed: true,
+                    fresh: true,
+                    checkpointId: "ask_turn:test",
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    } as Parameters<typeof buildStagePlayChatLedgerEvents>[0];
+
+    const events = buildStagePlayChatLedgerEvents(reply);
+
+    expect(events.map((event) => event.kind)).toEqual([
+      "job_plan",
+      "source_observation",
+      "checkpoint_request",
+      "ask_checkpoint",
+      "answer_snapshot",
+      "perturbation",
+      "live_output",
+    ]);
+    expect(events[0]).toMatchObject({
+      title: "Stage Play job plan created.",
+      detail: "Required: visual_frame. Optional: audio_transcript.",
+    });
+    expect(events.find((event) => event.kind === "source_observation")?.detail).toContain(
+      "First compact observation ready.",
+    );
+    expect(events.find((event) => event.kind === "checkpoint_request")?.actions).toEqual([
+      "Run",
+      "Skip",
+      "Pause job",
+    ]);
+    expect(events.find((event) => event.kind === "ask_checkpoint")?.title).toBe(
+      "Helix Ask checkpoint completed.",
+    );
+    expect(events.find((event) => event.kind === "perturbation")?.detail).toContain(
+      "Staled 1 answer snapshot",
+    );
+    expect(events.find((event) => event.kind === "live_output")?.detail).toContain(
+      "risk, possibilities, unknowns, next_check",
+    );
   });
 
   it("uses an atomic nonempty JSON debug copy helper", async () => {

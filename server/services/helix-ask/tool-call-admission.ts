@@ -7,8 +7,18 @@ import {
 } from "@shared/helix-tool-call-admission";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { buildTurnOperationalConstraints } from "./operational-constraints";
+import {
+  isStagePlayCheckpointRequestPrompt,
+  isStagePlayJobPlanningPrompt,
+  isStagePlayReflectionPrompt,
+} from "./stage-play-prompt-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 
 const HARD_SOURCE_TARGETS = new Set([
   "visual_capture",
@@ -95,6 +105,13 @@ export function buildToolCallAdmissionDecision(input: {
   let extraForbiddenTerminalKinds: string[] = [];
   let extraForbiddenRoutes: string[] = [];
   let reason = "source_target_requires_evidence_path";
+  const isStagePlayLiveEnvironmentPrompt =
+    sourceTarget === "live_environment" &&
+    (
+      isStagePlayCheckpointRequestPrompt(promptText) ||
+      isStagePlayJobPlanningPrompt(promptText) ||
+      isStagePlayReflectionPrompt(promptText)
+    );
 
   if (sourceTarget === "docs_viewer") {
     admittedToolFamilies = ["docs_viewer"];
@@ -163,9 +180,13 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "live_pipeline_requires_receipt_presentation_path";
   } else if (sourceTarget === "live_environment") {
     admittedToolFamilies = ["live_environment"];
-    extraForbiddenTerminalKinds = ["direct_answer_text", "situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"];
+    extraForbiddenTerminalKinds = isStagePlayLiveEnvironmentPrompt
+      ? ["situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "live_pipeline_receipt", "client_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"]
+      : ["direct_answer_text", "situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept", "no_tool_direct", "panel_generated_answer"];
-    reason = "live_environment_requires_tool_evidence_path";
+    reason = isStagePlayLiveEnvironmentPrompt
+      ? "stage_play_live_environment_requires_tool_observation_then_model_synthesis"
+      : "live_environment_requires_tool_evidence_path";
   } else if (sourceTarget === "world_event") {
     admittedToolFamilies = ["world_event"];
     extraForbiddenTerminalKinds = ["active_doc_identity", "doc_location_matches", "no_tool_direct", "model_only_concept"];
@@ -209,4 +230,21 @@ export function buildToolCallAdmissionDecision(input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+}
+
+export function ensureToolCallAdmissionDecisionForPayload(input: {
+  payload: Record<string, unknown>;
+  turnId: string;
+  promptText?: string | null;
+}): Record<string, unknown> {
+  const existing = readRecord(input.payload.tool_call_admission_decision);
+  if (existing) return existing;
+  const decision = buildToolCallAdmissionDecision({
+    turnId: input.turnId,
+    promptText: input.promptText,
+    sourceTargetIntent: readRecord(input.payload.source_target_intent),
+    routeProductContract: readRecord(input.payload.route_product_contract),
+  });
+  input.payload.tool_call_admission_decision = decision;
+  return decision;
 }

@@ -1,3 +1,12 @@
+import {
+  validateStagePlayPerturbationEventV1,
+  type StagePlayPerturbationEventV1,
+} from "./stage-play-perturbation-event.v1";
+import {
+  validateStagePlayCheckpointRequestV1,
+  type StagePlayCheckpointRequestV1,
+} from "./stage-play-checkpoint-request.v1";
+
 export const STAGE_PLAY_BADGE_GRAPH_ARTIFACT_ID =
   "stage_play_badge_graph" as const;
 
@@ -27,9 +36,12 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "admission_gate",
   "missing_evidence",
   "ask_checkpoint",
+  "helix_ask_checkpoint",
   "answer_snapshot",
   "live_output",
   "voice_output",
+  "perturbation",
+  "checkpoint_request",
 ] as const;
 
 export const STAGE_PLAY_SOURCE_ROUTING_STATUSES = [
@@ -82,6 +94,7 @@ export const STAGE_PLAY_EDGE_RELATIONS = [
   "needs_check",
   "admitted_as",
   "sourced_by",
+  "supersedes",
 ] as const;
 
 export const STAGE_PLAY_SOURCE_REF_KINDS = [
@@ -97,6 +110,8 @@ export const STAGE_PLAY_SOURCE_REF_KINDS = [
   "world_sense_context",
   "stage_play_raw_session_buffer_entry",
   "stage_play_compact_observation",
+  "stage_play_perturbation_event",
+  "stage_play_checkpoint_request",
   "synthetic_evidence",
 ] as const;
 
@@ -361,15 +376,19 @@ export type StagePlayBadgeGraphV1 = {
   badges: StagePlayBadgeV1[];
   edges: StagePlayBadgeEdgeV1[];
   recommendedActions: StagePlayBadgeGraphRecommendedActionV1[];
+  perturbations: StagePlayPerturbationEventV1[];
+  checkpointRequests: StagePlayCheckpointRequestV1[];
   summary: StagePlayBadgeGraphSummaryV1;
   authority: StagePlayBadgeGraphAuthorityV1;
 };
 
 export type BuildStagePlayBadgeGraphV1Input = Omit<
   StagePlayBadgeGraphV1,
-  "artifactId" | "schemaVersion" | "generatedAt" | "summary" | "authority"
+  "artifactId" | "schemaVersion" | "generatedAt" | "summary" | "authority" | "perturbations" | "checkpointRequests"
 > & {
   generatedAt?: string;
+  perturbations?: StagePlayPerturbationEventV1[];
+  checkpointRequests?: StagePlayCheckpointRequestV1[];
   summary?: Partial<StagePlayBadgeGraphSummaryV1>;
   authority?: Partial<StagePlayBadgeGraphAuthorityV1>;
 };
@@ -480,6 +499,8 @@ export function buildStagePlayBadgeGraphV1(input: BuildStagePlayBadgeGraphV1Inpu
     badges: input.badges,
     edges: input.edges,
     recommendedActions: input.recommendedActions,
+    perturbations: input.perturbations ?? [],
+    checkpointRequests: input.checkpointRequests ?? [],
     summary: {
       ...buildStagePlayBadgeGraphSummaryV1(input.badges, input.edges),
       ...input.summary,
@@ -781,6 +802,8 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   }
   if (!Array.isArray(value.edges)) issues.push("edges must be an array");
   if (!Array.isArray(value.recommendedActions)) issues.push("recommendedActions must be an array");
+  if (!Array.isArray(value.perturbations)) issues.push("perturbations must be an array");
+  if (!Array.isArray(value.checkpointRequests)) issues.push("checkpointRequests must be an array");
   validateAuthority(value.authority, issues);
 
   const badges = Array.isArray(value.badges) ? value.badges : [];
@@ -839,8 +862,8 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
     }
     if (rawBadge.checkpoint != null) {
       validateCheckpoint(`${prefix}.checkpoint`, rawBadge.checkpoint, issues);
-      if (rawBadge.kind !== "ask_checkpoint" && rawBadge.kind !== "answer_snapshot") {
-        issues.push(`${prefix}.checkpoint may only appear on ask_checkpoint or answer_snapshot badges`);
+      if (!["ask_checkpoint", "helix_ask_checkpoint", "answer_snapshot"].includes(String(rawBadge.kind))) {
+        issues.push(`${prefix}.checkpoint may only appear on ask_checkpoint, helix_ask_checkpoint, or answer_snapshot badges`);
       }
     }
     if (rawBadge.output != null) {
@@ -940,6 +963,17 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
       if (pattern.test(serializedAction)) {
         issues.push(`${prefix} must not reference execution tooling: ${pattern.source}`);
       }
+    }
+  }
+
+  for (const [index, rawPerturbation] of (Array.isArray(value.perturbations) ? value.perturbations : []).entries()) {
+    for (const issue of validateStagePlayPerturbationEventV1(rawPerturbation)) {
+      issues.push(`perturbations[${index}].${issue}`);
+    }
+  }
+  for (const [index, rawRequest] of (Array.isArray(value.checkpointRequests) ? value.checkpointRequests : []).entries()) {
+    for (const issue of validateStagePlayCheckpointRequestV1(rawRequest)) {
+      issues.push(`checkpointRequests[${index}].${issue}`);
     }
   }
 

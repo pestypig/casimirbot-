@@ -46,6 +46,11 @@ const textHash = (value: string): string => {
 const isStaleWorkspaceFailureText = (value: unknown): boolean =>
   /(?:workspace_step_failed|Failed to execute)/i.test(readString(value) ?? "");
 
+const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
+  /^(?:Stage Play reflected\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b)/i.test(
+    readString(value) ?? "",
+  );
+
 const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
@@ -284,8 +289,16 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const repoTerminalMaterialized =
     draftMaterialization?.ok === true &&
     draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
+  const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
+  const stagePlayTerminalMaterialized =
+    draftMaterialization?.ok === true &&
+    isStagePlayPostObservationSynthesisText(latestDraftForContinuation?.text);
   const solverContinuationPending =
-    rawSolverContinuationPending && !(repoTerminalMaterialized && goalAllowsTerminal);
+    rawSolverContinuationPending &&
+    !(
+      (repoTerminalMaterialized && goalAllowsTerminal) ||
+      (stagePlayTerminalMaterialized && goalAllowsTerminal)
+    );
   if (solverContinuationPending) {
     const pendingText =
       "I could not complete this turn yet because solver continuation is required before terminal answer selection.";
@@ -304,6 +317,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_repo_terminal",
+    });
+  } else if (rawSolverContinuationPending && stagePlayTerminalMaterialized && goalAllowsTerminal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_stage_play_terminal",
     });
   }
   const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);

@@ -7762,6 +7762,339 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTra
   return rows;
 }
 
+export type StagePlayChatLedgerEventKind =
+  | "job_plan"
+  | "source_observation"
+  | "checkpoint_request"
+  | "ask_checkpoint"
+  | "perturbation"
+  | "answer_snapshot"
+  | "live_output";
+
+export type StagePlayChatLedgerEvent = {
+  key: string;
+  kind: StagePlayChatLedgerEventKind;
+  title: string;
+  detail: string;
+  meta: string;
+  evidenceRefs: string[];
+  actions?: Array<"Run" | "Skip" | "Pause job">;
+  status?: string;
+};
+
+const STAGE_PLAY_LEDGER_EVENT_ORDER: Record<StagePlayChatLedgerEventKind, number> = {
+  job_plan: 0,
+  source_observation: 1,
+  checkpoint_request: 2,
+  ask_checkpoint: 3,
+  answer_snapshot: 4,
+  perturbation: 5,
+  live_output: 6,
+};
+
+function readStagePlayLedgerString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function readStagePlayLedgerStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((entry) => readStagePlayLedgerString(entry)).filter((entry): entry is string => Boolean(entry))
+    : [];
+}
+
+function readStagePlayLedgerRecordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value
+        .map((entry) => readAgentLoopAuditRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    : [];
+}
+
+function uniqueStagePlayLedgerStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function labelizeStagePlayLedgerValue(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function collectStagePlayLedgerArtifacts(reply: HelixAskReply): Record<string, unknown>[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const directLedgers = [
+    replyRecord?.current_turn_artifact_ledger,
+    debugRecord?.current_turn_artifact_ledger,
+    replyRecord?.artifact_ledger,
+    debugRecord?.artifact_ledger,
+  ];
+  return directLedgers.flatMap(readStagePlayLedgerRecordArray);
+}
+
+function collectStagePlayLedgerPayloads(reply: HelixAskReply): Record<string, unknown>[] {
+  const payloads: Record<string, unknown>[] = [];
+  for (const artifact of collectStagePlayLedgerArtifacts(reply)) {
+    const payload = readAgentLoopAuditRecord(artifact.payload) ?? artifact;
+    payloads.push(payload);
+    const observation = readAgentLoopAuditRecord(payload.observation);
+    if (observation) payloads.push(observation);
+  }
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  [
+    debugRecord?.latest_result_artifact,
+    debugRecord?.stage_play_reflection_result,
+    debugRecord?.stage_play_job_plan,
+    debugRecord?.stage_play_checkpoint_request_result,
+  ].forEach((candidate) => {
+    const record = readAgentLoopAuditRecord(candidate);
+    if (record) payloads.push(record);
+  });
+  return payloads;
+}
+
+function firstStagePlayLedgerPayload(
+  reply: HelixAskReply,
+  predicate: (payload: Record<string, unknown>) => boolean,
+): Record<string, unknown> | null {
+  return collectStagePlayLedgerPayloads(reply).find(predicate) ?? null;
+}
+
+function readStagePlayGraphFromReflection(reflection: Record<string, unknown> | null): Record<string, unknown> | null {
+  return readAgentLoopAuditRecord(reflection?.graph);
+}
+
+function readStagePlayGraphBadges(graph: Record<string, unknown> | null): Record<string, unknown>[] {
+  return readStagePlayLedgerRecordArray(graph?.badges);
+}
+
+function readStagePlayGraphBadgeByKind(
+  graph: Record<string, unknown> | null,
+  kind: string,
+): Record<string, unknown> | null {
+  return readStagePlayGraphBadges(graph).find((badge) => readStagePlayLedgerString(badge.kind) === kind) ?? null;
+}
+
+function readStagePlayGraphBadgeById(
+  graph: Record<string, unknown> | null,
+  id: string,
+): Record<string, unknown> | null {
+  return readStagePlayGraphBadges(graph).find((badge) => readStagePlayLedgerString(badge.id) === id) ?? null;
+}
+
+function readStagePlayBadgeEvidenceRefs(badge: Record<string, unknown> | null): string[] {
+  return uniqueStagePlayLedgerStrings([
+    ...readStagePlayLedgerStringArray(badge?.evidenceRefs),
+    ...readStagePlayLedgerRecordArray(badge?.sourceRefs).map((ref) => readStagePlayLedgerString(ref.id)).filter((ref): ref is string => Boolean(ref)),
+    ...readStagePlayLedgerStringArray(readAgentLoopAuditRecord(badge?.dataTray)?.evidenceRefs),
+  ]);
+}
+
+function pushStagePlayLedgerEvent(
+  events: StagePlayChatLedgerEvent[],
+  event: StagePlayChatLedgerEvent,
+): void {
+  if (events.some((entry) => entry.key === event.key)) return;
+  events.push({
+    ...event,
+    evidenceRefs: uniqueStagePlayLedgerStrings(event.evidenceRefs),
+  });
+}
+
+export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayChatLedgerEvent[] {
+  const events: StagePlayChatLedgerEvent[] = [];
+  const jobPlan = firstStagePlayLedgerPayload(reply, (payload) =>
+    payload.artifactId === "stage_play_job_plan" || payload.schemaVersion === "stage_play_job_plan/v1",
+  );
+  if (jobPlan) {
+    const requiredSources = readStagePlayLedgerRecordArray(jobPlan.requiredSources);
+    const required = requiredSources
+      .filter((source) => source.required === true)
+      .map((source) => readStagePlayLedgerString(source.modality) ?? readStagePlayLedgerString(source.label) ?? "")
+      .filter(Boolean);
+    const optional = requiredSources
+      .filter((source) => source.required !== true)
+      .map((source) => readStagePlayLedgerString(source.modality) ?? readStagePlayLedgerString(source.label) ?? "")
+      .filter(Boolean);
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-job-plan`,
+      kind: "job_plan",
+      title: "Stage Play job plan created.",
+      detail: `Required: ${required.join(", ") || "none"}. Optional: ${optional.join(", ") || "none"}.`,
+      meta: `${labelizeStagePlayLedgerValue(jobPlan.domain) || "stage play"} | ${readStagePlayLedgerRecordArray(jobPlan.nodeChain).length} nodes`,
+      evidenceRefs: [],
+      status: "planned",
+    });
+  }
+
+  const reflection = firstStagePlayLedgerPayload(reply, (payload) =>
+    payload.schema === "stage_play_reflection_result/v1",
+  );
+  const graph = readStagePlayGraphFromReflection(reflection);
+  const debugReceipt = readAgentLoopAuditRecord(reflection?.debugReceipt);
+  const visualStatuses = readStagePlayLedgerRecordArray(debugReceipt?.visualSourceStatus);
+  const activeVisualStatuses = visualStatuses.filter((source) =>
+    readStagePlayLedgerString(source.status) === "active",
+  );
+  const sourceRefs = readStagePlayLedgerStringArray(debugReceipt?.sourceRefs);
+  const compactObservation =
+    readStagePlayGraphBadgeById(graph, "compact_observation.latest_visual") ??
+    readStagePlayGraphBadgeById(graph, "compact_observation.latest") ??
+    readStagePlayGraphBadgeByKind(graph, "compact_observation");
+  if (reflection && (activeVisualStatuses.length > 0 || compactObservation)) {
+    const cadence = activeVisualStatuses
+      .map((source) => typeof source.cadenceMs === "number" ? `${source.cadenceMs}ms` : null)
+      .find(Boolean);
+    const sourceStatusText = activeVisualStatuses.length > 0
+      ? `Visual source attached${cadence ? ` at ${cadence} cadence` : ""}.`
+      : "Visual source reflected.";
+    const compactReady = compactObservation && readStagePlayLedgerString(compactObservation.status) !== "missing_evidence";
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-source-observation`,
+      kind: "source_observation",
+      title: "Visual source attached.",
+      detail: `${sourceStatusText} ${compactReady ? "First compact observation ready." : "Waiting for compact observation."}`,
+      meta: `sources ${activeVisualStatuses.length}/${visualStatuses.length || activeVisualStatuses.length} | refs ${sourceRefs.length}`,
+      evidenceRefs: uniqueStagePlayLedgerStrings([
+        ...sourceRefs,
+        ...readStagePlayBadgeEvidenceRefs(compactObservation),
+      ]),
+      status: compactReady ? "ready" : "waiting",
+    });
+  }
+
+  const perturbations = readStagePlayLedgerRecordArray(graph?.perturbations);
+  const latestPerturbation = perturbations.at(-1) ?? null;
+  if (latestPerturbation) {
+    const affected = readStagePlayLedgerStringArray(latestPerturbation.affectedBadgeIds);
+    const staleSnapshots = readStagePlayLedgerStringArray(latestPerturbation.staleAnswerSnapshotIds);
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-perturbation-${readStagePlayLedgerString(latestPerturbation.perturbationId) ?? perturbations.length}`,
+      kind: "perturbation",
+      title: "Perturbation observed.",
+      detail: `${labelizeStagePlayLedgerValue(latestPerturbation.reason) || "state changed"}. ${staleSnapshots.length > 0 ? `Staled ${staleSnapshots.length} answer snapshot(s).` : "No answer snapshot was marked stale."}`,
+      meta: `${labelizeStagePlayLedgerValue(latestPerturbation.materiality) || "unknown materiality"} | affected ${affected.length}`,
+      evidenceRefs: readStagePlayLedgerStringArray(latestPerturbation.evidenceRefs),
+      status: readStagePlayLedgerString(latestPerturbation.materiality) ?? "observed",
+    });
+  }
+
+  const requestResult = firstStagePlayLedgerPayload(reply, (payload) =>
+    payload.schema === "stage_play_checkpoint_request_result/v1",
+  );
+  const resultCheckpointRequest = readAgentLoopAuditRecord(requestResult?.checkpointRequest);
+  const graphCheckpointRequest = readStagePlayLedgerRecordArray(graph?.checkpointRequests)[0] ?? null;
+  const checkpointRequest = resultCheckpointRequest ?? graphCheckpointRequest;
+  if (checkpointRequest) {
+    const requestId = readStagePlayLedgerString(checkpointRequest.checkpointRequestId) ?? "checkpoint";
+    const reason = labelizeStagePlayLedgerValue(checkpointRequest.reason) || "checkpoint requested";
+    const status = readStagePlayLedgerString(checkpointRequest.status) ?? readStagePlayLedgerString(requestResult?.reason) ?? "queued";
+    const evidenceRefs = uniqueStagePlayLedgerStrings([
+      ...readStagePlayLedgerStringArray(checkpointRequest.currentGraphRefs),
+      ...readStagePlayLedgerStringArray(checkpointRequest.compactObservationRefs),
+      ...readStagePlayLedgerStringArray(checkpointRequest.perturbationRefs),
+      ...readStagePlayLedgerStringArray(checkpointRequest.priorAnswerSnapshotRefs),
+      ...sourceRefs,
+    ]);
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-checkpoint-request-${requestId}`,
+      kind: "checkpoint_request",
+      title: "Queued checkpoint.",
+      detail: `Reason: ${reason}. Evidence: ${evidenceRefs.slice(0, 3).join(", ") || "none"}.`,
+      meta: `${requestId} | ${status}`,
+      evidenceRefs,
+      actions: ["Run", "Skip", "Pause job"],
+      status,
+    });
+  }
+
+  const checkpointFreshness = readAgentLoopAuditRecord(debugReceipt?.checkpointFreshness);
+  const checkpointBadge =
+    readStagePlayGraphBadgeById(graph, "helix_ask.checkpoint.latest") ??
+    readStagePlayGraphBadgeByKind(graph, "helix_ask_checkpoint") ??
+    readStagePlayGraphBadgeByKind(graph, "ask_checkpoint");
+  const answerSnapshotBadge =
+    readStagePlayGraphBadgeById(graph, "answer_snapshot.latest") ??
+    readStagePlayGraphBadgeByKind(graph, "answer_snapshot");
+  const checkpointRecord = readAgentLoopAuditRecord(checkpointBadge?.checkpoint);
+  const modelReviewed =
+    checkpointFreshness?.modelReviewed === true ||
+    checkpointFreshness?.fresh === true ||
+    checkpointRecord?.modelReviewed === true ||
+    readAgentLoopAuditRecord(answerSnapshotBadge?.checkpoint)?.modelReviewed === true;
+  if (reflection || checkpointBadge || answerSnapshotBadge) {
+    const freshnessReason = labelizeStagePlayLedgerValue(checkpointFreshness?.reason) || "no checkpoint";
+    const answerText =
+      readStagePlayLedgerString(readAgentLoopAuditRecord(answerSnapshotBadge?.output)?.text) ??
+      readStagePlayLedgerString(readAgentLoopAuditRecord(answerSnapshotBadge?.dataTray)?.summary) ??
+      readStagePlayLedgerString(reply.content) ??
+      "";
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-ask-checkpoint`,
+      kind: "ask_checkpoint",
+      title: modelReviewed ? "Helix Ask checkpoint completed." : "No answer snapshot yet.",
+      detail: modelReviewed
+        ? clipText(`Model-reviewed checkpoint available. ${answerText}`, 220)
+        : `No current model-reviewed checkpoint has consumed this Stage Play graph yet. Freshness: ${freshnessReason}.`,
+      meta: `${readStagePlayLedgerString(checkpointRecord?.askTurnId) ?? readStagePlayLedgerString(checkpointFreshness?.checkpointId) ?? "checkpoint"} | ${modelReviewed ? "model reviewed" : "not reviewed"}`,
+      evidenceRefs: uniqueStagePlayLedgerStrings([
+        ...readStagePlayBadgeEvidenceRefs(checkpointBadge),
+        ...readStagePlayBadgeEvidenceRefs(answerSnapshotBadge),
+        ...sourceRefs,
+      ]),
+      status: modelReviewed ? "model_reviewed" : "missing_evidence",
+    });
+  }
+
+  if (answerSnapshotBadge && readStagePlayLedgerString(answerSnapshotBadge.status) !== "missing_evidence") {
+    const output = readAgentLoopAuditRecord(answerSnapshotBadge.output);
+    const text =
+      readStagePlayLedgerString(output?.text) ??
+      readStagePlayLedgerString(readAgentLoopAuditRecord(answerSnapshotBadge.dataTray)?.summary) ??
+      "Model-reviewed answer snapshot is available.";
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-answer-snapshot`,
+      kind: "answer_snapshot",
+      title: "Answer Snapshot, checkpoint only.",
+      detail: clipText(text, 220),
+      meta: `${readStagePlayLedgerString(output?.state) ?? readStagePlayLedgerString(answerSnapshotBadge.status) ?? "snapshot"} | refs ${readStagePlayBadgeEvidenceRefs(answerSnapshotBadge).length}`,
+      evidenceRefs: readStagePlayBadgeEvidenceRefs(answerSnapshotBadge),
+      status: readStagePlayLedgerString(output?.state) ?? readStagePlayLedgerString(answerSnapshotBadge.status) ?? "available",
+    });
+  }
+
+  const liveOutputBadge =
+    readStagePlayGraphBadgeById(graph, "live_output.current") ??
+    readStagePlayGraphBadgeByKind(graph, "live_output");
+  const liveProjection = readAgentLoopAuditRecord(reflection?.liveAnswerProjection);
+  const changedLineKeys = readStagePlayLedgerStringArray(liveProjection?.changedLineKeys);
+  if (liveOutputBadge || changedLineKeys.length > 0) {
+    const output = readAgentLoopAuditRecord(liveOutputBadge?.output);
+    const lineKey = readStagePlayLedgerString(output?.lineKey) ?? (changedLineKeys.join(", ") || "live interpretation");
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-live-output`,
+      kind: "live_output",
+      title: "Live Interpretation lanes updated.",
+      detail: changedLineKeys.length > 0
+        ? `Projected: ${changedLineKeys.join(", ")}.`
+        : readStagePlayLedgerString(output?.text) ?? "Live output node is present.",
+      meta: `${lineKey} | ${readStagePlayLedgerString(liveProjection?.reason) ?? readStagePlayLedgerString(output?.state) ?? "projection"}`,
+      evidenceRefs: uniqueStagePlayLedgerStrings([
+        ...readStagePlayBadgeEvidenceRefs(liveOutputBadge),
+        ...sourceRefs,
+      ]),
+      status: readStagePlayLedgerString(liveProjection?.reason) ?? readStagePlayLedgerString(output?.state) ?? "projected",
+    });
+  }
+
+  return [...events].sort((a, b) =>
+    STAGE_PLAY_LEDGER_EVENT_ORDER[a.kind] - STAGE_PLAY_LEDGER_EVENT_ORDER[b.kind],
+  );
+}
+
 function normalizeCitations(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
@@ -31282,6 +31615,7 @@ export function HelixAskPill({
               runtimeSummary,
             ) ?? visibleResolvedTurn.primary_source_label;
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
+            const stagePlayChatLedgerEvents = buildStagePlayChatLedgerEvents(reply);
             const causalTurnTraceRows = buildHelixCausalTurnTraceRows(reply);
             const replyCausalTurnTimeline = readHelixCausalTurnTimeline(reply);
             const replyReasoningTheaterState = coerceReasoningTheaterStateV1(reply.debug?.reasoning_theater_state_v1);
@@ -31469,6 +31803,86 @@ export function HelixAskPill({
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </details>
+                  ) : null}
+                  {stagePlayChatLedgerEvents.length > 0 ? (
+                    <details
+                      open
+                      className="rounded-2xl border border-violet-300/20 bg-violet-950/20 px-3 py-2 text-xs text-violet-50"
+                      data-testid={isLatestReply ? "helix-ask-latest-stage-play-ledger" : undefined}
+                    >
+                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-violet-200">
+                        Stage Play ledger
+                        <span className="ml-2 rounded border border-violet-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-violet-100">
+                          {stagePlayChatLedgerEvents.length} events
+                        </span>
+                        <span className="rounded border border-violet-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-violet-100">
+                          visible reasoning ledger
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-1.5">
+                        {stagePlayChatLedgerEvents.map((event, index) => {
+                          const tone =
+                            event.kind === "checkpoint_request"
+                              ? "border-amber-300/25 bg-amber-950/20 text-amber-50"
+                              : event.kind === "perturbation"
+                                ? "border-fuchsia-300/25 bg-fuchsia-950/20 text-fuchsia-50"
+                                : event.kind === "answer_snapshot"
+                                  ? "border-emerald-300/25 bg-emerald-950/15 text-emerald-50"
+                                  : event.kind === "ask_checkpoint" && event.status === "missing_evidence"
+                                    ? "border-slate-500/25 bg-slate-950/35 text-slate-100"
+                                    : "border-violet-300/20 bg-black/15 text-violet-50";
+                          return (
+                            <div
+                              key={event.key}
+                              className={`rounded-lg border px-2 py-1.5 ${tone}`}
+                              data-testid={isLatestReply ? "helix-ask-latest-stage-play-ledger-row" : undefined}
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="mt-0.5 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] tabular-nums">
+                                  {index + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="break-words">
+                                    <span className="font-semibold text-violet-100/90">{event.title} </span>
+                                    {clipText(event.detail, 280)}
+                                  </p>
+                                  <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-violet-100/65">
+                                    {event.meta}
+                                    {event.evidenceRefs.length > 0 ? ` | refs ${event.evidenceRefs.length}` : ""}
+                                  </p>
+                                  {event.evidenceRefs.length > 0 ? (
+                                    <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal text-violet-100/55">
+                                      {event.evidenceRefs.slice(0, 4).join(" | ")}
+                                      {event.evidenceRefs.length > 4 ? " | ..." : ""}
+                                    </p>
+                                  ) : null}
+                                  {event.actions?.length ? (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                      {event.actions.map((action) => (
+                                        <button
+                                          key={`${event.key}-${action}`}
+                                          type="button"
+                                          disabled
+                                          title="Use the Stage Play graph checkpoint controls for this v1 action."
+                                          className="rounded border border-amber-300/30 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-100/70 disabled:cursor-not-allowed disabled:opacity-70"
+                                          data-testid={
+                                            isLatestReply
+                                              ? `helix-ask-latest-stage-play-${action.toLowerCase().replace(/\s+/g, "-")}`
+                                              : undefined
+                                          }
+                                        >
+                                          {action}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </details>
                   ) : null}

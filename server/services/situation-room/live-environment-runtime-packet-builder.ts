@@ -25,6 +25,8 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.query_stage_sources", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.draft_stage_play_graph", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.validate_stage_play_graph", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.plan_stage_play_job", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.request_stage_play_checkpoint", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.reflect_stage_play_context", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_source_health", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_constructs", requires_user_confirmation: false, can_run_automatically: true },

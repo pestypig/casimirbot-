@@ -75,9 +75,9 @@ export const STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA: LiveAnswerLineDefinition[] = [
   stagePlayAnswerLine("risk", "Risk", "salience_only", "Hazards and blocked moves.", "warn"),
   stagePlayAnswerLine("possibilities", "Possibilities", "projection_only", "Candidate procedural bindings, not final guidance."),
   stagePlayAnswerLine("rehearsal", "Rehearsal", "simulation_stream", "Prediction or dry-run checks when available."),
-  stagePlayAnswerLine("recommendation", "Recommendation", "model_reviewed", "Post-tool model-reviewed guidance only.", "action"),
-  stagePlayAnswerLine("answer_snapshot", "Answer snapshot", "model_reviewed", "Model-reviewed answer snapshot only.", "action"),
-  stagePlayAnswerLine("voice_output", "Voice output", "model_reviewed", "Model-reviewed and voice-policy-eligible output only.", "action"),
+  stagePlayAnswerLine("recommendation", "Checkpoint Recommendation", "model_reviewed", "Model-reviewed checkpoint guidance only; never deterministic projection.", "action"),
+  stagePlayAnswerLine("answer_snapshot", "Answer Snapshot", "model_reviewed", "Checkpoint-only model-reviewed answer snapshot.", "action"),
+  stagePlayAnswerLine("voice_output", "Voice output", "model_reviewed", "Model-reviewed answer snapshot plus explicit voice-policy eligibility only.", "action"),
   stagePlayAnswerLine("unknowns", "Unknowns", "projection_only", "Missing evidence and source gaps.", "warn"),
   stagePlayAnswerLine("next_check", "Next check", "episode_based", "Recommended next observation/check.", "action"),
   stagePlayAnswerLine("debug_basis", "Debug basis", "projection_only", "Evidence refs and Stage Play reducer basis."),
@@ -132,11 +132,28 @@ type LaneSpec = Omit<
 
 const LANE_TEXT_LIMIT = 360;
 
-const STAGE_PLAY_MODEL_REVIEWED_LINE_KEYS = new Set<StagePlayLiveAnswerLineKey>([
+export const DETERMINISTIC_STAGE_PLAY_LINE_KEYS = [
+  "situation",
+  "actor_state",
+  "resources",
+  "affordances",
+  "risk",
+  "possibilities",
+  "rehearsal",
+  "unknowns",
+  "next_check",
+  "debug_basis",
+] as const;
+
+export const CHECKPOINT_ONLY_LINE_KEYS = [
   "recommendation",
   "answer_snapshot",
   "voice_output",
-]);
+  "final_answer",
+] as const;
+
+const DETERMINISTIC_STAGE_PLAY_LINE_KEY_SET = new Set<string>(DETERMINISTIC_STAGE_PLAY_LINE_KEYS);
+const CHECKPOINT_ONLY_LINE_KEY_SET = new Set<string>(CHECKPOINT_ONLY_LINE_KEYS);
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((value): value is string =>
@@ -529,14 +546,14 @@ export function buildStagePlayOutputLaneProjectionV1(
     makeLane(graph, {
       laneId: "live_answer",
       lineKey: "recommendation",
-      label: "Recommendation",
+      label: "Checkpoint Recommendation",
       status: hasReviewedRecommendation ? "ready" : "missing_evidence",
       text: outputTextFrom(
         recommendationBadges,
-        "Stage Play did not produce a final recommendation. A post-tool model-reviewed answer is required before this line can become assistant guidance.",
+        "No checkpoint recommendation is available. A post-tool model-reviewed answer is required before this line can become assistant guidance.",
       ),
       admission: hasReviewedRecommendation ? "auto" : "blocked",
-      lineUpdateAllowed: hasReviewedRecommendation,
+      lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: recommendationBadges,
       actions: hasReviewedRecommendation
@@ -547,14 +564,14 @@ export function buildStagePlayOutputLaneProjectionV1(
     makeLane(graph, {
       laneId: "answer_snapshot",
       lineKey: "answer_snapshot",
-      label: "Answer snapshot",
+      label: "Answer Snapshot",
       status: hasReviewedAnswerSnapshot ? "ready" : "missing_evidence",
       text: outputTextFrom(
         answerSnapshotBadges,
-        "No model-reviewed answer snapshot is available for this stage yet.",
+        "No answer snapshot yet.",
       ),
       admission: hasReviewedAnswerSnapshot ? "auto" : "blocked",
-      lineUpdateAllowed: hasReviewedAnswerSnapshot,
+      lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: answerSnapshotBadges,
       fallbackConfidence: hasReviewedAnswerSnapshot ? 0.82 : 0.34,
@@ -571,7 +588,7 @@ export function buildStagePlayOutputLaneProjectionV1(
           : "Voice output requires a model-reviewed answer snapshot first.",
       ),
       admission: hasVoiceOutput ? "auto" : "blocked",
-      lineUpdateAllowed: hasVoiceOutput,
+      lineUpdateAllowed: false,
       modelReviewRequired: true,
       badges: voiceOutputBadges,
       fallbackConfidence: hasVoiceOutput ? 0.8 : 0.3,
@@ -609,8 +626,9 @@ export function buildStagePlayLiveAnswerLineValuesV1(
   const lineValues: Record<string, LineValue> = {};
   for (const lane of projection.lanes) {
     if (!lane.lineUpdateAllowed) continue;
+    if (CHECKPOINT_ONLY_LINE_KEY_SET.has(lane.lineKey)) continue;
+    if (!DETERMINISTIC_STAGE_PLAY_LINE_KEY_SET.has(lane.lineKey)) continue;
     if (availableLines && !availableLines.has(lane.lineKey)) continue;
-    const modelReviewedLine = STAGE_PLAY_MODEL_REVIEWED_LINE_KEYS.has(lane.lineKey);
     lineValues[lane.lineKey] = {
       value: lane.text,
       confidence: lane.confidence,
@@ -618,12 +636,19 @@ export function buildStagePlayLiveAnswerLineValuesV1(
       source_event_ids: projection.evidenceRefs.filter((ref) =>
         /live_source_observation|world_event|source_event/i.test(ref)
       ).slice(-12),
-      source: modelReviewedLine ? "model_review" : "deterministic_reducer",
-      model_invoked: modelReviewedLine,
-      deterministic: !modelReviewedLine,
+      source: "deterministic_reducer",
+      model_invoked: false,
+      deterministic: true,
     };
   }
   return lineValues;
+}
+
+export function checkpointOnlySkippedLineKeysForStagePlayProjection(
+  projection: StagePlayOutputLaneProjectionV1,
+): string[] {
+  const laneKeys = new Set<string>(projection.lanes.map((lane) => lane.lineKey));
+  return CHECKPOINT_ONLY_LINE_KEYS.filter((key) => laneKeys.has(key));
 }
 
 export function ensureLiveAnswerEnvironmentHasStagePlayLines(input: {

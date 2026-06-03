@@ -16,6 +16,8 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_stage_sources"
   | "live_env.draft_stage_play_graph"
   | "live_env.validate_stage_play_graph"
+  | "live_env.plan_stage_play_job"
+  | "live_env.request_stage_play_checkpoint"
   | "live_env.reflect_stage_play_context"
   | "live_env.query_source_health"
   | "live_env.query_constructs"

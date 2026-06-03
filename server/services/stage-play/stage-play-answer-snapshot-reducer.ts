@@ -5,6 +5,7 @@ import type {
   StagePlayBadgeSourceRefV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
+import { evaluateStagePlayCheckpointFreshness } from "./stage-play-checkpoint-freshness";
 
 export type AskTurnDebugExport = Record<string, unknown> & {
   schema?: "helix.ask.debug_export.v1" | string;
@@ -241,7 +242,6 @@ export function reduceStagePlayAnswerSnapshot(
   const completedSolverPath = readBoolean(trace?.completed_solver_path) === true;
   const modelAuthored = isModelAuthoredTerminal(terminalKind, answerSource);
   const hasAnswerText = Boolean(answerText);
-  const modelReviewed = completedSolverPath && modelAuthored && hasAnswerText;
   const generatedAt = input.generatedAt ?? input.graph.generatedAt;
   const askRefs = uniqueStrings([
     turnId,
@@ -256,11 +256,35 @@ export function reduceStagePlayAnswerSnapshot(
     input.liveAnswerEnvironment?.environment_id,
     ...(input.liveAnswerEnvironment?.evidence_refs ?? []),
   ]);
+  const modelReviewedBeforeFreshness = completedSolverPath && modelAuthored && hasAnswerText;
+  const hasCheckpointCandidate = Boolean(
+    turnId ||
+    solverTraceRef ||
+    terminalKind ||
+    answerSource ||
+    answerText ||
+    completedSolverPath,
+  );
+  const checkpointFreshness = evaluateStagePlayCheckpointFreshness({
+    graph: input.graph,
+    checkpoint: hasCheckpointCandidate
+      ? {
+          checkpointId: turnId ?? solverTraceRef,
+          graphId: input.liveAnswerEnvironment?.graph_id ?? readString(debug?.stage_play_graph_id),
+          createdAt: readString(debug?.created_at) ?? readString(debug?.updated_at) ?? input.liveAnswerEnvironment?.updated_at ?? null,
+          modelReviewed: modelReviewedBeforeFreshness,
+          sourceArtifactRefs: toolObservationRefs,
+          evidenceRefs: liveAnswerRefs,
+        }
+      : null,
+  });
+  const modelReviewed = modelReviewedBeforeFreshness && checkpointFreshness.fresh;
   const evidenceRefs = uniqueStrings([
     ...sourceWindowEvidenceRefs(input.graph),
     ...toolObservationRefs,
     ...askRefs,
     ...liveAnswerRefs,
+    `checkpoint_freshness:${checkpointFreshness.reason}`,
   ]);
   const sourceRefs = sourceRefsFromEvidence(evidenceRefs);
   const voicePolicyEligible = input.voicePolicy?.voiceEligible === true;
@@ -280,17 +304,24 @@ export function reduceStagePlayAnswerSnapshot(
     evidenceRefs,
     confidence: modelReviewed ? 0.88 : 0.35,
     missingEvidence: modelReviewed ? [] : [
-      completedSolverPath ? "A model-authored terminal artifact with answer text is required." : "Completed Ask solver path is required.",
-    ],
+      !completedSolverPath ? "Completed Ask solver path is required." : null,
+      !modelAuthored ? "A model-authored terminal artifact is required." : null,
+      !hasAnswerText ? "Selected final answer text is required." : null,
+      modelReviewedBeforeFreshness && !checkpointFreshness.fresh ? "A fresh checkpoint matching the current Stage Play source window is required." : null,
+      ...checkpointFreshness.staleBecause,
+    ].filter((entry): entry is string => Boolean(entry)),
     reasonCodes: [
       "stage_play_answer_snapshot_reducer",
       modelReviewed ? "completed_model_authored_checkpoint" : "missing_model_reviewed_checkpoint",
+      `checkpoint_freshness_${checkpointFreshness.reason}`,
     ],
     dataTray: {
       title: "Latest Ask checkpoint",
       summary: modelReviewed
         ? "Completed solver path and model-authored terminal artifact are available."
-        : "No completed model-reviewed checkpoint has been produced for this stage yet.",
+        : modelReviewedBeforeFreshness && !checkpointFreshness.fresh
+          ? "No current model-reviewed checkpoint."
+          : "No answer snapshot yet.",
       updatedAt: generatedAt,
       freshness: modelReviewed ? "fresh" : "missing",
       confidence: modelReviewed ? 0.88 : 0.35,
@@ -430,22 +461,28 @@ export function reduceStagePlayAnswerSnapshot(
           "Completed Ask solver path",
           "Model-authored terminal artifact",
           "Selected final answer text",
+          "Fresh checkpoint matching current source window",
         ].filter((item) =>
           item !== "Completed Ask solver path" || !completedSolverPath
         ).filter((item) =>
           item !== "Model-authored terminal artifact" || !modelAuthored
         ).filter((item) =>
           item !== "Selected final answer text" || !hasAnswerText
+        ).filter((item) =>
+          item !== "Fresh checkpoint matching current source window" || !checkpointFreshness.fresh
         ),
         reasonCodes: [
           "stage_play_answer_snapshot_reducer",
           completedSolverPath ? "solver_path_completed" : "solver_path_missing",
           modelAuthored ? "model_authored_terminal_present" : "model_authored_terminal_missing",
           hasAnswerText ? "answer_text_present" : "answer_text_missing",
+          `checkpoint_freshness_${checkpointFreshness.reason}`,
         ],
         dataTray: {
           title: "Missing answer snapshot check",
-          summary: "No model-reviewed answer snapshot is available; Stage Play projection remains non-final.",
+          summary: modelReviewedBeforeFreshness && !checkpointFreshness.fresh
+            ? "No current model-reviewed checkpoint."
+            : "No answer snapshot yet; Stage Play projection remains non-final.",
           updatedAt: generatedAt,
           freshness: "missing",
           confidence: 0.72,

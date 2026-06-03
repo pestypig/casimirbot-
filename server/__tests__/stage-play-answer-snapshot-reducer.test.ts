@@ -281,6 +281,37 @@ describe("Stage Play answer snapshot reducer", () => {
     expect(result.edges.map((edge) => edge.relation)).toContain("needs_check");
   });
 
+  it("does not create an answer snapshot when checkpoint freshness fails", () => {
+    const result = reduceStagePlayAnswerSnapshot({
+      graph: graphFixture(),
+      askTurnDebug: completedDebugExport(),
+      liveAnswerEnvironment: {
+        ...liveAnswerEnvironmentFixture(),
+        graph_id: "stage_play_badge_graph:older-source-window",
+      },
+      generatedAt: "2026-06-03T12:00:10.000Z",
+    });
+
+    expect(result.checkpointBadge).toMatchObject({
+      status: "missing_evidence",
+      checkpoint: expect.objectContaining({
+        modelReviewed: false,
+      }),
+      reasonCodes: expect.arrayContaining(["checkpoint_freshness_graph_id_mismatch"]),
+      dataTray: expect.objectContaining({
+        summary: "No current model-reviewed checkpoint.",
+      }),
+    });
+    expect(result.answerSnapshotBadge).toBeNull();
+    expect(result.liveOutputBadge).toBeNull();
+    expect(result.missingCheckBadge).toMatchObject({
+      reasonCodes: expect.arrayContaining(["checkpoint_freshness_graph_id_mismatch"]),
+      dataTray: expect.objectContaining({
+        summary: "No current model-reviewed checkpoint.",
+      }),
+    });
+  });
+
   it("does not create an answer snapshot from a completed receipt terminal artifact", () => {
     const result = reduceStagePlayAnswerSnapshot({
       graph: graphFixture(),

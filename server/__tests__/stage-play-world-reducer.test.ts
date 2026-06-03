@@ -39,6 +39,8 @@ import {
   recordStagePlayAskCheckpointReceipt,
   resetStagePlayAskCheckpointReceiptsForTest,
 } from "../services/stage-play/stage-play-ask-checkpoint-store";
+import { resetStagePlayPerturbationEventsForTest } from "../services/stage-play/stage-play-perturbation-event-store";
+import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import { resetStagePlayRawSessionBufferForTest } from "../services/stage-play/stage-play-raw-session-buffer-store";
 
 const threadId = "thread:stage-play-reducer";
@@ -57,6 +59,8 @@ beforeEach(() => {
   resetSituationSourceCapabilitiesForTest();
   resetStagePlayRawSessionBufferForTest();
   resetStagePlayAskCheckpointReceiptsForTest();
+  resetStagePlayPerturbationEventsForTest();
+  resetStagePlayCheckpointQueueForTest();
   clearEventJournalForTest();
 });
 
@@ -111,6 +115,30 @@ describe("Stage Play world-state badge reducer", () => {
         kind: "compact_observation",
       }),
       expect.objectContaining({
+        id: "source.visual_frame.active",
+        kind: "source",
+      }),
+      expect.objectContaining({
+        id: "compact_observation.latest_visual",
+        kind: "compact_observation",
+      }),
+      expect.objectContaining({
+        id: "interpreter.visual_scene",
+        kind: "interpreter",
+      }),
+      expect.objectContaining({
+        id: "possibilities.current",
+        kind: "procedural_binding",
+      }),
+      expect.objectContaining({
+        id: "perturbation.latest",
+        kind: "perturbation",
+      }),
+      expect.objectContaining({
+        id: "checkpoint_request.queued",
+        kind: "checkpoint_request",
+      }),
+      expect.objectContaining({
         id: "stage_interpretation.current",
         kind: "stage_interpretation",
       }),
@@ -120,13 +148,13 @@ describe("Stage Play world-state badge reducer", () => {
       }),
       expect.objectContaining({
         id: "helix_ask.checkpoint.latest",
-        kind: "ask_checkpoint",
+        kind: "helix_ask_checkpoint",
         status: "missing_evidence",
         checkpoint: expect.objectContaining({
           modelReviewed: false,
         }),
         dataTray: expect.objectContaining({
-          summary: "No model-reviewed checkpoint has been produced for this stage yet.",
+          summary: "No answer snapshot yet.",
         }),
       }),
       expect.objectContaining({
@@ -143,8 +171,51 @@ describe("Stage Play world-state badge reducer", () => {
           voiceEligible: false,
         }),
       }),
+      expect.objectContaining({
+        kind: "checkpoint_request",
+        status: "ask_user_required",
+        sourceRefs: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "stage_play_checkpoint_request",
+          }),
+        ]),
+      }),
+    ]));
+    expect(graph.checkpointRequests).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        artifactId: "stage_play_checkpoint_request",
+        reason: "first_usable_observation",
+        status: "queued",
+        assistant_answer: false,
+        context_role: "tool_evidence",
+      }),
     ]));
     expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "observer.live_sources",
+        to: "source.visual_frame.active",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "source.visual_frame.active",
+        to: "compact_observation.latest_visual",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "compact_observation.latest_visual",
+        to: "interpreter.visual_scene",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "possibilities.current",
+        to: "checkpoint_request.queued",
+        relation: "recommends",
+      }),
+      expect.objectContaining({
+        from: "checkpoint_request.queued",
+        to: "helix_ask.checkpoint.latest",
+        relation: "needs_check",
+      }),
       expect.objectContaining({
         from: "observer.live_sources",
         to: "compact_observation.latest",
@@ -191,7 +262,7 @@ describe("Stage Play world-state badge reducer", () => {
 
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
-      kind: "ask_checkpoint",
+      kind: "helix_ask_checkpoint",
       status: "observed",
       checkpoint: {
         askTurnId: "ask:turn:stage-play",
@@ -267,6 +338,73 @@ describe("Stage Play world-state badge reducer", () => {
       output: expect.objectContaining({
         state: "model_reviewed",
         text: "Stage Play projected the current risk and next check from the active source.",
+      }),
+    });
+  });
+
+  it("does not attach a stored Ask checkpoint after a newer source observation", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:live-answer",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+
+    recordStagePlayAskCheckpointReceipt({
+      threadId,
+      askTurnId: "ask:turn:stale-stage-play",
+      solverTraceRef: "ask:turn:stale-stage-play:ask_turn_solver_trace",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      completedSolverPath: true,
+      answerText: "This checkpoint should be stale after the next source event.",
+      evidenceRefs: [producer.producer_id, "ask:turn:stale-stage-play:final_answer_draft"],
+      sourceArtifactRefs: ["ask:turn:stale-stage-play:live_env_tool_observation"],
+      createdAt: "2026-06-02T12:10:05.000Z",
+    });
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:stage-play-after-checkpoint",
+      thread_id: threadId,
+      room_id: null,
+      environment_id: null,
+      source_id: "visual_source:live-answer",
+      source_kind: "visual_frame",
+      event_kind: "visual_frame",
+      observed_at: "2026-06-02T12:10:06.000Z",
+      freshness: { status: "fresh", age_ms: 20 },
+      provenance: { adapter: "browser_capture", confidence: "high" },
+      compact_summary: "New visual frame after checkpoint.",
+      evidence_refs: ["evidence:visual-after-checkpoint"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:10:07.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
+      status: "missing_evidence",
+      checkpoint: expect.objectContaining({
+        modelReviewed: false,
+      }),
+      reasonCodes: expect.arrayContaining(["checkpoint_freshness_checkpoint_expired"]),
+      dataTray: expect.objectContaining({
+        summary: "No current model-reviewed checkpoint.",
+      }),
+    });
+    expect(graph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
+      status: "missing_evidence",
+      output: expect.objectContaining({
+        state: "stale",
+        text: "No current model-reviewed checkpoint.",
       }),
     });
   });
@@ -650,13 +788,13 @@ describe("Stage Play world-state badge reducer", () => {
       }),
     });
     expect(graph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
-      kind: "ask_checkpoint",
+      kind: "helix_ask_checkpoint",
       status: "missing_evidence",
       checkpoint: expect.objectContaining({
         modelReviewed: false,
       }),
       dataTray: expect.objectContaining({
-        summary: "No model-reviewed checkpoint has been produced for this stage yet.",
+        summary: "No answer snapshot yet.",
       }),
     });
     expect(graph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({

@@ -233,7 +233,7 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         title: "Latest Ask Checkpoint",
         plainMeaning: "The latest Ask checkpoint records whether the solver completed a model-reviewed path.",
         whyItMatters: "Only completed model-reviewed checkpoints can uphold an answer snapshot.",
-        kind: "ask_checkpoint",
+        kind: "helix_ask_checkpoint",
         status: "observed",
         subjects: ["thread:stage-play-ui"],
         tags: ["ask_checkpoint", "model_reviewed"],
@@ -257,6 +257,40 @@ function buildFixture(): StagePlayBadgeGraphV1 {
           freshness: "fresh",
           confidence: 0.92,
           evidenceRefs: ["ask_turn_solver_trace:ui"],
+        },
+      }),
+      badge({
+        id: "checkpoint_request.ui",
+        title: "Checkpoint Request: Meaningful Perturbation",
+        plainMeaning: "A bounded Helix Ask checkpoint has been requested for this Stage Play job.",
+        whyItMatters: "The request queues visible reasoning without creating a hidden answer loop.",
+        kind: "checkpoint_request",
+        status: "ask_user_required",
+        subjects: ["stage_play_job:ui", "stage_play_badge_graph:ui-fixture"],
+        tags: ["checkpoint_request", "meaningful_perturbation", "queued"],
+        liveBindings: [],
+        sourceRefs: [{ kind: "stage_play_checkpoint_request", id: "stage_play_checkpoint_request:ui" }],
+        intentModule: undefined,
+        admission: "ask_user",
+        confidence: 0.72,
+        evidenceRefs: [
+          "stage_play_checkpoint_request:ui",
+          "stage_play_badge_graph:ui-fixture",
+          "stage_play_perturbation_event:ui",
+        ],
+        reasonCodes: [
+          "stage_play_checkpoint_request",
+          "checkpoint_reason_meaningful_perturbation",
+          "checkpoint_status_queued",
+          "requires_user_approval",
+        ],
+        dataTray: {
+          title: "Checkpoint request",
+          summary: "Meaningful perturbation is queued; visible queue first.",
+          updatedAt: "2026-06-02T00:00:02.500Z",
+          freshness: "fresh",
+          confidence: 0.72,
+          evidenceRefs: ["stage_play_checkpoint_request:ui"],
         },
       }),
       badge({
@@ -401,6 +435,15 @@ function buildFixture(): StagePlayBadgeGraphV1 {
     ],
     edges: [
       {
+        id: "edge:checkpoint-request:ask-checkpoint",
+        from: "checkpoint_request.ui",
+        to: "helix_ask.checkpoint.latest",
+        relation: "needs_check",
+        label: "awaits Ask checkpoint",
+        evidenceRefs: ["stage_play_checkpoint_request:ui"],
+        reasonCodes: ["checkpoint_request_awaits_ask"],
+      },
+      {
         id: "edge:move-away:defensive-retreat-barrier",
         from: "intent.move_away",
         to: "procedure.defensive_retreat_barrier",
@@ -438,6 +481,32 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         reasonCodes: ["live_world_hazard_nearby", "low_health_constraint", "requires_user_world_action"],
         evidenceRefs: ["environment_snapshot:ui"],
         missingEvidence: [],
+      },
+    ],
+    checkpointRequests: [
+      {
+        artifactId: "stage_play_checkpoint_request",
+        schemaVersion: "stage_play_checkpoint_request/v1",
+        checkpointRequestId: "stage_play_checkpoint_request:ui",
+        jobId: "stage_play_job:ui",
+        graphId: "stage_play_badge_graph:ui-fixture",
+        objective: "Track the visual source and produce visible checkpoints.",
+        userPromptRef: null,
+        reason: "meaningful_perturbation",
+        question: "A meaningful Stage Play perturbation occurred; what current answer snapshot should Helix Ask produce?",
+        currentGraphRefs: ["stage_play_badge_graph:ui-fixture"],
+        compactObservationRefs: ["stage_play_compact_observation:ui"],
+        perturbationRefs: ["stage_play_perturbation_event:ui"],
+        priorAnswerSnapshotRefs: ["answer_snapshot.latest"],
+        missingEvidence: ["Audio transcript is missing."],
+        checkpointPolicy: {
+          autoRunEligible: true,
+          requiresUserApproval: true,
+          minMsSinceLastCheckpoint: 15_000,
+        },
+        status: "queued",
+        assistant_answer: false,
+        context_role: "tool_evidence",
       },
     ],
   });
@@ -718,6 +787,32 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/checkpoint-queue/action")) {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_checkpoint_queue_action_response/v1",
+        action: body.action ?? "run",
+        request: {
+          ...(graph.checkpointRequests[0] ?? {}),
+          status: body.action === "run" ? "running" : "skipped",
+        },
+        queue: {
+          schema: "stage_play_checkpoint_queue/v1",
+          jobId: body.jobId ?? "stage_play_job:ui",
+          requests: graph.checkpointRequests,
+          jobState: null,
+          assistant_answer: false,
+          context_role: "tool_evidence",
+        },
+        reason: "updated",
+        assistant_answer: false,
+        context_role: "tool_evidence",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.includes("/api/agi/situation/live-answer-environment")) {
       return new Response(JSON.stringify({
         ok: true,
@@ -820,8 +915,17 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
     expect(screen.getByText("Latest reflect_stage_play_context")).toBeTruthy();
-    expect(screen.getByText("13 badges")).toBeTruthy();
+    expect(screen.getByText("14 badges")).toBeTruthy();
     expect(screen.getByText("0 missing checks")).toBeTruthy();
+    expect(screen.getByText(/checkpoint queue: Meaningful Perturbation \/ queued/i)).toBeTruthy();
+    expect(screen.getByTestId("stage-play-run-checkpoint")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("stage-play-run-checkpoint"));
+    const checkpointQueueBody = fetchJsonBodies("/api/helix/stage-play/checkpoint-queue/action").at(-1);
+    expect(checkpointQueueBody).toEqual(expect.objectContaining({
+      jobId: "stage_play_job:ui",
+      checkpointRequestId: "stage_play_checkpoint_request:ui",
+      action: "run",
+    }));
     expect(screen.getByTestId("stage-play-lane-observer")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-compact_observation")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-stage_bounds")).toBeTruthy();
@@ -829,6 +933,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-lane-procedural_bindings")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-helix_ask_checkpoint")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-answer_snapshot")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-lane-validation_feedback")).toBeTruthy();
     expect(screen.getByTestId("stage-play-lane-live_voice_output")).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-data-tray").length).toBeGreaterThanOrEqual(12);
     expect(screen.getByText(/visual frame active - latest scene summary available/i)).toBeTruthy();
@@ -836,6 +941,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/confidence 0\.76/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/solver completed; model reviewed/i)).toBeTruthy();
     expect(screen.getByText(/route authority passed/i)).toBeTruthy();
+    expect(screen.getByText(/Meaningful perturbation is queued/i)).toBeTruthy();
     expect(screen.getAllByText(/Hold position until the next observation confirms the scene/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/model reviewed/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Project Stage Play possibilities into Live Answer/i)).toBeTruthy();
@@ -869,9 +975,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText("audio transcript").length).toBeGreaterThan(0);
     expect(screen.getByTestId("stage-play-project-live-answer")).toBeTruthy();
     fireEvent.click(screen.getByTestId("stage-play-project-live-answer"));
-    expect(await screen.findByText(/Projected 6 Stage Play line\(s\) to Live Answer/i)).toBeTruthy();
-    expect(screen.getByText(/Projected 6 lines: situation, affordances, risk, possibilities, unknowns, next_check/i)).toBeTruthy();
-    expect(screen.getByText(/Skipped: recommendation requires model review/i)).toBeTruthy();
+    const observerProjectionText = (await screen.findByTestId("stage-play-tool-activity-strip")).textContent ?? "";
+    expect(observerProjectionText).toMatch(
+      /Projected 6 interpretation lanes: situation, affordances, risk, possibilities, unknowns, next_check/i,
+    );
+    expect(observerProjectionText).toMatch(/Skipped: recommendation requires model review/i);
     expect(fetchJsonBodies("/api/helix/stage-play/project-live-answer").at(-1)).toEqual(expect.objectContaining({
       ensureStagePlayLineSchema: true,
       createIfMissing: true,
@@ -933,7 +1041,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Latest Ask Checkpoint" }));
     expect(screen.getByTestId("stage-play-ask-checkpoint-node-controls")).toBeTruthy();
-    expect(screen.getByText("Ask Checkpoint")).toBeTruthy();
+    expect(screen.getByText("Helix Ask Checkpoint")).toBeTruthy();
     expect(screen.getByText("Ask Prompt")).toBeTruthy();
     expect(screen.getByText("Tool Observation")).toBeTruthy();
     expect(screen.getByText("Solver / Debug Status")).toBeTruthy();
@@ -970,11 +1078,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     await screen.findByTestId("stage-play-badge-graph-scrollport");
     fireEvent.click(screen.getByTestId("stage-play-project-live-answer-interpreter"));
 
-    expect(await screen.findByText(/Projected 6 lines: situation, affordances, risk, possibilities, unknowns, next_check/i)).toBeTruthy();
-    expect(screen.getByText(/Skipped: recommendation requires model review/i)).toBeTruthy();
+    const interpreterProjectionText = (await screen.findByTestId("stage-play-tool-activity-strip")).textContent ?? "";
+    expect(interpreterProjectionText).toMatch(
+      /Projected 6 interpretation lanes: situation, affordances, risk, possibilities, unknowns, next_check/i,
+    );
+    expect(interpreterProjectionText).toMatch(/Skipped: recommendation requires model review/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Stage Play interpreter" }));
-    expect(screen.getByText("Live Answer Projection")).toBeTruthy();
+    expect(screen.getByText("Live Interpretation Projection")).toBeTruthy();
     expect(screen.getByTestId("stage-play-project-live-answer-inspector")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("stage-play-project-live-answer-output"));
