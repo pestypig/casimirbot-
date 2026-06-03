@@ -24,12 +24,18 @@ export type BuildStagePlayAnswerSnapshotInput = {
   askTurnDebug?: AskTurnDebugExport | null;
   liveAnswerEnvironment?: LiveAnswerEnvironment | null;
   generatedAt?: string;
+  voicePolicy?: {
+    voiceEligible?: boolean;
+    evidenceRefs?: string[];
+    reasonCodes?: string[];
+  } | null;
 };
 
 export type StagePlayAnswerSnapshotReducerOutput = {
   checkpointBadge: StagePlayBadgeV1;
   answerSnapshotBadge: StagePlayBadgeV1 | null;
   liveOutputBadge: StagePlayBadgeV1 | null;
+  voiceOutputBadge: StagePlayBadgeV1 | null;
   missingCheckBadge: StagePlayBadgeV1 | null;
   badges: StagePlayBadgeV1[];
   edges: StagePlayBadgeEdgeV1[];
@@ -257,6 +263,7 @@ export function reduceStagePlayAnswerSnapshot(
     ...liveAnswerRefs,
   ]);
   const sourceRefs = sourceRefsFromEvidence(evidenceRefs);
+  const voicePolicyEligible = input.voicePolicy?.voiceEligible === true;
 
   const checkpointBadge = badge({
     id: "helix_ask.checkpoint.latest",
@@ -340,7 +347,7 @@ export function reduceStagePlayAnswerSnapshot(
         subjects: [input.liveAnswerEnvironment?.environment_id ?? "live_answer"],
         tags: ["answer_snapshot_reducer", "model_reviewed", "live_output"],
         sourceRefs,
-        evidenceRefs,
+        evidenceRefs: uniqueStrings([...evidenceRefs, "answer_snapshot.latest"]),
         confidence: 0.82,
         reasonCodes: ["stage_play_answer_snapshot_reducer", "live_output_from_answer_snapshot"],
         dataTray: {
@@ -349,13 +356,58 @@ export function reduceStagePlayAnswerSnapshot(
           updatedAt: generatedAt,
           freshness: "fresh",
           confidence: 0.82,
-          evidenceRefs,
+          evidenceRefs: uniqueStrings([...evidenceRefs, "answer_snapshot.latest"]),
         },
         output: {
           lineKey: "live_output",
           text: compactText(answerText ?? "Model-reviewed answer snapshot is available."),
           state: "model_reviewed",
           voiceEligible: false,
+        },
+      })
+    : null;
+
+  const voiceOutputBadge = modelReviewed && voicePolicyEligible
+    ? badge({
+        id: "voice_output.current",
+        title: "voice output",
+        plainMeaning: "Current voice output is eligible only through explicit voice policy over a model-reviewed answer snapshot.",
+        whyItMatters: "Voice output must cite the upheld answer snapshot rather than raw observer data or source projection.",
+        kind: "voice_output",
+        status: "observed",
+        subjects: [input.liveAnswerEnvironment?.environment_id ?? "voice_output"],
+        tags: ["answer_snapshot_reducer", "model_reviewed", "voice_output", "voice_policy"],
+        sourceRefs,
+        evidenceRefs: uniqueStrings([
+          ...evidenceRefs,
+          "answer_snapshot.latest",
+          ...(input.voicePolicy?.evidenceRefs ?? []),
+        ]),
+        confidence: 0.8,
+        reasonCodes: uniqueStrings([
+          "stage_play_answer_snapshot_reducer",
+          "voice_output_from_answer_snapshot",
+          "voice_cites_answer_snapshot",
+          "explicit_voice_policy",
+          ...(input.voicePolicy?.reasonCodes ?? []),
+        ]),
+        dataTray: {
+          title: "Current voice output",
+          summary: "Voice output cites the model-reviewed answer snapshot and explicit voice policy.",
+          updatedAt: generatedAt,
+          freshness: "fresh",
+          confidence: 0.8,
+          evidenceRefs: uniqueStrings([
+            ...evidenceRefs,
+            "answer_snapshot.latest",
+            ...(input.voicePolicy?.evidenceRefs ?? []),
+          ]),
+        },
+        output: {
+          lineKey: "voice_output",
+          text: compactText(answerText ?? "Model-reviewed answer snapshot is available for voice output."),
+          state: "model_reviewed",
+          voiceEligible: true,
         },
       })
     : null;
@@ -430,6 +482,20 @@ export function reduceStagePlayAnswerSnapshot(
       evidenceRefs,
       reasonCodes: ["answer_snapshot_live_output"],
     }));
+    if (voiceOutputBadge) {
+      edges.push(edge({
+        from: answerSnapshotBadge.id,
+        to: voiceOutputBadge.id,
+        relation: "produces",
+        label: "answer snapshot produces policy-gated voice output",
+        evidenceRefs: uniqueStrings([
+          ...evidenceRefs,
+          "answer_snapshot.latest",
+          ...(input.voicePolicy?.evidenceRefs ?? []),
+        ]),
+        reasonCodes: ["answer_snapshot_voice_output", "explicit_voice_policy"],
+      }));
+    }
   } else if (missingCheckBadge) {
     edges.push(edge({
       from: checkpointBadge.id,
@@ -445,6 +511,7 @@ export function reduceStagePlayAnswerSnapshot(
     checkpointBadge,
     ...(answerSnapshotBadge ? [answerSnapshotBadge] : []),
     ...(liveOutputBadge ? [liveOutputBadge] : []),
+    ...(voiceOutputBadge ? [voiceOutputBadge] : []),
     ...(missingCheckBadge ? [missingCheckBadge] : []),
   ];
 
@@ -452,6 +519,7 @@ export function reduceStagePlayAnswerSnapshot(
     checkpointBadge,
     answerSnapshotBadge,
     liveOutputBadge,
+    voiceOutputBadge,
     missingCheckBadge,
     badges,
     edges,

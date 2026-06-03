@@ -41,6 +41,11 @@ export type StagePlayAskCheckpointReceiptV1 = {
   completedSolverPath: boolean;
   answerText?: string | null;
   evidenceRefs?: string[];
+  voicePolicy?: {
+    voiceEligible?: boolean;
+    evidenceRefs?: string[];
+    reasonCodes?: string[];
+  } | null;
 };
 
 export type BuildStagePlayRecommendedActionAdmissionInput = {
@@ -257,6 +262,7 @@ const addPipelineSkeleton = (
     ...(completedCheckpoint?.solverTraceRef ? [completedCheckpoint.solverTraceRef] : []),
   ]);
   const answerText = completedCheckpoint?.answerText?.trim() ?? "";
+  const voicePolicyEligible = completedCheckpoint?.voicePolicy?.voiceEligible === true;
 
   const compactObservationId = pushBadge(badges, badge({
     id: "compact_observation.latest",
@@ -424,6 +430,9 @@ const addPipelineSkeleton = (
     admission: "auto",
   }));
 
+  const liveOutputEvidenceRefs = completedCheckpoint
+    ? unique([...checkpointEvidenceRefs, answerSnapshotId])
+    : checkpointEvidenceRefs;
   const liveOutputId = pushBadge(badges, badge({
     id: "live_output.current",
     title: "live output",
@@ -436,7 +445,7 @@ const addPipelineSkeleton = (
     subjects: ["live_answer"],
     tags: ["pipeline", "live_output", completedCheckpoint ? "model_reviewed" : "waiting_for_checkpoint"],
     sourceRefs: input.sourceRefs,
-    evidenceRefs: checkpointEvidenceRefs,
+    evidenceRefs: liveOutputEvidenceRefs,
     confidence: completedCheckpoint ? 0.8 : 0.32,
     missingEvidence: completedCheckpoint ? [] : ["Live output requires a model-reviewed answer snapshot."],
     reasonCodes: [
@@ -451,7 +460,7 @@ const addPipelineSkeleton = (
       updatedAt: input.generatedAt,
       freshness: completedCheckpoint ? "fresh" : "missing",
       confidence: completedCheckpoint ? 0.8 : 0.32,
-      evidenceRefs: checkpointEvidenceRefs,
+      evidenceRefs: liveOutputEvidenceRefs,
     },
     output: {
       lineKey: "live_output",
@@ -463,6 +472,52 @@ const addPipelineSkeleton = (
     },
     admission: "auto",
   }));
+
+  const voiceOutputId = completedCheckpoint && voicePolicyEligible
+    ? pushBadge(badges, badge({
+        id: "voice_output.current",
+        title: "voice output",
+        plainMeaning: "Current voice output is eligible only because an explicit voice policy cites the reviewed answer snapshot.",
+        whyItMatters: "Voice output must speak from a model-reviewed answer snapshot, never from raw Stage Play projection.",
+        kind: "voice_output",
+        status: "observed",
+        subjects: ["voice_output"],
+        tags: ["pipeline", "voice_output", "model_reviewed", "voice_policy"],
+        sourceRefs: input.sourceRefs,
+        evidenceRefs: unique([
+          ...checkpointEvidenceRefs,
+          answerSnapshotId,
+          ...(completedCheckpoint.voicePolicy?.evidenceRefs ?? []),
+        ]),
+        confidence: 0.78,
+        reasonCodes: unique([
+          "stage_play_pipeline_skeleton",
+          "explicit_voice_policy",
+          "voice_output_from_answer_snapshot",
+          "voice_cites_answer_snapshot",
+          ...(completedCheckpoint.voicePolicy?.reasonCodes ?? []),
+        ]),
+        dataTray: {
+          title: "Current voice output",
+          summary: "Voice output cites the model-reviewed answer snapshot and an explicit voice policy.",
+          updatedAt: input.generatedAt,
+          freshness: "fresh",
+          confidence: 0.78,
+          evidenceRefs: unique([
+            ...checkpointEvidenceRefs,
+            answerSnapshotId,
+            ...(completedCheckpoint.voicePolicy?.evidenceRefs ?? []),
+          ]),
+        },
+        output: {
+          lineKey: "voice_output",
+          text: answerText || "Model-reviewed answer snapshot is available for voice output.",
+          state: "model_reviewed",
+          voiceEligible: true,
+        },
+        admission: "auto",
+      }))
+    : null;
 
   pushEdge(edges, {
     from: input.observerId,
@@ -541,6 +596,20 @@ const addPipelineSkeleton = (
     evidenceRefs: checkpointEvidenceRefs,
     reasonCodes: ["pipeline_answer_live_output"],
   });
+  if (voiceOutputId) {
+    pushEdge(edges, {
+      from: answerSnapshotId,
+      to: voiceOutputId,
+      relation: "produces",
+      label: "answer snapshot produces policy-gated voice output",
+      evidenceRefs: unique([
+        ...checkpointEvidenceRefs,
+        answerSnapshotId,
+        ...(completedCheckpoint.voicePolicy?.evidenceRefs ?? []),
+      ]),
+      reasonCodes: ["pipeline_answer_voice_output", "explicit_voice_policy"],
+    });
+  }
 };
 
 const dimensionSettingId = (snapshot: HelixEnvironmentStateSnapshot | null): "setting.overworld" | "setting.nether" | "setting.end" | null => {

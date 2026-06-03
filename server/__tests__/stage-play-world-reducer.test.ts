@@ -216,6 +216,60 @@ describe("Stage Play world-state badge reducer", () => {
         voiceEligible: false,
       }),
     });
+    expect(graph.badges.find((badge) => badge.id === "voice_output.current")).toBeUndefined();
+  });
+
+  it("emits policy-gated voice output when the Ask checkpoint receipt allows voice", () => {
+    const producer = upsertLiveSourceProducer({
+      sourceId: "visual_source:live-answer",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:live-answer",
+      now: "2026-06-02T12:09:55.000Z",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:10:00.000Z"),
+      askCheckpointReceipt: {
+        askTurnId: "ask:turn:stage-play",
+        solverTraceRef: "ask_turn_solver_trace:stage-play",
+        terminalArtifactKind: "model_synthesized_answer",
+        finalAnswerSource: "final_answer_draft",
+        completedSolverPath: true,
+        answerText: "Keep observing the visual source and attach audio before prediction.",
+        evidenceRefs: [producer.producer_id, "ask_turn_solver_trace:stage-play"],
+        voicePolicy: {
+          voiceEligible: true,
+          evidenceRefs: ["voice_policy:stage-play"],
+          reasonCodes: ["explicit_voice_policy_allowed"],
+        },
+      },
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.badges.find((badge) => badge.id === "voice_output.current")).toMatchObject({
+      kind: "voice_output",
+      status: "observed",
+      tags: expect.arrayContaining(["voice_policy"]),
+      reasonCodes: expect.arrayContaining(["explicit_voice_policy", "voice_cites_answer_snapshot"]),
+      evidenceRefs: expect.arrayContaining(["answer_snapshot.latest", "voice_policy:stage-play"]),
+      output: expect.objectContaining({
+        lineKey: "voice_output",
+        state: "model_reviewed",
+        voiceEligible: true,
+      }),
+    });
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "answer_snapshot.latest",
+        to: "voice_output.current",
+        relation: "produces",
+      }),
+    ]));
   });
 
   it("assembles world facts into deterministic Stage Play badges and procedural bindings", () => {

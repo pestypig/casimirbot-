@@ -614,6 +614,67 @@ function validateOutput(prefix: string, value: unknown, issues: string[]): void 
   }
 }
 
+const stringArrayValues = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+
+const badgeReferenceTokens = (badge: Record<string, unknown>): Set<string> => {
+  const sourceRefs = Array.isArray(badge.sourceRefs)
+    ? badge.sourceRefs.filter(isRecord)
+    : [];
+  const dataTray = isRecord(badge.dataTray) ? badge.dataTray : null;
+  return new Set([
+    typeof badge.id === "string" ? badge.id : "",
+    ...(typeof badge.id === "string" ? [`badge:${badge.id}`, `stage_play_badge:${badge.id}`] : []),
+    ...stringArrayValues(badge.evidenceRefs),
+    ...stringArrayValues(dataTray?.evidenceRefs),
+    ...sourceRefs.map((ref) => typeof ref.id === "string" ? ref.id : "").filter(Boolean),
+    ...sourceRefs.map((ref) =>
+      typeof ref.kind === "string" && typeof ref.id === "string" ? `${ref.kind}:${ref.id}` : ""
+    ).filter(Boolean),
+  ].filter(Boolean));
+};
+
+const hasModelReviewedAnswerSnapshotMark = (badge: Record<string, unknown>): boolean => {
+  if (badge.kind !== "answer_snapshot") return false;
+  const output = isRecord(badge.output) ? badge.output : null;
+  if (output?.state !== "model_reviewed" || !isNonEmptyString(output.text)) return false;
+  const checkpoint = isRecord(badge.checkpoint) ? badge.checkpoint : null;
+  const markers = [
+    ...stringArrayValues(badge.tags),
+    ...stringArrayValues(badge.reasonCodes),
+  ].join(" ");
+  return checkpoint?.modelReviewed === true ||
+    /model_reviewed|model_authored|answer_snapshot_from_checkpoint|answer_snapshot_from_model_authored_checkpoint/i.test(markers);
+};
+
+const hasExplicitVoicePolicyMark = (badge: Record<string, unknown>): boolean =>
+  [
+    ...stringArrayValues(badge.tags),
+    ...stringArrayValues(badge.reasonCodes),
+  ].some((value) =>
+    /(?:explicit_)?voice(?:_output)?_(?:policy|eligible|allowed)|voice_policy/i.test(value)
+  );
+
+const citesModelReviewedAnswerSnapshot = (
+  badge: Record<string, unknown>,
+  answerSnapshots: Record<string, unknown>[],
+): boolean => {
+  const refs = badgeReferenceTokens(badge);
+  return answerSnapshots.some((snapshot) => {
+    const snapshotId = typeof snapshot.id === "string" ? snapshot.id : "";
+    if (snapshotId && (
+      refs.has(snapshotId) ||
+      refs.has(`badge:${snapshotId}`) ||
+      refs.has(`stage_play_badge:${snapshotId}`)
+    )) {
+      return true;
+    }
+    return Array.from(badgeReferenceTokens(snapshot)).some((ref) =>
+      refs.has(ref) && /answer_snapshot/i.test(ref)
+    );
+  });
+};
+
 export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   const issues: string[] = [];
   if (!isRecord(value)) return ["graph must be an object"];
@@ -726,6 +787,9 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
   const edges = Array.isArray(value.edges) ? value.edges : [];
   const badgeIds = new Set<string>();
   const edgeIds = new Set<string>();
+  const modelReviewedAnswerSnapshots = badges
+    .filter(isRecord)
+    .filter(hasModelReviewedAnswerSnapshotMark);
 
   for (const [index, rawBadge] of badges.entries()) {
     const prefix = `badges[${index}]`;
@@ -783,6 +847,23 @@ export function validateStagePlayBadgeGraphV1(value: unknown): string[] {
       validateOutput(`${prefix}.output`, rawBadge.output, issues);
       if (!["answer_snapshot", "live_output", "voice_output"].includes(String(rawBadge.kind))) {
         issues.push(`${prefix}.output may only appear on answer_snapshot, live_output, or voice_output badges`);
+      }
+      if (isRecord(rawBadge.output) && rawBadge.output.voiceEligible === true) {
+        if (rawBadge.kind === "answer_snapshot") {
+          issues.push(`${prefix}.output.voiceEligible is only allowed on live_output or voice_output badges`);
+        }
+        if (rawBadge.kind !== "live_output" && rawBadge.kind !== "voice_output") {
+          issues.push(`${prefix}.output.voiceEligible may only appear on live_output or voice_output badges`);
+        }
+        if (rawBadge.output.state !== "model_reviewed") {
+          issues.push(`${prefix}.output.voiceEligible requires model_reviewed output state`);
+        }
+        if (!hasExplicitVoicePolicyMark(rawBadge)) {
+          issues.push(`${prefix}.output.voiceEligible requires explicit voice policy evidence`);
+        }
+        if (!citesModelReviewedAnswerSnapshot(rawBadge, modelReviewedAnswerSnapshots)) {
+          issues.push(`${prefix}.output.voiceEligible requires citation to a model-reviewed answer_snapshot`);
+        }
       }
     }
     if (rawBadge.admission === "auto" && rawBadge.kind === "blocked_affordance") {

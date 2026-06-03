@@ -179,6 +179,7 @@ describe("Stage Play answer snapshot reducer", () => {
         state: "model_reviewed",
       },
     });
+    expect(result.voiceOutputBadge).toBeNull();
     expect(result.missingCheckBadge).toBeNull();
     expect(result.edges.map((edge) => `${edge.from}->${edge.to}`)).toEqual(expect.arrayContaining([
       "procedural_binding.active->helix_ask.checkpoint.latest",
@@ -192,6 +193,50 @@ describe("Stage Play answer snapshot reducer", () => {
       "ask:turn:stage-answer:live_environment_tool_observation:1",
       "live_answer_environment:stage-answer",
     ]));
+
+    const mergedGraph = {
+      ...graph,
+      badges: [...graph.badges, ...result.badges],
+      edges: [...graph.edges, ...result.edges],
+      summary: buildStagePlayBadgeGraphSummaryV1(
+        [...graph.badges, ...result.badges],
+        [...graph.edges, ...result.edges],
+      ),
+    };
+    expect(validateStagePlayBadgeGraphV1(mergedGraph)).toEqual([]);
+  });
+
+  it("creates policy-gated voice output only from a reviewed answer snapshot", () => {
+    const graph = graphFixture();
+    const result = reduceStagePlayAnswerSnapshot({
+      graph,
+      askTurnDebug: completedDebugExport(),
+      liveAnswerEnvironment: liveAnswerEnvironmentFixture(),
+      generatedAt: "2026-06-03T12:00:10.000Z",
+      voicePolicy: {
+        voiceEligible: true,
+        evidenceRefs: ["voice_policy:stage-answer"],
+        reasonCodes: ["explicit_voice_policy_allowed"],
+      },
+    });
+
+    expect(result.voiceOutputBadge).toMatchObject({
+      id: "voice_output.current",
+      kind: "voice_output",
+      status: "observed",
+      tags: expect.arrayContaining(["voice_policy"]),
+      reasonCodes: expect.arrayContaining(["explicit_voice_policy", "voice_cites_answer_snapshot"]),
+      evidenceRefs: expect.arrayContaining(["answer_snapshot.latest", "voice_policy:stage-answer"]),
+      output: {
+        lineKey: "voice_output",
+        state: "model_reviewed",
+        voiceEligible: true,
+        text: expect.stringContaining("keep observing the source"),
+      },
+    });
+    expect(result.edges.map((edge) => `${edge.from}->${edge.to}`)).toContain(
+      "answer_snapshot.latest->voice_output.current",
+    );
 
     const mergedGraph = {
       ...graph,
@@ -226,6 +271,7 @@ describe("Stage Play answer snapshot reducer", () => {
     expect(result.checkpointBadge.checkpoint?.modelReviewed).toBe(false);
     expect(result.answerSnapshotBadge).toBeNull();
     expect(result.liveOutputBadge).toBeNull();
+    expect(result.voiceOutputBadge).toBeNull();
     expect(result.missingCheckBadge).toMatchObject({
       id: "answer_snapshot.missing_check",
       kind: "missing_evidence",

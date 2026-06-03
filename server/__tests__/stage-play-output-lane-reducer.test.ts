@@ -203,7 +203,9 @@ const reviewedOutputBadges = (includeVoicePolicy = false): StagePlayBadgeV1[] =>
     tags: includeVoicePolicy ? ["voice_policy"] : [],
     reasonCodes: includeVoicePolicy ? ["explicit_voice_policy"] : ["model_reviewed_output"],
     confidence: 0.8,
-    evidenceRefs: ["ask:turn:stage-output"],
+    evidenceRefs: includeVoicePolicy
+      ? ["ask:turn:stage-output", "answer_snapshot.latest"]
+      : ["ask:turn:stage-output"],
     output: {
       lineKey: "voice_output",
       text: "Check hostile distance before using the barrier retreat plan.",
@@ -346,6 +348,19 @@ describe("stage-play output lane reducer", () => {
       model_invoked: true,
       deterministic: false,
     });
+  });
+
+  it("does not write voice output when policy exists but answer snapshot citation is missing", () => {
+    const uncitedVoiceBadges = reviewedOutputBadges(true).map((entry) =>
+      entry.id === "voice_output.current"
+        ? { ...entry, evidenceRefs: ["ask:turn:stage-output"] }
+        : entry
+    );
+    const projection = buildStagePlayOutputLaneProjectionV1({
+      graph: graphFixture(uncitedVoiceBadges),
+    });
+
+    expect(buildStagePlayLiveAnswerLineValuesV1(projection).voice_output).toBeUndefined();
   });
 
   it("updates active Live Answer lines while preserving model-reviewed recommendation authority", () => {

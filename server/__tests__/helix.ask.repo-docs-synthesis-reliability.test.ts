@@ -365,6 +365,8 @@ describe("repo/docs synthesis reliability", () => {
         "terminal_authority_single_writer",
       ]),
     );
+    expect(packet.exact_section_contract?.required_terms).not.toContain("ask_user");
+    expect(packet.exact_section_contract?.required_terms).not.toContain("terminal_eligible");
   });
 
   it("rejects exact-section answers that invent field names or omit required terms", () => {

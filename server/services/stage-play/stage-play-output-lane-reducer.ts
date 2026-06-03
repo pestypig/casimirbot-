@@ -324,6 +324,30 @@ const hasExplicitVoicePolicy = (badge: StagePlayBadgeV1): boolean =>
     /(?:explicit_)?voice(?:_output)?_(?:policy|eligible|allowed)|voice_policy/i.test(value)
   );
 
+const badgeReferenceTokens = (badge: StagePlayBadgeV1): Set<string> =>
+  new Set([
+    badge.id,
+    `badge:${badge.id}`,
+    `stage_play_badge:${badge.id}`,
+    ...badge.evidenceRefs,
+    ...(badge.dataTray?.evidenceRefs ?? []),
+    ...badge.sourceRefs.map((ref) => ref.id),
+    ...badge.sourceRefs.map((ref) => `${ref.kind}:${ref.id}`),
+  ]);
+
+const citesAnswerSnapshot = (
+  badge: StagePlayBadgeV1,
+  answerSnapshots: StagePlayBadgeV1[],
+): boolean => {
+  const refs = badgeReferenceTokens(badge);
+  return answerSnapshots.some((snapshot) =>
+    refs.has(snapshot.id) ||
+    refs.has(`badge:${snapshot.id}`) ||
+    refs.has(`stage_play_badge:${snapshot.id}`) ||
+    Array.from(badgeReferenceTokens(snapshot)).some((ref) => refs.has(ref) && /answer_snapshot/i.test(ref))
+  );
+};
+
 export function buildStagePlayOutputLaneProjectionV1(
   input: LaneBuildInput,
 ): StagePlayOutputLaneProjectionV1 {
@@ -361,7 +385,11 @@ export function buildStagePlayOutputLaneProjectionV1(
     ? answerSnapshotBadges
     : liveOutputBadges;
   const voiceOutputBadges = modelReviewedOutputBadges(graph, "voice_output")
-    .filter((badge) => answerSnapshotBadges.length > 0 && hasExplicitVoicePolicy(badge));
+    .filter((badge) =>
+      answerSnapshotBadges.length > 0 &&
+      hasExplicitVoicePolicy(badge) &&
+      citesAnswerSnapshot(badge, answerSnapshotBadges)
+    );
   const hasReviewedAnswerSnapshot = answerSnapshotBadges.length > 0;
   const hasReviewedRecommendation = recommendationBadges.length > 0;
   const hasVoiceOutput = voiceOutputBadges.length > 0;

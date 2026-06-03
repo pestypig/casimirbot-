@@ -154,6 +154,19 @@ const extractSnakeTerms = (text: string): string[] =>
     .filter((term) => term.length >= 5)
     .slice(0, 40);
 
+const extractRequiredFieldTerms = (text: string): string[] => {
+  const requiredIndex = text.search(/\brequired\s+fields?\b/i);
+  if (requiredIndex >= 0) {
+    const requiredSlice = text.slice(requiredIndex);
+    const fenced = requiredSlice.match(/```[^\n]*\n([\s\S]*?)```/);
+    if (fenced?.[1]) return extractSnakeTerms(fenced[1]);
+    const bounded = requiredSlice.split(/\n\s*(?:The shared loop boundary|Patch instructions|Receipt terminal products)\b/i)[0] ?? requiredSlice;
+    const terms = extractSnakeTerms(bounded);
+    if (terms.length > 0) return terms;
+  }
+  return extractSnakeTerms(text);
+};
+
 const buildExactSectionContract = (input: {
   promptText: string;
   evidence: HelixRepoDocsSynthesisPacket["compact_evidence"];
@@ -170,7 +183,7 @@ const buildExactSectionContract = (input: {
   const fallbackCandidates = candidates.length > 0
     ? candidates
     : input.evidence.filter((entry) => requestedPath ? normalizePath(entry.path).includes(requestedPath) : true);
-  const requiredTerms = unique(fallbackCandidates.flatMap((entry) => extractSnakeTerms(entry.excerpt)));
+  const requiredTerms = unique(fallbackCandidates.flatMap((entry) => extractRequiredFieldTerms(entry.excerpt)));
   if (!requestedPath && !requestedHeading && requiredTerms.length === 0) return undefined;
   return {
     contract_kind: "field_list",

@@ -310,6 +310,128 @@ describe("stage_play_badge_graph/v1", () => {
     expect(graph.authority.terminal_eligible).toBe(false);
   });
 
+  it("accepts voice output only when it cites a model-reviewed answer snapshot", () => {
+    const voiceOutputBadge: StagePlayBadgeV1 = {
+      ...answerSnapshotBadge,
+      id: "voice_output:current",
+      title: "Voice output",
+      plainMeaning: "Policy-gated voice output cites the upheld answer snapshot.",
+      whyItMatters: "Voice output must be sourced from model-reviewed answer text, not raw projection.",
+      kind: "voice_output",
+      subjects: ["voice_output"],
+      tags: ["voice_output", "model_reviewed", "voice_policy"],
+      evidenceRefs: ["ask:turn:123", "answer_snapshot:latest"],
+      reasonCodes: ["explicit_voice_policy", "voice_output_from_answer_snapshot"],
+      dataTray: {
+        title: "Current voice output",
+        summary: "Voice output cites the answer snapshot.",
+        updatedAt: "2026-06-02T12:00:02.000Z",
+        freshness: "fresh",
+        confidence: 0.8,
+        evidenceRefs: ["answer_snapshot:latest"],
+      },
+      output: {
+        lineKey: "voice_output",
+        text: "Attach audio before resolving narrative intent.",
+        state: "model_reviewed",
+        voiceEligible: true,
+      },
+    };
+    const graph = buildFixture({
+      badges: [askCheckpointBadge, answerSnapshotBadge, voiceOutputBadge],
+      edges: [
+        {
+          id: "edge:checkpoint:produces:answer",
+          from: askCheckpointBadge.id,
+          to: answerSnapshotBadge.id,
+          relation: "produces",
+          label: "model-reviewed checkpoint produces answer snapshot",
+          evidenceRefs: answerSnapshotBadge.evidenceRefs,
+          reasonCodes: ["answer_snapshot_from_checkpoint"],
+        },
+        {
+          id: "edge:answer:produces:voice",
+          from: answerSnapshotBadge.id,
+          to: voiceOutputBadge.id,
+          relation: "produces",
+          label: "answer snapshot produces policy-gated voice output",
+          evidenceRefs: voiceOutputBadge.evidenceRefs,
+          reasonCodes: ["explicit_voice_policy"],
+        },
+      ],
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+  });
+
+  it("rejects voice output without model review, policy, and answer-snapshot citation", () => {
+    const unsafeVoiceBadge = (overrides: Partial<StagePlayBadgeV1>): StagePlayBadgeV1 => ({
+      ...answerSnapshotBadge,
+      id: "voice_output:unsafe",
+      title: "Unsafe voice output",
+      kind: "voice_output",
+      tags: ["voice_output"],
+      evidenceRefs: ["ask:turn:123"],
+      reasonCodes: ["voice_output_from_projection"],
+      output: {
+        lineKey: "voice_output",
+        text: "Speak projected source state.",
+        state: "projected",
+        voiceEligible: true,
+      },
+      ...overrides,
+    });
+
+    expect(validateStagePlayBadgeGraphV1(buildFixture({
+      badges: [
+        askCheckpointBadge,
+        {
+          ...answerSnapshotBadge,
+          output: {
+            ...(answerSnapshotBadge.output ?? {}),
+            voiceEligible: true,
+          },
+        },
+      ],
+    })).join("\n")).toMatch(/output\.voiceEligible is only allowed on live_output or voice_output badges/);
+
+    expect(validateStagePlayBadgeGraphV1(buildFixture({
+      badges: [askCheckpointBadge, answerSnapshotBadge, unsafeVoiceBadge({})],
+    })).join("\n")).toMatch(/output\.voiceEligible requires model_reviewed output state/);
+
+    expect(validateStagePlayBadgeGraphV1(buildFixture({
+      badges: [
+        askCheckpointBadge,
+        answerSnapshotBadge,
+        unsafeVoiceBadge({
+          output: {
+            lineKey: "voice_output",
+            text: "Speak without policy.",
+            state: "model_reviewed",
+            voiceEligible: true,
+          },
+        }),
+      ],
+    })).join("\n")).toMatch(/output\.voiceEligible requires explicit voice policy evidence/);
+
+    expect(validateStagePlayBadgeGraphV1(buildFixture({
+      badges: [
+        askCheckpointBadge,
+        answerSnapshotBadge,
+        unsafeVoiceBadge({
+          tags: ["voice_policy"],
+          reasonCodes: ["explicit_voice_policy"],
+          output: {
+            lineKey: "voice_output",
+            text: "Speak without answer snapshot citation.",
+            state: "model_reviewed",
+            voiceEligible: true,
+          },
+        }),
+      ],
+    })).join("\n")).toMatch(/output\.voiceEligible requires citation to a model-reviewed answer_snapshot/);
+  });
+
   it("allows raw session buffer ids as refs without allowing raw content in the graph", () => {
     const rawBufferRef = "stage_play_raw_session_buffer_entry:abc123";
     const graph = buildFixture({

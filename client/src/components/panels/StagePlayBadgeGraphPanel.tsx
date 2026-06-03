@@ -665,10 +665,13 @@ function badgeReferenceTokens(badge: StagePlayBadgeV1): Set<string> {
 }
 
 function isModelReviewedAnswerSnapshot(badge: StagePlayBadgeV1): boolean {
+  const modelReviewedMarkers = [...badge.tags, ...badge.reasonCodes].some((value) =>
+    /model_reviewed|model_authored|answer_snapshot_from_checkpoint|answer_snapshot_from_model_authored_checkpoint/i.test(value)
+  );
   return (
     badge.kind === "answer_snapshot" &&
-    badge.checkpoint?.modelReviewed === true &&
-    badge.output?.state === "model_reviewed"
+    badge.output?.state === "model_reviewed" &&
+    (badge.checkpoint?.modelReviewed === true || modelReviewedMarkers)
   );
 }
 
