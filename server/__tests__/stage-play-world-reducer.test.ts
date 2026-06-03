@@ -234,6 +234,127 @@ describe("Stage Play world-state badge reducer", () => {
     ]));
   });
 
+  it("prioritizes current-graph checkpoint requests over stale queued requests", () => {
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:checkpoint-old",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:checkpoint-priority",
+      source_id: "source:visual-checkpoint",
+      source_kind: "screen_capture",
+      event_kind: "visual_summary",
+      observed_at: "2026-06-02T12:15:00.000Z",
+      freshness: { status: "fresh", age_ms: 0 },
+      provenance: { adapter: "browser.visual", confidence: "medium" },
+      compact_summary: "Old visual frame shows the opening scene.",
+      payload_summary: { visual: { scene_summary: "Opening scene.", confidence: "medium" } },
+      evidence_refs: ["visual_evidence:checkpoint-old"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    upsertLiveSourceDescriptor({
+      source_id: "source:visual-checkpoint",
+      thread_id: threadId,
+      environment_id: "env:checkpoint-priority",
+      modality: "visual_frame",
+      user_label: "Checkpoint visual tab",
+      serving_context: { surface: "browser_tab", source_origin: "browser_getDisplayMedia" },
+      current_state: "active",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:checkpoint-old"],
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-checkpoint",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:checkpoint-old",
+      now: "2026-06-02T12:15:00.500Z",
+    });
+
+    const oldGraph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: "env:checkpoint-priority",
+      objective: "track scene checkpoint priority",
+      now: new Date("2026-06-02T12:15:01.000Z"),
+    });
+    const oldRequest = oldGraph.checkpointRequests[0];
+    expect(oldRequest?.graphId).toBe(oldGraph.graphId);
+
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:checkpoint-current",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: "env:checkpoint-priority",
+      source_id: "source:visual-checkpoint",
+      source_kind: "screen_capture",
+      event_kind: "visual_summary",
+      observed_at: "2026-06-02T12:15:10.000Z",
+      freshness: { status: "fresh", age_ms: 0 },
+      provenance: { adapter: "browser.visual", confidence: "high" },
+      compact_summary: "Current visual frame changes the scene.",
+      payload_summary: { visual: { scene_summary: "Scene changed.", confidence: "high" } },
+      evidence_refs: ["visual_evidence:checkpoint-current"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    upsertLiveSourceDescriptor({
+      source_id: "source:visual-checkpoint",
+      thread_id: threadId,
+      environment_id: "env:checkpoint-priority",
+      modality: "visual_frame",
+      user_label: "Checkpoint visual tab",
+      serving_context: { surface: "browser_tab", source_origin: "browser_getDisplayMedia" },
+      current_state: "active",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:checkpoint-current"],
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-checkpoint",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:checkpoint-current",
+      now: "2026-06-02T12:15:10.500Z",
+    });
+    upsertStagePlaySourceRouteOverride({
+      threadId,
+      roomId,
+      environmentId: "env:checkpoint-priority",
+      sourceId: "source:visual-checkpoint",
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: ["visual_evidence:checkpoint-current"],
+      now: "2026-06-02T12:15:10.750Z",
+    });
+
+    const currentGraph = buildStagePlayGraphFromWorld({
+      threadId,
+      roomId,
+      environmentId: "env:checkpoint-priority",
+      objective: "track scene checkpoint priority",
+      now: new Date("2026-06-02T12:15:11.000Z"),
+    });
+    const currentRequest = currentGraph.checkpointRequests[0];
+    const stableCheckpointBadge = currentGraph.badges.find((badge) => badge.id === "checkpoint_request.queued");
+
+    expect(validateStagePlayBadgeGraphV1(currentGraph)).toEqual([]);
+    expect(currentRequest?.graphId).toBe(currentGraph.graphId);
+    expect(currentRequest?.checkpointRequestId).not.toBe(oldRequest?.checkpointRequestId);
+    expect(stableCheckpointBadge?.evidenceRefs).toEqual(expect.arrayContaining([
+      currentRequest?.checkpointRequestId,
+    ]));
+    expect(stableCheckpointBadge?.evidenceRefs).not.toContain(oldRequest?.checkpointRequestId);
+  });
+
   it("marks the Ask checkpoint as model reviewed only with a completed Ask receipt", () => {
     const producer = upsertLiveSourceProducer({
       sourceId: "visual_source:live-answer",

@@ -586,8 +586,9 @@ function fetchJsonBodies(pathPart: string): Array<Record<string, unknown>> {
 function renderPanel(options: {
   descriptors?: Array<Record<string, unknown>>;
   producers?: Array<Record<string, unknown>>;
+  graph?: StagePlayBadgeGraphV1;
 } = {}) {
-  const graph = buildFixture();
+  const graph = options.graph ?? buildFixture();
   const sourceHandles = buildSourceHandles(options);
   const fetchMock = vi.fn(async (requestInput: RequestInfo | URL, init?: RequestInit) => {
     const url = String(requestInput);
@@ -789,12 +790,15 @@ function renderPanel(options: {
     }
     if (url.includes("/api/helix/stage-play/checkpoint-queue/action")) {
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      const requestedCheckpointRequest = graph.checkpointRequests.find((request) =>
+        request.checkpointRequestId === body.checkpointRequestId
+      ) ?? graph.checkpointRequests[0] ?? {};
       return new Response(JSON.stringify({
         ok: true,
         schema: "stage_play_checkpoint_queue_action_response/v1",
         action: body.action ?? "run",
         request: {
-          ...(graph.checkpointRequests[0] ?? {}),
+          ...requestedCheckpointRequest,
           status: body.action === "run" ? "running" : "skipped",
         },
         queue: {
@@ -1016,6 +1020,53 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Candidate: retreat while tracking threat/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/agent executable: false/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /execute|run command|auto move|auto place/i })).toBeNull();
+  });
+
+  it("runs the current graph checkpoint request before stale queued requests", async () => {
+    const baseGraph = buildFixture();
+    const baseRequest = baseGraph.checkpointRequests[0];
+    const staleRequest = {
+      ...baseRequest,
+      checkpointRequestId: "stage_play_checkpoint_request:stale",
+      graphId: "stage_play_badge_graph:stale",
+      currentGraphRefs: ["stage_play_badge_graph:stale"],
+      reason: "first_usable_observation" as const,
+      question: "A stale first observation should not drive the current checkpoint.",
+      status: "queued" as const,
+    };
+    const currentRequest = {
+      ...baseRequest,
+      checkpointRequestId: "stage_play_checkpoint_request:current",
+      graphId: baseGraph.graphId,
+      currentGraphRefs: [baseGraph.graphId],
+      reason: "meaningful_perturbation" as const,
+      question: "Current visual-source graph has a meaningful perturbation; review the active checkpoint.",
+      status: "queued" as const,
+    };
+    renderPanel({
+      graph: {
+        ...baseGraph,
+        checkpointRequests: [staleRequest, currentRequest],
+      },
+    });
+
+    expect(await screen.findByText(/checkpoint queue: Meaningful Perturbation \/ queued/i)).toBeTruthy();
+    const promptEvents: CustomEvent[] = [];
+    window.addEventListener("helix-ask:prompt", ((event: Event) => {
+      promptEvents.push(event as CustomEvent);
+    }) as EventListener);
+    fireEvent.click(screen.getByTestId("stage-play-run-checkpoint"));
+    await waitFor(() => {
+      const checkpointQueueBody = fetchJsonBodies("/api/helix/stage-play/checkpoint-queue/action").at(-1);
+      expect(checkpointQueueBody).toEqual(expect.objectContaining({
+        jobId: "stage_play_job:ui",
+        checkpointRequestId: "stage_play_checkpoint_request:current",
+        action: "run",
+      }));
+      expect(promptEvents).toHaveLength(1);
+    });
+    expect(String(promptEvents[0]?.detail?.question)).toContain("stage_play_checkpoint_request:current");
+    expect(String(promptEvents[0]?.detail?.question)).not.toContain("stage_play_checkpoint_request:stale");
   });
 
   it("shows Observer controls in the Stage Console inspector when Observer is selected", async () => {

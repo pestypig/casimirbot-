@@ -359,6 +359,41 @@ const checkpointRequestTitle = (reason: StagePlayCheckpointRequestV1["reason"]):
 const checkpointRequestBadgeId = (request: StagePlayCheckpointRequestV1): string =>
   `checkpoint_request.${request.checkpointRequestId.split(":").pop() ?? hashShort(request.checkpointRequestId, 10)}`;
 
+const checkpointRequestMatchesGraph = (
+  request: StagePlayCheckpointRequestV1,
+  graphId: string,
+): boolean =>
+  request.graphId === graphId || request.currentGraphRefs.includes(graphId);
+
+const checkpointRequestGraphPriority = (
+  request: StagePlayCheckpointRequestV1,
+  graphId: string,
+): number => {
+  const currentGraph = checkpointRequestMatchesGraph(request, graphId);
+  if (currentGraph && request.status === "running") return 0;
+  if (currentGraph && request.reason === "user_requested_checkpoint") return 1;
+  if (currentGraph && request.status === "queued") return 2;
+  if (request.status === "running") return 3;
+  if (request.reason === "user_requested_checkpoint") return 4;
+  if (request.status === "queued") return 5;
+  return 6;
+};
+
+const prioritizeCheckpointRequestsForGraph = (
+  checkpointRequests: StagePlayCheckpointRequestV1[],
+  graphId: string,
+): StagePlayCheckpointRequestV1[] =>
+  checkpointRequests
+    .map((request, index) => ({ request, index }))
+    .sort((left, right) => {
+      const priorityDelta =
+        checkpointRequestGraphPriority(left.request, graphId) -
+        checkpointRequestGraphPriority(right.request, graphId);
+      if (priorityDelta !== 0) return priorityDelta;
+      return right.index - left.index;
+    })
+    .map((entry) => entry.request);
+
 const addCheckpointRequestBadges = (
   badges: StagePlayBadgeV1[],
   edges: StagePlayBadgeGraphV1["edges"],
@@ -1630,7 +1665,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       objective: input.objective ?? baseGraph.description,
       now: resolvedAt,
     });
-    const checkpointRequests = listStagePlayCheckpointRequests({ jobId, limit: 10 });
+    const checkpointRequests = prioritizeCheckpointRequestsForGraph(
+      listStagePlayCheckpointRequests({ jobId, limit: 10 }),
+      graphId,
+    );
     addLatestPerturbationNode(missingBadges, missingEdges, perturbationResult.latestEvents);
     addPerturbationBadges(missingBadges, missingEdges, perturbationResult.latestEvents);
     addCheckpointRequestBadges(missingBadges, missingEdges, checkpointRequests, perturbationResult.latestEvents);
@@ -2627,7 +2665,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     objective: input.objective ?? baseGraph.description,
     now: resolvedAt,
   });
-  const checkpointRequests = listStagePlayCheckpointRequests({ jobId, limit: 10 });
+  const checkpointRequests = prioritizeCheckpointRequestsForGraph(
+    listStagePlayCheckpointRequests({ jobId, limit: 10 }),
+    graphId,
+  );
   addLatestPerturbationNode(badges, edges, perturbationResult.latestEvents);
   addPerturbationBadges(badges, edges, perturbationResult.latestEvents);
   addCheckpointRequestBadges(badges, edges, checkpointRequests, perturbationResult.latestEvents);

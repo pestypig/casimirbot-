@@ -179,6 +179,46 @@ type StagePlayCheckpointQueueStatus = {
 
 type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointRequests"]>[number];
 
+const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
+  request.status === "queued" || request.status === "running";
+
+const stagePlayCheckpointRequestMatchesGraph = (
+  request: StagePlayCheckpointRequest,
+  graph: StagePlayBadgeGraphV1,
+): boolean =>
+  request.graphId === graph.graphId || request.currentGraphRefs.includes(graph.graphId);
+
+const stagePlayCheckpointRequestPriority = (
+  request: StagePlayCheckpointRequest,
+  graph: StagePlayBadgeGraphV1,
+): number => {
+  const currentGraph = stagePlayCheckpointRequestMatchesGraph(request, graph);
+  if (currentGraph && request.status === "running") return 0;
+  if (currentGraph && request.reason === "user_requested_checkpoint") return 1;
+  if (currentGraph && request.status === "queued") return 2;
+  if (request.status === "running") return 3;
+  if (request.reason === "user_requested_checkpoint") return 4;
+  if (request.status === "queued") return 5;
+  return 6;
+};
+
+const selectStagePlayVisibleCheckpointRequest = (
+  graph: StagePlayBadgeGraphV1 | null | undefined,
+): StagePlayCheckpointRequest | null => {
+  const indexedRequests = (graph?.checkpointRequests ?? [])
+    .map((request, index) => ({ request, index }))
+    .filter((entry) => isActiveStagePlayCheckpointRequest(entry.request));
+  if (!graph || indexedRequests.length === 0) return null;
+  indexedRequests.sort((left, right) => {
+    const priorityDelta =
+      stagePlayCheckpointRequestPriority(left.request, graph) -
+      stagePlayCheckpointRequestPriority(right.request, graph);
+    if (priorityDelta !== 0) return priorityDelta;
+    return right.index - left.index;
+  });
+  return indexedRequests[0]?.request ?? null;
+};
+
 type StagePlayLaneId =
   | "observer"
   | "compact_observation"
@@ -905,12 +945,7 @@ function StagePlayToolActivityStrip({
   const missingCount = graph.summary.missingEvidenceCount;
   const latestPerturbations = (graph.perturbations ?? []).slice(0, 5);
   const latestCheckpointPerturbation = latestPerturbations.find((event) => event.checkpointSuggested);
-  const activeCheckpointRequests = (graph.checkpointRequests ?? []).filter((request) =>
-    request.status === "queued" || request.status === "running"
-  );
-  const firstQueuedCheckpointRequest = activeCheckpointRequests.find((request) => request.status === "queued") ?? null;
-  const runningCheckpointRequest = activeCheckpointRequests.find((request) => request.status === "running") ?? null;
-  const visibleCheckpointRequest = runningCheckpointRequest ?? firstQueuedCheckpointRequest;
+  const visibleCheckpointRequest = selectStagePlayVisibleCheckpointRequest(graph);
   const summaryText = `Built Stage Play Badge Graph with ${graph.summary.badgeCount} badge(s), ${graph.summary.affordanceCount} affordance(s), and ${graph.summary.blockedAffordanceCount} blocked move(s).`;
   const skippedText = projectionStatus?.skippedLineKeys
     .map((key) => key === "recommendation" ? "recommendation requires model review" : key)
@@ -3791,7 +3826,7 @@ export default function StagePlayBadgeGraphPanel() {
   async function handleCheckpointQueueAction(action: StagePlayCheckpointQueueAction, requestId?: string | null) {
     const request = requestId
       ? graph?.checkpointRequests?.find((entry) => entry.checkpointRequestId === requestId) ?? null
-      : graph?.checkpointRequests?.find((entry) => entry.status === "queued" || entry.status === "running") ?? null;
+      : selectStagePlayVisibleCheckpointRequest(graph);
     const jobId = request?.jobId ?? graph?.checkpointRequests?.[0]?.jobId ?? null;
     if (!jobId) {
       setCheckpointQueueStatus({
