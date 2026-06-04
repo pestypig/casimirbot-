@@ -429,6 +429,98 @@ describe("final_answer_draft terminal selection", () => {
     });
   });
 
+  it("appends clickable scholarly citations from fetched full-text URLs", () => {
+    const turnId = "ask:test:scholarly-citation-footer";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full_text`;
+    const draftText = [
+      "The paper frames Hawking radiation as a tunneling process near the event horizon.",
+      "It uses the fetched PDF chunks as the evidence basis for the answer.",
+      "Support: artifact://scholarly-pdf/hawking/page/1#text",
+    ].join("\n");
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          papers: [{
+            result_id: "arxiv:hep-th/9907001",
+            title: "Hawking Radiation As Tunneling",
+            identifiers: {
+              arxiv_id: "hep-th/9907001",
+              pdf_url: "https://arxiv.org/pdf/hep-th/9907001.pdf",
+            },
+          }],
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        kind: "scholarly_full_text_observation",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          paper_result_id: "arxiv:hep-th/9907001",
+          title: "Hawking Radiation As Tunneling",
+          source_url: "https://arxiv.org/pdf/hep-th/9907001.pdf",
+          pages_parsed: 5,
+          selected_chunks: [{
+            chunk_ref: "artifact://scholarly-pdf/hawking/page/1#chunk/1",
+            source_text_ref: "artifact://scholarly-pdf/hawking/page/1#text",
+            text_excerpt: "Hawking radiation can be viewed as tunneling.",
+          }],
+          page_text_refs: ["artifact://scholarly-pdf/hawking/page/1#text"],
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_scholarly_research",
+          grounded_in_observation_refs: [lookupRef, fullTextRef],
+          support_refs: [lookupRef, fullTextRef, "artifact://scholarly-pdf/hawking/page/1#text"],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Do research: fetch the PDF/full text for a Hawking radiation paper and cite it.",
+      route_product_contract: scholarlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+    };
+    addScholarlyRuntimeProof(payload, lookupRef, fullTextRef);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(result.visible_text).toContain(draftText);
+    expect(result.visible_text).toContain("Citations");
+    expect(result.visible_text).toContain("- [Hawking Radiation As Tunneling](https://arxiv.org/pdf/hep-th/9907001.pdf) (PDF/full text; 5 parsed pages)");
+    expect(payload.scholarly_research_answer).toMatchObject({
+      schema: "helix.scholarly_research_answer.v1",
+      answer_text: result.visible_text,
+      citations: [
+        {
+          label: "Hawking Radiation As Tunneling",
+          url: "https://arxiv.org/pdf/hep-th/9907001.pdf",
+          note: "PDF/full text; 5 parsed pages",
+        },
+      ],
+    });
+  });
+
   it("fails closed when a scholarly draft contradicts observed PDF/full-text evidence", () => {
     const turnId = "ask:test:scholarly-contradictory-draft";
     const lookupRef = `${turnId}:lookup`;

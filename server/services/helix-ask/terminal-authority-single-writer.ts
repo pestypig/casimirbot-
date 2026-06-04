@@ -153,6 +153,162 @@ const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
     );
   });
 
+type ScholarlyCitation = {
+  label: string;
+  url: string;
+  note: string | null;
+};
+
+const isScholarlyResearchObservation = (artifact: ArtifactLike): boolean =>
+  /scholarly_research_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+
+const firstReadableString = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readString(value);
+    if (text) return text;
+  }
+  return null;
+};
+
+const firstHttpUrl = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const text = readString(value);
+    if (text && /^https?:\/\//i.test(text)) return text;
+  }
+  return null;
+};
+
+const doiUrl = (value: unknown): string | null => {
+  const doi = readString(value);
+  if (!doi) return null;
+  if (/^https?:\/\/(?:dx\.)?doi\.org\//i.test(doi)) return doi.replace(/^https?:\/\/dx\.doi\.org\//i, "https://doi.org/");
+  return `https://doi.org/${doi.replace(/^doi:\s*/i, "")}`;
+};
+
+const arxivUrl = (value: unknown): string | null => {
+  const arxivId = readString(value);
+  if (!arxivId) return null;
+  if (/^https?:\/\/(?:www\.)?arxiv\.org\//i.test(arxivId)) return arxivId;
+  return `https://arxiv.org/abs/${arxivId.replace(/^arxiv:\s*/i, "")}`;
+};
+
+const citationKey = (value: string | null): string | null =>
+  value ? value.trim().toLowerCase() : null;
+
+const paperCitationUrl = (paper: Record<string, unknown> | null): string | null => {
+  const identifiers = readRecord(paper?.identifiers);
+  return firstHttpUrl(
+    paper?.pdf_url,
+    paper?.full_text_url,
+    paper?.url,
+    identifiers?.pdf_url,
+    identifiers?.full_text_url,
+    identifiers?.url,
+    doiUrl(firstReadableString(paper?.doi, identifiers?.doi)),
+    arxivUrl(firstReadableString(paper?.arxiv_id, identifiers?.arxiv_id)),
+  );
+};
+
+const collectScholarlyPaperRecordsByKey = (artifacts: ArtifactLike[]): Map<string, Record<string, unknown>> => {
+  const papers = new Map<string, Record<string, unknown>>();
+  const add = (key: string | null, paper: Record<string, unknown>): void => {
+    if (key && !papers.has(key)) papers.set(key, paper);
+  };
+  for (const artifact of artifacts) {
+    if (!isScholarlyResearchObservation(artifact)) continue;
+    const payload = artifactPayload(artifact);
+    for (const paperValue of readArray(payload?.papers)) {
+      const paper = readRecord(paperValue);
+      if (!paper) continue;
+      const identifiers = readRecord(paper.identifiers);
+      add(citationKey(readString(paper.result_id)), paper);
+      add(citationKey(readString(identifiers?.openalex_id)), paper);
+      add(citationKey(readString(identifiers?.doi)), paper);
+      add(citationKey(readString(identifiers?.arxiv_id)), paper);
+      add(citationKey(readString(paper.title)), paper);
+    }
+  }
+  return papers;
+};
+
+const findPaperForFullTextObservation = (
+  payload: Record<string, unknown>,
+  papersByKey: Map<string, Record<string, unknown>>,
+): Record<string, unknown> | null => {
+  const keys = [
+    citationKey(readString(payload.paper_result_id)),
+    citationKey(readString(payload.result_id)),
+    citationKey(readString(payload.title)),
+  ].filter((entry): entry is string => Boolean(entry));
+  for (const key of keys) {
+    const paper = papersByKey.get(key);
+    if (paper) return paper;
+  }
+  return null;
+};
+
+const markdownLinkLabel = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]").replace(/\s+/g, " ").trim();
+
+const hasExistingCitationFooter = (text: string): boolean =>
+  /(?:^|\n)\s*(?:#{1,6}\s*)?(?:citations|references|sources)\s*:?\s*(?:\n|$)/i.test(text);
+
+const collectScholarlyCitations = (artifacts: ArtifactLike[]): ScholarlyCitation[] => {
+  const papersByKey = collectScholarlyPaperRecordsByKey(artifacts);
+  const citations: ScholarlyCitation[] = [];
+  const seen = new Set<string>();
+  const addCitation = (citation: ScholarlyCitation): void => {
+    const key = `${citation.url.toLowerCase()}|${citation.label.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    citations.push(citation);
+  };
+
+  for (const artifact of artifacts) {
+    if (!isScholarlyFullTextObservation(artifact)) continue;
+    const payload = artifactPayload(artifact);
+    if (!payload || payload.selected_for_answer === false) continue;
+    const selectedChunks = readArray(payload.selected_chunks);
+    const pageTextRefs = readArray(payload.page_text_refs);
+    const pagesParsed = typeof payload.pages_parsed === "number" ? payload.pages_parsed : 0;
+    if (selectedChunks.length === 0 && pageTextRefs.length === 0 && pagesParsed <= 0) continue;
+    const paper = findPaperForFullTextObservation(payload, papersByKey);
+    const url = firstHttpUrl(payload.source_url, paperCitationUrl(paper));
+    if (!url) continue;
+    const label = firstReadableString(payload.title, paper?.title, payload.paper_result_id, artifactId(artifact)) ?? "Scholarly source";
+    const note = pagesParsed > 0 ? `PDF/full text; ${pagesParsed} parsed page${pagesParsed === 1 ? "" : "s"}` : "PDF/full text";
+    addCitation({ label, url, note });
+  }
+
+  if (citations.length === 0) {
+    for (const paper of papersByKey.values()) {
+      if (paper.selected_for_answer === false) continue;
+      const url = paperCitationUrl(paper);
+      if (!url) continue;
+      const label = firstReadableString(paper.title, paper.result_id, url) ?? "Scholarly source";
+      addCitation({ label, url, note: null });
+      if (citations.length >= 4) break;
+    }
+  }
+
+  return citations.slice(0, 6);
+};
+
+const appendScholarlyCitationFooter = (
+  text: string,
+  artifacts: ArtifactLike[],
+): { text: string; citations: ScholarlyCitation[]; footer: string | null } => {
+  if (hasExistingCitationFooter(text)) return { text, citations: [], footer: null };
+  const citations = collectScholarlyCitations(artifacts);
+  if (citations.length === 0) return { text, citations, footer: null };
+  const footer = [
+    "Citations",
+    ...citations.map((citation) =>
+      `- [${markdownLinkLabel(citation.label)}](${citation.url})${citation.note ? ` (${citation.note})` : ""}`),
+  ].join("\n");
+  return { text: `${text.trimEnd()}\n\n${footer}`, citations, footer };
+};
+
 const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
   const kind = artifactKind(artifact);
   return (
@@ -520,9 +676,29 @@ export function applyHelixTerminalAuthoritySingleWriter(
     delete input.payload.terminal_error_code;
   } else if (!solverContinuationPending && draftMaterialization?.ok) {
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
-    const text = latestDraft?.text ?? readString(input.payload.selected_final_answer) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;
     selectedArtifactKind = draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer";
+    const materializedScholarlyAnswer =
+      selectedArtifactKind === "scholarly_research_answer"
+        ? readRecord(input.payload.scholarly_research_answer)
+        : null;
+    const baseText =
+      readString(materializedScholarlyAnswer?.answer_text) ??
+      readString(materializedScholarlyAnswer?.text) ??
+      latestDraft?.text ??
+      readString(input.payload.selected_final_answer) ??
+      "I could not produce a terminal answer for this turn.";
+    const citationFooter =
+      selectedArtifactKind === "scholarly_research_answer"
+        ? appendScholarlyCitationFooter(baseText, artifacts)
+        : { text: baseText, citations: [] as ScholarlyCitation[], footer: null };
+    const text = citationFooter.text;
+    if (materializedScholarlyAnswer) {
+      materializedScholarlyAnswer.text = text;
+      materializedScholarlyAnswer.answer_text = text;
+      materializedScholarlyAnswer.citations = citationFooter.citations;
+      materializedScholarlyAnswer.citation_footer = citationFooter.footer;
+    }
     selectedSource = "final_answer_draft";
     input.payload.terminal_artifact_kind = selectedArtifactKind;
     input.payload.final_answer_source = "final_answer_draft";
@@ -638,6 +814,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const visibleText = appliedEnvelope.terminal_text;
   const latestDraftForIntegrity = findLatestFinalAnswerDraftCandidate(artifacts);
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
+  const selectedMaterializedAnswerText =
+    readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
+    readString(readRecord(input.payload.repo_code_evidence_answer)?.answer_text);
+  const selectedArtifactTextForIntegrity = selectedMaterializedAnswerText ?? draftText;
   const receiptVisibleAsAnswer = artifacts.some((artifact) => {
     if (!isForbiddenReceiptOrProjection(artifact)) return false;
     const text = artifactText(artifact);
@@ -676,8 +856,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     },
     integrity: {
       single_writer_applied: true,
-      visible_matches_selected_artifact: !draftText || visibleText === draftText,
-      visible_matches_draft: !draftText || visibleText === draftText,
+      visible_matches_selected_artifact: !selectedArtifactTextForIntegrity || visibleText === selectedArtifactTextForIntegrity,
+      visible_matches_draft: !draftText || visibleText === draftText || Boolean(selectedMaterializedAnswerText?.startsWith(draftText)),
       stale_failure_visible: isStaleWorkspaceFailureText(visibleText),
       receipt_visible_as_answer: receiptVisibleAsAnswer,
       post_tool_model_step_satisfied: latestRequiredObservationSequence < 0 || Boolean(

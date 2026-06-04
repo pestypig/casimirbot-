@@ -13,6 +13,7 @@ import {
   __testHelixAgentStepRepairHints,
   __testHelixGoalSatisfaction,
   __testHelixRuntimeToolCallValidation,
+  __testHelixScholarlyTerminalAuthorityRefresh,
   __testHelixScholarlyFinalFallback,
 } from "../routes/agi.plan";
 import {
@@ -817,5 +818,204 @@ describe("Helix scholarly research tool admission", () => {
       source_text_ref: expect.stringContaining("#text"),
     });
     expect(observation.selected_chunks[0].text_excerpt.length).toBeLessThanOrEqual(1400);
+  });
+
+  it("refreshes stale fail-closed debug after scholarly terminal materialization", () => {
+    const turnId = "ask:scholarly-terminal-refresh";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full_text`;
+    const terminalText = [
+      "Hawking radiation is commonly framed as quantum field emission associated with black-hole horizons.",
+      "The fetched full-text evidence supports the answer from the selected PDF chunks.",
+      "",
+      "Citations",
+      "- [Hawking Radiation As Tunneling](https://arxiv.org/pdf/hep-th/9907001.pdf) (PDF/full text; 5 parsed pages)",
+    ].join("\n");
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        turn_id: turnId,
+        kind: "scholarly_research_observation",
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          papers: [{
+            result_id: "arxiv:hep-th/9907001",
+            title: "Hawking Radiation As Tunneling",
+            identifiers: { arxiv_id: "hep-th/9907001", pdf_url: "https://arxiv.org/pdf/hep-th/9907001.pdf" },
+          }],
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        turn_id: turnId,
+        kind: "scholarly_full_text_observation",
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          paper_result_id: "arxiv:hep-th/9907001",
+          title: "Hawking Radiation As Tunneling",
+          source_url: "https://arxiv.org/pdf/hep-th/9907001.pdf",
+          pages_parsed: 5,
+          selected_chunks: [{
+            chunk_ref: "artifact://scholarly-pdf/hawking/page/1#chunk/1",
+            source_text_ref: "artifact://scholarly-pdf/hawking/page/1#text",
+            text_excerpt: "Hawking radiation can be described as tunneling across the horizon.",
+          }],
+          page_text_refs: ["artifact://scholarly-pdf/hawking/page/1#text"],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use scholarly research papers about Hawking radiation and cite the references.",
+      canonical_goal_frame: {
+        ...canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+        turn_id: turnId,
+      },
+      current_turn_artifact_ledger: artifacts,
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        turn_id: turnId,
+        thread_id: "thread:test",
+        target_source: "scholarly_research",
+        target_kind: "scholarly_research_lookup",
+        strength: "hard",
+        requested_outputs: ["scholarly_research_answer"],
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "scholarly_research_answer",
+        visible_text: terminalText,
+        source: "final_answer_draft",
+      },
+      scholarly_research_answer: {
+        schema: "helix.scholarly_research_answer.v1",
+        artifact_id: `${turnId}:scholarly_research_answer`,
+        answer_text: terminalText,
+        text: terminalText,
+        support_refs: [lookupRef, fullTextRef],
+      },
+      terminal_artifact_id: `${turnId}:scholarly_research_answer`,
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer: terminalText,
+      answer: terminalText,
+      text: terminalText,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      route_authority_audit: {
+        schema: "helix.route_authority_audit.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+        route_authority_ok: false,
+        route_authority_violation_code: "terminal_product_authority_mismatch",
+      },
+      solver_controller_decision: {
+        schema: "helix.solver_controller_decision.v1",
+        decision: "fail_closed",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+        blocking_reasons: ["route_authority_failed"],
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: `${turnId}:agent-step:1`,
+            next_step: "next_action",
+            chosen_capability: "scholarly-research.lookup_papers",
+            decision_authority: "llm",
+            observed_artifact_refs: [lookupRef],
+          },
+          {
+            iteration: 2,
+            decision_id: `${turnId}:agent-step:2`,
+            next_step: "next_action",
+            chosen_capability: "scholarly-research.fetch_full_text",
+            decision_authority: "llm",
+            observed_artifact_refs: [fullTextRef],
+          },
+          {
+            iteration: 3,
+            decision_id: `${turnId}:agent-step:3`,
+            next_step: "answer",
+            chosen_capability: "model.synthesize_from_scholarly_research",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+          },
+        ],
+      },
+      agent_step_decision: {
+        decision_id: `${turnId}:agent-step:3`,
+        next_step: "answer",
+        chosen_capability: "model.synthesize_from_scholarly_research",
+        decision_authority: "llm",
+        decision_timing: "post_observation",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        canonical_goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+        terminal_contract: {
+          goal_kind: "scholarly_research_lookup",
+          required_terminal_kinds: ["scholarly_research_answer"],
+          acceptable_fallbacks: [],
+          forbidden_terminal_kinds: ["direct_answer_text", "model_synthesized_answer"],
+        },
+        required_actions: [],
+        required_evidence: [],
+        observed_results: [],
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      debug: {
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "typed_failure",
+        solver_controller_decision: {
+          decision: "fail_closed",
+          blocking_reasons: ["route_authority_failed"],
+        },
+      },
+    };
+
+    const refreshed = __testHelixScholarlyTerminalAuthorityRefresh.refreshScholarlyTerminalAuthorityAfterMaterialization({
+      payload,
+      threadId: "thread:test",
+      turnId,
+      route: "scholarly_research_lookup",
+      prompt: "Use scholarly research papers about Hawking radiation and cite the references.",
+    });
+
+    expect(refreshed).toBe(true);
+    expect(payload.route_authority_audit).toMatchObject({
+      terminal_artifact_kind: "scholarly_research_answer",
+      route_authority_ok: true,
+    });
+    expect(payload.terminal_consistency_check).toMatchObject({
+      selected_terminal_kind: "scholarly_research_answer",
+      consistent: true,
+    });
+    expect(payload.solver_controller_decision).toMatchObject({
+      decision: "allow_terminal",
+      selected_terminal_artifact_kind: "scholarly_research_answer",
+      blocking_reasons: [],
+    });
+    expect(payload.terminal_equivalence_harness_result).toMatchObject({ ok: true });
+    expect(payload.debug).toMatchObject({
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "final_answer_draft",
+      solver_controller_decision: expect.objectContaining({
+        decision: "allow_terminal",
+        selected_terminal_artifact_kind: "scholarly_research_answer",
+      }),
+    });
   });
 });
