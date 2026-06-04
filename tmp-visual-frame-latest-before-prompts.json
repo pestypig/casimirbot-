@@ -1,0 +1,128 @@
+﻿{
+    "ok":  true,
+    "schema":  "helix.visual_frame_latest_response.v1",
+    "thread_id":  "helix-ask:desktop",
+    "source":  {
+                   "schema":  "helix.visual_snapshot_source.v1",
+                   "source_id":  "visual_source:446a7e936bd1a713",
+                   "thread_id":  "helix-ask:desktop",
+                   "room_id":  null,
+                   "session_id":  null,
+                   "profile_id":  null,
+                   "source_family":  "visual_snapshot",
+                   "capture_mode":  "manual",
+                   "source_surface":  "minecraft_client_window",
+                   "status":  "active",
+                   "cadence_ms":  null,
+                   "raw_image_storage_policy":  "ephemeral",
+                   "context_policy":  "compact_context_pack_only",
+                   "raw_image_included":  false,
+                   "assistant_answer":  false,
+                   "created_at":  "2026-06-04T01:40:34.995Z",
+                   "updated_at":  "2026-06-04T01:40:43.832Z"
+               },
+    "active_source":  {
+                          "schema":  "helix.visual_snapshot_source.v1",
+                          "source_id":  "visual_source:446a7e936bd1a713",
+                          "thread_id":  "helix-ask:desktop",
+                          "room_id":  null,
+                          "session_id":  null,
+                          "profile_id":  null,
+                          "source_family":  "visual_snapshot",
+                          "capture_mode":  "manual",
+                          "source_surface":  "minecraft_client_window",
+                          "status":  "active",
+                          "cadence_ms":  null,
+                          "raw_image_storage_policy":  "ephemeral",
+                          "context_policy":  "compact_context_pack_only",
+                          "raw_image_included":  false,
+                          "assistant_answer":  false,
+                          "created_at":  "2026-06-04T01:40:34.995Z",
+                          "updated_at":  "2026-06-04T01:40:43.832Z"
+                      },
+    "frame":  {
+                  "schema":  "helix.visual_frame_record.v1",
+                  "frame_id":  "visual_frame:b9776a0d91c2eb33",
+                  "source_id":  "visual_source:446a7e936bd1a713",
+                  "thread_id":  "helix-ask:desktop",
+                  "room_id":  null,
+                  "ts":  "2026-06-04T01:40:40.084Z",
+                  "player_position":  null,
+                  "related_event_refs":  [
+
+                                         ],
+                  "image_ref":  "ephemeral://helix-ask-upload/919ab01774ea19d3",
+                  "image_sha256":  "919ab01774ea19d3f28a3dc99d4594740518d7737fd569df02ea7dcda7b713d0",
+                  "mime_type":  "image/jpeg",
+                  "raw_image_storage_policy":  "ephemeral",
+                  "raw_image_included":  false,
+                  "assistant_answer":  false,
+                  "context_policy":  "compact_context_pack_only"
+              },
+    "evidence":  {
+                     "schema":  "helix.visual_frame_evidence.v1",
+                     "frame_id":  "visual_frame:b9776a0d91c2eb33",
+                     "evidence_id":  "visual_evidence:83eac9c18124f235",
+                     "source_id":  "visual_source:446a7e936bd1a713",
+                     "thread_id":  "helix-ask:desktop",
+                     "ts":  "2026-06-04T01:40:43.832Z",
+                     "player_position":  null,
+                     "related_event_refs":  [
+
+                                            ],
+                     "image_model":  "gpt-4o-mini",
+                     "model_invoked":  true,
+                     "summary":  "The scene depicts a cozy, animated environment reminiscent of a crafting game, likely Minecraft. A character with orange hair and a green shirt is engaged in reading a book at a crafting station, with a blue enchantment table nearby. There is a cat at their feet, contributing to the homey atmosphere. The background features a night sky with a bright moon, illuminating distant mountains and waterfalls, indicating a tranquil nighttime setting. Various blocks and interactive items are present, suggesting player activities involving crafting and exploration. Uncertainty lies in interpreting the character\u0027s specific actions and intentions, as well as the broader context of the gameplay.",
+                     "detected_objects":  [
+
+                                          ],
+                     "detected_scene_relations":  [
+
+                                                  ],
+                     "uncertainty":  [
+
+                                     ],
+                     "supports_claims":  [
+
+                                         ],
+                     "raw_image_included":  false,
+                     "assistant_answer":  false,
+                     "context_policy":  "compact_context_pack_only"
+                 },
+    "alignment":  {
+                      "schema":  "helix.visual_event_alignment.v1",
+                      "alignment_id":  "visual_alignment:518ec16e7e548d17",
+                      "thread_id":  "helix-ask:desktop",
+                      "frame_ids":  [
+                                        "visual_frame:b9776a0d91c2eb33"
+                                    ],
+                      "event_refs":  [
+
+                                     ],
+                      "place_id":  null,
+                      "summary":  "Visual frame and event window were aligned as compact evidence.",
+                      "confidence":  0.5,
+                      "missing_evidence":  [
+
+                                           ],
+                      "assistant_answer":  false,
+                      "raw_image_included":  false,
+                      "context_policy":  "compact_context_pack_only"
+                  },
+    "visual_evidence_health":  {
+                                   "schema":  "helix.visual_evidence_health.v1",
+                                   "source_id":  "visual_source:446a7e936bd1a713",
+                                   "thread_id":  "helix-ask:desktop",
+                                   "status":  "analysis_ready",
+                                   "latest_frame_id":  "visual_frame:b9776a0d91c2eb33",
+                                   "latest_evidence_id":  "visual_evidence:83eac9c18124f235",
+                                   "latest_summary":  "The scene depicts a cozy, animated environment reminiscent of a crafting game, likely Minecraft. A character with orange hair and a green shirt is engaged in reading a book at a crafting station, with a blue enchantment table nearby. There is a cat at their feet, contributing to the homey atmosphere. The background features a night sky with a bright moon, illuminating distant mountains and waterfalls, indicating a tranquil nighttime setting. Various blocks and interactive items are present, suggesting player activities involving crafting and exploration. Uncertainty lies in interpreting the character\u0027s specific actions and intentions, as well as the broader context of the gameplay.",
+                                   "provider_status":  "configured",
+                                   "next_required_action":  null,
+                                   "assistant_answer":  false,
+                                   "raw_image_included":  false
+                               },
+    "assistant_answer":  false,
+    "raw_image_included":  false,
+    "context_policy":  "compact_context_pack_only"
+}
