@@ -1,0 +1,43 @@
+﻿{
+    "traceId":  "codex-helix-ask-api-83e40c4e-f12d-46cf-a991-8efc2b6ccafc",
+    "runId":  "745",
+    "verdict":  "PASS",
+    "pass":  true,
+    "firstFail":  null,
+    "failReason":  "NONE",
+    "deltas":  [
+
+               ],
+    "certificate":  {
+                        "certificateHash":  "e58abff1a2ca7061cce7459eacbfd5cdc5466c56c84d17642108f2efdbb7c03f",
+                        "certificateId":  "constraint-pack:repo-convergence:e58abff1a2ca",
+                        "integrityOk":  true,
+                        "status":  "GREEN"
+                    },
+    "artifacts":  [
+                      {
+                          "kind":  "constraint-pack",
+                          "ref":  "repo-convergence"
+                      },
+                      {
+                          "kind":  "training-trace-id",
+                          "ref":  "745"
+                      },
+                      {
+                          "kind":  "training-trace-url",
+                          "ref":  "/api/agi/training-trace/745"
+                      },
+                      {
+                          "kind":  "training-trace-export",
+                          "ref":  "/api/agi/training-trace/export"
+                      },
+                      {
+                          "kind":  "constraint-pack-certificate-hash",
+                          "ref":  "e58abff1a2ca7061cce7459eacbfd5cdc5466c56c84d17642108f2efdbb7c03f"
+                      },
+                      {
+                          "kind":  "constraint-pack-certificate-id",
+                          "ref":  "constraint-pack:repo-convergence:e58abff1a2ca"
+                      }
+                  ]
+}
