@@ -1097,7 +1097,7 @@ function buildObserverMailLoopNodes(input: {
     : latestDecision?.textAnswerDraft?.text
       ? `text answer: ${latestDecision.textAnswerDraft.text}`
       : latestDecision?.decision === "wait_for_next_summary"
-        ? "no output yet; armed for next summary"
+        ? "no output yet; armed for next source update"
         : latestDecision?.requestedTool?.toolName
           ? `requested tool: ${latestDecision.requestedTool.toolName}`
           : "no output yet";

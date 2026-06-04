@@ -178,7 +178,7 @@ export function buildMailLoopTranscriptRows(input: {
       title: "Tool receipt",
       body: input.readResult.items.length > 0
         ? `${input.readResult.items.length} unread live-source mail item(s).`
-        : "No unread visual summaries yet. Waiting for the next summary.",
+        : "No unread live-source updates. Standing by for the next source update.",
       source: {
         toolName: "live_env.check_live_source_mail",
         artifactId: input.readResult.readId,
@@ -266,7 +266,7 @@ export function buildMailLoopTranscriptRows(input: {
       rowKind: "loop_state",
       title: "Loop state",
       body: input.decision.nextLoopState === "armed_for_next_summary"
-        ? "Armed for next visual summary."
+        ? "Armed for the next live-source update."
         : input.decision.nextLoopState,
       source: {
         artifactId: input.decision.decisionId,

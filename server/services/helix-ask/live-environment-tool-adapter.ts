@@ -986,7 +986,7 @@ export function executeLiveEnvironmentTool(
       ok: true,
       summary: readResult.items.length > 0
         ? `Read ${readResult.items.length} unread live-source mail item(s); decision required.`
-        : "No unread live-source mail yet; loop is armed for the next summary.",
+        : "No unread live-source updates yet; loop is armed for the next source update.",
       observation: {
         ...readResult,
         transcriptRows,
@@ -1066,7 +1066,7 @@ export function executeLiveEnvironmentTool(
       summary: mailIds.length > 0
         ? `Recorded live-source mail decision ${recordedDecision.decision}; loop state ${recordedDecision.nextLoopState}.`
         : waitDecisionWithoutMail
-        ? "Recorded wait_for_next_summary; no unread visual summaries yet. Waiting for the next summary."
+        ? "Recorded wait_for_next_summary; no unread live-source updates. Standing by for the next source update."
         : "Live-source mail decision could not link to mail ids.",
       observation: {
         ...recordedDecision,

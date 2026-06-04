@@ -8274,14 +8274,14 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
   if (row.rowKind === "mail_read_receipt") {
     const count = row.body.match(/\b(\d+)\s+unread\b/i)?.[1] ?? "1";
-    return `${count} unread visual summary${count === "1" ? "" : " summaries"}.`;
+    return `${count} unread live-source update${count === "1" ? "" : "s"}.`;
   }
   if (row.rowKind === "agent_decision") {
     const match = row.body.match(/^([^:]+):\s*([\s\S]+)$/);
     if (match) return `${match[1].trim()}\nReason: ${match[2].trim()}`;
     return row.body;
   }
-  if (row.rowKind === "wait_for_next_summary") return "No unread visual summary mail yet.\nWaiting for the next summary.";
+  if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
   if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
   return row.body;
 }

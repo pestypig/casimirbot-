@@ -140,7 +140,7 @@ describe("live-source mail live environment tools", () => {
     ]));
   });
 
-  it("records a wait decision when no unread visual summaries exist", () => {
+  it("records a wait decision when no unread live-source updates exist", () => {
     const readObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.read_live_source_mail",
       thread_id: threadId,
@@ -159,7 +159,7 @@ describe("live-source mail live environment tools", () => {
     const readPayload = readObservation.observation as any;
     expect(readPayload.items).toEqual([]);
     expect(readPayload.transcriptRows.find((row: any) => row.rowKind === "wait_for_next_summary")?.body)
-      .toBe("No unread visual summaries yet. Waiting for the next summary.");
+      .toBe("No unread live-source updates. Standing by for the next source update.");
 
     const decisionObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.record_live_source_mail_decision",
@@ -168,7 +168,7 @@ describe("live-source mail live environment tools", () => {
         room_id: roomId,
         mail_ids: [],
         decision: "wait_for_next_summary",
-        rationale_preview: "No unread visual summaries yet. Waiting for the next summary.",
+        rationale_preview: "No unread live-source updates. Standing by for the next source update.",
         next_loop_state: "armed_for_next_summary",
       },
     });
@@ -176,7 +176,7 @@ describe("live-source mail live environment tools", () => {
     expect(decisionObservation).toMatchObject({
       tool_name: "live_env.record_live_source_mail_decision",
       ok: true,
-      summary: "Recorded wait_for_next_summary; no unread visual summaries yet. Waiting for the next summary.",
+      summary: "Recorded wait_for_next_summary; no unread live-source updates. Standing by for the next source update.",
       assistant_answer: false,
       context_role: "tool_evidence",
     });

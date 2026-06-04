@@ -177,7 +177,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("visual evidence is unavailable");
     expect(response.body?.answer, routeDebug).not.toContain("visual capture evidence is unavailable");
     expect(response.body?.answer, routeDebug).toContain("wait_for_next_summary");
-    expect(response.body?.answer, routeDebug).toContain("waiting for the next visual summary");
+    expect(response.body?.answer, routeDebug).toContain("standing by for the next source update");
     expect(response.body?.answer, routeDebug).not.toContain("one unread live-source mail item requiring a decision");
   }, 30_000);
 
