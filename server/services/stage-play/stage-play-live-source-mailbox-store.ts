@@ -1,0 +1,457 @@
+import crypto from "node:crypto";
+import {
+  STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA,
+  STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA,
+  STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA,
+  type StagePlayLiveSourceJobStateV1,
+  type StagePlayLiveSourceMailDecisionV1,
+  type StagePlayLiveSourceMailItemV1,
+  type StagePlayLiveSourceMailSourceKindV1,
+  type StagePlayLiveSourceMailStatusV1,
+  type StagePlayMailDecisionV1,
+  type StagePlayNextLoopStateV1,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
+
+const mailById = new Map<string, StagePlayLiveSourceMailItemV1>();
+const decisionsById = new Map<string, StagePlayLiveSourceMailDecisionV1>();
+const jobStateById = new Map<string, StagePlayLiveSourceJobStateV1>();
+const MAX_MAIL_PER_THREAD = 250;
+
+const hashShort = (value: unknown, size = 18): string =>
+  crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const previewText = (text: string, limit = 220): string => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
+};
+
+const defaultJobId = (input: { threadId: string; roomId?: string | null; environmentId?: string | null; sourceId?: string | null }): string =>
+  `stage_play_live_source_job:${hashShort([
+    input.threadId,
+    input.roomId ?? null,
+    input.environmentId ?? null,
+    input.sourceId ?? "all_sources",
+  ])}`;
+
+const defaultNextLoopStateForDecision = (decision: StagePlayMailDecisionV1): StagePlayNextLoopStateV1 => {
+  if (decision === "fail_closed") return "blocked_tool_error";
+  return "armed_for_next_summary";
+};
+
+const listThreadMail = (threadId: string): StagePlayLiveSourceMailItemV1[] =>
+  Array.from(mailById.values())
+    .filter((item) => item.threadId === threadId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+const trimThreadMail = (threadId: string): void => {
+  const entries = listThreadMail(threadId);
+  if (entries.length <= MAX_MAIL_PER_THREAD) return;
+  for (const entry of entries.slice(0, entries.length - MAX_MAIL_PER_THREAD)) {
+    mailById.delete(entry.mailId);
+  }
+};
+
+const latestMailBefore = (input: {
+  threadId: string;
+  sourceId?: string | null;
+  createdAt?: string | null;
+}): StagePlayLiveSourceMailItemV1 | null => {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  return listThreadMail(input.threadId)
+    .filter((item) =>
+      item.createdAt < createdAt &&
+      (!input.sourceId || item.sourceId === input.sourceId)
+    )
+    .at(-1) ?? null;
+};
+
+const hasMailForEvidence = (evidenceRef: string): StagePlayLiveSourceMailItemV1 | null =>
+  Array.from(mailById.values()).find((item) => item.sourceRefs.evidenceRef === evidenceRef || item.evidenceRefs.includes(evidenceRef)) ?? null;
+
+export function enqueueStagePlayLiveSourceMailItem(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId: string;
+  sourceKind: StagePlayLiveSourceMailSourceKindV1;
+  frameRef?: string | null;
+  evidenceRef?: string | null;
+  observationRef?: string | null;
+  summaryText: string;
+  summaryPreview?: string | null;
+  confidence?: number | null;
+  analysisState?: StagePlayLiveSourceMailItemV1["summary"]["analysisState"];
+  objectiveText?: string | null;
+  objectiveId?: string | null;
+  deterministicChangeHint?: StagePlayLiveSourceMailItemV1["hints"]["deterministicChangeHint"];
+  sourceFreshness?: StagePlayLiveSourceMailItemV1["hints"]["sourceFreshness"];
+  evidenceRefs?: string[];
+  createdAt?: string;
+}): StagePlayLiveSourceMailItemV1 {
+  const evidenceRefs = uniqueStrings([
+    input.sourceId,
+    input.frameRef,
+    input.evidenceRef,
+    input.observationRef,
+    ...(input.evidenceRefs ?? []),
+  ]);
+  if (input.evidenceRef) {
+    const existing = hasMailForEvidence(input.evidenceRef);
+    if (existing) return existing;
+  }
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const previous = latestMailBefore({ threadId: input.threadId, sourceId: input.sourceId, createdAt });
+  const previousCreatedMs = previous ? Date.parse(previous.createdAt) : Number.NaN;
+  const createdMs = Date.parse(createdAt);
+  const elapsedMsSincePrevious =
+    Number.isFinite(previousCreatedMs) && Number.isFinite(createdMs)
+      ? Math.max(0, createdMs - previousCreatedMs)
+      : null;
+  const preview = previewText(input.summaryPreview ?? input.summaryText);
+  const mail: StagePlayLiveSourceMailItemV1 = {
+    artifactId: "stage_play_live_source_mail_item",
+    schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA,
+    mailId: `stage_play_live_source_mail:${hashShort([
+      input.threadId,
+      input.sourceId,
+      input.frameRef ?? null,
+      input.evidenceRef ?? null,
+      input.summaryText,
+      createdAt,
+    ])}`,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId,
+    sourceKind: input.sourceKind,
+    sourceRefs: {
+      sourceId: input.sourceId,
+      frameRef: input.frameRef ?? null,
+      evidenceRef: input.evidenceRef ?? null,
+      observationRef: input.observationRef ?? null,
+    },
+    summary: {
+      text: input.summaryText,
+      preview,
+      confidence: input.confidence ?? null,
+      analysisState: input.analysisState ?? "analysis_ready",
+    },
+    priorContext: {
+      previousMailId: previous?.mailId ?? null,
+      previousEvidenceRef: previous?.sourceRefs.evidenceRef ?? null,
+      previousSummaryPreview: previous?.summary.preview ?? null,
+    },
+    objective: input.objectiveText || input.objectiveId
+      ? {
+          objectiveId: input.objectiveId ?? null,
+          text: input.objectiveText ?? null,
+        }
+      : undefined,
+    hints: {
+      deterministicChangeHint: input.deterministicChangeHint ?? (previous ? "summary_changed" : "first_summary"),
+      elapsedMsSincePrevious,
+      sourceFreshness: input.sourceFreshness ?? "fresh",
+    },
+    status: "unread",
+    evidenceRefs,
+    createdAt,
+    updatedAt: createdAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+  mailById.set(mail.mailId, mail);
+  trimThreadMail(input.threadId);
+  upsertStagePlayLiveSourceJobState({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceIds: [input.sourceId],
+    lastMailId: mail.mailId,
+    nextLoopState: "armed_for_next_summary",
+    status: "armed",
+    updatedAt: createdAt,
+  });
+  return mail;
+}
+
+export function getStagePlayLiveSourceMailItem(mailId: string): StagePlayLiveSourceMailItemV1 | null {
+  return mailById.get(mailId) ?? null;
+}
+
+export function listStagePlayLiveSourceMailItems(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  status?: StagePlayLiveSourceMailStatusV1 | null;
+  limit?: number;
+} = {}): StagePlayLiveSourceMailItemV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 50, 250));
+  return Array.from(mailById.values())
+    .filter((item) => {
+      if (input.threadId && item.threadId !== input.threadId) return false;
+      if (input.roomId && item.roomId !== input.roomId) return false;
+      if (input.environmentId && item.environmentId !== input.environmentId) return false;
+      if (input.sourceId && item.sourceId !== input.sourceId) return false;
+      if (input.status && item.status !== input.status) return false;
+      return true;
+    })
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .slice(-limit);
+}
+
+export function listUnreadStagePlayLiveSourceMailItems(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  includeDelivered?: boolean;
+  limit?: number;
+}): StagePlayLiveSourceMailItemV1[] {
+  const statuses: StagePlayLiveSourceMailStatusV1[] = input.includeDelivered
+    ? ["unread", "delivered_to_ask"]
+    : ["unread"];
+  return listStagePlayLiveSourceMailItems({
+    ...input,
+    limit: input.limit ?? 10,
+  }).filter((item) => statuses.includes(item.status));
+}
+
+const updateMailStatus = (
+  mailId: string,
+  status: StagePlayLiveSourceMailStatusV1,
+  now = new Date().toISOString(),
+): StagePlayLiveSourceMailItemV1 | null => {
+  const item = mailById.get(mailId);
+  if (!item) return null;
+  const updated: StagePlayLiveSourceMailItemV1 = {
+    ...item,
+    status,
+    updatedAt: now,
+  };
+  mailById.set(mailId, updated);
+  return updated;
+};
+
+export const markStagePlayMailDeliveredToAsk = (mailIds: string[], now?: string): StagePlayLiveSourceMailItemV1[] =>
+  mailIds.map((mailId) => updateMailStatus(mailId, "delivered_to_ask", now)).filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item));
+
+export const markStagePlayMailRead = (mailIds: string[], now?: string): StagePlayLiveSourceMailItemV1[] =>
+  mailIds.map((mailId) => updateMailStatus(mailId, "read", now)).filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item));
+
+export const markStagePlayMailDecisionRecorded = (mailIds: string[], now?: string): StagePlayLiveSourceMailItemV1[] =>
+  mailIds.map((mailId) => updateMailStatus(mailId, "decision_recorded", now)).filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item));
+
+export function recordStagePlayMailDecision(input: {
+  mailIds: string[];
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  decision: StagePlayMailDecisionV1;
+  rationalePreview: string;
+  textAnswerDraft?: string | null;
+  textAnswerTerminalEligible?: boolean | null;
+  voiceCalloutDraft?: string | null;
+  voiceEligible?: boolean | null;
+  voiceRequiresConfirmation?: boolean | null;
+  requestedTool?: StagePlayLiveSourceMailDecisionV1["requestedTool"];
+  nextLoopState?: StagePlayNextLoopStateV1 | null;
+  nextExpectedSourceKind?: StagePlayLiveSourceMailDecisionV1["nextExpectedSourceKind"];
+  nextExpectedAfterMs?: number | null;
+  activeJobId?: string | null;
+  rearmReason?: string | null;
+  evidenceRefs?: string[];
+  modelReviewed?: boolean;
+  createdAt?: string;
+}): StagePlayLiveSourceMailDecisionV1 {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const mailItems = input.mailIds.map((mailId) => mailById.get(mailId)).filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item));
+  const evidenceRefs = uniqueStrings([
+    ...input.mailIds,
+    ...mailItems.flatMap((item) => item.evidenceRefs),
+    ...(input.evidenceRefs ?? []),
+  ]);
+  const nextLoopState = input.nextLoopState ?? defaultNextLoopStateForDecision(input.decision);
+  const jobId = input.activeJobId ?? defaultJobId({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: mailItems[0]?.sourceId ?? null,
+  });
+  const decision: StagePlayLiveSourceMailDecisionV1 = {
+    artifactId: "stage_play_live_source_mail_decision",
+    schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA,
+    decisionId: `stage_play_live_source_mail_decision:${hashShort([
+      input.threadId,
+      input.mailIds,
+      input.decision,
+      input.rationalePreview,
+      createdAt,
+    ])}`,
+    mailIds: uniqueStrings(input.mailIds),
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    decision: input.decision,
+    rationalePreview: previewText(input.rationalePreview || input.decision, 260),
+    textAnswerDraft: input.textAnswerDraft
+      ? {
+          text: input.textAnswerDraft,
+          terminalEligible: input.textAnswerTerminalEligible === true,
+        }
+      : null,
+    voiceCalloutDraft: input.voiceCalloutDraft
+      ? {
+          text: input.voiceCalloutDraft,
+          voiceEligible: input.voiceEligible === true,
+          requiresConfirmation: input.voiceRequiresConfirmation === true,
+        }
+      : null,
+    requestedTool: input.requestedTool ?? null,
+    nextLoopState,
+    nextExpectedSourceKind: input.nextExpectedSourceKind ?? mailItems[0]?.sourceKind ?? "visual_frame",
+    nextExpectedAfterMs: input.nextExpectedAfterMs ?? null,
+    mailboxCursor: mailItems.at(-1)?.mailId ?? input.mailIds.at(-1) ?? null,
+    activeJobId: jobId,
+    rearmReason: input.rearmReason ?? (nextLoopState === "armed_for_next_summary" ? "decision_recorded_rearm" : null),
+    evidenceRefs,
+    modelReviewed: input.modelReviewed !== false,
+    createdAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+  decisionsById.set(decision.decisionId, decision);
+  markStagePlayMailDecisionRecorded(decision.mailIds, createdAt);
+  upsertStagePlayLiveSourceJobState({
+    jobId,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceIds: uniqueStrings(mailItems.map((item) => item.sourceId)),
+    status: nextLoopState === "ended"
+      ? "ended"
+      : nextLoopState === "paused_by_user"
+        ? "paused"
+        : /^blocked/.test(nextLoopState)
+          ? "blocked"
+          : "armed",
+    mailboxCursor: decision.mailboxCursor,
+    lastMailId: decision.mailboxCursor,
+    lastDecisionId: decision.decisionId,
+    nextLoopState,
+    nextWakePolicy: {
+      sourceKind: decision.nextExpectedSourceKind,
+      afterMs: decision.nextExpectedAfterMs ?? null,
+      maxConsecutiveReads: 3,
+    },
+    updatedAt: createdAt,
+  });
+  return decision;
+}
+
+export function listStagePlayMailDecisions(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  mailId?: string | null;
+  limit?: number;
+} = {}): StagePlayLiveSourceMailDecisionV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  return Array.from(decisionsById.values())
+    .filter((decision) => {
+      if (input.threadId && decision.threadId !== input.threadId) return false;
+      if (input.roomId && decision.roomId !== input.roomId) return false;
+      if (input.environmentId && decision.environmentId !== input.environmentId) return false;
+      if (input.mailId && !decision.mailIds.includes(input.mailId)) return false;
+      return true;
+    })
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .slice(-limit);
+}
+
+export function getStagePlayMailDecision(decisionId: string): StagePlayLiveSourceMailDecisionV1 | null {
+  return decisionsById.get(decisionId) ?? null;
+}
+
+export function upsertStagePlayLiveSourceJobState(input: {
+  jobId?: string | null;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds?: string[];
+  objective?: string | null;
+  status?: StagePlayLiveSourceJobStateV1["status"];
+  mailboxCursor?: string | null;
+  lastMailId?: string | null;
+  lastDecisionId?: string | null;
+  nextLoopState?: StagePlayNextLoopStateV1;
+  nextWakePolicy?: Partial<StagePlayLiveSourceJobStateV1["nextWakePolicy"]>;
+  updatedAt?: string;
+}): StagePlayLiveSourceJobStateV1 {
+  const jobId = input.jobId ?? defaultJobId({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceIds?.[0] ?? null,
+  });
+  const existing = jobStateById.get(jobId);
+  const updatedAt = input.updatedAt ?? new Date().toISOString();
+  const state: StagePlayLiveSourceJobStateV1 = {
+    artifactId: "stage_play_live_source_job_state",
+    schemaVersion: STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA,
+    jobId,
+    threadId: input.threadId,
+    roomId: input.roomId ?? existing?.roomId ?? null,
+    environmentId: input.environmentId ?? existing?.environmentId ?? null,
+    sourceIds: uniqueStrings([...(existing?.sourceIds ?? []), ...(input.sourceIds ?? [])]),
+    objective: input.objective ?? existing?.objective ?? null,
+    status: input.status ?? existing?.status ?? "armed",
+    mailboxCursor: input.mailboxCursor ?? existing?.mailboxCursor ?? null,
+    lastMailId: input.lastMailId ?? existing?.lastMailId ?? null,
+    lastDecisionId: input.lastDecisionId ?? existing?.lastDecisionId ?? null,
+    nextLoopState: input.nextLoopState ?? existing?.nextLoopState ?? "armed_for_next_summary",
+    nextWakePolicy: {
+      sourceKind: input.nextWakePolicy?.sourceKind ?? existing?.nextWakePolicy.sourceKind ?? "visual_frame",
+      afterMs: input.nextWakePolicy?.afterMs ?? existing?.nextWakePolicy.afterMs ?? null,
+      maxConsecutiveReads: input.nextWakePolicy?.maxConsecutiveReads ?? existing?.nextWakePolicy.maxConsecutiveReads ?? 3,
+    },
+    updatedAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+  jobStateById.set(jobId, state);
+  return state;
+}
+
+export function listStagePlayLiveSourceJobStates(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  limit?: number;
+} = {}): StagePlayLiveSourceJobStateV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  return Array.from(jobStateById.values())
+    .filter((state) => {
+      if (input.threadId && state.threadId !== input.threadId) return false;
+      if (input.roomId && state.roomId !== input.roomId) return false;
+      if (input.environmentId && state.environmentId !== input.environmentId) return false;
+      return true;
+    })
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    .slice(-limit);
+}
+
+export function resetStagePlayLiveSourceMailboxForTest(): void {
+  mailById.clear();
+  decisionsById.clear();
+  jobStateById.clear();
+}

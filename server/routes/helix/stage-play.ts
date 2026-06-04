@@ -28,6 +28,15 @@ import {
   type StagePlayCheckpointQueueAction,
 } from "../../services/stage-play/stage-play-checkpoint-queue";
 import {
+  listStagePlayLiveSourceJobStates,
+  listStagePlayLiveSourceMailItems,
+} from "../../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  buildMailLoopTranscriptRows,
+  readLiveSourceMailForAsk,
+  recordLiveSourceMailDecisionForAsk,
+} from "../../services/stage-play/stage-play-visual-summary-mail-ingest";
+import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
   STAGE_PLAY_RAW_SESSION_BUFFER_RETENTION_POLICIES,
   type StagePlayRawSessionBufferRawKindV1,
@@ -183,6 +192,21 @@ helixStagePlayRouter.options("/checkpoint-queue", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/checkpoint-queue/action", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/check", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/decision", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -525,6 +549,157 @@ helixStagePlayRouter.post("/checkpoint-queue/action", (req: Request, res: Respon
       error: "stage-play-checkpoint-queue-action-failed",
       err,
       schema: "stage_play_checkpoint_queue_action_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id);
+    const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
+    const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
+    const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const status = readQueryString(req.query.status) as any;
+    const limit = readOptionalNumber(req.query.limit) ?? 50;
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_list_response/v1",
+      mailItems: listStagePlayLiveSourceMailItems({
+        threadId,
+        roomId,
+        environmentId,
+        sourceId,
+        status,
+        limit,
+      }),
+      jobStates: listStagePlayLiveSourceJobStates({
+        threadId,
+        roomId,
+        environmentId,
+        limit: 10,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-list-failed",
+      err,
+      schema: "stage_play_live_source_mail_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/check", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const readResult = readLiveSourceMailForAsk({
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId),
+      limit: readOptionalNumber(body.limit) ?? readOptionalNumber(req.query.limit) ?? 3,
+      includeRead: readOptionalBoolean(body.includeRead ?? body.include_read) ?? false,
+      voicePolicy: {
+        voiceEnabled: readOptionalBoolean(body.voiceEnabled ?? body.voice_enabled) ?? false,
+        requiresConfirmation: readOptionalBoolean(body.voiceRequiresConfirmation ?? body.voice_requires_confirmation) ?? false,
+        allowedNow: readOptionalBoolean(body.voiceAllowedNow ?? body.voice_allowed_now) ?? false,
+        reason: readQueryString(body.voicePolicyReason) ?? readQueryString(body.voice_policy_reason),
+      },
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_check_response/v1",
+      readResult,
+      transcriptRows: buildMailLoopTranscriptRows({
+        mailItems: readResult.items,
+        readResult,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-check-failed",
+      err,
+      schema: "stage_play_live_source_mail_check_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const decisionValue = readQueryString(body.decision) ?? "wait_for_next_summary";
+    const decision = (
+      [
+        "wait_for_next_summary",
+        "record_interpretation",
+        "draft_text_answer",
+        "request_voice_callout",
+        "request_more_evidence",
+        "request_stage_play_checkpoint",
+        "fail_closed",
+      ] as const
+    ).includes(decisionValue as any)
+      ? decisionValue as any
+      : "wait_for_next_summary";
+    const decisionReceipt = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      mailIds: readStringArray(body.mailIds ?? body.mail_ids),
+      decision,
+      rationalePreview:
+        readQueryString(body.rationalePreview) ??
+        readQueryString(body.rationale_preview) ??
+        readQueryString(body.reason) ??
+        `Recorded ${decision}.`,
+      textAnswerDraft: readQueryString(body.textAnswerDraft) ?? readQueryString(body.text_answer_draft),
+      textAnswerTerminalEligible: readOptionalBoolean(body.textAnswerTerminalEligible ?? body.text_answer_terminal_eligible) ?? false,
+      voiceCalloutDraft: readQueryString(body.voiceCalloutDraft) ?? readQueryString(body.voice_callout_draft),
+      voiceEnabled: readOptionalBoolean(body.voiceEnabled ?? body.voice_enabled) ?? false,
+      voiceRequiresConfirmation: readOptionalBoolean(body.voiceRequiresConfirmation ?? body.voice_requires_confirmation) ?? false,
+      nextLoopState: (readQueryString(body.nextLoopState) ?? readQueryString(body.next_loop_state)) as any,
+      evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_decision_response/v1",
+      decision: decisionReceipt,
+      transcriptRows: buildMailLoopTranscriptRows({
+        decision: decisionReceipt,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-decision-failed",
+      err,
+      schema: "stage_play_live_source_mail_decision_response/v1",
       contextRole: "tool_evidence",
     });
   }

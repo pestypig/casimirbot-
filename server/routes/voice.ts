@@ -62,6 +62,11 @@ import {
   type HelixSpeakerSegment,
 } from "../../shared/helix-audio-identity";
 import type { HelixDiarizationShadowResult } from "../../shared/helix-diarization";
+import {
+  createVoiceLaneBreadcrumbId,
+  readVoiceLaneRequestSummary,
+  writeVoiceLaneBreadcrumb,
+} from "../services/diagnostics/voice-lane-crash-breadcrumbs";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
@@ -1985,11 +1990,22 @@ voiceRouter.post("/speaker-session/trust", express.json({ limit: "64kb" }), (req
 voiceRouter.post("/transcribe", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  const breadcrumbId = createVoiceLaneBreadcrumbId("voice_transcribe");
+  writeVoiceLaneBreadcrumb("voice.transcribe.received", {
+    breadcrumbId,
+    contentType: req.headers["content-type"] ?? null,
+    contentLength: req.headers["content-length"] ?? null,
+  });
   voiceUpload.single("audio")(req, res, async (uploadError?: unknown) => {
     const rawTraceId = typeof req.body?.traceId === "string" ? req.body.traceId.trim() : undefined;
     const traceId = rawTraceId || undefined;
     if (uploadError) {
       const message = uploadError instanceof Error ? uploadError.message : "Audio upload failed.";
+      writeVoiceLaneBreadcrumb("voice.transcribe.upload_error", {
+        breadcrumbId,
+        traceId,
+        error: message,
+      });
       return errorEnvelope(
         res,
         400,
@@ -2001,6 +2017,7 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
     }
 
     if (!voiceTranscriptionEnabled()) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.disabled", { breadcrumbId, traceId });
       return errorEnvelope(
         res,
         503,
@@ -2013,6 +2030,11 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
 
     const parsed = transcribeRequestSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.invalid_payload", {
+        breadcrumbId,
+        traceId,
+        issues: parsed.error.flatten(),
+      });
       return errorEnvelope(
         res,
         400,
@@ -2025,6 +2047,10 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
 
     const file = (req as Request & { file?: Express.Multer.File }).file;
     if (!file?.buffer || file.buffer.length === 0) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.missing_audio", {
+        breadcrumbId,
+        traceId: parsed.data.traceId ?? traceId,
+      });
       return errorEnvelope(
         res,
         400,
@@ -2038,7 +2064,22 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
     const policyMode = resolveSttPolicyMode();
     const outputMode = resolveSttOutputMode();
     const configuredBackends = resolveSttBackendOrder(policyMode);
+    writeVoiceLaneBreadcrumb("voice.transcribe.dispatch", {
+      breadcrumbId,
+      traceId: parsed.data.traceId ?? traceId,
+      policyMode,
+      outputMode,
+      fileBytes: file.buffer.length,
+      backends: configuredBackends.map((backend) => backend.kind),
+      request: parsed.data,
+    });
     if (configuredBackends.length === 0) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.no_backend", {
+        breadcrumbId,
+        traceId: parsed.data.traceId ?? traceId,
+        policyMode,
+        outputMode,
+      });
       return errorEnvelope(
         res,
         503,
@@ -2061,6 +2102,12 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       outputMode,
     });
     if (!result) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.failed", {
+        breadcrumbId,
+        traceId: parsed.data.traceId ?? traceId,
+        failureCount: failures.length,
+        failures,
+      });
       const rateLimitedFailures = failures.filter((entry) => entry.status === 429);
       const allFailuresRateLimited =
         failures.length > 0 && rateLimitedFailures.length === failures.length;
@@ -2306,6 +2353,18 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
       responseSpeakerSegments = responseAudioIdentity.segments;
     }
     const missionId = resolveTranscribeMissionId(parsed.data);
+    writeVoiceLaneBreadcrumb("voice.transcribe.success", {
+      breadcrumbId,
+      traceId: parsed.data.traceId ?? traceId,
+      missionId,
+      engine: result.engine ?? null,
+      language: result.language ?? parsed.data.language ?? "en",
+      translated: result.translated ?? false,
+      text: result.text ?? "",
+      source_text: result.source_text ?? null,
+      speakerCount: responseAudioIdentity?.speakers.length ?? 0,
+      segmentCount: Array.isArray(result.segments) ? result.segments.length : 0,
+    });
 
     return res.status(200).json({
       ok: true,
@@ -2386,9 +2445,18 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
 voiceRouter.post("/speak", async (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  const breadcrumbId = createVoiceLaneBreadcrumbId("voice_speak");
+  writeVoiceLaneBreadcrumb("voice.speak.received", {
+    breadcrumbId,
+    request: readVoiceLaneRequestSummary(req.body),
+  });
 
   const parsed = requestSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
+    writeVoiceLaneBreadcrumb("voice.speak.invalid_payload", {
+      breadcrumbId,
+      issues: parsed.error.flatten(),
+    });
     return errorEnvelope(
       res,
       400,
@@ -2399,8 +2467,20 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   const payload = parsed.data;
+  const traceId = payload.traceId?.trim() || undefined;
   const policyNowMs = resolvePolicyNowMs(payload);
+  writeVoiceLaneBreadcrumb("voice.speak.validated", {
+    breadcrumbId,
+    request: readVoiceLaneRequestSummary(payload),
+  });
   if (isDotVoiceRequest(payload)) {
+    writeVoiceLaneBreadcrumb("voice.speak.dot_authority_check", {
+      breadcrumbId,
+      traceId: payload.traceId ?? null,
+      threadId: payload.threadId ?? null,
+      turnId: payload.turnId ?? null,
+      voiceAuthorityState: payload.voiceAuthorityState ?? null,
+    });
     const voiceSourceDecision = authorizeDotVoiceSource({
       text: payload.text,
       voiceAuthorityState: payload.voiceAuthorityState ?? (payload.mode === "callout" ? "callout_voice" : "status_voice"),
@@ -2414,6 +2494,11 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       nowMs: policyNowMs,
     });
     if (!voiceSourceDecision.ok) {
+      writeVoiceLaneBreadcrumb("voice.speak.suppressed", {
+        breadcrumbId,
+        traceId: payload.traceId ?? null,
+        reason: voiceSourceDecision.reason,
+      });
       return res.status(200).json({
         ok: true,
         suppressed: true,
@@ -2430,6 +2515,11 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       classification: payload.priority,
     });
     if (!contextEligibility.emitVoice) {
+      writeVoiceLaneBreadcrumb("voice.speak.suppressed", {
+        breadcrumbId,
+        traceId: payload.traceId ?? null,
+        reason: "voice_context_ineligible",
+      });
       return res
         .status(200)
         .json({ ok: true, suppressed: true, ...suppressionEnvelope("voice_context_ineligible"), traceId: payload.traceId ?? null });
@@ -2446,6 +2536,11 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     requireEvidence: repoAttributedEffective,
   });
   if (!parity.allowed) {
+    writeVoiceLaneBreadcrumb("voice.speak.suppressed", {
+      breadcrumbId,
+      traceId: payload.traceId ?? null,
+      reason: parity.reason,
+    });
     return res.status(200).json({
       ok: true,
       suppressed: true,
@@ -2459,6 +2554,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const operatorCalloutValidation = validateOperatorCalloutV1(operatorCalloutCandidate);
   if (!operatorCalloutValidation.ok) {
     const firstError = operatorCalloutValidation.errors[0];
+    writeVoiceLaneBreadcrumb("voice.speak.suppressed", {
+      breadcrumbId,
+      traceId: payload.traceId ?? null,
+      reason: "contract_violation",
+      firstError,
+    });
     return res.status(200).json({
       ok: true,
       suppressed: true,
@@ -2473,7 +2574,6 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     });
   }
 
-  const traceId = payload.traceId?.trim() || undefined;
   const tenantId =
     (req.header("x-tenant-id") ?? req.header("x-customer-id") ?? "single-tenant").trim().toLowerCase() ||
     "single-tenant";
@@ -2487,6 +2587,11 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const usesReferenceAudio = Boolean(payload.referenceAudioHash && payload.referenceAudioHash.trim());
   if (usesReferenceAudio && payload.consent_asserted !== true) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_consent_required",
+    });
     return errorEnvelope(
       res,
       400,
@@ -2501,8 +2606,22 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const missionCritical = payload.priority === "critical" || payload.priority === "action";
   const requestedProvider = payload.provider?.trim() || "local-chatterbox";
   const provider = missionCritical && governance.localOnlyMissionMode ? "local-chatterbox" : requestedProvider;
+  writeVoiceLaneBreadcrumb("voice.speak.provider_selected", {
+    breadcrumbId,
+    traceId,
+    provider,
+    requestedProvider,
+    missionCritical,
+    governance,
+  });
 
   if (!isLocalProvider(provider) && !governance.managedProvidersEnabled) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_provider_not_allowed",
+      provider,
+    });
     return errorEnvelope(
       res,
       403,
@@ -2514,6 +2633,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (governance.providerMode === "local_only" && !isLocalProvider(provider)) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_provider_not_allowed_local_only",
+      provider,
+    });
     return errorEnvelope(
       res,
       403,
@@ -2529,6 +2654,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     governance.providerAllowlist.length > 0 &&
     !governance.providerAllowlist.includes(provider.toLowerCase())
   ) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_provider_not_allowed_commercial",
+      provider,
+    });
     return errorEnvelope(
       res,
       403,
@@ -2541,6 +2672,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   const budgetRejection = checkAndRecordBudget(payload.missionId, tenantId, policyNowMs);
   if (budgetRejection) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_budget_exceeded",
+      missionId: payload.missionId ?? null,
+      budgetRejection,
+    });
     return errorEnvelope(
       res,
       429,
@@ -2555,6 +2693,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (payload.mode === "callout" && !missionRateAllowed(payload.missionId, policyNowMs)) {
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "voice_rate_limited",
+      missionId: payload.missionId ?? null,
+    });
     return errorEnvelope(
       res,
       429,
@@ -2566,6 +2710,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (payload.mode === "callout" && dedupeSuppressed(payload, policyNowMs)) {
+    writeVoiceLaneBreadcrumb("voice.speak.suppressed", {
+      breadcrumbId,
+      traceId,
+      reason: "dedupe_cooldown",
+      missionId: payload.missionId ?? null,
+      eventId: payload.eventId ?? null,
+    });
     return res.status(200).json({
       ok: true,
       suppressed: true,
@@ -2583,6 +2734,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const elevenLabsConfig = elevenLabsRequested ? resolveElevenLabsConfig(requestedVoiceProfile) : null;
 
   if (dryRun) {
+    writeVoiceLaneBreadcrumb("voice.speak.dry_run", {
+      breadcrumbId,
+      traceId,
+      provider: "dry-run",
+      voiceProfile: requestedVoiceProfile ?? "default",
+    });
     return res.status(200).json({
       ok: true,
       dryRun: true,
@@ -2597,6 +2754,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (elevenLabsRequested && !elevenLabsConfig) {
+    writeVoiceLaneBreadcrumb("voice.speak.no_backend", {
+      breadcrumbId,
+      traceId,
+      provider,
+      reason: "elevenlabs_not_configured",
+    });
     return unavailableVoiceSpeakEnvelope(
       res,
       "ElevenLabs voice service is not configured.",
@@ -2610,6 +2773,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   }
 
   if (!elevenLabsRequested && !baseUrl) {
+    writeVoiceLaneBreadcrumb("voice.speak.no_backend", {
+      breadcrumbId,
+      traceId,
+      provider,
+      reason: "tts_base_url_not_configured",
+    });
     return unavailableVoiceSpeakEnvelope(
       res,
       "Voice service is not configured.",
@@ -2620,6 +2789,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
 
   if (isCircuitBreakerOpen(policyNowMs)) {
     const retryAfterMs = Math.max(0, circuitBreaker.openedUntil - policyNowMs);
+    writeVoiceLaneBreadcrumb("voice.speak.rejected", {
+      breadcrumbId,
+      traceId,
+      reason: "circuit_breaker_open",
+      retryAfterMs,
+    });
     return errorEnvelope(
       res,
       503,
@@ -2646,6 +2821,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const cacheKey = createVoiceSpeakCacheKey(payload, provider, resolvedProfileHeader);
   const cached = readVoiceSpeakChunkCache(cacheKey, policyNowMs);
   if (cached) {
+    writeVoiceLaneBreadcrumb("voice.speak.cache_hit", {
+      breadcrumbId,
+      traceId,
+      provider: cached.providerHeader,
+      contentType: cached.contentType,
+      bytes: cached.buffer.length,
+    });
     res.setHeader("content-type", cached.contentType);
     res.setHeader("x-voice-provider", cached.providerHeader);
     res.setHeader("x-voice-profile", cached.profileHeader);
@@ -2677,6 +2859,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      writeVoiceLaneBreadcrumb("voice.speak.backend_attempt", {
+        breadcrumbId,
+        traceId,
+        provider: elevenLabsRequested ? "elevenlabs" : "proxy",
+        attemptIndex,
+        timeoutMs,
+      });
       if (elevenLabsRequested) {
         const config = elevenLabsConfig as ElevenLabsConfig;
         const response = await fetch(`${config.baseUrl}/v1/text-to-speech/${encodeURIComponent(config.voiceId)}`, {
@@ -2703,6 +2892,14 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
             body: clipBackendErrorDetail(responseText),
             retryable,
           });
+          writeVoiceLaneBreadcrumb("voice.speak.backend_error_response", {
+            breadcrumbId,
+            traceId,
+            provider: "elevenlabs",
+            attemptIndex,
+            status: response.status,
+            retryable,
+          });
           if (retryable && attemptIndex < maxAttempts - 1) {
             await waitWithJitter(attemptIndex);
             continue;
@@ -2718,6 +2915,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
           profileHeader: config.voiceId,
           buffer: Buffer.from(await response.arrayBuffer()),
         };
+        writeVoiceLaneBreadcrumb("voice.speak.backend_success", {
+          breadcrumbId,
+          traceId,
+          provider: "elevenlabs",
+          contentType,
+          bytes: success.buffer.length,
+        });
         break;
       }
 
@@ -2742,6 +2946,14 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
           body: clipBackendErrorDetail(responseText),
           retryable,
         });
+        writeVoiceLaneBreadcrumb("voice.speak.backend_error_response", {
+          breadcrumbId,
+          traceId,
+          provider: "proxy",
+          attemptIndex,
+          status: upstream.status,
+          retryable,
+        });
         if (retryable && attemptIndex < maxAttempts - 1) {
           await waitWithJitter(attemptIndex);
           continue;
@@ -2758,6 +2970,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
         profileHeader: resolvedProfileHeader,
         buffer: Buffer.from(await upstream.arrayBuffer()),
       };
+      writeVoiceLaneBreadcrumb("voice.speak.backend_success", {
+        breadcrumbId,
+        traceId,
+        provider: "proxy",
+        contentType,
+        bytes: success.buffer.length,
+      });
       break;
     } catch (error) {
       const aborted = error instanceof Error && error.name === "AbortError";
@@ -2767,6 +2986,14 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
         message: aborted ? "Voice backend timed out." : "Voice backend request failed.",
         body: clipBackendErrorDetail(error instanceof Error ? error.message : String(error)),
         retryable: true,
+      });
+      writeVoiceLaneBreadcrumb("voice.speak.backend_exception", {
+        breadcrumbId,
+        traceId,
+        provider: elevenLabsRequested ? "elevenlabs" : "proxy",
+        attemptIndex,
+        aborted,
+        error,
       });
       if (attemptIndex < maxAttempts - 1) {
         await waitWithJitter(attemptIndex);
@@ -2781,6 +3008,12 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   if (!success) {
     recordBackendFailure(policyNowMs);
     const finalAttempt = attempts[attempts.length - 1];
+    writeVoiceLaneBreadcrumb("voice.speak.failed", {
+      breadcrumbId,
+      traceId,
+      attemptCount: attempts.length,
+      finalAttempt,
+    });
     return errorEnvelope(
       res,
       finalAttempt?.status ?? 502,
@@ -2812,6 +3045,20 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       : `skipped:${normalization.reason}`;
   const normalizationGainDbHeader =
     normalization.applied ? normalization.gainDb.toFixed(2) : "";
+  writeVoiceLaneBreadcrumb("voice.speak.normalized", {
+    breadcrumbId,
+    traceId,
+    provider: success.providerHeader,
+    contentType: success.contentType,
+    inputBytes: success.buffer.length,
+    outputBytes: normalization.buffer.length,
+    normalization: {
+      applied: normalization.applied,
+      codec: normalization.codec,
+      reason: normalization.reason,
+      gainDb: normalization.applied ? normalization.gainDb : null,
+    },
+  });
 
   writeVoiceSpeakChunkCache(cacheKey, policyNowMs, {
     contentType: success.contentType,
@@ -2841,6 +3088,13 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   if (success.durationHeader) {
     res.setHeader("x-voice-meter-duration-ms", success.durationHeader);
   }
+  writeVoiceLaneBreadcrumb("voice.speak.success", {
+    breadcrumbId,
+    traceId,
+    provider: success.providerHeader,
+    contentType: success.contentType,
+    bytes: normalization.buffer.length,
+  });
   return res.status(200).send(normalization.buffer);
 });
 

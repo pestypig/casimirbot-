@@ -13,6 +13,7 @@ import {
   initErrorReporter,
   reportError,
 } from "./services/observability/error-reporter";
+import { writeVoiceLaneBreadcrumb } from "./services/diagnostics/voice-lane-crash-breadcrumbs";
 import {
   loadIdeologyVerifierPack,
   validateIdeologyVerifierPackAgainstNodeIds,
@@ -109,6 +110,11 @@ const log = (message: string, source = "express") => {
 
 const bootStartedAt = new Date().toISOString();
 log(`boot start ts=${bootStartedAt} pid=${process.pid} node=${process.version}`);
+writeVoiceLaneBreadcrumb("process.boot", {
+  node: process.version,
+  runtimeEnv,
+  port: process.env.PORT ?? null,
+});
 
 const resolveReadyState = (): boolean => appReady && artifactsReady;
 
@@ -446,6 +452,7 @@ const requestShutdown = (signal: NodeJS.Signals | string) => {
   try {
     console.error(`[process] signal received: ${signal}`);
   } catch {}
+  writeVoiceLaneBreadcrumb("process.signal", { signal });
 
   if (shuttingDown) {
     return;
@@ -519,6 +526,9 @@ process.on('uncaughtException', (err) => {
   try {
     console.error('[process] uncaughtException:', err?.stack || err);
   } catch {}
+  writeVoiceLaneBreadcrumb("process.uncaught_exception", {
+    error: err,
+  });
   reportError(err, { tags: { source: "uncaughtException" } });
   scheduleFatalExit("uncaughtException", err);
 });
@@ -526,6 +536,9 @@ process.on('unhandledRejection', (reason) => {
   try {
     console.error('[process] unhandledRejection:', reason);
   } catch {}
+  writeVoiceLaneBreadcrumb("process.unhandled_rejection", {
+    reason,
+  });
   reportError(reason, { tags: { source: "unhandledRejection" } });
   scheduleFatalExit("unhandledRejection", reason);
 });
@@ -534,11 +547,13 @@ process.on('beforeExit', (code) => {
   try {
     console.error('[process] beforeExit with code:', code);
   } catch {}
+  writeVoiceLaneBreadcrumb("process.before_exit", { code });
 });
 process.on('exit', (code) => {
   try {
     console.error('[process] exit with code:', code);
   } catch {}
+  writeVoiceLaneBreadcrumb("process.exit", { code });
 });
 for (const sig of ['SIGINT','SIGTERM'] as const) {
   process.on(sig, () => requestShutdown(sig));

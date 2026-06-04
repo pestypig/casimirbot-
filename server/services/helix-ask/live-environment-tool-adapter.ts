@@ -51,6 +51,11 @@ import {
   enqueueStagePlayCheckpointRequestFromGraph,
   getStagePlayCheckpointQueue,
 } from "../stage-play/stage-play-checkpoint-queue";
+import {
+  buildMailLoopTranscriptRows,
+  readLiveSourceMailForAsk,
+  recordLiveSourceMailDecisionForAsk,
+} from "../stage-play/stage-play-visual-summary-mail-ingest";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -934,6 +939,121 @@ export function executeLiveEnvironmentTool(
             ]
           : []),
       ],
+    });
+  }
+
+  if (input.tool_name === "live_env.check_live_source_mail" || input.tool_name === "live_env.read_live_source_mail") {
+    const readResult = readLiveSourceMailForAsk({
+      threadId: effectiveThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId: explicitSourceId,
+      limit: readNumber(args.limit, 3),
+      includeRead: args.include_read === true || args.includeRead === true,
+      voicePolicy: {
+        voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
+        requiresConfirmation: args.voice_requires_confirmation === true || args.voiceRequiresConfirmation === true,
+        allowedNow: args.voice_allowed_now === true || args.voiceAllowedNow === true,
+        reason: readString(args.voice_policy_reason) ?? readString(args.voicePolicyReason),
+      },
+    });
+    const transcriptRows = buildMailLoopTranscriptRows({
+      mailItems: readResult.items,
+      readResult,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: readResult.environmentId ?? environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: readResult.items.length > 0
+        ? `Read ${readResult.items.length} unread live-source mail item(s); decision required.`
+        : "No unread live-source mail yet; loop is armed for the next summary.",
+      observation: {
+        ...readResult,
+        transcriptRows,
+        loopState: readResult.items.length > 0 ? "continue_with_unread_mail" : "armed_for_next_summary",
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: readResult.evidenceRefs,
+    });
+  }
+
+  if (input.tool_name === "live_env.record_live_source_mail_decision") {
+    const decisionRaw = readString(args.decision) ?? "wait_for_next_summary";
+    const allowedDecisions = new Set([
+      "wait_for_next_summary",
+      "record_interpretation",
+      "draft_text_answer",
+      "request_voice_callout",
+      "request_more_evidence",
+      "request_stage_play_checkpoint",
+      "fail_closed",
+    ]);
+    const decision = allowedDecisions.has(decisionRaw)
+      ? decisionRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"]
+      : "wait_for_next_summary";
+    const mailIds = readStringArray(args.mail_ids ?? args.mailIds);
+    const nextLoopStateRaw = readString(args.next_loop_state) ?? readString(args.nextLoopState);
+    const allowedLoopStates = new Set([
+      "armed_for_next_summary",
+      "continue_with_unread_mail",
+      "paused_by_user",
+      "blocked_missing_source",
+      "blocked_voice_policy",
+      "blocked_tool_error",
+      "ended",
+    ]);
+    const nextLoopState = nextLoopStateRaw && allowedLoopStates.has(nextLoopStateRaw)
+      ? nextLoopStateRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["nextLoopState"]
+      : null;
+    const recordedDecision = recordLiveSourceMailDecisionForAsk({
+      threadId: effectiveThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      mailIds,
+      decision,
+      rationalePreview:
+        readString(args.rationale_preview) ??
+        readString(args.rationalePreview) ??
+        readString(args.reason) ??
+        `Agent recorded ${decision}.`,
+      textAnswerDraft: readString(args.text_answer_draft) ?? readString(args.textAnswerDraft),
+      textAnswerTerminalEligible: args.text_answer_terminal_eligible === true || args.textAnswerTerminalEligible === true,
+      voiceCalloutDraft: readString(args.voice_callout_draft) ?? readString(args.voiceCalloutDraft),
+      voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
+      voiceRequiresConfirmation: args.voice_requires_confirmation === true || args.voiceRequiresConfirmation === true,
+      nextLoopState,
+      evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
+      modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
+    });
+    const transcriptRows = buildMailLoopTranscriptRows({
+      decision: recordedDecision,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: recordedDecision.environmentId ?? environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: mailIds.length > 0,
+      summary: mailIds.length > 0
+        ? `Recorded live-source mail decision ${recordedDecision.decision}; loop state ${recordedDecision.nextLoopState}.`
+        : "Live-source mail decision could not link to mail ids.",
+      observation: {
+        ...recordedDecision,
+        transcriptRows,
+        post_tool_model_step_required: recordedDecision.decision !== "wait_for_next_summary",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: [recordedDecision.decisionId, ...recordedDecision.evidenceRefs],
     });
   }
 
