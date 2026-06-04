@@ -1130,7 +1130,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/mail unread: 1/i)).toBeTruthy();
     expect(screen.getByText(/summary preview: Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
-    expect(screen.getByText(/no output yet; armed for next summary/i)).toBeTruthy();
+    expect(screen.getByText(/no output yet; armed for next source update/i)).toBeTruthy();
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {
