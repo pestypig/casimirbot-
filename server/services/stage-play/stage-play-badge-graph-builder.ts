@@ -20,8 +20,10 @@ import type {
   EnvironmentObjectSummary,
   HelixEnvironmentStateSnapshot,
 } from "@shared/helix-environment-state-snapshot";
+import type { HelixVisualFrameEvidence } from "@shared/helix-visual-frame-evidence";
 import { getLatestEnvironmentStateSnapshot } from "../situation-room/environment-state-snapshot-window";
 import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
+import { listVisualFrameEvidence } from "../situation-room/visual-snapshot-store";
 import { getLatestStagePlayAskCheckpointReceipt } from "./stage-play-ask-checkpoint-store";
 import {
   evaluateStagePlayCheckpointFreshness,
@@ -81,6 +83,24 @@ const hashShort = (value: unknown, size = 18): string =>
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
 const lower = (value: string | null | undefined): string => String(value ?? "").toLowerCase();
+
+const compactPreview = (value: string | null | undefined, fallback: string, max = 150): string => {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
+  return text.length > max ? `${text.slice(0, max - 3).trimEnd()}...` : text;
+};
+
+const refsMatching = (refs: string[], pattern: RegExp): string[] =>
+  refs.filter((ref) => pattern.test(ref));
+
+const latestVisualEvidenceForGraph = (input: {
+  threadId: string;
+  sourceIds?: string[];
+}): HelixVisualFrameEvidence | null => {
+  const sourceIds = new Set(input.sourceIds ?? []);
+  const entries = listVisualFrameEvidence({ threadId: input.threadId, limit: 24 })
+    .filter((entry) => sourceIds.size === 0 || sourceIds.has(entry.source_id));
+  return entries.at(-1) ?? null;
+};
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
@@ -456,6 +476,17 @@ const addCheckpointRequestBadges = (
           ...request.currentGraphRefs,
           ...request.perturbationRefs,
         ]),
+        inputRefs: unique([
+          ...request.currentGraphRefs,
+          ...request.compactObservationRefs,
+          ...request.perturbationRefs,
+          ...request.priorAnswerSnapshotRefs,
+        ]),
+        inputPreview: "graph + projected interpretation + prompt",
+        transformLabel: "checkpoint request queue",
+        outputRefs: [request.checkpointRequestId],
+        outputPreview: `${request.checkpointRequestId} status: ${request.status}`,
+        skipped: request.missingEvidence,
       },
       admission: "ask_user",
     }));
@@ -535,12 +566,14 @@ const addPipelineSkeleton = (
   input: {
     observerId: string;
     interpreterId?: string | null;
+    graphId?: string | null;
     sourceRefs: StagePlayBadgeSourceRefV1[];
     evidenceRefs: string[];
     sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
     generatedAt: string;
     askCheckpointReceipt?: StagePlayAskCheckpointReceiptV1 | null;
     checkpointFreshness?: StagePlayCheckpointFreshnessV1 | null;
+    latestVisualEvidence?: HelixVisualFrameEvidence | null;
   },
 ): void => {
   if (input.sources.length === 0) return;
@@ -553,6 +586,20 @@ const addPipelineSkeleton = (
   ]);
   const skeletonEvidenceRefs = sourceEvidenceRefs.length > 0 ? sourceEvidenceRefs : input.evidenceRefs;
   const hasCompactEvidence = skeletonEvidenceRefs.length > 0;
+  const visualFrameRefs = refsMatching(skeletonEvidenceRefs, /^visual_frame:/);
+  const visualEvidenceRefs = unique([
+    ...refsMatching(skeletonEvidenceRefs, /^visual_evidence:/),
+    ...(input.latestVisualEvidence?.evidence_id ? [input.latestVisualEvidence.evidence_id] : []),
+  ]);
+  const compactInputRefs = visualFrameRefs.length > 0
+    ? visualFrameRefs
+    : input.sources.flatMap((source) => source.evidenceRefs).slice(0, 6);
+  const compactOutputRefs = visualEvidenceRefs.length > 0
+    ? visualEvidenceRefs
+    : skeletonEvidenceRefs.slice(0, 6);
+  const compactOutputPreview = input.latestVisualEvidence?.summary
+    ? compactPreview(input.latestVisualEvidence.summary, "Latest compact evidence is available.")
+    : null;
   const existingStageBoundCount = badges.filter((entry) =>
     [
       "setting",
@@ -622,6 +669,15 @@ const addPipelineSkeleton = (
       freshness: hasCompactEvidence ? "fresh" : "missing",
       confidence: hasCompactEvidence ? 0.76 : 0.35,
       evidenceRefs: skeletonEvidenceRefs,
+      inputRefs: compactInputRefs,
+      inputPreview: compactInputRefs.length > 0 ? compactInputRefs.slice(0, 3).join(", ") : null,
+      transformLabel: visualFrameRefs.length > 0 || input.latestVisualEvidence
+        ? "visual frame analyze -> compact evidence"
+        : "compact source window",
+      outputRefs: compactOutputRefs,
+      outputPreview: compactOutputPreview ?? (hasCompactEvidence
+        ? `Observed ${activeCount} active source(s), ${selectedCount} selected for Stage Play.`
+        : "Waiting for admitted compact observation evidence."),
     },
     admission: "auto",
   }));
@@ -715,6 +771,15 @@ const addPipelineSkeleton = (
       freshness: completedCheckpoint ? "fresh" : "missing",
       confidence: completedCheckpoint ? 0.86 : 0.34,
       evidenceRefs: checkpointEvidenceRefs,
+      inputRefs: unique([activeProcedureId, ...checkpointEvidenceRefs.slice(0, 5)]),
+      inputPreview: completedCheckpoint ? "Stage Play graph plus checkpoint evidence." : "Stage Play graph is waiting for checkpoint review.",
+      transformLabel: "model-reviewed Helix Ask checkpoint",
+      outputRefs: unique([
+        ...(completedCheckpoint?.askTurnId ? [completedCheckpoint.askTurnId] : []),
+        ...(completedCheckpoint?.solverTraceRef ? [completedCheckpoint.solverTraceRef] : []),
+      ]),
+      outputPreview: completedCheckpoint ? "Model-reviewed checkpoint completed." : checkpointMissingSummary,
+      blockedUntil: completedCheckpoint ? null : "model-reviewed Helix Ask checkpoint",
     },
     checkpoint: {
       askTurnId: completedCheckpoint?.askTurnId ?? null,
@@ -754,6 +819,17 @@ const addPipelineSkeleton = (
       freshness: completedCheckpoint ? "fresh" : "missing",
       confidence: completedCheckpoint ? 0.82 : 0.32,
       evidenceRefs: checkpointEvidenceRefs,
+      inputRefs: unique([
+        checkpointId,
+        ...checkpointEvidenceRefs.slice(0, 5),
+      ]),
+      inputPreview: completedCheckpoint ? "Completed checkpoint consumed Stage Play evidence." : "Checkpoint request has not produced reviewed answer evidence.",
+      transformLabel: "answer snapshot promotion",
+      outputRefs: completedCheckpoint ? ["answer_snapshot.latest"] : [],
+      outputPreview: completedCheckpoint
+        ? compactPreview(answerText, "Model-reviewed checkpoint is available.")
+        : "No answer snapshot yet.",
+      blockedUntil: completedCheckpoint ? null : "model-reviewed Helix Ask checkpoint",
     },
     output: {
       lineKey: "recommendation",
@@ -797,6 +873,18 @@ const addPipelineSkeleton = (
       freshness: completedCheckpoint ? "fresh" : "missing",
       confidence: completedCheckpoint ? 0.8 : 0.32,
       evidenceRefs: liveOutputEvidenceRefs,
+      inputRefs: unique([
+        input.graphId ?? "stage_play_badge_graph",
+        ...skeletonEvidenceRefs.slice(0, 5),
+      ]),
+      inputPreview: "Stage Play graph plus projected interpretation lanes.",
+      transformLabel: "output lane reducer",
+      outputRefs: ["risk", "possibilities", "unknowns", "next_check"],
+      outputPreview: completedCheckpoint
+        ? "Reviewed output can display the answer snapshot."
+        : "risk, possibilities, unknowns, next_check",
+      skipped: completedCheckpoint ? [] : ["recommendation", "answer_snapshot", "voice_output"],
+      blockedUntil: completedCheckpoint ? null : "model-reviewed Helix Ask checkpoint for answer_snapshot / voice_output",
     },
     output: {
       lineKey: "live_output",
@@ -957,6 +1045,7 @@ const addVisualCaptureCheckpointChain = (
     evidenceRefs: string[];
     sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
     generatedAt: string;
+    latestVisualEvidence?: HelixVisualFrameEvidence | null;
   },
 ): void => {
   const visualSources = input.sources.filter((source) =>
@@ -968,7 +1057,21 @@ const addVisualCaptureCheckpointChain = (
   const visualEvidenceRefs = unique([
     ...input.evidenceRefs,
     ...visualSources.flatMap((source) => source.evidenceRefs),
+    ...(input.latestVisualEvidence?.frame_id ? [input.latestVisualEvidence.frame_id] : []),
+    ...(input.latestVisualEvidence?.evidence_id ? [input.latestVisualEvidence.evidence_id] : []),
   ]);
+  const visualSourceRefs = unique(visualSources.map((source) => source.sourceId));
+  const latestFrameRefs = unique([
+    ...refsMatching(visualEvidenceRefs, /^visual_frame:/),
+    ...(input.latestVisualEvidence?.frame_id ? [input.latestVisualEvidence.frame_id] : []),
+  ]);
+  const latestCompactRefs = unique([
+    ...refsMatching(visualEvidenceRefs, /^visual_evidence:/),
+    ...(input.latestVisualEvidence?.evidence_id ? [input.latestVisualEvidence.evidence_id] : []),
+  ]);
+  const latestVisualSummary = input.latestVisualEvidence?.summary
+    ? compactPreview(input.latestVisualEvidence.summary, "Latest visual compact evidence is available.")
+    : null;
   const sourceId = pushBadge(badges, badge({
     id: "source.visual_frame.active",
     title: "visual frame source",
@@ -992,6 +1095,11 @@ const addVisualCaptureCheckpointChain = (
       freshness: "fresh",
       confidence: 0.82,
       evidenceRefs: visualEvidenceRefs,
+      inputRefs: visualSourceRefs,
+      inputPreview: visualSourceRefs.join(", ") || null,
+      transformLabel: "Visual frame producer / source descriptor",
+      outputRefs: latestFrameRefs.length > 0 ? latestFrameRefs : visualEvidenceRefs.slice(0, 4),
+      outputPreview: `${visualSources[0]?.status ?? "active"}${latestFrameRefs[0] ? ` -> ${latestFrameRefs[0]}` : ""}`,
     },
     admission: "auto",
   }));
@@ -1019,6 +1127,11 @@ const addVisualCaptureCheckpointChain = (
       freshness: visualEvidenceRefs.length > 0 ? "fresh" : "missing",
       confidence: visualEvidenceRefs.length > 0 ? 0.76 : 0.35,
       evidenceRefs: visualEvidenceRefs,
+      inputRefs: latestFrameRefs.length > 0 ? latestFrameRefs : visualSources.flatMap((source) => source.evidenceRefs).slice(0, 4),
+      inputPreview: latestFrameRefs[0] ?? "Waiting for visual frame refs.",
+      transformLabel: "visual frame analyze -> compact evidence",
+      outputRefs: latestCompactRefs.length > 0 ? latestCompactRefs : visualEvidenceRefs.slice(0, 4),
+      outputPreview: latestVisualSummary ?? "Latest visual frame compacted into Stage Play evidence.",
     },
     admission: "auto",
   }));
@@ -1045,6 +1158,14 @@ const addVisualCaptureCheckpointChain = (
       freshness: "fresh",
       confidence: 0.72,
       evidenceRefs: visualEvidenceRefs,
+      inputRefs: unique([
+        ...latestCompactRefs,
+        ...input.sourceRefs.filter((ref) => ref.kind === "live_source_descriptor").map((ref) => ref.id).slice(0, 4),
+      ]),
+      inputPreview: latestVisualSummary ?? "Latest visual compact observation plus source descriptors.",
+      transformLabel: "reflect_stage_play_context",
+      outputRefs: ["setting.visual_scene", "actor.observed_subject", "possibilities.current"],
+      outputPreview: "scene bounds and possibilities pending final graph summary",
     },
     admission: "auto",
   }));
@@ -1130,6 +1251,29 @@ const addVisualCaptureCheckpointChain = (
       evidenceRefs: visualEvidenceRefs,
       reasonCodes: ["visual_chain_bound_possibility"],
     });
+  }
+};
+
+const applyStagePlayProcessingSummaryTrays = (
+  badges: StagePlayBadgeV1[],
+  input: {
+    graphId: string;
+    generatedAt: string;
+  },
+): void => {
+  const badgeCount = badges.length;
+  const affordanceCount = badges.filter((entry) => entry.kind === "affordance").length;
+  const blockedCount = badges.filter((entry) => entry.kind === "blocked_affordance" || entry.status === "blocked").length;
+  const outputPreview = `graph badges: ${badgeCount}; affordances: ${affordanceCount}; blocked: ${blockedCount}`;
+  for (const id of ["interpreter.stage_play_reflection", "interpreter.visual_scene"]) {
+    const entry = badges.find((badgeEntry) => badgeEntry.id === id);
+    if (!entry?.dataTray) continue;
+    entry.dataTray = {
+      ...entry.dataTray,
+      updatedAt: input.generatedAt,
+      outputRefs: unique([...(entry.dataTray.outputRefs ?? []), input.graphId]),
+      outputPreview,
+    };
   }
 };
 
@@ -1644,12 +1788,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     }
     addPipelineSkeleton(missingBadges, missingEdges, {
       observerId: missingObserverId,
+      graphId,
       sourceRefs: [],
       evidenceRefs: [],
       sources: sourceWindow.sources,
       generatedAt: resolvedAt,
       askCheckpointReceipt,
       checkpointFreshness,
+      latestVisualEvidence: null,
     });
     addVisualCaptureCheckpointChain(missingBadges, missingEdges, {
       observerId: missingObserverId,
@@ -1657,6 +1803,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       evidenceRefs: [],
       sources: sourceWindow.sources,
       generatedAt: resolvedAt,
+      latestVisualEvidence: null,
     });
     const baseGraph = buildStagePlayBadgeGraphV1({
       generatedAt: resolvedAt,
@@ -1687,6 +1834,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     addLatestPerturbationNode(missingBadges, missingEdges, perturbationResult.latestEvents);
     addPerturbationBadges(missingBadges, missingEdges, perturbationResult.latestEvents);
     addCheckpointRequestBadges(missingBadges, missingEdges, checkpointRequests, perturbationResult.latestEvents);
+    applyStagePlayProcessingSummaryTrays(missingBadges, {
+      graphId,
+      generatedAt: resolvedAt,
+    });
     return buildStagePlayBadgeGraphV1({
       generatedAt: resolvedAt,
       graphId,
@@ -1717,6 +1868,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   });
   const evidenceRefs = sourceWindow.evidenceRefs;
   const sourceIds = sourceRefIds(sourceRefs);
+  const latestVisualEvidence = latestVisualEvidenceForGraph({
+    threadId: input.threadId,
+    sourceIds: sourceWindow.sources.map((source) => source.sourceId),
+  });
   const badges: StagePlayBadgeV1[] = [];
   const edges: StagePlayBadgeGraphV1["edges"] = [];
   const recommendedActions: StagePlayBadgeGraphV1["recommendedActions"] = [];
@@ -1742,6 +1897,9 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       eventWindowRefs: [],
     });
     const refIds = sourceRefIds(refs);
+    const visualOutputRefs = latestVisualEvidence?.source_id === descriptor.sourceId
+      ? unique([latestVisualEvidence.frame_id, latestVisualEvidence.evidence_id])
+      : [];
     sourceBadgeIds.push(pushBadge(badges, badge({
       id: `source.${hashShort([descriptor.sourceId, descriptor.modality], 10)}`,
       title: descriptor.modality.replace(/_/g, " "),
@@ -1762,6 +1920,25 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
         ...(descriptor.cadenceMs != null ? [makeBinding("source_cadence", refIds, descriptor.cadenceMs)] : []),
       ],
       reasonCodes: ["live_source_descriptor"],
+      dataTray: {
+        title: descriptor.modality.replace(/_/g, " "),
+        summary: `Source ${descriptor.state}; ${descriptor.latestObservationRefs.length} latest observation ref(s).`,
+        updatedAt: resolvedAt,
+        freshness: descriptor.state === "stale" || descriptor.state === "paused" ? "stale" : "fresh",
+        confidence: descriptor.state === "active" || descriptor.state === "active_interval" ? 0.84 : 0.62,
+        evidenceRefs: unique([descriptor.descriptorId, ...(matchingProducer ? [matchingProducer.producerId] : []), ...descriptor.latestObservationRefs]),
+        inputRefs: [descriptor.sourceId],
+        inputPreview: descriptor.sourceId,
+        transformLabel: /visual|frame|screen/i.test(descriptor.modality)
+          ? "Visual frame producer / source descriptor"
+          : "live source descriptor",
+        outputRefs: visualOutputRefs.length > 0
+          ? visualOutputRefs
+          : unique([...(matchingProducer?.latestChunkId ? [matchingProducer.latestChunkId] : []), ...descriptor.latestObservationRefs]).slice(0, 5),
+        outputPreview: visualOutputRefs[0]
+          ? `${descriptor.state} -> ${visualOutputRefs[0]}`
+          : `${descriptor.state}; ${matchingProducer?.latestChunkId ?? "no latest frame chunk"}`,
+      },
       admission: "auto",
     })));
   }
@@ -1780,6 +1957,9 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       eventWindowRefs: [],
     });
     const refIds = sourceRefIds(refs);
+    const visualOutputRefs = latestVisualEvidence?.source_id === producer.sourceId
+      ? unique([latestVisualEvidence.frame_id, latestVisualEvidence.evidence_id])
+      : [];
     sourceBadgeIds.push(pushBadge(badges, badge({
       id: `source.${hashShort([producer.sourceId, producer.modality], 10)}`,
       title: producer.modality.replace(/_/g, " "),
@@ -1799,6 +1979,25 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
         ...(producer.cadenceMs != null ? [makeBinding("source_cadence", refIds, producer.cadenceMs)] : []),
       ],
       reasonCodes: ["live_source_producer"],
+      dataTray: {
+        title: producer.modality.replace(/_/g, " "),
+        summary: `Producer ${producer.status}; ${producer.latestChunkId ?? "no latest chunk"}.`,
+        updatedAt: resolvedAt,
+        freshness: producer.status === "stale" || producer.status === "paused" ? "stale" : "fresh",
+        confidence: producer.status === "active" ? 0.78 : 0.58,
+        evidenceRefs: unique([producer.producerId, producer.latestChunkId].filter(Boolean) as string[]),
+        inputRefs: [producer.sourceId],
+        inputPreview: producer.sourceId,
+        transformLabel: /visual|frame|screen/i.test(producer.modality)
+          ? "Visual frame producer / source descriptor"
+          : "live source producer",
+        outputRefs: visualOutputRefs.length > 0
+          ? visualOutputRefs
+          : unique([producer.latestChunkId].filter(Boolean) as string[]),
+        outputPreview: visualOutputRefs[0]
+          ? `${producer.status} -> ${visualOutputRefs[0]}`
+          : `${producer.status}; ${producer.latestChunkId ?? "no latest frame chunk"}`,
+      },
       admission: "auto",
     })));
   }
@@ -1819,6 +2018,24 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       makeBinding("route_state", sourceIds, sourceWindow.compactFacts.navigation?.routeStatus ?? "unknown"),
     ],
     reasonCodes: ["stage_play_interpreter", "compact_source_window"],
+    dataTray: {
+      title: "Stage Play interpreter",
+      summary: "reflect_stage_play_context reduces compact evidence into graph badges.",
+      updatedAt: resolvedAt,
+      freshness: sourceRefs.length > 0 ? "fresh" : "missing",
+      confidence: sourceRefs.length > 0 ? 0.76 : 0.4,
+      evidenceRefs,
+      inputRefs: unique([
+        ...(latestVisualEvidence?.evidence_id ? [latestVisualEvidence.evidence_id] : []),
+        ...sourceWindow.latestSourceDescriptorRefs.slice(0, 4),
+      ]),
+      inputPreview: latestVisualEvidence?.summary
+        ? compactPreview(latestVisualEvidence.summary, "Latest compact visual evidence.")
+        : "Compact source window and live source descriptors.",
+      transformLabel: "reflect_stage_play_context",
+      outputRefs: [graphId],
+      outputPreview: "graph badges pending",
+    },
     admission: "auto",
   }));
   for (const sourceBadgeId of sourceBadgeIds) {
@@ -2651,12 +2868,14 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   addPipelineSkeleton(badges, edges, {
     observerId,
     interpreterId,
+    graphId,
     sourceRefs,
     evidenceRefs,
     sources: sourceWindow.sources,
     generatedAt: resolvedAt,
     askCheckpointReceipt,
     checkpointFreshness,
+    latestVisualEvidence,
   });
   addVisualCaptureCheckpointChain(badges, edges, {
     observerId,
@@ -2664,6 +2883,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     evidenceRefs,
     sources: sourceWindow.sources,
     generatedAt: resolvedAt,
+    latestVisualEvidence,
   });
   const baseGraph = buildStagePlayBadgeGraphV1({
     generatedAt: resolvedAt,
@@ -2694,6 +2914,10 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   addLatestPerturbationNode(badges, edges, perturbationResult.latestEvents);
   addPerturbationBadges(badges, edges, perturbationResult.latestEvents);
   addCheckpointRequestBadges(badges, edges, checkpointRequests, perturbationResult.latestEvents);
+  applyStagePlayProcessingSummaryTrays(badges, {
+    graphId,
+    generatedAt: resolvedAt,
+  });
 
   return buildStagePlayBadgeGraphV1({
     generatedAt: resolvedAt,

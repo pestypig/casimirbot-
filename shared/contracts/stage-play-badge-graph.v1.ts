@@ -246,6 +246,13 @@ export type StagePlayBadgeDataTrayV1 = {
   freshness?: "fresh" | "stale" | "missing" | "unknown";
   confidence?: number | null;
   evidenceRefs: string[];
+  inputRefs?: string[];
+  inputPreview?: string | null;
+  transformLabel?: string;
+  outputRefs?: string[];
+  outputPreview?: string | null;
+  skipped?: string[];
+  blockedUntil?: string | null;
 };
 
 export type StagePlayBadgeCheckpointV1 = {
@@ -600,6 +607,27 @@ function validateDataTray(prefix: string, value: unknown, issues: string[]): voi
     issues.push(`${prefix}.confidence must be between 0 and 1`);
   }
   if (!isStringArray(value.evidenceRefs)) issues.push(`${prefix}.evidenceRefs must be strings`);
+  if (value.inputRefs != null && !isStringArray(value.inputRefs)) {
+    issues.push(`${prefix}.inputRefs must be strings`);
+  }
+  if (value.inputPreview != null && typeof value.inputPreview !== "string") {
+    issues.push(`${prefix}.inputPreview must be a string or null`);
+  }
+  if (value.transformLabel != null && !isNonEmptyString(value.transformLabel)) {
+    issues.push(`${prefix}.transformLabel must be a non-empty string`);
+  }
+  if (value.outputRefs != null && !isStringArray(value.outputRefs)) {
+    issues.push(`${prefix}.outputRefs must be strings`);
+  }
+  if (value.outputPreview != null && typeof value.outputPreview !== "string") {
+    issues.push(`${prefix}.outputPreview must be a string or null`);
+  }
+  if (value.skipped != null && !isStringArray(value.skipped)) {
+    issues.push(`${prefix}.skipped must be strings`);
+  }
+  if (value.blockedUntil != null && typeof value.blockedUntil !== "string") {
+    issues.push(`${prefix}.blockedUntil must be a string or null`);
+  }
 }
 
 function validateCheckpoint(prefix: string, value: unknown, issues: string[]): void {

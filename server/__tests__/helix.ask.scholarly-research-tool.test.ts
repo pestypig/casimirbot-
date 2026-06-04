@@ -10,6 +10,7 @@ import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import {
+  __testHelixAgentStepRepairHints,
   __testHelixGoalSatisfaction,
   __testHelixRuntimeToolCallValidation,
   __testHelixScholarlyFinalFallback,
@@ -115,6 +116,78 @@ describe("Helix scholarly research tool admission", () => {
       },
     });
     expect(selectedPaperFetch.validation.valid).toBe(true);
+  });
+
+  it("re-enters rejected scholarly args as compact repair hints for the model step", () => {
+    const hints = __testHelixAgentStepRepairHints.buildHelixAgentStepInvalidArgsHintSummary([
+      {
+        artifact_id: "call:lookup-empty",
+        turn_id: "ask:scholarly-validation",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "runtime_tool_call",
+        created_at_ms: 1,
+        source_scope: "current_turn",
+        goal_hash: "test",
+        payload: {
+          schema: "helix.runtime_tool_call.v1",
+          turn_id: "ask:scholarly-validation",
+          call_id: "call:lookup-empty",
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          args: {},
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: "call:lookup-empty:runtime_tool_call_validation",
+        turn_id: "ask:scholarly-validation",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "runtime_tool_call_validation",
+        created_at_ms: 2,
+        source_scope: "current_turn",
+        goal_hash: "test",
+        payload: {
+          schema: "helix.runtime_tool_call_validation.v1",
+          turn_id: "ask:scholarly-validation",
+          call_id: "call:lookup-empty",
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          valid: false,
+          errors: ["missing_required_arg:query_or_identifier"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: "call:lookup-empty:runtime_tool_observation",
+        turn_id: "ask:scholarly-validation",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "runtime_tool_observation",
+        created_at_ms: 3,
+        source_scope: "current_turn",
+        goal_hash: "test",
+        payload: {
+          schema: "helix.runtime_tool_observation.v1",
+          turn_id: "ask:scholarly-validation",
+          call_id: "call:lookup-empty",
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          status: "invalid_args",
+          summary: "Runtime tool call rejected before execution: missing_required_arg:query_or_identifier.",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ] as any);
+
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toMatchObject({
+      capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      attempted_args: {},
+      validation_errors: ["missing_required_arg:query_or_identifier"],
+      occurrence_count: 1,
+      latest_call_id: "call:lookup-empty",
+    });
+    expect(hints[0]?.repair_instruction).toContain("query");
+    expect(hints[0]?.repair_instruction).toContain("user goal");
   });
 
   it("routes DOI citations and references to external scholarly research instead of Docs Viewer", () => {
@@ -367,6 +440,7 @@ describe("Helix scholarly research tool admission", () => {
             schema: "helix.scholarly_full_text_observation.v1",
             capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
             paper_result_id: "arxiv:1706.03762",
+            selected_for_answer: true,
             selected_chunks: [{ chunk_ref: "page:2#chunk:1", page_start: 2, text_excerpt: "The Transformer uses encoder and decoder stacks." }],
             page_text_refs: ["page:2#text"],
             assistant_answer: false,
@@ -397,6 +471,99 @@ describe("Helix scholarly research tool admission", () => {
       "scholarly_research_observation",
       "scholarly_full_text_observation",
     ]);
+  });
+
+  it("keeps failed zero-chunk full-text observations from satisfying page-evidence requirements", () => {
+    const turnId = "ask:scholarly-full-text-403";
+    const promptText = "Do research: fetch a Hawking radiation paper with PDF/full text and summarize it with page evidence.";
+    const evaluation = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+        turn_id: turnId,
+        concept_tokens: ["paper_search", "scholarly_full_text_or_pdf"],
+      },
+      currentTurnArtifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          producer_item_id: "agent_runtime_scholarly_research_tool",
+          kind: "scholarly_research_observation",
+          created_at_ms: 1,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+            selected_for_answer: true,
+            papers: [{ result_id: "openalex:hawking-radiation", title: "Particle Creation by Black Holes" }],
+            evidence_refs: ["openalex:hawking-radiation"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: `${turnId}:full-text:scholarly_full_text_observation`,
+          turn_id: turnId,
+          producer_item_id: "agent_runtime_scholarly_research_tool",
+          kind: "scholarly_full_text_observation",
+          created_at_ms: 2,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.scholarly_full_text_observation.v1",
+            capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+            paper_result_id: "openalex:hawking-radiation",
+            selected_for_answer: false,
+            selected_chunks: [],
+            pages_parsed: 0,
+            missing_requirements: ["full_text_http_403"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: `${turnId}:full-text:runtime_tool_observation`,
+          turn_id: turnId,
+          producer_item_id: "agent_runtime_tool_executor",
+          kind: "runtime_tool_observation",
+          created_at_ms: 3,
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.runtime_tool_observation.v1",
+            capability_key: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+            call_id: "call:full-text-403",
+            status: "failed",
+            summary: "Full text fetch failed: HTTP 403.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ] as any,
+      satisfactionReport: {
+        satisfied: false,
+        terminal_kind: "final_failure",
+        terminal_source: "typed_failure",
+        missing_artifacts: ["scholarly_full_text_observation", "scholarly_research_answer"],
+        missing_reason: "scholarly_full_text_unavailable",
+        confidence: "high",
+        rejected_terminal_candidates: [],
+      } as any,
+    });
+
+    const lookupAction = evaluation.required_actions.find((action) => action.action_key === HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY);
+    const fullTextAction = evaluation.required_actions.find((action) => action.action_key === HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY);
+    const lookupEvidence = evaluation.required_evidence.find((evidence) => evidence.kind === "scholarly_research_observation");
+    const fullTextEvidence = evaluation.required_evidence.find((evidence) => evidence.kind === "scholarly_full_text_observation");
+    const failedFullTextObservation = evaluation.observed_results.find(
+      (result) => result.ref === `${turnId}:full-text:scholarly_full_text_observation`,
+    );
+
+    expect(lookupAction?.satisfied).toBe(true);
+    expect(lookupEvidence?.satisfied).toBe(true);
+    expect(fullTextAction?.satisfied).toBe(false);
+    expect(fullTextEvidence?.satisfied).toBe(false);
+    expect(evaluation.satisfaction).toBe("partially_satisfied");
+    expect(failedFullTextObservation?.supports_goal).toBe(false);
   });
 
   it("builds a scholarly fallback draft from compact full-text evidence and rejects retry boilerplate", () => {

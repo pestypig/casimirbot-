@@ -207,7 +207,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Disable microphone");
     expect(source).not.toContain("Voice Monitor");
     expect(source).not.toContain("Helix Timeline");
-    expect(source).toContain("Input level");
+    expect(source).not.toContain("<span>Input level</span>");
+    expect(source).not.toContain("Listening for first segment...");
+    expect(source).toContain("backdrop-blur-xl");
     expect(source).toContain("Voice input level meter");
     expect(source).not.toContain("{voiceMonitorExpanded ? \"hide\" : \"diag\"}");
     expect(source).not.toContain("Capture diagnostics");
@@ -371,7 +373,7 @@ describe("HelixAskPill mic-first surface contract", () => {
                       evidenceRefs: ["visual_observation:test"],
                       dataTray: {
                         summary: "First compact observation ready.",
-                        evidenceRefs: ["visual_observation:test"],
+                        evidenceRefs: ["visual_observation:test", "visual_evidence:test"],
                       },
                     },
                     {
@@ -431,12 +433,15 @@ describe("HelixAskPill mic-first surface contract", () => {
                 },
                 liveAnswerProjection: {
                   changedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+                  projectedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+                  checkpointOnlySkipped: ["recommendation", "answer_snapshot", "voice_output"],
                   reason: "projected",
                 },
                 debugReceipt: {
                   schema: "stage_play_tool_receipt_debug/v1",
                   graphId: "stage_play_badge_graph:test",
-                  sourceRefs: ["visual_observation:test"],
+                  sourceRefs: ["visual_observation:test", "visual_evidence:test"],
+                  checkpointOnlySkipped: ["recommendation", "answer_snapshot", "voice_output"],
                   visualSourceStatus: [
                     {
                       sourceId: "browser_tab_visual:test",
@@ -445,7 +450,7 @@ describe("HelixAskPill mic-first surface contract", () => {
                       cadenceMs: 10000,
                       selectedForStagePlay: true,
                       routeTo: "narrative_stage_play",
-                      evidenceRefs: ["visual_observation:test"],
+                      evidenceRefs: ["visual_observation:test", "visual_evidence:test"],
                     },
                   ],
                   checkpointFreshness: {
@@ -467,6 +472,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(events.map((event) => event.kind)).toEqual([
       "job_plan",
       "source_observation",
+      "debug_receipt",
       "checkpoint_request",
       "ask_checkpoint",
       "answer_snapshot",
@@ -480,6 +486,15 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(events.find((event) => event.kind === "source_observation")?.detail).toContain(
       "First compact observation ready.",
     );
+    const receipt = events.find((event) => event.kind === "debug_receipt");
+    expect(receipt?.detail).toContain("Tool: live_env.reflect_stage_play_context");
+    expect(receipt?.detail).toContain("Graph: stage_play_badge_graph:test");
+    expect(receipt?.detail).toContain("Source: visual_frame active selected yes narrative_stage_play");
+    expect(receipt?.detail).toContain("Visual evidence: visual_evidence:test");
+    expect(receipt?.detail).toContain("Projected live interpretation: risk, possibilities, unknowns, next_check");
+    expect(receipt?.detail).toContain("Checkpoint-only skipped: recommendation, answer_snapshot, voice_output");
+    expect(receipt?.detail).toContain("Queued checkpoint: stage_play_checkpoint_request:test");
+    expect(receipt?.detail).toContain("Checkpoint reviewed: true");
     expect(events.find((event) => event.kind === "checkpoint_request")?.actions).toEqual([
       "Run",
       "Skip",
@@ -494,6 +509,84 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(events.find((event) => event.kind === "live_output")?.detail).toContain(
       "risk, possibilities, unknowns, next_check",
     );
+  });
+
+  it("shows a pending Stage Play debug receipt when checkpoint synthesis has not completed", () => {
+    const reply = {
+      id: "reply-stage-play-pending",
+      content: "Stage Play reflection succeeded, but checkpoint answer synthesis did not complete.",
+      debug: {
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.reflect_stage_play_context",
+              observation: {
+                schema: "stage_play_reflection_result/v1",
+                graph: {
+                  graphId: "stage_play_badge_graph:pending",
+                  badges: [
+                    {
+                      id: "compact_observation.latest_visual",
+                      kind: "compact_observation",
+                      status: "observed",
+                      evidenceRefs: ["visual_frame:pending", "visual_evidence:pending"],
+                    },
+                  ],
+                  checkpointRequests: [
+                    {
+                      checkpointRequestId: "stage_play_checkpoint_request:pending",
+                      reason: "first_usable_observation",
+                      status: "queued",
+                      currentGraphRefs: ["stage_play_badge_graph:pending"],
+                      compactObservationRefs: ["visual_evidence:pending"],
+                    },
+                  ],
+                },
+                liveAnswerProjection: {
+                  projectedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+                  checkpointOnlySkipped: ["recommendation", "answer_snapshot", "voice_output"],
+                },
+                debugReceipt: {
+                  schema: "stage_play_tool_receipt_debug/v1",
+                  graphId: "stage_play_badge_graph:pending",
+                  sourceRefs: ["visual_frame:pending", "visual_evidence:pending"],
+                  checkpointOnlySkipped: ["recommendation", "answer_snapshot", "voice_output"],
+                  checkpointRequestId: "stage_play_checkpoint_request:pending",
+                  visualSourceStatus: [
+                    {
+                      sourceId: "visual_source:pending",
+                      modality: "visual_frame",
+                      status: "active",
+                      selectedForStagePlay: true,
+                      routeTo: "narrative_stage_play",
+                      evidenceRefs: ["visual_frame:pending", "visual_evidence:pending"],
+                    },
+                  ],
+                  checkpointFreshness: {
+                    reason: "no_checkpoint",
+                    modelReviewed: false,
+                    fresh: false,
+                    checkpointId: null,
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    } as Parameters<typeof buildStagePlayChatLedgerEvents>[0];
+
+    const receipt = buildStagePlayChatLedgerEvents(reply).find((event) => event.kind === "debug_receipt");
+
+    expect(receipt?.detail).toContain("Tool: live_env.reflect_stage_play_context");
+    expect(receipt?.detail).toContain("Graph: stage_play_badge_graph:pending");
+    expect(receipt?.detail).toContain("Source: visual_frame active selected yes narrative_stage_play");
+    expect(receipt?.detail).toContain("Visual evidence: visual_evidence:pending");
+    expect(receipt?.detail).toContain("Projected live interpretation: risk, possibilities, unknowns, next_check");
+    expect(receipt?.detail).toContain("Checkpoint-only skipped: recommendation, answer_snapshot, voice_output");
+    expect(receipt?.detail).toContain("Queued checkpoint: stage_play_checkpoint_request:pending");
+    expect(receipt?.detail).toContain("Checkpoint reviewed: false");
   });
 
   it("uses an atomic nonempty JSON debug copy helper", async () => {

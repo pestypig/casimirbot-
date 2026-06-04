@@ -176,6 +176,19 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         intentModule: undefined,
         evidenceRefs: ["live_source_observation:ui", "stage_play_raw_session_buffer_entry:ui"],
         reasonCodes: ["source_handle"],
+        dataTray: {
+          title: "Visual source",
+          summary: "Visual source active.",
+          updatedAt: "2026-06-02T00:00:01.000Z",
+          freshness: "fresh",
+          confidence: 0.84,
+          evidenceRefs: ["live_source_observation:ui", "visual_frame:ui", "visual_evidence:ui"],
+          inputRefs: ["source:visual-tab"],
+          inputPreview: "source:visual-tab",
+          transformLabel: "Visual frame producer / source descriptor",
+          outputRefs: ["visual_frame:ui"],
+          outputPreview: "active -> visual_frame:ui",
+        },
       }),
       badge({
         id: "interpreter.stage_play_reflection",
@@ -196,6 +209,19 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         intentModule: undefined,
         evidenceRefs: ["live_source_observation:ui"],
         reasonCodes: ["stage_play_interpreter", "compact_source_window"],
+        dataTray: {
+          title: "Stage Play interpreter",
+          summary: "reflect_stage_play_context reduces compact evidence into graph badges.",
+          updatedAt: "2026-06-02T00:00:01.000Z",
+          freshness: "fresh",
+          confidence: 0.76,
+          evidenceRefs: ["live_source_observation:ui", "visual_evidence:ui"],
+          inputRefs: ["visual_evidence:ui", "live_source_descriptor:ui"],
+          inputPreview: "Minecraft-like scene with character and enchantment table.",
+          transformLabel: "reflect_stage_play_context",
+          outputRefs: ["stage_play_badge_graph:ui-fixture"],
+          outputPreview: "graph badges: 19; affordances: 1; blocked: 0",
+        },
       }),
       badge({
         id: "compact_observation.latest",
@@ -226,6 +252,11 @@ function buildFixture(): StagePlayBadgeGraphV1 {
           freshness: "fresh",
           confidence: 0.76,
           evidenceRefs: ["stage_play_compact_observation:ui"],
+          inputRefs: ["visual_frame:ui"],
+          inputPreview: "visual_frame:ui",
+          transformLabel: "visual frame analyze -> compact evidence",
+          outputRefs: ["visual_evidence:ui"],
+          outputPreview: "Minecraft-like scene with character, book/crafting station, enchantment table, cat.",
         },
       }),
       badge({
@@ -291,6 +322,11 @@ function buildFixture(): StagePlayBadgeGraphV1 {
           freshness: "fresh",
           confidence: 0.72,
           evidenceRefs: ["stage_play_checkpoint_request:ui"],
+          inputRefs: ["stage_play_badge_graph:ui-fixture", "stage_play_compact_observation:ui", "stage_play_perturbation_event:ui"],
+          inputPreview: "graph + projected interpretation + prompt",
+          transformLabel: "checkpoint request queue",
+          outputRefs: ["stage_play_checkpoint_request:ui"],
+          outputPreview: "stage_play_checkpoint_request:ui status: queued",
         },
       }),
       badge({
@@ -328,6 +364,10 @@ function buildFixture(): StagePlayBadgeGraphV1 {
           freshness: "fresh",
           confidence: 0.9,
           evidenceRefs: ["ask_turn_solver_trace:ui"],
+          inputRefs: ["helix_ask.checkpoint.latest", "ask_turn_solver_trace:ui"],
+          transformLabel: "answer snapshot promotion",
+          outputRefs: ["answer_snapshot.latest"],
+          outputPreview: "Hold position until the next observation confirms the scene.",
         },
       }),
       badge({
@@ -358,6 +398,12 @@ function buildFixture(): StagePlayBadgeGraphV1 {
           freshness: "fresh",
           confidence: 0.7,
           evidenceRefs: ["live_answer_environment:ui"],
+          inputRefs: ["stage_play_badge_graph:ui-fixture"],
+          inputPreview: "Stage Play graph plus projected interpretation lanes.",
+          transformLabel: "output lane reducer",
+          outputRefs: ["risk", "possibilities", "unknowns", "next_check"],
+          outputPreview: "risk, possibilities, unknowns, next_check",
+          skipped: ["recommendation", "answer_snapshot", "voice_output"],
         },
       }),
       badge({
@@ -988,14 +1034,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-lane-live_voice_output")).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-data-tray").length).toBeGreaterThanOrEqual(12);
     expect(screen.getByText(/visual frame active - latest scene summary available/i)).toBeTruthy();
-    expect(screen.getByText(/latest compact fact summary/i)).toBeTruthy();
+    expect(screen.getAllByText(/Minecraft-like scene with character/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/confidence 0\.76/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/solver completed; model reviewed/i)).toBeTruthy();
     expect(screen.getByText(/route authority passed/i)).toBeTruthy();
-    expect(screen.getByText(/Meaningful perturbation is queued/i)).toBeTruthy();
+    expect(screen.getByText(/stage_play_checkpoint_request:ui status: queued/i)).toBeTruthy();
     expect(screen.getAllByText(/Hold position until the next observation confirms the scene/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/model reviewed/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Project Stage Play possibilities into Live Answer/i)).toBeTruthy();
+    expect(screen.getAllByText(/risk, possibilities, unknowns, next_check/i).length).toBeGreaterThan(0);
     const nodeSlots = screen.getAllByTestId("stage-play-node-slot");
     const occupiedSlots = nodeSlots.map((slot) => `${slot.style.left}:${slot.style.top}`);
     expect(new Set(occupiedSlots).size).toBe(occupiedSlots.length);
@@ -1128,6 +1174,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Visual Tab Source" }));
 
     expect(screen.getByTestId("stage-play-source-node-controls")).toBeTruthy();
+    expect(screen.getByText("Data Flow")).toBeTruthy();
+    expect(screen.getAllByText("Visual frame producer / source descriptor").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("active -> visual_frame:ui").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-copy-data-flow-refs").length).toBeGreaterThan(0);
     expect(screen.getByText("Source Route Controls")).toBeTruthy();
     expect(screen.getByText("Route to Narrative")).toBeTruthy();
     expect(screen.getByText("Review source evidence")).toBeTruthy();
@@ -1151,6 +1201,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Latest Compact Observation" }));
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
     expect(screen.getByTestId("stage-play-compact-observation-node-controls")).toBeTruthy();
+    expect(screen.getByText("Data Flow")).toBeTruthy();
+    expect(screen.getAllByText("visual frame analyze -> compact evidence").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Minecraft-like scene with character/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Compact Observation Evidence")).toBeTruthy();
     expect(screen.getByText("Evidence Refs")).toBeTruthy();
     expect(screen.getByText("Audit Links")).toBeTruthy();
@@ -1172,6 +1225,10 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Current Live Output" }));
     expect(screen.getByTestId("stage-play-live-output-node-controls")).toBeTruthy();
+    expect(screen.getByText("output lane reducer")).toBeTruthy();
+    expect(screen.getAllByText("recommendation").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("answer snapshot").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("voice output").length).toBeGreaterThan(0);
     expect(screen.getByText("Projection State")).toBeTruthy();
     expect(screen.getByText("Voice Boundary")).toBeTruthy();
     expect(screen.getByText("Output Text")).toBeTruthy();

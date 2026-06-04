@@ -7801,6 +7801,7 @@ export function buildHelixTurnTranscriptRows(reply: HelixAskReply): HelixTurnTra
 export type StagePlayChatLedgerEventKind =
   | "job_plan"
   | "source_observation"
+  | "debug_receipt"
   | "checkpoint_request"
   | "ask_checkpoint"
   | "perturbation"
@@ -7821,11 +7822,12 @@ export type StagePlayChatLedgerEvent = {
 const STAGE_PLAY_LEDGER_EVENT_ORDER: Record<StagePlayChatLedgerEventKind, number> = {
   job_plan: 0,
   source_observation: 1,
-  checkpoint_request: 2,
-  ask_checkpoint: 3,
-  answer_snapshot: 4,
-  perturbation: 5,
-  live_output: 6,
+  debug_receipt: 2,
+  checkpoint_request: 3,
+  ask_checkpoint: 4,
+  answer_snapshot: 5,
+  perturbation: 6,
+  live_output: 7,
 };
 
 function readStagePlayLedgerString(value: unknown): string | null {
@@ -8063,6 +8065,16 @@ function readStagePlayBadgeEvidenceRefs(badge: Record<string, unknown> | null): 
   ]);
 }
 
+function formatStagePlayLedgerSourceLine(sources: Record<string, unknown>[]): string {
+  const source = sources[0] ?? null;
+  if (!source) return "none";
+  const modality = readStagePlayLedgerString(source.modality) ?? "visual_frame";
+  const status = readStagePlayLedgerString(source.status) ?? "unknown";
+  const selected = source.selectedForStagePlay === true ? "yes" : "no";
+  const routeTo = readStagePlayLedgerString(source.routeTo) ?? "unrouted";
+  return `${modality} ${status} selected ${selected} ${routeTo}`;
+}
+
 function pushStagePlayLedgerEvent(
   events: StagePlayChatLedgerEvent[],
   event: StagePlayChatLedgerEvent,
@@ -8105,6 +8117,8 @@ export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayC
   );
   const graph = readStagePlayGraphFromReflection(reflection);
   const debugReceipt = readAgentLoopAuditRecord(reflection?.debugReceipt);
+  const liveProjection = readAgentLoopAuditRecord(reflection?.liveAnswerProjection);
+  const checkpointFreshness = readAgentLoopAuditRecord(debugReceipt?.checkpointFreshness);
   const visualStatuses = readStagePlayLedgerRecordArray(debugReceipt?.visualSourceStatus);
   const activeVisualStatuses = visualStatuses.filter((source) =>
     readStagePlayLedgerString(source.status) === "active",
@@ -8158,6 +8172,48 @@ export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayC
   const resultCheckpointRequest = readAgentLoopAuditRecord(requestResult?.checkpointRequest);
   const graphCheckpointRequest = readStagePlayLedgerRecordArray(graph?.checkpointRequests)[0] ?? null;
   const checkpointRequest = resultCheckpointRequest ?? graphCheckpointRequest;
+  if (reflection && debugReceipt) {
+    const requestId = readStagePlayLedgerString(checkpointRequest?.checkpointRequestId);
+    const projectedLineKeys = readStagePlayLedgerStringArray(liveProjection?.projectedLineKeys);
+    const changedLineKeys = readStagePlayLedgerStringArray(liveProjection?.changedLineKeys);
+    const displayedLineKeys = projectedLineKeys.length > 0 ? projectedLineKeys : changedLineKeys;
+    const preferredProjectedKeys = ["risk", "possibilities", "unknowns", "next_check"];
+    const projectedDisplay = preferredProjectedKeys.filter((key) => displayedLineKeys.includes(key));
+    const checkpointOnlySkipped = uniqueStagePlayLedgerStrings([
+      ...readStagePlayLedgerStringArray(liveProjection?.checkpointOnlySkipped),
+      ...readStagePlayLedgerStringArray(debugReceipt.checkpointOnlySkipped),
+    ]);
+    const visualEvidenceRefs = uniqueStagePlayLedgerStrings([
+      ...sourceRefs.filter((ref) => /^visual_evidence:/i.test(ref)),
+      ...readStagePlayBadgeEvidenceRefs(compactObservation).filter((ref) => /^visual_evidence:/i.test(ref)),
+      ...visualStatuses.flatMap((source) => readStagePlayLedgerStringArray(source.evidenceRefs)).filter((ref) => /^visual_evidence:/i.test(ref)),
+    ]);
+    const reviewed = checkpointFreshness?.modelReviewed === true || checkpointFreshness?.fresh === true;
+    const detail = [
+      "Tool: live_env.reflect_stage_play_context",
+      `Graph: ${readStagePlayLedgerString(debugReceipt.graphId) ?? readStagePlayLedgerString(graph?.graphId) ?? "unknown"}`,
+      `Source: ${formatStagePlayLedgerSourceLine(visualStatuses)}`,
+      `Visual evidence: ${visualEvidenceRefs.join(", ") || "none"}`,
+      `Projected live interpretation: ${(projectedDisplay.length > 0 ? projectedDisplay : displayedLineKeys).join(", ") || "none"}`,
+      `Checkpoint-only skipped: ${checkpointOnlySkipped.join(", ") || "none"}`,
+      `Queued checkpoint: ${requestId ?? readStagePlayLedgerString(debugReceipt.checkpointRequestId) ?? "none"}`,
+      `Checkpoint reviewed: ${reviewed ? "true" : "false"}`,
+    ].join("\n");
+    pushStagePlayLedgerEvent(events, {
+      key: `${reply.id}-stage-play-debug-receipt-${readStagePlayLedgerString(debugReceipt.graphId) ?? "current"}`,
+      kind: "debug_receipt",
+      title: "Stage Play debug receipt.",
+      detail,
+      meta: `${readStagePlayLedgerString(debugReceipt.graphId) ?? "graph"} | ${reviewed ? "reviewed" : "not reviewed"}`,
+      evidenceRefs: uniqueStagePlayLedgerStrings([
+        ...sourceRefs,
+        ...visualEvidenceRefs,
+        readStagePlayLedgerString(debugReceipt.graphId) ?? "",
+        requestId ?? readStagePlayLedgerString(debugReceipt.checkpointRequestId) ?? "",
+      ]),
+      status: reviewed ? "model_reviewed" : "not_reviewed",
+    });
+  }
   if (checkpointRequest) {
     const requestId = readStagePlayLedgerString(checkpointRequest.checkpointRequestId) ?? "checkpoint";
     const reason = labelizeStagePlayLedgerValue(checkpointRequest.reason) || "checkpoint requested";
@@ -8181,7 +8237,6 @@ export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayC
     });
   }
 
-  const checkpointFreshness = readAgentLoopAuditRecord(debugReceipt?.checkpointFreshness);
   const checkpointBadge =
     readStagePlayGraphBadgeById(graph, "helix_ask.checkpoint.latest") ??
     readStagePlayGraphBadgeByKind(graph, "helix_ask_checkpoint") ??
@@ -8239,7 +8294,6 @@ export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayC
   const liveOutputBadge =
     readStagePlayGraphBadgeById(graph, "live_output.current") ??
     readStagePlayGraphBadgeByKind(graph, "live_output");
-  const liveProjection = readAgentLoopAuditRecord(reflection?.liveAnswerProjection);
   const projectedLineKeys = readStagePlayLedgerStringArray(liveProjection?.projectedLineKeys);
   const changedLineKeys = readStagePlayLedgerStringArray(liveProjection?.changedLineKeys);
   const displayedLineKeys = projectedLineKeys.length > 0 ? projectedLineKeys : changedLineKeys;
@@ -30766,44 +30820,36 @@ export function HelixAskPill({
                 showTopInputLevelMonitor ? { maxHeight: `${Math.max(0, voiceMonitorMaxHeightPx)}px` } : undefined
               }
             >
-              <div className="rounded-xl border border-white/10 bg-black/35 px-2.5 py-2">
-                <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                  <div className="flex items-center justify-between text-[9px] uppercase tracking-[0.14em] text-slate-500">
-                    <span>Input level</span>
-                    <span>
-                      {voiceSignalState === "speech"
-                        ? "speech-level signal"
-                        : voiceSignalState === "low"
-                          ? "low-level signal"
-                          : "waiting for device audio"}
-                    </span>
-                  </div>
-                  <div
-                    className="mt-1 grid grid-cols-12 gap-0.5 rounded border border-white/10 bg-slate-900/70 p-1"
-                    aria-label="Voice input level meter"
-                  >
-                    {Array.from({ length: 12 }).map((_, index) => {
-                      const threshold = (index + 1) / 12;
-                      const active = voiceMonitorLevel >= threshold;
-                      return (
-                        <span
-                          key={`voice-level-${index}`}
-                          className={`h-2 rounded-[2px] ${
-                            active
-                              ? voiceMonitorLevel >= 0.75
-                                ? "bg-emerald-300"
-                                : voiceMonitorLevel >= 0.45
-                                  ? "bg-cyan-300"
-                                  : "bg-sky-300"
-                              : "bg-slate-700/80"
-                          }`}
-                        />
-                      );
-                    })}
-                  </div>
-                  {voiceSegmentAttempts.length === 0 ? (
-                    <p className="mt-1 text-[11px] text-slate-500">Listening for first segment...</p>
-                  ) : null}
+              <div className="rounded-2xl border border-cyan-200/15 bg-slate-950/55 px-2 py-1.5 shadow-[0_10px_32px_rgba(8,47,73,0.34)] backdrop-blur-xl">
+                <div
+                  className="grid gap-0.5 rounded-xl border border-white/10 bg-black/35 p-1 shadow-inner shadow-cyan-950/40"
+                  style={{ gridTemplateColumns: "repeat(16, minmax(0, 1fr))" }}
+                  aria-label={`Voice input level meter: ${
+                    voiceSignalState === "speech"
+                      ? "speech-level signal"
+                      : voiceSignalState === "low"
+                        ? "low-level signal"
+                        : "waiting for device audio"
+                  }`}
+                >
+                  {Array.from({ length: 16 }).map((_, index) => {
+                    const threshold = (index + 1) / 16;
+                    const active = voiceMonitorLevel >= threshold;
+                    return (
+                      <span
+                        key={`voice-level-${index}`}
+                        className={`h-2.5 rounded-full transition-colors duration-150 ${
+                          active
+                            ? voiceMonitorLevel >= 0.75
+                              ? "bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]"
+                              : voiceMonitorLevel >= 0.45
+                                ? "bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.72)]"
+                                : "bg-sky-300 shadow-[0_0_8px_rgba(125,211,252,0.62)]"
+                            : "bg-slate-700/60"
+                        }`}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -31984,9 +32030,12 @@ export function HelixAskPill({
                       </summary>
                       <div className="mt-2 space-y-1.5">
                         {stagePlayChatLedgerEvents.map((event, index) => {
+                          const eventDetail = clipText(event.detail, event.kind === "debug_receipt" ? 1200 : 280);
                           const tone =
                             event.kind === "checkpoint_request"
                               ? "border-amber-300/25 bg-amber-950/20 text-amber-50"
+                              : event.kind === "debug_receipt"
+                                ? "border-sky-300/25 bg-sky-950/20 text-sky-50"
                               : event.kind === "perturbation"
                                 ? "border-fuchsia-300/25 bg-fuchsia-950/20 text-fuchsia-50"
                                 : event.kind === "answer_snapshot"
@@ -32007,7 +32056,7 @@ export function HelixAskPill({
                                 <div className="min-w-0 flex-1">
                                   <p className="break-words">
                                     <span className="font-semibold text-violet-100/90">{event.title} </span>
-                                    {clipText(event.detail, 280)}
+                                    {eventDetail}
                                   </p>
                                   <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-violet-100/65">
                                     {event.meta}

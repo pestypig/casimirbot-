@@ -211,6 +211,7 @@ const buildStagePlayToolReceiptDebug = (input: {
   graph: StagePlayBadgeGraphV1;
   outputProjectionKeys?: string[];
   skippedProjectionKeys?: string[];
+  checkpointOnlySkipped?: string[];
   checkpointRequestId?: string | null;
 }) => ({
   schema: "stage_play_tool_receipt_debug/v1",
@@ -220,6 +221,7 @@ const buildStagePlayToolReceiptDebug = (input: {
   visualSourceStatus: visualStagePlaySourceStatuses(input.graph),
   outputProjectionKeys: uniqueStrings(input.outputProjectionKeys ?? []),
   skippedProjectionKeys: uniqueStrings(input.skippedProjectionKeys ?? []),
+  checkpointOnlySkipped: uniqueStrings(input.checkpointOnlySkipped ?? []),
   checkpointFreshness: checkpointFreshnessFromStagePlayGraph(input.graph),
   checkpointRequestId: input.checkpointRequestId ?? input.graph.checkpointRequests[0]?.checkpointRequestId ?? null,
   assistant_answer: false,
@@ -895,6 +897,7 @@ export function executeLiveEnvironmentTool(
         graph,
         outputProjectionKeys: projectedLineKeys,
         skippedProjectionKeys: skippedLineKeys,
+        checkpointOnlySkipped,
       }),
       assistant_answer: false,
       raw_content_included: false,

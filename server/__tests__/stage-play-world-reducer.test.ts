@@ -17,6 +17,11 @@ import {
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
 import {
+  analyzeVisualFrame,
+  recordVisualFrame,
+  resetVisualSnapshotStoreForTest,
+} from "../services/situation-room/visual-snapshot-store";
+import {
   resetLiveSourceDescriptorsForTest,
   upsertLiveSourceDescriptor,
 } from "../services/situation-room/live-source-descriptor-builder";
@@ -56,6 +61,7 @@ beforeEach(() => {
   resetStagePlaySourceRouteOverridesForTest();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetVisualSnapshotStoreForTest();
   resetSituationSourceCapabilitiesForTest();
   resetStagePlayRawSessionBufferForTest();
   resetStagePlayAskCheckpointReceiptsForTest();
@@ -75,6 +81,22 @@ describe("Stage Play world-state badge reducer", () => {
       captureMode: "interval",
       latestChunkId: "live_source_chunk:live-answer",
       now: "2026-06-02T12:09:55.000Z",
+    });
+    const frame = recordVisualFrame({
+      thread_id: threadId,
+      source_id: "visual_source:live-answer",
+      frame_id: "visual_frame:live-answer",
+      image_ref: "ephemeral://frame/live-answer",
+      image_sha256: "a".repeat(64),
+      ts: "2026-06-02T12:09:56.000Z",
+    });
+    const evidence = analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:live-answer",
+      summary: "Minecraft-like scene with character, book/crafting station, enchantment table, and cat.",
+      detected_objects: ["character", "book", "crafting station", "enchantment table", "cat"],
+      ts: "2026-06-02T12:09:57.000Z",
     });
 
     const graph = buildStagePlayGraphFromWorld({
@@ -181,6 +203,45 @@ describe("Stage Play world-state badge reducer", () => {
         ]),
       }),
     ]));
+    const sourceNode = graph.badges.find((badge) => badge.id === "source.visual_frame.active");
+    expect(sourceNode?.dataTray).toEqual(expect.objectContaining({
+      inputRefs: ["visual_source:live-answer"],
+      transformLabel: "Visual frame producer / source descriptor",
+      outputRefs: expect.arrayContaining([frame.frame_id]),
+      outputPreview: expect.stringContaining(frame.frame_id),
+    }));
+    const visualEvidenceNode = graph.badges.find((badge) => badge.id === "compact_observation.latest_visual");
+    expect(visualEvidenceNode?.dataTray).toEqual(expect.objectContaining({
+      inputRefs: expect.arrayContaining([frame.frame_id]),
+      transformLabel: "visual frame analyze -> compact evidence",
+      outputRefs: expect.arrayContaining([evidence.evidence_id]),
+      outputPreview: expect.stringContaining("Minecraft-like scene"),
+    }));
+    const interpreterNode = graph.badges.find((badge) => badge.id === "interpreter.visual_scene");
+    expect(interpreterNode?.dataTray).toEqual(expect.objectContaining({
+      inputRefs: expect.arrayContaining([evidence.evidence_id]),
+      transformLabel: "reflect_stage_play_context",
+      outputRefs: expect.arrayContaining([graph.graphId]),
+      outputPreview: expect.stringMatching(/graph badges: \d+; affordances: \d+; blocked: \d+/),
+    }));
+    const answerSnapshotNode = graph.badges.find((badge) => badge.id === "answer_snapshot.latest");
+    expect(answerSnapshotNode?.dataTray).toEqual(expect.objectContaining({
+      inputRefs: expect.arrayContaining(["helix_ask.checkpoint.latest"]),
+      outputPreview: "No answer snapshot yet.",
+      blockedUntil: "model-reviewed Helix Ask checkpoint",
+    }));
+    const liveOutputNode = graph.badges.find((badge) => badge.id === "live_output.current");
+    expect(liveOutputNode?.dataTray).toEqual(expect.objectContaining({
+      transformLabel: "output lane reducer",
+      outputRefs: ["risk", "possibilities", "unknowns", "next_check"],
+      skipped: ["recommendation", "answer_snapshot", "voice_output"],
+    }));
+    const checkpointRequestNode = graph.badges.find((badge) => badge.id === "checkpoint_request.queued");
+    expect(checkpointRequestNode?.dataTray).toEqual(expect.objectContaining({
+      transformLabel: "checkpoint request queue",
+      outputRefs: expect.arrayContaining([expect.stringMatching(/^stage_play_checkpoint_request:/)]),
+      outputPreview: expect.stringContaining("status: queued"),
+    }));
     expect(graph.checkpointRequests).toEqual(expect.arrayContaining([
       expect.objectContaining({
         artifactId: "stage_play_checkpoint_request",

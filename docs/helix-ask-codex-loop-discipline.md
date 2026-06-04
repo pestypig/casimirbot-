@@ -234,6 +234,84 @@ commands only when the primary intent and route product contract explicitly
 allow that receipt kind. All other tool outputs must either continue the loop,
 ask the user, repair, or fail closed.
 
+### Tool Lifecycle And Follow-Up Decisions
+
+Helix Ask should describe tool work with a shared lifecycle record instead of
+letting each tool family invent its own retry or wrap-up vocabulary. This is a
+policy/debug contract over existing tool execution; it is not a private Codex
+runtime.
+
+Every source-backed or multi-step tool family should expose:
+
+```txt
+tool_lifecycle_trace
+tool_followup_decision
+```
+
+`tool_lifecycle_trace` uses schema `helix.tool_lifecycle_trace.v1` and must
+summarize:
+
+```txt
+requested_capability
+admitted_capability
+executed_capability
+lifecycle_stage
+status
+session_ref
+process_ref
+observation_refs
+receipt_refs
+evidence_refs
+failure_reason
+retry_recommendation
+fallback_used
+fallback_equivalent
+terminal_eligible
+assistant_answer=false
+raw_content_included=false
+```
+
+`tool_followup_decision` uses schema `helix.tool_followup_decision.v1` and must
+translate the lifecycle into the next solver action:
+
+```txt
+poll
+retry
+alternate_probe
+continue_reasoning
+ask_user
+terminal_failure
+terminal_answer
+```
+
+The follow-up decision must also expose:
+
+```txt
+external_change_required
+terminal_blockers
+required_surface_satisfied
+evidence_reentered
+assistant_answer=false
+raw_content_included=false
+```
+
+The practical rule is:
+
+```txt
+running tool -> poll
+failed but same tool is still valid -> retry
+wrong surface or wrong probe shape -> alternate_probe
+missing operator/user requirement -> ask_user
+server/process/browser missing or unstable -> terminal_failure with external_change_required
+result re-entered solver and gates allow terminal -> terminal_answer
+otherwise -> continue_reasoning
+```
+
+This lets browser, calculator, docs, repo, workstation, live-source, adapter,
+voice, and future tool families share the same loop boundary while preserving
+their own domain validators. The trace can recommend what to do next, but only
+terminal authority may publish the visible final answer.
+
 ### Operational Constraints And Surface Satisfaction
 
 User constraints about tool families, browser surfaces, and local vocabulary are

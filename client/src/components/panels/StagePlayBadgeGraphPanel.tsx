@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
+import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -794,6 +794,50 @@ function compactTrayMetric(value: string | number | null | undefined, fallback: 
   return text.length > 34 ? `${text.slice(0, 31).trimEnd()}...` : text;
 }
 
+function stagePlayDataFlowRefs(badge: StagePlayBadgeV1): string[] {
+  return uniqueSorted([
+    ...(badge.dataTray?.inputRefs ?? []),
+    ...(badge.dataTray?.outputRefs ?? []),
+    ...(badge.dataTray?.evidenceRefs ?? []),
+  ]);
+}
+
+function hasStagePlayDataFlowTray(badge: StagePlayBadgeV1): boolean {
+  return Boolean(
+    badge.dataTray?.transformLabel ||
+      badge.dataTray?.inputRefs?.length ||
+      badge.dataTray?.outputRefs?.length ||
+      badge.dataTray?.inputPreview ||
+      badge.dataTray?.outputPreview ||
+      badge.dataTray?.skipped?.length ||
+      badge.dataTray?.blockedUntil,
+  );
+}
+
+function copyStagePlayRefs(refs: string[]): void {
+  if (refs.length === 0) return;
+  void navigator.clipboard?.writeText(refs.join("\n")).catch(() => undefined);
+}
+
+function CopyStagePlayRefsButton({ refs, label = "Copy refs" }: { refs: string[]; label?: string }) {
+  if (refs.length === 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        copyStagePlayRefs(refs);
+      }}
+      className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-700 text-slate-400 hover:border-cyan-500 hover:text-cyan-100"
+      aria-label={label}
+      title={label}
+      data-testid="stage-play-copy-data-flow-refs"
+    >
+      <Copy className="h-3 w-3" aria-hidden="true" />
+    </button>
+  );
+}
+
 function firstLiveBindingSummary(badge: StagePlayBadgeV1): string | null {
   const binding = badge.liveBindings.find((entry) =>
     entry.compactValue !== null && entry.compactValue !== undefined && entry.compactValue !== ""
@@ -824,7 +868,7 @@ function observerTrayView(badge: StagePlayBadgeV1, sources: StagePlayObserverSou
     title: badge.dataTray?.title ?? "Observer",
     metric: compactTrayMetric(badge.dataTray?.freshness ?? `${selectedCount}/${sources.length} routed`, "unknown"),
     summary: compactTrayText(
-      `${visualStatus} - ${badge.dataTray?.summary ?? sceneSource?.contribution ?? badge.plainMeaning}`,
+      badge.dataTray?.outputPreview ?? `${visualStatus} - ${badge.dataTray?.summary ?? sceneSource?.contribution ?? badge.plainMeaning}`,
       "No live source summary yet.",
     ),
     detail: compactTrayText(
@@ -844,11 +888,11 @@ function compactObservationTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTray
       "confidence unknown",
     ),
     summary: compactTrayText(
-      badge.dataTray?.summary ?? firstLiveBindingSummary(badge) ?? badge.plainMeaning,
+      badge.dataTray?.outputPreview ?? badge.dataTray?.summary ?? firstLiveBindingSummary(badge) ?? badge.plainMeaning,
       "No compact fact summary yet.",
     ),
     detail: compactTrayText(
-      badge.sourceRefs[0]?.id ?? badge.evidenceRefs[0] ?? "source window pending",
+      badge.dataTray?.transformLabel ?? badge.sourceRefs[0]?.id ?? badge.evidenceRefs[0] ?? "source window pending",
       "source window pending",
     ),
   };
@@ -862,7 +906,7 @@ function askCheckpointTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView 
     title: badge.dataTray?.title ?? "Ask checkpoint",
     metric: compactTrayMetric(checkpoint?.askTurnId ?? "no turn", "no turn"),
     summary: compactTrayText(
-      badge.dataTray?.summary ?? `${solverState}; ${checkpoint?.modelReviewed ? "model reviewed" : "not reviewed"}`,
+      badge.dataTray?.outputPreview ?? badge.dataTray?.summary ?? `${solverState}; ${checkpoint?.modelReviewed ? "model reviewed" : "not reviewed"}`,
       "No answer snapshot yet.",
     ),
     detail: compactTrayText(
@@ -877,7 +921,7 @@ function answerSnapshotTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView
     title: badge.dataTray?.title ?? "Answer snapshot",
     metric: compactTrayMetric(badge.dataTray?.updatedAt ? formatStagePlayClock(badge.dataTray.updatedAt) : "no update", "no update"),
     summary: compactTrayText(
-      badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
+      badge.dataTray?.outputPreview ?? badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
       "No upheld answer snapshot yet.",
     ),
     detail: compactTrayText(
@@ -893,7 +937,7 @@ function outputTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
     title: badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind),
     metric: compactTrayMetric(labelize(outputState), "draft"),
     summary: compactTrayText(
-      badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
+      badge.dataTray?.outputPreview ?? badge.output?.text ?? badge.dataTray?.summary ?? badge.plainMeaning,
       "No output text projected yet.",
     ),
     detail: compactTrayText(
@@ -916,7 +960,8 @@ function badgeTrayView(badge: StagePlayBadgeV1, observerSources: StagePlayObserv
       badge.confidence.toFixed(2),
     ),
     summary: compactTrayText(
-      badge.dataTray?.summary ??
+      badge.dataTray?.outputPreview ??
+        badge.dataTray?.summary ??
         badge.output?.text ??
         firstLiveBindingSummary(badge) ??
         badge.missingEvidence[0] ??
@@ -925,7 +970,7 @@ function badgeTrayView(badge: StagePlayBadgeV1, observerSources: StagePlayObserv
       "No compact tray data yet.",
     ),
     detail: compactTrayText(
-      `${badge.evidenceRefs.length} evidence ref(s)`,
+      badge.dataTray?.transformLabel ?? `${badge.evidenceRefs.length} evidence ref(s)`,
       "0 evidence ref(s)",
     ),
   };
@@ -1384,6 +1429,73 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function StagePlayDataFlowSection({ badge }: { badge: StagePlayBadgeV1 }) {
+  if (!hasStagePlayDataFlowTray(badge)) return null;
+  const inputRefs = badge.dataTray?.inputRefs ?? [];
+  const outputRefs = badge.dataTray?.outputRefs ?? [];
+  const skipped = badge.dataTray?.skipped ?? [];
+  const copyRefs = stagePlayDataFlowRefs(badge);
+  const renderRefs = (refs: string[], empty: string) => refs.length > 0 ? (
+    <div className="mt-1 space-y-1 font-mono text-[11px] text-slate-400">
+      {refs.slice(0, 8).map((ref) => <div key={ref} className="break-all">{ref}</div>)}
+      {refs.length > 8 ? <div className="text-slate-600">+{refs.length - 8} more ref(s)</div> : null}
+    </div>
+  ) : (
+    <div className="mt-1 text-xs text-slate-500">{empty}</div>
+  );
+
+  return (
+    <Section title="Data Flow">
+      <div className="space-y-3 text-xs">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-slate-500">Input</div>
+            {badge.dataTray?.inputPreview ? (
+              <div className="mt-1 rounded border border-slate-800 bg-black/20 p-2 text-slate-300">
+                {badge.dataTray.inputPreview}
+              </div>
+            ) : null}
+            {renderRefs(inputRefs, "No input refs recorded.")}
+          </div>
+          <CopyStagePlayRefsButton refs={copyRefs} label={`Copy data flow refs for ${badge.title}`} />
+        </div>
+        <div>
+          <div className="font-semibold uppercase tracking-wide text-slate-500">Transform</div>
+          <div className="mt-1 rounded border border-cyan-900/70 bg-cyan-950/15 p-2 font-mono text-cyan-100">
+            {badge.dataTray?.transformLabel ?? "No transform label recorded."}
+          </div>
+        </div>
+        <div>
+          <div className="font-semibold uppercase tracking-wide text-slate-500">Output</div>
+          {badge.dataTray?.outputPreview ? (
+            <div className="mt-1 rounded border border-emerald-900/70 bg-emerald-950/15 p-2 text-emerald-100">
+              {badge.dataTray.outputPreview}
+            </div>
+          ) : null}
+          {renderRefs(outputRefs, "No output refs recorded.")}
+        </div>
+        {skipped.length > 0 ? (
+          <div>
+            <div className="font-semibold uppercase tracking-wide text-slate-500">Skipped</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {skipped.map((entry) => (
+                <Badge key={entry} variant="outline" className="border-amber-800 text-amber-100">
+                  {labelize(entry)}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {badge.dataTray?.blockedUntil ? (
+          <div className="rounded border border-amber-900/70 bg-amber-950/20 p-2 text-amber-100">
+            Blocked until: <span className="font-mono">{badge.dataTray.blockedUntil}</span>
+          </div>
+        ) : null}
+      </div>
+    </Section>
+  );
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
@@ -1440,6 +1552,41 @@ function StagePlayFloatingTooltipView({ tooltip }: { tooltip: StagePlayFloatingT
           {proceduralExpression(badge) || labelize(badge.kind)}
         </div>
         <div className="mt-2 text-[11px] leading-relaxed text-slate-400">{badge.plainMeaning}</div>
+        {hasStagePlayDataFlowTray(badge) ? (
+          <div className="mt-2 rounded border border-slate-800 bg-black/25 p-2 text-[10px] leading-relaxed">
+            <div className="font-semibold uppercase tracking-wide text-slate-400">Data flow</div>
+            {badge.dataTray?.inputPreview || badge.dataTray?.inputRefs?.length ? (
+              <div className="mt-1">
+                <span className="text-slate-500">Input:</span>{" "}
+                <span className="font-mono text-slate-200">{badge.dataTray.inputPreview ?? badge.dataTray.inputRefs?.slice(0, 2).join(", ")}</span>
+              </div>
+            ) : null}
+            {badge.dataTray?.transformLabel ? (
+              <div>
+                <span className="text-slate-500">Transform:</span>{" "}
+                <span className="font-mono text-cyan-100">{badge.dataTray.transformLabel}</span>
+              </div>
+            ) : null}
+            {badge.dataTray?.outputPreview || badge.dataTray?.outputRefs?.length ? (
+              <div>
+                <span className="text-slate-500">Output:</span>{" "}
+                <span className="font-mono text-emerald-100">{badge.dataTray.outputPreview ?? badge.dataTray.outputRefs?.slice(0, 2).join(", ")}</span>
+              </div>
+            ) : null}
+            {badge.dataTray?.skipped?.length ? (
+              <div>
+                <span className="text-slate-500">Skipped:</span>{" "}
+                <span className="font-mono text-amber-100">{badge.dataTray.skipped.join(", ")}</span>
+              </div>
+            ) : null}
+            {badge.dataTray?.blockedUntil ? (
+              <div>
+                <span className="text-slate-500">Blocked:</span>{" "}
+                <span className="font-mono text-amber-100">{badge.dataTray.blockedUntil}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {badge.kind === "observer" ? (
           <div className="mt-2 space-y-1">
             {observerSources.slice(0, 5).map((source) => (
@@ -1784,7 +1931,10 @@ function StagePlayGraphCanvas({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-semibold uppercase tracking-wide">{tray.title}</span>
-                  <span className="shrink-0 truncate font-mono text-[9px] text-slate-500">{tray.metric}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="truncate font-mono text-[9px] text-slate-500">{tray.metric}</span>
+                    <CopyStagePlayRefsButton refs={stagePlayDataFlowRefs(badge)} label={`Copy refs for ${badge.title}`} />
+                  </span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
                   {tray.summary}
@@ -2589,6 +2739,8 @@ function Inspector({
           <p>{badge.plainMeaning}</p>
           <p className="mt-2 text-xs text-slate-400">{badge.whyItMatters}</p>
         </Section>
+
+        <StagePlayDataFlowSection badge={badge} />
 
         {badge.kind === "compact_observation" ? (
           <>
