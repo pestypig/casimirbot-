@@ -856,7 +856,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"wait_for_next_summary"');
     expect(source).toContain("Visual summary received.\\nPreview:");
     expect(source).toContain("live_env.read_live_source_mail");
-    expect(source).toContain("unread visual summary");
+    expect(source).toContain("unread live-source update");
     expect(source).toContain('count === "1"');
     expect(source).toContain("Reason:");
     expect(source).toContain("Text / Callout draft");

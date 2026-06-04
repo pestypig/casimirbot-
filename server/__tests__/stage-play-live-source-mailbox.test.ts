@@ -155,7 +155,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(rows.every((row) => row.assistantAnswer === false && row.terminalEligible === false)).toBe(true);
   });
 
-  it("records a model decision as a receipt and re-arms for the next visual summary", () => {
+  it("records a model decision as a receipt and re-arms for the next source update", () => {
     seedVisualEvidence();
     const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
     const mailId = readResult.items[0].mailId;
