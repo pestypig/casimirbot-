@@ -72,10 +72,45 @@ type VoicePriority = "info" | "warn" | "critical" | "action";
 
 const voiceRouter = Router();
 const OPENAI_AUDIO_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
+const BYTES_PER_MIB = 1024 * 1024;
+const DEFAULT_TRANSCRIBE_MAX_HEAP_USED_MIB = 480;
+const DEFAULT_TRANSCRIBE_MAX_RSS_MIB = 900;
 const voiceUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES },
 });
+
+const readPositiveNumberEnv = (name: string, fallback: number): number => {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const readVoiceTranscribeMemoryPressure = (): null | {
+  reason: "heap_used_limit" | "rss_limit";
+  heapUsedMiB: number;
+  rssMiB: number;
+  maxHeapUsedMiB: number;
+  maxRssMiB: number;
+} => {
+  if (String(process.env.VOICE_TRANSCRIBE_MEMORY_GUARD ?? "1").trim() === "0") return null;
+  const maxHeapUsedMiB = readPositiveNumberEnv(
+    "VOICE_TRANSCRIBE_MAX_HEAP_USED_MB",
+    DEFAULT_TRANSCRIBE_MAX_HEAP_USED_MIB,
+  );
+  const maxRssMiB = readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_RSS_MB", DEFAULT_TRANSCRIBE_MAX_RSS_MIB);
+  const memory = process.memoryUsage();
+  const heapUsedMiB = memory.heapUsed / BYTES_PER_MIB;
+  const rssMiB = memory.rss / BYTES_PER_MIB;
+  if (heapUsedMiB >= maxHeapUsedMiB) {
+    return { reason: "heap_used_limit", heapUsedMiB, rssMiB, maxHeapUsedMiB, maxRssMiB };
+  }
+  if (rssMiB >= maxRssMiB) {
+    return { reason: "rss_limit", heapUsedMiB, rssMiB, maxHeapUsedMiB, maxRssMiB };
+  }
+  return null;
+};
 
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(600),
@@ -1996,6 +2031,33 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
     contentType: req.headers["content-type"] ?? null,
     contentLength: req.headers["content-length"] ?? null,
   });
+  res.once("finish", () => {
+    writeVoiceLaneBreadcrumb("voice.transcribe.response_finished", {
+      breadcrumbId,
+      statusCode: res.statusCode,
+    });
+  });
+  const memoryPressure = readVoiceTranscribeMemoryPressure();
+  if (memoryPressure) {
+    writeVoiceLaneBreadcrumb("voice.transcribe.memory_pressure", {
+      breadcrumbId,
+      ...memoryPressure,
+    });
+    return errorEnvelope(
+      res,
+      503,
+      "voice_memory_pressure",
+      "Voice transcription is temporarily paused because the server is under memory pressure.",
+      {
+        reason: memoryPressure.reason,
+        heapUsedMiB: Math.round(memoryPressure.heapUsedMiB),
+        rssMiB: Math.round(memoryPressure.rssMiB),
+        maxHeapUsedMiB: memoryPressure.maxHeapUsedMiB,
+        maxRssMiB: memoryPressure.maxRssMiB,
+      },
+      undefined,
+    );
+  }
   voiceUpload.single("audio")(req, res, async (uploadError?: unknown) => {
     const rawTraceId = typeof req.body?.traceId === "string" ? req.body.traceId.trim() : undefined;
     const traceId = rawTraceId || undefined;

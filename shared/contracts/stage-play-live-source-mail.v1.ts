@@ -179,7 +179,7 @@ export type StagePlayLiveSourceJobStateV1 = {
   raw_content_included: false;
 };
 
-export type HelixSTranscriptRowDraftV1 = {
+export type AskTurnTranscriptRowDraftV1 = {
   rowId: string;
   rowKind:
     | "mail_received"

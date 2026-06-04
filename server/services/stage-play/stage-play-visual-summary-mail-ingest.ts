@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import type { HelixVisualFrameEvidence } from "@shared/helix-visual-frame-evidence";
 import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA,
-  type HelixSTranscriptRowDraftV1,
+  type AskTurnTranscriptRowDraftV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourceMailReadResultV1,
@@ -117,12 +117,12 @@ export function buildMailLoopTranscriptRows(input: {
   readResult?: StagePlayLiveSourceMailReadResultV1 | null;
   decision?: StagePlayLiveSourceMailDecisionV1 | null;
   createdAt?: string;
-}): HelixSTranscriptRowDraftV1[] {
+}): AskTurnTranscriptRowDraftV1[] {
   const createdAt = input.createdAt ?? new Date().toISOString();
-  const rows: HelixSTranscriptRowDraftV1[] = [];
+  const rows: AskTurnTranscriptRowDraftV1[] = [];
   for (const item of input.mailItems ?? []) {
     rows.push({
-      rowId: `helix_s_mail_received:${hashShort(item.mailId)}`,
+      rowId: `ask_turn_mail_received:${hashShort(item.mailId)}`,
       rowKind: "mail_received",
       title: "Observation mail",
       body: `Visual summary received. Preview: ${item.summary.preview}`,
@@ -139,7 +139,7 @@ export function buildMailLoopTranscriptRows(input: {
   }
   if (input.readResult) {
     rows.push({
-      rowId: `helix_s_mail_read_tool_call:${hashShort(input.readResult.readId)}`,
+      rowId: `ask_turn_mail_read_tool_call:${hashShort(input.readResult.readId)}`,
       rowKind: "mail_read_tool_call",
       title: "Tool call",
       body: "live_env.check_live_source_mail",
@@ -155,7 +155,7 @@ export function buildMailLoopTranscriptRows(input: {
       createdAt,
     });
     rows.push({
-      rowId: `helix_s_mail_read_receipt:${hashShort(input.readResult.readId)}`,
+      rowId: `ask_turn_mail_read_receipt:${hashShort(input.readResult.readId)}`,
       rowKind: input.readResult.items.length > 0 ? "mail_read_receipt" : "wait_for_next_summary",
       title: "Tool receipt",
       body: input.readResult.items.length > 0
@@ -175,7 +175,7 @@ export function buildMailLoopTranscriptRows(input: {
   }
   if (input.decision) {
     rows.push({
-      rowId: `helix_s_mail_decision:${hashShort(input.decision.decisionId)}`,
+      rowId: `ask_turn_mail_decision:${hashShort(input.decision.decisionId)}`,
       rowKind: "agent_decision",
       title: "Agent decision",
       body: `${input.decision.decision}: ${input.decision.rationalePreview}`,
@@ -192,7 +192,7 @@ export function buildMailLoopTranscriptRows(input: {
     });
     if (input.decision.voiceCalloutDraft) {
       rows.push({
-        rowId: `helix_s_mail_voice:${hashShort(input.decision.decisionId)}`,
+        rowId: `ask_turn_mail_voice:${hashShort(input.decision.decisionId)}`,
         rowKind: "voice_callout_request",
         title: "Voice callout draft",
         body: input.decision.voiceCalloutDraft.text,
@@ -209,7 +209,7 @@ export function buildMailLoopTranscriptRows(input: {
     }
     if (input.decision.textAnswerDraft) {
       rows.push({
-        rowId: `helix_s_mail_text:${hashShort(input.decision.decisionId)}`,
+        rowId: `ask_turn_mail_text:${hashShort(input.decision.decisionId)}`,
         rowKind: "text_answer",
         title: "Text draft",
         body: input.decision.textAnswerDraft.text,
@@ -225,7 +225,7 @@ export function buildMailLoopTranscriptRows(input: {
       });
     }
     rows.push({
-      rowId: `helix_s_mail_loop_state:${hashShort(input.decision.decisionId)}`,
+      rowId: `ask_turn_mail_loop_state:${hashShort(input.decision.decisionId)}`,
       rowKind: "loop_state",
       title: "Loop state",
       body: input.decision.nextLoopState === "armed_for_next_summary"

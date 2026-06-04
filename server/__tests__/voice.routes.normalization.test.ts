@@ -70,6 +70,9 @@ describe("voice routes normalization", () => {
     process.env.VOICE_SPEAK_MIN_DELTA_DB = "0.1";
     process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED = "1";
     process.env.VOICE_SPEAK_MP3_BITRATE_KBPS = "128";
+    delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
+    delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
+    delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
   });
 
   afterEach(() => {
@@ -82,6 +85,9 @@ describe("voice routes normalization", () => {
     delete process.env.VOICE_SPEAK_MIN_DELTA_DB;
     delete process.env.VOICE_SPEAK_MP3_NORMALIZE_ENABLED;
     delete process.env.VOICE_SPEAK_MP3_BITRATE_KBPS;
+    delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
+    delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
+    delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -160,6 +166,29 @@ describe("voice routes normalization", () => {
       ok: true,
       dryRun: true,
       provider: "dry-run",
+    });
+  });
+
+  it("fails closed before transcription when the server is under memory pressure", async () => {
+    process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB = "1";
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/transcribe")
+      .field("traceId", "trace-memory-pressure")
+      .attach("audio", Buffer.from("voice"), {
+        filename: "input.webm",
+        contentType: "audio/webm",
+      })
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      error: "voice_memory_pressure",
+      message: "Voice transcription is temporarily paused because the server is under memory pressure.",
+      details: {
+        reason: "heap_used_limit",
+        maxHeapUsedMiB: 1,
+      },
     });
   });
 
