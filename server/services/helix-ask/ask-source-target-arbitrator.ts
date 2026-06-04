@@ -19,6 +19,7 @@ import {
 import {
   isContextualLiveSourceCadenceMention,
   isLiveSourceCadenceControlPrompt,
+  isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
@@ -647,6 +648,38 @@ export function arbitrateAskSourceTarget(input: {
         "no_tool_direct",
       ],
       precedenceReason: "explicit_stage_play_reflection_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "live_environment",
+      targetKind: "live_environment",
+      strength: "hard",
+      explicitCues: ["live_source_mail_loop"],
+      reasons: ["explicit_live_source_mail_loop_source_target"],
+      requestedOutputs: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_read_result",
+        "stage_play_live_source_mail_decision",
+        "typed_failure",
+      ],
+      suppressedRoutes: [
+        "visual_deictic",
+        "visual_frame_evidence",
+        "visual_capture_describe",
+        "live_pipeline_control",
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "explicit_live_source_mail_loop_source_target",
       confidence: 0.97,
       allowClientShortcut: false,
       allowNoToolDirect: false,

@@ -50,7 +50,7 @@ const isBackendReasoningPromptWithoutLiveAsk = (text: string): boolean =>
   /\b(?:backend|code|patch(?:es)?|route|runtime|terminal\s+authority|source-targeted|source\s+targeted|audit|controller|boundary|projection|debug|repo|grep|implementation|function|file|server|client)\b/i.test(text) &&
   !hasExplicitLiveOrVisualCue(text);
 
-const isLiveSourceMailLoopPrompt = (text: string): boolean =>
+export const isLiveSourceMailLoopPrompt = (text: string): boolean =>
   /\b(?:watch|monitor|track|observe|read|keep\s+an\s+eye\s+on|tell\s+me\s+if|announce\s+if)\b[\s\S]{0,140}\b(?:live\s+source|visual\s+(?:source|capture|summary|frame)|screen\s+(?:source|summary)|latest\s+visual\s+capture)\b/i.test(text) ||
   /\b(?:live\s+source|visual\s+(?:source|capture|summary|frame)|screen\s+(?:source|summary)|latest\s+visual\s+capture)\b[\s\S]{0,140}\b(?:watch|monitor|track|observe|read|changes?|happens?|announce|important)\b/i.test(text);
 

@@ -133,7 +133,9 @@ const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
   const text = artifactText(artifact);
   return /^Stage Play checkpoint request (?:queued|running|completed):/i.test(text ?? "")
     ? text!
-    : stagePlayReceiptPendingText;
+    : /^Stage Play/i.test(text ?? "")
+      ? stagePlayReceiptPendingText
+      : text || stagePlayReceiptPendingText;
 };
 
 const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean =>

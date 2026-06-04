@@ -63,6 +63,12 @@ const defaultVoicePolicy = (input?: Partial<StagePlayLiveSourceVoicePolicyV1> | 
 const isVoiceRequestedTool = (tool: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null | undefined): boolean =>
   Boolean(tool?.toolName && /\b(?:voice(?:_delivery|\.speak)?|confirm_speak|speak)\b/i.test(tool.toolName));
 
+const mailItemCanBeDeliveredToAsk = (
+  item: StagePlayLiveSourceMailItemV1,
+  input?: { includeDelivered?: boolean },
+): boolean =>
+  item.status === "unread" || (input?.includeDelivered === true && item.status === "delivered_to_ask");
+
 export function enqueueVisualSummaryMailFromEvidence(input: {
   threadId: string;
   roomId?: string | null;
@@ -311,7 +317,9 @@ export function readLiveSourceMailForAsk(input: {
       objective,
       now: input.now,
     });
-    if (latest) items = [latest];
+    if (latest && mailItemCanBeDeliveredToAsk(latest, { includeDelivered: input.includeRead === true })) {
+      items = [latest];
+    }
   }
   const now = input.now ?? new Date().toISOString();
   const delivered = markStagePlayMailDeliveredToAsk(items.map((item) => item.mailId), now);

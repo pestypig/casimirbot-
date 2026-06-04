@@ -8,6 +8,7 @@ import {
 } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
 import {
   enqueueStagePlayLiveSourceMailItem,
+  listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
   resetStagePlayLiveSourceMailboxForTest,
@@ -383,6 +384,49 @@ describe("Stage Play live-source mailbox", () => {
     expect(rows.map((row) => row.rowKind)).not.toContain("text_answer");
     expect(rows.map((row) => row.rowKind)).not.toContain("voice_callout_request");
     expect(rows.every((row) => row.assistantAnswer === false && row.terminalEligible === false)).toBe(true);
+  });
+
+  it("does not re-deliver a visual summary mail item after a decision is recorded", () => {
+    seedVisualEvidence();
+    const firstRead = readLiveSourceMailForAsk({
+      threadId,
+      roomId,
+      sourceId,
+      limit: 1,
+      now: "2026-06-04T12:00:13.000Z",
+    });
+    const mailId = firstRead.items[0].mailId;
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mailId],
+      decision: "wait_for_next_summary",
+      rationalePreview: "No high-salience change yet; wait for the next interval summary.",
+      evidenceRefs: firstRead.evidenceRefs,
+      now: "2026-06-04T12:00:14.000Z",
+    });
+
+    const secondRead = readLiveSourceMailForAsk({
+      threadId,
+      roomId,
+      sourceId,
+      limit: 1,
+      now: "2026-06-04T12:00:15.000Z",
+    });
+
+    expect(secondRead.items).toEqual([]);
+    expect(secondRead.priorDecisionRefs).toContain(decision.decisionId);
+    expect(listStagePlayLiveSourceMailItems({ threadId, status: "decision_recorded" }).map((item) => item.mailId)).toEqual([
+      mailId,
+    ]);
+    expect(listStagePlayMailDecisions({ threadId, mailId })).toHaveLength(1);
+    expect(listStagePlayLiveSourceJobStates({ threadId })[0]).toMatchObject({
+      status: "armed",
+      mailboxCursor: mailId,
+      lastDecisionId: decision.decisionId,
+      nextLoopState: "armed_for_next_summary",
+    });
   });
 
   it("persists a requested next tool on the mail decision receipt", () => {

@@ -132,8 +132,16 @@ describe("Helix Ask Stage Play routing", () => {
 
     expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
       goal_kind: "live_environment_review",
+      required_terminal_kind: "model_synthesized_answer",
     });
     expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
     expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
       .toEqual(expect.arrayContaining([
         "live_env.read_live_source_mail",
@@ -164,8 +172,13 @@ describe("Helix Ask Stage Play routing", () => {
       decision: "wait_for_next_summary",
       nextLoopState: "armed_for_next_summary",
     });
+    expect(response.body?.terminal_artifact_kind, routeDebug).toBe("model_synthesized_answer");
+    expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).not.toContain("terminal_route_mismatch");
     expect(response.body?.answer, routeDebug).not.toContain("visual evidence is unavailable");
     expect(response.body?.answer, routeDebug).not.toContain("visual capture evidence is unavailable");
+    expect(response.body?.answer, routeDebug).toContain("wait_for_next_summary");
+    expect(response.body?.answer, routeDebug).toContain("waiting for the next visual summary");
+    expect(response.body?.answer, routeDebug).not.toContain("one unread live-source mail item requiring a decision");
   }, 30_000);
 
   it("answers Stage Play panel concept questions from repo/product evidence instead of live environment state", async () => {
