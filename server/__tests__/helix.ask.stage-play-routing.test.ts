@@ -12,6 +12,12 @@ import {
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
 import {
+  analyzeVisualFrame,
+  recordVisualFrame,
+  resetVisualSnapshotStoreForTest,
+  startVisualSnapshotSource,
+} from "../services/situation-room/visual-snapshot-store";
+import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
@@ -25,6 +31,7 @@ import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runti
 import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-badge-graph-builder";
 import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-play/stage-play-ask-checkpoint-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
+import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -42,8 +49,10 @@ beforeEach(() => {
   resetLiveSourceObservationStoreForTest();
   resetLiveSourceDescriptorsForTest();
   resetLiveSourceChunkBufferForTest();
+  resetVisualSnapshotStoreForTest();
   resetStagePlayAskCheckpointReceiptsForTest();
   resetStagePlayCheckpointQueueForTest();
+  resetStagePlayLiveSourceMailboxForTest();
 });
 
 describe("Helix Ask Stage Play routing", () => {
@@ -72,6 +81,92 @@ describe("Helix Ask Stage Play routing", () => {
       raw_content_included: false,
     });
   });
+
+  it("routes visual watch prompts through live-source mail and records a decision", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:stage-play-mail-route",
+      ts: "2026-06-04T16:30:00.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:stage-play-mail-route",
+      summary: "Minecraft-like scene with a player near a cat, book stand, and distant mountains.",
+      supports_claims: [
+        {
+          claim: "The active visual source has compact evidence.",
+          support_status: "supports",
+          confidence: 0.82,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Watch this visual source and tell me if anything important happens.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      canonical: response.body?.canonical_goal_frame,
+      terminalContract: response.body?.goal_satisfaction_evaluation?.terminal_contract,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      currentTurnArtifactKinds: response.body?.current_turn_artifact_ledger?.map((artifact: any) => artifact?.kind),
+    }, null, 2);
+
+    expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
+      goal_kind: "live_environment_review",
+    });
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
+    expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
+      .toEqual(expect.arrayContaining([
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ]));
+    const liveToolArtifacts = response.body?.current_turn_artifact_ledger
+      ?.filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
+      ?? [];
+    const readArtifact = liveToolArtifacts.find((artifact: any) =>
+      artifact?.payload?.tool_name === "live_env.read_live_source_mail"
+    );
+    expect(readArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_read_result",
+      items: [
+        expect.objectContaining({
+          sourceRefs: expect.objectContaining({
+            frameRef: "visual_frame:stage-play-mail-route",
+            evidenceRef: "visual_evidence:stage-play-mail-route",
+          }),
+        }),
+      ],
+    });
+    const decisionArtifact = liveToolArtifacts.find((artifact: any) =>
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "wait_for_next_summary",
+      nextLoopState: "armed_for_next_summary",
+    });
+    expect(response.body?.answer, routeDebug).not.toContain("visual evidence is unavailable");
+    expect(response.body?.answer, routeDebug).not.toContain("visual capture evidence is unavailable");
+  }, 30_000);
 
   it("answers Stage Play panel concept questions from repo/product evidence instead of live environment state", async () => {
     const response = await request(createApp())

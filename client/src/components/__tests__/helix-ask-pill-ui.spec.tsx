@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 
 let mergeVoiceTranscriptDraft: typeof import("@/components/helix/HelixAskPill").mergeVoiceTranscriptDraft;
+let resolveVoiceDispatchTranscriptFromDraft: typeof import("@/components/helix/HelixAskPill").resolveVoiceDispatchTranscriptFromDraft;
 let buildVoiceInputStatusLabel: typeof import("@/components/helix/HelixAskPill").buildVoiceInputStatusLabel;
 let scoreConversationCompletion: typeof import("@/components/helix/HelixAskPill").scoreConversationCompletion;
 let shouldDispatchReasoningAttempt: typeof import("@/components/helix/HelixAskPill").shouldDispatchReasoningAttempt;
@@ -89,11 +90,13 @@ let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixA
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
+let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({
     mergeVoiceTranscriptDraft,
+    resolveVoiceDispatchTranscriptFromDraft,
     buildVoiceInputStatusLabel,
     scoreConversationCompletion,
     shouldDispatchReasoningAttempt,
@@ -179,6 +182,7 @@ beforeAll(async () => {
     readReasoningTheaterHardFailureSignals,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
+    evaluateVoiceAutoDispatchGovernance,
   } = await import("@/components/helix/HelixAskPill"));
 });
 
@@ -2386,6 +2390,59 @@ describe("HelixAskPill mic helper behavior", () => {
     expect(shouldDispatchReasoningAttempt("thanks")).toBe(false);
   });
 
+  it("keeps passive voice observations from becoming automatic dispatches", () => {
+    const passive = evaluateVoiceAutoDispatchGovernance({
+      transcript: "earlier you mentioned the Dottie voice lane",
+      micArmState: "on",
+      confidence: 0.92,
+      queueDepth: 0,
+      activeDispatchCount: 0,
+    });
+    expect(passive.admitted).toBe(false);
+    expect(passive.reason).toBe("observe_only_by_default");
+    expect(passive.assistant_answer).toBe(false);
+    expect(passive.instruction_authority).toBe("none");
+
+    const explicitAsk = evaluateVoiceAutoDispatchGovernance({
+      transcript: "Can you explain what the voice lane is doing?",
+      micArmState: "on",
+      confidence: 0.92,
+      queueDepth: 0,
+      activeDispatchCount: 0,
+    });
+    expect(explicitAsk.admitted).toBe(true);
+    expect(explicitAsk.reason).toBe("admitted_explicit_user_turn");
+  });
+
+  it("blocks voice auto-dispatch under echo, queue, and budget pressure", () => {
+    expect(
+      evaluateVoiceAutoDispatchGovernance({
+        transcript: "Can you explain this?",
+        micArmState: "on",
+        confidence: 0.95,
+        possibleTtsEcho: true,
+      }).reason,
+    ).toBe("possible_tts_echo");
+    expect(
+      evaluateVoiceAutoDispatchGovernance({
+        transcript: "Can you explain this?",
+        micArmState: "on",
+        confidence: 0.95,
+        queueDepth: 4,
+        maxQueueDepth: 4,
+      }).reason,
+    ).toBe("queue_backpressure");
+    expect(
+      evaluateVoiceAutoDispatchGovernance({
+        transcript: "Can you explain this?",
+        micArmState: "on",
+        confidence: 0.95,
+        activeDispatchCount: 3,
+        maxAutoDispatchPerWindow: 3,
+      }).reason,
+    ).toBe("auto_dispatch_budget_exceeded");
+  });
+
   it("keeps smalltalk fast-path outputs in the brief lane", () => {
     expect(shouldKeepHelixReplyInBriefLane(undefined)).toBe(false);
     expect(
@@ -2889,6 +2946,56 @@ describe("HelixAskPill mic helper behavior", () => {
         "Transition phrase with additional detail.",
       ),
     ).toBe("First sentence. Transition phrase with additional detail.");
+  });
+
+  it("uses the accumulated visible draft as the voice dispatch source when it contains the latest fragment", () => {
+    expect(
+      resolveVoiceDispatchTranscriptFromDraft({
+        draftText: "First thing I said. Second thing I said. Final send sentence.",
+        assemblerTranscript: "Final send sentence.",
+        recordedText: "Final send sentence.",
+      }),
+    ).toEqual({
+      transcript: "First thing I said. Second thing I said. Final send sentence.",
+      recordedText: "First thing I said. Second thing I said. Final send sentence.",
+      source: "draft",
+    });
+  });
+
+  it("merges the visible draft and assembler fragment before voice dispatch when they diverge", () => {
+    expect(
+      resolveVoiceDispatchTranscriptFromDraft({
+        draftText: "First thing I said.",
+        assemblerTranscript: "Second thing I said.",
+      }),
+    ).toEqual({
+      transcript: "First thing I said. Second thing I said.",
+      recordedText: "First thing I said. Second thing I said.",
+      source: "merged",
+    });
+  });
+
+  it("falls back to whichever voice dispatch transcript source has text", () => {
+    expect(
+      resolveVoiceDispatchTranscriptFromDraft({
+        draftText: "",
+        assemblerTranscript: "Only assembler text.",
+      }),
+    ).toEqual({
+      transcript: "Only assembler text.",
+      recordedText: "Only assembler text.",
+      source: "assembler",
+    });
+    expect(
+      resolveVoiceDispatchTranscriptFromDraft({
+        draftText: "Only visible draft text.",
+        assemblerTranscript: "",
+      }),
+    ).toEqual({
+      transcript: "Only visible draft text.",
+      recordedText: "Only visible draft text.",
+      source: "draft",
+    });
   });
 
   it("smooths the level meter with attack/release behavior", () => {

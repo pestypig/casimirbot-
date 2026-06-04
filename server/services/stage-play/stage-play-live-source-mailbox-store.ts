@@ -266,6 +266,7 @@ export function recordStagePlayMailDecision(input: {
   voiceCalloutDraft?: string | null;
   voiceEligible?: boolean | null;
   voiceRequiresConfirmation?: boolean | null;
+  voicePolicy?: StagePlayLiveSourceMailDecisionV1["voicePolicy"];
   requestedTool?: StagePlayLiveSourceMailDecisionV1["requestedTool"];
   nextLoopState?: StagePlayNextLoopStateV1 | null;
   nextExpectedSourceKind?: StagePlayLiveSourceMailDecisionV1["nextExpectedSourceKind"];
@@ -319,6 +320,7 @@ export function recordStagePlayMailDecision(input: {
           requiresConfirmation: input.voiceRequiresConfirmation === true,
         }
       : null,
+    voicePolicy: input.voicePolicy ?? null,
     requestedTool: input.requestedTool ?? null,
     nextLoopState,
     nextExpectedSourceKind: input.nextExpectedSourceKind ?? mailItems[0]?.sourceKind ?? "visual_frame",

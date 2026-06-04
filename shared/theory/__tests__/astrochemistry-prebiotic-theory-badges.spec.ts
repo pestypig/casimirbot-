@@ -18,12 +18,20 @@ describe("astrochemistry/prebiotic theory badges", () => {
 
     expect(branchBadgeIds).toContain("astrochemistry.aromatic_carbon.interstellar_context");
     expect(branchBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
+    expect(branchBadgeIds).toContain("astrochemistry.pah.spectral_family_context");
+    expect(branchBadgeIds).toContain("prebiotic.inventory.meteoritic_organics_context");
+    expect(branchBadgeIds).toContain("prebiotic.photochemistry.radiation_processing_context");
+    expect(branchBadgeIds).toContain("prebiotic.surface_catalysis.mineral_aqueous_context");
     expect(branchBadgeIds).toContain("prebiotic.aromatic_ring.coupled_oscillator_context");
+    expect(branchBadgeIds).toContain("prebiotic.coherence.decoherence_lifetime_gate");
     expect(branchBadgeIds).toContain("prebiotic.rna_world.ribozyme_context");
+    expect(branchBadgeIds).toContain("prebiotic.claim_boundary.dopamine_not_pah_shortcut");
     expect(branchBadgeIds).toContain("biophysics.membrane.open_system_entropy_flow");
     expect(branchBadgeIds).toContain("orch_or.claim_boundary.prebiotic_consciousness_exploratory_only");
 
     expect(graphBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
+    expect(graphBadgeIds).toContain("prebiotic.inventory.meteoritic_organics_context");
+    expect(graphBadgeIds).toContain("prebiotic.claim_boundary.dopamine_not_pah_shortcut");
     expect(graphBadgeIds).toContain("orch_or.claim_boundary.prebiotic_consciousness_exploratory_only");
     expect(isTheoryBadgeGraphV1(graph)).toBe(true);
   });
@@ -34,7 +42,10 @@ describe("astrochemistry/prebiotic theory badges", () => {
       graph,
       badgeIds: [
         "astrochemistry.fullerene.c60_stellar_context",
+        "astrochemistry.pah.spectral_family_context",
+        "prebiotic.photochemistry.radiation_processing_context",
         "prebiotic.aromatic_ring.coupled_oscillator_context",
+        "prebiotic.coherence.decoherence_lifetime_gate",
         "biophysics.membrane.open_system_entropy_flow",
       ],
       mode: "selected_badges",
@@ -46,7 +57,10 @@ describe("astrochemistry/prebiotic theory badges", () => {
 
     expect(solveExpressions).toContain("f_C60_Hz = c/lambda_C60_m");
     expect(solveExpressions).toContain("E_C60_J = h*f_C60_Hz");
+    expect(solveExpressions).toContain("E_PAH_J = h*c/lambda_PAH_m");
+    expect(solveExpressions).toContain("photon_fluence_m2 = photon_flux_m2_s*t_exposure_s");
     expect(solveExpressions).toContain("delta_omega_rad_s = abs(omega_1_rad_s - omega_2_rad_s)");
+    expect(solveExpressions).toContain("coherence_surplus_s = tau_coherence_s - tau_candidate_s");
     expect(solveExpressions).toContain("dS_system_dt = sigma_entropy_production + Phi_entropy_flow");
   });
 
@@ -79,6 +93,18 @@ describe("astrochemistry/prebiotic theory badges", () => {
         expect.objectContaining({ symbol: "N_rings", dimensionSignature: "1" }),
       ]),
     );
+    expect(byId.get("prebiotic.photochemistry.radiation_processing_context")?.units).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "photon_flux_m2_s", dimensionSignature: "L^-2 T^-1" }),
+        expect.objectContaining({ symbol: "photon_fluence_m2", dimensionSignature: "L^-2" }),
+      ]),
+    );
+    expect(byId.get("prebiotic.coherence.decoherence_lifetime_gate")?.units).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "tau_coherence_s", dimensionSignature: "T" }),
+        expect.objectContaining({ symbol: "coherence_surplus_s", dimensionSignature: "T" }),
+      ]),
+    );
   });
 
   it("allows Orch-OR adjacency only through an exploratory boundary", () => {
@@ -98,6 +124,11 @@ describe("astrochemistry/prebiotic theory badges", () => {
     expect(branch.edges).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          from: "prebiotic.claim_boundary.dopamine_not_pah_shortcut",
+          to: "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
+          relation: "documents",
+        }),
+        expect.objectContaining({
           from: "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
           to: "orch_or.claim_boundary.exploratory_only",
           relation: "documents",
@@ -110,7 +141,7 @@ describe("astrochemistry/prebiotic theory badges", () => {
     const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
 
     expect(JSON.stringify(branch)).not.toMatch(
-      /buckyballs caused life|pleasure optimization is a law|OR validated|consciousness validated|wavefunction-collapse biology validated|dopamine is a PAH/i,
+      /buckyballs caused life|pleasure optimization is a law|OR validated|consciousness validated|wavefunction-collapse biology validated|PAHs become dopamine|PAH chemistry proves reward/i,
     );
   });
 });

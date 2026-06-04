@@ -85,6 +85,55 @@ describe("runtime memory governor", () => {
     expect(decision.reason).toBe("rss_limit");
   });
 
+  it("uses higher default voice STT headroom in development", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 600 * mib, rss: 1100 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+
+      expect(decision.admitted).toBe(true);
+      expect(decision.limits.maxHeapUsedMiB).toBe(720);
+      expect(decision.limits.maxRssMiB).toBe(1400);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("keeps explicit voice STT env limits authoritative in development", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB = "480";
+      process.env.VOICE_TRANSCRIBE_MAX_RSS_MB = "900";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 600 * mib, rss: 700 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.reason).toBe("heap_used_limit");
+      expect(decision.limits.maxHeapUsedMiB).toBe(480);
+      expect(decision.limits.maxRssMiB).toBe(900);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
   it("allows guard disabled mode", () => {
     process.env.VOICE_TRANSCRIBE_MEMORY_GUARD = "0";
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
@@ -175,4 +224,3 @@ describe("runtime memory governor", () => {
     expect(decision.reason).toBe("critical_bypass");
   });
 });
-

@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Bug, Copy, Image as ImageIcon, Mic, Plus, Radio, Search, Square, Volume2, X } from "lucide-react";
+import { BrainCircuit, Bug, Copy, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -548,6 +548,17 @@ const HELIX_VOICE_COMMAND_LANE_ENABLED = parseVoiceEnvBoolean(
   "VITE_HELIX_VOICE_COMMAND_LANE_ENABLED",
   false,
 );
+const HELIX_VOICE_TRANSCRIBE_QUEUE_MAX = Math.max(
+  1,
+  Math.floor(readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_TRANSCRIBE_QUEUE_MAX, 4)),
+);
+const HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE = Math.max(
+  1,
+  Math.floor(readNumber((import.meta as any)?.env?.VITE_HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE, 3)),
+);
+const HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS = 60_000;
+const HELIX_VOICE_AUTO_DISPATCH_CONFIDENCE_FLOOR = 0.5;
+const HELIX_VOICE_TRANSCRIBE_PRESSURE_RETRY_DELAY_MS = 2_500;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_CONFIDENCE_MIN = 0.62;
 const HELIX_WORKSTATION_INTENT_CLASSIFIER_TIMEOUT_MS = 1800;
 const HELIX_EXTERNAL_PROMPT_CLAIM_TTL_MS = 120_000;
@@ -2268,6 +2279,132 @@ type VoiceConfirmedTurn = {
   translationUncertain: boolean;
 };
 
+type VoiceTranscribeQueuedSegment = {
+  id: string;
+  blob: Blob;
+  durationMs: number;
+  cutAtMs: number;
+  turnKey: string;
+  speakerId?: string | null;
+  speakerConfidence?: number | null;
+  speechProbability?: number | null;
+  snrDb?: number | null;
+  lowAudioQuality?: boolean;
+  confirmBias?: number;
+};
+
+type RetainedVoiceTranscriptionRetry = {
+  segment: VoiceTranscribeQueuedSegment;
+  retainedAtMs: number;
+  retryCount: number;
+  reason: "voice_memory_pressure" | "queue_backpressure";
+  message: string;
+};
+
+export type VoiceAutoDispatchGovernanceReason =
+  | "admitted_explicit_user_turn"
+  | "admitted_forced_reasoning"
+  | "empty_transcript"
+  | "mic_not_armed"
+  | "possible_tts_echo"
+  | "blocked_interpreter_dispatch"
+  | "confidence_below_auto_dispatch_floor"
+  | "auto_dispatch_budget_exceeded"
+  | "queue_backpressure"
+  | "observe_only_by_default";
+
+export type VoiceAutoDispatchGovernance = {
+  schema: "helix.voice_auto_dispatch_governance.v1";
+  admitted: boolean;
+  reason: VoiceAutoDispatchGovernanceReason;
+  candidateDispatchHint: boolean;
+  queueDepth: number;
+  activeDispatchCount: number;
+  confidence: number | null;
+  assistant_answer: false;
+  raw_content_included: false;
+  output_authority: "admission_trace";
+  instruction_authority: "none";
+};
+
+function isExplicitVoiceAskTurnCandidate(transcript: string): boolean {
+  const text = transcript.trim();
+  if (!text) return false;
+  if (shouldDispatchReasoningAttempt(text)) return true;
+  if (isSimpleConversationTurnCandidate(text)) return true;
+  return /\b(?:ask|question|tell me|explain|summari[sz]e|review|what|why|how|can you|could you|please|send|submit)\b/i.test(
+    text,
+  );
+}
+
+export function evaluateVoiceAutoDispatchGovernance(args: {
+  transcript: string;
+  micArmState: MicArmState;
+  confidence?: number | null;
+  dispatchState?: VoiceConfirmedTurn["dispatchState"];
+  interpreterDispatchState?: VoiceConfirmedTurn["interpreterDispatchState"];
+  possibleTtsEcho?: boolean;
+  forceReasoningAfterWorkstation?: boolean;
+  queueDepth?: number;
+  activeDispatchCount?: number;
+  maxAutoDispatchPerWindow?: number;
+  maxQueueDepth?: number;
+}): VoiceAutoDispatchGovernance {
+  const transcript = args.transcript.trim();
+  const confidence = typeof args.confidence === "number" && Number.isFinite(args.confidence) ? args.confidence : null;
+  const queueDepth = Math.max(0, Math.floor(args.queueDepth ?? 0));
+  const activeDispatchCount = Math.max(0, Math.floor(args.activeDispatchCount ?? 0));
+  const maxAutoDispatchPerWindow = Math.max(
+    1,
+    Math.floor(args.maxAutoDispatchPerWindow ?? HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE),
+  );
+  const maxQueueDepth = Math.max(1, Math.floor(args.maxQueueDepth ?? HELIX_VOICE_TRANSCRIBE_QUEUE_MAX));
+  const candidateDispatchHint =
+    args.forceReasoningAfterWorkstation === true || isExplicitVoiceAskTurnCandidate(transcript);
+  let reason: VoiceAutoDispatchGovernanceReason = "admitted_explicit_user_turn";
+  let admitted = true;
+  if (!transcript) {
+    admitted = false;
+    reason = "empty_transcript";
+  } else if (args.micArmState !== "on") {
+    admitted = false;
+    reason = "mic_not_armed";
+  } else if (args.possibleTtsEcho === true) {
+    admitted = false;
+    reason = "possible_tts_echo";
+  } else if (args.dispatchState === "blocked" || args.interpreterDispatchState === "blocked") {
+    admitted = false;
+    reason = "blocked_interpreter_dispatch";
+  } else if (confidence !== null && confidence < HELIX_VOICE_AUTO_DISPATCH_CONFIDENCE_FLOOR) {
+    admitted = false;
+    reason = "confidence_below_auto_dispatch_floor";
+  } else if (queueDepth >= maxQueueDepth) {
+    admitted = false;
+    reason = "queue_backpressure";
+  } else if (activeDispatchCount >= maxAutoDispatchPerWindow) {
+    admitted = false;
+    reason = "auto_dispatch_budget_exceeded";
+  } else if (!candidateDispatchHint) {
+    admitted = false;
+    reason = "observe_only_by_default";
+  } else if (args.forceReasoningAfterWorkstation === true) {
+    reason = "admitted_forced_reasoning";
+  }
+  return {
+    schema: "helix.voice_auto_dispatch_governance.v1",
+    admitted,
+    reason,
+    candidateDispatchHint,
+    queueDepth,
+    activeDispatchCount,
+    confidence,
+    assistant_answer: false,
+    raw_content_included: false,
+    output_authority: "admission_trace",
+    instruction_authority: "none",
+  };
+}
+
 export type VoiceAutoSpeakTask = {
   key: string;
   kind: VoicePlaybackUtteranceKind;
@@ -3468,6 +3605,67 @@ export function mergeVoiceTranscriptDraft(currentDraft: string, transcript: stri
   }
   const joiner = normalizedDraft && !/\s$/.test(normalizedDraft) ? " " : "";
   return `${normalizedDraft}${joiner}${normalizedSegment}`;
+}
+
+export type VoiceDispatchTranscriptSource = "draft" | "assembler" | "merged" | "empty";
+
+export function resolveVoiceDispatchTranscriptFromDraft(args: {
+  draftText?: string | null;
+  assemblerTranscript?: string | null;
+  recordedText?: string | null;
+}): {
+  transcript: string;
+  recordedText: string;
+  source: VoiceDispatchTranscriptSource;
+} {
+  const draftText = (args.draftText ?? "").trim();
+  const assemblerTranscript = (args.assemblerTranscript ?? "").trim();
+  const recordedText = (args.recordedText ?? "").trim();
+  const resolveRecordedText = (transcript: string): string => {
+    if (!recordedText) return transcript;
+    const normalizedRecorded = recordedText.toLowerCase();
+    const normalizedTranscript = transcript.toLowerCase();
+    return normalizedRecorded.includes(normalizedTranscript) ? recordedText : transcript;
+  };
+  if (!draftText && !assemblerTranscript) {
+    return { transcript: "", recordedText: "", source: "empty" };
+  }
+  if (!draftText) {
+    return {
+      transcript: assemblerTranscript,
+      recordedText: resolveRecordedText(assemblerTranscript),
+      source: "assembler",
+    };
+  }
+  if (!assemblerTranscript) {
+    return {
+      transcript: draftText,
+      recordedText: resolveRecordedText(draftText),
+      source: "draft",
+    };
+  }
+  const normalizedDraft = draftText.toLowerCase();
+  const normalizedAssembler = assemblerTranscript.toLowerCase();
+  if (normalizedDraft.includes(normalizedAssembler) || normalizedDraft.startsWith(normalizedAssembler)) {
+    return {
+      transcript: draftText,
+      recordedText: resolveRecordedText(draftText),
+      source: "draft",
+    };
+  }
+  if (normalizedAssembler.includes(normalizedDraft) || normalizedAssembler.startsWith(normalizedDraft)) {
+    return {
+      transcript: assemblerTranscript,
+      recordedText: resolveRecordedText(assemblerTranscript),
+      source: "assembler",
+    };
+  }
+  const mergedTranscript = mergeVoiceTranscriptDraft(draftText, assemblerTranscript).trim();
+  return {
+    transcript: mergedTranscript,
+    recordedText: resolveRecordedText(mergedTranscript),
+    source: "merged",
+  };
 }
 
 export function shouldMergeVoiceContinuationTurn(args: {
@@ -5830,6 +6028,15 @@ function describeVoiceInputError(error: unknown): string {
     }
   }
   return "Voice input unavailable.";
+}
+
+function isVoiceMemoryPressureError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as { status?: unknown }).status;
+  return (
+    status === 503 &&
+    /voice_memory_pressure|memory pressure|temporarily paused/i.test(error.message)
+  );
 }
 
 type HelixAskReply = {
@@ -16158,27 +16365,19 @@ export function HelixAskPill({
   const voiceTrackMutedRef = useRef(false);
   const voiceSegmentStartMsRef = useRef<number | null>(null);
   const voiceSegmentStartIndexRef = useRef(0);
-  const voiceTranscribeQueueRef = useRef<
-    Array<{
-      id: string;
-      blob: Blob;
-      durationMs: number;
-      cutAtMs: number;
-      turnKey: string;
-      speakerId?: string | null;
-      speakerConfidence?: number | null;
-      speechProbability?: number | null;
-      snrDb?: number | null;
-      lowAudioQuality?: boolean;
-      confirmBias?: number;
-    }>
-  >([]);
+  const voiceTranscribeQueueRef = useRef<VoiceTranscribeQueuedSegment[]>([]);
   const voiceSpeechActivitySeqRef = useRef(0);
   const voiceQueuedSegmentSeqRef = useRef(0);
   const voiceActiveSegmentAnalysisRef = useRef<VoiceSegmentAnalysisAccumulator | null>(null);
   const voiceSessionSpeakerProfilesRef = useRef<VoiceSessionSpeakerProfile[]>([]);
   const voiceSessionSpeakerActiveIdRef = useRef<string | null>(null);
   const voiceConfirmedTurnQueueRef = useRef<VoiceConfirmedTurn[]>([]);
+  const voiceAutoDispatchWindowRef = useRef<number[]>([]);
+  const voiceRetainedTranscriptionRetryRef = useRef<RetainedVoiceTranscriptionRetry | null>(null);
+  const [voiceRetainedTranscriptionRetry, setVoiceRetainedTranscriptionRetry] =
+    useState<RetainedVoiceTranscriptionRetry | null>(null);
+  const voiceTranscribeBackoffUntilMsRef = useRef<number | null>(null);
+  const voiceTranscribeBackoffTimerRef = useRef<number | null>(null);
   const transcriptConfirmStateRef = useRef<TranscriptConfirmState | null>(null);
   const transcriptConfirmAutoTimerRef = useRef<number | null>(null);
   const transcriptConfirmAutoDeadlineMsRef = useRef<number | null>(null);
@@ -20195,6 +20394,16 @@ export function HelixAskPill({
     [askLiveTraceId, buildCopyText, enqueueVoicePlaybackIntent, primeVoiceAudioPlayback, readAloudByReply, stopReadAloud],
   );
 
+  const clearRetainedVoiceTranscriptionRetry = useCallback(() => {
+    voiceRetainedTranscriptionRetryRef.current = null;
+    setVoiceRetainedTranscriptionRetry(null);
+    voiceTranscribeBackoffUntilMsRef.current = null;
+    if (voiceTranscribeBackoffTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(voiceTranscribeBackoffTimerRef.current);
+      voiceTranscribeBackoffTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (micArmState !== "off") return;
     voiceAutoSpeakQueueRef.current = [];
@@ -20211,6 +20420,7 @@ export function HelixAskPill({
     voiceActiveAssemblerTurnKeyRef.current = null;
     clearVoiceSealPollTimer();
     clearHeldTranscriptState();
+    clearRetainedVoiceTranscriptionRetry();
     setTranscriptConfirmState(null);
     voiceDivergenceEventsRef.current = [];
     voiceBargeResumeNotBeforeMsRef.current = null;
@@ -20218,7 +20428,13 @@ export function HelixAskPill({
     voiceBargeHoldTurnKeyRef.current = null;
     voiceBargeHoldStartedAtMsRef.current = null;
     stopReadAloud("mic_off");
-  }, [clearHeldTranscriptState, clearVoiceSealPollTimer, micArmState, stopReadAloud]);
+  }, [
+    clearHeldTranscriptState,
+    clearRetainedVoiceTranscriptionRetry,
+    clearVoiceSealPollTimer,
+    micArmState,
+    stopReadAloud,
+  ]);
 
   const handleOpenConversationPanel = useCallback(() => {
     const sessionId = getHelixAskSessionId();
@@ -23830,6 +24046,8 @@ export function HelixAskPill({
       voiceSessionSpeakerProfilesRef.current = [];
       voiceSessionSpeakerActiveIdRef.current = null;
       voiceTranscribeQueueRef.current = [];
+      voiceAutoDispatchWindowRef.current = [];
+      clearRetainedVoiceTranscriptionRetry();
       voiceTranscribeBusyRef.current = false;
       clearVoiceSealPollTimer();
       voiceTurnAssemblerByTurnKeyRef.current = {};
@@ -23876,7 +24094,7 @@ export function HelixAskPill({
       }
       voiceBargeResumeNotBeforeMsRef.current = null;
     },
-    [clearHeldTranscriptState, clearVoiceSealPollTimer],
+    [clearHeldTranscriptState, clearRetainedVoiceTranscriptionRetry, clearVoiceSealPollTimer],
   );
 
   const runAskRef = useRef<
@@ -23942,6 +24160,74 @@ export function HelixAskPill({
           eventSeq: assemblerSnapshot?.eventSeq ?? null,
         },
       });
+      const nowMs = Date.now();
+      voiceAutoDispatchWindowRef.current = voiceAutoDispatchWindowRef.current.filter(
+        (entryMs) => nowMs - entryMs < HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS,
+      );
+      const governance = evaluateVoiceAutoDispatchGovernance({
+        transcript,
+        micArmState: micArmStateRef.current,
+        confidence: input.confidence,
+        dispatchState: input.dispatchState,
+        interpreterDispatchState: input.interpreterDispatchState,
+        possibleTtsEcho:
+          voiceAutoSpeakActiveUtteranceRef.current !== null ||
+          voiceBargeHoldActiveRef.current === true ||
+          voiceSpeechActiveRef.current === true,
+        queueDepth: voiceTranscribeQueueRef.current.length + voiceConfirmedTurnQueueRef.current.length,
+        activeDispatchCount: voiceAutoDispatchWindowRef.current.length,
+      });
+      if (!governance.admitted) {
+        updateVoiceDecisionBrief({
+          baseBrief: "Voice transcript captured as observation only.",
+          lifecycle: "suppressed",
+          mode: "observe",
+          routeReasonCode: `suppressed:voice_auto_dispatch_governance:${governance.reason}`,
+          traceId: input.traceId,
+          meta: {
+            governance,
+            dispatchHint: false,
+            classifierSource: "fallback",
+            classifierConfidence: null,
+            classifierReason: governance.reason,
+            routeReasonCode: `suppressed:voice_auto_dispatch_governance:${governance.reason}`,
+            confidence: input.confidence,
+            confidenceReason: input.confidenceReason,
+            transcript,
+            briefSource: "none",
+            authorityRejectStage: "voice_auto_dispatch_governance",
+          },
+        });
+        addHelixTimelineEntry({
+          type: "suppressed",
+          source: "voice_auto",
+          status: "suppressed",
+          text: clipText(recordedText, 240),
+          detail: `voice_auto_dispatch_governance:${governance.reason}`,
+          mode: "observe",
+          traceId: input.traceId,
+          meta: {
+            kind: "voice_auto_dispatch_governance",
+            governance,
+            assistant_answer: false,
+            raw_content_included: false,
+            output_authority: "admission_trace",
+            instruction_authority: "none",
+          },
+        });
+        markVoiceCheckpoint(
+          "dispatch_suppressed",
+          governance.reason === "queue_backpressure" || governance.reason === "auto_dispatch_budget_exceeded"
+            ? "warn"
+            : "ok",
+          `Voice auto-dispatch suppressed (${governance.reason}).`,
+        );
+        patchVoiceSegmentAttempt(input.segmentId, { dispatch: "suppressed" });
+        return;
+      }
+      voiceAutoDispatchWindowRef.current = [...voiceAutoDispatchWindowRef.current, nowMs].slice(
+        -HELIX_VOICE_AUTO_DISPATCH_MAX_PER_MINUTE,
+      );
       const recentTurnsForTurn = conversationRecentTurnsRef.current.slice(-6);
       rememberConversationTurn(`user: ${recordedText}`);
       const sessionId = getHelixAskSessionId() ?? undefined;
@@ -23991,6 +24277,7 @@ export function HelixAskPill({
             confidenceReason: input.confidenceReason,
             transcript,
             briefSource: "none",
+            governance,
           },
         });
         markVoiceCheckpoint(
@@ -24679,7 +24966,12 @@ export function HelixAskPill({
         return;
       }
       const sealedRevision = state.transcriptRevision;
-      if (sealedRevision <= 0 || !state.draftTranscript.trim()) {
+      const resolvedDispatchTranscript = resolveVoiceDispatchTranscriptFromDraft({
+        draftText: askDraftRef.current,
+        assemblerTranscript: state.draftTranscript,
+        recordedText: state.draftRecordedText,
+      });
+      if (sealedRevision <= 0 || !resolvedDispatchTranscript.transcript) {
         return;
       }
       const sealToken = crypto.randomUUID();
@@ -24697,8 +24989,8 @@ export function HelixAskPill({
         id: `confirm:${turnKey}:sealed:${sealedRevision}`,
         traceId: turnKey,
         segmentId: state.segmentId ?? `segment:${crypto.randomUUID()}`,
-        transcript: state.draftTranscript,
-        recordedText: state.draftRecordedText || state.draftTranscript,
+        transcript: resolvedDispatchTranscript.transcript,
+        recordedText: resolvedDispatchTranscript.recordedText || resolvedDispatchTranscript.transcript,
         completion: state.completion,
         turnComplete: state.turnComplete,
         sttEngine: state.sttEngine,
@@ -24745,7 +25037,12 @@ export function HelixAskPill({
     (turnKey: string): boolean => {
       const state = getVoiceTurnAssemblerState(turnKey);
       if (!state) return false;
-      const transcript = state.draftTranscript.trim();
+      const resolvedDispatchTranscript = resolveVoiceDispatchTranscriptFromDraft({
+        draftText: askDraftRef.current,
+        assemblerTranscript: state.draftTranscript,
+        recordedText: state.draftRecordedText,
+      });
+      const transcript = resolvedDispatchTranscript.transcript;
       if (!transcript) return false;
       const now = Date.now();
       const sealedRevision =
@@ -24763,7 +25060,7 @@ export function HelixAskPill({
         traceId: turnKey,
         segmentId: state.segmentId ?? `segment:${crypto.randomUUID()}`,
         transcript,
-        recordedText: state.draftRecordedText || transcript,
+        recordedText: resolvedDispatchTranscript.recordedText || transcript,
         completion: state.completion,
         turnComplete: state.turnComplete,
         sttEngine: state.sttEngine,
@@ -24977,6 +25274,21 @@ export function HelixAskPill({
 
   const processTranscriptionQueue = useCallback(async () => {
     if (voiceTranscribeBusyRef.current) return;
+    const backoffUntilMs = voiceTranscribeBackoffUntilMsRef.current;
+    if (typeof backoffUntilMs === "number" && Number.isFinite(backoffUntilMs)) {
+      const remainingMs = Math.max(0, backoffUntilMs - Date.now());
+      if (remainingMs > 0) {
+        if (voiceTranscribeBackoffTimerRef.current === null && typeof window !== "undefined") {
+          voiceTranscribeBackoffTimerRef.current = window.setTimeout(() => {
+            voiceTranscribeBackoffTimerRef.current = null;
+            voiceTranscribeBackoffUntilMsRef.current = null;
+            void processTranscriptionQueue();
+          }, remainingMs);
+        }
+        return;
+      }
+      voiceTranscribeBackoffUntilMsRef.current = null;
+    }
     voiceTranscribeBusyRef.current = true;
     const scheduleHeldTranscriptFlush = (heldState: HeldTranscriptState) => {
       clearHeldTranscriptFlushTimer();
@@ -25167,6 +25479,7 @@ export function HelixAskPill({
             speech_probability: nextSegment.speechProbability ?? undefined,
             snr_db: nextSegment.snrDb ?? undefined,
           });
+          clearRetainedVoiceTranscriptionRetry();
           const sttLatencyMs = Date.now() - sttStartedAt;
           const transcript = result.text?.trim() ?? "";
           const resolvedSourceLanguage = resolveVoiceSourceLanguage({
@@ -26187,6 +26500,42 @@ export function HelixAskPill({
         } catch (error) {
           resolveBargeInFromTranscription(true);
           const message = describeVoiceInputError(error);
+          if (isVoiceMemoryPressureError(error)) {
+            const retained: RetainedVoiceTranscriptionRetry = {
+              segment: nextSegment,
+              retainedAtMs: Date.now(),
+              retryCount:
+                nextSegment.id === voiceRetainedTranscriptionRetryRef.current?.segment.id
+                  ? voiceRetainedTranscriptionRetryRef.current.retryCount
+                  : 0,
+              reason: "voice_memory_pressure",
+              message,
+            };
+            voiceRetainedTranscriptionRetryRef.current = retained;
+            setVoiceRetainedTranscriptionRetry(retained);
+            voiceTranscribeBackoffUntilMsRef.current =
+              Date.now() + HELIX_VOICE_TRANSCRIBE_PRESSURE_RETRY_DELAY_MS;
+            setVoiceInputError("Voice transcription paused; retry the saved sample when memory clears.");
+            markVoiceCheckpoint(
+              "stt_response_error",
+              "warn",
+              "Voice transcription paused under memory pressure; sample retained for retry.",
+            );
+            patchVoiceSegmentAttempt(nextSegment.id, {
+              status: "stt_error",
+              sttLatencyMs: Math.max(0, Date.now() - sttStartedAt),
+              error: "voice_memory_pressure_retained",
+              dispatch: "suppressed",
+            });
+            setVoiceInputState("error");
+            setConversationGovernor((prev) => ({
+              ...prev,
+              floor_owner: "none",
+              turn_state: "soft_pause",
+              cooling_down: false,
+            }));
+            return;
+          }
           setVoiceInputError(message);
           markVoiceCheckpoint("stt_response_error", "error", message);
           patchVoiceSegmentAttempt(nextSegment.id, {
@@ -26210,6 +26559,7 @@ export function HelixAskPill({
   }, [
     clearHeldTranscriptFlushTimer,
     clearHeldTranscriptState,
+    clearRetainedVoiceTranscriptionRetry,
     contextId,
     ingestVoiceDraftSegment,
     markVoiceCheckpoint,
@@ -26223,6 +26573,36 @@ export function HelixAskPill({
     voiceNoiseProfile,
     voiceSessionSpeakerActive,
   ]);
+
+  const handleRetainedVoiceTranscriptionRetry = useCallback(() => {
+    const retained = voiceRetainedTranscriptionRetryRef.current;
+    if (!retained || micArmStateRef.current !== "on") return;
+    const nextRetry: RetainedVoiceTranscriptionRetry = {
+      ...retained,
+      retryCount: retained.retryCount + 1,
+    };
+    voiceRetainedTranscriptionRetryRef.current = nextRetry;
+    setVoiceRetainedTranscriptionRetry(nextRetry);
+    voiceTranscribeQueueRef.current = [
+      retained.segment,
+      ...voiceTranscribeQueueRef.current.filter((entry) => entry.id !== retained.segment.id),
+    ];
+    voiceTranscribeBackoffUntilMsRef.current =
+      Date.now() + Math.min(HELIX_VOICE_TRANSCRIBE_PRESSURE_RETRY_DELAY_MS, 900);
+    markVoiceCheckpoint(
+      "stt_request_started",
+      "ok",
+      `Retrying retained voice sample (${nextRetry.retryCount}).`,
+    );
+    patchVoiceSegmentAttempt(retained.segment.id, {
+      status: "segment_cut",
+      dispatch: "queued",
+      error: null,
+    });
+    setVoiceInputError(null);
+    setVoiceInputState("transcribing");
+    void processTranscriptionQueue();
+  }, [markVoiceCheckpoint, patchVoiceSegmentAttempt, processTranscriptionQueue]);
 
   const handleTranscriptConfirmationAccept = useCallback(() => {
     const pending = transcriptConfirmStateRef.current;
@@ -26530,7 +26910,7 @@ export function HelixAskPill({
           lastSpeechAtMs: Date.now(),
         }));
       }
-      voiceTranscribeQueueRef.current.push({
+      const queuedSegment: VoiceTranscribeQueuedSegment = {
         id: segmentId,
         blob,
         durationMs,
@@ -26542,7 +26922,48 @@ export function HelixAskPill({
         snrDb: quality?.snrDb ?? null,
         lowAudioQuality: quality?.lowAudioQuality ?? false,
         confirmBias: quality?.confirmBias ?? 0,
-      });
+      };
+      if (voiceTranscribeQueueRef.current.length >= HELIX_VOICE_TRANSCRIBE_QUEUE_MAX) {
+        const retained: RetainedVoiceTranscriptionRetry = {
+          segment: queuedSegment,
+          retainedAtMs: Date.now(),
+          retryCount: 0,
+          reason: "queue_backpressure",
+          message: "Voice STT queue is busy; sample retained for retry.",
+        };
+        voiceRetainedTranscriptionRetryRef.current = retained;
+        setVoiceRetainedTranscriptionRetry(retained);
+        markVoiceCheckpoint(
+          "stt_response_error",
+          "warn",
+          `Voice STT queue backpressure; retained segment at depth ${voiceTranscribeQueueRef.current.length}.`,
+        );
+        patchVoiceSegmentAttempt(segmentId, {
+          status: "stt_error",
+          dispatch: "suppressed",
+          error: "voice_queue_backpressure_retained",
+        });
+        addHelixTimelineEntry({
+          type: "suppressed",
+          source: "voice_auto",
+          status: "suppressed",
+          text: "Voice segment retained before STT.",
+          detail: "voice_queue_backpressure",
+          mode: "observe",
+          traceId: turnKey,
+          meta: {
+            kind: "voice_queue_backpressure",
+            queueDepth: voiceTranscribeQueueRef.current.length,
+            maxQueueDepth: HELIX_VOICE_TRANSCRIBE_QUEUE_MAX,
+            assistant_answer: false,
+            raw_content_included: false,
+            output_authority: "admission_trace",
+            instruction_authority: "none",
+          },
+        });
+        return;
+      }
+      voiceTranscribeQueueRef.current.push(queuedSegment);
       voiceQueuedSegmentSeqRef.current += 1;
       const hardCutReason = resolveVoiceBargeHardCutReason({
         holdActive: voiceBargeHoldActiveRef.current,
@@ -26561,7 +26982,10 @@ export function HelixAskPill({
     [
       getVoiceTurnAssemblerState,
       hardCutVoicePlaybackForBargeIn,
+      addHelixTimelineEntry,
       pausePlaybackForPotentialBargeIn,
+      markVoiceCheckpoint,
+      patchVoiceSegmentAttempt,
       processTranscriptionQueue,
       resolveVoiceAssemblerTurnKeyForIncomingSegment,
       updateVoiceTurnAssemblerState,
@@ -31313,6 +31737,18 @@ export function HelixAskPill({
                       }`}
                     />
                   </button>
+                  {voiceRetainedTranscriptionRetry ? (
+                    <button
+                      type="button"
+                      aria-label="Retry saved voice sample"
+                      title="Retry saved voice sample"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/45 bg-amber-400/12 text-amber-100 transition hover:bg-amber-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70 disabled:opacity-60"
+                      onClick={handleRetainedVoiceTranscriptionRetry}
+                      disabled={micArmState !== "on" || voiceTranscribeBusyRef.current}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     aria-label="Capture visual source for Situation Room"

@@ -28,6 +28,7 @@ import {
   type StagePlayCheckpointQueueAction,
 } from "../../services/stage-play/stage-play-checkpoint-queue";
 import {
+  listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
 } from "../../services/stage-play/stage-play-live-source-mailbox-store";
@@ -599,6 +600,12 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
         environmentId,
         limit: 10,
       }),
+      decisions: listStagePlayMailDecisions({
+        threadId,
+        roomId,
+        environmentId,
+        limit: 20,
+      }),
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
@@ -698,6 +705,8 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
       voiceCalloutDraft: readQueryString(body.voiceCalloutDraft) ?? readQueryString(body.voice_callout_draft),
       voiceEnabled: readOptionalBoolean(body.voiceEnabled ?? body.voice_enabled) ?? false,
       voiceRequiresConfirmation: readOptionalBoolean(body.voiceRequiresConfirmation ?? body.voice_requires_confirmation) ?? false,
+      voiceAllowedNow: readOptionalBoolean(body.voiceAllowedNow ?? body.voice_allowed_now) ?? false,
+      voicePolicyReason: readQueryString(body.voicePolicyReason) ?? readQueryString(body.voice_policy_reason),
       requestedTool: readRequestedTool(body.requestedTool ?? body.requested_tool),
       nextLoopState: (readQueryString(body.nextLoopState) ?? readQueryString(body.next_loop_state)) as any,
       evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),

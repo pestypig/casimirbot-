@@ -1046,6 +1046,8 @@ export function executeLiveEnvironmentTool(
       voiceCalloutDraft: readString(args.voice_callout_draft) ?? readString(args.voiceCalloutDraft),
       voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
       voiceRequiresConfirmation: args.voice_requires_confirmation === true || args.voiceRequiresConfirmation === true,
+      voiceAllowedNow: args.voice_allowed_now === true || args.voiceAllowedNow === true,
+      voicePolicyReason: readString(args.voice_policy_reason) ?? readString(args.voicePolicyReason),
       requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool),
       nextLoopState,
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
@@ -1054,13 +1056,17 @@ export function executeLiveEnvironmentTool(
     const transcriptRows = buildMailLoopTranscriptRows({
       decision: recordedDecision,
     });
+    const waitDecisionWithoutMail =
+      mailIds.length === 0 && recordedDecision.decision === "wait_for_next_summary";
     return makeObservation({
       threadId: input.thread_id,
       environmentId: recordedDecision.environmentId ?? environment?.environment_id ?? input.environment_id,
       toolName: input.tool_name,
-      ok: mailIds.length > 0,
+      ok: mailIds.length > 0 || waitDecisionWithoutMail,
       summary: mailIds.length > 0
         ? `Recorded live-source mail decision ${recordedDecision.decision}; loop state ${recordedDecision.nextLoopState}.`
+        : waitDecisionWithoutMail
+        ? "Recorded wait_for_next_summary; no unread visual summaries yet. Waiting for the next summary."
         : "Live-source mail decision could not link to mail ids.",
       observation: {
         ...recordedDecision,

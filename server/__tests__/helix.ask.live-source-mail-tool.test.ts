@@ -140,6 +140,56 @@ describe("live-source mail live environment tools", () => {
     ]));
   });
 
+  it("records a wait decision when no unread visual summaries exist", () => {
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    expect(readObservation).toMatchObject({
+      tool_name: "live_env.read_live_source_mail",
+      ok: true,
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    const readPayload = readObservation.observation as any;
+    expect(readPayload.items).toEqual([]);
+    expect(readPayload.transcriptRows.find((row: any) => row.rowKind === "wait_for_next_summary")?.body)
+      .toBe("No unread visual summaries yet. Waiting for the next summary.");
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [],
+        decision: "wait_for_next_summary",
+        rationale_preview: "No unread visual summaries yet. Waiting for the next summary.",
+        next_loop_state: "armed_for_next_summary",
+      },
+    });
+
+    expect(decisionObservation).toMatchObject({
+      tool_name: "live_env.record_live_source_mail_decision",
+      ok: true,
+      summary: "Recorded wait_for_next_summary; no unread visual summaries yet. Waiting for the next summary.",
+      assistant_answer: false,
+      context_role: "tool_evidence",
+    });
+    const decisionPayload = decisionObservation.observation as any;
+    expect(decisionPayload).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "wait_for_next_summary",
+      nextLoopState: "armed_for_next_summary",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+  });
+
   it("records the model decision as evidence and keeps text/voice drafts non-terminal", () => {
     seedVisualSummary();
     const readObservation = executeLiveEnvironmentTool({
@@ -240,5 +290,67 @@ describe("live-source mail live environment tools", () => {
       "loop_state",
     ]));
     expect(payload.transcriptRows.find((row: any) => row.rowKind === "requested_tool").terminalEligible).toBe(false);
+  });
+
+  it("blocks voice requested_tool when mailbox voice policy requires confirmation", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        voice_enabled: true,
+        voice_requires_confirmation: true,
+        voice_allowed_now: false,
+        voice_policy_reason: "voice_requires_confirmation",
+      },
+    });
+    const readPayload = readObservation.observation as any;
+    const mailId = readPayload.items[0].mailId;
+    expect(readPayload.voicePolicy).toMatchObject({
+      voiceEnabled: true,
+      requiresConfirmation: true,
+      allowedNow: false,
+      reason: "voice_requires_confirmation",
+    });
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        decision: "request_voice_callout",
+        rationale_preview: "A callout is useful, but confirmation is required before speech.",
+        voice_callout_draft: "Hostile mob appeared near the player.",
+        voice_enabled: true,
+        voice_requires_confirmation: true,
+        voice_allowed_now: false,
+        voice_policy_reason: "voice_requires_confirmation",
+        requested_tool: {
+          tool_name: "situation-room-pipelines.voice_delivery.confirm_speak",
+          args: {
+            text: "Hostile mob appeared near the player.",
+          },
+        },
+      },
+    });
+
+    const payload = decisionObservation.observation as any;
+    expect(payload.voicePolicy).toMatchObject({
+      voiceEnabled: true,
+      requiresConfirmation: true,
+      allowedNow: false,
+      reason: "voice_requires_confirmation",
+    });
+    expect(payload.voiceCalloutDraft).toMatchObject({
+      text: "Hostile mob appeared near the player.",
+      voiceEligible: false,
+      requiresConfirmation: true,
+    });
+    expect(payload.requestedTool).toBeNull();
+    expect(payload.transcriptRows.map((row: any) => row.rowKind)).toContain("voice_callout_request");
+    expect(payload.transcriptRows.map((row: any) => row.rowKind)).not.toContain("voice_tool_call");
   });
 });

@@ -7,6 +7,11 @@ import type {
   StagePlayBadgeGraphV1,
   StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
+import type {
+  StagePlayLiveSourceJobStateV1,
+  StagePlayLiveSourceMailDecisionV1,
+  StagePlayLiveSourceMailItemV1,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { StagePlayRawSessionBufferEntryV1 } from "@shared/stage-play-raw-session-buffer";
 import type {
   StagePlayBuilderCatalogV1,
@@ -179,6 +184,35 @@ type StagePlayCheckpointQueueStatus = {
 
 type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointRequests"]>[number];
 
+type StagePlayLiveSourceMailListResponse = {
+  ok: boolean;
+  schema: "stage_play_live_source_mail_list_response/v1";
+  mailItems?: StagePlayLiveSourceMailItemV1[];
+  jobStates?: StagePlayLiveSourceJobStateV1[];
+  decisions?: StagePlayLiveSourceMailDecisionV1[];
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+type StagePlayGraphDisplayMode = "observer_mail_loop_v1" | "full_graph";
+
+type StagePlayMailLoopNode = {
+  id: string;
+  title: string;
+  subtitle: string;
+  status: string;
+  inputLabel: string;
+  inputRefs: string[];
+  inputPreview: string;
+  transformLabel: string;
+  outputLabel: string;
+  outputRefs: string[];
+  outputPreview: string;
+  blockedUntil?: string | null;
+};
+
 const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
   request.status === "queued" || request.status === "running";
 
@@ -341,6 +375,25 @@ async function fetchStagePlayBadgeGraph(input: {
     throw new Error(`Stage Play graph request failed: ${response.status}`);
   }
   return await response.json() as StagePlayBadgeGraphV1;
+}
+
+async function fetchStagePlayLiveSourceMail(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+}): Promise<StagePlayLiveSourceMailListResponse> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  if (input.roomId) params.set("roomId", input.roomId);
+  if (input.environmentId) params.set("environmentId", input.environmentId);
+  params.set("limit", "20");
+  const response = await fetch(`/api/helix/stage-play/live-source-mail?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play live-source mail request failed: ${response.status}`);
+  }
+  return await response.json() as StagePlayLiveSourceMailListResponse;
 }
 
 async function fetchStagePlayBuilderContext(input: {
@@ -987,6 +1040,206 @@ function syntheticNodeTrayView(node: StagePlaySyntheticNode): StagePlayBadgeTray
     ),
     detail: compactTrayText(`${node.evidenceRefs.length} evidence ref(s)`, "0 evidence ref(s)"),
   };
+}
+
+const latestStagePlayMailItem = (
+  items: StagePlayLiveSourceMailItemV1[],
+  predicate?: (item: StagePlayLiveSourceMailItemV1) => boolean,
+): StagePlayLiveSourceMailItemV1 | null => {
+  const matching = predicate ? items.filter(predicate) : items;
+  return matching.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)).at(-1) ?? null;
+};
+
+const latestStagePlayMailDecision = (
+  decisions: StagePlayLiveSourceMailDecisionV1[],
+  mailId?: string | null,
+): StagePlayLiveSourceMailDecisionV1 | null => {
+  const matching = mailId
+    ? decisions.filter((decision) => decision.mailIds.includes(mailId))
+    : decisions;
+  return matching.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)).at(-1) ?? null;
+};
+
+function buildObserverMailLoopNodes(input: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+}): StagePlayMailLoopNode[] {
+  const { graph, mailbox } = input;
+  const mailItems = mailbox?.mailItems ?? [];
+  const jobStates = mailbox?.jobStates ?? [];
+  const decisions = mailbox?.decisions ?? [];
+  const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
+  const visualSource = graph.sourceWindow.sources.find((source) =>
+    source.modality === "visual_frame" && source.status === "active"
+  ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const unreadCount = mailItems.filter((item) => item.status === "unread").length;
+  const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
+  const latestDecision =
+    latestStagePlayMailDecision(decisions, visualMail?.mailId) ??
+    latestStagePlayMailDecision(decisions, jobStates.at(-1)?.lastMailId ?? null) ??
+    latestStagePlayMailDecision(decisions);
+  const activeJob = jobStates.at(-1) ?? null;
+  const observerOutputRefs = uniqueSorted([
+    visualSource?.sourceId ?? "",
+    activeJob?.jobId ?? "",
+    visualMail?.mailId ?? "",
+  ].filter(Boolean));
+  const mailInputRefs = uniqueSorted([
+    visualMail?.sourceRefs.frameRef ?? "",
+    visualMail?.sourceRefs.evidenceRef ?? "",
+    visualMail?.sourceRefs.observationRef ?? "",
+  ].filter(Boolean));
+  const decisionInputRefs = uniqueSorted([
+    ...(latestDecision?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
+  ]);
+  const outputPreview = latestDecision?.voiceCalloutDraft?.text
+    ? `voice draft: ${latestDecision.voiceCalloutDraft.text}`
+    : latestDecision?.textAnswerDraft?.text
+      ? `text answer: ${latestDecision.textAnswerDraft.text}`
+      : latestDecision?.decision === "wait_for_next_summary"
+        ? "no output yet; armed for next summary"
+        : latestDecision?.requestedTool?.toolName
+          ? `requested tool: ${latestDecision.requestedTool.toolName}`
+          : "no output yet";
+  return [
+    {
+      id: "observer_mail_loop:observer",
+      title: "Observer",
+      subtitle: "source registry",
+      status: visualSource?.status ?? "waiting",
+      inputLabel: "Input",
+      inputRefs: ["source registry"],
+      inputPreview: "source registry",
+      transformLabel: "source registry -> live-source mailbox",
+      outputLabel: "Output",
+      outputRefs: observerOutputRefs,
+      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mail unread: ${unreadCount}`,
+    },
+    {
+      id: "observer_mail_loop:visual_mail",
+      title: "Visual Summary Mail",
+      subtitle: "compact observation delivery",
+      status: visualMail?.status ?? "missing",
+      inputLabel: "Input",
+      inputRefs: mailInputRefs,
+      inputPreview: mailInputRefs.length > 0 ? mailInputRefs.slice(0, 2).join(", ") : "visual_frame / visual_evidence pending",
+      transformLabel: "visual summary enqueue -> mailbox item",
+      outputLabel: "Output",
+      outputRefs: visualMail ? [visualMail.mailId, ...visualMail.evidenceRefs] : [],
+      outputPreview: visualMail
+        ? `summary preview: ${visualMail.summary.preview}; status ${visualMail.status}`
+        : "summary preview: none yet; status missing",
+    },
+    {
+      id: "observer_mail_loop:ask_decision",
+      title: "Ask Decision",
+      subtitle: "mail reader + model decision",
+      status: latestDecision?.decision ?? (deliveredCount > 0 ? "delivered_to_ask" : "awaiting_mail_read"),
+      inputLabel: "Input",
+      inputRefs: decisionInputRefs,
+      inputPreview: decisionInputRefs.length > 0 ? decisionInputRefs.join(", ") : "mail item ids pending",
+      transformLabel: "live_env.read_live_source_mail -> live_env.record_live_source_mail_decision",
+      outputLabel: "Output",
+      outputRefs: latestDecision ? [latestDecision.decisionId, ...latestDecision.evidenceRefs] : [],
+      outputPreview: latestDecision?.decision ?? (unreadCount > 0 ? "awaiting Ask mail read" : "wait_for_next_summary"),
+    },
+    {
+      id: "observer_mail_loop:output_wait",
+      title: "Output/Wait",
+      subtitle: "text answer / voice draft / wait",
+      status: latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary",
+      inputLabel: "Input",
+      inputRefs: latestDecision ? [latestDecision.decisionId] : [],
+      inputPreview: latestDecision?.decisionId ?? "decision id pending",
+      transformLabel: "decision receipt -> output policy",
+      outputLabel: "Output",
+      outputRefs: uniqueSorted([
+        latestDecision?.voiceCalloutDraft?.text ? "voice_callout_draft" : "",
+        latestDecision?.textAnswerDraft?.text ? "text_answer_draft" : "",
+        latestDecision?.requestedTool?.toolName ?? "",
+      ].filter(Boolean)),
+      outputPreview,
+      blockedUntil: latestDecision?.voiceCalloutDraft?.requiresConfirmation ? "voice confirmation" : null,
+    },
+  ];
+}
+
+function StagePlayObserverMailLoopCanvas({
+  graph,
+  mailbox,
+}: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+}) {
+  const nodes = useMemo(() => buildObserverMailLoopNodes({ graph, mailbox }), [graph, mailbox]);
+  const refs = uniqueSorted(nodes.flatMap((node) => [...node.inputRefs, ...node.outputRefs]));
+  return (
+    <div
+      className="relative min-h-0 flex-1 overflow-auto rounded-md border border-slate-800 bg-slate-950/95 p-6"
+      data-testid="stage-play-badge-graph-scrollport"
+      data-stage-play-graph-mode="observer_mail_loop_v1"
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-wide text-cyan-200">observer_mail_loop_v1</div>
+          <div className="mt-1 text-sm text-slate-400">
+            Observer-first mail loop. Full Stage Play graph stays available when the receipt chain needs deeper inspection.
+          </div>
+        </div>
+        <CopyStagePlayRefsButton refs={refs} label="Copy observer mail loop refs" />
+      </div>
+      <div className="grid min-w-[980px] grid-cols-[repeat(4,220px)] items-start gap-8">
+        {nodes.map((node) => (
+          <div
+            key={node.id}
+            className="relative"
+            data-testid="stage-play-observer-mail-loop-node"
+          >
+            <div className="flex h-[88px] flex-col items-center justify-center rounded-md border border-slate-700 bg-slate-900/80 px-3 text-center shadow-[0_12px_30px_rgba(2,6,23,0.3)]">
+              <span className="text-xs font-semibold text-slate-100">{node.title}</span>
+              <span className="mt-1 font-mono text-[10px] text-cyan-200">{labelize(node.status)}</span>
+              <span className="mt-1 text-[10px] text-slate-500">{node.subtitle}</span>
+            </div>
+            <div
+              className="mt-2 h-[180px] overflow-hidden rounded-md border border-slate-800 bg-black/25 p-2 text-[10px] text-slate-300"
+              data-testid="stage-play-data-tray"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold uppercase tracking-wide text-slate-200">{node.title}</span>
+                <CopyStagePlayRefsButton refs={uniqueSorted([...node.inputRefs, ...node.outputRefs])} label={`Copy refs for ${node.title}`} />
+              </div>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">{node.inputLabel}</div>
+                  <div className="mt-0.5 line-clamp-2 font-mono text-[10px] text-sky-100">{node.inputPreview}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Transform</div>
+                  <div className="mt-0.5 line-clamp-2 font-mono text-[10px] text-cyan-100">{node.transformLabel}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">{node.outputLabel}</div>
+                  <div className="mt-0.5 line-clamp-3 font-mono text-[10px] text-emerald-100">{node.outputPreview}</div>
+                </div>
+                {node.blockedUntil ? (
+                  <div className="rounded border border-amber-800 bg-amber-950/25 px-2 py-1 text-amber-100">
+                    Blocked until: <span className="font-mono">{node.blockedUntil}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 grid min-w-[980px] grid-cols-[repeat(4,220px)] gap-8 font-mono text-[10px] text-slate-500">
+        {nodes.map((node, index) => (
+          <div key={`${node.id}:edge`} className="flex items-center justify-center">
+            {index < nodes.length - 1 ? <span>--&gt;</span> : <span>end</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function StagePlayToolActivityStrip({
@@ -3567,6 +3820,7 @@ export default function StagePlayBadgeGraphPanel() {
   const [sourceAuditSelection, setSourceAuditSelection] = useState<StagePlaySourceAuditSelection>(null);
   const [graphDiff, setGraphDiff] = useState<StagePlayGraphDiff | null>(null);
   const [removedBadgeGhosts, setRemovedBadgeGhosts] = useState<StagePlayRemovedBadgeGhost[]>([]);
+  const [graphDisplayMode, setGraphDisplayMode] = useState<StagePlayGraphDisplayMode>("observer_mail_loop_v1");
   const graphScrollportRef = useRef<HTMLDivElement>(null);
   const previousGraphRef = useRef<StagePlayBadgeGraphV1 | null>(null);
   const graphDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -3598,6 +3852,17 @@ export default function StagePlayBadgeGraphPanel() {
     refetchInterval: 1000,
   });
   const { data: graph, isLoading, error } = graphQuery;
+  const mailboxQuery = useQuery<StagePlayLiveSourceMailListResponse>({
+    queryKey: [
+      "/api/helix/stage-play/live-source-mail",
+      threadId,
+      roomId,
+      environmentId,
+    ],
+    queryFn: () => fetchStagePlayLiveSourceMail({ threadId, roomId, environmentId }),
+    refetchInterval: 1000,
+  });
+  const mailbox = mailboxQuery.data ?? null;
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
     queryKey: [
       "/api/helix/stage-play/raw-session-buffer",
@@ -4389,6 +4654,35 @@ export default function StagePlayBadgeGraphPanel() {
           </button>
         ) : null}
 
+        <div className="absolute right-3 top-3 z-30 flex rounded-md border border-slate-800 bg-slate-950/90 p-1 text-[10px] font-semibold uppercase tracking-wide shadow-xl">
+          <button
+            type="button"
+            onClick={() => setGraphDisplayMode("observer_mail_loop_v1")}
+            className={`rounded px-2.5 py-1.5 ${
+              graphDisplayMode === "observer_mail_loop_v1"
+                ? "bg-cyan-950 text-cyan-100"
+                : "text-slate-400 hover:text-slate-100"
+            }`}
+            aria-label="Show observer mail loop"
+            data-testid="stage-play-observer-mail-loop-toggle"
+          >
+            Mail Loop
+          </button>
+          <button
+            type="button"
+            onClick={() => setGraphDisplayMode("full_graph")}
+            className={`rounded px-2.5 py-1.5 ${
+              graphDisplayMode === "full_graph"
+                ? "bg-cyan-950 text-cyan-100"
+                : "text-slate-400 hover:text-slate-100"
+            }`}
+            aria-label="Show full Stage Play graph"
+            data-testid="stage-play-full-graph-toggle"
+          >
+            Full Graph
+          </button>
+        </div>
+
         {bindingOverlayOpen ? (
           <StagePlayBindingOverlay
             graph={graph}
@@ -4472,19 +4766,26 @@ export default function StagePlayBadgeGraphPanel() {
         ) : null}
 
         <main className="flex h-full min-h-0 flex-col">
-          <StagePlayGraphCanvas
-            graph={graph}
-            graphDiff={graphDiff}
-            removedBadgeGhosts={removedBadgeGhosts}
-            selectedBadgeIds={selectedBadgeIds}
-            selectedBadgeId={selectedBadgeId}
-            draftNodes={draftNodes}
-            selectedDraftNodeId={selectedDraftNodeId}
-            scrollportRef={graphScrollportRef}
-            onSelect={selectGraphBadge}
-            onSelectDraftNode={setSelectedDraftNodeId}
-            onProjectLiveAnswer={handleProjectLiveAnswer}
-          />
+          {graphDisplayMode === "observer_mail_loop_v1" ? (
+            <StagePlayObserverMailLoopCanvas
+              graph={graph}
+              mailbox={mailbox}
+            />
+          ) : (
+            <StagePlayGraphCanvas
+              graph={graph}
+              graphDiff={graphDiff}
+              removedBadgeGhosts={removedBadgeGhosts}
+              selectedBadgeIds={selectedBadgeIds}
+              selectedBadgeId={selectedBadgeId}
+              draftNodes={draftNodes}
+              selectedDraftNodeId={selectedDraftNodeId}
+              scrollportRef={graphScrollportRef}
+              onSelect={selectGraphBadge}
+              onSelectDraftNode={setSelectedDraftNodeId}
+              onProjectLiveAnswer={handleProjectLiveAnswer}
+            />
+          )}
         </main>
       </div>
     </div>

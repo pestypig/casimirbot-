@@ -29,8 +29,8 @@ STT runtime policy controls:
 
 Runtime memory admission controls:
 - `VOICE_TRANSCRIBE_MEMORY_GUARD`: `0` disables voice STT memory admission.
-- `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold, default `480`.
-- `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold, default `900`.
+- `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold. Default is `480`; development servers default to `720` because Vite/tsx middleware can idle above the production-sized guard.
+- `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold. Default is `900`; development servers default to `1400` for the same reason.
 - `RUNTIME_MEMORY_GUARD`: `0` disables generic runtime memory admission.
 - `RUNTIME_MEMORY_MAX_HEAP_USED_MB`: generic heap threshold, default `520`.
 - `RUNTIME_MEMORY_MAX_RSS_MB`: generic RSS threshold, default `950`.

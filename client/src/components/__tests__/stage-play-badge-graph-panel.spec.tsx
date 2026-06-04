@@ -772,6 +772,127 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/live-source-mail")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_live_source_mail_list_response/v1",
+        mailItems: [
+          {
+            artifactId: "stage_play_live_source_mail_item",
+            schemaVersion: "stage_play_live_source_mail_item/v1",
+            mailId: "stage_play_live_source_mail:ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            sourceId: "source:visual-tab",
+            sourceKind: "visual_frame",
+            sourceRefs: {
+              sourceId: "source:visual-tab",
+              frameRef: "visual_frame:ui",
+              evidenceRef: "visual_evidence:ui",
+              observationRef: "live_source_observation:ui",
+            },
+            summary: {
+              text: "Minecraft-like scene with character, book/crafting station, enchantment table, cat, moonlit mountains.",
+              preview: "Minecraft-like scene with character, book/crafting station, enchantment table, cat.",
+              confidence: 0.76,
+              analysisState: "analysis_ready",
+            },
+            priorContext: {
+              previousMailId: null,
+              previousEvidenceRef: null,
+              previousSummaryPreview: null,
+            },
+            objective: {
+              objectiveId: null,
+              text: "Watch the active visual source.",
+            },
+            hints: {
+              deterministicChangeHint: "first_summary",
+              elapsedMsSincePrevious: null,
+              sourceFreshness: "fresh",
+            },
+            status: "unread",
+            evidenceRefs: ["visual_frame:ui", "visual_evidence:ui"],
+            createdAt: "2026-06-02T00:00:01.000Z",
+            updatedAt: "2026-06-02T00:00:01.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        jobStates: [
+          {
+            artifactId: "stage_play_live_source_job_state",
+            schemaVersion: "stage_play_live_source_job_state/v1",
+            jobId: "stage_play_live_source_job:ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            sourceIds: ["source:visual-tab"],
+            objective: "Watch the active visual source.",
+            status: "armed",
+            mailboxCursor: "stage_play_live_source_mail:ui",
+            lastMailId: "stage_play_live_source_mail:ui",
+            lastDecisionId: "stage_play_live_source_mail_decision:ui",
+            nextLoopState: "armed_for_next_summary",
+            nextWakePolicy: {
+              sourceKind: "visual_frame",
+              afterMs: null,
+              maxConsecutiveReads: 3,
+            },
+            updatedAt: "2026-06-02T00:00:02.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        decisions: [
+          {
+            artifactId: "stage_play_live_source_mail_decision",
+            schemaVersion: "stage_play_live_source_mail_decision/v1",
+            decisionId: "stage_play_live_source_mail_decision:ui",
+            mailIds: ["stage_play_live_source_mail:ui"],
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            decision: "wait_for_next_summary",
+            rationalePreview: "No user-facing change yet.",
+            textAnswerDraft: null,
+            voiceCalloutDraft: null,
+            voicePolicy: {
+              voiceEnabled: false,
+              requiresConfirmation: false,
+              allowedNow: false,
+              reason: "voice disabled in test",
+            },
+            requestedTool: null,
+            nextLoopState: "armed_for_next_summary",
+            nextExpectedSourceKind: "visual_frame",
+            nextExpectedAfterMs: null,
+            mailboxCursor: "stage_play_live_source_mail:ui",
+            activeJobId: "stage_play_live_source_job:ui",
+            rearmReason: "decision recorded",
+            evidenceRefs: ["visual_evidence:ui"],
+            modelReviewed: true,
+            createdAt: "2026-06-02T00:00:02.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.includes("/api/helix/stage-play/raw-session-buffer/clear")) {
       return new Response(JSON.stringify({
         ok: true,
@@ -966,6 +1087,11 @@ function renderPanel(options: {
   );
 }
 
+async function showFullGraph() {
+  fireEvent.click(await screen.findByTestId("stage-play-full-graph-toggle"));
+  await screen.findByTestId("stage-play-lane-observer");
+}
+
 function dispatchPointer(target: EventTarget, type: string, clientX: number, clientY: number) {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(event, {
@@ -989,8 +1115,27 @@ afterEach(() => {
 });
 
 describe("StagePlayBadgeGraphPanel", () => {
+  it("defaults to the observer-first mail loop graph", async () => {
+    renderPanel();
+
+    const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
+    expect(scrollport.getAttribute("data-stage-play-graph-mode")).toBe("observer_mail_loop_v1");
+    expect(screen.getByTestId("stage-play-observer-mail-loop-toggle")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-full-graph-toggle")).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(4);
+    expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Visual Summary Mail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ask Decision").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Output/Wait").length).toBeGreaterThan(0);
+    expect(screen.getByText(/mail unread: 1/i)).toBeTruthy();
+    expect(screen.getByText(/summary preview: Minecraft-like scene/i)).toBeTruthy();
+    expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
+    expect(screen.getByText(/no output yet; armed for next summary/i)).toBeTruthy();
+  });
+
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {
     renderPanel();
+    await showFullGraph();
 
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
@@ -1133,6 +1278,7 @@ describe("StagePlayBadgeGraphPanel", () => {
         checkpointRequests: [staleRequest, currentRequest],
       },
     });
+    await showFullGraph();
 
     expect(await screen.findByText(/checkpoint queue: Meaningful Perturbation \/ queued/i)).toBeTruthy();
     const promptEvents: CustomEvent[] = [];
@@ -1159,6 +1305,7 @@ describe("StagePlayBadgeGraphPanel", () => {
       selectedBadgeIds: ["observer.live_sources"],
     });
     renderPanel();
+    await showFullGraph();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
     fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
@@ -1170,6 +1317,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("shows source route controls when a Source node is selected", async () => {
     renderPanel();
+    await showFullGraph();
 
     fireEvent.click(await screen.findByRole("button", { name: "Visual Tab Source" }));
 
@@ -1197,6 +1345,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("switches the Stage Console to node-specific interaction surfaces", async () => {
     renderPanel();
+    await showFullGraph();
 
     fireEvent.click(await screen.findByRole("button", { name: "Latest Compact Observation" }));
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
@@ -1248,6 +1397,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("projects from the Interpreter node and Live Answer output node controls", async () => {
     renderPanel();
+    await showFullGraph();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
     fireEvent.click(screen.getByTestId("stage-play-project-live-answer-interpreter"));
@@ -1279,6 +1429,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     visualProducerMock.startVisualFrameProducerInterval.mockClear();
 
     renderPanel();
+    await showFullGraph();
 
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
     expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
@@ -1301,6 +1452,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("opens Observer source setup when the graph Observer badge is clicked", async () => {
     renderPanel();
+    await showFullGraph();
 
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
 
@@ -1316,6 +1468,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("opens raw buffer previews from Observer source evidence without graph ownership", async () => {
     renderPanel();
+    await showFullGraph();
 
     fireEvent.click(await screen.findByRole("button", { name: "Observer" }));
     expect(screen.getByTestId("stage-play-observer-node-controls")).toBeTruthy();
@@ -1333,6 +1486,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("adds matching live nodes from the builder palette into the selected trace", async () => {
     renderPanel();
+    await showFullGraph();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
     fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
@@ -1347,6 +1501,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("drags a builder node onto the graph as a local draft node", async () => {
     renderPanel();
+    await showFullGraph();
 
     const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
     Object.defineProperty(scrollport, "getBoundingClientRect", {
@@ -1393,6 +1548,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("edits and adds local draft node parameters", async () => {
     renderPanel();
+    await showFullGraph();
 
     const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
     Object.defineProperty(scrollport, "getBoundingClientRect", {
@@ -1472,6 +1628,7 @@ describe("StagePlayBadgeGraphPanel", () => {
         },
       ],
     });
+    await showFullGraph();
 
     const scrollport = await screen.findByTestId("stage-play-badge-graph-scrollport");
     Object.defineProperty(scrollport, "getBoundingClientRect", {
@@ -1515,6 +1672,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
   it("lets the bindings overlay close and reopen without removing the graph", async () => {
     renderPanel();
+    await showFullGraph();
 
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
@@ -1568,6 +1726,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     });
 
     renderPanel();
+    await showFullGraph();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
     const graphUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/graph?")) ?? "";

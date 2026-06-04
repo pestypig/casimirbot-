@@ -125,6 +125,8 @@ type RecentRuntimeDecision = {
 
 const BYTES_PER_MIB = 1024 * 1024;
 const RECENT_DECISION_LIMIT = 50;
+const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 720;
+const DEV_VOICE_STT_MAX_RSS_MIB = 1400;
 
 const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
   critical_resident: { priority: 100, deferrable: false, pausable: false },
@@ -150,6 +152,20 @@ const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
   situation_room_poll: { priority: 30, deferrable: true, pausable: true },
   debug_export: { priority: 25, deferrable: true, pausable: false },
   repo_indexing: { priority: 20, deferrable: true, pausable: true },
+};
+
+const isDevelopmentRuntime = (): boolean => process.env.NODE_ENV === "development";
+
+const resolveDefaultTaskBudget = (taskClass: RuntimeTaskClass): RuntimeTaskBudget => {
+  const budget = DEFAULT_TASK_BUDGETS[taskClass];
+  if (taskClass === "voice_stt" && isDevelopmentRuntime()) {
+    return {
+      ...budget,
+      maxHeapUsedMiB: DEV_VOICE_STT_MAX_HEAP_USED_MIB,
+      maxRssMiB: DEV_VOICE_STT_MAX_RSS_MIB,
+    };
+  }
+  return budget;
 };
 
 let memoryReader: RuntimeMemoryReader = () => process.memoryUsage();
@@ -188,7 +204,7 @@ const toMemorySnapshot = (memory: NodeJS.MemoryUsage): RuntimeAdmissionDecision[
 });
 
 const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limits"] => {
-  const budget = DEFAULT_TASK_BUDGETS[taskClass];
+  const budget = resolveDefaultTaskBudget(taskClass);
   const genericMaxHeap = readPositiveNumberEnv(
     "RUNTIME_MEMORY_MAX_HEAP_USED_MB",
     budget.maxHeapUsedMiB ?? 520,

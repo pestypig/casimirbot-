@@ -168,6 +168,7 @@ describe("Stage Play live-source mailbox", () => {
       voiceCalloutDraft: "The active visual source now shows a Minecraft-like scene near a book stand.",
       voiceEnabled: true,
       voiceRequiresConfirmation: false,
+      voiceAllowedNow: true,
       evidenceRefs: readResult.evidenceRefs,
       now: "2026-06-04T12:00:02.000Z",
     });
@@ -200,6 +201,155 @@ describe("Stage Play live-source mailbox", () => {
       "loop_state",
     ]));
     expect(rows.find((row) => row.rowKind === "voice_callout_request")?.terminalEligible).toBe(false);
+  });
+
+  it("includes voice policy in mail reads and suppresses voice options when disabled", () => {
+    seedVisualEvidence();
+    const readResult = readLiveSourceMailForAsk({
+      threadId,
+      roomId,
+      sourceId,
+      limit: 1,
+      voicePolicy: {
+        voiceEnabled: false,
+        requiresConfirmation: false,
+        allowedNow: false,
+        reason: "operator_disabled_voice",
+      },
+    });
+
+    expect(readResult.voicePolicy).toEqual({
+      voiceEnabled: false,
+      requiresConfirmation: false,
+      allowedNow: false,
+      reason: "operator_disabled_voice",
+    });
+    expect(readResult.suggestedDecisionOptions).not.toContain("request_voice_callout");
+  });
+
+  it("downgrades disabled voice callout requests to text drafts and blocks voice tools", () => {
+    seedVisualEvidence();
+    const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
+    const mailId = readResult.items[0].mailId;
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "Risk appeared, but voice output is disabled.",
+      voiceCalloutDraft: "Hostile mob appeared near the player.",
+      voiceEnabled: false,
+      voiceRequiresConfirmation: false,
+      voiceAllowedNow: false,
+      voicePolicyReason: "voice_disabled",
+      requestedTool: {
+        toolName: "situation-room-pipelines.voice_delivery.confirm_speak",
+        args: { text: "Hostile mob appeared near the player." },
+      },
+      evidenceRefs: readResult.evidenceRefs,
+      now: "2026-06-04T12:00:02.100Z",
+    });
+
+    expect(decision.voicePolicy).toMatchObject({
+      voiceEnabled: false,
+      allowedNow: false,
+      reason: "voice_disabled",
+    });
+    expect(decision.voiceCalloutDraft).toBeNull();
+    expect(decision.textAnswerDraft).toMatchObject({
+      text: "Hostile mob appeared near the player.",
+      terminalEligible: false,
+    });
+    expect(decision.requestedTool).toBeNull();
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows.map((row) => row.rowKind)).toContain("text_answer");
+    expect(rows.map((row) => row.rowKind)).not.toContain("voice_callout_request");
+    expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
+  });
+
+  it("keeps confirmation-required voice callouts as drafts and blocks voice tools", () => {
+    seedVisualEvidence();
+    const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
+    const mailId = readResult.items[0].mailId;
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "Risk appeared, but voice output requires confirmation.",
+      voiceCalloutDraft: "Hostile mob appeared near the player.",
+      voiceEnabled: true,
+      voiceRequiresConfirmation: true,
+      voiceAllowedNow: false,
+      voicePolicyReason: "voice_requires_confirmation",
+      requestedTool: {
+        toolName: "situation-room-pipelines.voice_delivery.confirm_speak",
+        args: { text: "Hostile mob appeared near the player." },
+      },
+      evidenceRefs: readResult.evidenceRefs,
+      now: "2026-06-04T12:00:02.200Z",
+    });
+
+    expect(decision.voicePolicy).toMatchObject({
+      voiceEnabled: true,
+      requiresConfirmation: true,
+      allowedNow: false,
+      reason: "voice_requires_confirmation",
+    });
+    expect(decision.voiceCalloutDraft).toMatchObject({
+      text: "Hostile mob appeared near the player.",
+      voiceEligible: false,
+      requiresConfirmation: true,
+    });
+    expect(decision.requestedTool).toBeNull();
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows.map((row) => row.rowKind)).toContain("voice_callout_request");
+    expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
+  });
+
+  it("allows a separate voice tool request only after an allowed voice decision", () => {
+    seedVisualEvidence();
+    const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
+    const mailId = readResult.items[0].mailId;
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "New risk appeared and voice policy allows a callout now.",
+      voiceCalloutDraft: "Hostile mob appeared near the player.",
+      voiceEnabled: true,
+      voiceRequiresConfirmation: false,
+      voiceAllowedNow: true,
+      requestedTool: {
+        toolName: "situation-room-pipelines.voice_delivery.confirm_speak",
+        args: { text: "Hostile mob appeared near the player." },
+      },
+      evidenceRefs: readResult.evidenceRefs,
+      now: "2026-06-04T12:00:02.300Z",
+    });
+
+    expect(decision.voicePolicy).toMatchObject({
+      voiceEnabled: true,
+      requiresConfirmation: false,
+      allowedNow: true,
+    });
+    expect(decision.voiceCalloutDraft).toMatchObject({
+      voiceEligible: true,
+      requiresConfirmation: false,
+    });
+    expect(decision.requestedTool).toMatchObject({
+      toolName: "situation-room-pipelines.voice_delivery.confirm_speak",
+    });
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows.map((row) => row.rowKind)).toEqual(expect.arrayContaining([
+      "voice_callout_request",
+      "voice_tool_call",
+    ]));
+    expect(rows.find((row) => row.rowKind === "voice_tool_call")?.terminalEligible).toBe(false);
   });
 
   it("records wait as a visible decision receipt instead of silent no-op", () => {

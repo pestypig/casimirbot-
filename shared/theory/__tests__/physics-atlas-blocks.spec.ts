@@ -49,10 +49,28 @@ describe("physics atlas blocks", () => {
       "astrochemistry.fullerene.c60_stellar_context",
     );
     expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "astrochemistry.pah.spectral_family_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "prebiotic.inventory.meteoritic_organics_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "prebiotic.photochemistry.radiation_processing_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "prebiotic.surface_catalysis.mineral_aqueous_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
       "prebiotic.aromatic_ring.coupled_oscillator_context",
     );
     expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "prebiotic.coherence.decoherence_lifetime_gate",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
       "biophysics.membrane.open_system_entropy_flow",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.claimBoundaryBadgeIds).toContain(
+      "prebiotic.claim_boundary.dopamine_not_pah_shortcut",
     );
     expect(byId.get("astrochemistry_prebiotic")?.claimBoundaryBadgeIds).toContain(
       "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",

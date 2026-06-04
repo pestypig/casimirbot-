@@ -43,13 +43,25 @@ const readBoolean = (value: unknown, fallback = false): boolean =>
 const defaultVoicePolicy = (input?: Partial<StagePlayLiveSourceVoicePolicyV1> | null): StagePlayLiveSourceVoicePolicyV1 => {
   const voiceEnabled = input?.voiceEnabled === true;
   const requiresConfirmation = input?.requiresConfirmation === true;
+  const allowedNow = voiceEnabled && !requiresConfirmation && input?.allowedNow === true;
   return {
     voiceEnabled,
     requiresConfirmation,
-    allowedNow: input?.allowedNow ?? (voiceEnabled && !requiresConfirmation),
-    reason: input?.reason ?? (voiceEnabled ? null : "voice_disabled"),
+    allowedNow,
+    reason: input?.reason ?? (
+      !voiceEnabled
+        ? "voice_disabled"
+        : requiresConfirmation
+          ? "voice_requires_confirmation"
+          : allowedNow
+            ? null
+            : "voice_not_allowed_now"
+    ),
   };
 };
+
+const isVoiceRequestedTool = (tool: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null | undefined): boolean =>
+  Boolean(tool?.toolName && /\b(?:voice(?:_delivery|\.speak)?|confirm_speak|speak)\b/i.test(tool.toolName));
 
 export function enqueueVisualSummaryMailFromEvidence(input: {
   threadId: string;
@@ -160,7 +172,7 @@ export function buildMailLoopTranscriptRows(input: {
       title: "Tool receipt",
       body: input.readResult.items.length > 0
         ? `${input.readResult.items.length} unread live-source mail item(s).`
-        : "No unread visual summary mail yet. Waiting for the next summary.",
+        : "No unread visual summaries yet. Waiting for the next summary.",
       source: {
         toolName: "live_env.check_live_source_mail",
         artifactId: input.readResult.readId,
@@ -191,10 +203,11 @@ export function buildMailLoopTranscriptRows(input: {
       createdAt,
     });
     if (input.decision.requestedTool) {
+      const voiceTool = isVoiceRequestedTool(input.decision.requestedTool);
       rows.push({
-        rowId: `ask_turn_mail_requested_tool:${hashShort(input.decision.decisionId)}`,
-        rowKind: "requested_tool",
-        title: "Requested tool",
+        rowId: `ask_turn_mail_${voiceTool ? "voice_tool" : "requested_tool"}:${hashShort(input.decision.decisionId)}`,
+        rowKind: voiceTool ? "voice_tool_call" : "requested_tool",
+        title: voiceTool ? "Voice tool call" : "Requested tool",
         body: `${input.decision.requestedTool.toolName}: ${previewText(JSON.stringify(input.decision.requestedTool.args), 180)}`,
         source: {
           toolName: "live_env.record_live_source_mail_decision",
@@ -348,7 +361,7 @@ export function readLiveSourceMailForAsk(input: {
       "wait_for_next_summary",
       "record_interpretation",
       "draft_text_answer",
-      "request_voice_callout",
+      ...(defaultVoicePolicy(input.voicePolicy).voiceEnabled ? ["request_voice_callout" as const] : []),
       "request_more_evidence",
       "request_stage_play_checkpoint",
       "fail_closed",
@@ -373,6 +386,9 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   voiceCalloutDraft?: string | null;
   voiceEnabled?: boolean | null;
   voiceRequiresConfirmation?: boolean | null;
+  voiceAllowedNow?: boolean | null;
+  voicePolicyReason?: string | null;
+  voicePolicy?: Partial<StagePlayLiveSourceVoicePolicyV1> | null;
   requestedTool?: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null;
   nextLoopState?: StagePlayLiveSourceMailDecisionV1["nextLoopState"] | null;
   evidenceRefs?: string[];
@@ -380,7 +396,18 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   now?: string;
 }): StagePlayLiveSourceMailDecisionV1 {
   markStagePlayMailRead(input.mailIds, input.now);
-  const voiceEligible = readBoolean(input.voiceEnabled, false) && !readBoolean(input.voiceRequiresConfirmation, false);
+  const voicePolicy = defaultVoicePolicy(input.voicePolicy ?? {
+    voiceEnabled: readBoolean(input.voiceEnabled, false),
+    requiresConfirmation: readBoolean(input.voiceRequiresConfirmation, false),
+    allowedNow: readBoolean(input.voiceAllowedNow, false),
+    reason: input.voicePolicyReason ?? null,
+  });
+  const requestedVoiceToolBlocked = isVoiceRequestedTool(input.requestedTool) && !voicePolicy.allowedNow;
+  const requestedTool = requestedVoiceToolBlocked ? null : input.requestedTool ?? null;
+  const voiceCalloutDraft = voicePolicy.voiceEnabled ? input.voiceCalloutDraft ?? null : null;
+  const textAnswerDraft =
+    input.textAnswerDraft ??
+    (!voicePolicy.voiceEnabled && input.voiceCalloutDraft ? input.voiceCalloutDraft : null);
   const decision = recordStagePlayMailDecision({
     mailIds: input.mailIds,
     threadId: input.threadId,
@@ -388,12 +415,13 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     environmentId: input.environmentId ?? null,
     decision: input.decision,
     rationalePreview: input.rationalePreview,
-    textAnswerDraft: input.textAnswerDraft ?? null,
+    textAnswerDraft,
     textAnswerTerminalEligible: input.textAnswerTerminalEligible === true,
-    voiceCalloutDraft: input.voiceCalloutDraft ?? null,
-    voiceEligible,
-    voiceRequiresConfirmation: input.voiceRequiresConfirmation === true,
-    requestedTool: input.requestedTool ?? null,
+    voiceCalloutDraft,
+    voiceEligible: voicePolicy.allowedNow,
+    voiceRequiresConfirmation: voicePolicy.requiresConfirmation,
+    voicePolicy,
+    requestedTool,
     nextLoopState: input.nextLoopState ?? (input.decision === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary"),
     evidenceRefs: input.evidenceRefs ?? [],
     modelReviewed: input.modelReviewed !== false,

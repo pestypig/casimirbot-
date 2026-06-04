@@ -134,6 +134,7 @@ export type StagePlayLiveSourceMailDecisionV1 = {
     voiceEligible: boolean;
     requiresConfirmation: boolean;
   } | null;
+  voicePolicy?: StagePlayLiveSourceVoicePolicyV1 | null;
   requestedTool?: {
     toolName: string;
     args: Record<string, unknown>;
