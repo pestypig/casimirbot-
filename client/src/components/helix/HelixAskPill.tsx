@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Image as ImageIcon, Mic, Plus, Radio, Search, Square, X } from "lucide-react";
+import { BrainCircuit, Bug, Copy, Image as ImageIcon, Mic, Plus, Radio, Search, Square, Volume2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -7001,7 +7001,33 @@ const renderTypedFailureFallback = (code?: string | null): string => {
   return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
 };
 
-function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
+const readTerminalAnswerAuthorityRecord = (value: unknown): Record<string, unknown> | null => {
+  const record = readAgentLoopAuditRecord(value);
+  return record?.schema === "helix.turn_terminal_authority.v1" && record.server_authoritative === true
+    ? record
+    : null;
+};
+
+const readTerminalSourceLabelCandidate = (
+  record: Record<string, unknown> | null | undefined,
+  fallbackFinalAnswerSource?: string | null,
+): string | null => {
+  const terminalKind =
+    typeof record?.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
+      ? record.terminal_artifact_kind.trim()
+      : null;
+  const recordSource =
+    typeof record?.final_answer_source === "string" && record.final_answer_source.trim()
+      ? record.final_answer_source.trim()
+      : null;
+  if (!terminalKind && !recordSource) return null;
+  return formatHelixVisibleTerminalSourceLabel({
+    terminalArtifactKind: terminalKind,
+    finalAnswerSource: recordSource ?? fallbackFinalAnswerSource,
+  });
+};
+
+export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | null {
   for (const source of sources) {
     const record = readAgentLoopAuditRecord(source);
     if (!record) continue;
@@ -7017,6 +7043,20 @@ function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): string | nul
       typeof record.final_answer_source === "string" && record.final_answer_source.trim()
         ? record.final_answer_source.trim()
         : null;
+    const resolvedSummary = readAgentLoopAuditRecord(record.resolved_turn_summary);
+    const terminalAuthorityRecord = readTerminalAnswerAuthorityRecord(record.terminal_answer_authority);
+    const debugRecord = readAgentLoopAuditRecord(record.debug);
+    const debugResolvedSummary = readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
+    const debugTerminalAuthorityRecord = readTerminalAnswerAuthorityRecord(debugRecord?.terminal_answer_authority);
+    for (const terminalRecord of [
+      resolvedSummary,
+      terminalAuthorityRecord,
+      debugResolvedSummary,
+      debugTerminalAuthorityRecord,
+    ]) {
+      const label = readTerminalSourceLabelCandidate(terminalRecord, directSource);
+      if (label) return label;
+    }
     const directTerminalKind =
       typeof record.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
         ? record.terminal_artifact_kind.trim()
@@ -7875,6 +7915,247 @@ export type LiveAnswerTurnBridgeState = {
     | "receipt_fallback"
     | "live_state_available";
 };
+
+type HelixContinuousTurnStreamTone =
+  | "question"
+  | "working"
+  | "observation"
+  | "checkpoint"
+  | "bridge"
+  | "final"
+  | "warning";
+
+type HelixContinuousTurnStreamRow = {
+  key: string;
+  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "final";
+  label: string;
+  text: string;
+  meta: string;
+  status: string;
+  tone: HelixContinuousTurnStreamTone;
+  evidenceRefs: string[];
+  actions?: Array<"Run" | "Skip" | "Pause job">;
+  bridgePills?: LiveAnswerTurnBridgePill[];
+  detailLimit?: number;
+};
+
+function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
+  if (/\b(?:failed|blocked|error|mismatch)\b/i.test(row.status) || row.label === "Notice") return "warning";
+  if (row.label === "Observation" || row.label === "Recorded") return "observation";
+  if (row.label === "Decision" || row.label === "Gate") return "checkpoint";
+  if (row.label === "Final" || row.label === "Terminal") return "final";
+  return "working";
+}
+
+function toneForStagePlayLedgerEvent(event: StagePlayChatLedgerEvent): HelixContinuousTurnStreamTone {
+  if (event.kind === "checkpoint_request" || event.kind === "ask_checkpoint") return "checkpoint";
+  if (event.kind === "answer_snapshot") return "final";
+  if (event.kind === "debug_receipt" || event.kind === "source_observation" || event.kind === "live_output") return "observation";
+  if (event.kind === "perturbation") return "warning";
+  return "working";
+}
+
+function toneForAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): HelixContinuousTurnStreamTone {
+  if (row.tone === "observation") return "observation";
+  if (row.tone === "decision") return "checkpoint";
+  if (row.tone === "warning") return "warning";
+  if (row.tone === "final") return "final";
+  return "working";
+}
+
+function buildHelixContinuousTurnStreamRows(args: {
+  replyId: string;
+  question?: string | null;
+  turnTranscriptRows: HelixTurnTranscriptRow[];
+  stagePlayEvents: StagePlayChatLedgerEvent[];
+  liveAnswerTurnBridge: LiveAnswerTurnBridgeState | null;
+  finalAnswerText: string;
+  finalAnswerHeading: string;
+  finalAnswerSourceLabel: string;
+  terminalMismatch: boolean;
+}): HelixContinuousTurnStreamRow[] {
+  const rows: HelixContinuousTurnStreamRow[] = [];
+  const question = (args.question ?? "").trim();
+  if (question) {
+    rows.push({
+      key: `${args.replyId}-stream-question`,
+      source: "question",
+      label: "Question",
+      text: question,
+      meta: "user prompt",
+      status: "submitted",
+      tone: "question",
+      evidenceRefs: [],
+    });
+  }
+  args.turnTranscriptRows
+    .filter((row) => row.label !== "Final")
+    .forEach((row) => {
+      rows.push({
+        key: `${row.key}-stream`,
+        source: "agent_work",
+        label: row.label,
+        text: row.text,
+        meta: row.meta,
+        status: row.status,
+        tone: toneForHelixTranscriptRow(row),
+        evidenceRefs: [],
+      });
+    });
+  args.stagePlayEvents.forEach((event) => {
+    rows.push({
+      key: `${event.key}-stream`,
+      source: "stage_play",
+      label: event.kind === "debug_receipt" ? "Stage Play Receipt" : event.title.replace(/\.$/, ""),
+      text: event.detail,
+      meta: event.meta,
+      status: event.status ?? "observed",
+      tone: toneForStagePlayLedgerEvent(event),
+      evidenceRefs: event.evidenceRefs,
+      actions: event.actions,
+      detailLimit: event.kind === "debug_receipt" ? 1200 : 360,
+    });
+  });
+  if (args.liveAnswerTurnBridge) {
+    rows.push({
+      key: `${args.replyId}-stream-live-bridge`,
+      source: "live_bridge",
+      label: "Live turn bridge",
+      text: args.liveAnswerTurnBridge.detail,
+      meta: args.liveAnswerTurnBridge.meta,
+      status: args.liveAnswerTurnBridge.status,
+      tone: args.liveAnswerTurnBridge.tone === "amber" ? "checkpoint" : args.liveAnswerTurnBridge.tone === "emerald" ? "final" : "bridge",
+      evidenceRefs: args.liveAnswerTurnBridge.evidenceRefs,
+      bridgePills: args.liveAnswerTurnBridge.pills,
+    });
+  }
+  if (args.finalAnswerText.trim()) {
+    rows.push({
+      key: `${args.replyId}-stream-final-answer`,
+      source: "final",
+      label: args.finalAnswerHeading || "Final",
+      text: args.finalAnswerText,
+      meta: args.terminalMismatch ? "terminal mismatch" : args.finalAnswerSourceLabel,
+      status: args.terminalMismatch ? "mismatch" : "terminal",
+      tone: args.terminalMismatch ? "warning" : "final",
+      evidenceRefs: [],
+      detailLimit: 1600,
+    });
+  }
+  return rows;
+}
+
+function buildHelixActiveTurnStreamRows(args: {
+  question?: string | null;
+  eventRows: AskLiveAgenticEventRow[];
+  draftText?: string | null;
+}): HelixContinuousTurnStreamRow[] {
+  const rows: HelixContinuousTurnStreamRow[] = [];
+  const question = (args.question ?? "").trim();
+  if (question) {
+    rows.push({
+      key: "active-stream-question",
+      source: "question",
+      label: "Question",
+      text: question,
+      meta: "current prompt",
+      status: "submitted",
+      tone: "question",
+      evidenceRefs: [],
+    });
+  }
+  args.eventRows.forEach((row) => {
+    rows.push({
+      key: `${row.key}-active-stream`,
+      source: "agent_work",
+      label: row.label,
+      text: row.text,
+      meta: row.meta,
+      status: row.tone,
+      tone: toneForAskLiveAgenticEventRow(row),
+      evidenceRefs: [],
+    });
+  });
+  const draftText = (args.draftText ?? "").trim();
+  if (draftText && !rows.some((row) => row.text.trim() === draftText)) {
+    rows.push({
+      key: "active-stream-draft",
+      source: "agent_work",
+      label: "Working",
+      text: draftText,
+      meta: "streaming draft",
+      status: "running",
+      tone: "working",
+      evidenceRefs: [],
+      detailLimit: 420,
+    });
+  }
+  return rows;
+}
+
+function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
+  const record = readAgentLoopAuditRecord(reply);
+  const debug = readAgentLoopAuditRecord(reply.debug);
+  const candidates = [
+    record?.created_at_ms,
+    record?.createdAtMs,
+    record?.created_at,
+    record?.createdAt,
+    debug?.created_at_ms,
+    debug?.createdAtMs,
+    debug?.exported_at_ms,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  const transcriptEvents = resolveHelixTurnTranscriptEvents(reply)
+    .map((entry, index) => buildAskLiveEventFromTurnTranscriptRecord(entry, `${reply.id}-order-${index}`))
+    .filter((event): event is AskLiveEventEntry => event !== null);
+  const events = [
+    ...(Array.isArray(reply.liveEvents) ? reply.liveEvents : []),
+    ...buildHelixRuntimeAskLiveEvents(reply),
+    ...transcriptEvents,
+  ]
+    .map(resolveAskLiveEventTimestampMs)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return events.length > 0 ? Math.min(...events) : null;
+}
+
+function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
+  return replies
+    .map((reply, index) => ({ reply, index, ts: resolveHelixAskReplyOrderMs(reply) }))
+    .sort((left, right) => {
+      if (left.ts !== null && right.ts !== null && left.ts !== right.ts) return left.ts - right.ts;
+      if (left.ts !== null && right.ts === null) return -1;
+      if (left.ts === null && right.ts !== null) return 1;
+      return left.index - right.index;
+    })
+    .map((entry) => entry.reply);
+}
+
+function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {
+  if (tone === "question") return "border-cyan-300/20 text-cyan-50";
+  if (tone === "observation") return "border-emerald-300/20 text-emerald-50";
+  if (tone === "checkpoint") return "border-amber-300/25 text-amber-50";
+  if (tone === "bridge") return "border-sky-300/25 text-sky-50";
+  if (tone === "final") return "border-violet-300/25 text-violet-50";
+  if (tone === "warning") return "border-rose-300/30 text-rose-50";
+  return "border-slate-500/25 text-slate-100";
+}
+
+function readHelixContinuousTurnStreamDotClass(tone: HelixContinuousTurnStreamTone): string {
+  if (tone === "question") return "border-cyan-200/70 bg-cyan-300";
+  if (tone === "observation") return "border-emerald-200/70 bg-emerald-300";
+  if (tone === "checkpoint") return "border-amber-200/70 bg-amber-300";
+  if (tone === "bridge") return "border-sky-200/70 bg-sky-300";
+  if (tone === "final") return "border-violet-200/70 bg-violet-300";
+  if (tone === "warning") return "border-rose-200/70 bg-rose-300";
+  return "border-slate-200/60 bg-slate-400";
+}
 
 export function buildLiveAnswerTurnBridgeState({
   hasLiveState,
@@ -10229,10 +10510,32 @@ function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
   return `${stage}.`;
 }
 
+const LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS: RegExp[] = [
+  /^answer cleaned preview:\s*final\.?$/i,
+  /^citations:\s*optional\.?$/i,
+  /^clipboard copy:\s*live turn completed\.?$/i,
+  /^finalization finished\.?$/i,
+  /^live turn completed\.?$/i,
+  /^mode gate consistency:\s*ok\.?$/i,
+  /^objective gate consistency:\s*ok\.?$/i,
+  /^rattling gate:\s*pass\.?$/i,
+  /^step started\.?$/i,
+  /^stream visible\.?$/i,
+  /^tool result:\s*artifact contract satisfied\.?$/i,
+  /^turn completed\.?$/i,
+  /^work delta:\s*stream visible\.?$/i,
+];
+
+function shouldShowAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): boolean {
+  if (row.tone === "warning") return true;
+  const normalizedText = row.text.replace(/\s+/g, " ").replace(/\.+$/g, ".").trim();
+  if (!normalizedText) return false;
+  return !LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS.some((pattern) => pattern.test(normalizedText));
+}
+
 function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgenticEventRow[] {
   return events
     .filter((event) => !isAskLiveEventSuperseded(event))
-    .slice(-18)
     .map((event, index) => {
       const tsMs = resolveAskLiveEventTimestampMs(event);
       const timestamp =
@@ -10254,7 +10557,9 @@ function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgent
         text: buildAskLiveAgenticEventText(event),
         meta: [timestamp, duration].filter(Boolean).join(" / "),
       };
-    });
+    })
+    .filter(shouldShowAskLiveAgenticEventRow)
+    .slice(-18);
 }
 
 function buildReasoningTheaterFloatingActionText(input: {
@@ -10554,18 +10859,6 @@ function buildReasoningBattleAnswerTint(input: {
   };
 }
 
-function askLiveAgenticEventClassName(row: AskLiveAgenticEventRow, latest = false): string {
-  const base = latest
-    ? "border-slate-500/40 bg-slate-950/35 text-slate-100"
-    : "border-slate-700/35 bg-black/10 text-slate-300/90";
-  if (row.tone === "warning") return `${base} text-amber-100 border-amber-300/30 bg-amber-950/15`;
-  if (row.tone === "thinking") return `${base} text-cyan-100/95`;
-  if (row.tone === "observation") return `${base} text-emerald-100/90`;
-  if (row.tone === "decision") return `${base} text-indigo-100/95`;
-  if (row.tone === "final") return `${base} text-violet-100/95`;
-  return base;
-}
-
 function resolveObjectiveReasoningTrace(
   debug: HelixAskReply["debug"] | undefined,
 ): HelixAskObjectiveReasoningTrace[] {
@@ -10703,19 +10996,6 @@ function buildAskLiveEventLogDetailPayload(event: AskLiveEventEntry): string {
   return safeJsonStringify(payload);
 }
 
-const ASK_LIVE_FALLBACK_SIGNAL_RULES: Array<{
-  id: string;
-  pattern: RegExp;
-}> = [
-  { id: "objective_loop_primary_suppressed", pattern: /objective[_\s-]?loop[_\s-]?primary[_\s-]?(suppressed|execution)/i },
-  { id: "objective_unresolved", pattern: /objective[_\s-]?(mini[_\s-]?validation[_\s-]?unresolved|unresolved)/i },
-  { id: "unknown_terminal", pattern: /unknown[_\s-]?terminal/i },
-  { id: "retrieval_no_context", pattern: /retrieval[_\s-]?objective[-\s]?recovery.*error|no[_\s-]?context/i },
-  { id: "assembly_fail_closed", pattern: /objective_assembly_fail_closed_required_objective_unresolved|assembly[_\s-]?fail[_\s-]?closed/i },
-  { id: "stage0_empty_candidates", pattern: /stage0.*empty[_\s-]?candidates|empty[_\s-]?candidates/i },
-  { id: "deterministic_fallback", pattern: /deterministic[_\s-]?fallback/i },
-];
-
 function isAskLiveMissingArtifactProgressText(value: string): boolean {
   return /\b(?:missing_artifacts|missing_required_artifacts|blocked_missing_artifacts|required artifacts were satisfied|required artifacts are satisfied)\b/i.test(
     value,
@@ -10730,27 +11010,6 @@ function normalizeAskLiveProgressNotice(value: string): string {
   return isAskLiveMissingArtifactProgressText(value) && !isAskLiveTerminalFailureText(value)
     ? "Waiting for required tool receipt..."
     : value;
-}
-
-function formatAskLiveFallbackSignal(signal: string): string {
-  switch (signal) {
-    case "objective_loop_primary_suppressed":
-      return "Primary objective loop deferred";
-    case "objective_unresolved":
-      return "Objective still unresolved";
-    case "unknown_terminal":
-      return "Terminal answer not established";
-    case "retrieval_no_context":
-      return "Retrieval lacked usable context";
-    case "assembly_fail_closed":
-      return "Assembly closed on an evidence gap";
-    case "stage0_empty_candidates":
-      return "No initial candidates found";
-    case "deterministic_fallback":
-      return "Policy fallback used";
-    default:
-      return humanizeAskLiveEventToken(signal);
-  }
 }
 
 function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
@@ -10768,28 +11027,6 @@ function isAskLiveEventWarning(event: AskLiveEventEntry): boolean {
   return /\b(error|fail|failed|blocked|fallback|suppressed|unknown_terminal|no_context|unresolved)\b/i.test(
     haystack,
   );
-}
-
-function collectAskLiveFallbackSignals(events: AskLiveEventEntry[]): string[] {
-  if (!events.length) return [];
-  const matched: string[] = [];
-  events.forEach((event) => {
-    const metaRecord = asObjectRecord(event.meta);
-    const haystackParts = [event.text ?? "", event.tool ?? ""];
-    if (metaRecord) {
-      haystackParts.push(safeJsonStringify(metaRecord));
-    }
-    const haystack = haystackParts.join(" ");
-    if (isAskLiveMissingArtifactProgressText(haystack) && !isAskLiveTerminalFailureText(haystack)) {
-      return;
-    }
-    ASK_LIVE_FALLBACK_SIGNAL_RULES.forEach((rule) => {
-      if (rule.pattern.test(haystack)) {
-        matched.push(rule.id);
-      }
-    });
-  });
-  return dedupeStrings(matched).slice(0, 8);
 }
 
 function readEventMetaString(
@@ -15328,12 +15565,15 @@ export function HelixAskPill({
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askImageAttachment, setAskImageAttachment] = useState<HelixAskImageAttachment | null>(null);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
-  const [copiedReplyEventLogId, setCopiedReplyEventLogId] = useState<string | null>(null);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
   const latestAskReply = askReplies[0] ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
   const debugCopyInFlightRef = useRef(false);
+  const askReplyListRef = useRef<HTMLDivElement | null>(null);
+  const askReplyListBottomRef = useRef<HTMLDivElement | null>(null);
+  const askReplyListPinnedToBottomRef = useRef(true);
+  const askReplyListAutoScrollTimerRef = useRef<number | null>(null);
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
@@ -17726,26 +17966,6 @@ export function HelixAskPill({
       }
       try {
         await navigator.clipboard.writeText(buildContextCapsuleCopyText(reply.contextCapsule));
-      } catch {
-        // ignore clipboard failures
-      }
-    },
-    [],
-  );
-
-  const handleCopyReplyEventLog = useCallback(
-    async (replyId: string, events: AskLiveEventEntry[]) => {
-      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
-        return;
-      }
-      const payload = buildAskLiveEventLogExport(events);
-      if (!payload) return;
-      try {
-        await navigator.clipboard.writeText(payload);
-        setCopiedReplyEventLogId(replyId);
-        window.setTimeout(() => {
-          setCopiedReplyEventLogId((current) => (current === replyId ? null : current));
-        }, 1400);
       } catch {
         // ignore clipboard failures
       }
@@ -27190,8 +27410,77 @@ export function HelixAskPill({
     () => buildAskLiveAgenticEventRows(askLiveEvents),
     [askLiveEvents],
   );
+  const activeTurnStreamRows = useMemo(
+    () =>
+      askBusy
+        ? buildHelixActiveTurnStreamRows({
+            question: askActiveQuestion,
+            eventRows: askLiveAgenticEventRows,
+            draftText: askLiveDraft,
+          })
+        : [],
+    [askActiveQuestion, askBusy, askLiveAgenticEventRows, askLiveDraft],
+  );
+  const activeTurnStreamTail = activeTurnStreamRows.length
+    ? activeTurnStreamRows[activeTurnStreamRows.length - 1]
+    : null;
+  const activeTurnStreamScrollToken = activeTurnStreamTail
+    ? `${activeTurnStreamRows.length}:${activeTurnStreamTail.key}:${activeTurnStreamTail.text}:${activeTurnStreamTail.status}`
+    : `${activeTurnStreamRows.length}:idle`;
+  const handleAskReplyListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    askReplyListPinnedToBottomRef.current = distanceFromBottom < 144;
+  }, []);
+  const scrollAskReplyListToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const element = askReplyListRef.current;
+    if (!element) return;
+    const bottom = askReplyListBottomRef.current;
+    if (bottom) {
+      bottom.scrollIntoView({ behavior, block: "end" });
+    }
+    element.scrollTop = element.scrollHeight;
+  }, []);
+  useEffect(() => {
+    const element = askReplyListRef.current;
+    if (!element) return;
+    const shouldFollowBottom = askBusy || askReplyListPinnedToBottomRef.current;
+    if (!shouldFollowBottom) return;
+    if (askBusy) {
+      askReplyListPinnedToBottomRef.current = true;
+    }
+    if (askReplyListAutoScrollTimerRef.current !== null && typeof window !== "undefined") {
+      window.clearTimeout(askReplyListAutoScrollTimerRef.current);
+      askReplyListAutoScrollTimerRef.current = null;
+    }
+    const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+      if (!askBusy && !askReplyListPinnedToBottomRef.current) return;
+      scrollAskReplyListToBottom(behavior);
+    };
+    scrollToBottom("smooth");
+    if (typeof window === "undefined") return;
+    const raf = window.requestAnimationFrame(() => scrollToBottom("smooth"));
+    askReplyListAutoScrollTimerRef.current = window.setTimeout(() => {
+      scrollToBottom("smooth");
+      askReplyListAutoScrollTimerRef.current = null;
+    }, 180);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (askReplyListAutoScrollTimerRef.current !== null) {
+        window.clearTimeout(askReplyListAutoScrollTimerRef.current);
+        askReplyListAutoScrollTimerRef.current = null;
+      }
+    };
+  }, [activeTurnStreamScrollToken, askBusy, askLiveDraft, latestAskReplyId, scrollAskReplyListToBottom]);
+  useEffect(() => {
+    return () => {
+      if (askReplyListAutoScrollTimerRef.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(askReplyListAutoScrollTimerRef.current);
+        askReplyListAutoScrollTimerRef.current = null;
+      }
+    };
+  }, []);
   const askLiveLatestAgenticEvent = askLiveAgenticEventRows[askLiveAgenticEventRows.length - 1] ?? null;
-  const askLivePriorAgenticEvents = askLiveAgenticEventRows.slice(0, -1).slice(-8);
   const askLiveStatusText = useMemo(() => {
     const statusTrimmed = askStatus?.trim() ?? "";
     if (!askBusy) {
@@ -27214,54 +27503,11 @@ export function HelixAskPill({
     return statusTrimmed || null;
   }, [askBusy, askLiveDraft, askLiveLatestAgenticEvent, askStatus]);
 
-  const askLiveFallbackSignals = useMemo(
-    () => collectAskLiveFallbackSignals(askLiveEvents),
-    [askLiveEvents],
-  );
   useEffect(() => {
-    if (!askBusy || !reasoningTheater) {
-      clearReasoningTheaterFloatingTextTimers();
-      reasoningTheaterFloatingTextLastTokenRef.current = null;
-      setReasoningTheaterFloatingActionTexts([]);
-      return;
-    }
-    const action = reasoningTheaterFrontierDebug.action;
-    const delta = reasoningTheaterFrontierDebug.deltaPct;
-    const latestEventKey = askLiveLatestAgenticEvent?.key ?? "none";
-    const shouldEmit =
-      action !== "steady" ||
-      askLiveLatestAgenticEvent?.label === "Observation" ||
-      askLiveLatestAgenticEvent?.label === "Decision" ||
-      askLiveLatestAgenticEvent?.label === "Final";
-    if (!shouldEmit) return;
-    const token = `${action}:${Math.round(delta * 10)}:${latestEventKey}`;
-    if (token === reasoningTheaterFloatingTextLastTokenRef.current) return;
-    reasoningTheaterFloatingTextLastTokenRef.current = token;
-    const id = `reasoning-pop-${Date.now()}-${hash32(token)}`;
-    const pop = buildReasoningTheaterFloatingActionText({
-      id,
-      frontierAction: action,
-      frontierDeltaPct: delta,
-      meterPct: reasoningTheaterMeterDisplayRef.current || reasoningTheaterMeterTarget,
-      latestLiveEvent: askLiveLatestAgenticEvent,
-      seed: hash32(`${token}:${reasoningTheater.seed}`),
-    });
-    setReasoningTheaterFloatingActionTexts((prev) => [...prev.slice(-3), pop]);
-    if (typeof window !== "undefined") {
-      reasoningTheaterFloatingTextTimersRef.current[id] = window.setTimeout(() => {
-        setReasoningTheaterFloatingActionTexts((prev) => prev.filter((entry) => entry.id !== id));
-        delete reasoningTheaterFloatingTextTimersRef.current[id];
-      }, pop.durationMs + 120);
-    }
-  }, [
-    askBusy,
-    askLiveLatestAgenticEvent,
-    clearReasoningTheaterFloatingTextTimers,
-    reasoningTheater,
-    reasoningTheaterFrontierDebug.action,
-    reasoningTheaterFrontierDebug.deltaPct,
-    reasoningTheaterMeterTarget,
-  ]);
+    clearReasoningTheaterFloatingTextTimers();
+    reasoningTheaterFloatingTextLastTokenRef.current = null;
+    setReasoningTheaterFloatingActionTexts([]);
+  }, [askLiveLatestAgenticEvent, clearReasoningTheaterFloatingTextTimers]);
   const observerLaneEvents = useMemo(() => {
     if (!askBusy) return [];
     const activeTraceId = (askLiveTraceId ?? "").trim();
@@ -30153,8 +30399,9 @@ export function HelixAskPill({
   const replyListClassNameResolved =
     replyListClassName ??
     (layoutVariant === "dock"
-      ? "mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2"
-      : "mt-4 max-h-[52vh] space-y-3 overflow-y-auto pr-2");
+      ? "mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
+      : "mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
+  const chronologicalAskReplies = sortHelixAskRepliesChronologically(askReplies);
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
     micArmState,
@@ -30278,12 +30525,6 @@ export function HelixAskPill({
       }
     };
   }, []);
-
-  const queuePreview = useMemo(() => {
-    const preview = askQueue.slice(0, 3).map((entry) => clipText(entry, 80));
-    const remainder = Math.max(0, askQueue.length - preview.length);
-    return { preview, remainder };
-  }, [askQueue]);
 
   const helixTimelineFeed = useMemo(() => {
     return [...helixTimeline].sort((a, b) => {
@@ -31570,79 +31811,6 @@ export function HelixAskPill({
                     </span>
                   ) : null}
                 </div>
-                {askActiveQuestion ? (
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                      Now
-                    </span>{" "}
-                    {clipText(askActiveQuestion, 140)}
-                  </p>
-                ) : null}
-                {askQueue.length > 0 ? (
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                      Queue ({askQueue.length})
-                    </span>{" "}
-                    {queuePreview.preview.join(" | ")}
-                    {queuePreview.remainder > 0
-                      ? ` +${queuePreview.remainder} more`
-                      : ""}
-                  </p>
-                ) : null}
-                {askLiveFallbackSignals.length > 0 ? (
-                  <p className="mt-2 whitespace-pre-wrap text-[10px] leading-5 text-amber-200/90">
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-amber-300">
-                      Notices
-                    </span>
-                    {"\n"}
-                    {askLiveFallbackSignals.map(formatAskLiveFallbackSignal).join(" | ")}
-                  </p>
-                ) : null}
-                {askBusy && askLiveAgenticEventRows.length > 0 ? (
-                  <div className="mt-2 border-t border-slate-700/40 pt-2 text-[10px] leading-5">
-                    <div className="max-h-24 overflow-y-auto pr-1">
-                      {askLivePriorAgenticEvents.map((row) => (
-                        <div
-                          key={row.key}
-                          className={`mb-1 grid grid-cols-[72px_minmax(0,1fr)] gap-2 border-l px-2 py-1 last:mb-0 ${askLiveAgenticEventClassName(row)}`}
-                        >
-                          <span className="uppercase tracking-[0.16em] text-slate-500">{row.label}</span>
-                          <span className="min-w-0 truncate text-slate-300/90">{row.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {askLiveLatestAgenticEvent ? (
-                      <div
-                        data-testid="helix-ask-live-latest-event"
-                        className={`mt-1 grid grid-cols-[72px_minmax(0,1fr)] gap-2 border-l px-2 py-1.5 ${askLiveAgenticEventClassName(
-                          askLiveLatestAgenticEvent,
-                          true,
-                        )}`}
-                      >
-                        <span className="uppercase tracking-[0.16em] text-slate-400">
-                          {askLiveLatestAgenticEvent.label}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate">{askLiveLatestAgenticEvent.text}</span>
-                          {askLiveLatestAgenticEvent.meta ? (
-                            <span className="block truncate text-[9px] uppercase tracking-[0.14em] text-slate-500">
-                              {askLiveLatestAgenticEvent.meta}
-                            </span>
-                          ) : null}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Waiting for updates...
-                  </p>
-                )}
-                {askLiveDraft ? (
-                  <div className="mt-2 max-h-28 overflow-hidden px-1 py-0.5 text-[11px] text-slate-200">
-                    <p className="whitespace-pre-wrap leading-relaxed">{askLiveDraft}</p>
-                  </div>
-                ) : null}
               </div>
             </div>
           ) : null}
@@ -31652,8 +31820,15 @@ export function HelixAskPill({
         {askError ? (
           <p className="mt-3 text-xs text-rose-200">{askError}</p>
         ) : null}
-        {askReplies.length > 0 ? (
-          <div className={replyListClassNameResolved}>
+        <style>
+          {`@keyframes helixAskTurnFadeIn{0%{opacity:0;transform:translate3d(0,8px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}@keyframes helixAskTurnLineFadeIn{0%{opacity:0;transform:translate3d(0,5px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}.helix-ask-turn-enter{animation:helixAskTurnFadeIn 220ms ease-out both}.helix-ask-turn-line-enter{animation:helixAskTurnLineFadeIn 180ms ease-out both}@media (prefers-reduced-motion:reduce){.helix-ask-turn-enter,.helix-ask-turn-line-enter{animation:none}}`}
+        </style>
+        {askReplies.length > 0 || activeTurnStreamRows.length > 0 ? (
+          <div
+            ref={askReplyListRef}
+            className={replyListClassNameResolved}
+            onScroll={handleAskReplyListScroll}
+          >
           {askReplies.length > 1 ? (
             <div className="flex flex-wrap justify-end gap-2">
               <button
@@ -31661,14 +31836,14 @@ export function HelixAskPill({
                 onClick={() => {
                   setAskTurnExpandedByReply((prev) => {
                     const next = { ...prev };
-                    askReplies.forEach((reply) => {
+                    chronologicalAskReplies.forEach((reply) => {
                       next[reply.id] = true;
                     });
                     return next;
                   });
                   setAskExpandedByReply((prev) => {
                     const next = { ...prev };
-                    askReplies.forEach((reply) => {
+                    chronologicalAskReplies.forEach((reply) => {
                       next[reply.id] = true;
                     });
                     return next;
@@ -31683,7 +31858,7 @@ export function HelixAskPill({
                 onClick={() => {
                   setAskTurnExpandedByReply((prev) => {
                     const next = { ...prev };
-                    askReplies.forEach((reply) => {
+                    chronologicalAskReplies.forEach((reply) => {
                       if (reply.id === latestAskReplyId) return;
                       next[reply.id] = false;
                     });
@@ -31691,7 +31866,7 @@ export function HelixAskPill({
                   });
                   setAskExpandedByReply((prev) => {
                     const next = { ...prev };
-                    askReplies.forEach((reply) => {
+                    chronologicalAskReplies.forEach((reply) => {
                       if (reply.id === latestAskReplyId) return;
                       next[reply.id] = false;
                     });
@@ -31704,7 +31879,7 @@ export function HelixAskPill({
               </button>
             </div>
           ) : null}
-          {askReplies.map((reply) => {
+          {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
               const leftTs = resolveAskLiveEventTimestampMs(left);
@@ -31723,10 +31898,6 @@ export function HelixAskPill({
               }
               return left.id.localeCompare(right.id);
             });
-            const replyEventLogPreview = replyEventsChronological.slice(-80);
-            const replyEventLogPayload = buildAskLiveEventLogExport(replyEventsChronological);
-            const objectiveReasoningTrace = resolveObjectiveReasoningTrace(reply.debug);
-            const objectiveTelemetryUsed = resolveObjectiveTelemetryUsedSummary(reply.debug);
             const replyDebugContextSummary = buildHelixAskDebugContextSummary(reply.debug, {
               failReason:
                 typeof reply.debug?.helix_ask_fail_reason === "string"
@@ -31750,78 +31921,14 @@ export function HelixAskPill({
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
-            const liveSituationArtifact =
-              reply.liveSituationArtifact ?? reply.situationContextPack?.live_situation_artifact ?? null;
-            const liveAnswerEnvironmentFromResponse = reply.liveAnswerEnvironment ?? null;
-            const liveAnswerEnvironmentFromContext = reply.situationContextPack?.live_answer_environment ?? null;
-            const liveSituationThreadId =
-              liveSituationArtifact?.thread_id ??
-              liveAnswerEnvironmentFromResponse?.thread_id ??
-              liveAnswerEnvironmentFromContext?.thread_id ??
-              reply.situationContextPack?.thread_id ??
-              "helix-ask:desktop";
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);
-            const plannerContract = readAgentLoopAuditRecord(replyDebugRecord?.planner_contract);
             const runtimeSummary = readAgentLoopAuditRecord(replyDebugRecord?.turn_runtime);
             const visibleResolvedTurn = buildVisibleResolvedTurn(reply);
-            const pendingAgentRequest =
-              visibleResolvedTurn.primary_terminal_label === "pending_input" && visibleResolvedTurn.pending_server_request_present
-                ? readHelixTopLevelPendingServerRequest(reply)
-                : null;
-            const canceledPendingTurn = isHelixCanceledPendingTurn(reply, replyDebugRecord, agentLoopAudit, runtimeSummary);
-            const finalComposerConsumedArtifacts = Array.isArray(replyDebugRecord?.final_composer_consumed_artifacts)
-              ? replyDebugRecord.final_composer_consumed_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
-              : [];
             const jobReadyLinks = Array.isArray(replyDebugRecord?.job_ready_links)
               ? replyDebugRecord.job_ready_links
                   .map((entry) => readAgentLoopAuditRecord(entry))
                   .filter((entry): entry is Record<string, unknown> => Boolean(entry?.panel_id && entry?.action_id))
               : [];
-            const visibleDebugActionIds = Array.isArray(replyDebugRecord?.execution_trace)
-              ? replyDebugRecord.execution_trace
-                  .map((step) => {
-                    const record = readAgentLoopAuditRecord(step);
-                    const action = readAgentLoopAuditRecord(record?.action);
-                    return action?.panel_id && action?.action_id
-                      ? `${String(action.panel_id)}.${String(action.action_id)}`
-                      : null;
-                  })
-                  .filter((entry): entry is string => Boolean(entry))
-              : [];
-            const isLiveWorkstationPipelineSetupTurn =
-              visibleDebugActionIds.includes("situation-room-pipelines.create_live_workstation_pipeline");
-            const liveAnswerEnvironment =
-              isLiveWorkstationPipelineSetupTurn
-                ? null
-                : liveAnswerEnvironmentFromResponse ?? liveAnswerEnvironmentFromContext;
-            const visibleDebugActualArtifacts = Array.isArray(replyDebugRecord?.step_results)
-              ? Array.from(
-                  new Set(
-                    replyDebugRecord.step_results.flatMap((step) => {
-                      const record = readAgentLoopAuditRecord(step);
-                      return Array.isArray(record?.actual_artifacts)
-                        ? record.actual_artifacts.map((entry) => String(entry ?? "").trim()).filter(Boolean)
-                        : [];
-                    }),
-                  ),
-                )
-              : [];
-            const selectedAgentAction =
-              readAgentLoopAuditRecord(agentLoopAudit?.selected_action) ??
-              readAgentLoopAuditRecord(replyDebugRecord?.server_selected_action);
-            const latestRuntimeChosenCapability = readLatestHelixRuntimeChosenCapability(
-              reply,
-              replyDebugRecord,
-              agentLoopAudit,
-              runtimeSummary,
-            );
-            const agentPlanItems = Array.isArray(plannerContract?.plan_items)
-              ? plannerContract?.plan_items
-              : [];
-            const agentObservations = Array.isArray(runtimeSummary?.observations)
-              ? runtimeSummary?.observations
-              : [];
-            const proceduralTurnTimeline = renderProceduralTurnTimeline(reply);
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const isLatestReply = reply.id === latestAskReplyId;
             const expanded = askExpandedByReply[reply.id] ?? isLatestReply;
@@ -31835,7 +31942,6 @@ export function HelixAskPill({
             const finalAnswerPresentation = resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel);
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
             const stagePlayChatLedgerEvents = buildStagePlayChatLedgerEvents(reply);
-            const causalTurnTraceRows = buildHelixCausalTurnTraceRows(reply);
             const replyCausalTurnTimeline = readHelixCausalTurnTimeline(reply);
             const replyReasoningTheaterState = coerceReasoningTheaterStateV1(reply.debug?.reasoning_theater_state_v1);
             const replyBattleBeats = buildReasoningBattleBeats({
@@ -31858,9 +31964,6 @@ export function HelixAskPill({
               beats: replyBattleBeats,
               ambient: replyBattleAmbientState,
             });
-            const causalTraceHasIssue = causalTurnTraceRows.some((row) =>
-              /\b(?:failed|blocked|superseded)\b/i.test(row.status),
-            );
             const transcriptFinalRowText =
               [...turnTranscriptRows]
                 .reverse()
@@ -31892,38 +31995,22 @@ export function HelixAskPill({
                 normalizeTerminalAnswerText(transcriptTerminal.backendTerminalText) !==
                   normalizeTerminalAnswerText(transcriptTerminal.text),
             );
-            const transcriptTerminalRecord = readAgentLoopAuditRecord(runtimeSummary?.terminal);
-            const debugTraceOpen = Boolean(
-              terminalMismatchForReply ||
-                pendingAgentRequest ||
-                canceledPendingTurn ||
-                String(transcriptTerminalRecord?.kind ?? "").includes("failure"),
-            );
             const turnExpanded = Boolean(askTurnExpandedByReply[reply.id]);
-            const shouldRenderLiveSituationProjection =
-              Boolean(liveSituationArtifact) ||
-              (isLatestReply &&
-                !liveAnswerEnvironment &&
-                !/\b(?:live answer environment|watch my minecraft run|track this video|follow this research session)\b/i.test(
-                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
-                ) &&
-                /\b(?:minecraft|minehut)\b/i.test(`${reply.question ?? ""}\n${reply.content ?? ""}`) &&
-                /\b(?:situation|watch|danger|progress|monitor|goal session)\b/i.test(
-                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
-                ));
-            const shouldRenderLiveAnswerEnvironmentProjection =
-              Boolean(liveAnswerEnvironment) ||
-              isLatestReply ||
-              visibleDebugActualArtifacts.includes("live_workstation_pipeline_receipt") ||
-              visibleDebugActionIds.includes("situation-room-pipelines.create_live_workstation_pipeline") ||
-              (isLatestReply &&
-                /\b(?:live answer environment|live workstation pipeline|live browser tab|live transcript|transcript|sentence summary|track this video|follow this research session|watch my minecraft run|claims?|evidence|contradictions?|prime(?:s)?|calculator|computation|simulation|live source|live stream|generator)\b/i.test(
-                  `${reply.question ?? ""}\n${reply.content ?? ""}`,
-                ));
             const liveAnswerTurnBridge = buildLiveAnswerTurnBridgeState({
               hasLiveState: stagePlayChatLedgerEvents.length > 0,
               stagePlayEvents: stagePlayChatLedgerEvents,
               finalAnswerPresentation,
+            });
+            const turnStreamRows = buildHelixContinuousTurnStreamRows({
+              replyId: reply.id,
+              question: reply.question,
+              turnTranscriptRows,
+              stagePlayEvents: stagePlayChatLedgerEvents,
+              liveAnswerTurnBridge,
+              finalAnswerText: finalAnswerRawText,
+              finalAnswerHeading: finalAnswerPresentation.heading,
+              finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || transcriptTerminal.source,
+              terminalMismatch: terminalMismatchForReply,
             });
             const historySummary = clipText(
               transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
@@ -31932,17 +32019,16 @@ export function HelixAskPill({
             const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
             const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
             const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
-            const latestCausalTraceTestId = isLatestReply ? "helix-ask-latest-causal-trace" : undefined;
             const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer" : undefined;
             const latestCopyFinalTestId = isLatestReply ? "helix-ask-latest-copy-final" : undefined;
             const latestDebugCopyTestId = isLatestReply ? "helix-ask-latest-debug-copy" : undefined;
             const replyCard = (
               <div
-                  className={`relative overflow-hidden rounded-2xl border bg-slate-950/80 px-4 py-3 text-sm text-slate-100 shadow-[0_18px_50px_rgba(0,0,0,0.45)] backdrop-blur ${moodPalette.replyBorder}`}
+                  className={`relative px-1 py-1 text-sm text-slate-100 ${isLatestReply ? "helix-ask-turn-enter" : ""}`}
                   data-testid={latestTurnTestId}
                 >
                   <div
-                    className={`pointer-events-none absolute inset-0 opacity-80 ${moodPalette.replyTint}`}
+                    className={`pointer-events-none absolute inset-0 opacity-0 ${moodPalette.replyTint}`}
                     aria-hidden
                   />
                   <div className="relative">
@@ -31966,808 +32052,261 @@ export function HelixAskPill({
                   </div>
                 ) : null}
                 <div className="space-y-3">
-                  {reply.question ? (
+                  {turnStreamRows.length > 0 ? (
                     <div
-                      className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
-                      data-testid={latestQuestionTestId}
-                    >
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Question</p>
-                      <p className="mt-1 whitespace-pre-wrap leading-relaxed">{reply.question}</p>
-                    </div>
-                  ) : null}
-                  {turnTranscriptRows.length > 0 ? (
-                    <details
-                      open={askBusy}
-                      className="rounded-2xl border border-sky-300/20 bg-slate-950/45 px-3 py-2 text-xs text-sky-50"
+                      className="px-1 py-1 text-xs text-slate-100"
+                      aria-label="Turn stream"
                       data-testid={latestWorkLogTestId}
+                      data-turn-stream-lines={turnStreamRows.length}
+                      data-stage-play-events={stagePlayChatLedgerEvents.length}
                     >
-                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-sky-200">
-                        Agent work log
-                        <span className="ml-2 rounded border border-sky-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-sky-100">
-                          {turnTranscriptRows.length} events
-                        </span>
-                        <span className="rounded border border-sky-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-sky-100">
-                          {String(replyDebugRecord?.turn_transcript_source ?? replyDebugRecord?.runtime_loop_mode ?? "runtime")}
-                        </span>
-                      </summary>
-                      <div className="mt-2 space-y-1.5">
-                        {turnTranscriptRows.map((row, index) => (
-                          <div
-                            key={row.key}
-                            className="flex items-start gap-2 rounded-lg bg-black/15 px-2 py-1.5"
-                            data-testid={isLatestReply ? "helix-ask-latest-work-log-row" : undefined}
-                          >
-                            <span className="mt-0.5 rounded-full bg-sky-300/15 px-1.5 py-0.5 text-[10px] tabular-nums text-sky-100">
-                              {index + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="break-words text-sky-50">
-                                <span className="text-sky-200/80">{row.label}: </span>
-                                {clipText(row.text, 260)}
-                              </p>
-                              <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-sky-100/65">
-                                {row.meta}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                  {stagePlayChatLedgerEvents.length > 0 ? (
-                    <details
-                      className="rounded-2xl border border-violet-300/20 bg-violet-950/20 px-3 py-2 text-xs text-violet-50"
-                      data-testid={isLatestReply ? "helix-ask-latest-stage-play-ledger" : undefined}
-                    >
-                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-violet-200">
-                        Stage Play ledger
-                        <span className="ml-2 rounded border border-violet-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-violet-100">
-                          {stagePlayChatLedgerEvents.length} events
-                        </span>
-                        <span className="rounded border border-violet-300/25 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-violet-100">
-                          visible reasoning ledger
-                        </span>
-                      </summary>
-                      <div className="mt-2 space-y-1.5">
-                        {stagePlayChatLedgerEvents.map((event, index) => {
-                          const eventDetail = clipText(event.detail, event.kind === "debug_receipt" ? 1200 : 280);
-                          const tone =
-                            event.kind === "checkpoint_request"
-                              ? "border-amber-300/25 bg-amber-950/20 text-amber-50"
-                              : event.kind === "debug_receipt"
-                                ? "border-sky-300/25 bg-sky-950/20 text-sky-50"
-                              : event.kind === "perturbation"
-                                ? "border-fuchsia-300/25 bg-fuchsia-950/20 text-fuchsia-50"
-                                : event.kind === "answer_snapshot"
-                                  ? "border-emerald-300/25 bg-emerald-950/15 text-emerald-50"
-                                  : event.kind === "ask_checkpoint" && event.status === "missing_evidence"
-                                    ? "border-slate-500/25 bg-slate-950/35 text-slate-100"
-                                    : "border-violet-300/20 bg-black/15 text-violet-50";
+                      <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
+                        {turnStreamRows.map((row, index) => {
+                          const isFinalRow = row.source === "final";
+                          const isQuestionRow = row.source === "question";
+                          const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
+                          const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
+                          const visibleText = clipText(row.text, row.detailLimit ?? 360);
                           return (
                             <div
-                              key={event.key}
-                              className={`rounded-lg border px-2 py-1.5 ${tone}`}
-                              data-testid={isLatestReply ? "helix-ask-latest-stage-play-ledger-row" : undefined}
+                              key={row.key}
+                              className={`group/streamrow relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
+                                isLatestReply && isFinalRow ? "helix-ask-turn-line-enter" : ""
+                              }`}
+                              style={isFinalRow ? replyBattleAnswerTint?.style : undefined}
+                              data-testid={
+                                isQuestionRow
+                                  ? latestQuestionTestId
+                                  : isFinalRow
+                                    ? latestFinalAnswerTestId
+                                    : isLatestReply
+                                      ? "helix-ask-latest-turn-stream-row"
+                                      : undefined
+                              }
+                              data-stream-row-source={row.source}
+                              data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}
+                              data-reasoning-stage-palette={isFinalRow ? replyBattleAnswerTint?.palette ?? "" : undefined}
+                              data-reasoning-stage-balance={isFinalRow ? replyBattleAnswerTint?.label ?? "" : undefined}
+                              data-visible-terminal-source={isFinalRow ? transcriptTerminal.source : undefined}
+                              data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? "" : undefined}
+                              data-final-answer-authority={
+                                isFinalRow
+                                  ? finalAnswerPresentation.isDeterministicReceiptFallback
+                                    ? "receipt_fallback_not_reviewed"
+                                    : "terminal"
+                                  : undefined
+                              }
                             >
-                              <div className="flex items-start gap-2">
-                                <span className="mt-0.5 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] tabular-nums">
-                                  {index + 1}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <p className="break-words">
-                                    <span className="font-semibold text-violet-100/90">{event.title} </span>
-                                    {eventDetail}
-                                  </p>
-                                  <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-violet-100/65">
-                                    {event.meta}
-                                    {event.evidenceRefs.length > 0 ? ` | refs ${event.evidenceRefs.length}` : ""}
-                                  </p>
-                                  {event.evidenceRefs.length > 0 ? (
-                                    <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal text-violet-100/55">
-                                      {event.evidenceRefs.slice(0, 4).join(" | ")}
-                                      {event.evidenceRefs.length > 4 ? " | ..." : ""}
-                                    </p>
-                                  ) : null}
-                                  {event.actions?.length ? (
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                      {event.actions.map((action) => (
-                                        <button
-                                          key={`${event.key}-${action}`}
-                                          type="button"
-                                          disabled
-                                          title="Use the Stage Play graph checkpoint controls for this v1 action."
-                                          className="rounded border border-amber-300/30 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-100/70 disabled:cursor-not-allowed disabled:opacity-70"
-                                          data-testid={
-                                            isLatestReply
-                                              ? `helix-ask-latest-stage-play-${action.toLowerCase().replace(/\s+/g, "-")}`
-                                              : undefined
-                                          }
-                                        >
-                                          {action}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  ) : null}
+                              <span
+                                className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
+                                aria-hidden
+                              />
+                              <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
+                                {index + 1}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="break-words font-semibold">{row.label}</p>
+                                  <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
+                                    {row.source.replace(/_/g, " ")}
+                                  </span>
                                 </div>
+                                {isFinalRow && finalAnswerIsCollapsedPreview ? (
+                                  <div
+                                    className="mt-2 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
+                                    data-testid={isLatestReply ? "helix-ask-latest-final-answer-collapsed" : undefined}
+                                  >
+                                    Preview collapsed. Full backend answer is available.
+                                  </div>
+                                ) : null}
+                                <div className="mt-1 break-words leading-relaxed">
+                                  {isFinalRow ? renderHelixAskFinalAnswerContent(transcriptAnswer) : (
+                                    <p className="whitespace-pre-wrap">{visibleText}</p>
+                                  )}
+                                </div>
+                                {row.bridgePills?.length ? (
+                                  <div
+                                    className="mt-2 flex max-w-full flex-wrap gap-1"
+                                    data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}
+                                    data-live-turn-bridge-status={liveAnswerTurnBridge?.status}
+                                  >
+                                    {row.bridgePills.map((pill) => (
+                                      <span
+                                        key={`${row.key}-${pill.label}`}
+                                        className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${readLiveAnswerTurnBridgePillClassName(pill.tone)}`}
+                                      >
+                                        {pill.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
+                                  {row.meta}
+                                  {row.evidenceRefs.length > 0 ? ` | refs ${row.evidenceRefs.length}` : ""}
+                                </p>
+                                {row.evidenceRefs.length > 0 ? (
+                                  <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal text-slate-400/80">
+                                    {row.evidenceRefs.slice(0, 4).join(" | ")}
+                                    {row.evidenceRefs.length > 4 ? " | ..." : ""}
+                                  </p>
+                                ) : null}
+                                {row.actions?.length ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {row.actions.map((action) => (
+                                      <button
+                                        key={`${row.key}-${action}`}
+                                        type="button"
+                                        disabled
+                                        title="Use the Stage Play graph checkpoint controls for this v1 action."
+                                        className="rounded border border-amber-300/30 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-100/70 disabled:cursor-not-allowed disabled:opacity-70"
+                                        data-testid={
+                                          isLatestReply
+                                            ? `helix-ask-latest-stage-play-${action.toLowerCase().replace(/\s+/g, "-")}`
+                                            : undefined
+                                        }
+                                      >
+                                        {action}
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {isFinalRow ? (
+                                  <>
+                                    <div className="mt-2 flex max-w-fit items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/streamrow:opacity-100 group-focus-within/streamrow:opacity-100">
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleCopyReply(reply)}
+                                        className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100"
+                                        aria-label="Copy response"
+                                        title="Copy response"
+                                        data-testid={latestCopyFinalTestId}
+                                      >
+                                        <Copy className="h-3.5 w-3.5" aria-hidden />
+                                      </button>
+                                      {userSettings.showHelixAskDebug ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
+                                          disabled={typeof window === "undefined"}
+                                          className="rounded-full border border-white/10 bg-white/5 p-1.5 text-slate-400 transition hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                          aria-label="Debug copy"
+                                          title="Unified Debug Copy"
+                                          data-testid={latestDebugCopyTestId}
+                                        >
+                                          <Bug className="h-3.5 w-3.5" aria-hidden />
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleReadAloud(reply)}
+                                        className={`rounded-full border p-1.5 transition ${
+                                          shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                                            ? "border-amber-300/40 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20"
+                                            : "border-white/10 bg-white/5 text-slate-400 hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-cyan-100"
+                                        }`}
+                                        aria-label={
+                                          shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
+                                            ? "Stop reading"
+                                            : "Read aloud"
+                                        }
+                                        title={formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
+                                      >
+                                        <Volume2 className="h-3.5 w-3.5" aria-hidden />
+                                      </button>
+                                    </div>
+                                    {(() => {
+                                      const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
+                                      if (!trace || typeof trace !== "object") return null;
+                                      const steps = Array.isArray(trace.compact_steps) ? trace.compact_steps : [];
+                                      const caveats = Array.isArray(trace.caveats) ? trace.caveats : [];
+                                      return (
+                                        <details className="mt-3 rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2 text-xs text-amber-50">
+                                          <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-amber-200">
+                                            Proof trace
+                                            {typeof trace.proof_status === "string" ? (
+                                              <span className="ml-2 rounded border border-amber-300/30 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]">
+                                                {trace.proof_status}
+                                              </span>
+                                            ) : null}
+                                          </summary>
+                                          <div className="mt-2 space-y-1.5">
+                                            {steps.slice(0, 6).map((step: any, stepIndex: number) => (
+                                              <p key={`${String(step?.label ?? "step")}-${stepIndex}`} className="leading-relaxed">
+                                                <span className="text-amber-200/80">{String(step?.label ?? `Step ${stepIndex + 1}`)}: </span>
+                                                {clipText(String(step?.summary ?? ""), 260)}
+                                              </p>
+                                            ))}
+                                            {typeof trace.scope_match === "string" ? (
+                                              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/70">
+                                                Scope: {String(trace.requested_extraction_scope ?? "unknown")}{" -> "}
+                                                {String(trace.actual_extraction_scope ?? "unknown")} ({trace.scope_match})
+                                              </p>
+                                            ) : null}
+                                            {caveats.length > 0 ? (
+                                              <p className="text-amber-100/80">Caveats: {caveats.slice(0, 3).map(String).join(" | ")}</p>
+                                            ) : null}
+                                          </div>
+                                        </details>
+                                      );
+                                    })()}
+                                    {jobReadyLinks.length > 0 ? (
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {jobReadyLinks.slice(0, 6).map((link, linkIndex) => {
+                                          const label =
+                                            typeof link.label === "string" && link.label.trim()
+                                              ? link.label.trim()
+                                              : `${String(link.panel_id)}.${String(link.action_id)}`;
+                                          const source =
+                                            typeof link.source_artifact_kind === "string" && link.source_artifact_kind.trim()
+                                              ? link.source_artifact_kind.trim()
+                                              : typeof link.source === "string"
+                                                ? link.source
+                                                : "artifact";
+                                          return (
+                                            <button
+                                              key={`${String(link.type ?? "link")}-${String(link.panel_id)}-${String(link.action_id)}-${linkIndex}`}
+                                              type="button"
+                                              className="rounded-full border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-300/15"
+                                              onClick={() => runJobReadyLink(link)}
+                                              title={`From ${source}`}
+                                            >
+                                              {label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                    {finalAnswerIsLong ? (
+                                      <button
+                                        type="button"
+                                        className="mt-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:border-cyan-200/60 hover:text-cyan-100"
+                                        aria-expanded={expanded}
+                                        onClick={() =>
+                                          setAskExpandedByReply((prev) => ({
+                                            ...prev,
+                                            [reply.id]: !expanded,
+                                          }))
+                                        }
+                                      >
+                                        {expanded ? "Collapse Answer" : "Show Full Answer"}
+                                      </button>
+                                    ) : null}
+                                  </>
+                                ) : null}
                               </div>
                             </div>
                           );
                         })}
                       </div>
-                    </details>
-                  ) : null}
-                  {liveAnswerTurnBridge ? (
-                    <div
-                      className={`rounded-2xl border px-3 py-2 text-xs ${readLiveAnswerTurnBridgeClassName(liveAnswerTurnBridge.tone)}`}
-                      data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}
-                      data-live-turn-bridge-status={liveAnswerTurnBridge.status}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[10px] uppercase tracking-[0.2em] opacity-75">Live turn bridge</p>
-                          <p className="mt-1 break-words font-semibold">{liveAnswerTurnBridge.title}</p>
-                        </div>
-                        <div className="flex max-w-full flex-wrap gap-1">
-                          {liveAnswerTurnBridge.pills.map((pill) => (
-                            <span
-                              key={`${liveAnswerTurnBridge.status}-${pill.label}`}
-                              className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${readLiveAnswerTurnBridgePillClassName(pill.tone)}`}
-                            >
-                              {pill.label}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="mt-2 break-words leading-relaxed">{liveAnswerTurnBridge.detail}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] opacity-65">
-                        {liveAnswerTurnBridge.meta}
-                      </p>
-                      {liveAnswerTurnBridge.evidenceRefs.length > 0 ? (
-                        <p className="mt-1 break-words font-mono text-[10px] normal-case tracking-normal opacity-60">
-                          {liveAnswerTurnBridge.evidenceRefs.slice(0, 4).join(" | ")}
-                          {liveAnswerTurnBridge.evidenceRefs.length > 4 ? " | ..." : ""}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {causalTurnTraceRows.length > 0 ? (
-                    <details
-                      open={askBusy || causalTraceHasIssue}
-                      className="rounded-2xl border border-slate-500/25 bg-slate-950/35 px-3 py-2 text-xs text-slate-50"
-                      data-testid={latestCausalTraceTestId}
-                    >
-                      <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-slate-200">
-                        Causal trace
-                        <span className="ml-2 rounded border border-slate-300/20 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-100">
-                          {causalTurnTraceRows.length} events
-                        </span>
-                        {causalTraceHasIssue ? (
-                          <span className="ml-2 rounded border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-amber-100">
-                            needs attention
-                          </span>
-                        ) : null}
-                      </summary>
-                      <div className="mt-2 max-h-52 space-y-1.5 overflow-y-auto pr-1">
-                        {causalTurnTraceRows.map((row, index) => (
-                          <div
-                            key={row.key}
-                            className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 ${readHelixCausalTraceRowClass(row)}`}
-                            data-testid={isLatestReply ? "helix-ask-latest-causal-trace-row" : undefined}
-                          >
-                            <span className="mt-0.5 rounded-full bg-black/25 px-1.5 py-0.5 text-[10px] tabular-nums">
-                              {index + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="break-words">
-                                <span className="text-slate-200/80">{row.label}: </span>
-                                {clipText(row.text, 260)}
-                              </p>
-                              <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-slate-300/70">
-                                {row.meta}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                  <div
-                    className="rounded-2xl border border-cyan-300/30 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-50"
-                    style={replyBattleAnswerTint?.style}
-                    data-testid={latestFinalAnswerTestId}
-                    data-final-answer-text={finalAnswerRawText}
-                    data-reasoning-stage-palette={replyBattleAnswerTint?.palette ?? ""}
-                    data-reasoning-stage-balance={replyBattleAnswerTint?.label ?? ""}
-                    data-visible-terminal-source={transcriptTerminal.source}
-                    data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? ""}
-                    data-final-answer-authority={
-                      finalAnswerPresentation.isDeterministicReceiptFallback
-                        ? "receipt_fallback_not_reviewed"
-                        : "terminal"
-                    }
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-200">
-                        {finalAnswerPresentation.heading}
-                      </p>
-                      <span
-                        className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${
-                          terminalMismatchForReply
-                            ? "border-rose-300/45 bg-rose-400/10 text-rose-100"
-                            : "border-emerald-300/35 bg-emerald-400/10 text-emerald-100"
-                        }`}
-                      >
-                        {terminalMismatchForReply
-                          ? "terminal mismatch"
-                          : finalAnswerPresentation.sourceLabel
-                            ? `source: ${finalAnswerPresentation.sourceLabel}`
-                            : `source: ${transcriptTerminal.source}`}
-                      </span>
-                    </div>
-                    {finalAnswerIsCollapsedPreview ? (
-                      <div
-                        className="mt-2 rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] uppercase tracking-[0.14em] text-cyan-100"
-                        data-testid={isLatestReply ? "helix-ask-latest-final-answer-collapsed" : undefined}
-                      >
-                        Preview collapsed. Full backend answer is available.
-                      </div>
-                    ) : null}
-                    {renderHelixAskFinalAnswerContent(transcriptAnswer)}
-                    {(() => {
-                      const trace = (replyDebugRecord as Record<string, any> | null | undefined)?.workstation_reasoning_trace;
-                      if (!trace || typeof trace !== "object") return null;
-                      const steps = Array.isArray(trace.compact_steps) ? trace.compact_steps : [];
-                      const caveats = Array.isArray(trace.caveats) ? trace.caveats : [];
-                      return (
-                        <details className="mt-3 rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2 text-xs text-amber-50">
-                          <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-amber-200">
-                            Proof trace
-                            {typeof trace.proof_status === "string" ? (
-                              <span className="ml-2 rounded border border-amber-300/30 bg-black/20 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em]">
-                                {trace.proof_status}
-                              </span>
-                            ) : null}
-                          </summary>
-                          <div className="mt-2 space-y-1.5">
-                            {steps.slice(0, 6).map((step: any, index: number) => (
-                              <p key={`${String(step?.label ?? "step")}-${index}`} className="leading-relaxed">
-                                <span className="text-amber-200/80">{String(step?.label ?? `Step ${index + 1}`)}: </span>
-                                {clipText(String(step?.summary ?? ""), 260)}
-                              </p>
-                            ))}
-                            {typeof trace.scope_match === "string" ? (
-                              <p className="text-[10px] uppercase tracking-[0.14em] text-amber-100/70">
-                                Scope: {String(trace.requested_extraction_scope ?? "unknown")}{" -> "}
-                                {String(trace.actual_extraction_scope ?? "unknown")} ({trace.scope_match})
-                              </p>
-                            ) : null}
-                            {caveats.length > 0 ? (
-                              <p className="text-amber-100/80">Caveats: {caveats.slice(0, 3).map(String).join(" | ")}</p>
-                            ) : null}
-                          </div>
-                        </details>
-                      );
-                    })()}
-                    {jobReadyLinks.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {jobReadyLinks.slice(0, 6).map((link, index) => {
-                          const label =
-                            typeof link.label === "string" && link.label.trim()
-                              ? link.label.trim()
-                              : `${String(link.panel_id)}.${String(link.action_id)}`;
-                          const source =
-                            typeof link.source_artifact_kind === "string" && link.source_artifact_kind.trim()
-                              ? link.source_artifact_kind.trim()
-                              : typeof link.source === "string"
-                                ? link.source
-                                : "artifact";
-                          return (
-                            <button
-                              key={`${String(link.type ?? "link")}-${String(link.panel_id)}-${String(link.action_id)}-${index}`}
-                              type="button"
-                              className="rounded-full border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100 hover:border-cyan-200/60 hover:bg-cyan-300/15"
-                              onClick={() => runJobReadyLink(link)}
-                              title={`From ${source}`}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                    {finalAnswerIsLong ? (
-                      <button
-                        type="button"
-                        className="mt-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-200 hover:border-cyan-200/60 hover:text-cyan-100"
-                        aria-expanded={expanded}
-                        onClick={() =>
-                          setAskExpandedByReply((prev) => ({
-                            ...prev,
-                            [reply.id]: !expanded,
-                          }))
-                        }
-                      >
-                        {expanded ? "Collapse Answer" : "Show Full Answer"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                <details
-                  open={debugTraceOpen}
-                  className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300"
-                >
-                  <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                    Debug trace
-                  </summary>
-                  <div className="mt-2">
-                    {replyDebugRecord &&
-                    (replyDebugRecord.final_composer_source ||
-                      visibleDebugActionIds.length > 0 ||
-                      visibleDebugActualArtifacts.length > 0) ? (
-                      <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-950/15 px-3 py-2 text-xs text-emerald-50">
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">
-                          Turn verification summary
-                        </p>
-                        <p className="mt-1">
-                          Composer: {String(replyDebugRecord.final_composer_source ?? "n/a")} | Contract:{" "}
-                          {replyDebugRecord.final_composer_contract_pass === false ? "fail" : "pass"}
-                          {replyDebugRecord.final_composer_fail_reason
-                            ? ` (${String(replyDebugRecord.final_composer_fail_reason)})`
-                            : ""}
-                        </p>
-                        {finalComposerConsumedArtifacts.length > 0 ? (
-                          <p className="mt-1">
-                            Consumed artifacts: {finalComposerConsumedArtifacts.slice(0, 8).join(", ")}
-                          </p>
-                        ) : null}
-                        {visibleDebugActionIds.length > 0 ? (
-                          <p className="mt-1">Actions: {visibleDebugActionIds.slice(0, 8).join(" -> ")}</p>
-                        ) : null}
-                        {visibleDebugActualArtifacts.length > 0 ? (
-                          <p className="mt-1">
-                            Actual artifacts: {visibleDebugActualArtifacts.slice(0, 10).join(", ")}
-                          </p>
-                        ) : null}
-                        {jobReadyLinks.length > 0 ? (
-                          <p className="mt-1">
-                            Job-ready links:{" "}
-                            {jobReadyLinks
-                              .slice(0, 8)
-                              .map((link) => `${String(link.panel_id)}.${String(link.action_id)}`)
-                              .join(", ")}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-                {(() => {
-                  const objectiveSignals = extractObjectiveSignals(replyEvents);
-                  if (!objectiveSignals.objective && objectiveSignals.gaps.length === 0 && !objectiveSignals.suppression) return null;
-                  return (
-                    <div className="mt-2 rounded-lg border border-indigo-400/20 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-100">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-indigo-300">Objective-first situational view</p>
-                      {objectiveSignals.objective ? <p className="mt-1">Objective: {objectiveSignals.objective}</p> : null}
-                      {objectiveSignals.gaps.length > 0 ? <p className="mt-1">Top unresolved gaps: {objectiveSignals.gaps.join(" | ")}</p> : null}
-                      <p className="mt-1">Suppression inspector: {objectiveSignals.suppression ?? "not suppressed"}</p>
-                    </div>
-                  );
-                })()}
-                {reply.proof ? (
-                  <div className="mt-2 rounded-lg border border-cyan-400/20 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-300">Proof</p>
-                    <p className="mt-1">Mode: {reply.mode ?? "read"} | Verdict: {reply.proof.verdict ?? "n/a"}</p>
-                    {reply.proof.certificate?.certificateHash ? (
-                      <p className="mt-1">Certificate: {reply.proof.certificate.certificateHash}</p>
-                    ) : null}
-                    {typeof reply.proof.certificate?.integrityOk === "boolean" ? (
-                      <p className="mt-1">Integrity: {reply.proof.certificate.integrityOk ? "OK" : "FAILED"}</p>
-                    ) : null}
-                    {reply.proof.artifacts?.length ? (
-                      <p className="mt-1 whitespace-pre-wrap">
-                        Artifacts: {reply.proof.artifacts.map((a) => `${a.kind}: ${a.ref}`).join(", ")}
-                      </p>
-                    ) : null}
-                  </div>
-              ) : null}
-              {userSettings.showHelixAskDebug && reply.debug?.client_inferred_mode ? (
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                    Client inference
-                  </p>
-                  <p className="mt-1">Mode: {reply.debug.client_inferred_mode}</p>
-                </div>
-              ) : null}
-              {proceduralTurnTimeline}
-              {userSettings.showHelixAskDebug &&
-              (reply.debug?.capsule_dialogue_applied_count !== undefined ||
-                reply.debug?.capsule_evidence_applied_count !== undefined ||
-                reply.debug?.focus_guard_result ||
-                reply.debug?.anchor_guard_result ||
-                reply.debug?.capsule_retry_applied !== undefined) ? (
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                    Capsule guards
-                  </p>
-                  <p className="mt-1">
-                    Dialogue: {reply.debug?.capsule_dialogue_applied_count ?? 0} | Evidence:{" "}
-                    {reply.debug?.capsule_evidence_applied_count ?? 0}
-                  </p>
-                  <p className="mt-1">
-                    Focus: {reply.debug?.focus_guard_result ?? "pass"} | Anchor:{" "}
-                    {reply.debug?.anchor_guard_result ?? "pass"}
-                  </p>
-                  <p className="mt-1">
-                    Retry: {reply.debug?.capsule_retry_applied ? "applied" : "not applied"}
-                    {reply.debug?.capsule_retry_reason ? ` (${reply.debug.capsule_retry_reason})` : ""}
-                  </p>
-                </div>
-              ) : null}
-              {userSettings.showHelixAskDebug &&
-              (reply.sources?.length || reply.debug?.context_files?.length || reply.debug?.prompt_context_files?.length) ? (
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                    Context sources
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap">
-                    {(reply.sources?.length
-                      ? reply.sources
-                      : reply.debug?.context_files ?? reply.debug?.prompt_context_files ?? []
-                    )
-                      .filter(Boolean)
-                      .slice(0, 12)
-                      .join("\n")}
-                  </p>
-                </div>
-              ) : null}
-              {userSettings.showHelixAskDebug && (agentLoopAudit || plannerContract || runtimeSummary) ? (
-                <div className="mt-2 rounded-lg border border-emerald-400/20 bg-emerald-950/15 px-3 py-2 text-xs text-emerald-50">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300">Agent loop</p>
-                  <p className="mt-1">
-                    Goal:{" "}
-                    {clipText(
-                      String(runtimeSummary?.goal ?? plannerContract?.restate ?? reply.question ?? "n/a"),
-                      180,
-                    )}
-                  </p>
-                  <p className="mt-1">
-                    Policy:{" "}
-                    {String(
-                      agentLoopAudit?.dispatch_policy ??
-                        plannerContract?.dispatch_policy ??
-                        reply.debug?.server_dispatch_policy ??
-                        "n/a",
-                    )}{" "}
-                    | Route:{" "}
-                    {visibleResolvedTurn.primary_route_label}
-                  </p>
-                  {latestRuntimeChosenCapability || selectedAgentAction ? (
-                    <p className="mt-1">
-                      Tool selected:{" "}
-                      {latestRuntimeChosenCapability ??
-                        `${String(selectedAgentAction?.panel_id ?? "unknown")}.${String(selectedAgentAction?.action_id ?? "unknown")}`}
-                    </p>
-                  ) : null}
-                  {agentPlanItems.length > 0 ? (
-                    <p className="mt-1 whitespace-pre-wrap">
-                      Plan:
-                      {"\n"}
-                      {agentPlanItems
-                        .slice(0, 6)
-                        .map((item, index) => {
-                          const record = readAgentLoopAuditRecord(item);
-                          return `${index + 1}. ${String(record?.lane ?? "step")} ${String(record?.id ?? "unknown")} [${String(record?.status ?? "planned")}]`;
-                        })
-                        .join("\n")}
-                    </p>
-                  ) : null}
-                  {agentObservations.length > 0 ? (
-                    <p className="mt-1 whitespace-pre-wrap">
-                      Observations:
-                      {"\n"}
-                      {agentObservations
-                        .slice(-6)
-                        .map((item, index) => {
-                          const record = readAgentLoopAuditRecord(item);
-                          const contract =
-                            typeof record?.contract_pass === "boolean"
-                              ? record.contract_pass
-                                ? "contract=pass"
-                                : `contract=fail:${String(record.contract_fail_reason ?? "unknown")}`
-                              : "contract=n/a";
-                          return `${index + 1}. ${String(record?.step_id ?? "unknown")} [${String(record?.status ?? "unknown")}] ${contract}`;
-                        })
-                        .join("\n")}
-                    </p>
-                  ) : null}
-                  {pendingAgentRequest ? (
-                    <div className="mt-2 rounded border border-amber-300/30 bg-amber-400/10 p-2 text-amber-50">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[10px] uppercase tracking-[0.18em] text-amber-200">
-                            Pending request
-                          </p>
-                          <p className="mt-1">
-                            {clipText(String(pendingAgentRequest.prompt ?? "Waiting for missing input."), 220)}
-                          </p>
-                          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-amber-200/80">
-                            id={String(pendingAgentRequest.request_id ?? "n/a")} | scope=
-                            {String(pendingAgentRequest.pending_scope ?? "n/a")}
-                          </p>
-                          {reply.debug?.pending_intercepted_turn ? (
-                            <p className="mt-1 text-[10px] text-red-200">
-                              This turn was intercepted by pending state:{" "}
-                              {String(reply.debug.pending_interception_reason ?? "unknown")}
-                            </p>
-                          ) : null}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCancelAskPendingRequest}
-                          className="shrink-0 rounded border border-amber-200/50 bg-amber-300/15 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-amber-50 hover:bg-amber-300/25"
-                        >
-                          cancel pending
-                        </button>
-                      </div>
-                    </div>
-                  ) : reply.debug?.pending_intercepted_turn && visibleResolvedTurn.primary_terminal_label === "pending_input" ? (
-                    <p className="mt-1 text-[10px] text-red-200">
-                      Pending transition:{" "}
-                      {String(
-                        reply.debug.pending_resolution_reason ??
-                          reply.debug.pending_transition_reason ??
-                          reply.debug.pending_interception_reason ??
-                          "unknown",
-                      )}
-                    </p>
-                  ) : null}
-                  <p className="mt-1">
-                    Terminal:{" "}
-                    {visibleResolvedTurn.primary_terminal_label}
-                  </p>
-                </div>
-              ) : null}
-              {isLatestReply &&
-              userSettings.showHelixAskDebug &&
-              (replyEventLogPreview.length > 0 || objectiveReasoningTrace.length > 0) ? (
-                <div className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                      Reasoning event log
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyReplyEventLog(reply.id, replyEventsChronological)}
-                      disabled={
-                        !replyEventLogPayload ||
-                        typeof navigator === "undefined" ||
-                        typeof navigator.clipboard?.writeText !== "function"
-                      }
-                      className={`rounded border px-2 py-1 text-[10px] uppercase tracking-[0.14em] ${
-                        replyEventLogPayload &&
-                        typeof navigator !== "undefined" &&
-                        typeof navigator.clipboard?.writeText === "function"
-                          ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
-                          : "border-slate-600 text-slate-500"
-                      }`}
-                    >
-                      {copiedReplyEventLogId === reply.id ? "copied" : "copy logs"}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                    {replyEventsChronological.length} events | chronological
-                  </p>
-                  {objectiveReasoningTrace.length > 0 ? (
-                    <div className="mt-2 rounded border border-indigo-400/25 bg-indigo-950/20 p-2">
-                      <p className="text-[10px] uppercase tracking-[0.14em] text-indigo-200">
-                        Plain-English objective reasoning trace
-                      </p>
-                      {objectiveTelemetryUsed ? (
-                        <p className="mt-1 text-[10px] leading-5 text-indigo-100/90">
-                          finalize={objectiveTelemetryUsed.finalizeGateMode ?? "n/a"} | gate_pass=
-                          {objectiveTelemetryUsed.finalizeGatePassed === null
-                            ? "n/a"
-                            : objectiveTelemetryUsed.finalizeGatePassed
-                              ? "true"
-                              : "false"}{" "}
-                          | coverage_unresolved={objectiveTelemetryUsed.coverageUnresolvedCount ?? "n/a"} |
-                          unknown_blocks={objectiveTelemetryUsed.unknownBlockCount ?? "n/a"} |
-                          unresolved_without_unknown=
-                          {objectiveTelemetryUsed.unresolvedWithoutUnknownBlockCount ?? "n/a"} |
-                          missing_scoped_retrieval=
-                          {objectiveTelemetryUsed.missingScopedRetrievalCount ?? "n/a"}
-                        </p>
-                      ) : null}
-                      {objectiveTelemetryUsed?.coverageUnresolvedObjectiveIds.length ? (
-                        <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/85">
-                          coverage_unresolved_objective_ids:{" "}
-                          {objectiveTelemetryUsed.coverageUnresolvedObjectiveIds.join(", ")}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
-                        {objectiveReasoningTrace.map((entry) => {
-                          const requiredCount = entry.usedTelemetry.requiredSlots.length;
-                          const matchedCount = entry.usedTelemetry.matchedSlots.length;
-                          const missingCount = entry.usedTelemetry.missingSlots.length;
-                          const evidenceCount =
-                            entry.usedTelemetry.evidenceRefCount ?? entry.usedTelemetry.evidenceRefs.length;
-                          return (
-                            <details
-                              key={`${reply.id}-objective-trace-${entry.objectiveId}`}
-                              className="rounded border border-indigo-300/20 bg-black/20 p-2"
-                            >
-                              <summary className="cursor-pointer select-none text-[10px] leading-5 text-indigo-100">
-                                {entry.objectiveLabel} [{entry.finalStatus}] | slots {matchedCount}/{Math.max(requiredCount, matchedCount + missingCount)} | evidence={evidenceCount}
-                              </summary>
-                              <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-50">
-                                {entry.plainReasoning}
-                              </p>
-                              <p className="mt-1 text-[10px] leading-5 text-indigo-100/85">
-                                required={requiredCount} | matched={matchedCount} | missing={missingCount} | retrieval_confidence=
-                                {entry.usedTelemetry.retrievalConfidence === null
-                                  ? "n/a"
-                                  : entry.usedTelemetry.retrievalConfidence.toFixed(2)}{" "}
-                                | retrieval_passes={entry.usedTelemetry.retrievalPassCount ?? "n/a"} | scoped_retrieval=
-                                {entry.usedTelemetry.scopedRetrievalObserved === null
-                                  ? "n/a"
-                                  : entry.usedTelemetry.scopedRetrievalObserved
-                                    ? "true"
-                                    : "false"}{" "}
-                                | OES=
-                                {entry.usedTelemetry.objectiveOesScore === null
-                                  ? "n/a"
-                                  : entry.usedTelemetry.objectiveOesScore.toFixed(2)}
-                                /
-                                {entry.usedTelemetry.objectiveOesThreshold === null
-                                  ? "n/a"
-                                  : entry.usedTelemetry.objectiveOesThreshold.toFixed(2)}{" "}
-                                ({entry.usedTelemetry.objectiveOesPass === null
-                                  ? "n/a"
-                                  : entry.usedTelemetry.objectiveOesPass
-                                    ? "pass"
-                                    : "fail"})
-                              </p>
-                              {entry.transitionTail.length > 0 ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Transition tail:
-                                  {"\n"}
-                                  {entry.transitionTail.join("\n")}
-                                </p>
-                              ) : null}
-                              {entry.usedTelemetry.evidenceRefs.length > 0 ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Evidence refs:
-                                  {"\n"}
-                                  {entry.usedTelemetry.evidenceRefs.join("\n")}
-                                </p>
-                              ) : null}
-                              {entry.usedTelemetry.miniCriticReason ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Mini-critic reason: {entry.usedTelemetry.miniCriticReason}
-                                </p>
-                              ) : null}
-                              {entry.usedTelemetry.terminalizationReason ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Terminalization reason: {entry.usedTelemetry.terminalizationReason}
-                                </p>
-                              ) : null}
-                              {entry.usedTelemetry.blockedReason ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Blocked reason: {entry.usedTelemetry.blockedReason}
-                                </p>
-                              ) : null}
-                              {entry.unknownBlock ? (
-                                <p className="mt-1 whitespace-pre-wrap text-[10px] leading-5 text-indigo-100/80">
-                                  Unknown: {entry.unknownBlock.unknown}
-                                  {"\n"}Why: {entry.unknownBlock.why}
-                                  {entry.unknownBlock.whatIChecked.length > 0
-                                    ? `\nWhat I checked:\n${entry.unknownBlock.whatIChecked.join("\n")}`
-                                    : ""}
-                                  {"\n"}Next retrieval: {entry.unknownBlock.nextRetrieval}
-                                </p>
-                              ) : null}
-                            </details>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                  {replyEventLogPreview.length > 0 ? (
-                    <div className="mt-2 max-h-56 overflow-y-auto rounded border border-slate-700/80 bg-slate-950/70 p-2 font-mono text-[10px] leading-5 text-slate-200">
-                      {replyEventLogPreview.map((event) => {
-                        const superseded = isAskLiveEventSuperseded(event);
-                        return (
-                        <details
-                          key={`${reply.id}-reasoning-log-${event.id}`}
-                          className={`mb-1 rounded border px-1.5 py-1 last:mb-0 ${
-                            superseded
-                              ? "border-slate-700/60 bg-slate-900/30 opacity-70"
-                              : "border-slate-700/70 bg-black/20"
-                          }`}
-                        >
-                          <summary className="cursor-pointer select-none whitespace-pre-wrap break-words text-slate-100">
-                            {formatAskLiveEventLogLine(event)}
-                          </summary>
-                          <pre className="mt-1 whitespace-pre-wrap break-words text-slate-300">
-                            {buildAskLiveEventLogDetailPayload(event)}
-                          </pre>
-                        </details>
-                        );
-                      })}
                     </div>
                   ) : null}
                 </div>
-              ) : null}
-                  </div>
-                </details>
               {isLatestReply ? (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
                 <span>
                   Saved in Helix Console
                   {reply.promptIngested ? " | Prompt ingested" : ""}
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyReply(reply)}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-200"
-                    aria-label="Copy response"
-                    data-testid={latestCopyFinalTestId}
-                  >
-                    Copy
-                  </button>
-                  {userSettings.showHelixAskDebug ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
-                      disabled={
-                        typeof window === "undefined"
-                      }
-                      className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                        typeof window !== "undefined"
-                          ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
-                          : "border-slate-600 text-slate-500"
-                      }`}
-                      aria-label="Debug copy"
-                      data-testid={latestDebugCopyTestId}
-                    >
-                      {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Unified Debug Copy"}
-                    </button>
-                  ) : null}
-                  {reply.contextCapsule ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyContextCapsule(reply)}
-                      className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-cyan-100 transition hover:bg-cyan-400/20"
-                      aria-label="Copy context capsule"
-                    >
-                      Copy Capsule
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void handleReadAloud(reply)}
-                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                        ? "border-amber-300/40 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20"
-                        : "border-white/10 bg-white/5 text-slate-400 hover:text-slate-200"
-                    }`}
-                    aria-label={
-                      shouldStopReadAloudOnButtonPress(readAloudByReply[reply.id] ?? "idle")
-                        ? "Stop reading"
-                        : "Read aloud"
-                    }
-                  >
-                    {formatReadAloudButtonLabel(readAloudByReply[reply.id] ?? "idle")}
-                  </button>
-                  {onOpenConversation ? (
-                    <button
-                      className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-200 transition hover:bg-white/10"
-                      onClick={handleOpenConversationPanel}
-                      type="button"
-                    >
-                      Open conversation
-                    </button>
-                  ) : null}
-                </div>
               </div>
               ) : null}
                 </div>
@@ -32826,6 +32365,60 @@ export function HelixAskPill({
               </details>
             );
             })}
+            {activeTurnStreamRows.length > 0 ? (
+              <div
+                className="relative px-1 py-1 text-xs text-slate-100"
+                aria-label="Active turn stream"
+                data-testid="helix-ask-active-turn-stream"
+                data-turn-stream-lines={activeTurnStreamRows.length}
+              >
+                <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
+                  {activeTurnStreamRows.map((row, index) => {
+                    const isQuestionRow = row.source === "question";
+                    const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
+                    const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
+                    const visibleText = clipText(row.text, row.detailLimit ?? 360);
+                    const isLatestActiveRow = index === activeTurnStreamRows.length - 1;
+                    return (
+                      <div
+                        key={row.key}
+                        className={`relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
+                          isLatestActiveRow ? "helix-ask-turn-line-enter" : ""
+                        }`}
+                        data-testid={isLatestActiveRow ? "helix-ask-active-turn-latest-line" : undefined}
+                        data-stream-row-source={row.source}
+                      >
+                        <span
+                          className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
+                          aria-hidden
+                        />
+                        <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="break-words font-semibold">{row.label}</p>
+                            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
+                              {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed">{visibleText}</p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
+                            {row.meta || row.status}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            <div
+              ref={askReplyListBottomRef}
+              className="h-px w-full"
+              aria-hidden
+              data-testid="helix-ask-reply-list-bottom"
+            />
           </div>
         ) : null}
         {debugExportDrawer ? (

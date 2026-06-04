@@ -123,6 +123,15 @@ describe("formatHelixVisibleTerminalSourceLabel", () => {
       }),
     ).toBe("model direct answer");
   });
+
+  it("labels scholarly research terminal products by terminal product", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "scholarly_research_answer",
+        finalAnswerSource: "final_answer_draft",
+      }),
+    ).toBe("scholarly research answer");
+  });
 });
 
 describe("shouldShowHelixRuntimeStopReason", () => {

@@ -85,6 +85,7 @@ let buildHelixCausalTurnTraceRows: typeof import("@/components/helix/HelixAskPil
 let buildStagePlayChatLedgerEvents: typeof import("@/components/helix/HelixAskPill").buildStagePlayChatLedgerEvents;
 let buildLiveAnswerTurnBridgeState: typeof import("@/components/helix/HelixAskPill").buildLiveAnswerTurnBridgeState;
 let resolveHelixAskFinalAnswerPresentation: typeof import("@/components/helix/HelixAskPill").resolveHelixAskFinalAnswerPresentation;
+let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixAskPill").readHelixAskFinalAnswerSourceLabel;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
@@ -174,6 +175,7 @@ beforeAll(async () => {
     buildStagePlayChatLedgerEvents,
     buildLiveAnswerTurnBridgeState,
     resolveHelixAskFinalAnswerPresentation,
+    readHelixAskFinalAnswerSourceLabel,
     readReasoningTheaterHardFailureSignals,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
@@ -650,32 +652,52 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("exposes UI/debug parity hooks without making clipboard copy part of prompt submission", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
-    expect(source).toContain("data-testid={latestFinalAnswerTestId}");
-    expect(source).toContain("data-final-answer-text={finalAnswerRawText}");
-    expect(source).toContain("data-visible-terminal-source={transcriptTerminal.source}");
-    expect(source).toContain("data-backend-terminal-answer={transcriptTerminal.backendTerminalText ?? \"\"}");
+    expect(source).toContain("isFinalRow");
+    expect(source).toContain("? latestFinalAnswerTestId");
+    expect(source).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
+    expect(source).toContain("data-visible-terminal-source={isFinalRow ? transcriptTerminal.source : undefined}");
+    expect(source).toContain("data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? \"\" : undefined}");
     expect(source).toContain("ui_debug_parity_harness");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY__");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__");
     expect(source).toContain("clipboard_debug_copy_required_for_prompt_submission: false");
   });
 
-  it("renders Live Answer as a turn bridge before terminal output", () => {
+  it("renders Live Answer as an inline turn bridge before terminal output", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain('data-testid={isLatestReply ? "helix-ask-latest-live-turn-bridge" : undefined}');
-    expect(source).toContain("data-live-turn-bridge-status={liveAnswerTurnBridge.status}");
+    expect(source).toContain("data-live-turn-bridge-status={liveAnswerTurnBridge?.status}");
     expect(source).toContain("data-final-answer-authority=");
     expect(source).toContain("receipt_fallback_not_reviewed");
     expect(source).toContain("resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel)");
     expect(source).toContain("finalAnswerPresentation.heading");
+    expect(source).toContain("buildHelixContinuousTurnStreamRows");
+    expect(source).toContain('aria-label="Turn stream"');
+    expect(source).toContain("data-stage-play-events");
     expect(source).not.toContain("<HelixAskLiveAnswerEnvironmentProjection");
     expect(source).not.toContain("<HelixAskLiveSituationProjection");
     expect(source).not.toMatch(/<details\s+open\s+className="rounded-2xl border border-violet-300\/20/);
     expect(source).not.toContain("`source: ${finalAnswerSourceLabel}`");
-    expect(source.indexOf("helix-ask-latest-live-turn-bridge")).toBeGreaterThan(source.indexOf("Stage Play ledger"));
-    expect(source.indexOf("helix-ask-latest-live-turn-bridge")).toBeLessThan(
-      source.indexOf("data-testid={latestFinalAnswerTestId}"),
-    );
+    expect(source).not.toContain("Stage Play ledger");
+    expect(source).not.toContain("Stage Play inline");
+    expect(source).not.toContain(">Turn stream<");
+    expect(source).toContain("stagePlayEvents: stagePlayChatLedgerEvents");
+    expect(source).toContain("liveAnswerTurnBridge,");
+    expect(source).toContain("finalAnswerText: finalAnswerRawText");
+  });
+
+  it("prefers resolved scholarly terminal labels over stale direct model labels", () => {
+    const label = readHelixAskFinalAnswerSourceLabel({
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      resolved_turn_summary: {
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "scholarly_research_answer",
+      },
+    });
+
+    expect(label).toBe("scholarly research answer");
+    expect(resolveHelixAskFinalAnswerPresentation(label).sourceLabel).toBe("scholarly research answer");
   });
 
   it("demotes deterministic receipt fallback to checkpoint receipt presentation", () => {
@@ -749,10 +771,34 @@ describe("HelixAskPill mic-first surface contract", () => {
   it("renders the Codex-style turn transcript ahead of raw plan/debug blocks", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("buildHelixTurnTranscriptRows");
+    expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
-    expect(source).toContain("Agent work log");
-    expect(source).toContain("Causal trace");
-    expect(source).toContain("helix-ask-latest-causal-trace");
+    expect(source).toContain("sortHelixAskRepliesChronologically");
+    expect(source).toContain("chronologicalAskReplies.map");
+    expect(source).toContain('aria-label="Turn stream"');
+    expect(source).not.toContain(">Turn stream<");
+    expect(source).toContain("data-turn-stream-lines");
+    expect(source).toContain("data-stream-row-source");
+    expect(source).toContain("data-testid=\"helix-ask-reply-list-bottom\"");
+    expect(source).toContain("askReplyListBottomRef");
+    expect(source).toContain("scrollIntoView({ behavior, block: \"end\" })");
+    expect(source).toContain("askReplyListPinnedToBottomRef.current = true");
+    expect(source).toContain("LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS");
+    expect(source).toContain("shouldShowAskLiveAgenticEventRow");
+    expect(source).toContain("live turn completed");
+    expect(source).toContain("helix-ask-turn-enter");
+    expect(source).toContain("helix-ask-turn-line-enter");
+    expect(source).toContain("@keyframes helixAskTurnFadeIn");
+    expect(source).toContain('title="Copy response"');
+    expect(source).toContain('title="Unified Debug Copy"');
+    expect(source).toContain("formatReadAloudButtonLabel");
+    expect(source).not.toContain("Copy Capsule");
+    expect(source).not.toContain("Open conversation");
+    expect(source).not.toContain(">Causal trace<");
+    expect(source).not.toContain("helix-ask-latest-causal-trace");
+    expect(source).not.toContain(">Debug trace<");
+    expect(source).not.toContain("Reasoning event log");
+    expect(source).not.toContain("copy logs");
     expect(source).toContain("causal_turn_timeline");
     expect(source).toContain("buildReasoningTheaterFloatingActionText");
     expect(source).toContain("helix-ask-reasoning-floating-action-text");
