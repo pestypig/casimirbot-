@@ -39,6 +39,8 @@ export type HelixAskSourceTargetRequestedOutput =
   | "scholarly_paper_refs"
   | "doi_metadata"
   | "citation_graph"
+  | "scholarly_full_text"
+  | "paper_pdf_pages"
   | "route_trace"
   | "tool_call_eligibility"
   | "terminal_contract"

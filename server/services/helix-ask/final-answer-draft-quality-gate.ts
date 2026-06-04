@@ -4,6 +4,7 @@ export type FinalAnswerDraftQualityViolation =
   | "generic_answer_for_compound_prompt"
   | "missing_required_prompt_parts"
   | "missing_support_refs_for_repo_route"
+  | "missing_support_refs_for_scholarly_route"
   | "unsupported_repo_claim"
   | "receipt_like_answer"
   | "fallback_like_answer";
@@ -11,6 +12,7 @@ export type FinalAnswerDraftQualityViolation =
 export type FinalAnswerDraftRouteFamily =
   | "model_only"
   | "repo_evidence"
+  | "scholarly_research"
   | "docs_source"
   | "workstation_tool"
   | "calculator_tool"
@@ -71,6 +73,9 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence" || /repo_code|repo_evidence/i.test(routeText)) {
     return "repo_evidence";
   }
+  if (sourceTarget === "scholarly_research" || /scholarly_research|doi|citation|journal/i.test(routeText)) {
+    return "scholarly_research";
+  }
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc" || /\bdoc|docs_viewer|active_doc/i.test(routeText)) {
     return "docs_source";
   }
@@ -87,13 +92,20 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     return "model_only";
   }
   const ledger = input.artifactLedger ?? [];
-  if (ledger.some((artifact) => {
+  if (ledger.some((artifact: ArtifactLike) => {
     const kind = readString(artifact.kind);
     const payload = readRecord(artifact.payload);
     const schema = readString(payload?.schema);
-    return /repo_code_evidence_observation|scholarly_research_observation/i.test([kind, schema].join(" "));
+    return /repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation/i.test([kind, schema].join(" "));
   })) {
-    return "repo_evidence";
+    return ledger.some((artifact: ArtifactLike) => {
+      const kind = readString(artifact.kind);
+      const payload = readRecord(artifact.payload);
+      const schema = readString(payload?.schema);
+      return /scholarly_research_observation|scholarly_full_text_observation/i.test([kind, schema].join(" "));
+    })
+      ? "scholarly_research"
+      : "repo_evidence";
   }
   return "unknown";
 };
@@ -105,26 +117,32 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
   const draftRefs = readArray(input.draftPayload?.artifact_refs)
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
-  const ledgerRefs = (input.artifactLedger ?? []).flatMap((artifact) => {
+  const ledgerRefs = (input.artifactLedger ?? []).flatMap((artifact: ArtifactLike) => {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),
       ...readArray(payload?.produced_artifact_refs).map(readString),
       ...readArray(payload?.support_refs).map(readString),
+      ...readArray(payload?.page_text_refs)
+        .map(readRecord)
+        .map((page: Record<string, unknown> | null) => readString(page?.text_ref)),
+      ...readArray(payload?.selected_chunks)
+        .map(readRecord)
+        .flatMap((chunk: Record<string, unknown> | null) => [readString(chunk?.source_text_ref), readString(chunk?.citation_ref)]),
       ...readArray(payload?.spans)
         .map(readRecord)
-        .map((span) => readString(span?.ref) ?? readString(span?.path)),
+        .map((span: Record<string, unknown> | null) => readString(span?.ref) ?? readString(span?.path)),
     ].filter((entry): entry is string => Boolean(entry));
   });
   return unique([...draftRefs, ...ledgerRefs]).slice(0, 16);
 };
 
 const isFallbackLike = (text: string): boolean =>
-  /\b(?:I could not produce a terminal answer|could not produce a final answer|No final answer returned|terminal answer unavailable|missing_allowed_terminal_artifact)\b/i.test(text);
+  /\b(?:I could not produce a terminal answer|I couldn['’]?t produce a final answer|could not produce a final answer|No final answer returned|terminal answer unavailable|Please retry once|missing_allowed_terminal_artifact)\b/i.test(text);
 
 const isReceiptLike = (text: string): boolean =>
   /^(?:Opening panel|Opened panel|Workspace action|Action receipt|Receipt:|Successfully executed)\b/i.test(text.trim()) ||
@@ -172,14 +190,16 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
   if (routeFamily === "model_only" && isCompoundComparisonPrompt(prompt) && !compoundComparisonCovered(text)) {
     violations.push("missing_required_prompt_parts");
   }
-  if (routeFamily === "repo_evidence") {
+  if (routeFamily === "repo_evidence" || routeFamily === "scholarly_research") {
     if (collectFinalAnswerDraftSupportRefs({
       draftPayload: input.draftPayload,
       artifactLedger: input.artifactLedger,
     }).length === 0) {
-      violations.push("missing_support_refs_for_repo_route");
+      violations.push(routeFamily === "scholarly_research"
+        ? "missing_support_refs_for_scholarly_route"
+        : "missing_support_refs_for_repo_route");
     }
-    if (/\b(?:no|without|missing)\s+(?:current-turn\s+)?(?:repo|repository|code)\s+evidence/i.test(text)) {
+    if (routeFamily === "repo_evidence" && /\b(?:no|without|missing)\s+(?:current-turn\s+)?(?:repo|repository|code)\s+evidence/i.test(text)) {
       violations.push("unsupported_repo_claim");
     }
   }

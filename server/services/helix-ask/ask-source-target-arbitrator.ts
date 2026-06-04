@@ -554,7 +554,9 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isStagePlayCheckpointRequestPrompt(prompt)) {
+  const selectedEvidenceTargetSource = selectedEvidenceCandidate?.target_source ?? evidenceTargetArbitration.selected_target_source;
+  const stagePlayLiveEnvironmentAdmitted = selectedEvidenceTargetSource === "live_environment";
+  if (stagePlayLiveEnvironmentAdmitted && isStagePlayCheckpointRequestPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -586,7 +588,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isStagePlayJobPlanningPrompt(prompt)) {
+  if (stagePlayLiveEnvironmentAdmitted && isStagePlayJobPlanningPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -618,7 +620,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
-  if (isStagePlayReflectionPrompt(prompt)) {
+  if (stagePlayLiveEnvironmentAdmitted && isStagePlayReflectionPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,

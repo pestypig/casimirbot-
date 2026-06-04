@@ -59,4 +59,20 @@ describe("Helix Ask evidence-target arbitration", () => {
     expect(arbitration.selected_target_source).not.toBe("repo_code");
     expect(arbitration.reason_codes).not.toContain("known_project_concept_alias_question");
   });
+
+  it("keeps screen-visible control words contextual instead of admitting live tools", () => {
+    const arbitration = arbitrate('The screen says "start visual interval." What does that label mean?');
+
+    expect(arbitration.selected_target_source).not.toBe("live_environment");
+    expect(arbitration.available_capabilities).not.toContain("live_env.reflect_stage_play_context");
+    expect(arbitration.available_capabilities).not.toContain("live-source.set_rate");
+  });
+
+  it("treats not-yet-started visual capture phrasing as context, not control", () => {
+    const arbitration = arbitrate("I haven't started visual capture yet. Explain what will be needed before a checkpoint.");
+
+    expect(arbitration.selected_target_source).not.toBe("live_environment");
+    expect(arbitration.available_capabilities).not.toContain("live_env.reflect_stage_play_context");
+    expect(arbitration.available_capabilities).not.toContain("live-source.set_rate");
+  });
 });

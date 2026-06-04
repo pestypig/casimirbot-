@@ -32,6 +32,20 @@ const repoContract = (turnId: string) => ({
   raw_content_included: false,
 });
 
+const scholarlyContract = (turnId: string) => ({
+  schema: "helix.route_product_contract.v1",
+  turn_id: turnId,
+  thread_id: "thread:test",
+  source_target: "scholarly_research",
+  allowed_terminal_artifact_kinds: ["scholarly_research_answer", "typed_failure", "request_user_input"],
+  forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_synthesized_answer", "doc_summary", "repo_code_evidence_answer"],
+  side_artifact_kinds_allowed: ["scholarly_research_observation", "scholarly_full_text_observation", "final_answer_draft"],
+  required_artifact_refs: [],
+  precedence_reason: "test",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const addModelOnlyRuntimeProof = (payload: Record<string, unknown>): void => {
   payload.agent_runtime_loop = {
     iterations: [
@@ -64,6 +78,42 @@ const addRepoRuntimeProof = (payload: Record<string, unknown>, observationRef: s
         iteration: 2,
         next_step: "answer",
         chosen_capability: "model.synthesize_from_repo_evidence",
+        decision_authority: "llm",
+        observation_role: "model_answer_draft",
+      },
+    ],
+  };
+  payload.goal_satisfaction_evaluation = {
+    satisfaction: "satisfied",
+    next_decision: "allow_terminal",
+  };
+};
+
+const addScholarlyRuntimeProof = (
+  payload: Record<string, unknown>,
+  lookupRef: string,
+  fullTextRef: string,
+): void => {
+  payload.agent_runtime_loop = {
+    iterations: [
+      {
+        iteration: 1,
+        next_step: "next_action",
+        chosen_capability: "scholarly-research.lookup_papers",
+        decision_authority: "llm",
+        observed_artifact_refs: [lookupRef],
+      },
+      {
+        iteration: 2,
+        next_step: "next_action",
+        chosen_capability: "scholarly-research.fetch_full_text",
+        decision_authority: "llm",
+        observed_artifact_refs: [fullTextRef],
+      },
+      {
+        iteration: 3,
+        next_step: "answer",
+        chosen_capability: "model.synthesize_from_scholarly_research",
         decision_authority: "llm",
         observation_role: "model_answer_draft",
       },
@@ -286,6 +336,97 @@ describe("final_answer_draft terminal selection", () => {
     );
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+  });
+
+  it("publishes a valid scholarly answer instead of a stale continuation failure", () => {
+    const turnId = "ask:test:scholarly-draft-over-stale-continuation";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full_text`;
+    const draftText = [
+      "The paper identifies the Transformer as an encoder-decoder architecture built from stacked self-attention and position-wise feed-forward layers.",
+      "It uses multi-head attention plus positional encodings to model token order without recurrence.",
+      "Support: artifact://scholarly-pdf/test.pdf/page/2#text",
+    ].join("\n");
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          evidence_refs: ["arxiv:1706.03762"],
+          papers: [{ title: "Attention Is All You Need" }],
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        kind: "scholarly_full_text_observation",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          selected_chunks: [{
+            chunk_ref: "artifact://scholarly-pdf/test.pdf/page/2#chunk/1",
+            source_text_ref: "artifact://scholarly-pdf/test.pdf/page/2#text",
+            text_excerpt: "The Transformer uses stacked self-attention and point-wise feed-forward layers.",
+          }],
+          page_text_refs: ["artifact://scholarly-pdf/test.pdf/page/2#text"],
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_scholarly_research",
+          grounded_in_observation_refs: [lookupRef, fullTextRef],
+          support_refs: [lookupRef, fullTextRef, "artifact://scholarly-pdf/test.pdf/page/2#text"],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Do research: fetch the PDF/full text for arXiv:1706.03762 and extract model architecture details.",
+      route_product_contract: scholarlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not complete this Ask turn because solver authority failed (solver_path_incomplete_before_terminal).",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "answer",
+      },
+    };
+    addScholarlyRuntimeProof(payload, lookupRef, fullTextRef);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(result.visible_text).toBe(draftText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "typed_failure",
+          reason: "stale_solver_continuation_superseded_by_scholarly_terminal",
+        }),
+      ]),
+    );
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(payload.scholarly_research_answer).toMatchObject({
+      schema: "helix.scholarly_research_answer.v1",
+      text: draftText,
+      support_refs: expect.arrayContaining([lookupRef, fullTextRef]),
+    });
   });
 
   it("rejects fallback-like final drafts as successful terminals", () => {

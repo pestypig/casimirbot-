@@ -87,6 +87,7 @@ describe("Helix Ask Stage Play routing", () => {
       evidenceTargetArbitration: response.body?.evidence_target_arbitration,
       availableCapabilities: response.body?.available_capabilities,
       runtimeLoop: response.body?.agent_runtime_loop,
+      repoEvidenceRelevanceGate: response.body?.repo_evidence_relevance_gate,
       answer: response.body?.answer,
       terminalArtifactKind: response.body?.terminal_artifact_kind,
       finalAnswerSource: response.body?.final_answer_source,
@@ -128,6 +129,10 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
       String(iteration?.chosen_capability ?? "").startsWith("live_env.")
     ), routeDebug).toBe(false);
+    expect(response.body?.repo_evidence_relevance_gate, routeDebug).toMatchObject({
+      terminal_allowed: true,
+      selected_evidence_roles: expect.arrayContaining(["runtime_contract"]),
+    });
     expect(response.body?.terminal_artifact_kind, routeDebug).toBe("repo_code_evidence_answer");
     expect(response.body?.answer, routeDebug).toMatch(/Stage Play|stage_play|Badge Graph/i);
     expect(response.body?.answer, routeDebug).not.toMatch(/currently not accessible|absence of a live answer environment/i);
@@ -374,17 +379,58 @@ describe("Helix Ask Stage Play routing", () => {
 
     const routeDebug = JSON.stringify({
       route: response.body?.route_reason_code,
-      canonical: response.body?.canonical_goal_frame,
-      sourceTarget: response.body?.source_target_intent,
+      canonical: {
+        goal_kind: response.body?.canonical_goal_frame?.goal_kind,
+        required_terminal_kind: response.body?.canonical_goal_frame?.required_terminal_kind,
+      },
+      sourceTarget: {
+        target_source: response.body?.source_target_intent?.target_source,
+        target_kind: response.body?.source_target_intent?.target_kind,
+        reasons: response.body?.source_target_intent?.reasons,
+      },
       selectedAction: response.body?.selected_action,
       workstationPlan: response.body?.workstation_tool_plan,
-      actionEnvelope: response.body?.action_envelope,
-      capabilityPlan: response.body?.capability_plan,
-      capabilityResult: response.body?.capability_result,
-      capabilityLifecycleLedger: response.body?.capability_lifecycle_ledger,
-      solverControllerDecision: response.body?.solver_controller_decision,
-      goalSatisfaction: response.body?.goal_satisfaction_evaluation,
-      terminalAuthority: response.body?.terminal_answer_authority,
+      actionEnvelope: response.body?.action_envelope?.governance,
+      capabilityPlan: {
+        requested_action: response.body?.capability_plan?.requested_action,
+        admission_status: response.body?.capability_plan?.admission_status,
+      },
+      capabilityResult: {
+        status: response.body?.capability_result?.status,
+        selected_for_answer: response.body?.capability_result?.selected_for_answer,
+        reentered_solver: response.body?.capability_result?.reentered_solver,
+      },
+      capabilityLifecycleLedger: {
+        ok: response.body?.capability_lifecycle_ledger?.ok,
+        failure_codes: response.body?.capability_lifecycle_ledger?.failure_codes,
+      },
+      solverControllerDecision: {
+        decision: response.body?.solver_controller_decision?.decision,
+        selected_terminal_artifact_kind: response.body?.solver_controller_decision?.selected_terminal_artifact_kind,
+        blocking_reasons: response.body?.solver_controller_decision?.blocking_reasons,
+      },
+      goalSatisfaction: {
+        satisfaction: response.body?.goal_satisfaction_evaluation?.satisfaction,
+        next_decision: response.body?.goal_satisfaction_evaluation?.next_decision,
+        required_terminal_kind: response.body?.goal_satisfaction_evaluation?.required_terminal_kind,
+      },
+      terminalAuthority: {
+        final_answer_source: response.body?.terminal_answer_authority?.final_answer_source,
+        terminal_artifact_kind: response.body?.terminal_answer_authority?.terminal_artifact_kind,
+      },
+      finalAnswerSource: response.body?.final_answer_source,
+      terminalArtifactKind: response.body?.terminal_artifact_kind,
+      finalAnswerDraftAuthority: response.body?.final_answer_draft?.authority,
+      askTurnSolverTrace: {
+        completed_solver_path: response.body?.ask_turn_solver_trace?.completed_solver_path,
+        final_arbitration: response.body?.ask_turn_solver_trace?.final_arbitration,
+      },
+      stagePlayAskCheckpointReceipt: response.body?.stage_play_ask_checkpoint_receipt,
+      stagePlayCheckpointQueueCompletion: response.body?.stage_play_checkpoint_queue_completion,
+      currentTurnArtifactKinds: response.body?.current_turn_artifact_ledger?.map((artifact: any) => artifact?.kind),
+      stagePlayReceiptArtifacts: response.body?.current_turn_artifact_ledger
+        ?.filter((artifact: any) => artifact?.kind === "stage_play_ask_checkpoint_receipt")
+        ?.map((artifact: any) => artifact?.payload),
       answer: response.body?.answer,
     }, null, 2);
 
@@ -483,12 +529,9 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.final_answer_source).not.toBe("client_projection");
     expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
     expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
-    expect(response.body?.stage_play_checkpoint_queue_completion).toMatchObject({
-      request: expect.objectContaining({
-        checkpointRequestId: liveToolArtifact.payload.observation.debugReceipt.checkpointRequestId,
-        status: "completed",
-      }),
-    });
+    expect(response.body?.final_answer_draft?.authority, routeDebug).toBe("deterministic_receipt_fallback");
+    expect(response.body?.stage_play_checkpoint_queue_completion, routeDebug).toBeFalsy();
+    expect(response.body?.stage_play_ask_checkpoint_receipt, routeDebug).toBeFalsy();
     const boundaryReport = evaluateTerminalBoundaryEligibility(response.body as Record<string, unknown>);
     expect(boundaryReport.checks.agent_runtime_loop).toBe(true);
     expect(boundaryReport.checks.agent_step_decision).toBe(true);
@@ -503,26 +546,25 @@ describe("Helix Ask Stage Play routing", () => {
       now: new Date("2026-06-02T12:30:03.000Z"),
     });
     expect(refreshedGraph.badges.find((badge) => badge.id === "helix_ask.checkpoint.latest")).toMatchObject({
-      status: "observed",
+      status: "missing_evidence",
       checkpoint: expect.objectContaining({
-        askTurnId: expect.any(String),
-        solverTraceRef: expect.stringContaining("ask_turn_solver_trace"),
-        terminalArtifactKind: expect.stringMatching(/model_synthesized_answer|direct_answer_text/),
-        finalAnswerSource: "final_answer_draft",
-        modelReviewed: true,
+        askTurnId: null,
+        solverTraceRef: null,
+        terminalArtifactKind: null,
+        finalAnswerSource: null,
+        modelReviewed: false,
       }),
     });
     expect(refreshedGraph.badges.find((badge) => badge.id === "answer_snapshot.latest")).toMatchObject({
-      status: "observed",
+      status: "missing_evidence",
       output: expect.objectContaining({
-        state: "model_reviewed",
-        text: expect.stringContaining("Stage Play reflected the active visual source"),
+        state: "stale",
       }),
     });
     expect(refreshedGraph.badges.find((badge) => badge.id === "live_output.current")).toMatchObject({
-      status: "observed",
+      status: "missing_evidence",
       output: expect.objectContaining({
-        state: "model_reviewed",
+        state: "stale",
         voiceEligible: false,
       }),
     });

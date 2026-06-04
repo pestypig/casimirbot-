@@ -56,7 +56,7 @@ export function evaluateVisibleAnswerPolicyFaithfulnessGate(input: {
   if (/\bno\s+(?:repo|repository|code)\s+evidence\b/i.test(text) && /repo_code_evidence_observation|repo_docs_synthesis_packet/i.test(JSON.stringify(input.payload ?? {}).slice(0, 6000))) {
     violations.push("repo_evidence_claim_inverted");
   }
-  if (/\bno\s+(?:paper|scholarly|citation|doi|journal)\s+evidence\b/i.test(text) && /scholarly_research_observation|helix\.scholarly_research_observation\.v1/i.test(JSON.stringify(input.payload ?? {}).slice(0, 6000))) {
+  if (/\bno\s+(?:paper|scholarly|citation|doi|journal)\s+evidence\b/i.test(text) && /scholarly_research_observation|scholarly_full_text_observation|helix\.scholarly_(?:research|full_text)_observation\.v1/i.test(JSON.stringify(input.payload ?? {}).slice(0, 6000))) {
     violations.push("source_evidence_claim_inverted");
   }
   const uniqueViolations = Array.from(new Set(violations));

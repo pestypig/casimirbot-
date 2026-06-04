@@ -339,6 +339,71 @@ export const compactScholarlyResearchArtifactForModel = (input: {
   };
 };
 
+export const compactScholarlyFullTextArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const cfg = config();
+  const chunks = readArray(payload.selected_chunks).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const pageRefs = readArray(payload.page_text_refs).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const visualCandidates = readArray(payload.visual_candidates).map((entry: unknown) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const observationRef = readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? `${input.turnId}:scholarly_full_text_observation`;
+  const supportRefs = unique([
+    readString(artifact?.artifact_id),
+    readString(payload.artifact_id),
+    readString(payload.source_pdf_ref),
+    ...pageRefs.map((entry: Record<string, unknown>) => readString(entry.text_ref)),
+    ...chunks.flatMap((entry: Record<string, unknown>) => [readString(entry.source_text_ref), readString(entry.citation_ref)]),
+  ], 128);
+  const found = chunks.length
+    ? chunks.slice(0, cfg.observationMaxFindings).map((chunk: Record<string, unknown>) => {
+        const page = typeof chunk.page_start === "number" ? `p. ${chunk.page_start}` : "page unknown";
+        const section = readString(chunk.section_hint);
+        const excerpt = readString(chunk.text_excerpt) ?? "";
+        return compactText([page, section, excerpt].filter(Boolean).join(" - "), 520);
+      })
+    : [compactText(`No full-text chunks were selected for ${readString(payload.title) ?? readString(payload.query) ?? "the requested paper"}.`, 320)];
+  const proves = chunks.length
+    ? chunks.slice(0, cfg.observationMaxProves).map((chunk: Record<string, unknown>) => {
+        const page = typeof chunk.page_start === "number" ? `page ${chunk.page_start}` : "selected page";
+        const ref = readString(chunk.citation_ref) ?? readString(chunk.source_text_ref) ?? "full-text evidence";
+        return compactText(`${ref} provides selected full-text evidence from ${page}.`, 260);
+      })
+    : [];
+  const visualUncertainty = visualCandidates.map((candidate: Record<string, unknown>) => {
+    const page = typeof candidate.page === "number" ? `page ${candidate.page}` : "a page";
+    const reason = readString(candidate.reason) ?? "visual pass may be needed";
+    return `${page}: ${reason}`;
+  });
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: observationRef,
+    source: "scholarly_research",
+    source_target: "scholarly_research",
+    capability_key: "scholarly-research.fetch_full_text",
+    status: chunks.length > 0 ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? readString(payload.query) ?? "", 320),
+    found,
+    proves: proves.length ? proves : ["Full-text fetch completed, but no selected text chunks were available for synthesis."],
+    support_refs: supportRefs,
+    missing_or_uncertain: [
+      ...readStringArray(payload.missing_requirements),
+      ...visualUncertainty,
+    ].slice(0, cfg.observationMaxFindings),
+    suggested_next_steps: chunks.length ? ["answer", "use_another_tool", "repair"] : ["repair", "use_another_tool", "fail_closed"],
+    raw_debug_ref: `${observationRef}:raw_full_text_payload`,
+    exact_excerpt_refs: chunks.map((entry: Record<string, unknown>) => readString(entry.source_text_ref)).filter((entry): entry is string => Boolean(entry)).slice(0, 8),
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const compactRouteOrTerminalContractForModel = (
   value: unknown,
   options: { includeForbidden?: boolean; failedValidation?: boolean } = {},
@@ -466,6 +531,13 @@ export const buildHelixModelPromptContext = (input: {
           userRequested: input.userGoal,
         });
       }
+      if (/scholarly_full_text_observation/i.test(kind ?? "")) {
+        return compactScholarlyFullTextArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+        });
+      }
       if (/agent_step_observation_packet|runtime_tool_observation|tool_observation/i.test(kind ?? "")) {
         return compactAgentStepObservationPacketForModel({
           turnId: input.turnId,
@@ -489,10 +561,10 @@ export const buildHelixModelPromptContext = (input: {
     .slice(0, cfg.observationMaxPackets);
   const exactExcerpts = input.requiresExactExcerpts
     ? (input.selectedArtifacts ?? [])
-        .flatMap((artifact) => {
+        .flatMap((artifact: unknown) => {
           const record = readRecord(artifact);
           const payload = readRecord(record?.payload) ?? record;
-          return readArray(payload?.spans).map((span) => {
+          const spanExcerpts = readArray(payload?.spans).map((span: unknown) => {
             const spanRecord = readRecord(span);
             return {
               ref: readString(spanRecord?.ref),
@@ -505,14 +577,28 @@ export const buildHelixModelPromptContext = (input: {
               ),
             };
           });
+          const scholarlyChunkExcerpts = readArray(payload?.selected_chunks).map((chunk: unknown) => {
+            const chunkRecord = readRecord(chunk);
+            return {
+              ref: readString(chunkRecord?.source_text_ref) ?? readString(chunkRecord?.citation_ref),
+              excerpt: compactText(readString(chunkRecord?.text_excerpt) ?? "", cfg.exactExcerptMaxChars),
+            };
+          });
+          return [...spanExcerpts, ...scholarlyChunkExcerpts];
         })
-        .filter((entry) => entry.ref && entry.excerpt)
+        .filter((entry: { ref: string | null; excerpt: string }) => entry.ref && entry.excerpt)
         .slice(0, 8)
     : [];
-  const rawSpanRefsAvailable = (input.selectedArtifacts ?? []).flatMap((artifact) => {
+  const rawSpanRefsAvailable = (input.selectedArtifacts ?? []).flatMap((artifact: unknown) => {
     const record = readRecord(artifact);
     const payload = readRecord(record?.payload) ?? record;
-    return readArray(payload?.spans).map((span) => readString(readRecord(span)?.ref)).filter((entry): entry is string => Boolean(entry));
+    return [
+      ...readArray(payload?.spans).map((span: unknown) => readString(readRecord(span)?.ref)),
+      ...readArray(payload?.selected_chunks).map((chunk: unknown) => {
+        const chunkRecord = readRecord(chunk);
+        return readString(chunkRecord?.source_text_ref) ?? readString(chunkRecord?.citation_ref);
+      }),
+    ].filter((entry): entry is string => Boolean(entry));
   });
   const terminalContractCompact = compactRouteOrTerminalContractForModel(input.terminalContract);
   const routeContractCompact = compactRouteOrTerminalContractForModel(input.routeContract);

@@ -289,6 +289,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const repoTerminalMaterialized =
     draftMaterialization?.ok === true &&
     draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
+  const scholarlyTerminalMaterialized =
+    draftMaterialization?.ok === true &&
+    draftMaterialization.materialized_terminal_artifact_kind === "scholarly_research_answer";
   const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
   const stagePlayTerminalMaterialized =
     draftMaterialization?.ok === true &&
@@ -297,6 +300,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rawSolverContinuationPending &&
     !(
       (repoTerminalMaterialized && goalAllowsTerminal) ||
+      (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
       (stagePlayTerminalMaterialized && goalAllowsTerminal)
     );
   if (solverContinuationPending) {
@@ -317,6 +321,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_repo_terminal",
+    });
+  } else if (rawSolverContinuationPending && scholarlyTerminalMaterialized && goalAllowsTerminal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_scholarly_terminal",
     });
   } else if (rawSolverContinuationPending && stagePlayTerminalMaterialized && goalAllowsTerminal) {
     rejectedCandidates.push({

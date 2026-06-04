@@ -4,7 +4,10 @@ import {
   type HelixCapabilityFamily,
   type HelixCapabilityPlan,
 } from "@shared/helix-capability-plan";
-import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
+import {
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+} from "@shared/helix-scholarly-research-observation";
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
@@ -116,7 +119,11 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
   if (family === "visual_capture") return "review_current_visual_state";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
   if (family === "repo_evidence") return "repo-code.search_concept";
-  if (family === "scholarly_research") return HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
+  if (family === "scholarly_research") {
+    return detectScholarlyResearchIntent(promptText).fullTextRequested
+      ? HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
+      : HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
+  }
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
   return "diagnose_debug_or_runtime_evidence";

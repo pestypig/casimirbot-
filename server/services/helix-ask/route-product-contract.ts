@@ -420,6 +420,8 @@ export function buildRouteProductContract(input: {
       precedenceReason: "scholarly_research_source_target_allows_only_external_paper_evidence_terminal_products",
       sideArtifactKindsAllowed: [
         "scholarly_research_observation",
+        "scholarly_full_text_observation",
+        "scholarly_pdf_page_image_observation",
         "scholarly_research_synthesis_attempt",
         "scholarly_research_claim_support",
       ],

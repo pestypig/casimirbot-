@@ -130,8 +130,19 @@ export function buildAskEvidenceTargetArbitration(input: {
       terminalProductConstraints: ["direct_answer_text"],
     }));
   }
+  if (stagePlayLexical && !stagePlayOperational && !stagePlayNegative) {
+    candidates.push(makeCandidate({
+      candidateId: "model_only.stage_play_lexical_concept",
+      targetSource: "model_only",
+      targetKind: "general_background",
+      strength: "soft",
+      score: repoIntent.repoEvidenceRequested ? 0.38 : 0.56,
+      reasonCodes: ["stage_play_lexical_candidate_only", "no_stage_play_operation_admitted"],
+      terminalProductConstraints: ["direct_answer_text"],
+    }));
+  }
 
-  if (repoIntent.repoEvidenceRequested) {
+  if (!contextualSuppression && repoIntent.repoEvidenceRequested) {
     promptIntentCandidates.push("repo_code_evidence");
     candidates.push(makeCandidate({
       candidateId: "repo_code.project_concept_or_code_evidence",
@@ -146,7 +157,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (scholarlyIntent.researchRequested) {
+  if (!contextualSuppression && scholarlyIntent.researchRequested) {
     promptIntentCandidates.push("scholarly_research");
     candidates.push(makeCandidate({
       candidateId: "scholarly_research.external_sources",
@@ -156,8 +167,12 @@ export function buildAskEvidenceTargetArbitration(input: {
       score: scholarlyIntent.strength === "hard" ? 0.94 : 0.76,
       reasonCodes: scholarlyIntent.reasons,
       requestedOutputs: scholarlyIntent.requestedOutputs,
-      capabilityKeys: ["scholarly_research.lookup"],
-      terminalProductConstraints: ["scholarly_research_observation", "scholarly_research_answer"],
+      capabilityKeys: scholarlyIntent.fullTextRequested
+        ? ["scholarly_research.lookup", "scholarly_research.fetch_full_text"]
+        : ["scholarly_research.lookup"],
+      terminalProductConstraints: scholarlyIntent.fullTextRequested
+        ? ["scholarly_research_observation", "scholarly_full_text_observation", "scholarly_research_answer"]
+        : ["scholarly_research_observation", "scholarly_research_answer"],
     }));
   }
 

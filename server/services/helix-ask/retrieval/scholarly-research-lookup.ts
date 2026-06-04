@@ -193,6 +193,8 @@ const makePaper = (input: {
   openalexId?: string | null;
   semanticScholarId?: string | null;
   url?: string | null;
+  pdfUrl?: string | null;
+  fullTextUrl?: string | null;
   citationCount?: number;
   referenceCount?: number;
   isOpenAccess?: boolean;
@@ -213,6 +215,8 @@ const makePaper = (input: {
       ...(input.openalexId ? { openalex_id: input.openalexId } : {}),
       ...(input.semanticScholarId ? { semantic_scholar_id: input.semanticScholarId } : {}),
       ...(input.url ? { url: input.url } : {}),
+      ...(input.pdfUrl ? { pdf_url: input.pdfUrl } : {}),
+      ...(input.fullTextUrl ? { full_text_url: input.fullTextUrl } : {}),
     },
     ...(typeof input.citationCount === "number" ? { citation_count: input.citationCount } : {}),
     ...(typeof input.referenceCount === "number" ? { reference_count: input.referenceCount } : {}),
@@ -289,6 +293,7 @@ const lookupOpenAlex = async (input: {
     const ids = readRecord(work.ids);
     const primaryLocation = readRecord(work.primary_location);
     const source = readRecord(primaryLocation?.source);
+    const openAccess = readRecord(work.open_access);
     const ref = evidenceRef("openalex", readString(work.id) ?? hashShort(work), readString(work.id));
     input.evidenceRefs.push(ref);
     const authors = readArray(work.authorships)
@@ -309,9 +314,11 @@ const lookupOpenAlex = async (input: {
       doi: normalizeDoi(firstString(work.doi, ids?.doi)),
       openalexId: readString(work.id) ?? readString(ids?.openalex),
       url: firstString(work.id, work.landing_page_url),
+      pdfUrl: firstString(primaryLocation?.pdf_url),
+      fullTextUrl: firstString(primaryLocation?.landing_page_url, openAccess?.oa_url),
       citationCount: readNumber(work.cited_by_count),
       referenceCount: readNumber(work.referenced_works_count),
-      isOpenAccess: Boolean(readRecord(work.open_access)?.is_oa),
+      isOpenAccess: Boolean(openAccess?.is_oa),
       confidence: input.doi ? "high" : "medium",
     });
     if (paper) papers.push(paper);
@@ -368,7 +375,7 @@ const lookupSemanticScholar = async (input: {
   missingRequirements: string[];
   evidenceRefs: HelixScholarlyEvidenceRef[];
 }): Promise<HelixScholarlyPaperResult[]> => {
-  const fields = "paperId,title,authors,year,venue,abstract,citationCount,referenceCount,url,externalIds,isOpenAccess";
+  const fields = "paperId,title,authors,year,venue,abstract,citationCount,referenceCount,url,externalIds,isOpenAccess,openAccessPdf";
   const apiKey = readString(process.env.SEMANTIC_SCHOLAR_API_KEY);
   const url = input.doi
     ? `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(input.doi)}?fields=${fields}`
@@ -386,6 +393,7 @@ const lookupSemanticScholar = async (input: {
     const paperRecord = readRecord(raw);
     if (!paperRecord) continue;
     const externalIds = readRecord(paperRecord.externalIds);
+    const openAccessPdf = readRecord(paperRecord.openAccessPdf);
     const ref = evidenceRef("semantic_scholar", readString(paperRecord.paperId) ?? hashShort(paperRecord), readString(paperRecord.url));
     input.evidenceRefs.push(ref);
     const paper = makePaper({
@@ -400,6 +408,8 @@ const lookupSemanticScholar = async (input: {
       arxivId: firstString(externalIds?.ArXiv, externalIds?.arXiv),
       semanticScholarId: readString(paperRecord.paperId),
       url: readString(paperRecord.url),
+      pdfUrl: readString(openAccessPdf?.url),
+      fullTextUrl: readString(openAccessPdf?.url) ?? readString(paperRecord.url),
       citationCount: readNumber(paperRecord.citationCount),
       referenceCount: readNumber(paperRecord.referenceCount),
       isOpenAccess: typeof paperRecord.isOpenAccess === "boolean" ? paperRecord.isOpenAccess : undefined,
@@ -453,6 +463,8 @@ const lookupArxiv = async (input: {
       abstract: readString(entry.summary)?.replace(/\s+/g, " "),
       arxivId,
       url: id,
+      pdfUrl: arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined,
+      fullTextUrl: id,
       confidence: input.arxivId ? "high" : "medium",
     });
     if (paper) papers.push(paper);
@@ -477,7 +489,7 @@ const lookupUnpaywall = async (input: {
   const record = readRecord(json);
   if (!record) return [];
   const bestLocation = readRecord(record.best_oa_location);
-  const ref = evidenceRef("unpaywall", input.doi, readString(bestLocation?.url) ?? readString(record.doi_url));
+  const ref = evidenceRef("unpaywall", input.doi, readString(bestLocation?.url_for_pdf) ?? readString(bestLocation?.url) ?? readString(record.doi_url));
   input.evidenceRefs.push(ref);
   const paper = makePaper({
     provider: "unpaywall",
@@ -485,6 +497,8 @@ const lookupUnpaywall = async (input: {
     title: readString(record.title),
     doi: normalizeDoi(readString(record.doi)),
     url: readString(bestLocation?.url) ?? readString(record.doi_url),
+    pdfUrl: readString(bestLocation?.url_for_pdf),
+    fullTextUrl: readString(bestLocation?.url_for_landing_page) ?? readString(bestLocation?.url) ?? readString(record.doi_url),
     isOpenAccess: Boolean(record.is_oa),
     confidence: "medium",
   });
@@ -529,6 +543,8 @@ const lookupCore = async (input: {
       abstract: readString(result.abstract),
       doi: normalizeDoi(readString(result.doi)),
       url: readString(result.downloadUrl) ?? readString(result.url),
+      pdfUrl: readString(result.downloadUrl),
+      fullTextUrl: readString(result.url) ?? readString(result.downloadUrl),
       isOpenAccess: true,
       confidence: "medium",
     });

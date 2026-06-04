@@ -62,6 +62,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "process_graph_overview",
   "repo_code_evidence_question",
   "repo_entity_definition",
+  "scholarly_research_lookup",
   "situation_context_question",
   "visual_capture_describe",
   "zen_graph_reflection",
@@ -117,6 +118,7 @@ const artifactKindMatchesCapability = (
 
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
+  if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
   }
@@ -189,6 +191,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";
   }
+  if (/scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1/i.test(joined)) {
+    return "scholarly-research.fetch_full_text";
+  }
   if (/scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined)) {
     return "scholarly-research.lookup_papers";
   }
@@ -240,7 +245,7 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
   capability: string,
   artifacts: Record<string, unknown>[],
 ): boolean => {
-  if (capability !== "repo-code.search_concept" && capability !== "scholarly-research.lookup_papers") return false;
+  if (capability !== "repo-code.search_concept" && capability !== "scholarly-research.lookup_papers" && capability !== "scholarly-research.fetch_full_text") return false;
   return artifacts.some((artifact) => {
     const sourceScope = readString(artifact.source_scope);
     if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;

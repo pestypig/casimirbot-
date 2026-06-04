@@ -157,8 +157,8 @@ const collectScholarlyResearchEvidenceRefs = (input: {
   finalAnswerSource: string;
 }): string[] => {
   const terminalUsesScholarlyResearch =
-    /scholarly_research_answer|scholarly_research_observation/i.test(input.terminalArtifactKind) ||
-    /scholarly_research_answer|scholarly_research_observation/i.test(input.finalAnswerSource);
+    /scholarly_research_answer|scholarly_research_observation|scholarly_full_text_observation/i.test(input.terminalArtifactKind) ||
+    /scholarly_research_answer|scholarly_research_observation|scholarly_full_text_observation/i.test(input.finalAnswerSource);
   if (!terminalUsesScholarlyResearch) return [];
   const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
     ? input.payload.current_turn_artifact_ledger
@@ -166,7 +166,10 @@ const collectScholarlyResearchEvidenceRefs = (input: {
   return ledger
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry))
-    .filter((entry) => readString(entry.kind) === "scholarly_research_observation")
+    .filter((entry) => {
+      const kind = readString(entry.kind);
+      return kind === "scholarly_research_observation" || kind === "scholarly_full_text_observation";
+    })
     .map((entry) => readString(entry.artifact_id))
     .filter(Boolean);
 };

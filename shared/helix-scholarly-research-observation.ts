@@ -4,6 +4,12 @@ export const HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA =
 export const HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY =
   "scholarly-research.lookup_papers" as const;
 
+export const HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA =
+  "helix.scholarly_full_text_observation.v1" as const;
+
+export const HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY =
+  "scholarly-research.fetch_full_text" as const;
+
 export const HELIX_MODEL_SYNTHESIZE_FROM_SCHOLARLY_RESEARCH_CAPABILITY =
   "model.synthesize_from_scholarly_research" as const;
 
@@ -28,6 +34,8 @@ export type HelixScholarlyPaperIdentifier = {
   openalex_id?: string;
   semantic_scholar_id?: string;
   url?: string;
+  pdf_url?: string;
+  full_text_url?: string;
 };
 
 export type HelixScholarlyPaperAuthor = {
@@ -76,12 +84,76 @@ export type HelixScholarlyResearchObservation = {
   raw_content_included: false;
 };
 
+export type HelixScholarlyFullTextSourceKind =
+  | "pdf"
+  | "html"
+  | "unknown";
+
+export type HelixScholarlyFullTextPage = {
+  page: number;
+  text_char_count: number;
+  extraction_status: "text" | "empty" | "error";
+  text_ref: string;
+};
+
+export type HelixScholarlyFullTextChunk = {
+  chunk_id: string;
+  paper_result_id?: string;
+  title?: string;
+  page_start: number;
+  page_end: number;
+  section_hint?: string;
+  text_excerpt: string;
+  relevance_score: number;
+  citation_ref: string;
+  source_text_ref: string;
+  char_start?: number;
+  char_end?: number;
+};
+
+export type HelixScholarlyPdfVisualCandidate = {
+  page: number;
+  reason: string;
+  image_artifact_ref?: string;
+};
+
+export type HelixScholarlyFullTextObservation = {
+  schema: typeof HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
+  artifact_id: string;
+  turn_id: string;
+  capability: typeof HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
+  query: string;
+  paper_result_id?: string;
+  title?: string;
+  source_url?: string;
+  source_kind: HelixScholarlyFullTextSourceKind;
+  source_pdf_ref?: string;
+  cache_integrity_hash?: string;
+  cache_path?: string;
+  total_pages?: number;
+  pages_parsed: number;
+  page_text_refs: HelixScholarlyFullTextPage[];
+  selected_chunks: HelixScholarlyFullTextChunk[];
+  visual_candidates: HelixScholarlyPdfVisualCandidate[];
+  missing_requirements: string[];
+  selected_for_answer: boolean;
+  assistant_answer: false;
+  raw_content_included: false;
+  context_policy: "compact_context_pack_only";
+};
+
 export type HelixScholarlyResearchAnswerContract = {
   schema: "helix.scholarly_research_answer_contract.v1";
   answer_kind: "scholarly_research_answer";
-  required_capability: typeof HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
-  required_observation_schema: typeof HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA;
-  required_observation_kinds: ["scholarly_research_observation"];
+  required_capability:
+    | typeof HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY
+    | typeof HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY;
+  required_observation_schema:
+    | typeof HELIX_SCHOLARLY_RESEARCH_OBSERVATION_SCHEMA
+    | typeof HELIX_SCHOLARLY_FULL_TEXT_OBSERVATION_SCHEMA;
+  required_observation_kinds: Array<
+    "scholarly_research_observation" | "scholarly_full_text_observation"
+  >;
   forbidden_terminal_sources: [
     "docs_viewer_receipt",
     "active_doc_identity",

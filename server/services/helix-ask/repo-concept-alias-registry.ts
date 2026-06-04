@@ -50,11 +50,11 @@ export const REPO_CONCEPT_ALIAS_REGISTRY: RepoConceptAliasEntry[] = [
     ],
     exact_path_hints: [
       "docs/stage-play-badge-graph.md",
+      "server/services/helix-ask/live-environment-tool-adapter.ts",
+      "server/services/stage-play/stage-play-output-lane-reducer.ts",
       "docs/stage-play-live-interpretation-boundary.md",
       "client/src/components/panels/StagePlayBadgeGraphPanel.tsx",
       "client/src/pages/helix-core.panels.ts",
-      "server/services/stage-play/stage-play-output-lane-reducer.ts",
-      "server/services/helix-ask/live-environment-tool-adapter.ts",
       "server/services/helix-ask/stage-play-prompt-intent.ts",
       "server/__tests__/helix.ask.stage-play-routing.test.ts",
     ],

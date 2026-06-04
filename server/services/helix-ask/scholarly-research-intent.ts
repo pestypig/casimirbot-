@@ -13,6 +13,7 @@ export type HelixScholarlyResearchIntent = {
   requestedOutputs: HelixAskSourceTargetRequestedOutput[];
   doi: string | null;
   arxivId: string | null;
+  fullTextRequested: boolean;
   normalizedQuery: string;
 };
 
@@ -51,6 +52,9 @@ const hasCitationCue = (promptText: string): boolean =>
 const hasPaperCorpusCue = (promptText: string): boolean =>
   /\b(?:research\s+papers?|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
 
+export const hasScholarlyFullTextCue = (promptText: string): boolean =>
+  /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|extract\s+(?:text|sections?|passages?|chunks?)|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);
+
 const isExplanatoryOnlyPrompt = (promptText: string): boolean =>
   /\b(?:what\s+is|what\s+are|what\s+does|explain|describe|tell\s+me)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b/i.test(promptText) &&
   !hasLookupActionCue(promptText) &&
@@ -64,6 +68,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
   const providerCue = hasScholarlyProviderCue(prompt);
   const citationCue = hasCitationCue(prompt);
   const corpusCue = hasPaperCorpusCue(prompt);
+  const fullTextCue = hasScholarlyFullTextCue(prompt);
   const lookupAction = hasLookupActionCue(prompt);
   const localDocsScope = hasLocalDocsScopeCue(prompt);
   const externalIdentifier = Boolean(doi || arxivId);
@@ -71,9 +76,10 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     !isExplanatoryOnlyPrompt(prompt) &&
     (
       externalIdentifier ||
-      (lookupAction && (providerCue || citationCue || corpusCue)) ||
+      (lookupAction && (providerCue || citationCue || corpusCue || fullTextCue)) ||
       (providerCue && (citationCue || corpusCue)) ||
-      (citationCue && corpusCue)
+      (citationCue && corpusCue) ||
+      (fullTextCue && (providerCue || corpusCue || citationCue || externalIdentifier))
     ) &&
     (!localDocsScope || externalIdentifier || providerCue || citationCue);
   const explicitCues = [
@@ -82,6 +88,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     providerCue ? "scholarly_provider" : "",
     citationCue ? "citation_or_reference" : "",
     corpusCue ? "scholarly_paper_corpus" : "",
+    fullTextCue ? "scholarly_full_text_or_pdf" : "",
     lookupAction ? "research_lookup_action" : "",
   ].filter(Boolean);
   const mode: HelixScholarlyResearchIntentMode =
@@ -96,6 +103,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     "scholarly_paper_refs",
     ...(doi ? ["doi_metadata" as const] : []),
     ...(citationCue ? ["citation_graph" as const] : []),
+    ...(fullTextCue ? ["scholarly_full_text" as const, "paper_pdf_pages" as const] : []),
     "typed_failure",
   ];
   return {
@@ -109,6 +117,7 @@ export const detectScholarlyResearchIntent = (promptText: string): HelixScholarl
     requestedOutputs,
     doi,
     arxivId,
+    fullTextRequested: fullTextCue,
     normalizedQuery: prompt,
   };
 };
