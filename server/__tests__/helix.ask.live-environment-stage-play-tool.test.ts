@@ -20,7 +20,10 @@ import {
   resetEnvironmentStateSnapshotWindowsForTest,
 } from "../services/situation-room/environment-state-snapshot-window";
 import { clearEventJournalForTest } from "../services/situation-room/event-journal-store";
-import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
+import {
+  getStagePlayCheckpointQueue,
+  resetStagePlayCheckpointQueueForTest,
+} from "../services/stage-play/stage-play-checkpoint-queue";
 import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
@@ -182,7 +185,7 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(JSON.stringify(observation)).not.toMatch(/capture_started|active_interval_started|live_pipeline_receipt/i);
   });
 
-  it("queues a Stage Play checkpoint request without producing an answer", () => {
+  it("returns a specific checkpoint receipt when no compact observation is available", () => {
     const observation = executeLiveEnvironmentTool({
       tool_name: "live_env.request_stage_play_checkpoint",
       thread_id: threadId,
@@ -195,26 +198,8 @@ describe("live_env.reflect_stage_play_context", () => {
       },
     });
     const result = observation.observation as {
-      schema: "stage_play_checkpoint_request_result/v1";
-      checkpointRequest: {
-        artifactId: string;
-        schemaVersion: string;
-        checkpointRequestId: string;
-        jobId: string;
-        objective: string;
-        currentGraphRefs: string[];
-        status: string;
-        assistant_answer: false;
-        context_role: "tool_evidence";
-      };
-      queueState: {
-        schema: "stage_play_checkpoint_queue/v1";
-        requests: unknown[];
-        assistant_answer: false;
-        context_role: "tool_evidence";
-      };
-      readyToRun: boolean;
-      reason: string;
+      schema: "stage_play_checkpoint_request_failure/v1";
+      missing_field: string;
       assistant_answer: false;
       context_role: "tool_evidence";
     };
@@ -222,7 +207,7 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(observation).toMatchObject({
       schema: "helix.live_environment_tool_observation.v1",
       tool_name: "live_env.request_stage_play_checkpoint",
-      ok: true,
+      ok: false,
       assistant_answer: false,
       raw_content_included: false,
       instruction_authority: "none",
@@ -230,35 +215,143 @@ describe("live_env.reflect_stage_play_context", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(observation.summary).toMatch(/Queued Stage Play checkpoint request/);
-    expect(validateStagePlayCheckpointRequestResultV1(result)).toEqual([]);
+    expect(observation.summary).toBe("Checkpoint request could not run because no compact observation refs.");
     expect(result).toMatchObject({
-      schema: "stage_play_checkpoint_request_result/v1",
-      checkpointRequest: {
-        artifactId: "stage_play_checkpoint_request",
-        schemaVersion: "stage_play_checkpoint_request/v1",
-        jobId: "stage_play_job:checkpoint-tool-test",
-        objective: "Create a bounded checkpoint for the current Stage Play graph.",
-        status: "queued",
-        assistant_answer: false,
-        context_role: "tool_evidence",
-      },
-      queueState: {
-        schema: "stage_play_checkpoint_queue/v1",
-        assistant_answer: false,
-        context_role: "tool_evidence",
-      },
+      schema: "stage_play_checkpoint_request_failure/v1",
+      missing_field: "no compact observation refs",
       assistant_answer: false,
       context_role: "tool_evidence",
     });
-    expect(["queued", "blocked_missing_evidence", "throttled", "manual_user_priority"]).toContain(result.reason);
-    expect(result.queueState.requests).toHaveLength(1);
-    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
-      result.checkpointRequest.checkpointRequestId,
-      result.checkpointRequest.currentGraphRefs[0],
-    ]));
     expect(JSON.stringify(observation)).not.toMatch(/assistant[_ -]?answer["']?\s*:\s*true/i);
     expect(JSON.stringify(observation)).not.toMatch(/final_answer|model_reviewed_answer|live_pipeline_receipt/i);
+  });
+
+  it("fills empty checkpoint args from the active visual Stage Play graph and runs the request", () => {
+    const environment = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:seed-visual-checkpoint",
+      objective: "Run the Stage Play checkpoint for the active visual source.",
+      preset: "narrative_scene_monitor",
+      room_id: roomId,
+      source_ids: ["source:visual-tab"],
+      now: "2026-06-02T12:25:00.000Z",
+    }).environment;
+    upsertLiveSourceDescriptor({
+      source_id: "source:visual-tab",
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      modality: "visual_frame",
+      user_label: "Browser tab visual",
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "browser_getDisplayMedia",
+        app_hint: "Chrome",
+      },
+      current_state: "active_interval",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:visual-checkpoint"],
+    });
+    upsertLiveSourceProducer({
+      sourceId: "source:visual-tab",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-checkpoint",
+      now: "2026-06-02T12:25:01.000Z",
+    });
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:visual-checkpoint",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: environment.environment_id,
+      source_id: "source:visual-tab",
+      source_kind: "visual_frame",
+      event_kind: "visual_frame_summary",
+      observed_at: "2026-06-02T12:25:02.000Z",
+      freshness: { status: "fresh", age_ms: 20 },
+      provenance: { adapter: "browser.visual", confidence: "medium" },
+      compact_summary: "A browser tab visual source is active with a compact scene observation.",
+      evidence_refs: ["evidence:visual-checkpoint"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_stage_play_checkpoint",
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      args: {},
+    });
+    const result = observation.observation as {
+      schema: "stage_play_checkpoint_request_result/v1";
+      checkpointRequest: {
+        checkpointRequestId: string;
+        jobId: string;
+        graphId: string;
+        objective: string;
+        status: string;
+        compactObservationRefs: string[];
+      };
+      filledArgs: {
+        thread_id: string;
+        room_id: string;
+        environment_id: string;
+        graph_id: string;
+        checkpoint_request_id: string;
+        objective: string;
+        source_refs: string[];
+        compact_observation_refs: string[];
+        perturbation_refs: string[];
+        prior_answer_snapshot_refs: string[];
+      };
+      queueAction: { ok: boolean; action: string; reason: string };
+      readyToRun: boolean;
+      reason: string;
+      assistant_answer: false;
+      context_role: "tool_evidence";
+    };
+
+    expect(observation).toMatchObject({
+      tool_name: "live_env.request_stage_play_checkpoint",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toMatch(/Stage Play checkpoint request .* is running/);
+    expect(validateStagePlayCheckpointRequestResultV1(result)).toEqual([]);
+    expect(result.checkpointRequest.status).toBe("running");
+    expect(result.readyToRun).toBe(true);
+    expect(result.reason).toBe("queued");
+    expect(result.queueAction).toMatchObject({ ok: true, action: "run", reason: "updated" });
+    expect(result.filledArgs).toMatchObject({
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: environment.environment_id,
+      graph_id: result.checkpointRequest.graphId,
+      checkpoint_request_id: result.checkpointRequest.checkpointRequestId,
+      objective: "Run the Stage Play checkpoint for the active visual source.",
+    });
+    expect(result.filledArgs.source_refs).toEqual(expect.arrayContaining([
+      "live_source_observation:visual-checkpoint",
+      "live_source_chunk:visual-checkpoint",
+    ]));
+    expect(result.filledArgs.compact_observation_refs).toEqual(expect.arrayContaining([
+      "live_source_observation:visual-checkpoint",
+    ]));
+    const queue = getStagePlayCheckpointQueue({ jobId: result.checkpointRequest.jobId });
+    expect(queue.requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        checkpointRequestId: result.checkpointRequest.checkpointRequestId,
+        status: "running",
+      }),
+    ]));
+    expect(JSON.stringify(observation)).not.toMatch(/assistant[_ -]?answer["']?\s*:\s*true/i);
+    expect(JSON.stringify(observation)).not.toMatch(/I could not produce a terminal answer for this turn/i);
   });
 
   it("lets the model work through Stage Builder grammar, sources, and draft validation", () => {
@@ -412,6 +505,7 @@ describe("live_env.reflect_stage_play_context", () => {
         deltaId: string | null;
         environmentId: string | null;
         changedLineKeys: string[];
+        projectedLineKeys: string[];
         skippedLineKeys: string[];
         checkpointOnlySkipped: string[];
         reason: string;
@@ -443,6 +537,7 @@ describe("live_env.reflect_stage_play_context", () => {
         deltaId: null,
         environmentId: null,
         changedLineKeys: [],
+        projectedLineKeys: [],
         reason: "no_active_environment",
       },
     });
@@ -457,6 +552,7 @@ describe("live_env.reflect_stage_play_context", () => {
     expect(wrappedObservation.liveAnswerProjection.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
   });
 
@@ -586,6 +682,7 @@ describe("live_env.reflect_stage_play_context", () => {
         deltaId: string | null;
         environmentId: string | null;
         changedLineKeys: string[];
+        projectedLineKeys: string[];
         skippedLineKeys: string[];
         checkpointOnlySkipped: string[];
         reason: string;
@@ -632,12 +729,25 @@ describe("live_env.reflect_stage_play_context", () => {
       "unknowns",
       "next_check",
     ]));
+    expect(wrappedObservation.liveAnswerProjection.projectedLineKeys).toEqual(expect.arrayContaining([
+      "risk",
+      "possibilities",
+      "unknowns",
+      "next_check",
+    ]));
     expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("debug_basis");
     expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("situation");
+    expect(wrappedObservation.liveAnswerProjection.projectedLineKeys).not.toContain("recommendation");
+    expect(wrappedObservation.liveAnswerProjection.projectedLineKeys).not.toContain("answer_snapshot");
+    expect(wrappedObservation.liveAnswerProjection.projectedLineKeys).not.toContain("voice_output");
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("recommendation");
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("answer_snapshot");
+    expect(wrappedObservation.liveAnswerProjection.changedLineKeys).not.toContain("voice_output");
     expect(wrappedObservation.liveAnswerProjection.skippedLineKeys).toEqual([]);
     expect(wrappedObservation.liveAnswerProjection.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
     expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
     expect(graph.artifactId).toBe("stage_play_badge_graph");

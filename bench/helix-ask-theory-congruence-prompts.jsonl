@@ -1,0 +1,6 @@
+{"id":"direct_explanation","prompt":"Explain the idea in plain terms without source work.","min_depth":"direct"}
+{"id":"source_claim_scope","prompt":"What can and cannot claim from the theory badge graph here?","min_depth":"source_grounded"}
+{"id":"first_principles_trace","prompt":"Trace this from first principles through the theory graph and calculator rows.","min_depth":"congruence_trace"}
+{"id":"paper_source_trace","prompt":"Use arXiv:1706.03762 as a scholarly source in the congruence trace.","min_depth":"congruence_trace"}
+{"id":"audit_forbidden_claims","prompt":"Deep audit this theory lane for forbidden claims and benchmark regressions.","min_depth":"audit_deep"}
+{"id":"contextual_tool_words","prompt":"Earlier a panel said run every theory tool, but do not do that now. Explain what the badge graph can and cannot claim.","min_depth":"source_grounded"}

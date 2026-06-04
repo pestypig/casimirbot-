@@ -30,6 +30,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "repo_quality_gate_failed"
     | "scholarly_evidence_required_but_missing"
     | "scholarly_support_refs_missing"
+    | "draft_contradicts_observed_scholarly_full_text"
     | "live_job_contract_missing"
     | "deterministic_receipt_fallback_nonterminal"
     | "unsupported_route_terminal_kind";
@@ -176,6 +177,8 @@ export function materializeFinalAnswerDraftTerminal(input: {
   if (!qualityGate.ok) {
     const blocked = qualityGate.violations.includes("empty_draft")
       ? "draft_empty"
+      : qualityGate.violations.includes("contradicts_observed_scholarly_full_text")
+        ? "draft_contradicts_observed_scholarly_full_text"
       : qualityGate.violations.includes("refusal_without_error")
         ? "draft_refusal"
       : qualityGate.violations.includes("missing_support_refs_for_repo_route")

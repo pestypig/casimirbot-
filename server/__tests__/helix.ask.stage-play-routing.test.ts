@@ -3,7 +3,10 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
-import { resetLiveSourceObservationStoreForTest } from "../services/live-source/live-source-observation-store";
+import {
+  recordLiveSourceObservation,
+  resetLiveSourceObservationStoreForTest,
+} from "../services/live-source/live-source-observation-store";
 import {
   createLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
@@ -222,11 +225,64 @@ describe("Helix Ask Stage Play routing", () => {
   }, 60_000);
 
   it("routes Stage Play checkpoint requests to the checkpoint queue tool", async () => {
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:seed-stage-play-checkpoint-routing",
+      objective: "Run the Stage Play checkpoint for the active visual source.",
+      preset: "narrative_scene_monitor",
+      room_id: roomId,
+      source_ids: [sourceId],
+      line_schema: STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA,
+      now: "2026-06-02T12:25:00.000Z",
+    });
+    upsertLiveSourceDescriptor({
+      source_id: sourceId,
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      modality: "visual_frame",
+      user_label: "Browser tab visual",
+      serving_context: {
+        surface: "browser_tab",
+        source_origin: "browser_getDisplayMedia",
+        app_hint: "Chrome",
+      },
+      current_state: "active_interval",
+      cadence_ms: 10000,
+      latest_observation_refs: ["live_source_observation:stage-play-checkpoint-routing"],
+    });
+    upsertLiveSourceProducer({
+      sourceId,
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:stage-play-checkpoint-routing",
+      now: "2026-06-02T12:25:01.000Z",
+    });
+    recordLiveSourceObservation({
+      schema: "helix.live_source_observation.v1",
+      observation_id: "live_source_observation:stage-play-checkpoint-routing",
+      thread_id: threadId,
+      room_id: roomId,
+      environment_id: environment.environment_id,
+      source_id: sourceId,
+      source_kind: "visual_frame",
+      event_kind: "visual_frame_summary",
+      observed_at: "2026-06-02T12:25:02.000Z",
+      freshness: { status: "fresh", age_ms: 20 },
+      provenance: { adapter: "browser.visual", confidence: "medium" },
+      compact_summary: "The active visual source has a compact frame summary ready for a Stage Play checkpoint.",
+      evidence_refs: ["evidence:stage-play-checkpoint-routing"],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
       .send({
         question:
-          "Request a Stage Play checkpoint for the active graph so Helix Ask can produce the next model-reviewed answer snapshot.",
+          "Run the Stage Play checkpoint for the active visual source.",
         sessionId: threadId,
         debug: true,
       })
@@ -249,7 +305,7 @@ describe("Helix Ask Stage Play routing", () => {
 
     expect(
       classifyLiveSourceContinuationIntent(
-        "Request a Stage Play checkpoint for the active graph so Helix Ask can produce the next model-reviewed answer snapshot.",
+        "Run the Stage Play checkpoint for the active visual source.",
       ),
     ).toBeNull();
     expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
@@ -278,10 +334,11 @@ describe("Helix Ask Stage Play routing", () => {
       checkpointRequest: {
         artifactId: "stage_play_checkpoint_request",
         schemaVersion: "stage_play_checkpoint_request/v1",
-        status: "queued",
+        status: "running",
         assistant_answer: false,
         context_role: "tool_evidence",
       },
+      readyToRun: true,
       queueState: {
         schema: "stage_play_checkpoint_queue/v1",
         assistant_answer: false,
@@ -294,12 +351,12 @@ describe("Helix Ask Stage Play routing", () => {
       expect.objectContaining({
         artifactId: "stage_play_checkpoint_request",
         schemaVersion: "stage_play_checkpoint_request/v1",
-        status: "queued",
+        status: "running",
         assistant_answer: false,
         context_role: "tool_evidence",
       }),
     ]));
-    expect(response.body?.answer, routeDebug).toContain("Stage Play checkpoint request queued");
+    expect(response.body?.answer, routeDebug).toContain("Stage Play checkpoint request running");
     expect(response.body?.answer, routeDebug).toContain("tool evidence only");
     expect(response.body?.answer, routeDebug).toContain("did not produce the final answer snapshot");
     expect(response.body?.answer).not.toContain("\"schema\":\"stage_play_checkpoint_request_result/v1\"");
@@ -539,7 +596,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(boundaryReport.checks.agent_step_decision).toBe(true);
     expect(boundaryReport.checks.selected_capability_observation).toBe(true);
     expect(boundaryReport.checks.post_observation_model_decision).toBe(true);
-    expect(boundaryReport.eligible).toBe(false);
+    expect(boundaryReport.eligible).toBe(true);
 
     const refreshedGraph = buildStagePlayGraphFromWorld({
       threadId,

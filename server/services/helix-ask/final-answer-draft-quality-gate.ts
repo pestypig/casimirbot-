@@ -5,6 +5,7 @@ export type FinalAnswerDraftQualityViolation =
   | "missing_required_prompt_parts"
   | "missing_support_refs_for_repo_route"
   | "missing_support_refs_for_scholarly_route"
+  | "contradicts_observed_scholarly_full_text"
   | "unsupported_repo_claim"
   | "receipt_like_answer"
   | "fallback_like_answer";
@@ -151,6 +152,35 @@ const isReceiptLike = (text: string): boolean =>
 const isRefusalLike = (text: string): boolean =>
   /\b(?:I can't|I cannot|I’m unable|I am unable|cannot answer|can't answer)\b/i.test(text);
 
+const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean => {
+  const payload = readRecord(artifact.payload);
+  return /scholarly_full_text_observation/i.test([
+    readString(artifact.kind),
+    readString(payload?.schema),
+  ].join(" "));
+};
+
+const hasObservedScholarlyFullText = (artifacts?: ArtifactLike[] | null): boolean =>
+  (artifacts ?? []).some((artifact) => {
+    if (!isScholarlyFullTextObservation(artifact)) return false;
+    const payload = readRecord(artifact.payload);
+    if (!payload) return false;
+    const pagesParsed = typeof payload.pages_parsed === "number" ? payload.pages_parsed : 0;
+    return (
+      pagesParsed > 0 ||
+      readArray(payload.selected_chunks).length > 0 ||
+      readArray(payload.page_text_refs).length > 0 ||
+      Boolean(readString(payload.source_url) ?? readString(payload.source_pdf_ref))
+    );
+  });
+
+const contradictsObservedScholarlyFullText = (text: string): boolean =>
+  textIncludesAny(text, [
+    /\b(?:I\s+(?:can(?:not|'t)|am unable)|unable to|could not)\s+(?:fetch|access|retrieve|read)\b.{0,120}\b(?:pdf|full[-\s]?text|external documents?|paper|document)\b/i,
+    /\b(?:no|none)\b.{0,80}\b(?:full[-\s]?text|pdf)\b.{0,80}\b(?:available|retrieved|fetched|selected|found)\b/i,
+    /\b(?:full[-\s]?text|pdf)\s+(?:is|was|were)?\s*(?:not|unavailable|inaccessible)\b/i,
+  ]);
+
 const isCompoundComparisonPrompt = (prompt: string): boolean =>
   /\bcompare\b/i.test(prompt) &&
   /\b(?:three|ways|charge|mass|role|consequence|difference)\b/i.test(prompt);
@@ -201,6 +231,13 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     }
     if (routeFamily === "repo_evidence" && /\b(?:no|without|missing)\s+(?:current-turn\s+)?(?:repo|repository|code)\s+evidence/i.test(text)) {
       violations.push("unsupported_repo_claim");
+    }
+    if (
+      routeFamily === "scholarly_research" &&
+      hasObservedScholarlyFullText(input.artifactLedger) &&
+      contradictsObservedScholarlyFullText(text)
+    ) {
+      violations.push("contradicts_observed_scholarly_full_text");
     }
   }
   return {

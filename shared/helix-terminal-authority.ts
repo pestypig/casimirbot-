@@ -48,6 +48,7 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "later_valid_final_answer_draft"
   | "route_requires_synthesis"
   | "deterministic_receipt_fallback_nonterminal"
+  | "route_contract_forbids_model_synthesized_answer"
   | "coverage_valid_model_only_answer_exists";
 
 export type HelixTerminalAuthoritySingleWriterResult = {
@@ -57,6 +58,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   selected_terminal_artifact_kind:
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
+    | "scholarly_research_answer"
     | "situation_room_live_job_setup_answer"
     | "situation_context_pack"
     | "visual_context_pack"
@@ -71,6 +73,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   source:
     | "final_answer_draft"
     | "repo_code_evidence_answer"
+    | "scholarly_research_answer"
     | "situation_room_live_job_setup_answer"
     | "situation_context_pack"
     | "visual_context_pack"

@@ -487,7 +487,7 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget: "live_environment",
       allowedCore: ["live_environment_tool_observation"],
-      allowedExtra: ["direct_answer_text", "model_synthesized_answer", "turn_final_text", "source_binding_status", "source_binding_repair_candidate"],
+      allowedExtra: ["direct_answer_text", "model_synthesized_answer", "turn_final_text", "tool_receipt", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: [
         "live_pipeline_receipt",
         "visual_producer_cadence_receipt",

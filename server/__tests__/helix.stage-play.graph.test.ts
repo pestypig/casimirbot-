@@ -265,6 +265,7 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
     expect(response.body.liveAnswerDelta).toMatchObject({
       assistant_answer: false,
@@ -349,6 +350,7 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
     expect(response.body.liveAnswerEnvironment.environment_id).toBe(environment.environment_id);
   });
@@ -423,6 +425,7 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
     expect(response.body.liveAnswerEnvironment.lines.find((line: { key: string; visibility: string }) =>
       line.key === "debug_basis"
@@ -497,6 +500,7 @@ describe("GET /api/helix/stage-play/graph", () => {
     expect(response.body.checkpointOnlySkipped).toEqual(expect.arrayContaining([
       "recommendation",
       "answer_snapshot",
+      "voice_output",
     ]));
   });
 });

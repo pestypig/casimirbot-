@@ -15,8 +15,12 @@ import type {
   HelixDeicticReference,
   HelixDeicticResolutionStatus,
 } from "@shared/helix-deictic-reference";
-import type { HelixSituationEvidenceSelection } from "@shared/helix-situation-evidence-selection";
+import {
+  HELIX_SITUATION_EVIDENCE_SELECTION_SCHEMA,
+  type HelixSituationEvidenceSelection,
+} from "@shared/helix-situation-evidence-selection";
 import type { HelixVisualComparisonSession } from "@shared/helix-visual-comparison-session";
+import type { HelixVisualFrameEvidence } from "@shared/helix-visual-frame-evidence";
 import {
   HELIX_PROCEDURE_MEMORY_RECALL_SCHEMA,
   type HelixProcedureMemoryRecall,
@@ -37,6 +41,9 @@ import { listProcedureEpochLedger } from "../situation-room/procedure-epoch-ledg
 import { listProcedureEpochClosures } from "../situation-room/procedure-epoch-closure";
 import { listLiveProbeResults } from "../situation-room/live-probe-result-store";
 import { createVisualComparisonSession } from "../situation-room/visual-comparison-session-store";
+import { resolveStagePlaySourceWindow } from "../situation-room/stage-play-source-window";
+import { listVisualFrameEvidence, listVisualSnapshotSources } from "../situation-room/visual-snapshot-store";
+import { buildStagePlayGraphFromWorld } from "../stage-play/stage-play-badge-graph-builder";
 import {
   buildRelativeSessionSemanticIntent,
   buildVisualSceneComparisonResult,
@@ -843,6 +850,163 @@ const buildConciseSituationAnswer = (input: {
       objects: objects?.value,
     }),
     caveat: uncertainty?.value ?? null,
+  };
+};
+
+const latestActiveVisualFrameEvidence = (threadId: string): HelixVisualFrameEvidence | null => {
+  const activeSourceIds = new Set(
+    listVisualSnapshotSources({ threadId, status: "active" }).map((source) => source.source_id),
+  );
+  const latestEvidence = listVisualFrameEvidence({ threadId, limit: 24 });
+  if (latestEvidence.length === 0) return null;
+  if (activeSourceIds.size === 0) return latestEvidence.at(-1) ?? null;
+  return latestEvidence.filter((entry) => activeSourceIds.has(entry.source_id)).at(-1) ?? null;
+};
+
+const buildDirectVisualEvidenceRoute = (input: {
+  threadId: string;
+  turnId: string;
+  promptText: string;
+  activeContext: HelixActiveSituationContext;
+  deicticReference: HelixDeicticReference;
+  baseSelection: HelixSituationEvidenceSelection;
+  evidence: HelixVisualFrameEvidence;
+  answerStartedAt: string;
+  inputModality?: HelixDeicticInputModality;
+  liveContextWindowBinding: HelixLiveContextWindowBinding;
+  procedureEvidenceRetrievalPlan: HelixProcedureEvidenceRetrievalPlan;
+  procedureEvidenceRetrievalResult: HelixProcedureEvidenceRetrievalResult;
+  voiceLiveHandoff: ReturnType<typeof createVoiceLiveHandoff> | null;
+  bindingRepair: ReturnType<typeof repairUnboundVisualSituationContext> | null;
+}): SituationContextTurnRoute => {
+  const sourceWindow = resolveStagePlaySourceWindow({
+    threadId: input.threadId,
+    sourceId: input.evidence.source_id,
+    now: input.answerStartedAt,
+  });
+  const selectedNarrativeStagePlaySource = sourceWindow.sources.find((source) =>
+    source.sourceId === input.evidence.source_id &&
+    source.selectedForStagePlay === true &&
+    source.routeTo === "narrative_stage_play"
+  ) ?? null;
+  const stagePlayGraph = selectedNarrativeStagePlaySource
+    ? buildStagePlayGraphFromWorld({
+        threadId: input.threadId,
+        sourceId: input.evidence.source_id,
+        objective: input.promptText,
+        now: new Date(input.answerStartedAt),
+      })
+    : null;
+  const selectedRefs = uniqueStrings([
+    input.evidence.evidence_id,
+    input.evidence.frame_id,
+    ...input.evidence.related_event_refs,
+    stagePlayGraph?.graphId ?? null,
+    ...(stagePlayGraph?.evidenceRefs ?? []),
+    ...(selectedNarrativeStagePlaySource?.evidenceRefs ?? []),
+  ]);
+  const selection: HelixSituationEvidenceSelection = {
+    ...input.baseSelection,
+    schema: HELIX_SITUATION_EVIDENCE_SELECTION_SCHEMA,
+    selection_id: `situation_evidence_selection:${hashShort([
+      input.threadId,
+      input.evidence.evidence_id,
+      selectedNarrativeStagePlaySource?.routeTo ?? "direct_visual_evidence",
+    ])}`,
+    thread_id: input.threadId,
+    situation_run_id: input.activeContext.situation_run_id ?? null,
+    deictic_reference_id: input.deicticReference.reference_id,
+    selected_observation_refs: selectedRefs.slice(0, 12),
+    selected_field_evaluation_refs: [],
+    selected_interpretation_run_refs: [],
+    selected_interpretation_worker_run_refs: [],
+    selected_interpretation_hypothesis_refs: [],
+    selected_interpretation_graph_refs: stagePlayGraph ? [stagePlayGraph.graphId] : [],
+    selected_interpretation_tangent_refs: [],
+    selected_probe_result_refs: [],
+    selected_epoch_closure_refs: [],
+    selected_source_descriptor_refs: sourceWindow.latestSourceDescriptorRefs.slice(-6),
+    selected_source_refs: uniqueStrings([
+      input.evidence.source_id,
+      selectedNarrativeStagePlaySource?.sourceId ?? null,
+    ]),
+    selected_source_binding_status_refs: [],
+    rejected_unbound_source_refs: [],
+    source_binding_ledger_refs: [],
+    exclusion_reasons: uniqueStrings([
+      "raw_images_excluded",
+      "raw_audio_excluded",
+      "raw_logs_excluded",
+      selectedNarrativeStagePlaySource ? "stage_play_source_window_selected" : null,
+      input.activeContext.situation_run_id ? null : "no_situation_run_required_for_direct_visual_evidence",
+    ]),
+    answerable: true,
+    answerability_reason: selectedNarrativeStagePlaySource
+      ? "Selected active compact visual frame evidence through the narrative Stage Play source window."
+      : "Selected active compact visual frame evidence directly; no active SituationRun was required.",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const fullReasoning = [
+    selectedNarrativeStagePlaySource
+      ? `Stage Play visual source selected: ${selectedNarrativeStagePlaySource.sourceId} routed to narrative_stage_play${stagePlayGraph ? ` with graph ${stagePlayGraph.graphId}` : ""}.`
+      : "Active compact visual frame evidence was selected directly because no answerable SituationRun evidence was available.",
+    `Latest compact visual summary: ${input.evidence.summary}`,
+    input.evidence.detected_objects.length > 0
+      ? `Detected objects: ${input.evidence.detected_objects.join(", ")}.`
+      : "",
+    input.evidence.detected_scene_relations.length > 0
+      ? `Scene relations: ${input.evidence.detected_scene_relations.join(", ")}.`
+      : "",
+    input.evidence.uncertainty.length > 0
+      ? `Uncertainty: ${input.evidence.uncertainty.join(", ")}.`
+      : "",
+    `Evidence refs: ${selectedRefs.slice(0, 12).join(", ")}.`,
+    "Raw images, audio, and logs were not injected into Ask context.",
+  ].filter(Boolean).join("\n");
+  const concise = `The active visual source shows: ${input.evidence.summary}`;
+  const distillationBundle = recordReasoningAndDistillation({
+    turnId: input.turnId,
+    threadId: input.threadId,
+    prompt: input.promptText,
+    activeContext: input.activeContext,
+    selection,
+    sourceAnswerKind: "situation_context_question",
+    fullReasoningSummary: fullReasoning,
+    conciseAnswer: concise,
+    caveat: input.evidence.uncertainty.length > 0 ? input.evidence.uncertainty.join("; ") : null,
+    style: chooseLiveAnswerStyle({
+      promptText: input.promptText,
+      inputModality: input.inputModality,
+    }),
+  });
+  return {
+    route: "situation_context_question",
+    deictic_reference: {
+      ...input.deicticReference,
+      candidate_signal: true,
+      reference_type: "current_screen",
+      resolution_status: "resolved",
+      resolved_context_refs: [input.evidence.evidence_id, input.evidence.frame_id, stagePlayGraph?.graphId ?? ""].filter(Boolean),
+    },
+    active_situation_context: input.activeContext,
+    situation_evidence_selection: selection,
+    procedure_evidence_retrieval_plan: input.procedureEvidenceRetrievalPlan,
+    procedure_evidence_retrieval_result: input.procedureEvidenceRetrievalResult,
+    answer_text: distillationBundle.terminalText,
+    reasoning_snapshot: distillationBundle.snapshot,
+    answer_distillation: distillationBundle.distillation,
+    procedure_memory_recall: null,
+    live_context_window_binding: input.liveContextWindowBinding,
+    comparison_session: null,
+    relative_session_semantic_intent: null,
+    selected_session_semantic_binding: null,
+    visual_scene_query_intent: null,
+    selected_visual_scene_set: null,
+    visual_scene_comparison_result: null,
+    typed_failure: null,
+    voice_live_handoff: input.voiceLiveHandoff,
+    binding_repair: input.bindingRepair,
   };
 };
 
@@ -1730,6 +1894,27 @@ export function routeSituationContextTurn(input: {
       voice_live_handoff: voiceLiveHandoff,
       binding_repair: bindingRepair,
     };
+  }
+  const directVisualEvidence = currentVisualCaptureQuestion && !wantsSceneEpochReplay
+    ? latestActiveVisualFrameEvidence(input.threadId)
+    : null;
+  if (!selection.answerable && directVisualEvidence) {
+    return buildDirectVisualEvidenceRoute({
+      threadId: input.threadId,
+      turnId,
+      promptText: input.promptText,
+      activeContext: temporalActiveContext,
+      deicticReference,
+      baseSelection: selection,
+      evidence: directVisualEvidence,
+      answerStartedAt,
+      inputModality: input.inputModality,
+      liveContextWindowBinding,
+      procedureEvidenceRetrievalPlan,
+      procedureEvidenceRetrievalResult,
+      voiceLiveHandoff,
+      bindingRepair,
+    });
   }
   if (!selection.answerable) {
     return {

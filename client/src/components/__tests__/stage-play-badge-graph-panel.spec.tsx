@@ -805,8 +805,9 @@ function renderPanel(options: {
           model_invoked: false,
         },
         liveAnswerEnvironment: null,
-        projectedLineKeys: ["situation", "affordances", "risk", "possibilities", "unknowns", "next_check"],
-        skippedLineKeys: ["recommendation"],
+        projectedLineKeys: ["risk", "possibilities", "unknowns", "next_check"],
+        skippedLineKeys: [],
+        checkpointOnlySkipped: ["recommendation", "answer_snapshot", "voice_output"],
         reason: "projected",
         assistant_answer: false,
         raw_content_included: false,
@@ -1027,9 +1028,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     fireEvent.click(screen.getByTestId("stage-play-project-live-answer"));
     const observerProjectionText = (await screen.findByTestId("stage-play-tool-activity-strip")).textContent ?? "";
     expect(observerProjectionText).toMatch(
-      /Projected 6 interpretation lanes: situation, affordances, risk, possibilities, unknowns, next_check/i,
+      /Projected 4 interpretation lanes: risk, possibilities, unknowns, next_check/i,
     );
-    expect(observerProjectionText).toMatch(/Skipped: recommendation requires model review/i);
+    expect(observerProjectionText).toMatch(/Checkpoint-only: checkpoint recommendation, answer snapshot, voice output/i);
     expect(fetchJsonBodies("/api/helix/stage-play/project-live-answer").at(-1)).toEqual(expect.objectContaining({
       ensureStagePlayLineSchema: true,
       createIfMissing: true,
@@ -1196,9 +1197,9 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     const interpreterProjectionText = (await screen.findByTestId("stage-play-tool-activity-strip")).textContent ?? "";
     expect(interpreterProjectionText).toMatch(
-      /Projected 6 interpretation lanes: situation, affordances, risk, possibilities, unknowns, next_check/i,
+      /Projected 4 interpretation lanes: risk, possibilities, unknowns, next_check/i,
     );
-    expect(interpreterProjectionText).toMatch(/Skipped: recommendation requires model review/i);
+    expect(interpreterProjectionText).toMatch(/Checkpoint-only: checkpoint recommendation, answer snapshot, voice output/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Stage Play interpreter" }));
     expect(screen.getByText("Live Interpretation Projection")).toBeTruthy();

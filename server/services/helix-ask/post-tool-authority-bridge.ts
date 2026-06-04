@@ -21,11 +21,13 @@ export type HelixPostToolAuthorityBridge = {
     | "situation_room_setup"
     | "voice_delivery"
     | "repo_docs"
+    | "scholarly_research"
     | "workstation_panel"
     | "unknown";
   required_terminal_kind:
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
+    | "scholarly_research_answer"
     | "situation_room_live_job_setup_answer"
     | "request_user_input"
     | "typed_failure";
@@ -111,9 +113,11 @@ const selectedCapability = (payload: RecordLike): string =>
   readString(readRecord(payload.runtime_tool_call)?.capability_key);
 
 const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToolAuthorityBridge["route_family"] => {
+  const sourceTarget = readString(readRecord(payload.route_product_contract)?.source_target);
   const goalKind = readString(readRecord(payload.canonical_goal_frame)?.goal_kind);
   const prompt = readString(payload.active_prompt) || readString(payload.prompt) || readString(payload.question);
-  const haystack = `${goalKind} ${capability} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
+  const haystack = `${sourceTarget} ${goalKind} ${capability} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
+  if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
   if (/voice_delivery|confirm_speak|read.+out loud|voice/i.test(haystack)) return "voice_delivery";
   if (/dottie|situation-room|minecraft|live_pipeline|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint/i.test(haystack)) return "situation_room_setup";
@@ -129,8 +133,8 @@ export function buildPostToolAuthorityBridge(input: {
 }): HelixPostToolAuthorityBridge {
   const capability = selectedCapability(input.payload);
   const routeFamily = inferRouteFamily(input.payload, capability);
-  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
-  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer/);
+  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|scholarly_research_observation|scholarly_full_text_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
+  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer|scholarly_research_answer/);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });
   if (calculatorSupport.supports_goal) {
     return {
@@ -168,6 +172,31 @@ export function buildPostToolAuthorityBridge(input: {
         request_user_input_question: "I can prepare that voice output, but I need your confirmation before speaking. Should I speak it now?",
       }],
       reason: "voice_confirmation_required",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (routeFamily === "scholarly_research") {
+    const draftText = finalDraftText(input.payload);
+    const supportsAnswer = Boolean(toolObservationRefs.length > 0 && draftText);
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: toolObservationRefs.length > 0 || answerDraftRefs.length > 0,
+      selected_capability: capability || undefined,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: supportsAnswer ? "supports_answer" : toolObservationRefs.length > 0 ? "not_enough_information" : "not_applicable",
+      route_family: "scholarly_research",
+      required_terminal_kind: "scholarly_research_answer",
+      terminal_repair_action: "none",
+      pending_requirements: supportsAnswer ? [] : [{
+        code: toolObservationRefs.length > 0 ? "missing_post_tool_answer_draft" : "missing_live_source",
+        message: toolObservationRefs.length > 0 ? "A model-authored scholarly answer draft is missing." : "No usable scholarly research observation was found.",
+      }],
+      reason: supportsAnswer
+        ? "scholarly_route_requires_scholarly_research_answer_materialization"
+        : "scholarly_post_tool_support_incomplete",
       assistant_answer: false,
       raw_content_included: false,
     };

@@ -381,10 +381,27 @@ export function buildSolverControllerDecision(input: {
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
   const canonicalGoalKind = readString(canonicalGoal?.goal_kind);
-  const liveMaintenanceTerminal = Boolean(
-    (canonicalGoalKind && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(canonicalGoalKind)) ||
-      (finalRouteBase && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(finalRouteBase)),
-  ) && ["live_pipeline_receipt", "live_environment_binding_diagnosis"].includes(terminalArtifactKind ?? "");
+  const stagePlayCheckpointReceiptTerminal =
+    canonicalGoalKind === "live_environment_review" &&
+    terminalArtifactKind === "tool_receipt" &&
+    readString(payload.final_answer_source) === "deterministic_receipt_fallback" &&
+    readArray(payload.current_turn_artifact_ledger).some((artifact) => {
+      const artifactRecord = readRecord(artifact);
+      const payloadRecord = readRecord(artifactRecord?.payload);
+      return (
+        readString(artifactRecord?.kind) === "live_environment_tool_observation" &&
+        readString(payloadRecord?.tool_name) === "live_env.request_stage_play_checkpoint"
+      );
+    });
+  const liveMaintenanceTerminal =
+    (
+      Boolean(
+        (canonicalGoalKind && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(canonicalGoalKind)) ||
+          (finalRouteBase && /^live_(?:source_continuation|pipeline_control|runtime_repair|environment_binding_diagnosis)$/.test(finalRouteBase)),
+      ) &&
+      ["live_pipeline_receipt", "live_environment_binding_diagnosis"].includes(terminalArtifactKind ?? "")
+    ) ||
+    stagePlayCheckpointReceiptTerminal;
   const noteMutationTerminal =
     canonicalGoalKind === "note_mutation" &&
     goalSatisfactionState === "satisfied" &&

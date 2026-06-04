@@ -7,6 +7,10 @@ import {
   type TheoryContextReflectionRecommendedActionV1,
   type TheoryContextReflectionV1,
 } from "./theory-context-reflection.v1";
+import {
+  isTheoryCongruenceTraceV1,
+  type TheoryCongruenceTraceV1,
+} from "../helix-theory-congruence-trace";
 
 export const HELIX_THEORY_CONTEXT_REFLECTION_TOOL_RECEIPT_ARTIFACT_ID =
   "helix_theory_context_reflection_tool_receipt" as const;
@@ -47,6 +51,7 @@ export type HelixTheoryContextReflectionToolReceiptV1 = {
 
   reflectionV1: TheoryContextReflectionV1;
   explanationPlanV1: TheoryContextExplanationPlanV1 | null;
+  theoryCongruenceTraceV1: TheoryCongruenceTraceV1 | null;
 
   panelSync: {
     requested: boolean;
@@ -77,6 +82,7 @@ type BuildHelixTheoryContextReflectionToolReceiptInput = Omit<
   | "generatedAt"
   | "receiptId"
   | "authority"
+  | "theoryCongruenceTraceV1"
   | "assistant_answer"
   | "raw_content_included"
   | "terminal_eligible"
@@ -87,6 +93,7 @@ type BuildHelixTheoryContextReflectionToolReceiptInput = Omit<
 > & {
   generatedAt?: string;
   receiptId?: string;
+  theoryCongruenceTraceV1?: TheoryCongruenceTraceV1 | null;
 };
 
 const AUTHORITY: HelixTheoryContextReflectionToolReceiptAuthorityV1 = {
@@ -175,6 +182,7 @@ export function buildHelixTheoryContextReflectionToolReceiptV1(
     conversationContext: input.conversationContext,
     reflectionV1: input.reflectionV1,
     explanationPlanV1: input.explanationPlanV1,
+    theoryCongruenceTraceV1: input.theoryCongruenceTraceV1 ?? null,
     panelSync: input.panelSync,
     authority: { ...AUTHORITY },
     recommendedNextActions: input.recommendedNextActions,
@@ -205,6 +213,13 @@ export function validateHelixTheoryContextReflectionToolReceiptV1(value: unknown
   }
   if (value.explanationPlanV1 !== null && !isTheoryContextExplanationPlanV1(value.explanationPlanV1)) {
     issues.push("explanationPlanV1 must be null or a valid theory_context_explanation_plan/v1 artifact");
+  }
+  if (
+    value.theoryCongruenceTraceV1 !== undefined &&
+    value.theoryCongruenceTraceV1 !== null &&
+    !isTheoryCongruenceTraceV1(value.theoryCongruenceTraceV1)
+  ) {
+    issues.push("theoryCongruenceTraceV1 must be null or a valid helix.theory_congruence_trace.v1 artifact");
   }
 
   if (!isRecord(value.panelSync)) {

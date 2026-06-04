@@ -9,7 +9,11 @@ import { buildCapabilityResultGate } from "../services/helix-ask/capability-resu
 import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final-answer-draft-quality-gate";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
-import { __testHelixGoalSatisfaction, __testHelixScholarlyFinalFallback } from "../routes/agi.plan";
+import {
+  __testHelixGoalSatisfaction,
+  __testHelixRuntimeToolCallValidation,
+  __testHelixScholarlyFinalFallback,
+} from "../routes/agi.plan";
 import {
   runScholarlyResearchLookup,
   type ScholarlyFetch,
@@ -31,6 +35,88 @@ const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null)
 });
 
 describe("Helix scholarly research tool admission", () => {
+  it("rejects empty scholarly runtime tool args instead of falling back to the full prompt", () => {
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:scholarly-validation",
+      tool_admission_suppressed: false,
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+    } as any;
+
+    const emptyLookup = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-validation",
+        call_id: "call:lookup-empty",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: {},
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(emptyLookup.validation.valid).toBe(false);
+    expect(emptyLookup.validation.args_valid).toBe(false);
+    expect(emptyLookup.validation.errors).toContain("missing_required_arg:query_or_identifier");
+
+    const emptyFullText = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-validation",
+        call_id: "call:full-text-empty",
+        capability_key: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        args: {},
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(emptyFullText.validation.valid).toBe(false);
+    expect(emptyFullText.validation.args_valid).toBe(false);
+    expect(emptyFullText.validation.errors).toContain("missing_required_arg:paper_result_or_source");
+
+    const exactLookup = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-validation",
+        call_id: "call:lookup-arxiv",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: { arxiv_id: "1402.3952" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(exactLookup.validation.valid).toBe(true);
+
+    const selectedPaperFetch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-validation",
+        call_id: "call:full-text-result",
+        capability_key: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        args: { paper_result_id: "arxiv:1402.3952" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(selectedPaperFetch.validation.valid).toBe(true);
+  });
+
   it("routes DOI citations and references to external scholarly research instead of Docs Viewer", () => {
     const promptText = "Do research: find citations and references for DOI 10.1103/PhysRevD.84.024020.";
     const sourceTargetIntent = arbitrateAskSourceTarget({

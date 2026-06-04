@@ -8240,16 +8240,18 @@ export function buildStagePlayChatLedgerEvents(reply: HelixAskReply): StagePlayC
     readStagePlayGraphBadgeById(graph, "live_output.current") ??
     readStagePlayGraphBadgeByKind(graph, "live_output");
   const liveProjection = readAgentLoopAuditRecord(reflection?.liveAnswerProjection);
+  const projectedLineKeys = readStagePlayLedgerStringArray(liveProjection?.projectedLineKeys);
   const changedLineKeys = readStagePlayLedgerStringArray(liveProjection?.changedLineKeys);
-  if (liveOutputBadge || changedLineKeys.length > 0) {
+  const displayedLineKeys = projectedLineKeys.length > 0 ? projectedLineKeys : changedLineKeys;
+  if (liveOutputBadge || displayedLineKeys.length > 0) {
     const output = readAgentLoopAuditRecord(liveOutputBadge?.output);
-    const lineKey = readStagePlayLedgerString(output?.lineKey) ?? (changedLineKeys.join(", ") || "live interpretation");
+    const lineKey = readStagePlayLedgerString(output?.lineKey) ?? (displayedLineKeys.join(", ") || "live interpretation");
     pushStagePlayLedgerEvent(events, {
       key: `${reply.id}-stage-play-live-output`,
       kind: "live_output",
       title: "Live Interpretation lanes updated.",
-      detail: changedLineKeys.length > 0
-        ? `Projected: ${changedLineKeys.join(", ")}.`
+      detail: displayedLineKeys.length > 0
+        ? `Projected: ${displayedLineKeys.join(", ")}.`
         : readStagePlayLedgerString(output?.text) ?? "Live output node is present.",
       meta: `${lineKey} | ${readStagePlayLedgerString(liveProjection?.reason) ?? readStagePlayLedgerString(output?.state) ?? "projection"}`,
       evidenceRefs: uniqueStagePlayLedgerStrings([

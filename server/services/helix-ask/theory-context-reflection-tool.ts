@@ -7,6 +7,10 @@ import type {
 } from "../../../shared/contracts/theory-context-reflection.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "../../../shared/theory/nhm2-theory-badges";
 import { runHelixTheoryContextReflectionTool } from "../../../shared/theory/theory-context-reflection-tool";
+import {
+  buildTheoryCongruenceTrace,
+  type TheoryCongruenceTraceFeatureFlagMode,
+} from "./theory-congruence/solver-adapter";
 
 export type RunAskLevelTheoryContextReflectionToolInput = {
   prompt: string;
@@ -24,11 +28,16 @@ export type RunAskLevelTheoryContextReflectionToolInput = {
   panelOverlayMode?: HelixTheoryContextReflectionPanelSyncOverlayMode;
 };
 
+function theoryCongruenceTraceMode(): TheoryCongruenceTraceFeatureFlagMode {
+  const raw = process.env.HELIX_ASK_THEORY_CONGRUENCE_TRACE;
+  return raw === "off" || raw === "on" || raw === "shadow" ? raw : "shadow";
+}
+
 export function runAskLevelTheoryContextReflectionTool(
   input: RunAskLevelTheoryContextReflectionToolInput,
 ): HelixTheoryContextReflectionToolReceiptV1 {
   const graph = buildNhm2TheoryBadgeGraphV1();
-  return runHelixTheoryContextReflectionTool({
+  const receipt = runHelixTheoryContextReflectionTool({
     graph,
     prompt: input.prompt,
     conversationContext: input.conversationContext ?? null,
@@ -49,4 +58,17 @@ export function runAskLevelTheoryContextReflectionTool(
       selectedLiveContextBlock: true,
     },
   });
+  const mode = theoryCongruenceTraceMode();
+  if (mode === "off") return receipt;
+  return {
+    ...receipt,
+    theoryCongruenceTraceV1: buildTheoryCongruenceTrace({
+      graph,
+      turnId: input.turnId,
+      prompt: input.prompt,
+      reflection: receipt.reflectionV1,
+      explanationPlan: receipt.explanationPlanV1,
+      featureFlagMode: mode,
+    }),
+  };
 }

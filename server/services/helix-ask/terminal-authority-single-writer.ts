@@ -34,6 +34,8 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
 const textHash = (value: string): string => {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -47,9 +49,26 @@ const isStaleWorkspaceFailureText = (value: unknown): boolean =>
   /(?:workspace_step_failed|Failed to execute)/i.test(readString(value) ?? "");
 
 const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
-  /^(?:Stage Play reflected\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b)/i.test(
+  /^(?:Stage Play reflected\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b|Stage Play checkpoint request (?:queued|running|completed):)/i.test(
     readString(value) ?? "",
   );
+
+const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
+  readArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+
+const routeContractAllowsTerminalKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): boolean => {
+  const allowed = routeContractAllowedTerminalKinds(payload);
+  return allowed.length === 0 || allowed.includes(kind);
+};
+
+const routeContractRequiresScholarlyResearchAnswer = (payload: Record<string, unknown>): boolean =>
+  readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) === "scholarly_research_answer" ||
+  routeContractAllowedTerminalKinds(payload).includes("scholarly_research_answer");
 
 const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
@@ -109,6 +128,30 @@ const isDeterministicReceiptFallbackDraft = (artifact: ArtifactLike): boolean =>
 
 const stagePlayReceiptPendingText =
   "Stage Play reflected the active visual source and queued a checkpoint.\nNo model-reviewed answer snapshot exists yet.";
+
+const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
+  const text = artifactText(artifact);
+  return /^Stage Play checkpoint request (?:queued|running|completed):/i.test(text ?? "")
+    ? text!
+    : stagePlayReceiptPendingText;
+};
+
+const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean =>
+  /scholarly_full_text_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+
+const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
+  artifacts.some((artifact) => {
+    if (!isScholarlyFullTextObservation(artifact)) return false;
+    const payload = artifactPayload(artifact);
+    if (!payload) return false;
+    const pagesParsed = typeof payload.pages_parsed === "number" ? payload.pages_parsed : 0;
+    return (
+      pagesParsed > 0 ||
+      readArray(payload.selected_chunks).length > 0 ||
+      readArray(payload.page_text_refs).length > 0 ||
+      Boolean(readString(payload.source_url) ?? readString(payload.source_pdf_ref))
+    );
+  });
 
 const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
   const kind = artifactKind(artifact);
@@ -372,6 +415,33 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isPostToolObservation(artifact) ? index : latest, -1);
+  const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
+  const deterministicReceiptFallbackCanSurface =
+    Boolean(deterministicReceiptFallbackDraft) &&
+    (
+      routeContractAllowedTerminalKinds(input.payload).includes("tool_receipt") ||
+      isStagePlayPostObservationSynthesisText(artifactText(deterministicReceiptFallbackDraft!.artifact))
+    );
+  const scholarlyAnswerSynthesisMissing =
+    routeContractRequiresScholarlyResearchAnswer(input.payload) &&
+    hasObservedScholarlyFullText(artifacts);
+
+  if (selectedDraft && !routeAllowsModelSynthesizedAnswer && draftMaterialization?.ok !== true) {
+    rejectedCandidates.push({
+      ref: artifactId(selectedDraft.artifact) ?? undefined,
+      kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "route_contract_forbids_model_synthesized_answer",
+    });
+  }
+  if (deterministicReceiptFallbackDraft && !deterministicReceiptFallbackCanSurface) {
+    rejectedCandidates.push({
+      ref: artifactId(deterministicReceiptFallbackDraft.artifact) ?? undefined,
+      kind: "final_answer_draft",
+      source: "final_answer_draft",
+      reason: "deterministic_receipt_fallback_nonterminal",
+    });
+  }
 
   for (const artifact of artifacts) {
     if (!isForbiddenReceiptOrProjection(artifact)) continue;
@@ -478,7 +548,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         reason: "later_valid_final_answer_draft",
       });
     }
-  } else if (!solverContinuationPending && selectedDraft) {
+  } else if (!solverContinuationPending && selectedDraft && routeAllowsModelSynthesizedAnswer) {
     const text = artifactText(selectedDraft.artifact) ?? "I could not produce a terminal answer for this turn.";
     selectedArtifactRef = artifactId(selectedDraft.artifact);
     selectedArtifactKind = "model_synthesized_answer";
@@ -498,9 +568,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
-  } else if (!solverContinuationPending && deterministicReceiptFallbackDraft) {
+  } else if (!solverContinuationPending && deterministicReceiptFallbackDraft && deterministicReceiptFallbackCanSurface) {
     const draftRef = artifactId(deterministicReceiptFallbackDraft.artifact);
-    const text = stagePlayReceiptPendingText;
+    const text = stagePlayReceiptTextForDraft(deterministicReceiptFallbackDraft.artifact);
     selectedArtifactRef = draftRef;
     selectedArtifactKind = "tool_receipt";
     selectedSource = "tool_receipt";
@@ -529,16 +599,26 @@ export function applyHelixTerminalAuthoritySingleWriter(
       reason: "deterministic_receipt_fallback_nonterminal",
     });
   } else if (!solverContinuationPending && latestRequiredObservationSequence >= 0) {
+    const terminalErrorCode = scholarlyAnswerSynthesisMissing
+      ? "scholarly_answer_synthesis_failed_after_full_text_observed"
+      : "post_tool_model_step_missing";
+    const terminalErrorText = scholarlyAnswerSynthesisMissing
+      ? "I could not complete this scholarly research turn because PDF/full-text evidence was observed, but no valid model-authored scholarly answer passed terminal authority."
+      : "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
-    input.payload.terminal_error_code = "post_tool_model_step_missing";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
     input.payload.typed_failure = {
       ...(readRecord(input.payload.typed_failure) ?? {}),
       schema: "helix.typed_failure.v1",
-      error_code: "post_tool_model_step_missing",
-      message: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
-      text: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
-      answer_text: "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -600,7 +680,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
       visible_matches_draft: !draftText || visibleText === draftText,
       stale_failure_visible: isStaleWorkspaceFailureText(visibleText),
       receipt_visible_as_answer: receiptVisibleAsAnswer,
-      post_tool_model_step_satisfied: latestRequiredObservationSequence < 0 || Boolean(selectedDraft),
+      post_tool_model_step_satisfied: latestRequiredObservationSequence < 0 || Boolean(
+        draftMaterialization?.ok ||
+        selectedGoalArtifact ||
+        (selectedDraft && routeAllowsModelSynthesizedAnswer)
+      ),
       legacy_terminal_candidate_count: legacyCandidates.length,
       forbidden_terminal_candidate_count: rejectedCandidates.filter((entry) =>
         entry.reason === "receipt_or_projection" || entry.reason === "route_contract_forbidden"

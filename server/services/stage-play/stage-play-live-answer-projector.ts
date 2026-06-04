@@ -14,6 +14,7 @@ import {
 } from "../situation-room/live-answer-environment-store";
 import { buildStagePlayGraphFromWorld } from "./stage-play-badge-graph-builder";
 import {
+  buildStagePlayLiveAnswerLineValuesV1,
   buildStagePlayOutputLaneProjectionV1,
   checkpointOnlySkippedLineKeysForStagePlayProjection,
   ensureLiveAnswerEnvironmentHasStagePlayLines,
@@ -379,6 +380,10 @@ export function projectStagePlayLiveAnswer(
     graph,
     now,
   });
+  const projectedLineValues = reduction
+    ? buildStagePlayLiveAnswerLineValuesV1(reduction.projection, reduction.environment)
+    : {};
+  const projectedLineKeys = Object.keys(projectedLineValues);
 
   return {
     ok: true,
@@ -387,7 +392,7 @@ export function projectStagePlayLiveAnswer(
     outputLaneProjection: reduction?.projection ?? outputLaneProjection,
     liveAnswerDelta: reduction?.delta ?? null,
     liveAnswerEnvironment: reduction?.environment ?? liveAnswerEnvironment,
-    projectedLineKeys: reduction?.delta.changed_line_keys ?? [],
+    projectedLineKeys,
     skippedLineKeys: skippedLineKeysFor(outputLaneProjection, reduction?.environment ?? liveAnswerEnvironment),
     checkpointOnlySkipped,
     reason: reduction ? "projected" : "no_line_changes",

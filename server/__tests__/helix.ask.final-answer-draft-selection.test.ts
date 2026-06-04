@@ -429,6 +429,194 @@ describe("final_answer_draft terminal selection", () => {
     });
   });
 
+  it("fails closed when a scholarly draft contradicts observed PDF/full-text evidence", () => {
+    const turnId = "ask:test:scholarly-contradictory-draft";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full_text`;
+    const postToolRef = `${turnId}:post_tool_observation`;
+    const draftText = "I cannot fetch or access external PDF documents, so I cannot summarize the paper.";
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          evidence_refs: ["arxiv:1402.3952"],
+          papers: [{ result_id: "arxiv:1402.3952", title: "Hawking Radiation from Higher-Dimensional Black Holes" }],
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        kind: "scholarly_full_text_observation",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          paper_result_id: "arxiv:1402.3952",
+          source_url: "https://arxiv.org/pdf/1402.3952v2.pdf",
+          pages_parsed: 35,
+          selected_chunks: [{
+            chunk_ref: "arxiv:1402.3952:p1:c1",
+            source_text_ref: "arxiv:1402.3952:p1#text",
+            text_excerpt: "This paper reviews Hawking radiation from higher-dimensional black holes.",
+          }],
+          page_text_refs: [{ text_ref: "arxiv:1402.3952:p1#text" }],
+        },
+      },
+      {
+        artifact_id: postToolRef,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          status: "succeeded",
+          post_tool_model_step_required: true,
+          terminal_eligible: false,
+          observed_artifact_refs: [lookupRef, fullTextRef],
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_scholarly_research",
+          support_refs: [lookupRef, fullTextRef, "arxiv:1402.3952:p1#text"],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Do research: fetch the PDF/full text for arXiv:1402.3952 and summarize the Hawking radiation paper.",
+      route_product_contract: scholarlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+    };
+    addScholarlyRuntimeProof(payload, lookupRef, fullTextRef);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).toContain("PDF/full-text evidence was observed");
+    expect(result.integrity.post_tool_model_step_satisfied).toBe(false);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          reason: "route_contract_forbids_model_synthesized_answer",
+        }),
+      ]),
+    );
+    expect(payload.terminal_error_code).toBe("scholarly_answer_synthesis_failed_after_full_text_observed");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.model_synthesized_answer).toBeUndefined();
+    expect(payload.scholarly_research_answer).toBeUndefined();
+    expect((payload.final_answer_draft_quality_gate as Record<string, unknown>).violations).toEqual(
+      expect.arrayContaining(["contradicts_observed_scholarly_full_text"]),
+    );
+  });
+
+  it("keeps deterministic scholarly fallback drafts nonterminal", () => {
+    const turnId = "ask:test:scholarly-deterministic-fallback-nonterminal";
+    const lookupRef = `${turnId}:lookup`;
+    const fullTextRef = `${turnId}:full_text`;
+    const artifacts = [
+      {
+        artifact_id: lookupRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          evidence_refs: ["arxiv:1402.3952"],
+          papers: [{ result_id: "arxiv:1402.3952", title: "Hawking Radiation from Higher-Dimensional Black Holes" }],
+        },
+      },
+      {
+        artifact_id: fullTextRef,
+        kind: "scholarly_full_text_observation",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          source_url: "https://arxiv.org/pdf/1402.3952v2.pdf",
+          pages_parsed: 35,
+          selected_chunks: [{
+            chunk_ref: "arxiv:1402.3952:p1:c1",
+            source_text_ref: "arxiv:1402.3952:p1#text",
+            text_excerpt: "Hawking radiation from higher-dimensional black holes is reviewed.",
+          }],
+          page_text_refs: [{ text_ref: "arxiv:1402.3952:p1#text" }],
+        },
+      },
+      {
+        artifact_id: `${turnId}:post_tool_observation`,
+        kind: "agent_step_observation_packet",
+        payload: {
+          schema: "helix.agent_step_observation_packet.v1",
+          status: "succeeded",
+          post_tool_model_step_required: true,
+          terminal_eligible: false,
+          observed_artifact_refs: [lookupRef, fullTextRef],
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "Paper: Hawking Radiation from Higher-Dimensional Black Holes. Relevant PDF/full-text excerpts: arxiv:1402.3952:p1:c1.",
+          authority: "deterministic_receipt_fallback",
+          support_refs: [lookupRef, fullTextRef, "arxiv:1402.3952:p1#text"],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Do research: fetch the PDF/full text for arXiv:1402.3952 and summarize the paper.",
+      route_product_contract: scholarlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+    };
+    addScholarlyRuntimeProof(payload, lookupRef, fullTextRef);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(result.visible_text).toContain("no valid model-authored scholarly answer");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "final_answer_draft",
+          reason: "deterministic_receipt_fallback_nonterminal",
+        }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("scholarly_answer_synthesis_failed_after_full_text_observed");
+  });
+
   it("rejects fallback-like final drafts as successful terminals", () => {
     const gate = evaluateFinalAnswerDraftQualityGate({
       turnId: "ask:test:fallback-draft",

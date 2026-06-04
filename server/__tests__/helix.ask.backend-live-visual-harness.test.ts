@@ -10,6 +10,8 @@ import { resetProcedureEpochClosuresForTest } from "../services/situation-room/p
 import { resetLiveSourceChunkBufferForTest } from "../services/situation-room/live-source-chunk-buffer";
 import { resetLiveSourceProducerLifecycleForTest } from "../services/situation-room/live-source-producer-lifecycle-store";
 import { resetSituationSourceCapabilitiesForTest } from "../services/situation-room/situation-source-capability-store";
+import { resetStagePlaySourceRouteOverridesForTest, upsertStagePlaySourceRouteOverride } from "../services/situation-room/stage-play-source-window";
+import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 
@@ -30,8 +32,91 @@ describe("helix ask backend live visual test harness", () => {
     resetLiveSourceChunkBufferForTest();
     resetLiveSourceProducerLifecycleForTest();
     resetSituationSourceCapabilitiesForTest();
+    resetStagePlaySourceRouteOverridesForTest();
+    resetVisualSnapshotStoreForTest();
     resetReceiptPresentationSnapshotsForTest();
   });
+
+  it("answers generic current visual prompts from active compact visual evidence without a SituationRun", async () => {
+    const app = createApp();
+    const threadId = "helix-ask:desktop";
+    const sourceId = "visual_source:phase4-active";
+
+    await request(app)
+      .post("/api/agi/situation/visual-source/start")
+      .send({
+        thread_id: threadId,
+        source_id: sourceId,
+        status: "active",
+        source_surface: "browser_tab",
+      })
+      .expect(200);
+
+    await request(app)
+      .post("/api/agi/situation/visual-frame")
+      .send({
+        thread_id: threadId,
+        source_id: sourceId,
+        frame_id: "visual_frame:phase4-active",
+        image_ref: "ephemeral://phase4-active-frame",
+      })
+      .expect(200);
+
+    const analysis = await request(app)
+      .post("/api/agi/situation/visual-frame/analyze")
+      .send({
+        thread_id: threadId,
+        source_id: sourceId,
+        frame_id: "visual_frame:phase4-active",
+        evidence_id: "visual_evidence:phase4-active",
+        summary: "a Minecraft-like scene with blocky terrain, a grassy area, and an in-game HUD.",
+        detected_objects: ["blocky terrain", "grassy area", "in-game HUD"],
+        uncertainty: ["audio is unavailable"],
+      })
+      .expect(200);
+
+    expect(analysis.body?.evidence).toMatchObject({
+      evidence_id: "visual_evidence:phase4-active",
+      frame_id: "visual_frame:phase4-active",
+      source_id: sourceId,
+    });
+
+    upsertStagePlaySourceRouteOverride({
+      threadId,
+      sourceId,
+      modality: "visual_frame",
+      routeTo: "narrative_stage_play",
+      selectedForStagePlay: true,
+      evidenceRefs: ["visual_evidence:phase4-active"],
+    });
+
+    const ask = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: threadId,
+        question: "What is currently visible in the active visual source?",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    const answerText = String(ask.body?.selected_final_answer ?? ask.body?.answer ?? "");
+    expect(answerText).toMatch(/active visual source shows/i);
+    expect(answerText).toMatch(/Minecraft-like scene/i);
+    expect(answerText).not.toMatch(/visual capture evidence is unavailable/i);
+    expect(ask.body?.terminal_artifact_kind).toBe("situation_context_pack");
+    expect(ask.body?.situation_evidence_selection).toMatchObject({
+      answerable: true,
+      answerability_reason: expect.stringMatching(/compact visual frame evidence/i),
+      selected_source_refs: expect.arrayContaining([sourceId]),
+      selected_observation_refs: expect.arrayContaining([
+        "visual_evidence:phase4-active",
+        "visual_frame:phase4-active",
+      ]),
+    });
+    expect(ask.body?.situation_evidence_selection?.selected_interpretation_graph_refs?.[0]).toMatch(/^stage_play_badge_graph:/);
+    expect(JSON.stringify(ask.body)).not.toContain("raw_image_included\":true");
+  }, 60_000);
 
   it("seeds visual procedure evidence and answers a top-level visual capture Ask turn from debug-visible selection", async () => {
     const app = createApp();
