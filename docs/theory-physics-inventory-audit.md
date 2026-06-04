@@ -1,18 +1,18 @@
 # Theory Physics Inventory Audit
 
-Generated: 2026-06-02T18:47:25.517Z
+Generated: 2026-06-04T02:18:43.253Z
 
 This audit compares repo-owned physics docs, configs, scripts, data, and shared modules against the current Physics Atlas and Theory Badge Graph. It does not execute simulations or runtime commands.
 
 ## Summary
 
 - Graph: `nhm2-theory-badge-graph`
-- Badges in graph: 127
+- Badges in graph: 136
 - Atlas blocks: 9
-- Repo-owned paths scanned: 6857
-- Represented domains: 3
-- Partially represented domains: 3
-- Repo-present graph gaps: 2
+- Repo-owned paths scanned: 6911
+- Represented domains: 6
+- Partially represented domains: 1
+- Repo-present graph gaps: 1
 - Not detected: 0
 
 ## Domain Coverage
@@ -20,22 +20,15 @@ This audit compares repo-owned physics docs, configs, scripts, data, and shared 
 | Domain | Status | Repo paths | Atlas blocks | Badges | Missing badge prefixes | Next patch |
 | --- | --- | ---: | --- | ---: | --- | --- |
 | Granular / Tidal Love-Number Response | `represented` | 14 | `galactic_dynamics` | 6 | - | feat(theory): add granular tidal/Love-number badge seed under Galactic or Collapse |
-| Solar Flare / Sunquake / Nanoflare Response | `partially_represented` | 16 | `solar_surface_spectrum` | 3 | `solar.sunquake.`, `solar.nanoflare.` | feat(theory): extend solar atlas with flare-to-sunquake and nanoflare observable badges |
+| Solar Flare / Sunquake / Nanoflare Response | `represented` | 16 | `solar_surface_spectrum` | 8 | - | feat(theory): extend solar atlas with flare-to-sunquake and nanoflare observable badges |
 | Solar Restoration / Red-Giant Prevention | `repo_present_graph_gap` | 6 | - | 0 | `stellar.restoration.`, `solar.restoration.`, `starsim.restoration.` | feat(theory): add solar-restoration/red-giant planning badges as non-actionable forecast rows |
 | DP / Objective-Collapse Runtime | `represented` | 21 | `curvature_collapse` | 21 | - | chore(theory): keep DP/objective-collapse badges aligned with runtime artifacts |
 | Orch-OR / Microtubule / Time-Crystal Hypothesis | `represented` | 38 | `curvature_collapse` | 10 | - | chore(theory): keep Orch-OR comparison rows fenced as exploratory |
 | Halobank Solar / Tidal Diagnostics | `partially_represented` | 37 | `galactic_dynamics` | 6 | `halobank.`, `solar.tidal.` | feat(theory): add halobank solar/tidal diagnostic badge seed |
-| Stellar Structure / Nucleosynthesis | `partially_represented` | 64 | `galactic_dynamics`, `stellar_evolution` | 23 | `stellar.` | feat(theory): expand Stellar lane with hydrostatic/opacity/nucleosynthesis source rows |
-| Solar Reference Pack / Helioseismic Closure | `repo_present_graph_gap` | 16 | - | 0 | `solar.reference.`, `solar.interior.`, `solar.cycle.` | feat(theory): add solar reference-pack badges for helioseismic/neutrino/cycle context |
+| Stellar Structure / Nucleosynthesis | `represented` | 64 | `galactic_dynamics`, `stellar_evolution` | 27 | - | feat(theory): expand Stellar lane with hydrostatic/opacity/nucleosynthesis source rows |
+| Solar Reference Pack / Helioseismic Closure | `represented` | 16 | `solar_surface_spectrum`, `stellar_evolution` | 6 | - | feat(theory): add solar reference-pack badges for helioseismic/neutrino/cycle context |
 
 ## Gaps To Patch First
-
-### Solar Flare / Sunquake / Nanoflare Response
-
-- Status: `partially_represented`
-- Recommended patch: feat(theory): extend solar atlas with flare-to-sunquake and nanoflare observable badges
-- Claim boundary: Solar flare, sunquake, and nanoflare rows are observational/MHD diagnostics, not wavefunction-collapse evidence.
-- Sample repo paths: `docs/architecture/granular-tidal-sunquake-bridge-plan.md`, `docs/audits/research/granular-tidal-sunquake-source-check-2026-03-25.md`, `docs/knowledge/physics/flare-particle-precipitation.md`, `docs/knowledge/physics/flare-sunquake-timing-correlation.md`, `docs/knowledge/physics/nanoflare-heating.md`, `docs/knowledge/physics/physics-solar-surface-event-tree.json`, `docs/knowledge/physics/quasi-periodic-flare-envelope.md`, `docs/knowledge/physics/solar-flare-line-origin.md`, `docs/knowledge/physics/solar-flare-phase-definition.md`, `docs/knowledge/physics/solar-helioseismic-observable-contract.md`, `docs/knowledge/physics/solar-sunquake-impact-definition.md`, `docs/knowledge/physics/sunquake-timing-replay-diagnostic.md`
 
 ### Solar Restoration / Red-Giant Prevention
 
@@ -50,20 +43,6 @@ This audit compares repo-owned physics docs, configs, scripts, data, and shared 
 - Recommended patch: feat(theory): add halobank solar/tidal diagnostic badge seed
 - Claim boundary: Halobank solar/tidal rows should remain falsifier/diagnostic context unless runtime receipts support a narrower claim.
 - Sample repo paths: `configs/halobank-solar-diagnostic-datasets.v1.json`, `configs/halobank-solar-kernel-bundle.v1.json`, `configs/halobank-solar-local-rest-reference.v1.json`, `configs/halobank-solar-metric-context.v1.json`, `configs/halobank-solar-thresholds.v1.json`, `docs/architecture/granular-tidal-sunquake-bridge-plan.md`, `docs/architecture/halobank-paper-definition-congruence-plan.md`, `docs/knowledge/halobank-solar-proof-tree.json`, `docs/knowledge/halobank.md`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260218-012531.json`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260218t010053z.json`, `docs/audits/ticket-results/toe-012-halobank-horizons-consistency-gate.20260219-172109.json`
-
-### Stellar Structure / Nucleosynthesis
-
-- Status: `partially_represented`
-- Recommended patch: feat(theory): expand Stellar lane with hydrostatic/opacity/nucleosynthesis source rows
-- Claim boundary: Stellar structure rows are reduced-order/model-context unless external stellar-evolution receipts are present.
-- Sample repo paths: `docs/knowledge/star-hydrostatic.md`, `docs/research/starsim-fusion-benchmark-stage2-candidate.md`, `docs/research/starsim-fusion-external-repro-stage2-gate.md`, `docs/research/starsim-fusion-microphysics-stage1.md`, `docs/research/starsim-fusion-profile-import-stage2-prep.md`, `docs/research/starsim-solar-mesa-docker-repro-v1.md`, `docs/starsim/mesa-gyre-worker.md`, `docs/audits/research/quantum-to-classical-multiscale-closure-architecture-for-fusion-experiments-2026-03-28.md`, `docs/audits/research/quantum-to-classical-multiscale-closure-architecture-for-fusion-experiments-source-packet-2026-03-28.md`, `docs/audits/research/stellar-structure-nucleosynthesis-source-check-2026-03-25.md`, `docs/knowledge/math-claims/starsim-fusion-benchmark.claims.json`, `docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json`
-
-### Solar Reference Pack / Helioseismic Closure
-
-- Status: `repo_present_graph_gap`
-- Recommended patch: feat(theory): add solar reference-pack badges for helioseismic/neutrino/cycle context
-- Claim boundary: Solar reference-pack rows are observational closure context and must require calibration/provenance.
-- Sample repo paths: `data/starsim/solar-product-registry.v1.json`, `data/starsim/solar-reference-pack.v1.json`, `docs/research/starsim-solar-reference-repro-run-v1.md`, `docs/starsim/solar-product-provenance.md`, `docs/starsim/solar-reference-anchors.md`, `docs/knowledge/math-claims/starsim-solar-reference-run.claims.json`, `docs/knowledge/physics/solar-helioseismic-observable-contract.md`, `server/modules/starsim/solar-product-registry.ts`, `server/modules/starsim/solar-reference-anchors.ts`, `server/modules/starsim/solar-reference-pack.ts`, `server/modules/starsim/external/mesa-solar-reference-inlists.ts`, `shared/starsim-fusion-neutrino-closure.ts`
 
 ## Guardrails
 

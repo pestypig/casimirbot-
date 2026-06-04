@@ -61,12 +61,13 @@ export function auditTerminalPresentationCoverage(input: {
     readTerminalAnswerEventText(input.payload.turn_events);
   const visibleAnswerText = readVisibleAnswerText(input.payload);
   const terminalIsTypedFailure = input.terminalArtifactKind === "typed_failure";
+  const terminalIsToolReceipt = input.terminalArtifactKind === "tool_receipt";
   const canonicalText = terminalIsTypedFailure
     ? authorityText ?? typedFailureText ?? selectedFinalAnswer ?? input.selectedFinalAnswer.trim()
     : presentationText ?? selectedFinalAnswer ?? input.selectedFinalAnswer.trim();
   const violations: string[] = [];
   if (!presenterUsed) violations.push("terminal_presenter_missing");
-  if (terminalAuthorityCount !== 1 || terminalAuthority?.server_authoritative !== true) {
+  if (terminalAuthorityCount !== 1 || (terminalAuthority?.server_authoritative !== true && !terminalIsToolReceipt)) {
     violations.push("terminal_authority_missing");
   }
   if (poisonAudit?.schema !== "helix.turn_poison_audit.v1" || poisonAudit.ok !== true) {
@@ -113,6 +114,7 @@ export function auditTerminalPresentationCoverage(input: {
       "workspace_action_receipt",
       "tool_evaluation",
       "workstation_tool_evaluation",
+      "tool_receipt",
       "request_user_input",
       "typed_failure",
     ]

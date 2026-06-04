@@ -31,6 +31,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "scholarly_evidence_required_but_missing"
     | "scholarly_support_refs_missing"
     | "live_job_contract_missing"
+    | "deterministic_receipt_fallback_nonterminal"
     | "unsupported_route_terminal_kind";
   route_allowed_terminal_artifact_kinds: string[];
   final_answer_draft_quality_gate: FinalAnswerDraftQualityGate;
@@ -70,6 +71,12 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   const payload = artifactPayload(artifact);
   return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.visible_text);
 };
+
+const artifactAuthority = (artifact: ArtifactLike): string | null =>
+  readString(artifactPayload(artifact)?.authority);
+
+const isDeterministicStagePlayReceiptText = (value: unknown): boolean =>
+  /^Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b/i.test(readString(value) ?? "");
 
 export const isFinalAnswerDraftArtifact = (artifact: ArtifactLike): boolean =>
   artifactKind(artifact) === "final_answer_draft" ||
@@ -143,6 +150,22 @@ export function materializeFinalAnswerDraftTerminal(input: {
     artifactLedger: input.artifactLedger,
   });
   input.payload.final_answer_draft_quality_gate = qualityGate;
+  const draftAuthority =
+    artifactAuthority(draft.artifact) ??
+    readString(readRecord(input.payload.final_answer_draft)?.authority);
+  if (draftAuthority === "deterministic_receipt_fallback" || isDeterministicStagePlayReceiptText(draft.text)) {
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: false,
+      blocked_reason: "deterministic_receipt_fallback_nonterminal",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
 
   const directSequence = latestDirectAnswerSequence(input.artifactLedger);
   const routeFamily = inferFinalAnswerDraftRouteFamily({

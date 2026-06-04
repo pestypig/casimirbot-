@@ -22,6 +22,7 @@ export type HelixTerminalAnswerEnvelope = {
     | "repo_code_evidence_answer"
     | "selected_final_answer"
     | "request_user_input"
+    | "tool_receipt"
     | "typed_failure";
   assistant_answer: false;
   raw_content_included: false;
@@ -313,6 +314,7 @@ export const applyDocConceptExplanationTerminalCandidate = (
 function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAuthority["terminal_kind"] {
   if (terminalArtifactKind === "request_user_input") return "request_user_input";
   if (terminalArtifactKind === "typed_failure") return "failure";
+  if (terminalArtifactKind === "tool_receipt") return "tool_receipt";
   if (terminalArtifactKind === "live_pipeline_receipt") return "workspace_action_receipt";
   if (terminalArtifactKind === "situation_context_pack") return "situation_context_pack";
   if (terminalArtifactKind === "live_environment_binding_diagnosis") return "live_answer_environment";
@@ -321,6 +323,10 @@ function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAut
   }
   return "answer";
 }
+
+const isNonAuthoritativeToolReceiptEnvelope = (envelope: HelixTerminalAnswerEnvelope): boolean =>
+  envelope.terminal_artifact_kind === "tool_receipt" ||
+  envelope.final_answer_source === "deterministic_receipt_fallback";
 
 export function resolveTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
@@ -353,6 +359,11 @@ export function resolveTerminalAnswerEnvelope(
   } else if (terminalArtifactKind === "request_user_input") {
     terminalText = requestUserInputText(payload);
     authorityOrigin = "request_user_input";
+  } else if (terminalArtifactKind === "tool_receipt" || finalAnswerSource === "deterministic_receipt_fallback") {
+    terminalArtifactKind = "tool_receipt";
+    finalAnswerSource = "deterministic_receipt_fallback";
+    terminalText = readString(payload.selected_final_answer) ?? readTerminalPresentationText(payload) ?? readFinalAnswerDraftText(payload);
+    authorityOrigin = "tool_receipt";
   } else if (terminalArtifactKind === "repo_code_evidence_answer") {
     terminalText = readValidRepoEvidenceAnswerText(payload) ?? readTerminalPresentationText(payload);
     authorityOrigin = terminalText === readValidRepoEvidenceAnswerText(payload)
@@ -423,6 +434,8 @@ function upsertTerminalAnswerInArray(value: unknown, envelope: HelixTerminalAnsw
       ? "final_failure"
       : envelope.terminal_kind === "request_user_input"
         ? "pending_input"
+        : isNonAuthoritativeToolReceiptEnvelope(envelope)
+          ? "tool_receipt"
         : "final_answer";
   return [
     ...events,
@@ -558,6 +571,7 @@ function clearStaleFailureFieldsForSuccessfulTerminal(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): void {
+  if (isNonAuthoritativeToolReceiptEnvelope(envelope)) return;
   if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
 
   delete payload.terminal_error_code;
@@ -589,6 +603,24 @@ function syncSuccessfulTerminalStatusMirrors(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): void {
+  if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+    payload.ok = true;
+    payload.status = "tool_receipt";
+    payload.final_status = "checkpoint_pending";
+    payload.response_type = "tool_receipt";
+    const existingSummary = readRecord(payload.resolved_turn_summary);
+    payload.resolved_turn_summary = {
+      ...(existingSummary ?? {}),
+      turn_id: envelope.turn_id,
+      final_status: "checkpoint_pending",
+      resolved_route_label: "stage_play_reflection / tool_receipt",
+      terminal_kind: "tool_receipt",
+      terminal_artifact_kind: envelope.terminal_artifact_kind,
+      terminal_error_code: null,
+      pending_server_request_present: false,
+    };
+    return;
+  }
   if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
 
   payload.ok = true;
@@ -637,7 +669,11 @@ export function applyTerminalAnswerEnvelope(
   };
   const initialBoundary = evaluateTerminalBoundaryEligibility(previewPayload);
   if (!initialBoundary.eligible && envelope.terminal_kind !== "request_user_input") {
-    envelope = buildTerminalBoundaryFailureEnvelope(payload, envelope, initialBoundary);
+    if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+      payload.terminal_eligible = false;
+    } else {
+      envelope = buildTerminalBoundaryFailureEnvelope(payload, envelope, initialBoundary);
+    }
   }
 
   clearStaleFailureFieldsForSuccessfulTerminal(payload, envelope);
@@ -646,7 +682,7 @@ export function applyTerminalAnswerEnvelope(
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
   payload.selected_final_answer = envelope.terminal_text;
-  payload.assistant_answer = envelope.terminal_text;
+  payload.assistant_answer = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : envelope.terminal_text;
   payload.answer = envelope.terminal_text;
   payload.text = envelope.terminal_text;
   payload.finalAnswer = envelope.terminal_text;
@@ -654,14 +690,15 @@ export function applyTerminalAnswerEnvelope(
   payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
   payload.final_answer_source = envelope.final_answer_source;
   payload.terminal_answer_envelope = envelope;
+  payload.terminal_eligible = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : payload.terminal_eligible;
   payload.terminal_boundary_eligibility = evaluateTerminalBoundaryEligibility(payload);
   const runtimeRecord = readRecord(payload.turn_runtime);
   if (runtimeRecord && envelope.terminal_kind !== "failure" && envelope.final_answer_source !== "typed_failure") {
     payload.turn_runtime = {
       ...runtimeRecord,
-      status: "completed",
+      status: isNonAuthoritativeToolReceiptEnvelope(envelope) ? "checkpoint_pending" : "completed",
       terminal: {
-        kind: "final_answer",
+        kind: isNonAuthoritativeToolReceiptEnvelope(envelope) ? "tool_receipt" : "final_answer",
         text: envelope.terminal_text,
         error_code: null,
       },
@@ -688,6 +725,7 @@ export function applyTerminalAnswerEnvelope(
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     concise_text: envelope.terminal_text,
     assistant_answer: false,
+    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : undefined,
     raw_content_included: false,
   };
 
@@ -701,6 +739,9 @@ export function applyTerminalAnswerEnvelope(
     terminal_item_id: readString(payload.terminal_item_id),
     route: readString(payload.route_reason_code) ?? readString(payload.route),
     authority_origin: envelope.authority_origin,
+    server_authoritative: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : true,
+    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : undefined,
+    assistant_answer: false,
   });
   payload.terminal_answer_authority = terminalAuthority;
   payload.current_turn_events = upsertCurrentTurnEvents(payload.current_turn_events, envelope);
@@ -735,7 +776,11 @@ export function applyTerminalAnswerEnvelope(
     debug.terminal_presentation = payload.terminal_presentation;
     debug.terminal_answer_authority = payload.terminal_answer_authority;
     debug.terminal_answer_envelope = envelope;
-    if (envelope.terminal_kind !== "failure" && envelope.final_answer_source !== "typed_failure") {
+    if (
+      envelope.terminal_kind !== "failure" &&
+      envelope.final_answer_source !== "typed_failure" &&
+      !isNonAuthoritativeToolReceiptEnvelope(envelope)
+    ) {
       debug.ok = true;
       debug.status = "final_answer";
       debug.final_status = "final_answer";
@@ -744,6 +789,13 @@ export function applyTerminalAnswerEnvelope(
       delete debug.terminal_error_code;
       delete debug.terminal_failure_text;
       delete debug.typed_failure;
+    } else if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
+      debug.ok = true;
+      debug.status = "tool_receipt";
+      debug.final_status = "checkpoint_pending";
+      debug.response_type = "tool_receipt";
+      debug.assistant_answer = false;
+      debug.terminal_eligible = false;
     }
     debug.terminal_boundary_eligibility = payload.terminal_boundary_eligibility;
     debug.current_turn_events = payload.current_turn_events;

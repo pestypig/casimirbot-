@@ -117,4 +117,87 @@ describe("Helix Ask deterministic fallback demotion", () => {
       ]),
     );
   });
+
+  it("keeps deterministic Stage Play receipt fallback nonterminal when checkpoint is pending", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Use Stage Play to reflect the active visual source.",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer:
+        "Stage Play tool receipt: live_env.reflect_stage_play_context; graph stage_play_badge_graph:test.",
+      source_target_intent: {
+        target_source: "live_environment",
+      },
+      route_product_contract: {
+        source_target: "live_environment",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["live_pipeline_receipt", "client_projection"],
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            chosen_capability: "live_env.reflect_stage_play_context",
+          },
+        ],
+      },
+      agent_step_decision: {
+        chosen_capability: "live_env.reflect_stage_play_context",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId: "turn-stage-play-receipt",
+      payload,
+      artifactLedger: [
+        {
+          artifact_id: "obs-1",
+          kind: "agent_step_observation_packet",
+          payload: {
+            schema: "helix.agent_step_observation_packet.v1",
+            status: "succeeded",
+            tool_name: "live_env.reflect_stage_play_context",
+            post_tool_model_step_required: true,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "draft-1",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text:
+              "Stage Play tool receipt: live_env.reflect_stage_play_context; graph stage_play_badge_graph:test.",
+            authority: "deterministic_receipt_fallback",
+          },
+        },
+      ],
+    });
+
+    expect(payload.final_answer_draft_selection).toMatchObject({
+      blocked_reason: "deterministic_receipt_fallback_nonterminal",
+    });
+    expect(payload.route_terminal_materialization).toMatchObject({
+      materialization_ok: false,
+      materialization_blocked_reason: "deterministic_receipt_fallback_nonterminal",
+    });
+    expect(payload.terminal_artifact_kind).toBe("tool_receipt");
+    expect(payload.terminal_artifact_kind).not.toBe("model_synthesized_answer");
+    expect(payload.final_answer_source).toBe("deterministic_receipt_fallback");
+    expect(payload.terminal_eligible).toBe(false);
+    expect(payload.assistant_answer).toBe(false);
+    expect(payload.answer).toContain("Stage Play reflected the active visual source and queued a checkpoint.");
+    expect(payload.answer).toContain("No model-reviewed answer snapshot exists yet.");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_artifact_kind: "tool_receipt",
+      final_answer_source: "deterministic_receipt_fallback",
+      server_authoritative: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(result.selected_terminal_artifact_kind).toBe("tool_receipt");
+  });
 });

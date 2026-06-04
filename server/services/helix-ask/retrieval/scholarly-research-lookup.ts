@@ -90,6 +90,20 @@ const normalizeDoi = (value: string | null | undefined): string | undefined => {
     .toLowerCase() || undefined;
 };
 
+const normalizeArxivId = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const normalized = value
+    .trim()
+    .replace(/^https?:\/\/arxiv\.org\/(?:abs|pdf)\//i, "")
+    .replace(/^arxiv:\s*/i, "")
+    .replace(/\.pdf$/i, "")
+    .replace(/[)\].,;:!?]+$/g, "");
+  return normalized || undefined;
+};
+
+const arxivComparisonKey = (value: string | null | undefined): string | undefined =>
+  normalizeArxivId(value)?.replace(/v\d+$/i, "").toLowerCase();
+
 const defaultFetch: ScholarlyFetch = async (url, init) => {
   const response = await fetch(url, init as RequestInit);
   return response;
@@ -149,7 +163,7 @@ const openAlexAbstract = (invertedIndex: unknown): string | undefined => {
 
 const paperKey = (paper: HelixScholarlyPaperResult): string =>
   paper.identifiers.doi ??
-  paper.identifiers.arxiv_id ??
+  arxivComparisonKey(paper.identifiers.arxiv_id) ??
   paper.identifiers.openalex_id ??
   paper.identifiers.semantic_scholar_id ??
   paper.title.toLowerCase();
@@ -202,8 +216,9 @@ const makePaper = (input: {
 }): HelixScholarlyPaperResult | null => {
   const title = input.title?.trim();
   if (!title) return null;
+  const arxivId = normalizeArxivId(input.arxivId);
   return {
-    result_id: `${input.provider}:${hashShort([title, input.doi, input.arxivId, input.openalexId, input.semanticScholarId])}`,
+    result_id: `${input.provider}:${hashShort([title, input.doi, arxivId, input.openalexId, input.semanticScholarId])}`,
     title,
     authors: input.authors ?? [],
     ...(input.year ? { year: input.year } : {}),
@@ -211,7 +226,7 @@ const makePaper = (input: {
     ...(input.abstract ? { abstract: input.abstract } : {}),
     identifiers: {
       ...(normalizeDoi(input.doi) ? { doi: normalizeDoi(input.doi) } : {}),
-      ...(input.arxivId ? { arxiv_id: input.arxivId } : {}),
+      ...(arxivId ? { arxiv_id: arxivId } : {}),
       ...(input.openalexId ? { openalex_id: input.openalexId } : {}),
       ...(input.semanticScholarId ? { semantic_scholar_id: input.semanticScholarId } : {}),
       ...(input.url ? { url: input.url } : {}),
@@ -224,6 +239,40 @@ const makePaper = (input: {
     evidence_refs: [input.ref.ref],
     source_providers: [input.provider],
     confidence: input.confidence ?? "medium",
+  };
+};
+
+const paperMatchesArxivId = (paper: HelixScholarlyPaperResult, arxivId: string | null): boolean => {
+  const target = arxivComparisonKey(arxivId);
+  if (!target) return false;
+  const paperArxiv = arxivComparisonKey(paper.identifiers.arxiv_id);
+  if (paperArxiv === target) return true;
+  const urlText = [
+    paper.identifiers.url,
+    paper.identifiers.pdf_url,
+    paper.identifiers.full_text_url,
+  ].filter(Boolean).join(" ");
+  return new RegExp(`arxiv\\.org\\/(?:abs|pdf)\\/${target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:v\\d+)?(?:\\.pdf)?\\b`, "i").test(urlText);
+};
+
+const makeFallbackArxivPaper = (input: {
+  arxivId: string;
+  ref: HelixScholarlyEvidenceRef;
+}): HelixScholarlyPaperResult => {
+  const arxivId = normalizeArxivId(input.arxivId) ?? input.arxivId;
+  return {
+    result_id: `arxiv:${arxivId}`,
+    title: `arXiv:${arxivId}`,
+    authors: [],
+    identifiers: {
+      arxiv_id: arxivId,
+      url: `https://arxiv.org/abs/${arxivId}`,
+      pdf_url: `https://arxiv.org/pdf/${arxivId}.pdf`,
+      full_text_url: `https://arxiv.org/abs/${arxivId}`,
+    },
+    evidence_refs: [input.ref.ref],
+    source_providers: ["arxiv"],
+    confidence: "high",
   };
 };
 
@@ -369,6 +418,7 @@ const lookupCrossref = async (input: {
 const lookupSemanticScholar = async (input: {
   query: string;
   doi: string | null;
+  arxivId: string | null;
   limit: number;
   fetchImpl: ScholarlyFetch;
   providersCalled: HelixScholarlyResearchProvider[];
@@ -377,9 +427,12 @@ const lookupSemanticScholar = async (input: {
 }): Promise<HelixScholarlyPaperResult[]> => {
   const fields = "paperId,title,authors,year,venue,abstract,citationCount,referenceCount,url,externalIds,isOpenAccess,openAccessPdf";
   const apiKey = readString(process.env.SEMANTIC_SCHOLAR_API_KEY);
+  const exactArxivId = normalizeArxivId(input.arxivId);
   const url = input.doi
     ? `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(input.doi)}?fields=${fields}`
-    : `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(input.query)}&limit=${input.limit}&fields=${fields}`;
+    : exactArxivId
+      ? `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${encodeURIComponent(exactArxivId)}?fields=${fields}`
+      : `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(input.query)}&limit=${input.limit}&fields=${fields}`;
   const json = await fetchJson({
     ...input,
     provider: "semantic_scholar",
@@ -413,7 +466,7 @@ const lookupSemanticScholar = async (input: {
       citationCount: readNumber(paperRecord.citationCount),
       referenceCount: readNumber(paperRecord.referenceCount),
       isOpenAccess: typeof paperRecord.isOpenAccess === "boolean" ? paperRecord.isOpenAccess : undefined,
-      confidence: input.doi ? "high" : "medium",
+      confidence: input.doi || exactArxivId ? "high" : "medium",
     });
     if (paper) papers.push(paper);
   }
@@ -429,8 +482,9 @@ const lookupArxiv = async (input: {
   missingRequirements: string[];
   evidenceRefs: HelixScholarlyEvidenceRef[];
 }): Promise<HelixScholarlyPaperResult[]> => {
-  const search = input.arxivId
-    ? `id_list=${encodeURIComponent(input.arxivId)}`
+  const exactArxivId = normalizeArxivId(input.arxivId);
+  const search = exactArxivId
+    ? `id_list=${encodeURIComponent(exactArxivId)}`
     : `search_query=all:${encodeURIComponent(input.query)}&start=0&max_results=${input.limit}`;
   const xml = await fetchText({
     ...input,
@@ -446,7 +500,7 @@ const lookupArxiv = async (input: {
     const entry = readRecord(raw);
     if (!entry) continue;
     const id = readString(entry.id);
-    const arxivId = id?.match(/arxiv\.org\/abs\/(.+)$/i)?.[1] ?? input.arxivId ?? undefined;
+    const arxivId = normalizeArxivId(id?.match(/arxiv\.org\/abs\/(.+)$/i)?.[1] ?? exactArxivId);
     const ref = evidenceRef("arxiv", arxivId ?? hashShort(entry), id);
     input.evidenceRefs.push(ref);
     const authorEntries = readArray(entry.author).length ? readArray(entry.author) : entry.author ? [entry.author] : [];
@@ -465,7 +519,7 @@ const lookupArxiv = async (input: {
       url: id,
       pdfUrl: arxivId ? `https://arxiv.org/pdf/${arxivId}.pdf` : undefined,
       fullTextUrl: id,
-      confidence: input.arxivId ? "high" : "medium",
+      confidence: exactArxivId ? "high" : "medium",
     });
     if (paper) papers.push(paper);
   }
@@ -559,7 +613,7 @@ export async function runScholarlyResearchLookup(
   const query = input.query.trim();
   const intent = detectScholarlyResearchIntent(query);
   const doi = input.mode === "doi_lookup" ? extractScholarlyDoi(query) : intent.doi ?? extractScholarlyDoi(query);
-  const arxivId = intent.arxivId ?? extractScholarlyArxivId(query);
+  const arxivId = normalizeArxivId(intent.arxivId ?? extractScholarlyArxivId(query)) ?? null;
   const limit = Math.max(1, Math.min(Number(input.limit) || 8, 20));
   const providers = unique((input.providers?.length ? input.providers : DEFAULT_PROVIDERS)
     .filter((provider): provider is HelixScholarlyResearchProvider => DEFAULT_PROVIDERS.includes(provider)));
@@ -575,12 +629,15 @@ export async function runScholarlyResearchLookup(
 
   for (const provider of providers) {
     if (!query) break;
+    if (arxivId && !doi && !["arxiv", "semantic_scholar"].includes(provider)) {
+      continue;
+    }
     if (provider === "openalex") {
       papers.push(...await lookupOpenAlex({ query, doi, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
     } else if (provider === "crossref") {
       papers.push(...await lookupCrossref({ query, doi, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
     } else if (provider === "semantic_scholar") {
-      papers.push(...await lookupSemanticScholar({ query, doi, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
+      papers.push(...await lookupSemanticScholar({ query, doi, arxivId, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
     } else if (provider === "arxiv") {
       papers.push(...await lookupArxiv({ query, arxivId, limit, fetchImpl, providersCalled, missingRequirements, evidenceRefs }));
     } else if (provider === "unpaywall") {
@@ -590,7 +647,20 @@ export async function runScholarlyResearchLookup(
     }
   }
 
-  const dedupedPapers = dedupePapers(papers).slice(0, limit);
+  const exactArxivPapers = arxivId
+    ? dedupePapers(papers).filter((paper) => paperMatchesArxivId(paper, arxivId))
+    : [];
+  if (arxivId && exactArxivPapers.length === 0) {
+    const ref = evidenceRef("arxiv", arxivId, `https://arxiv.org/abs/${arxivId}`);
+    evidenceRefs.push(ref);
+    missingRequirements.push("arxiv_metadata_unavailable_using_direct_pdf_url");
+    papers.push(makeFallbackArxivPaper({ arxivId, ref }));
+  }
+
+  const candidatePapers = arxivId
+    ? dedupePapers(papers).filter((paper) => paperMatchesArxivId(paper, arxivId))
+    : dedupePapers(papers);
+  const dedupedPapers = candidatePapers.slice(0, limit);
   if (!dedupedPapers.length && query) {
     missingRequirements.push("no_scholarly_results_returned");
   }

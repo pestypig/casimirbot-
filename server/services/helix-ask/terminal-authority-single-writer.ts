@@ -94,6 +94,22 @@ const isFinalAnswerDraft = (artifact: ArtifactLike): boolean =>
   artifactKind(artifact) === "final_answer_draft" ||
   artifactSchema(artifact) === "helix.final_answer_draft.v1";
 
+const finalAnswerDraftAuthority = (artifact: ArtifactLike): string | null =>
+  readString(artifactPayload(artifact)?.authority);
+
+const isDeterministicStagePlayReceiptText = (value: unknown): boolean =>
+  /^Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b/i.test(readString(value) ?? "");
+
+const isDeterministicReceiptFallbackDraft = (artifact: ArtifactLike): boolean =>
+  isFinalAnswerDraft(artifact) &&
+  (
+    finalAnswerDraftAuthority(artifact) === "deterministic_receipt_fallback" ||
+    isDeterministicStagePlayReceiptText(artifactText(artifact))
+  );
+
+const stagePlayReceiptPendingText =
+  "Stage Play reflected the active visual source and queued a checkpoint.\nNo model-reviewed answer snapshot exists yet.";
+
 const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
   const kind = artifactKind(artifact);
   return (
@@ -191,8 +207,24 @@ const findSelectedDraftAfterRequiredObservation = (
   for (let index = artifacts.length - 1; index > latestObservationSequence; index -= 1) {
     const artifact = artifacts[index];
     if (!artifact || !isFinalAnswerDraft(artifact)) continue;
+    if (isDeterministicReceiptFallbackDraft(artifact)) continue;
     const text = artifactText(artifact);
     if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return { artifact, sequence: index, latestObservationSequence };
+  }
+  return null;
+};
+
+const findDeterministicReceiptFallbackDraftAfterRequiredObservation = (
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; sequence: number; latestObservationSequence: number } | null => {
+  const latestObservationSequence = artifacts.reduce((latest, artifact, index) =>
+    isPostToolObservation(artifact) ? index : latest, -1);
+  if (latestObservationSequence < 0) return null;
+
+  for (let index = artifacts.length - 1; index > latestObservationSequence; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || !isDeterministicReceiptFallbackDraft(artifact)) continue;
     return { artifact, sequence: index, latestObservationSequence };
   }
   return null;
@@ -334,6 +366,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
     });
   }
   const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);
+  const deterministicReceiptFallbackDraft = selectedDraft
+    ? null
+    : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
   const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isPostToolObservation(artifact) ? index : latest, -1);
@@ -463,6 +498,36 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+  } else if (!solverContinuationPending && deterministicReceiptFallbackDraft) {
+    const draftRef = artifactId(deterministicReceiptFallbackDraft.artifact);
+    const text = stagePlayReceiptPendingText;
+    selectedArtifactRef = draftRef;
+    selectedArtifactKind = "tool_receipt";
+    selectedSource = "tool_receipt";
+    input.payload.terminal_artifact_kind = "tool_receipt";
+    input.payload.final_answer_source = "deterministic_receipt_fallback";
+    input.payload.selected_final_answer = text;
+    input.payload.answer = text;
+    input.payload.text = text;
+    input.payload.assistant_answer = false;
+    input.payload.terminal_eligible = false;
+    input.payload.terminal_artifact_id = draftRef ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "tool_receipt",
+      concise_text: text,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    rejectedCandidates.push({
+      ref: draftRef ?? undefined,
+      kind: "final_answer_draft",
+      source: "final_answer_draft",
+      reason: "deterministic_receipt_fallback_nonterminal",
+    });
   } else if (!solverContinuationPending && latestRequiredObservationSequence >= 0) {
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";

@@ -456,6 +456,56 @@ describe("Helix scholarly research tool admission", () => {
     expect(observation.evidence_refs.map((ref) => ref.provider)).toEqual(["openalex", "crossref"]);
   });
 
+  it("pins explicit arXiv identifiers to exact arXiv-capable results", async () => {
+    const arxivXml = `<?xml version="1.0" encoding="UTF-8"?>
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <entry>
+          <id>http://arxiv.org/abs/1706.03762</id>
+          <updated>2023-08-02T00:00:00Z</updated>
+          <published>2017-06-12T00:00:00Z</published>
+          <title>Attention Is All You Need</title>
+          <summary>The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.</summary>
+          <author><name>Ashish Vaswani</name></author>
+        </entry>
+      </feed>`;
+    const fetchImpl: ScholarlyFetch = async (url) => {
+      if (url.includes("api.openalex.org")) {
+        throw new Error("broad OpenAlex search should not run for an explicit arXiv ID");
+      }
+      if (url.includes("export.arxiv.org")) {
+        expect(url).toContain("id_list=1706.03762");
+        return { ok: true, status: 200, text: async () => arxivXml };
+      }
+      if (url.includes("api.semanticscholar.org")) {
+        expect(url).toContain("ARXIV:1706.03762");
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:scholarly-exact-arxiv",
+      callId: "call:scholarly-exact-arxiv",
+      query: "Do research: fetch the PDF/full text for arXiv:1706.03762.",
+      providers: ["openalex", "arxiv", "semantic_scholar"],
+      limit: 8,
+      fetchImpl,
+    });
+
+    expect(observation.providers_called).toEqual(["arxiv", "semantic_scholar"]);
+    expect(observation.papers).toHaveLength(1);
+    expect(observation.papers[0]).toMatchObject({
+      title: "Attention Is All You Need",
+      identifiers: {
+        arxiv_id: "1706.03762",
+        pdf_url: "https://arxiv.org/pdf/1706.03762.pdf",
+        full_text_url: "http://arxiv.org/abs/1706.03762",
+      },
+      source_providers: ["arxiv"],
+      confidence: "high",
+    });
+  });
+
   it("fetches a selected PDF source and returns compact page chunks without answer authority", async () => {
     const bytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]);
     const observation = await runScholarlyFullTextFetch({

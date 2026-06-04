@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-05-25T22:54:03.761Z
+Generated: 2026-06-04T02:21:52.806Z
 Registry entries: 124
 
 ## Coverage by Stage
@@ -19,6 +19,7 @@ Registry entries: 124
 - server/routes/agi.demonstration.ts
 - server/routes/agi.plan.ancillary.ts
 - server/routes/agi.refinery.ts
+- server/routes/agi.zen-graph.ts
 - server/services/observability/error-reporter.ts
 - server/services/observability/event-spine-ring-buffer.ts
 - server/services/observability/event-spine.ts
@@ -27,7 +28,7 @@ Registry entries: 124
 
 ## Unstaged Stage Suggestions
 - diagnostic: 3
-- reduced-order: 6
+- reduced-order: 7
 - exploratory: 5
 - default: exploratory
 
@@ -59,8 +60,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 1569
-- edges: 3701
+- nodes: 1835
+- edges: 4284
 
 ## Stage Violations (Edges)
 none

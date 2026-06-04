@@ -9,6 +9,9 @@ const FIXTURE_FILE_PATHS = [
   "docs/knowledge/solar-restoration.md",
   "docs/knowledge/red-giant-phase.md",
   "docs/knowledge/stellar-restoration-tree.json",
+  "docs/knowledge/star-hydrostatic.md",
+  "docs/audits/research/stellar-structure-nucleosynthesis-source-check-2026-03-25.md",
+  "docs/research/starsim-fusion-benchmark-stage2-candidate.md",
   "docs/knowledge/physics/nanoflare-heating.md",
   "docs/knowledge/physics/flare-sunquake-timing-correlation.md",
   "data/starsim/solar-reference-pack.v1.json",
@@ -32,7 +35,9 @@ describe("theory physics inventory audit", () => {
       "docs/knowledge/physics/tidal-bulge-response.md",
     );
     expect(byId.get("solar_restoration_red_giant")?.status).toBe("repo_present_graph_gap");
-    expect(byId.get("solar_flare_sunquake_nanoflare")?.status).toBe("partially_represented");
+    expect(byId.get("solar_reference_pack")?.status).toBe("represented");
+    expect(byId.get("solar_flare_sunquake_nanoflare")?.status).toBe("represented");
+    expect(byId.get("stellar_structure_nucleosynthesis")?.status).toBe("represented");
     expect(byId.get("dp_objective_collapse")?.status).toBe("represented");
     expect(byId.get("orch_or_microtubule_time_crystal")?.status).toBe("represented");
   });

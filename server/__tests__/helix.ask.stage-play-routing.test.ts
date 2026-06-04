@@ -507,29 +507,31 @@ describe("Helix Ask Stage Play routing", () => {
     expect(liveToolArtifact.payload.observation.liveAnswerProjection.changedLineKeys).toEqual(
       expect.arrayContaining(["risk", "possibilities", "unknowns", "next_check"]),
     );
-    expect(response.body?.answer, routeDebug).toContain("Stage Play tool receipt: live_env.reflect_stage_play_context");
-    expect(response.body?.answer).toContain("visual source status:");
-    expect(response.body?.answer).toContain(`${sourceId} active`);
-    expect(response.body?.answer).not.toContain("no visual source status reported");
-    expect(response.body?.answer).toContain("Source refs:");
-    expect(response.body?.answer).toContain("output projection keys:");
-    expect(response.body?.answer).toContain("checkpoint freshness: no_checkpoint");
-    expect(response.body?.answer).toContain("Visual evidence exists in Stage Play, but no current model-reviewed checkpoint has consumed it yet.");
+    expect(response.body?.answer, routeDebug).toContain("Stage Play reflected the active visual source and queued a checkpoint.");
+    expect(response.body?.answer).toContain("No model-reviewed answer snapshot exists yet.");
     expect(response.body?.answer).toContain("Stage Play reflected the active visual source");
-    expect(response.body?.answer).toContain("projected risk, possibilities, unknowns, and next_check as Live Interpretation");
-    expect(response.body?.answer).toContain("audio/transcript grounding");
-    expect(response.body?.answer).toContain("user objective/prediction target");
-    expect(response.body?.answer).toContain("post-observation synthesis");
+    expect(response.body?.answer).toContain("queued a checkpoint");
     expect(response.body?.answer).not.toContain("visual capture evidence is unavailable");
     expect(response.body?.terminal_error_code).not.toBe("visual_evidence_missing");
     expect(response.body?.answer).not.toContain("\"artifactId\":\"stage_play_badge_graph\"");
-    expect(response.body?.final_answer_source).not.toBe("typed_failure");
-    expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
-    expect(response.body?.final_answer_source).not.toBe("panel_generated_answer");
-    expect(response.body?.final_answer_source).not.toBe("client_projection");
-    expect(response.body?.terminal_artifact_kind).not.toBe("live_pipeline_receipt");
-    expect(response.body?.terminal_artifact_kind).not.toBe("typed_failure");
     expect(response.body?.final_answer_draft?.authority, routeDebug).toBe("deterministic_receipt_fallback");
+    expect(response.body?.terminal_artifact_kind, routeDebug).toBe("tool_receipt");
+    expect(response.body?.terminal_artifact_kind, routeDebug).not.toBe("model_synthesized_answer");
+    expect(response.body?.final_answer_source, routeDebug).toBe("deterministic_receipt_fallback");
+    expect(response.body?.terminal_eligible, routeDebug).toBe(false);
+    expect(response.body?.assistant_answer, routeDebug).toBe(false);
+    expect(response.body?.terminal_answer_authority, routeDebug).toMatchObject({
+      terminal_artifact_kind: "tool_receipt",
+      final_answer_source: "deterministic_receipt_fallback",
+      server_authoritative: false,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(response.body?.terminal_presentation, routeDebug).toMatchObject({
+      terminal_artifact_kind: "tool_receipt",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
     expect(response.body?.stage_play_checkpoint_queue_completion, routeDebug).toBeFalsy();
     expect(response.body?.stage_play_ask_checkpoint_receipt, routeDebug).toBeFalsy();
     const boundaryReport = evaluateTerminalBoundaryEligibility(response.body as Record<string, unknown>);
@@ -537,7 +539,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(boundaryReport.checks.agent_step_decision).toBe(true);
     expect(boundaryReport.checks.selected_capability_observation).toBe(true);
     expect(boundaryReport.checks.post_observation_model_decision).toBe(true);
-    expect(boundaryReport.eligible).toBe(true);
+    expect(boundaryReport.eligible).toBe(false);
 
     const refreshedGraph = buildStagePlayGraphFromWorld({
       threadId,

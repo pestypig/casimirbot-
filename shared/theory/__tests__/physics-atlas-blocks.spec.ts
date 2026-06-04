@@ -28,6 +28,21 @@ describe("physics atlas blocks", () => {
     expect(byId.get("solar_surface_spectrum")?.primaryBadgeIds).toContain(
       "solar.spectrum.photon_energy",
     );
+    expect(byId.get("solar_surface_spectrum")?.primaryBadgeIds).toContain(
+      "solar.reference.solar_product_registry",
+    );
+    expect(byId.get("solar_surface_spectrum")?.primaryBadgeIds).toContain(
+      "solar.sunquake.flare_coupling_window",
+    );
+    expect(byId.get("solar_surface_spectrum")?.primaryBadgeIds).toContain(
+      "solar.nanoflare.heating_proxy",
+    );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "stellar.structure.hydrostatic_equilibrium",
+    );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "stellar.nucleosynthesis.reaction_network_context",
+    );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
     expect(byId.get("galactic_dynamics")?.primaryBadgeIds).toContain(
       "tidal.love_number.displacement_response",

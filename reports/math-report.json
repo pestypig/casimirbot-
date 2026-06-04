@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T22:54:03.761Z",
+  "generatedAt": "2026-06-04T02:21:52.806Z",
   "registryCount": 124,
   "coverage": {
     "exploratory": {
@@ -148,7 +148,7 @@
     }
   },
   "unstaged": {
-    "count": 14,
+    "count": 15,
     "modules": [
       "modules/gr/gr-diagnostics.ts",
       "modules/warp/warp-metric-adapter.ts",
@@ -159,6 +159,7 @@
       "server/routes/agi.demonstration.ts",
       "server/routes/agi.plan.ancillary.ts",
       "server/routes/agi.refinery.ts",
+      "server/routes/agi.zen-graph.ts",
       "server/services/observability/error-reporter.ts",
       "server/services/observability/event-spine-ring-buffer.ts",
       "server/services/observability/event-spine.ts",
@@ -177,7 +178,8 @@
         "server/routes/agi.contributions.ts",
         "server/routes/agi.demonstration.ts",
         "server/routes/agi.plan.ancillary.ts",
-        "server/routes/agi.refinery.ts"
+        "server/routes/agi.refinery.ts",
+        "server/routes/agi.zen-graph.ts"
       ],
       "exploratory": [
         "server/services/observability/error-reporter.ts",
@@ -244,8 +246,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1569,
-    "edgeCount": 3701
+    "nodeCount": 1835,
+    "edgeCount": 4284
   },
   "evidenceProfiles": [
     {

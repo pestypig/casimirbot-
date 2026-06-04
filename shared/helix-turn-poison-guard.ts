@@ -70,6 +70,7 @@ export type HelixTerminalAuthority = {
     | "answer"
     | "request_user_input"
     | "workspace_action_receipt"
+    | "tool_receipt"
     | "situation_context_pack"
     | "live_answer_environment"
     | "tool_evaluation"
@@ -84,9 +85,12 @@ export type HelixTerminalAuthority = {
     | "selected_final_answer"
     | "request_user_input"
     | "typed_failure"
+    | "tool_receipt"
     | "fallback";
   live_source_authority?: HelixLiveSourceTerminalAuthority | null;
-  server_authoritative: true;
+  server_authoritative: boolean;
+  terminal_eligible?: boolean;
+  assistant_answer?: boolean;
   created_at: string;
 };
 

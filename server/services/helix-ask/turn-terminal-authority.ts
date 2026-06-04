@@ -22,6 +22,9 @@ function inferTerminalKind(input: {
   if (/typed_failure|failure|error/i.test(source) || /typed_failure|failure|error/i.test(artifact)) {
     return "failure";
   }
+  if (/deterministic_receipt_fallback/i.test(source) || artifact === "tool_receipt") {
+    return "tool_receipt";
+  }
   if (/workstation_tool_evaluation|tool_evaluation/i.test(source) || /workstation_tool_evaluation|tool_evaluation/i.test(artifact)) {
     return "tool_evaluation";
   }
@@ -48,6 +51,9 @@ export function buildHelixTurnTerminalAuthority(input: {
   terminal_kind?: HelixTerminalAuthority["terminal_kind"] | null;
   authority_origin?: HelixTerminalAuthority["authority_origin"] | null;
   live_source_authority?: HelixLiveSourceTerminalAuthority | null;
+  server_authoritative?: boolean;
+  terminal_eligible?: boolean;
+  assistant_answer?: boolean;
   created_at?: string;
 }): HelixTerminalAuthority {
   const terminalText = normalizeText(input.terminal_text);
@@ -64,7 +70,9 @@ export function buildHelixTurnTerminalAuthority(input: {
     terminal_text_preview: terminalText,
     authority_origin: input.authority_origin ?? undefined,
     live_source_authority: input.live_source_authority ?? null,
-    server_authoritative: true,
+    server_authoritative: input.server_authoritative ?? true,
+    terminal_eligible: input.terminal_eligible,
+    assistant_answer: input.assistant_answer,
     created_at: input.created_at ?? new Date().toISOString(),
   };
 }

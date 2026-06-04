@@ -32,4 +32,6 @@ Stage Play projection must not update these checkpoint or final-output lanes:
 
 Those lanes require a completed Helix Ask checkpoint and model-reviewed answer snapshot. Projection receipts remain tool evidence and are not assistant answers.
 
+A deterministic receipt fallback may be shown only as a receipt or debug explanation. It must not be promoted to `model_synthesized_answer`, must not satisfy terminal answer authority, and must carry nonterminal receipt metadata such as `server_authoritative:false`, `terminal_eligible:false`, and `assistant_answer:false`.
+
 Projection responses should report checkpoint-only lanes separately as `checkpointOnlySkipped`. They should not count those lanes as projected, and they should not mix them into schema-mismatch `skippedLineKeys`.

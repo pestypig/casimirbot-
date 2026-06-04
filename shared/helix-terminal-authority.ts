@@ -7,6 +7,7 @@ export type HelixTerminalCandidateSource =
   | "workspace_action_receipt"
   | "agent_step_observation_packet"
   | "client_projection"
+  | "deterministic_receipt_fallback"
   | "legacy_fallback"
   | "legacy_workspace_failure";
 
@@ -46,6 +47,7 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "lower_priority_than_selected_artifact"
   | "later_valid_final_answer_draft"
   | "route_requires_synthesis"
+  | "deterministic_receipt_fallback_nonterminal"
   | "coverage_valid_model_only_answer_exists";
 
 export type HelixTerminalAuthoritySingleWriterResult = {
@@ -61,6 +63,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "visual_frame_evidence"
     | "request_user_input"
     | "typed_failure"
+    | "tool_receipt"
     | "direct_answer_text"
     | null;
   visible_text: string;
@@ -74,6 +77,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "visual_frame_evidence"
     | "request_user_input"
     | "typed_failure"
+    | "tool_receipt"
     | "direct_answer_text"
     | "terminal_authority_repair_failure";
   rejected_candidates: Array<{

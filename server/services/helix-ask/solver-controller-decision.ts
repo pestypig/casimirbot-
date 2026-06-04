@@ -36,13 +36,20 @@ const isNonAnswerTerminal = (payload: RecordLike): boolean => {
   const finalStatus = readString(payload.final_status);
   return (
     terminalArtifactKind === "typed_failure" ||
+    (
+      terminalArtifactKind === "tool_receipt" &&
+      finalAnswerSource === "deterministic_receipt_fallback"
+    ) ||
     terminalArtifactKind === "request_user_input" ||
     terminalArtifactKind === "pending_server_request" ||
     finalAnswerSource === "typed_failure" ||
+    finalAnswerSource === "deterministic_receipt_fallback" ||
     finalAnswerSource === "request_user_input" ||
     finalAnswerSource === "pending_server_request" ||
+    responseType === "tool_receipt" ||
     responseType === "final_failure" ||
     responseType === "pending_input" ||
+    finalStatus === "checkpoint_pending" ||
     finalStatus === "final_failure" ||
     finalStatus === "pending_input"
   );
