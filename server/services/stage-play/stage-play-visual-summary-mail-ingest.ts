@@ -190,6 +190,24 @@ export function buildMailLoopTranscriptRows(input: {
       terminalEligible: false,
       createdAt,
     });
+    if (input.decision.requestedTool) {
+      rows.push({
+        rowId: `ask_turn_mail_requested_tool:${hashShort(input.decision.decisionId)}`,
+        rowKind: "requested_tool",
+        title: "Requested tool",
+        body: `${input.decision.requestedTool.toolName}: ${previewText(JSON.stringify(input.decision.requestedTool.args), 180)}`,
+        source: {
+          toolName: "live_env.record_live_source_mail_decision",
+          artifactId: input.decision.decisionId,
+          artifactKind: input.decision.artifactId,
+        },
+        evidenceRefs: input.decision.evidenceRefs,
+        authority: "model_decision_receipt",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt,
+      });
+    }
     if (input.decision.voiceCalloutDraft) {
       rows.push({
         rowId: `ask_turn_mail_voice:${hashShort(input.decision.decisionId)}`,
@@ -250,6 +268,7 @@ export function readLiveSourceMailForAsk(input: {
   roomId?: string | null;
   environmentId?: string | null;
   sourceId?: string | null;
+  sourceKind?: string | null;
   limit?: number;
   includeRead?: boolean;
   voicePolicy?: Partial<StagePlayLiveSourceVoicePolicyV1> | null;
@@ -266,6 +285,7 @@ export function readLiveSourceMailForAsk(input: {
     roomId,
     environmentId: input.environmentId ?? environment?.environment_id ?? null,
     sourceId: input.sourceId ?? null,
+    sourceKind: input.sourceKind ?? null,
     includeDelivered: input.includeRead === true,
     limit,
   });
@@ -353,6 +373,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   voiceCalloutDraft?: string | null;
   voiceEnabled?: boolean | null;
   voiceRequiresConfirmation?: boolean | null;
+  requestedTool?: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null;
   nextLoopState?: StagePlayLiveSourceMailDecisionV1["nextLoopState"] | null;
   evidenceRefs?: string[];
   modelReviewed?: boolean;
@@ -372,6 +393,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     voiceCalloutDraft: input.voiceCalloutDraft ?? null,
     voiceEligible,
     voiceRequiresConfirmation: input.voiceRequiresConfirmation === true,
+    requestedTool: input.requestedTool ?? null,
     nextLoopState: input.nextLoopState ?? (input.decision === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary"),
     evidenceRefs: input.evidenceRefs ?? [],
     modelReviewed: input.modelReviewed !== false,

@@ -7927,7 +7927,7 @@ type HelixContinuousTurnStreamTone =
 
 type HelixContinuousTurnStreamRow = {
   key: string;
-  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "final";
+  source: "question" | "agent_work" | "stage_play" | "live_bridge" | "live_source_mail" | "voice" | "final";
   label: string;
   text: string;
   meta: string;
@@ -7937,6 +7937,39 @@ type HelixContinuousTurnStreamRow = {
   actions?: Array<"Run" | "Skip" | "Pause job">;
   bridgePills?: LiveAnswerTurnBridgePill[];
   detailLimit?: number;
+};
+
+type HelixMailLoopTranscriptRowKind =
+  | "mail_received"
+  | "mail_read_tool_call"
+  | "mail_read_receipt"
+  | "agent_decision"
+  | "text_answer"
+  | "voice_callout_request"
+  | "voice_tool_call"
+  | "wait_for_next_summary"
+  | "requested_tool";
+
+const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowKind>([
+  "mail_received",
+  "mail_read_tool_call",
+  "mail_read_receipt",
+  "agent_decision",
+  "text_answer",
+  "voice_callout_request",
+  "voice_tool_call",
+  "wait_for_next_summary",
+  "requested_tool",
+]);
+
+type HelixMailLoopTranscriptRow = {
+  rowId: string;
+  rowKind: HelixMailLoopTranscriptRowKind;
+  title: string;
+  body: string;
+  evidenceRefs: string[];
+  authority: string;
+  terminalEligible: boolean;
 };
 
 function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
@@ -7963,10 +7996,127 @@ function toneForAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): HelixContin
   return "working";
 }
 
+function readHelixMailLoopTranscriptRow(value: unknown): HelixMailLoopTranscriptRow | null {
+  const record = readAgentLoopAuditRecord(value);
+  const rowKind = coerceText(record?.rowKind).trim() as HelixMailLoopTranscriptRowKind;
+  if (!record || !HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS.has(rowKind)) return null;
+  const rowId = coerceText(record.rowId).trim() || `mail-loop-row:${rowKind}:${clipText(coerceText(record.body), 48)}`;
+  const evidenceRefs = Array.isArray(record.evidenceRefs)
+    ? record.evidenceRefs.map((entry) => coerceText(entry).trim()).filter(Boolean)
+    : [];
+  return {
+    rowId,
+    rowKind,
+    title: coerceText(record.title).trim(),
+    body: coerceText(record.body).trim(),
+    evidenceRefs: Array.from(new Set(evidenceRefs)),
+    authority: coerceText(record.authority).trim(),
+    terminalEligible: record.terminalEligible === true,
+  };
+}
+
+function collectHelixMailLoopTranscriptRowsFromCandidate(value: unknown): HelixMailLoopTranscriptRow[] {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return [];
+  const rows = Array.isArray(record.transcriptRows)
+    ? record.transcriptRows.map(readHelixMailLoopTranscriptRow).filter((row): row is HelixMailLoopTranscriptRow => Boolean(row))
+    : [];
+  const payload = readAgentLoopAuditRecord(record.payload);
+  if (payload) rows.push(...collectHelixMailLoopTranscriptRowsFromCandidate(payload));
+  const observation = readAgentLoopAuditRecord(record.observation);
+  if (observation) rows.push(...collectHelixMailLoopTranscriptRowsFromCandidate(observation));
+  return rows;
+}
+
+function collectHelixMailLoopTranscriptRows(reply: HelixAskReply): HelixMailLoopTranscriptRow[] {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const candidates: unknown[] = [
+    replyRecord,
+    debugRecord,
+    replyRecord?.latest_result_artifact,
+    debugRecord?.latest_result_artifact,
+    replyRecord?.stage_play_live_source_mail,
+    debugRecord?.stage_play_live_source_mail,
+    replyRecord?.live_source_mail_read_result,
+    debugRecord?.live_source_mail_read_result,
+    replyRecord?.live_source_mail_decision,
+    debugRecord?.live_source_mail_decision,
+    ...readAgentLoopAuditArray(replyRecord?.current_turn_artifact_ledger),
+    ...readAgentLoopAuditArray(debugRecord?.current_turn_artifact_ledger),
+    ...readAgentLoopAuditArray(replyRecord?.artifact_ledger),
+    ...readAgentLoopAuditArray(debugRecord?.artifact_ledger),
+  ];
+  const rows = candidates.flatMap(collectHelixMailLoopTranscriptRowsFromCandidate);
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.rowId}:${row.rowKind}:${row.body}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): string {
+  if (row.rowKind === "mail_received") {
+    const preview = row.body.match(/\bPreview:\s*([\s\S]+)/i)?.[1]?.trim();
+    return preview
+      ? `Visual summary received.\nPreview: ${preview}`
+      : row.body || "Visual summary received.";
+  }
+  if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
+  if (row.rowKind === "mail_read_receipt") {
+    const count = row.body.match(/\b(\d+)\s+unread\b/i)?.[1] ?? "1";
+    return `${count} unread visual summary${count === "1" ? "" : " summaries"}.`;
+  }
+  if (row.rowKind === "agent_decision") {
+    const match = row.body.match(/^([^:]+):\s*([\s\S]+)$/);
+    if (match) return `${match[1].trim()}\nReason: ${match[2].trim()}`;
+    return row.body;
+  }
+  if (row.rowKind === "wait_for_next_summary") return "No unread visual summary mail yet.\nWaiting for the next summary.";
+  if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
+  return row.body;
+}
+
+function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): string {
+  if (row.rowKind === "mail_received") return "Observation mail";
+  if (row.rowKind === "mail_read_tool_call") return "Tool call";
+  if (row.rowKind === "mail_read_receipt" || row.rowKind === "wait_for_next_summary") return "Tool receipt";
+  if (row.rowKind === "agent_decision") return "Agent decision";
+  if (row.rowKind === "text_answer" || row.rowKind === "voice_callout_request") return "Text / Callout draft";
+  if (row.rowKind === "voice_tool_call") return "Voice tool call";
+  if (row.rowKind === "requested_tool") return "Requested tool";
+  return row.title || "Live source mail";
+}
+
+function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
+  if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
+  if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary") return "checkpoint";
+  if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
+  if (row.rowKind === "voice_tool_call") return "working";
+  return "working";
+}
+
+function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
+  return mailRows.map((row) => ({
+    key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
+    source: row.rowKind === "voice_tool_call" ? "voice" : "live_source_mail",
+    label: labelForHelixMailLoopTranscriptRow(row),
+    text: formatHelixMailLoopTranscriptBody(row),
+    meta: row.authority || "tool_evidence",
+    status: row.rowKind,
+    tone: toneForHelixMailLoopTranscriptRow(row),
+    evidenceRefs: row.evidenceRefs,
+    detailLimit: row.rowKind === "mail_received" ? 520 : 420,
+  }));
+}
+
 function buildHelixContinuousTurnStreamRows(args: {
   replyId: string;
   question?: string | null;
   turnTranscriptRows: HelixTurnTranscriptRow[];
+  mailLoopRows?: HelixMailLoopTranscriptRow[];
   stagePlayEvents: StagePlayChatLedgerEvent[];
   liveAnswerTurnBridge: LiveAnswerTurnBridgeState | null;
   finalAnswerText: string;
@@ -8002,6 +8152,7 @@ function buildHelixContinuousTurnStreamRows(args: {
         evidenceRefs: [],
       });
     });
+  buildHelixMailLoopTurnStreamRows(args.replyId, args.mailLoopRows ?? []).forEach((row) => rows.push(row));
   args.stagePlayEvents.forEach((event) => {
     rows.push({
       key: `${event.key}-stream`,
@@ -32001,10 +32152,12 @@ export function HelixAskPill({
               stagePlayEvents: stagePlayChatLedgerEvents,
               finalAnswerPresentation,
             });
+            const mailLoopRows = collectHelixMailLoopTranscriptRows(reply);
             const turnStreamRows = buildHelixContinuousTurnStreamRows({
               replyId: reply.id,
               question: reply.question,
               turnTranscriptRows,
+              mailLoopRows,
               stagePlayEvents: stagePlayChatLedgerEvents,
               liveAnswerTurnBridge,
               finalAnswerText: finalAnswerRawText,

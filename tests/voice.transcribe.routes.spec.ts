@@ -191,7 +191,7 @@ describe("voice transcribe route", () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    expect(res.body).toMatchObject({
       ok: true,
       text: "Alpha bubble stable.",
       language: "en",

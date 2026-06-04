@@ -3,6 +3,7 @@ export const PHYSICS_ATLAS_SCHEMA_VERSION = "physics_atlas/v1" as const;
 
 export const PHYSICS_ATLAS_BLOCK_IDS = [
   "stellar_evolution",
+  "astrochemistry_prebiotic",
   "cosmic_distance_ladder",
   "solar_surface_spectrum",
   "casimir_cavity_modes",

@@ -837,6 +837,29 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("async_step_durations");
   });
 
+  it("renders live-source mail loop rows in the continuous Helix Ask transcript", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("collectHelixMailLoopTranscriptRows");
+    expect(source).toContain("buildHelixMailLoopTurnStreamRows");
+    expect(source).toContain("HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS");
+    expect(source).toContain('"mail_received"');
+    expect(source).toContain('"mail_read_tool_call"');
+    expect(source).toContain('"mail_read_receipt"');
+    expect(source).toContain('"agent_decision"');
+    expect(source).toContain('"text_answer"');
+    expect(source).toContain('"voice_callout_request"');
+    expect(source).toContain('"voice_tool_call"');
+    expect(source).toContain('"wait_for_next_summary"');
+    expect(source).toContain("Visual summary received.\\nPreview:");
+    expect(source).toContain("live_env.read_live_source_mail");
+    expect(source).toContain("unread visual summary");
+    expect(source).toContain('count === "1"');
+    expect(source).toContain("Reason:");
+    expect(source).toContain("Text / Callout draft");
+    expect(source).toContain("Voice tool call");
+    expect(source).toContain('source: row.rowKind === "voice_tool_call" ? "voice" : "live_source_mail"');
+  });
+
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {
     const signals = readReasoningTheaterHardFailureSignals(
       {

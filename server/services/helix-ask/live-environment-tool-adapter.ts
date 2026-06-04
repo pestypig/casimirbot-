@@ -90,6 +90,23 @@ const readStringArray = (value: unknown): string[] =>
     ? Array.from(new Set(value.map(readString).filter((entry): entry is string => Boolean(entry))))
     : [];
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readRequestedTool = (
+  value: unknown,
+): Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["requestedTool"] | null => {
+  const record = readRecord(value);
+  const toolName = readString(record?.tool_name) ?? readString(record?.toolName);
+  if (!record || !toolName) return null;
+  return {
+    toolName,
+    args: readRecord(record.args) ?? {},
+  };
+};
+
 const readNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
@@ -948,6 +965,7 @@ export function executeLiveEnvironmentTool(
       roomId,
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       sourceId: explicitSourceId,
+      sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
       limit: readNumber(args.limit, 3),
       includeRead: args.include_read === true || args.includeRead === true,
       voicePolicy: {
@@ -1028,6 +1046,7 @@ export function executeLiveEnvironmentTool(
       voiceCalloutDraft: readString(args.voice_callout_draft) ?? readString(args.voiceCalloutDraft),
       voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
       voiceRequiresConfirmation: args.voice_requires_confirmation === true || args.voiceRequiresConfirmation === true,
+      requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool),
       nextLoopState,
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,

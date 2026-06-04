@@ -23,6 +23,7 @@ import { ethosRouter } from "./routes/ethos";
 import { searchRouter } from "./routes/search";
 import { devTerminalRouter } from "./routes/dev-terminal";
 import { voiceRouter } from "./routes/voice";
+import { runtimeGovernorRouter } from "./routes/runtime-governor";
 import { missionBoardRouter } from "./routes/mission-board";
 import { halobankSolarRouter } from "./routes/halobank-solar";
 import { helixQiRouter } from "./routes/helix/qi";
@@ -202,6 +203,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/search", searchRouter);
   app.use("/api/dev-terminal", devTerminalRouter);
   app.use("/api/voice", voiceRouter);
+  app.use("/api/runtime", runtimeGovernorRouter);
   const { discordLinkRouter } = await import("./routes/discord-link");
   app.use(discordLinkRouter);
   const { accountSessionRouter } = await import("./routes/account-session");

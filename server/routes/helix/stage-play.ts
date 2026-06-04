@@ -220,6 +220,23 @@ const isRetentionPolicy = (value: unknown): value is StagePlayRawSessionBufferRe
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : [];
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readRequestedTool = (
+  value: unknown,
+): Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["requestedTool"] | null => {
+  const record = readRecord(value);
+  const toolName = readQueryString(record?.toolName) ?? readQueryString(record?.tool_name);
+  if (!record || !toolName) return null;
+  return {
+    toolName,
+    args: readRecord(record.args) ?? {},
+  };
+};
+
 const readOptionalNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value)
     ? value
@@ -610,6 +627,7 @@ helixStagePlayRouter.post("/live-source-mail/check", (req: Request, res: Respons
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId),
+      sourceKind: readQueryString(body.sourceKind) ?? readQueryString(body.source_kind) ?? readQueryString(req.query.sourceKind) ?? readQueryString(req.query.source_kind),
       limit: readOptionalNumber(body.limit) ?? readOptionalNumber(req.query.limit) ?? 3,
       includeRead: readOptionalBoolean(body.includeRead ?? body.include_read) ?? false,
       voicePolicy: {
@@ -680,6 +698,7 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
       voiceCalloutDraft: readQueryString(body.voiceCalloutDraft) ?? readQueryString(body.voice_callout_draft),
       voiceEnabled: readOptionalBoolean(body.voiceEnabled ?? body.voice_enabled) ?? false,
       voiceRequiresConfirmation: readOptionalBoolean(body.voiceRequiresConfirmation ?? body.voice_requires_confirmation) ?? false,
+      requestedTool: readRequestedTool(body.requestedTool ?? body.requested_tool),
       nextLoopState: (readQueryString(body.nextLoopState) ?? readQueryString(body.next_loop_state)) as any,
       evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
     });

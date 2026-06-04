@@ -186,6 +186,7 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "mail_read_tool_call"
     | "mail_read_receipt"
     | "agent_decision"
+    | "requested_tool"
     | "wait_for_next_summary"
     | "text_answer"
     | "voice_callout_request"

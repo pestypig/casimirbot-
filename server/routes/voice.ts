@@ -67,50 +67,20 @@ import {
   readVoiceLaneRequestSummary,
   writeVoiceLaneBreadcrumb,
 } from "../services/diagnostics/voice-lane-crash-breadcrumbs";
+import {
+  runtimeMemoryGovernor,
+  type RuntimeAdmissionDecision,
+  type RuntimeTaskLease,
+} from "../services/runtime/runtime-memory-governor";
 
 type VoicePriority = "info" | "warn" | "critical" | "action";
 
 const voiceRouter = Router();
 const OPENAI_AUDIO_UPLOAD_LIMIT_BYTES = 25 * 1024 * 1024;
-const BYTES_PER_MIB = 1024 * 1024;
-const DEFAULT_TRANSCRIBE_MAX_HEAP_USED_MIB = 480;
-const DEFAULT_TRANSCRIBE_MAX_RSS_MIB = 900;
 const voiceUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: OPENAI_AUDIO_UPLOAD_LIMIT_BYTES },
 });
-
-const readPositiveNumberEnv = (name: string, fallback: number): number => {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
-
-const readVoiceTranscribeMemoryPressure = (): null | {
-  reason: "heap_used_limit" | "rss_limit";
-  heapUsedMiB: number;
-  rssMiB: number;
-  maxHeapUsedMiB: number;
-  maxRssMiB: number;
-} => {
-  if (String(process.env.VOICE_TRANSCRIBE_MEMORY_GUARD ?? "1").trim() === "0") return null;
-  const maxHeapUsedMiB = readPositiveNumberEnv(
-    "VOICE_TRANSCRIBE_MAX_HEAP_USED_MB",
-    DEFAULT_TRANSCRIBE_MAX_HEAP_USED_MIB,
-  );
-  const maxRssMiB = readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_RSS_MB", DEFAULT_TRANSCRIBE_MAX_RSS_MIB);
-  const memory = process.memoryUsage();
-  const heapUsedMiB = memory.heapUsed / BYTES_PER_MIB;
-  const rssMiB = memory.rss / BYTES_PER_MIB;
-  if (heapUsedMiB >= maxHeapUsedMiB) {
-    return { reason: "heap_used_limit", heapUsedMiB, rssMiB, maxHeapUsedMiB, maxRssMiB };
-  }
-  if (rssMiB >= maxRssMiB) {
-    return { reason: "rss_limit", heapUsedMiB, rssMiB, maxHeapUsedMiB, maxRssMiB };
-  }
-  return null;
-};
 
 const requestSchema = z.object({
   text: z.string().trim().min(1).max(600),
@@ -289,6 +259,23 @@ const transcribeRequestSchema = z.object({
 });
 
 type VoiceTranscribeRequest = z.infer<typeof transcribeRequestSchema>;
+
+const voiceMemoryPressureDetails = (admission: RuntimeAdmissionDecision): Record<string, unknown> => ({
+  reason: admission.reason,
+  heapUsedMiB: Math.round(admission.memory.heapUsedMiB),
+  rssMiB: Math.round(admission.memory.rssMiB),
+  maxHeapUsedMiB: admission.limits.maxHeapUsedMiB,
+  maxRssMiB: admission.limits.maxRssMiB,
+  pausedTaskCount: admission.pausedTaskCount,
+  activeTaskCount: admission.activeTaskCount,
+});
+
+const releaseVoiceTranscribeLease = (
+  lease: RuntimeTaskLease | undefined,
+  outcome: "completed" | "failed" | "rejected" | "aborted",
+): void => {
+  lease?.release(outcome);
+};
 
 const speakerSessionTrustSchema = z.object({
   session_id: z.string().trim().min(1).max(200).optional(),
@@ -2031,30 +2018,43 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
     contentType: req.headers["content-type"] ?? null,
     contentLength: req.headers["content-length"] ?? null,
   });
+  const admission = runtimeMemoryGovernor.admitRuntimeTask({
+    taskClass: "voice_stt",
+    requestBytes: Number(req.headers["content-length"]) || 0,
+    source: "api.voice.transcribe.pre_upload",
+  });
+  let voiceTranscribeLease = admission.lease;
+  let responseFinished = false;
   res.once("finish", () => {
+    responseFinished = true;
     writeVoiceLaneBreadcrumb("voice.transcribe.response_finished", {
       breadcrumbId,
       statusCode: res.statusCode,
     });
+    releaseVoiceTranscribeLease(
+      voiceTranscribeLease,
+      res.statusCode >= 200 && res.statusCode < 400 ? "completed" : "rejected",
+    );
   });
-  const memoryPressure = readVoiceTranscribeMemoryPressure();
-  if (memoryPressure) {
+  res.once("close", () => {
+    if (!responseFinished) {
+      releaseVoiceTranscribeLease(voiceTranscribeLease, "aborted");
+    }
+  });
+  if (!admission.admitted) {
     writeVoiceLaneBreadcrumb("voice.transcribe.memory_pressure", {
       breadcrumbId,
-      ...memoryPressure,
+      source: "api.voice.transcribe.pre_upload",
+      action: admission.action,
+      pressureLevel: admission.pressureLevel,
+      ...voiceMemoryPressureDetails(admission),
     });
     return errorEnvelope(
       res,
       503,
       "voice_memory_pressure",
       "Voice transcription is temporarily paused because the server is under memory pressure.",
-      {
-        reason: memoryPressure.reason,
-        heapUsedMiB: Math.round(memoryPressure.heapUsedMiB),
-        rssMiB: Math.round(memoryPressure.rssMiB),
-        maxHeapUsedMiB: memoryPressure.maxHeapUsedMiB,
-        maxRssMiB: memoryPressure.maxRssMiB,
-      },
+      voiceMemoryPressureDetails(admission),
       undefined,
     );
   }
@@ -2153,6 +2153,35 @@ voiceRouter.post("/transcribe", (req: Request, res: Response) => {
           backendConfigured: false,
           requiredEnv: ["WHISPER_HTTP_API_KEY|OPENAI_API_KEY", "STT_LOCAL_URL"],
         },
+        parsed.data.traceId,
+      );
+    }
+
+    const burstRecheck = runtimeMemoryGovernor.recheckRuntimeTask(voiceTranscribeLease, {
+      taskClass: "voice_stt",
+      traceId: parsed.data.traceId ?? traceId,
+      actualBytes: file.buffer.length,
+      estimatedExpansionBytes: file.buffer.length * 4,
+      source: "api.voice.transcribe.pre_stt",
+    });
+    voiceTranscribeLease = burstRecheck.lease ?? voiceTranscribeLease;
+    if (!burstRecheck.admitted) {
+      writeVoiceLaneBreadcrumb("voice.transcribe.memory_pressure", {
+        breadcrumbId,
+        traceId: parsed.data.traceId ?? traceId,
+        source: "api.voice.transcribe.pre_stt",
+        action: burstRecheck.action,
+        pressureLevel: burstRecheck.pressureLevel,
+        actualBytes: file.buffer.length,
+        estimatedExpansionBytes: file.buffer.length * 4,
+        ...voiceMemoryPressureDetails(burstRecheck),
+      });
+      return errorEnvelope(
+        res,
+        503,
+        "voice_memory_pressure",
+        "Voice transcription is temporarily paused because the server is under memory pressure.",
+        voiceMemoryPressureDetails(burstRecheck),
         parsed.data.traceId,
       );
     }

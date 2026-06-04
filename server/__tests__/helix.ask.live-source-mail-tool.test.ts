@@ -82,21 +82,24 @@ describe("live-source mail live environment tools", () => {
     ]));
   });
 
-  it("reads latest visual summary mail as evidence and requires a follow-up model decision", () => {
+  it.each(["live_env.check_live_source_mail", "live_env.read_live_source_mail"] as const)(
+    "reads latest visual summary mail as evidence through %s and requires a follow-up model decision",
+    (toolName) => {
     seedVisualSummary();
 
     const observation = executeLiveEnvironmentTool({
-      tool_name: "live_env.check_live_source_mail",
+      tool_name: toolName,
       thread_id: threadId,
       args: {
         room_id: roomId,
         source_id: sourceId,
+        source_kind: "visual_frame",
       },
     });
 
     expect(observation).toMatchObject({
       schema: "helix.live_environment_tool_observation.v1",
-      tool_name: "live_env.check_live_source_mail",
+      tool_name: toolName,
       ok: true,
       assistant_answer: false,
       raw_content_included: false,
@@ -190,5 +193,52 @@ describe("live-source mail live environment tools", () => {
       "loop_state",
     ]));
     expect(payload.transcriptRows.find((row: any) => row.rowKind === "text_answer").terminalEligible).toBe(false);
+  });
+
+  it("records requested_tool from the decision tool as the next requested action", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const mailId = (readObservation.observation as any).items[0].mailId;
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        decision: "request_more_evidence",
+        rationale_preview: "Need the next compact visual summary before answering.",
+        requested_tool: {
+          tool_name: "live_env.read_live_source_mail",
+          args: {
+            source_kind: "visual_frame",
+            limit: 1,
+          },
+        },
+      },
+    });
+
+    const payload = decisionObservation.observation as any;
+    expect(payload.requestedTool).toEqual({
+      toolName: "live_env.read_live_source_mail",
+      args: {
+        source_kind: "visual_frame",
+        limit: 1,
+      },
+    });
+    expect(payload.transcriptRows.map((row: any) => row.rowKind)).toEqual(expect.arrayContaining([
+      "agent_decision",
+      "requested_tool",
+      "loop_state",
+    ]));
+    expect(payload.transcriptRows.find((row: any) => row.rowKind === "requested_tool").terminalEligible).toBe(false);
   });
 });

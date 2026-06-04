@@ -89,6 +89,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   deterministicChangeHint?: StagePlayLiveSourceMailItemV1["hints"]["deterministicChangeHint"];
   sourceFreshness?: StagePlayLiveSourceMailItemV1["hints"]["sourceFreshness"];
   evidenceRefs?: string[];
+  supersedesMailIds?: string[];
   createdAt?: string;
 }): StagePlayLiveSourceMailItemV1 {
   const evidenceRefs = uniqueStrings([
@@ -165,6 +166,9 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     raw_content_included: false,
   };
   mailById.set(mail.mailId, mail);
+  for (const superseded of input.supersedesMailIds ?? []) {
+    updateMailStatus(superseded, "superseded", createdAt);
+  }
   trimThreadMail(input.threadId);
   upsertStagePlayLiveSourceJobState({
     threadId: input.threadId,
@@ -188,6 +192,7 @@ export function listStagePlayLiveSourceMailItems(input: {
   roomId?: string | null;
   environmentId?: string | null;
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   status?: StagePlayLiveSourceMailStatusV1 | null;
   limit?: number;
 } = {}): StagePlayLiveSourceMailItemV1[] {
@@ -198,6 +203,7 @@ export function listStagePlayLiveSourceMailItems(input: {
       if (input.roomId && item.roomId !== input.roomId) return false;
       if (input.environmentId && item.environmentId !== input.environmentId) return false;
       if (input.sourceId && item.sourceId !== input.sourceId) return false;
+      if (input.sourceKind && item.sourceKind !== input.sourceKind) return false;
       if (input.status && item.status !== input.status) return false;
       return true;
     })
@@ -210,6 +216,7 @@ export function listUnreadStagePlayLiveSourceMailItems(input: {
   roomId?: string | null;
   environmentId?: string | null;
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   includeDelivered?: boolean;
   limit?: number;
 }): StagePlayLiveSourceMailItemV1[] {

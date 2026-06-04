@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PhysicsAtlasBlockV1 } from "../../contracts/physics-atlas.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
 import { buildHelixPhysicsAtlasV1 } from "../physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "../physics-atlas-lens";
@@ -19,6 +20,10 @@ describe("physics atlas lens", () => {
     expect(lens.dimmedBadgeIds.length).toBeGreaterThan(0);
     expect(lens.dimmedBadgeIds.every((badgeId: string) => !lens.highlightedBadgeIds.includes(badgeId))).toBe(true);
     expect(lens.suggestedViewport.centerBadgeId).toBe("solar.spectrum.photon_energy");
-    expect(lens.calculatorExamples.some((example) => example.expression === "E = h*c/lambda")).toBe(true);
+    expect(
+      lens.calculatorExamples.some(
+        (example: PhysicsAtlasBlockV1["calculatorExamples"][number]) => example.expression === "E = h*c/lambda",
+      ),
+    ).toBe(true);
   });
 });

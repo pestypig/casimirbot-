@@ -12,6 +12,7 @@ describe("physics atlas blocks", () => {
 
     expect(blocks.map((block: PhysicsAtlasBlockV1) => block.glyph)).toEqual([
       "★",
+      "C",
       "z",
       "☀",
       "▣",
@@ -42,6 +43,19 @@ describe("physics atlas blocks", () => {
     );
     expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
       "stellar.nucleosynthesis.reaction_network_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.status).toBe("seed");
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "astrochemistry.fullerene.c60_stellar_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "prebiotic.aromatic_ring.coupled_oscillator_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "biophysics.membrane.open_system_entropy_flow",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.claimBoundaryBadgeIds).toContain(
+      "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
     expect(byId.get("galactic_dynamics")?.primaryBadgeIds).toContain(

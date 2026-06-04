@@ -27,6 +27,18 @@ STT runtime policy controls:
 - `WHISPER_HTTP_MODEL`: default `gpt-4o-mini-transcribe`
 - STT auth key precedence: `WHISPER_HTTP_API_KEY -> OPENAI_API_KEY -> LLM_HTTP_API_KEY`
 
+Runtime memory admission controls:
+- `VOICE_TRANSCRIBE_MEMORY_GUARD`: `0` disables voice STT memory admission.
+- `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold, default `480`.
+- `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold, default `900`.
+- `RUNTIME_MEMORY_GUARD`: `0` disables generic runtime memory admission.
+- `RUNTIME_MEMORY_MAX_HEAP_USED_MB`: generic heap threshold, default `520`.
+- `RUNTIME_MEMORY_MAX_RSS_MB`: generic RSS threshold, default `950`.
+- `RUNTIME_MEMORY_RESUME_HEAP_USED_MB`: resume threshold for paused work; defaults to 85% of max.
+- `RUNTIME_MEMORY_RESUME_RSS_MB`: resume threshold for paused work; defaults to 85% of max.
+- `RUNTIME_MEMORY_HOST_FREE_RATIO_MIN`: host free-memory ratio floor, default `0.08`.
+- `RUNTIME_MEMORY_STATUS_ENABLED`: `0` disables `/api/runtime/memory`.
+
 ## Request body
 ```json
 {
@@ -94,11 +106,40 @@ Stable error codes:
 - `voice_unavailable`
 - `voice_invalid_request`
 - `voice_consent_required`
+- `voice_memory_pressure`
 - `voice_rate_limited`
 - `voice_queue_full`
 - `voice_backend_timeout`
 - `voice_backend_error`
 
+`voice_memory_pressure` means the runtime memory governor refused a voice STT
+burst to protect the main Ask/Express server. It does not mean the user's audio
+was invalid. The route checks memory before accepting multipart audio and again
+before STT, where buffer expansion such as base64/data-URI conversion can
+increase temporary memory use.
+
+Example memory-pressure envelope:
+```json
+{
+  "error": "voice_memory_pressure",
+  "message": "Voice transcription is temporarily paused because the server is under memory pressure.",
+  "details": {
+    "reason": "heap_used_limit",
+    "heapUsedMiB": 500,
+    "rssMiB": 1030,
+    "maxHeapUsedMiB": 480,
+    "maxRssMiB": 900,
+    "pausedTaskCount": 0,
+    "activeTaskCount": 0
+  }
+}
+```
+
+Runtime memory status is available at `GET /api/runtime/memory` when enabled.
+The status response exposes process memory, host free-memory ratio, active
+runtime task leases, paused task identifiers, recent admission decisions, and
+limits. It must not expose transcript text, prompts, audio, API keys, or raw
+request bodies.
 
 ## Ownership-first routing policy (mission callouts)
 - Mission-critical callouts (`priority=critical|action` or explicit mission/go-board events) must route through the local ownership path first.
