@@ -1,7 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { extractCalculatorExpression, planWorkstationToolUse } from "../services/helix-ask/workstation-tool-planner";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  classifyVoiceContextRequest,
+  extractCalculatorExpression,
+  planWorkstationToolUse,
+} from "../services/helix-ask/workstation-tool-planner";
+import {
+  clearVoiceInterpretationContextsForTest,
+  getActiveVoiceInterpretationContextDebugSummary,
+  upsertVoiceInterpretationContext,
+} from "../services/voice/voice-interpretation-context-store";
 
 describe("Helix Ask workstation tool planner", () => {
+  beforeEach(() => {
+    clearVoiceInterpretationContextsForTest();
+  });
+
   it("routes equation verification to scientific calculator solve-with-steps", () => {
     const plan = planWorkstationToolUse("Check this equation with the scientific calculator: x^2 - 4 = 0");
 
@@ -703,12 +716,102 @@ describe("Helix Ask workstation tool planner", () => {
 
     expect(plan.intent).toBe("dottie_observer");
     expect(plan.should_use_tool).toBe(true);
-    expect(plan.missing_required_args).toContain("source_event_id");
+    expect(plan.missing_required_args).toContain("answer_snapshot.latest_or_selected_text_ref_or_source_event_id");
     expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toContain(
       "situation-room-pipelines.voice_delivery.propose_from_trace",
     );
     expect(plan.action).toBeNull();
     expect(plan.scores.some((score) => score.action_id === "voice_delivery.propose_from_trace")).toBe(true);
+  });
+
+  it("accepts answer snapshot refs as Dottie delivery sources without speaking pre-solver", () => {
+    const plan = planWorkstationToolUse(
+      "Have Dottie read answer_snapshot.latest out loud.",
+      { threadId: "thread:dottie-voice", turnId: "turn:dottie-voice" },
+    );
+
+    expect(classifyVoiceContextRequest("Have Dottie read answer_snapshot.latest out loud.")).toBe("delivery_requested");
+    expect(plan.intent).toBe("dottie_observer");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    const voiceStep = plan.tool_plan?.steps.find((step) => step.action_id === "voice_delivery.propose_from_trace");
+    expect(voiceStep?.args).toEqual(expect.objectContaining({
+      source_event_id: "answer_snapshot.latest",
+      voice_mode: "voice_on_confirm",
+    }));
+  });
+
+  it("keeps Dottie style and post-solver voice requests out of delivery routing", () => {
+    const stylePlan = planWorkstationToolUse(
+      "Answer like Auntie Dottie.",
+      { threadId: "thread:voice-context", turnId: "turn:voice-context" },
+    );
+    const styleContext = getActiveVoiceInterpretationContextDebugSummary("thread:voice-context");
+    expect(classifyVoiceContextRequest("Answer like Auntie Dottie.")).toBe("style_context_only");
+    expect(stylePlan.intent).toBe("direct_answer");
+    expect(stylePlan.should_use_tool).toBe(false);
+    expect(stylePlan.tool_plan).toBeNull();
+    expect(styleContext).toMatchObject({
+      persona_profile: "auntie_dottie",
+      output_mode: "manual_read_style",
+      speak_policy: "muted",
+      salience_policy: "manual_only",
+      assistant_answer: false,
+      raw_content_included: false,
+      output_authority: "steering_context",
+      instruction_authority: "none",
+      context_role: "tool_evidence",
+    });
+
+    const mutedPlan = planWorkstationToolUse(
+      "Answer like Auntie Dottie, but do not read anything out loud.",
+      { threadId: "thread:voice-context" },
+    );
+    expect(classifyVoiceContextRequest("Answer like Auntie Dottie, but do not read anything out loud.")).toBe("voice_disabled_or_forbidden");
+    expect(mutedPlan.intent).toBe("direct_answer");
+    expect(mutedPlan.should_use_tool).toBe(false);
+    expect(getActiveVoiceInterpretationContextDebugSummary("thread:voice-context")).toBeNull();
+
+    const postSolver = planWorkstationToolUse(
+      "Read the disclaimer out loud as Dottie.",
+      { threadId: "thread:voice-lane", turnId: "turn:voice-lane" },
+    );
+    expect(classifyVoiceContextRequest("Read the disclaimer out loud as Dottie.")).toBe("post_solver_voice_lane_requested");
+    expect(postSolver.intent).toBe("direct_answer");
+    expect(postSolver.should_use_tool).toBe(false);
+    expect(postSolver.missing_required_args).toEqual(["answer_snapshot"]);
+    expect(getActiveVoiceInterpretationContextDebugSummary("thread:voice-lane")).toMatchObject({
+      scope: "turn",
+      persona_profile: "auntie_dottie",
+      interpretation_job: "caveat_reader",
+      output_mode: "voice_lane_only",
+      speak_policy: "confirm_required",
+      salience_policy: "caveats_only",
+      certainty_ceiling: "source_answer_snapshot",
+      applies_until: "turn_end",
+      evidence_refs: ["answer_snapshot:pending"],
+      reason_codes: ["post_solver_voice_lane_requested"],
+      assistant_answer: false,
+    });
+  });
+
+  it("keeps historical and conceptual Dottie voice mentions as direct answers", () => {
+    upsertVoiceInterpretationContext({
+      thread_id: "thread:historical",
+      persona_profile: "auntie_dottie",
+      reason_codes: ["existing_context"],
+    });
+    for (const prompt of [
+      "Earlier you mentioned Dottie voice. What did you mean?",
+      "What is the Dottie voice policy?",
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:historical" });
+      expect(classifyVoiceContextRequest(prompt)).toBe("historical_or_conceptual_mention");
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+    }
+    expect(getActiveVoiceInterpretationContextDebugSummary("thread:historical")?.reason_codes).toEqual(["existing_context"]);
   });
 
   it("does not turn contextual Dottie debugging into observer actions", () => {

@@ -17,6 +17,10 @@ import {
   inferHelixDimensionForUnit,
   inferHelixQuantityForUnit,
 } from "../../../shared/helix-physical-units";
+import {
+  cancelVoiceInterpretationContext,
+  upsertVoiceInterpretationContext,
+} from "../voice/voice-interpretation-context-store";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -33,6 +37,15 @@ export type WorkstationToolIntent =
   | "physics_calculation_context"
   | "zen_graph_reflection"
   | "direct_answer";
+
+export type VoiceContextRequestKind =
+  | "none"
+  | "historical_or_conceptual_mention"
+  | "chat_scoped_voice_context"
+  | "style_context_only"
+  | "post_solver_voice_lane_requested"
+  | "delivery_requested"
+  | "voice_disabled_or_forbidden";
 
 export type WorkstationToolPlannerAction = {
   panel_id: string;
@@ -553,6 +566,14 @@ function extractDottieSourceEventId(prompt: string): string | null {
   );
 }
 
+function extractDottieAnswerSnapshotRef(prompt: string): string | null {
+  return (
+    (/\banswer_snapshot\.latest\b/i.test(prompt) ? "answer_snapshot.latest" : null) ??
+    extractNamedArg(prompt, ["selected_text_ref", "selected text ref", "selectedTextRef"]) ??
+    extractNamedArg(prompt, ["answer_snapshot", "answer snapshot", "answerSnapshot"])
+  );
+}
+
 function extractDottieObserverProfile(prompt: string): string {
   const explicit = extractNamedArg(prompt, ["observer_profile", "observer profile", "profile"]);
   if (explicit) return explicit;
@@ -585,7 +606,115 @@ function extractDottieSourceText(prompt: string): string | null {
   return stripOuterPunctuation(clipped);
 }
 
+export function classifyVoiceContextRequest(prompt: string): VoiceContextRequestKind {
+  const normalized = normalizePrompt(prompt);
+  const mentionsDottie = /\b(?:auntie\s+dottie|dottie)\b/i.test(normalized);
+  const mentionsVoice = /\b(?:voice|read\s+aloud|read\s+out\s+loud|out\s*loud|outloud|aloud|speak|say|narrate)\b/i.test(normalized);
+  if (!mentionsDottie && !mentionsVoice) return "none";
+
+  if (/\b(?:operator\s+command|run\s+panel\s+action|voice_delivery\.propose_from_trace)\b/i.test(normalized)) {
+    return "delivery_requested";
+  }
+  if (/\b(?:do\s+not|don't|dont|stop|disable|mute|turn\s+off|without)\b[\s\S]{0,80}\b(?:auntie\s+dottie|dottie|voice|speak|read|narrate)\b/i.test(normalized)) {
+    return "voice_disabled_or_forbidden";
+  }
+  if (/\b(?:earlier|previously|before|last\s+time|you\s+mentioned|we\s+mentioned)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie|voice)\b/i.test(normalized)) {
+    return "historical_or_conceptual_mention";
+  }
+  if (/\bwhat\s+is\b[\s\S]{0,80}\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,80}\b(?:voice\s+policy|policy|style|mode)\b/i.test(normalized)) {
+    return "historical_or_conceptual_mention";
+  }
+  if (/\b(?:answer|respond|talk|write)\s+(?:like|as)\s+(?:auntie\s+dottie|dottie)\b/i.test(normalized)) {
+    return "style_context_only";
+  }
+  if (/\b(?:use|set|make|keep)\b[\s\S]{0,80}\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,80}\b(?:style|persona|tone|voice)\b/i.test(normalized)) {
+    return "chat_scoped_voice_context";
+  }
+  if (/\b(?:read|speak|say|narrate)\b[\s\S]{0,80}\b(?:disclaimer|caveat|warning|status|ready|summary)\b[\s\S]{0,100}\b(?:out\s*loud|outloud|aloud|as\s+(?:auntie\s+dottie|dottie)|with\s+(?:auntie\s+dottie|dottie))\b/i.test(normalized)) {
+    return "post_solver_voice_lane_requested";
+  }
+  if (
+    /\b(?:have|ask|tell)\s+(?:auntie\s+)?dottie\b[\s\S]{0,120}\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|out\s*loud|outloud|aloud|to\s+me|answer_snapshot\.latest|selected_text_ref)\b/i.test(normalized) ||
+    /\b(?:auntie\s+dottie|dottie)\b[\s\S]{0,120}\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|out\s*loud|outloud|aloud|to\s+me|answer_snapshot\.latest|selected_text_ref)\b/i.test(normalized) ||
+    /\b(?:read|speak|say|narrate|voice)\b[\s\S]{0,100}\b(?:that|this|it|answer_snapshot\.latest|selected_text_ref|out\s*loud|outloud|aloud|to\s+me)\b[\s\S]{0,120}\b(?:auntie\s+dottie|dottie)\b/i.test(normalized)
+  ) {
+    return "delivery_requested";
+  }
+  return mentionsVoice ? "historical_or_conceptual_mention" : "none";
+}
+
+function applyVoiceInterpretationContextRequest(
+  prompt: string,
+  kind: VoiceContextRequestKind,
+  options: PlanWorkstationToolUseOptions,
+): void {
+  if (
+    kind !== "chat_scoped_voice_context" &&
+    kind !== "style_context_only" &&
+    kind !== "post_solver_voice_lane_requested" &&
+    kind !== "voice_disabled_or_forbidden"
+  ) {
+    return;
+  }
+
+  const threadId = options.threadId ?? "helix-ask:desktop";
+  if (kind === "voice_disabled_or_forbidden") {
+    cancelVoiceInterpretationContext(threadId);
+    return;
+  }
+
+  const personaProfile = /\bauntie\s+dottie\b/i.test(prompt)
+    ? "auntie_dottie"
+    : /\bdottie\b/i.test(prompt)
+      ? "auntie_dottie"
+      : "operator_neutral";
+  const reasonCodes =
+    kind === "post_solver_voice_lane_requested"
+      ? ["post_solver_voice_lane_requested"]
+      : kind === "style_context_only"
+        ? ["style_context_only"]
+        : ["chat_scoped_voice_context"];
+
+  upsertVoiceInterpretationContext({
+    thread_id: threadId,
+    turn_id: options.turnId ?? null,
+    scope: kind === "post_solver_voice_lane_requested" ? "turn" : "chat_session",
+    persona_profile: personaProfile,
+    interpretation_job:
+      kind === "post_solver_voice_lane_requested"
+        ? /\b(?:disclaimer|caveat)\b/i.test(prompt)
+          ? "caveat_reader"
+          : "status_callout"
+        : "manual_read_style",
+    output_mode: kind === "style_context_only" ? "manual_read_style" : "voice_lane_only",
+    salience_policy:
+      kind === "post_solver_voice_lane_requested"
+        ? /\b(?:warning|blocker|blocked|risk)\b/i.test(prompt)
+          ? "warnings_and_blockers"
+          : /\b(?:status|ready)\b/i.test(prompt)
+            ? "state_changes_only"
+            : "caveats_only"
+        : "manual_only",
+    speak_policy: kind === "post_solver_voice_lane_requested" ? "confirm_required" : "muted",
+    max_chars: extractDottieMaxChars(prompt) ?? 180,
+    certainty_ceiling: "source_answer_snapshot",
+    applies_until: kind === "post_solver_voice_lane_requested" ? "turn_end" : "explicit_cancel",
+    evidence_refs: kind === "post_solver_voice_lane_requested" ? ["answer_snapshot:pending"] : [],
+    reason_codes: reasonCodes,
+  });
+}
+
 function isDottieObserverToolPrompt(prompt: string): boolean {
+  const voiceContextKind = classifyVoiceContextRequest(prompt);
+  if (
+    voiceContextKind === "historical_or_conceptual_mention" ||
+    voiceContextKind === "chat_scoped_voice_context" ||
+    voiceContextKind === "style_context_only" ||
+    voiceContextKind === "post_solver_voice_lane_requested" ||
+    voiceContextKind === "voice_disabled_or_forbidden"
+  ) {
+    return false;
+  }
   const mentionsDottie =
     /\b(?:auntie\s+dottie|dottie)\b/i.test(prompt) ||
     /\bsituation-room-pipelines\.(?:observer|voice_delivery|dottie)\./i.test(prompt) ||
@@ -1005,10 +1134,37 @@ export function planWorkstationToolUse(
     return buildMinecraftLiveContinuationPlan(normalized, options, scores);
   }
 
+  const voiceContextKind = classifyVoiceContextRequest(normalized);
+  if (
+    voiceContextKind === "historical_or_conceptual_mention" ||
+    voiceContextKind === "chat_scoped_voice_context" ||
+    voiceContextKind === "style_context_only" ||
+    voiceContextKind === "post_solver_voice_lane_requested" ||
+    voiceContextKind === "voice_disabled_or_forbidden"
+  ) {
+    applyVoiceInterpretationContextRequest(normalized, voiceContextKind, options);
+    return {
+      intent: "direct_answer",
+      action: null,
+      tool_plan: null,
+      scores,
+      should_use_tool: false,
+      reason:
+        voiceContextKind === "post_solver_voice_lane_requested"
+          ? "Prompt requests a post-solver voice lane; no speech delivery is eligible before an answer snapshot exists."
+          : voiceContextKind === "voice_disabled_or_forbidden"
+            ? "Prompt disables or forbids voice; do not route to Dottie delivery."
+            : "Prompt mentions Dottie or voice as context/style/history, not as an affirmative delivery command.",
+      missing_required_args: voiceContextKind === "post_solver_voice_lane_requested" ? ["answer_snapshot"] : [],
+    };
+  }
+
   if (isDottieObserverToolPrompt(normalized)) {
     const targetRunId = extractDottieTargetRunId(normalized);
     const targetTurnId = extractDottieTargetTurnId(normalized);
     const sourceEventId = extractDottieSourceEventId(normalized);
+    const answerSnapshotRef = extractDottieAnswerSnapshotRef(normalized);
+    const sourceRef = sourceEventId ?? answerSnapshotRef;
     const sourceText = extractDottieSourceText(normalized);
     const observerProfile = extractDottieObserverProfile(normalized);
     const voiceMode = extractDottieVoiceMode(normalized);
@@ -1024,7 +1180,7 @@ export function planWorkstationToolUse(
       /\bthen\s+(?:query|show|list)\b/i.test(normalized);
     const missing = Array.from(new Set([
       ...(!wantsManifest && wantsAttach && !targetRunId ? ["target_run_id"] : []),
-      ...(!wantsManifest && wantsVoiceProposal && !sourceEventId ? ["source_event_id"] : []),
+      ...(!wantsManifest && wantsVoiceProposal && !sourceRef ? ["answer_snapshot.latest_or_selected_text_ref_or_source_event_id"] : []),
     ]));
     const observerArgs = {
       ...(targetRunId ? { target_run_id: targetRunId } : {}),
@@ -1035,7 +1191,7 @@ export function planWorkstationToolUse(
       thread_id: options.threadId ?? "helix-ask:desktop",
     };
     const voiceArgs = {
-      ...(sourceEventId ? { source_event_id: sourceEventId } : {}),
+      ...(sourceRef ? { source_event_id: sourceRef } : {}),
       ...(sourceText ? { source_text: sourceText } : {}),
       source_event_schema: "helix.agent_commentary.v1",
       observer_id: targetRunId ? `observer:dottie:${targetRunId.replace(/[^a-z0-9_-]+/gi, "_")}` : "observer:dottie:unassigned",
