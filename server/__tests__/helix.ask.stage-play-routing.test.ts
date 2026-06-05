@@ -241,6 +241,8 @@ describe("Helix Ask Stage Play routing", () => {
   it("configures visual watch-job policy without reading mail when the user gives a standing watch objective", async () => {
     const question = "Watch the active visual source and describe each new mail batch in one sentence.";
     const expectedObjective = "Watch the active visual source and describe each new visual-summary mail batch in one sentence.";
+    process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
+      "The active visual live-source mailbox has been checked, and there are currently no new mail batches to describe.";
 
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -348,6 +350,10 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
     expect(response.body?.answer, routeDebug).not.toContain("latest unread source update");
     expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).toContain(expectedObjective);
+    expect(response.body?.answer, routeDebug).not.toContain("mailbox has been checked");
+    expect(response.body?.answer, routeDebug).not.toContain("no new mail batches");
 
     const debugExport = await request(createApp())
       .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)

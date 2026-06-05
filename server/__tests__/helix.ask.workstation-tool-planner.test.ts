@@ -495,7 +495,7 @@ describe("Helix Ask workstation tool planner", () => {
 
   it("plans a Theory-Zen bridge before standalone ZenGraph or theory reflection", () => {
     const plan = planWorkstationToolUse(
-      "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.",
+      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.",
     );
 
     expect(plan.intent).toBe("theory_ideology_bridge_reflection");
@@ -522,7 +522,7 @@ describe("Helix Ask workstation tool planner", () => {
         },
         args: expect.objectContaining({
           prompt:
-            "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.",
+            "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.",
           refs: ["helix-ask:current-turn"],
           theory_reflection_ref: "step:reflect_theory_context",
           ideology_reflection_ref: "step:reflect_zen_graph_context",

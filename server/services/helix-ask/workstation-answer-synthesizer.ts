@@ -11,6 +11,7 @@ export type SynthesizeWorkstationAnswerInput = {
   evaluation?: HelixWorkstationToolEvaluation | null;
   postToolSynthesisPlan?: HelixPostToolSynthesisPlanV1 | null;
   zenGraphReflectionToolOutput?: unknown;
+  theoryIdeologyBridgeToolOutput?: unknown;
 };
 
 export type CalculatorObservation = {
@@ -299,6 +300,51 @@ function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstation
   return appendAskToolTraceDisclosureNote(calculatorAnswer, buildAskToolTraceDisclosure({ plan: input.plan }));
 }
 
+function synthesizeTheoryIdeologyBridgeAnswer(
+  input: SynthesizeWorkstationAnswerInput,
+): string {
+  const output =
+    input.theoryIdeologyBridgeToolOutput &&
+    typeof input.theoryIdeologyBridgeToolOutput === "object" &&
+    !Array.isArray(input.theoryIdeologyBridgeToolOutput)
+      ? (input.theoryIdeologyBridgeToolOutput as Record<string, unknown>)
+      : null;
+
+  const bridge =
+    output?.bridge && typeof output.bridge === "object" && !Array.isArray(output.bridge)
+      ? (output.bridge as Record<string, unknown>)
+      : null;
+
+  const links = Array.isArray(bridge?.links) ? bridge.links : [];
+  const missingEvidence = Array.isArray(bridge?.missingEvidence)
+    ? bridge.missingEvidence.map(String)
+    : [];
+
+  const renderedLinks = links
+    .map((entry) => (entry && typeof entry === "object" ? entry as Record<string, unknown> : null))
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((entry) => {
+      const relation = String(entry.relation ?? "constrains");
+      const effect = String(
+        entry.proceduralEffect ?? entry.explanation ?? "Use as evidence-only procedural context.",
+      );
+      return `- ${relation}: ${effect}`;
+    });
+
+  return [
+    "I treated the theory side as observable/mathematical constraint evidence and the Zen side as procedural justice evidence.",
+    renderedLinks.length
+      ? ["Bridge links:", ...renderedLinks].join("\n")
+      : "Bridge links: the bridge receipt did not expose named links, so the safe posture is to preserve uncertainty and ask for missing evidence.",
+    missingEvidence.length
+      ? `Missing checks: ${missingEvidence.join(", ")}.`
+      : "Missing checks: none reported by the bridge receipt.",
+    "Boundary: physics, conservation, entropy, and self-organization can constrain how we reason about fairness, but they do not prove moral certainty or authorize execution.",
+    "Procedural posture: use the bridge to ask better questions, calibrate claim strength, preserve contestability, and route high-impact uncertainty toward review.",
+  ].join("\n");
+}
+
 function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerInput): string {
   const summary = input.evaluation?.summary?.trim();
   const toolOutput =
@@ -435,6 +481,9 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   }
   if (input.plan.intent === "theory_context_reflection") {
     return synthesizeTheoryContextReflectionAnswer(input);
+  }
+  if (input.plan.intent === "theory_ideology_bridge_reflection") {
+    return synthesizeTheoryIdeologyBridgeAnswer(input);
   }
   if (input.plan.intent === "zen_graph_reflection") {
     return synthesizeZenGraphReflectionAnswer(input);

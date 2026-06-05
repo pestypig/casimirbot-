@@ -268,13 +268,14 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
     const issues = validateTheoryIdeologyBridgeToolResult(bridgeArtifact);
     if (!ok) {
       result = "insufficient";
-      summary = getString(receipt.message) ?? "Theory-Zen bridge tool did not produce a usable receipt.";
+      summary = getString(receipt.message) ?? "Theory/Zen bridge did not produce a usable receipt.";
     } else if (issues.length > 0) {
       result = "insufficient";
-      summary = `Theory-Zen bridge rejected as policy evidence: ${issues.join(", ")}.`;
+      summary = `Theory/Zen bridge rejected as policy evidence: ${issues.join(", ")}.`;
     } else {
       result = "supports_subgoal";
-      summary = "Theory-Zen bridge produced evidence-only procedural links, missing-evidence checks, and overclaim guards.";
+      summary =
+        "Theory/Zen bridge produced evidence-only procedural constraints, analogy boundaries, missing checks, and overclaim guards.";
     }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";

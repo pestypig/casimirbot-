@@ -180,6 +180,33 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
     });
   });
 
+  it("maps feedback loops and self-organization to feedback-loop hygiene", () => {
+    const bridge = buildTheoryIdeologyBridgeFromReflections({
+      generatedAt,
+      bridgeId: "theory-ideology-bridge:feedback",
+      prompt: "Self-organization and feedback loop risk should inform review posture.",
+      theoryReflection: baseTheoryReflection(
+        "feedback loop self_organization self-organization",
+        "theory.feedback-loop",
+        "Feedback Loop",
+      ),
+      ideologyReflection: baseIdeologyReflection(
+        "feedback-loop-hygiene",
+        "Feedback Loop Hygiene",
+      ),
+    });
+
+    expect(validateTheoryIdeologyBridgeV1(bridge)).toEqual([]);
+    expect(bridge.links[0]).toMatchObject({
+      relation: "constrains",
+      theoryBadgeIds: ["theory.feedback-loop", "claim_boundary:1"],
+      ideologyNodeIds: ["feedback-loop-hygiene"],
+    });
+    expect(bridge.links[0].proceduralEffect).toContain(
+      "Prevent self-confirming evidence loops",
+    );
+  });
+
   it("can emit an ideology-side link while marking missing theory evidence", () => {
     const bridge = buildTheoryIdeologyBridgeFromReflections({
       generatedAt,

@@ -114,6 +114,8 @@ describe("Helix Ask Theory-Zen bridge tool", () => {
     });
 
     expect(validateTheoryIdeologyBridgeV1(output.bridge)).toEqual([]);
+    expect(output.bridge.artifactId).toBe("theory_ideology_bridge");
+    expect(output.bridge.schemaVersion).toBe("theory_ideology_bridge/v1");
     expect(output.bridge.links.map((link) => link.relation)).toEqual(
       expect.arrayContaining(["constrains", "analogy_only"]),
     );
@@ -152,6 +154,25 @@ describe("Helix Ask Theory-Zen bridge tool", () => {
     ).rejects.toThrow(/invalid_ideology_reflection/);
   });
 
+  it("keeps forbidden physics-as-morality claims invalid", async () => {
+    const output = await runHelixAskTheoryIdeologyBridgeTool({
+      prompt: "Bridge entropy and fairness.",
+      theoryReflection: theoryReflection(),
+      ideologyReflection: ideologyReflection(),
+    });
+    const issues = validateTheoryIdeologyBridgeV1({
+      ...output.bridge,
+      links: [
+        {
+          ...output.bridge.links[0],
+          explanation: "physics proves morality",
+        },
+      ],
+    });
+
+    expect(issues.some((issue) => issue.includes("forbidden theory-ideology overclaim text"))).toBe(true);
+  });
+
   it("can be evaluated as bridge evidence, not final answer authority", async () => {
     const output = await runHelixAskTheoryIdeologyBridgeTool({
       prompt: "Bridge entropy and fairness.",
@@ -175,7 +196,9 @@ describe("Helix Ask Theory-Zen bridge tool", () => {
     });
 
     expect(evaluation.result).toBe("supports_subgoal");
-    expect(evaluation.summary).toContain("Theory-Zen bridge produced evidence-only procedural links");
+    expect(evaluation.summary).toContain(
+      "Theory/Zen bridge produced evidence-only procedural constraints",
+    );
     expect(evaluation.model_invoked).toBe(false);
     expect(evaluation.deterministic_gate).toBe(true);
   });

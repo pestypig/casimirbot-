@@ -152,4 +152,45 @@ describe("Helix Ask workstation answer synthesizer", () => {
       "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
     );
   });
+
+  it("synthesizes a bounded answer from Theory-Zen bridge evidence", () => {
+    const prompt =
+      "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    expect(plan?.intent).toBe("theory_ideology_bridge_reflection");
+
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      theoryIdeologyBridgeToolOutput: {
+        bridge: {
+          links: [
+            {
+              relation: "constrains",
+              proceduralEffect: "Require revision triggers and uncertainty-aware next steps.",
+            },
+            {
+              relation: "analogy_only",
+              proceduralEffect:
+                "Use conservation and boundary language as a constraint metaphor, not as final authority.",
+            },
+          ],
+          missingEvidence: ["theory_context_reflection", "jurisdiction_context"],
+        },
+      },
+    });
+
+    expect(answer).toContain(
+      "I treated the theory side as observable/mathematical constraint evidence and the Zen side as procedural justice evidence.",
+    );
+    expect(answer).toContain("Bridge links:");
+    expect(answer).toContain("- constrains: Require revision triggers and uncertainty-aware next steps.");
+    expect(answer).toContain("Missing checks: theory_context_reflection, jurisdiction_context.");
+    expect(answer).toContain(
+      "Boundary: physics, conservation, entropy, and self-organization can constrain how we reason about fairness, but they do not prove moral certainty or authorize execution.",
+    );
+    expect(answer).toContain("Procedural posture: use the bridge to ask better questions");
+  });
 });

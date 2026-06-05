@@ -7,6 +7,12 @@ import {
 } from "../contracts/theory-ideology-bridge.v1";
 import { BRIDGE_MAPPINGS, type TheoryIdeologyBridgeMapping } from "./bridge-mappings";
 
+// TheoryIdeologyBridge is an evidence-only bridge. It may relate observable
+// constraints, mathematical structure, and declared/lived context to procedural
+// justice lenses. It must not claim that physics proves morality, that a person
+// is morally approved or failed, or that any action has execution permission.
+// Analogy links must remain analogy_only unless both graph receipts supply
+// direct evidence for a stronger procedural relation.
 export type BuildTheoryIdeologyBridgeInput = {
   prompt: string;
   theoryReflection?: TheoryContextReflectionV1 | null;

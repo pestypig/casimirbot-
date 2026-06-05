@@ -28237,28 +28237,6 @@ export function HelixAskPill({
     };
   }, []);
   const askLiveLatestAgenticEvent = askLiveAgenticEventRows[askLiveAgenticEventRows.length - 1] ?? null;
-  const askLiveStatusText = useMemo(() => {
-    const statusTrimmed = askStatus?.trim() ?? "";
-    if (!askBusy) {
-      return statusTrimmed || null;
-    }
-    if (askLiveLatestAgenticEvent?.text) {
-      return askLiveLatestAgenticEvent.text;
-    }
-    const statusIsGenerating = !statusTrimmed || /^generating/i.test(statusTrimmed);
-    const draftTail = askLiveDraft.trim();
-    if (draftTail && statusIsGenerating) {
-      const normalized = draftTail.replace(/\s+/g, " ").trim();
-      if (normalized) {
-        const snippet = normalized.slice(-160);
-        return normalized.length > snippet.length
-          ? `Streaming: ...${snippet}`
-          : `Streaming: ${snippet}`;
-      }
-    }
-    return statusTrimmed || null;
-  }, [askBusy, askLiveDraft, askLiveLatestAgenticEvent, askStatus]);
-
   useEffect(() => {
     clearReasoningTheaterFloatingTextTimers();
     reasoningTheaterFloatingTextLastTokenRef.current = null;
@@ -32356,19 +32334,19 @@ export function HelixAskPill({
                       </div>
                     </div>
                     <div className="relative">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
                         <span
-                          className={`text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
+                          className={`min-w-0 truncate text-[10px] uppercase tracking-[0.18em] ${REASONING_THEATER_STANCE_META[reasoningTheater.stance].badge}`}
                         >
                           {REASONING_THEATER_STANCE_META[reasoningTheater.stance].label}
                         </span>
-                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
+                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
                           {REASONING_THEATER_ARCHETYPE_LABEL[reasoningTheater.archetype]}
                         </span>
-                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
+                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
                           {REASONING_THEATER_PHASE_LABEL[reasoningTheater.phase]}
                         </span>
-                        <span className="text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
+                        <span className="min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90">
                           {REASONING_THEATER_CERTAINTY_LABEL[reasoningTheater.certaintyClass]}
                         </span>
                       </div>
@@ -32549,19 +32527,6 @@ export function HelixAskPill({
                     </div>
                   </div>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                    Live
-                  </span>
-                  <span className="text-slate-200">
-                    {askLiveStatusText ?? "Working..."}
-                  </span>
-                  {askElapsedMs !== null ? (
-                    <span className="text-slate-500">
-                      ({Math.round(askElapsedMs / 1000)}s)
-                    </span>
-                  ) : null}
-                </div>
               </div>
             </div>
           ) : null}

@@ -68,7 +68,11 @@ function baseBridge(
         confidence: 0.62,
         evidenceRefs: ["theory:boundary", "ideology:due-process"],
         missingEvidence: ["jurisdiction_context", "contestability_path"],
-        refusesAuthority: ["physics_proves_morality", "terminal_moral_authority"],
+        refusesAuthority: [
+          "moral_finality",
+          "physics_derived_moral_certainty",
+          "execution_permission",
+        ],
         reasonCodes: ["analogy_only", "due_process_required"],
       },
     ],
@@ -125,8 +129,29 @@ describe("theory ideology bridge v1", () => {
     expect(bridge.links[2]).toMatchObject({
       theoryBadgeIds: ["theory.boundary_conditions", "theory.conservation_constraint"],
       ideologyNodeIds: ["fairness-due-process-and-justification"],
-      refusesAuthority: ["physics_proves_morality", "terminal_moral_authority"],
+      refusesAuthority: [
+        "moral_finality",
+        "physics_derived_moral_certainty",
+        "execution_permission",
+      ],
     });
+  });
+
+  it("requires analogy-only links to refuse physics-derived certainty", () => {
+    const bridge = baseBridge();
+    const issues = validateTheoryIdeologyBridgeV1({
+      ...bridge,
+      links: [
+        {
+          ...bridge.links[2],
+          refusesAuthority: ["moral_finality", "execution_permission"],
+        },
+      ],
+    });
+
+    expect(issues).toContain(
+      "links[0].analogy_only links must refuse physics_derived_moral_certainty",
+    );
   });
 
   it("rejects bridge overclaims and character verdict language", () => {

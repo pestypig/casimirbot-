@@ -175,6 +175,13 @@ function validateLink(prefix: string, value: unknown, issues: string[]): void {
   validateRequiredStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
   validateOptionalStringArray(`${prefix}.missingEvidence`, value.missingEvidence, issues);
   validateRequiredStringArray(`${prefix}.refusesAuthority`, value.refusesAuthority, issues);
+  if (
+    value.relation === "analogy_only" &&
+    (!isStringArray(value.refusesAuthority) ||
+      !value.refusesAuthority.includes("physics_derived_moral_certainty"))
+  ) {
+    issues.push(`${prefix}.analogy_only links must refuse physics_derived_moral_certainty`);
+  }
   validateRequiredStringArray(`${prefix}.reasonCodes`, value.reasonCodes, issues);
 }
 
