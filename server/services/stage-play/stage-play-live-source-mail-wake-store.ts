@@ -23,6 +23,13 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 
 const sortedKey = (values: string[]): string => uniqueStrings(values).sort().join("|");
 
+const ACTIVE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
+  "queued",
+  "running",
+  "failed_retryable",
+  "deferred_for_pressure",
+]);
+
 const listThreadWakes = (threadId: string): StagePlayLiveSourceMailWakeRequestV1[] =>
   Array.from(wakeById.values())
     .filter((wake) => wake.threadId === threadId)
@@ -56,7 +63,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     wake.roomId === (input.roomId ?? null) &&
     wake.environmentId === (input.environmentId ?? null) &&
     sortedKey(wake.mailIds) === key &&
-    (wake.status === "queued" || wake.status === "running")
+    ACTIVE_WAKE_STATUSES.has(wake.status)
   );
   if (existing) return existing;
   const now = input.now ?? new Date().toISOString();
@@ -81,6 +88,10 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     status: "queued",
     askTurnId: null,
     decisionIds: [],
+    attemptCount: 0,
+    lastAttemptAt: null,
+    nextRetryAt: null,
+    failureReason: null,
     evidenceRefs: uniqueStrings([...mailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
     queuedAt: now,
     updatedAt: now,
