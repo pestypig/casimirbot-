@@ -58,7 +58,15 @@ const hasExplicitLiveSourceMailCue = (text: string): boolean =>
   /\b(?:read|check|watch|monitor|observe|use|process)\b[\s\S]{0,160}\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
   /\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b[\s\S]{0,160}\b(?:read|check|watch|monitor|observe|process|decision|decide|record)\b/i.test(text);
 
+const hasContextualLiveSourceMailCue = (text: string): boolean =>
+  /["'`][^"'`]*(?:live_env\.(?:read_live_source_mail|record_live_source_mail_decision)|read\s+live\s+source\s+mail|live[-\s]?source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail)[^"'`]*["'`]/i.test(text) ||
+  /\b(?:in\s+the\s+future|future|later|eventually|if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,140}\b(?:live_env\.(?:read_live_source_mail|record_live_source_mail_decision)|read\s+live\s+source\s+mail|live[-\s]?source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
+  /\b(?:screen|page|button|label|ui|text)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.(?:read_live_source_mail|record_live_source_mail_decision)|read\s+live\s+source\s+mail|live[-\s]?source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,120}\b(?:run|execute|use|read|check|process)?\b[\s\S]{0,120}\b(?:live_env\.(?:read_live_source_mail|record_live_source_mail_decision)|read\s+live\s+source\s+mail|live[-\s]?source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
+  /\b(?:explain|describe|what\s+does|what\s+is|what\s+are)\b[\s\S]{0,120}\b(?:live_env\.(?:read_live_source_mail|record_live_source_mail_decision)|read\s+live\s+source\s+mail|live[-\s]?source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|visual\s+summary\s+mail)\b[\s\S]{0,80}\b(?:mean|means|for|do|does|is|are)\b/i.test(text);
+
 export const isLiveSourceMailLoopPrompt = (text: string): boolean =>
+  !hasContextualLiveSourceMailCue(text) && (
   hasExplicitLiveSourceMailCue(text) ||
   (
     !isStagePlayJobPlanningPrompt(text) &&
@@ -66,7 +74,7 @@ export const isLiveSourceMailLoopPrompt = (text: string): boolean =>
   /\b(?:watch|monitor|track|observe|read|keep\s+an\s+eye\s+on|tell\s+me\s+if|announce\s+if)\b[\s\S]{0,140}\b(?:live\s+source|visual\s+(?:source|capture|summary|frame)|screen\s+(?:source|summary)|latest\s+visual\s+capture)\b/i.test(text) ||
       /\b(?:live\s+source|visual\s+(?:source|capture|summary|frame)|screen\s+(?:source|summary)|latest\s+visual\s+capture)\b[\s\S]{0,140}\b(?:watch|monitor|track|observe|read|changes?|happens?|announce|important)\b/i.test(text)
     )
-  );
+  ));
 
 export const isNegatedLiveSourceCadenceMention = (prompt: string): boolean => {
   const text = normalize(prompt);

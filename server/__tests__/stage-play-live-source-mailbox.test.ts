@@ -12,9 +12,11 @@ import {
   listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
+  recordStagePlayMailDecision,
   resetStagePlayLiveSourceMailboxForTest,
   upsertStagePlayLiveSourceJobState,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/stage-play-live-source-mail-context-pack";
 import {
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
@@ -28,6 +30,7 @@ import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-runner";
+import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
 import {
   analyzeVisualFrame,
   recordVisualFrame,
@@ -938,6 +941,14 @@ describe("Stage Play live-source mailbox", () => {
   });
 
   it("binds wake Ask prompts to the active watch-job objective and compact mail batch", async () => {
+    const priorDecision = recordStagePlayMailDecision({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:prior-policy-bound"],
+      decision: "wait_for_next_summary",
+      rationalePreview: "Prior harmless camera movement did not match the hostile mob objective.",
+      createdAt: "2026-06-04T12:00:15.000Z",
+    });
     const mail = enqueueStagePlayLiveSourceMailItem({
       threadId,
       roomId,
@@ -1000,6 +1011,9 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain("Only announce hostile mobs.");
     expect(prompt).toContain("The mail is perturbation evidence for this continuing job.");
     expect(prompt).toContain("Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.");
+    expect(prompt).toContain("Prior decisions:");
+    expect(prompt).toContain(priorDecision.decisionId);
+    expect(prompt).toContain("Prior harmless camera movement did not match the hostile mob objective.");
     expect(prompt).toContain(mail.mailId);
     expect(prompt).toContain("Harmless Minecraft-like scene change");
     expect(prompt).toContain("voiceEnabled: true");
@@ -1152,6 +1166,40 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
   });
 
+  it("defers a wake before Ask when runtime pressure admission rejects it", async () => {
+    seedVisualEvidence();
+    let askCalls = 0;
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+      askTurnRunner: async () => {
+        askCalls += 1;
+        throw new Error("should_not_call_ask_under_pressure");
+      },
+    });
+
+    expect(askCalls).toBe(0);
+    expect(result).toMatchObject({
+      status: "deferred_for_pressure",
+      failedReason: "runtime_memory_queue_deferrable",
+      decisionIds: [],
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "deferred_for_pressure",
+      attemptCount: 1,
+      lastAttemptAt: "2026-06-04T12:01:30.000Z",
+      nextRetryAt: "2026-06-04T12:01:45.000Z",
+      failureReason: "runtime_memory_queue_deferrable",
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+  });
+
   it("runs a retryable pressure wake after nextRetryAt while preserving exact mail ids", async () => {
     seedVisualEvidence();
     await runNextMailWakeRequest({
@@ -1248,6 +1296,76 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("server admission cycle owns one same-source unread batch in chronological order", async () => {
+    const first = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:cycle-first",
+      evidenceRef: "visual_evidence:cycle-first",
+      summaryText: "First cycle summary.",
+      createdAt: "2026-06-04T12:02:40.000Z",
+    });
+    const second = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:cycle-second",
+      evidenceRef: "visual_evidence:cycle-second",
+      summaryText: "Second cycle summary.",
+      createdAt: "2026-06-04T12:02:41.000Z",
+    });
+    let wakeMailIds: string[] = [];
+
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:42.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async ({ wakeRequest }) => {
+        wakeMailIds = wakeRequest.mailIds;
+        return {
+          turn_id: "ask:wake-cycle-batch",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-cycle-batch",
+                  mailIds: wakeRequest.mailIds,
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(wakeMailIds).toEqual([first.mailId, second.mailId]);
+    expect(cycle).toMatchObject({
+      schema: "stage_play_live_source_mail_wake_admission_cycle/v1",
+      status: "completed",
+      reason: "wake_admitted",
+      result: {
+        status: "completed",
+        askTurnId: "ask:wake-cycle-batch",
+        decisionIds: ["stage_play_live_source_mail_decision:wake-cycle-batch"],
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      mailIds: [first.mailId, second.mailId],
+    });
+  });
+
   it("recovers a stale running wake into retryable state", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
@@ -1282,5 +1400,331 @@ describe("Stage Play live-source mailbox", () => {
       status: "completed",
       attemptCount: 2,
     });
+  });
+
+  it("does not inject unrelated live-source mail context without an explicitly armed watch job", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:unarmed-context",
+      evidenceRef: "visual_evidence:unarmed-context",
+      summaryText: "Unarmed visual summary should stay out of future Ask context.",
+      createdAt: "2026-06-04T12:05:00.000Z",
+    });
+    recordStagePlayMailDecision({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      decision: "draft_text_answer",
+      rationalePreview: "This unrelated decision must not enter consensual chat context.",
+      textAnswerDraft: "Unrelated draft.",
+      createdAt: "2026-06-04T12:05:01.000Z",
+    });
+
+    const pack = buildStagePlayLiveSourceMailContextPack({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:05:02.000Z",
+    });
+
+    expect(pack).toMatchObject({
+      artifactId: "stage_play_live_source_mail_context_pack",
+      includedReason: "none",
+      activeWatchJobs: [],
+      latestMailItems: [],
+      latestDecisions: [],
+      latestTextAnswerDrafts: [],
+      latestVoiceCalloutDrafts: [],
+      currentMailboxCursor: null,
+      evidenceRefs: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  });
+
+  it("builds compact future-Ask context from armed watch jobs, mail, and decisions", () => {
+    const { policy } = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+      decisionPolicyPrompt: "Wait on harmless scene changes. Draft a callout only for hostile mobs.",
+      importanceCriteria: ["hostile mob appears"],
+      suppressCriteria: ["harmless camera movement"],
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      now: "2026-06-04T12:06:00.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:armed-context",
+      evidenceRef: "visual_evidence:armed-context",
+      summaryText: "Compact visual summary: a hostile mob appears near the player. No raw image is included.",
+      createdAt: "2026-06-04T12:06:01.000Z",
+    });
+    const decision = recordStagePlayMailDecision({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "The watch policy asks for a callout when a hostile mob appears.",
+      voiceCalloutDraft: "Hostile mob appeared near the player.",
+      voiceEligible: true,
+      voiceRequiresConfirmation: false,
+      activeJobId: policy.jobId,
+      createdAt: "2026-06-04T12:06:02.000Z",
+    });
+
+    const pack = buildStagePlayLiveSourceMailContextPack({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:06:03.000Z",
+    });
+
+    expect(pack.includedReason).toBe("armed_watch_job");
+    expect(pack.activeWatchJobs).toHaveLength(1);
+    expect(pack.activeWatchJobs[0]).toMatchObject({
+      jobId: policy.jobId,
+      policyId: policy.policyId,
+      objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+      decisionPolicyPrompt: "Wait on harmless scene changes. Draft a callout only for hostile mobs.",
+      sourceIds: [sourceId],
+      status: "armed",
+    });
+    expect(pack.latestMailItems).toEqual([
+      expect.objectContaining({
+        mailId: mail.mailId,
+        sourceId,
+        summaryPreview: expect.stringContaining("hostile mob appears"),
+        evidenceRefs: expect.arrayContaining([
+          sourceId,
+          "visual_frame:armed-context",
+          "visual_evidence:armed-context",
+        ]),
+      }),
+    ]);
+    expect(pack.latestDecisions).toEqual([
+      expect.objectContaining({
+        decisionId: decision.decisionId,
+        decision: "request_voice_callout",
+        voiceCalloutDraft: "Hostile mob appeared near the player.",
+        activeJobId: policy.jobId,
+        mailboxCursor: mail.mailId,
+      }),
+    ]);
+    expect(pack.latestVoiceCalloutDrafts).toEqual([
+      expect.objectContaining({
+        decisionId: decision.decisionId,
+        text: "Hostile mob appeared near the player.",
+        voiceEligible: true,
+      }),
+    ]);
+    expect(pack.currentMailboxCursor).toBe(mail.mailId);
+    expect(pack.evidenceRefs).toEqual(expect.arrayContaining([
+      policy.policyId,
+      policy.jobId,
+      mail.mailId,
+      decision.decisionId,
+    ]));
+    expect(JSON.stringify(pack)).not.toMatch(/raw_image|data:image|base64/i);
+  });
+
+  it("keeps voice-disabled callouts as text-only decisions without voice tools", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:voice-disabled",
+      evidenceRef: "visual_evidence:voice-disabled",
+      summaryText: "A visual summary that would otherwise be announced.",
+      createdAt: "2026-06-04T12:07:00.000Z",
+    });
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "Important update, but voice is off.",
+      voiceCalloutDraft: "Important update near the player.",
+      voicePolicy: {
+        voiceEnabled: false,
+        requiresConfirmation: false,
+        allowedNow: false,
+        reason: "voice_disabled_by_policy",
+      },
+      requestedTool: {
+        toolName: "voice_delivery.confirm_speak",
+        args: { text: "Important update near the player." },
+      },
+      now: "2026-06-04T12:07:01.000Z",
+    });
+
+    expect(decision.decision).toBe("draft_text_answer");
+    expect(decision.textAnswerDraft?.text).toBe("Important update near the player.");
+    expect(decision.voiceCalloutDraft).toBeNull();
+    expect(decision.requestedTool).toBeNull();
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows.map((row) => row.rowKind)).toContain("text_answer");
+    expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
+  });
+
+  it("holds voice callouts for confirmation without requesting the voice tool", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:voice-confirm",
+      evidenceRef: "visual_evidence:voice-confirm",
+      summaryText: "A compact summary with an operator-relevant change.",
+      createdAt: "2026-06-04T12:08:00.000Z",
+    });
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      decision: "request_voice_callout",
+      rationalePreview: "Voice requires confirmation, so draft only.",
+      voiceCalloutDraft: "Operator-relevant change detected.",
+      voicePolicy: {
+        voiceEnabled: true,
+        requiresConfirmation: true,
+        allowedNow: false,
+        reason: "confirmation_required",
+      },
+      requestedTool: {
+        toolName: "voice_delivery.confirm_speak",
+        args: { text: "Operator-relevant change detected." },
+      },
+      now: "2026-06-04T12:08:01.000Z",
+    });
+
+    expect(decision.decision).toBe("request_voice_callout");
+    expect(decision.voiceCalloutDraft).toMatchObject({
+      text: "Operator-relevant change detected.",
+      voiceEligible: false,
+      requiresConfirmation: true,
+    });
+    expect(decision.requestedTool).toBeNull();
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows.map((row) => row.rowKind)).toContain("voice_callout_request");
+    expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
+    expect(rows.find((row) => row.rowKind === "voice_callout_request")?.body).toMatch(/Awaiting confirmation/);
+  });
+
+  it("records allowed voice delivery as decision, voice tool, then voice receipt rows", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the source and announce urgent changes.",
+      decisionPolicyPrompt: "Request a voice callout when an urgent change appears.",
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      importanceCriteria: ["urgent change"],
+      now: "2026-06-04T12:09:00.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:voice-allowed",
+      evidenceRef: "visual_evidence:voice-allowed",
+      summaryText: "Urgent compact summary: hostile mob appeared near the player.",
+      createdAt: "2026-06-04T12:09:01.000Z",
+    });
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId }).find((entry) => entry.mailIds.includes(mail.mailId));
+    expect(wake).toBeTruthy();
+    const delivered: Array<{ decisionId: string; text: string; evidenceRefs: string[] }> = [];
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:09:02.000Z",
+      askTurnRunner: async ({ wakeRequest }) => {
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId,
+          roomId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "Urgent hostile mob update should be announced.",
+          voiceCalloutDraft: "Hostile mob appeared near the player.",
+          voicePolicy: {
+            voiceEnabled: true,
+            requiresConfirmation: false,
+            allowedNow: true,
+            reason: "urgent_voice_allowed",
+          },
+          requestedTool: {
+            toolName: "voice_delivery.confirm_speak",
+            args: {
+              decisionId: "from_decision_receipt",
+              text: "Hostile mob appeared near the player.",
+            },
+          },
+          now: "2026-06-04T12:09:03.000Z",
+        });
+        return {
+          turn_id: "ask:wake-voice-allowed",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
+      },
+      voiceDeliveryRunner: async ({ decisionId, text, evidenceRefs }) => {
+        delivered.push({ decisionId, text, evidenceRefs });
+        return {
+          ok: true,
+          status: "delivered",
+          provider: "test_voice_delivery",
+          artifactRef: "voice_audio:allowed",
+          message: "Voice callout delivered.",
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-voice-allowed",
+    });
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toMatchObject({
+      text: "Hostile mob appeared near the player.",
+    });
+    const entries = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:wake-voice-allowed" });
+    const rowKinds = entries.map((entry) => entry.row.rowKind);
+    const decisionIndex = rowKinds.indexOf("agent_decision");
+    const toolIndex = rowKinds.indexOf("voice_tool_call");
+    const receiptIndex = rowKinds.indexOf("voice_receipt");
+    expect(decisionIndex).toBeGreaterThanOrEqual(0);
+    expect(toolIndex).toBeGreaterThan(decisionIndex);
+    expect(receiptIndex).toBeGreaterThan(toolIndex);
+    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/delivered/);
+    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/voice_audio:allowed/);
   });
 });

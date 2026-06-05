@@ -12,6 +12,9 @@ import {
 import { listVisualFrameEvidence } from "../situation-room/visual-snapshot-store";
 import { getActiveLiveAnswerEnvironmentForThread, getLiveAnswerEnvironment } from "../situation-room/live-answer-environment-store";
 import {
+  isStagePlayLiveSourceVoiceRequestedTool,
+} from "./stage-play-live-source-mail-voice-bridge";
+import {
   enqueueStagePlayLiveSourceMailItem,
   getStagePlayLiveSourceMailItem,
   listStagePlayLiveSourceJobStates,
@@ -62,7 +65,7 @@ const defaultVoicePolicy = (input?: Partial<StagePlayLiveSourceVoicePolicyV1> | 
 };
 
 const isVoiceRequestedTool = (tool: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null | undefined): boolean =>
-  Boolean(tool?.toolName && /\b(?:voice(?:_delivery|\.speak)?|confirm_speak|speak)\b/i.test(tool.toolName));
+  isStagePlayLiveSourceVoiceRequestedTool(tool);
 
 const mailItemCanBeDeliveredToAsk = (
   item: StagePlayLiveSourceMailItemV1,
@@ -229,11 +232,16 @@ export function buildMailLoopTranscriptRows(input: {
       });
     }
     if (input.decision.voiceCalloutDraft) {
+      const requiresConfirmation =
+        input.decision.voicePolicy?.requiresConfirmation === true ||
+        input.decision.voiceCalloutDraft.requiresConfirmation === true;
       rows.push({
         rowId: `ask_turn_mail_voice:${hashShort(input.decision.decisionId)}`,
         rowKind: "voice_callout_request",
         title: "Voice callout draft",
-        body: input.decision.voiceCalloutDraft.text,
+        body: requiresConfirmation
+          ? `${input.decision.voiceCalloutDraft.text}\nAwaiting confirmation before voice delivery.`
+          : input.decision.voiceCalloutDraft.text,
         source: {
           artifactId: input.decision.decisionId,
           artifactKind: input.decision.artifactId,
@@ -430,19 +438,46 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     allowedNow: readBoolean(input.voiceAllowedNow, false),
     reason: input.voicePolicyReason ?? null,
   });
-  const requestedVoiceToolBlocked = isVoiceRequestedTool(input.requestedTool) && !voicePolicy.allowedNow;
-  const requestedTool = requestedVoiceToolBlocked ? null : input.requestedTool ?? null;
-  const voiceCalloutDraft = voicePolicy.voiceEnabled ? input.voiceCalloutDraft ?? null : null;
-  const textAnswerDraft =
-    input.textAnswerDraft ??
-    (!voicePolicy.voiceEnabled && input.voiceCalloutDraft ? input.voiceCalloutDraft : null);
+  const rawVoiceDraft = previewText(input.voiceCalloutDraft, 420);
+  let normalizedDecision = input.decision;
+  let rationalePreview = input.rationalePreview;
+  let requestedTool = input.requestedTool ?? null;
+  let voiceCalloutDraft = voicePolicy.voiceEnabled ? rawVoiceDraft || null : null;
+  let textAnswerDraft = input.textAnswerDraft ?? null;
+
+  if (normalizedDecision === "request_voice_callout") {
+    if (!rawVoiceDraft) {
+      normalizedDecision = "request_more_evidence";
+      rationalePreview = `${rationalePreview} Voice callout was not requested because voiceCalloutDraft.text was missing.`;
+      requestedTool = null;
+      voiceCalloutDraft = null;
+    } else if (!voicePolicy.voiceEnabled) {
+      normalizedDecision = "draft_text_answer";
+      rationalePreview = `${rationalePreview} Voice is disabled, so the callout draft was retained as text only.`;
+      requestedTool = null;
+      voiceCalloutDraft = null;
+      textAnswerDraft = textAnswerDraft ?? rawVoiceDraft;
+    } else if (voicePolicy.requiresConfirmation) {
+      requestedTool = null;
+      voiceCalloutDraft = rawVoiceDraft;
+    } else if (!voicePolicy.allowedNow) {
+      requestedTool = null;
+      voiceCalloutDraft = rawVoiceDraft;
+    }
+  }
+  if (isVoiceRequestedTool(requestedTool) && !voicePolicy.allowedNow) {
+    requestedTool = null;
+  }
+  textAnswerDraft =
+    textAnswerDraft ??
+    (!voicePolicy.voiceEnabled && rawVoiceDraft ? rawVoiceDraft : null);
   const decision = recordStagePlayMailDecision({
     mailIds: input.mailIds,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
-    decision: input.decision,
-    rationalePreview: input.rationalePreview,
+    decision: normalizedDecision,
+    rationalePreview,
     textAnswerDraft,
     textAnswerTerminalEligible: input.textAnswerTerminalEligible === true,
     voiceCalloutDraft,
@@ -450,7 +485,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     voiceRequiresConfirmation: voicePolicy.requiresConfirmation,
     voicePolicy,
     requestedTool,
-    nextLoopState: input.nextLoopState ?? (input.decision === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary"),
+    nextLoopState: input.nextLoopState ?? (normalizedDecision === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary"),
     evidenceRefs: input.evidenceRefs ?? [],
     modelReviewed: input.modelReviewed !== false,
     createdAt: input.now,

@@ -50,6 +50,7 @@ import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
 } from "../../services/stage-play/stage-play-live-source-mail-wake-runner";
+import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../../services/stage-play/stage-play-live-source-mail-wake-service";
 import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
   STAGE_PLAY_RAW_SESSION_BUFFER_RETENTION_POLICIES,
@@ -231,6 +232,11 @@ helixStagePlayRouter.options("/live-source-mail/wake", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/live-source-mail/wake/run", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/wake/cycle", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -859,6 +865,39 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
       error: "stage-play-live-source-mail-wake-run-failed",
       err,
       schema: "stage_play_live_source_mail_wake_run_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId),
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
+      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_wake_cycle_response/v1",
+      cycle,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-wake-cycle-failed",
+      err,
+      schema: "stage_play_live_source_mail_wake_cycle_response/v1",
       contextRole: "tool_evidence",
     });
   }

@@ -8160,6 +8160,7 @@ type HelixMailLoopTranscriptRowKind =
   | "text_answer"
   | "voice_callout_request"
   | "voice_tool_call"
+  | "voice_receipt"
   | "wait_for_next_summary"
   | "requested_tool"
   | "loop_state";
@@ -8172,6 +8173,7 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "text_answer",
   "voice_callout_request",
   "voice_tool_call",
+  "voice_receipt",
   "wait_for_next_summary",
   "requested_tool",
   "loop_state",
@@ -8393,6 +8395,7 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   }
   if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
   if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
+  if (row.rowKind === "voice_receipt" && !row.body) return "Voice delivery receipt recorded.";
   return row.body;
 }
 
@@ -8403,6 +8406,7 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "agent_decision") return "Agent decision";
   if (row.rowKind === "text_answer" || row.rowKind === "voice_callout_request") return "Text / Callout draft";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
+  if (row.rowKind === "voice_receipt") return "Voice receipt";
   if (row.rowKind === "requested_tool") return "Requested tool";
   if (row.rowKind === "loop_state") return "Loop state";
   return row.title || "Live source mail";
@@ -8413,13 +8417,14 @@ function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): Hel
   if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
   if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
   if (row.rowKind === "voice_tool_call") return "working";
+  if (row.rowKind === "voice_receipt") return "observation";
   return "working";
 }
 
 function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
   return mailRows.map((row) => ({
     key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
-    source: row.rowKind === "voice_tool_call" ? "voice" : "live_source_mail",
+    source: row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail",
     label: labelForHelixMailLoopTranscriptRow(row),
     text: formatHelixMailLoopTranscriptBody(row),
     meta: row.authority || "tool_evidence",

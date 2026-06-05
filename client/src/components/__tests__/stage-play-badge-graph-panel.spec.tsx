@@ -772,6 +772,35 @@ function renderPanel(options: {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (url.includes("/api/helix/stage-play/live-source-mail/wake/cycle")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_live_source_mail_wake_cycle_response/v1",
+        cycle: {
+          schema: "stage_play_live_source_mail_wake_admission_cycle/v1",
+          now: "2026-06-02T00:00:03.000Z",
+          queuedWakeIds: ["stage_play_live_source_mail_wake:queued-ui"],
+          runnableWakeIds: ["stage_play_live_source_mail_wake:queued-ui"],
+          runningWakeIds: [],
+          deferredWakeIds: ["stage_play_live_source_mail_wake:pressure-ui"],
+          result: null,
+          status: "queued",
+          reason: "no_runnable_wake",
+          runtimeAdmission: null,
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_evidence",
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.includes("/api/helix/stage-play/live-source-mail")) {
       return new Response(JSON.stringify({
         ok: true,
@@ -1178,18 +1207,42 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-full-graph-toggle")).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(5);
     expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Visual Summary Mail").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Ask Wake").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Ask Decision").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Output/Wait").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mailbox").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Wake Ask").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
-    expect(screen.getByText("behind: 3")).toBeTruthy();
     expect(screen.getByText("pressure")).toBeTruthy();
     expect(screen.getByText("retrying")).toBeTruthy();
-    expect(screen.getByText(/summary preview: Minecraft-like scene/i)).toBeTruthy();
+    expect(screen.getByText(/Observer -> Mailbox -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeTruthy();
+    expect(screen.queryByText("14 badges")).toBeNull();
+    expect(screen.queryByText("0 missing checks")).toBeNull();
+    expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
+    expect(screen.getAllByText(/queued 0 \/ running 0/i).length).toBeGreaterThan(0);
     expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
-    expect(screen.getByText(/no output yet; armed for next source update/i)).toBeTruthy();
+    expect(screen.getAllByText(/no output yet; armed for next source update/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(5);
+  });
+
+  it("shows manual mail wake admission without auto-running from the panel", async () => {
+    renderPanel();
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+    expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/run"))).toBe(false);
+    expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/cycle"))).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Run armed mail wake" }));
+
+    await waitFor(() => {
+      expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/cycle"))).toBe(true);
+    });
+    expect(fetchJsonBodies("/api/helix/stage-play/live-source-mail/wake/cycle").at(-1)).toEqual(expect.objectContaining({
+      threadId: "helix-ask:desktop",
+      roomId: null,
+      environmentId: null,
+    }));
+    expect(await screen.findByText(/queued: no_runnable_wake/i)).toBeTruthy();
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {

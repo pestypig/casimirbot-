@@ -853,6 +853,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"text_answer"');
     expect(source).toContain('"voice_callout_request"');
     expect(source).toContain('"voice_tool_call"');
+    expect(source).toContain('"voice_receipt"');
     expect(source).toContain('"wait_for_next_summary"');
     expect(source).toContain("Visual summary received.\\nPreview:");
     expect(source).toContain("live_env.read_live_source_mail");
@@ -861,7 +862,26 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Reason:");
     expect(source).toContain("Text / Callout draft");
     expect(source).toContain("Voice tool call");
-    expect(source).toContain('source: row.rowKind === "voice_tool_call" ? "voice" : "live_source_mail"');
+    expect(source).toContain("Voice receipt");
+    expect(source).toContain('row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail"');
+  });
+
+  it("persists wake mail transcript rows through backend fetch and chronological reply merge", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("fetchStagePlayLiveSourceMailTranscript");
+    expect(source).toContain("/api/helix/stage-play/live-source-mail/transcript?");
+    expect(source).toContain("groupStagePlayMailTranscriptEntries(entries)");
+    expect(source).toContain("buildHelixAskReplyFromMailTranscriptEntries");
+    expect(source).toContain("live_source_mail_wake_transcript_durable: true");
+    expect(source).toContain("stage_play_live_source_mail_transcript_entries: entries");
+    expect(source).toContain("stage_play_live_source_mail_transcript_entry_ids: transcriptEntryIds");
+    expect(source).toContain("current_turn_artifact_ledger: currentTurnArtifactLedger");
+    expect(source).toContain("setAskReplies((prev) =>");
+    expect(source).toContain("return [...nextDurableReplies, ...prev].slice(0, 8)");
+    expect(source).toContain("sortHelixAskRepliesChronologically");
+    expect(source).toContain("chronologicalAskReplies.map");
+    expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
+    expect(source).toContain("left.sequence - right.sequence");
   });
 
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {

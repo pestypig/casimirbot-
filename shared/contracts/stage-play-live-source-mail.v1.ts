@@ -5,6 +5,7 @@ export const STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA = "stage_play_live_source_j
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA = "stage_play_live_source_watch_job_policy/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_live_source_mail_transcript_entry/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA = "stage_play_live_source_voice_delivery_receipt/v1" as const;
 
 export type StagePlayLiveSourceMailSourceKindV1 =
   | "visual_frame"
@@ -157,6 +158,47 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   raw_content_included: false;
 };
 
+export type StagePlayLiveSourceVoiceDeliveryReceiptV1 = {
+  artifactId: "stage_play_live_source_voice_delivery_receipt";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA;
+  receiptId: string;
+  decisionId: string;
+  mailIds: string[];
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  status:
+    | "delivered"
+    | "queued"
+    | "confirmation_required"
+    | "blocked_voice_disabled"
+    | "blocked_voice_not_allowed"
+    | "blocked_missing_callout_draft"
+    | "blocked_missing_voice_tool"
+    | "failed";
+  voiceCalloutDraft?: {
+    text: string;
+    voiceEligible: boolean;
+    requiresConfirmation: boolean;
+  } | null;
+  voicePolicy: StagePlayLiveSourceVoicePolicyV1;
+  requestedTool?: {
+    toolName: string;
+    args: Record<string, unknown>;
+  } | null;
+  delivery?: {
+    provider?: string | null;
+    artifactRef?: string | null;
+    message?: string | null;
+  } | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
 export type StagePlayLiveSourceJobStateV1 = {
   artifactId: "stage_play_live_source_job_state";
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA;
@@ -227,6 +269,7 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "text_answer"
     | "voice_callout_request"
     | "voice_tool_call"
+    | "voice_receipt"
     | "loop_state"
     | "blocked";
   title: string;

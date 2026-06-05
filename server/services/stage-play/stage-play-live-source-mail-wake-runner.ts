@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type {
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayLiveSourceVoiceDeliveryReceiptV1,
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -20,6 +21,10 @@ import {
 } from "./stage-play-live-source-mailbox-store";
 import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-live-source-mail-transcript-store";
 import {
+  maybeRunStagePlayLiveSourceVoiceDelivery,
+  type StagePlayLiveSourceVoiceDeliveryRunner,
+} from "./stage-play-live-source-mail-voice-bridge";
+import {
   MAX_MAIL_IDS_PER_WAKE_BATCH,
   listRunnableStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeRequests,
@@ -33,12 +38,23 @@ import {
 
 type AskWakeTurnResponse = Record<string, unknown>;
 
-type AskWakeTurnRunner = (input: {
+export type AskWakeTurnRunner = (input: {
   prompt: string;
   threadId: string;
   evidenceRefs: string[];
   wakeRequest: StagePlayLiveSourceMailWakeRequestV1;
 }) => Promise<AskWakeTurnResponse>;
+
+export type StagePlayMailWakePressureCheckResult = {
+  deferred: boolean;
+  reason?: string | null;
+  release?: (outcome?: "completed" | "failed" | "rejected" | "aborted") => void;
+};
+
+export type StagePlayMailWakePressureCheck = (input: {
+  wakeRequest: StagePlayLiveSourceMailWakeRequestV1;
+  now: string;
+}) => StagePlayMailWakePressureCheckResult;
 
 type DurableWakeTranscriptRow = import("@shared/contracts/stage-play-live-source-mail.v1").AskTurnTranscriptRowDraftV1;
 
@@ -248,6 +264,7 @@ const buildDurableWakeTranscriptRows = (input: {
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   decisionIds: string[];
+  voiceReceipts?: StagePlayLiveSourceVoiceDeliveryReceiptV1[];
   evidenceRefs: string[];
   createdAt: string;
 }): DurableWakeTranscriptRow[] => {
@@ -289,8 +306,12 @@ const buildDurableWakeTranscriptRows = (input: {
   const decisions = input.decisionIds
     .map((decisionId) => getStagePlayMailDecision(decisionId))
     .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
+  const voiceReceiptByDecisionId = new Map(
+    (input.voiceReceipts ?? []).map((receipt) => [receipt.decisionId, receipt]),
+  );
   if (decisions.length > 0) {
     for (const decision of decisions) {
+      const voiceReceipt = voiceReceiptByDecisionId.get(decision.decisionId) ?? null;
       rows.push(makeWakeTranscriptRow({
         rowId: `wake_agent_decision:${hashShort(decision.decisionId)}`,
         rowKind: "agent_decision",
@@ -318,15 +339,53 @@ const buildDurableWakeTranscriptRows = (input: {
         }));
       }
       if (decision.voiceCalloutDraft) {
+        const requiresConfirmation =
+          decision.voicePolicy?.requiresConfirmation === true ||
+          decision.voiceCalloutDraft.requiresConfirmation === true;
         rows.push(makeWakeTranscriptRow({
           rowId: `wake_voice_callout:${hashShort(decision.decisionId)}`,
           rowKind: "voice_callout_request",
           title: "Voice callout draft",
-          body: decision.voiceCalloutDraft.text,
+          body: requiresConfirmation
+            ? `${decision.voiceCalloutDraft.text}\nAwaiting confirmation before voice delivery.`
+            : decision.voiceCalloutDraft.text,
           artifactId: decision.decisionId,
           artifactKind: decision.artifactId,
           evidenceRefs: decision.evidenceRefs,
           authority: "model_decision_receipt",
+          createdAt: input.createdAt,
+        }));
+      }
+      if (voiceReceipt?.requestedTool && voiceReceipt.status !== "confirmation_required") {
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_voice_tool_call:${hashShort(voiceReceipt.receiptId)}`,
+          rowKind: "voice_tool_call",
+          title: "Voice tool call",
+          body: `${voiceReceipt.requestedTool.toolName}: ${voiceReceipt.voiceCalloutDraft?.text ?? ""}`.trim(),
+          toolName: voiceReceipt.requestedTool.toolName,
+          artifactId: voiceReceipt.decisionId,
+          artifactKind: decision.artifactId,
+          evidenceRefs: voiceReceipt.evidenceRefs,
+          authority: "model_decision_receipt",
+          createdAt: input.createdAt,
+        }));
+      }
+      if (voiceReceipt) {
+        const receiptBody = [
+          voiceReceipt.status,
+          voiceReceipt.delivery?.message,
+          voiceReceipt.delivery?.artifactRef ? `artifact: ${voiceReceipt.delivery.artifactRef}` : null,
+        ].filter(Boolean).join(" - ");
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_voice_receipt:${hashShort(voiceReceipt.receiptId)}`,
+          rowKind: voiceReceipt.status === "confirmation_required" ? "voice_callout_request" : "voice_receipt",
+          title: voiceReceipt.status === "confirmation_required" ? "Voice confirmation required" : "Voice receipt",
+          body: receiptBody || voiceReceipt.status,
+          toolName: voiceReceipt.requestedTool?.toolName ?? null,
+          artifactId: voiceReceipt.receiptId,
+          artifactKind: voiceReceipt.artifactId,
+          evidenceRefs: voiceReceipt.evidenceRefs,
+          authority: voiceReceipt.status === "failed" ? "blocked" : "tool_evidence",
           createdAt: input.createdAt,
         }));
       }
@@ -404,6 +463,11 @@ const buildWakePrompt = (input: {
     "",
     "Voice policy:",
     formatVoicePolicy(input.voicePolicy),
+    "Voice decision rules:",
+    "- request_voice_callout requires voiceCalloutDraft.text.",
+    "- If voiceEnabled is false, draft text only and do not request a voice tool.",
+    "- If requiresConfirmation is true, produce the callout draft and wait for confirmation; do not request a voice tool.",
+    "- If allowedNow is true and speech is appropriate, record the decision first and request the separate voice delivery tool from that decision.",
     "",
     "Unread mail batch:",
     `Wake request: ${input.wake.wakeRequestId}`,
@@ -570,6 +634,8 @@ export async function runNextMailWakeRequest(input: {
   jobId?: string | null;
   baseUrl?: string;
   askTurnRunner?: AskWakeTurnRunner;
+  voiceDeliveryRunner?: StagePlayLiveSourceVoiceDeliveryRunner | null;
+  pressureCheck?: StagePlayMailWakePressureCheck | null;
   now?: string;
 } = {}): Promise<StagePlayLiveSourceMailWakeResultV1 | null> {
   const now = input.now ?? new Date().toISOString();
@@ -627,6 +693,38 @@ export async function runNextMailWakeRequest(input: {
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
+  const pressure = input.pressureCheck?.({
+    wakeRequest: runningAttempt,
+    now,
+  }) ?? null;
+  let admissionReleased = false;
+  const releaseAdmission = (outcome: "completed" | "failed" | "rejected" | "aborted") => {
+    if (admissionReleased) return;
+    admissionReleased = true;
+    pressure?.release?.(outcome);
+  };
+  if (pressure?.deferred) {
+    const nextRetryAt = addMs(now, wakeAttemptBackoffMs(runningAttempt.attemptCount));
+    const reason = pressure.reason ?? "runtime_memory_pressure";
+    markStagePlayMailWakeRetryable({
+      wakeRequestId: running.wakeRequestId,
+      status: "deferred_for_pressure",
+      failureReason: reason,
+      nextRetryAt,
+      now,
+    });
+    releaseAdmission("rejected");
+    return recordStagePlayMailWakeResult({
+      wakeRequestId: running.wakeRequestId,
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      status: "deferred_for_pressure",
+      failedReason: reason,
+      evidenceRefs,
+      createdAt: now,
+    });
+  }
   try {
     const prompt = buildWakePrompt({
       wake: running,
@@ -650,6 +748,7 @@ export async function runNextMailWakeRequest(input: {
         failureReason: failedReason,
         now: new Date().toISOString(),
       });
+      releaseAdmission("failed");
       return recordStagePlayMailWakeResult({
         wakeRequestId: running.wakeRequestId,
         threadId: running.threadId,
@@ -680,12 +779,28 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: completed?.evidenceRefs ?? evidenceRefs,
       createdAt: new Date().toISOString(),
     });
+    const storedDecisions = (completed?.decisionIds ?? decisionIds)
+      .map((decisionId) => getStagePlayMailDecision(decisionId))
+      .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
+    const voiceReceipts: StagePlayLiveSourceVoiceDeliveryReceiptV1[] = [];
+    for (const decision of storedDecisions) {
+      const receipt = await maybeRunStagePlayLiveSourceVoiceDelivery({
+        decision,
+        runner: input.voiceDeliveryRunner ?? null,
+        now: wakeResult.createdAt,
+      });
+      if (receipt) voiceReceipts.push(receipt);
+    }
     const transcriptRows = buildDurableWakeTranscriptRows({
       wake: completed ?? running,
       wakeResult,
       mailBatch,
       decisionIds: completed?.decisionIds ?? decisionIds,
-      evidenceRefs: completed?.evidenceRefs ?? evidenceRefs,
+      voiceReceipts,
+      evidenceRefs: uniqueStrings([
+        ...(completed?.evidenceRefs ?? evidenceRefs),
+        ...voiceReceipts.flatMap((receipt) => receipt.evidenceRefs),
+      ]),
       createdAt: wakeResult.createdAt,
     });
     const transcriptEntries = recordStagePlayLiveSourceMailTranscriptEntries({
@@ -699,7 +814,10 @@ export async function runNextMailWakeRequest(input: {
       mailIds: running.mailIds,
       sourceIds: running.sourceIds,
       rows: transcriptRows,
-      evidenceRefs: wakeResult.evidenceRefs,
+      evidenceRefs: uniqueStrings([
+        ...wakeResult.evidenceRefs,
+        ...voiceReceipts.flatMap((receipt) => [receipt.receiptId, ...receipt.evidenceRefs]),
+      ]),
       createdAt: wakeResult.createdAt,
     });
     return {
@@ -710,6 +828,7 @@ export async function runNextMailWakeRequest(input: {
       ]),
     };
   } catch (err) {
+    releaseAdmission(isPressure503(err) ? "rejected" : "failed");
     const failedAt = now;
     if (isPressure503(err)) {
       const nextRetryAt = addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount));
@@ -747,5 +866,7 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs,
       createdAt: failedAt,
     });
+  } finally {
+    releaseAdmission("completed");
   }
 }

@@ -67,6 +67,7 @@ import { trainStatusRouter } from "./routes/train-status";
 import { clientErrorRouter } from "./routes/observability.client-error";
 import { createRateLimiter } from "./middleware/rate-limit";
 import { createConcurrencyGuard } from "./middleware/concurrency-guard";
+import { startStagePlayLiveSourceMailWakeService } from "./services/stage-play/stage-play-live-source-mail-wake-service";
 
 const flagEnabled = (value: string | undefined, defaultValue: boolean): boolean => {
   if (value === "1") return true;
@@ -1266,6 +1267,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix", grAgentRouter);
   app.use("/api/helix", trainingTraceRouter);
   app.use("/api/helix", constraintPacksRouter);
+  startStagePlayLiveSourceMailWakeService();
 
   app.get("/api/qisnap/stream", (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");

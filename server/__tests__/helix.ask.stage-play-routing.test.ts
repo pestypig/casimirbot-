@@ -37,6 +37,7 @@ import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-pl
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -59,6 +60,7 @@ beforeEach(() => {
   resetStagePlayCheckpointQueueForTest();
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
+  resetStagePlayLiveSourceMailTranscriptStoreForTest();
 });
 
 afterEach(() => {
@@ -155,6 +157,22 @@ describe("Helix Ask Stage Play routing", () => {
       allow_client_shortcut: false,
       allow_no_tool_direct: false,
     });
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      route_admission: {
+        status: "won",
+        selected_target_source: "live_source_mailbox",
+      },
+      source_target_intent: expect.objectContaining({
+        target_source: "live_source_mailbox",
+        target_kind: "live_source_mailbox",
+      }),
+      capability: "live_env.read_live_source_mail",
+      ask_turn_id: response.body?.turn_id,
+      next_loop_state: "armed_for_next_summary",
+      voice_policy: expect.objectContaining({
+        allowedNow: false,
+      }),
+    });
     expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
       .toEqual(expect.arrayContaining([
         "live_env.read_live_source_mail",
@@ -170,6 +188,7 @@ describe("Helix Ask Stage Play routing", () => {
       artifactId: "stage_play_live_source_mail_read_result",
       items: [
         expect.objectContaining({
+          mailId: expect.stringMatching(/^stage_play_live_source_mail:/),
           sourceRefs: expect.objectContaining({
             frameRef: "visual_frame:stage-play-mail-route",
             evidenceRef: "visual_evidence:stage-play-mail-route",
@@ -185,6 +204,12 @@ describe("Helix Ask Stage Play routing", () => {
       decision: "wait_for_next_summary",
       nextLoopState: "armed_for_next_summary",
     });
+    expect(response.body?.stage_play_live_source_mailbox_debug?.mail_ids, routeDebug).toContain(
+      readArtifact?.payload?.observation?.items?.[0]?.mailId,
+    );
+    expect(response.body?.stage_play_live_source_mailbox_debug?.decision_ids, routeDebug).toContain(
+      decisionArtifact?.payload?.observation?.decisionId,
+    );
     expect(response.body?.terminal_artifact_kind, routeDebug).toBe("model_synthesized_answer");
     expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).not.toContain("terminal_route_mismatch");
     expect(response.body?.answer, routeDebug).not.toContain("visual evidence is unavailable");
@@ -199,6 +224,24 @@ describe("Helix Ask Stage Play routing", () => {
     expect(debugExport.body?.payload?.source_target_intent, routeDebug).toMatchObject({
       target_source: "live_source_mailbox",
       target_kind: "live_source_mailbox",
+    });
+    expect(debugExport.body?.payload?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      route_admission: expect.objectContaining({
+        status: "won",
+        reason: expect.stringMatching(/mail/i),
+      }),
+      source_target_intent: expect.objectContaining({
+        target_source: "live_source_mailbox",
+        target_kind: "live_source_mailbox",
+      }),
+      capability: "live_env.read_live_source_mail",
+      mail_ids: expect.arrayContaining([readArtifact?.payload?.observation?.items?.[0]?.mailId]),
+      ask_turn_id: response.body?.turn_id,
+      decision_ids: expect.arrayContaining([decisionArtifact?.payload?.observation?.decisionId]),
+      next_loop_state: "armed_for_next_summary",
+      voice_policy: expect.objectContaining({
+        allowedNow: false,
+      }),
     });
     expect(debugExport.body?.payload?.evidence_target_arbitration, routeDebug).toMatchObject({
       selected_target_source: "live_source_mailbox",
@@ -362,6 +405,18 @@ describe("Helix Ask Stage Play routing", () => {
     expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
       artifactId: "stage_play_live_source_mail_decision",
     });
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      route_admission: expect.objectContaining({
+        status: "won",
+        selected_target_source: "live_source_mailbox",
+      }),
+      capability: "live_env.read_live_source_mail",
+      wake_request_id: "stage_play_live_source_mail_wake:test",
+      wake_request_ids: expect.arrayContaining(["stage_play_live_source_mail_wake:test"]),
+      mail_ids: expect.arrayContaining(["stage_play_live_source_mail:test"]),
+      ask_turn_id: response.body?.turn_id,
+      decision_ids: expect.arrayContaining([decisionArtifact?.payload?.observation?.decisionId]),
+    });
   }, 30_000);
 
   it("does not execute mailbox tools from a negated live-source mail mention", async () => {
@@ -383,7 +438,67 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.canonical_goal_frame?.classifier_reasons ?? [], routeDebug).not.toContain("prefer_read_live_source_mail");
     expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [], routeDebug)
       .not.toContain("live_env.read_live_source_mail");
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      route_admission: expect.objectContaining({
+        status: "rejected",
+        selected_target_source: expect.any(String),
+      }),
+      capability: null,
+    });
+    const debugExport = await request(createApp())
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      route_admission: expect.objectContaining({
+        status: "rejected",
+        reason: expect.stringMatching(/selected/i),
+      }),
+      capability: null,
+    });
   }, 30_000);
+
+  it.each([
+    [
+      "future mailbox command",
+      "In the future, use live_env.read_live_source_mail when I ask you to watch the mailbox; for now explain what that tool is.",
+    ],
+    [
+      "quoted mailbox command",
+      "\"live_env.read_live_source_mail\" is the literal command text I saw; explain what it means without running it.",
+    ],
+    [
+      "screen-visible mailbox command",
+      "The screen says \"read live source mail\" on a button. Do not press or execute it; just explain the label.",
+    ],
+  ])("does not execute mailbox tools from %s", async (_label, question) => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      sourceTarget: response.body?.source_target_intent,
+      mailboxDebug: response.body?.stage_play_live_source_mailbox_debug,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.read_live_source_mail");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.record_live_source_mail_decision");
+    expect(response.body?.stage_play_live_source_mailbox_debug?.route_admission?.status, routeDebug).not.toBe("won");
+
+    const debugExport = await request(createApp())
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.stage_play_live_source_mailbox_debug?.route_admission?.status, routeDebug)
+      .not.toBe("won");
+  }, 45_000);
 
   it("routes natural active visual mailbox prompts away from Situation Room visual capture", async () => {
     startVisualSnapshotSource({
