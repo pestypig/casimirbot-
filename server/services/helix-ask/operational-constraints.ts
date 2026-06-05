@@ -210,6 +210,7 @@ export const buildOperationalCapabilityTrace = (input: {
 const surfaceForCapability = (capability: string | null): string | null => {
   if (!capability) return null;
   if (/chrome_extension/i.test(capability)) return "chrome_extension";
+  if (/workspace[_-]?os|workspace_diagnostic/i.test(capability)) return "workspace_os_status";
   if (/repo-code|repo_code|repo_evidence/i.test(capability)) return "repo_code_evidence";
   if (/docs-viewer|docs_viewer|docs:/i.test(capability)) return "docs_viewer";
   if (/situation-room|situation_run|visual_capture|visual/i.test(capability)) return "helix_tab_capture";

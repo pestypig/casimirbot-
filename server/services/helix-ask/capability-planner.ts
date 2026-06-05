@@ -11,6 +11,10 @@ import {
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import {
+  HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+  isWorkspaceOsStatusPrompt,
+} from "./workspace-os-status-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -47,6 +51,14 @@ const classifySourceFamily = (input: {
   admittedFamilies: string[];
 }): HelixCapabilityFamily => {
   const prompt = normalize(input.promptText);
+  if (
+    input.sourceTarget === "workspace_diagnostic" ||
+    input.targetKind === "workspace_diagnostic" ||
+    input.admittedFamilies.includes("workspace_diagnostic") ||
+    isWorkspaceOsStatusPrompt(input.promptText)
+  ) {
+    return "workspace_diagnostic";
+  }
   if (/\b(?:why|debug|diagnos|explain)\b/.test(prompt) && /\b(?:set_rate|tool call|last turn|debug export|authority|failure|failed)\b/.test(prompt)) {
     return "debug_export";
   }
@@ -129,6 +141,7 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
       : HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
   }
   if (family === "process_graph") return "inspect_process_graph";
+  if (family === "workspace_diagnostic") return HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
   return "diagnose_debug_or_runtime_evidence";
 };
@@ -161,6 +174,7 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "repo_evidence") return admittedFamilies.includes("repo_code");
   if (family === "scholarly_research") return admittedFamilies.includes("scholarly_research");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
+  if (family === "workspace_diagnostic") return admittedFamilies.includes("workspace_diagnostic");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
   if (family === "live_environment") return admittedFamilies.includes("live_environment");
   if (family === "live_source") return admittedFamilies.includes("live_pipeline");
@@ -204,6 +218,7 @@ const admissionFor = (input: {
     input.family === "visual_capture" ||
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
+    input.family === "workspace_diagnostic" ||
     input.family === "live_environment" ||
     input.family === "scholarly_research" ||
     input.family === "repo_evidence" ||

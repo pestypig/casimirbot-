@@ -790,6 +790,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS");
     expect(source).toContain("shouldShowAskLiveAgenticEventRow");
     expect(source).toContain("live turn completed");
+    expect(source).toContain("live question");
+    expect(source).toContain("model decision");
     expect(source).toContain("helix-ask-turn-enter");
     expect(source).toContain("helix-ask-turn-line-enter");
     expect(source).toContain("@keyframes helixAskTurnFadeIn");
@@ -864,6 +866,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Voice callout request");
     expect(source).toContain("Voice tool call");
     expect(source).toContain("Voice receipt");
+    expect(source).toContain('if (row.rowKind === "loop_state") return row.title || "Loop state"');
     expect(source).toContain('row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail"');
   });
 

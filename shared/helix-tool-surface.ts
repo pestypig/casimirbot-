@@ -74,6 +74,7 @@ export type HelixToolSurfaceDebugSnapshot = {
   grouped_by_panel: Record<string, string[]>;
   visible_panels: string[];
   workspace_actions: string[];
+  workspace_os_tools?: string[];
   open_panel_mappings: number;
   run_panel_action_mappings: number;
   manual_only_count: number;

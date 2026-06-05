@@ -9,6 +9,7 @@ export type HelixToolCallAdmissionFamily =
   | "repo_code"
   | "scholarly_research"
   | "runtime_evidence"
+  | "workspace_diagnostic"
   | "live_environment"
   | "live_pipeline"
   | "process_graph"

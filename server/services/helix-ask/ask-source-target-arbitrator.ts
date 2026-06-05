@@ -30,6 +30,10 @@ import {
   isStagePlayJobPlanningPrompt,
   isStagePlayReflectionPrompt,
 } from "./stage-play-prompt-intent";
+import {
+  isWorkspaceOsStatusPrompt,
+  workspaceOsStatusReasonCodes,
+} from "./workspace-os-status-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -735,6 +739,32 @@ export function arbitrateAskSourceTarget(input: {
       confidence: 0.9,
       allowClientShortcut: false,
       allowNoToolDirect: true,
+    });
+  }
+  if (isWorkspaceOsStatusPrompt(prompt)) {
+    const reasonCodes = workspaceOsStatusReasonCodes(prompt);
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "workspace_diagnostic",
+      targetKind: "workspace_diagnostic",
+      strength: "hard",
+      explicitCues: reasonCodes,
+      reasons: ["workspace_os_status_source_target", ...reasonCodes],
+      requestedOutputs: ["workspace_os_status", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: [
+        "workspace_action_receipt",
+        "workstation_action",
+        "workspace_panel",
+        "client_projection",
+        "panel_generated_answer",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "workspace_os_status_source_target",
+      confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
     });
   }
   const scholarlyResearchIntent = detectScholarlyResearchIntent(prompt);

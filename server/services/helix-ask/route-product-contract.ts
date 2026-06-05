@@ -124,6 +124,7 @@ const normalizeSourceTarget = (
     sourceTarget === "repo_code" ||
     sourceTarget === "scholarly_research" ||
     sourceTarget === "runtime_evidence" ||
+    sourceTarget === "workspace_diagnostic" ||
     sourceTarget === "situation_epoch" ||
     sourceTarget === "visual_scene_memory" ||
     sourceTarget === "process_graph" ||
@@ -445,6 +446,38 @@ export function buildRouteProductContract(input: {
         "repo_answer_text_quality_gate",
         "repo_claim_support",
         "repo_claim_observation_gate",
+      ],
+    });
+  }
+
+  if (sourceTarget === "workspace_diagnostic") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "workspace_diagnostic",
+      allowedCore: [],
+      allowedExtra: ["model_synthesized_answer", "typed_failure", "request_user_input"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "situation_context_pack",
+        "visual_context_pack",
+        "client_projection",
+        "panel_generated_answer",
+        "no_tool_direct",
+        "model_only_concept",
+      ],
+      precedenceReason: "workspace_diagnostic_requires_workspace_os_status_observation_then_model_synthesis",
+      sideArtifactKindsAllowed: [
+        "workspace_os_status_observation",
+        "helix.workspace_os_status_observation.v1",
+        "helix.workspace_os.status.v1",
+        "helix.agent_step_observation_packet",
       ],
     });
   }

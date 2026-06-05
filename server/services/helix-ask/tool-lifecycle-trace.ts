@@ -46,6 +46,7 @@ const capabilityFromPlan = (plan: RecordLike | null): string | null => {
 const toolFamilyFromCapability = (capability: string | null): string => {
   if (!capability) return "none";
   const normalized = capability.toLowerCase();
+  if (/workspace[_-]?os|workspace_diagnostic/.test(normalized)) return "workspace_diagnostic";
   if (/calculator|scientific-calculator/.test(normalized)) return "calculator";
   if (/chrome|browser|visual|live_source|live-environment|situation/.test(normalized)) return "live_source";
   if (/docs|document/.test(normalized)) return "docs";

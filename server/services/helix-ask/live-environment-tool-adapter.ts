@@ -155,27 +155,66 @@ const readWatchJobOutputPolicy = (
   };
 };
 
+const formatWatchJobOutputPolicy = (policy: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]): string => {
+  const text = policy.allowTextAnswer ? "text answer allowed" : "text answer disabled";
+  const voice = policy.allowVoiceCallout ? "voice allowed" : "voice disabled";
+  const confirmation = policy.confirmationRequired ? "confirmation required" : "no confirmation required";
+  const urgency = policy.voiceRequiresUrgency ? "urgent voice only" : "voice urgency not required";
+  return `${text}, ${voice}, ${confirmation}, ${urgency}.`;
+};
+
 const buildWatchJobConfiguredTranscriptRows = (input: {
   policy: StagePlayLiveSourceWatchJobPolicyV1;
   createdAt?: string;
 }): AskTurnTranscriptRowDraftV1[] => {
   const createdAt = input.createdAt ?? new Date().toISOString();
+  const rowBase = {
+    source: {
+      toolName: "live_env.configure_live_source_watch_job",
+      artifactId: input.policy.policyId,
+      artifactKind: input.policy.artifactId,
+    },
+    evidenceRefs: input.policy.evidenceRefs,
+    authority: "tool_evidence" as const,
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  };
   return [
     {
       rowId: `ask_turn_watch_job_configured:${hashShort(input.policy.policyId)}`,
       rowKind: "loop_state",
       title: "Watch job configured",
-      body: `Armed watch policy: ${input.policy.objectiveText}`,
-      source: {
-        toolName: "live_env.configure_live_source_watch_job",
-        artifactId: input.policy.policyId,
-        artifactKind: input.policy.artifactId,
-      },
-      evidenceRefs: input.policy.evidenceRefs,
-      authority: "tool_evidence",
-      assistantAnswer: false,
-      terminalEligible: false,
-      createdAt,
+      body: `Watch policy armed: ${input.policy.policyId}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_watch_job_objective:${hashShort(input.policy.policyId)}`,
+      rowKind: "loop_state",
+      title: "Objective",
+      body: `Objective: ${input.policy.objectiveText}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_watch_job_source:${hashShort(input.policy.policyId)}`,
+      rowKind: "loop_state",
+      title: "Source",
+      body: `Source: ${input.policy.sourceIds.length > 0 ? input.policy.sourceIds.join(", ") : "all active live sources"}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_watch_job_policy:${hashShort(input.policy.policyId)}`,
+      rowKind: "loop_state",
+      title: "Policy",
+      body: `Policy: ${formatWatchJobOutputPolicy(input.policy.outputPolicy)}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_watch_job_loop_state:${hashShort(input.policy.policyId)}`,
+      rowKind: "loop_state",
+      title: "Loop state",
+      body: "Loop state: armed for next summary.",
+      ...rowBase,
     },
   ];
 };

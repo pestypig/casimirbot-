@@ -17,6 +17,10 @@ import {
   type HelixToolSurfacePacket,
 } from "@shared/helix-tool-surface";
 import { detectContextualToolAdmissionSuppression } from "../contextual-tool-admission";
+import {
+  HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+  isWorkspaceOsStatusPrompt,
+} from "../workspace-os-status-intent";
 
 export type BuildHelixToolSurfaceInput = {
   turnId: string;
@@ -30,6 +34,7 @@ export type BuildHelixToolSurfaceInput = {
 };
 
 const DEFAULT_MAX_SURFACE_ENTRIES = 28;
+const WORKSPACE_OS_TOOL_COUNT = 1;
 
 const MUTATING_ACTION_PATTERN =
   /\b(?:create|append|write|delete|clear|stop|pause|resume|activate|detach|attach|bind|set_|set\.|confirm|speak|start|run|archive|refresh)\b/i;
@@ -133,6 +138,55 @@ export const buildHelixToolSurfaceEntry = (
   };
 };
 
+const buildWorkspaceOsStatusToolSurfaceEntry = (): HelixToolSurfaceEntry => ({
+  schema: HELIX_TOOL_SURFACE_ENTRY_SCHEMA,
+  capability_key: HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+  panel_id: "workspace-os",
+  action: "status",
+  display_name: "Inspect Workspace OS status",
+  description:
+    "Read sanitized workspace capability, binding, fallback, and runtime-memory status. It never executes browser, clipboard, shell, filesystem, or workstation actions.",
+  runtime_shape: "run_panel_action",
+  execution_target: "server_only",
+  mutating: false,
+  manual_only: false,
+  explicit_attachment_only: false,
+  confirmation_required: false,
+  requires_active_panel: false,
+  active_panel_boost: false,
+  source_requirements: [],
+  input_schema: {
+    type: "object",
+    required: [],
+    additionalProperties: true,
+    properties: {
+      thread_id: { type: "string" },
+      room_id: { type: "string" },
+      capability_ids: { type: "array", items: { type: "string" } },
+    },
+  },
+  expected_observation_schema: "helix.workspace_os_status_observation.v1",
+  terminal_eligible: false,
+  safety_tags: ["read_or_observe", "diagnostic_only", "no_raw_content", "non_terminal"],
+  route_tags: [
+    "workspace",
+    "workspace_os",
+    "status",
+    "capability",
+    "health",
+    "browser",
+    "clipboard",
+    "capture",
+    "source",
+    "binding",
+    "runtime",
+    "memory",
+    "fallback",
+  ],
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const scoreEntryForPrompt = (entry: HelixToolSurfaceEntry, prompt: string, focusedPanelId?: string | null): number => {
   const promptTokens = new Set(tokenize(prompt));
   const haystack = new Set([...entry.route_tags, ...tokenize(`${entry.capability_key} ${entry.description}`)]);
@@ -147,6 +201,7 @@ const scoreEntryForPrompt = (entry: HelixToolSurfaceEntry, prompt: string, focus
   if (entry.panel_id === "scientific-calculator" && /(?:calculate|compute|solve|calculator|equation|expression)/i.test(prompt)) score += 6;
   if (entry.panel_id === "workstation-notes" && /(?:note|notes|append|save|write down)/i.test(prompt)) score += 6;
   if (entry.panel_id.startsWith("situation-room") && /(?:situation|dottie|minecraft|source|live|watch|voice|callout|observer)/i.test(prompt)) score += 6;
+  if (entry.capability_key === HELIX_WORKSPACE_OS_STATUS_CAPABILITY && isWorkspaceOsStatusPrompt(prompt)) score += 12;
   if (entry.mutating) score -= 0.4;
   if (entry.manual_only) score -= 1.5;
   return score;
@@ -163,7 +218,10 @@ const incrementOmitted = (
 
 export const buildHelixToolSurfacePacket = (input: BuildHelixToolSurfaceInput): HelixToolSurfacePacket => {
   const activePanelSet = new Set((input.activePanels ?? []).map((panel) => panel.trim()).filter(Boolean));
-  const allEntries = WORKSTATION_DYNAMIC_TOOL_ACTIONS.map((action) => buildHelixToolSurfaceEntry(action, activePanelSet));
+  const allEntries = [
+    buildWorkspaceOsStatusToolSurfaceEntry(),
+    ...WORKSTATION_DYNAMIC_TOOL_ACTIONS.map((action) => buildHelixToolSurfaceEntry(action, activePanelSet)),
+  ];
   const omitted = new Map<string, number>();
   const contextualSuppression = detectContextualToolAdmissionSuppression(input.prompt);
   if (contextualSuppression) {
@@ -173,7 +231,7 @@ export const buildHelixToolSurfacePacket = (input: BuildHelixToolSurfaceInput): 
     return {
       schema: HELIX_TOOL_SURFACE_PACKET_SCHEMA,
       turn_id: input.turnId,
-      total_registered_tools: WORKSTATION_DYNAMIC_TOOL_ACTIONS.length,
+      total_registered_tools: WORKSTATION_DYNAMIC_TOOL_ACTIONS.length + WORKSPACE_OS_TOOL_COUNT,
       visible_panel_count: WORKSPACE_ACTION_VISIBLE_PANEL_IDS.length,
       workspace_action_count: WORKSPACE_ACTION_REGISTRY.filter((entry) => entry.enabled).length,
       entries: [],
@@ -229,7 +287,7 @@ export const buildHelixToolSurfacePacket = (input: BuildHelixToolSurfaceInput): 
   return {
     schema: HELIX_TOOL_SURFACE_PACKET_SCHEMA,
     turn_id: input.turnId,
-    total_registered_tools: WORKSTATION_DYNAMIC_TOOL_ACTIONS.length,
+    total_registered_tools: WORKSTATION_DYNAMIC_TOOL_ACTIONS.length + WORKSPACE_OS_TOOL_COUNT,
     visible_panel_count: WORKSPACE_ACTION_VISIBLE_PANEL_IDS.length,
     workspace_action_count: WORKSPACE_ACTION_REGISTRY.filter((entry) => entry.enabled).length,
     entries,
@@ -270,6 +328,7 @@ export const buildHelixToolSurfaceDebugSnapshot = (): HelixToolSurfaceDebugSnaps
     ),
     visible_panels: [...WORKSPACE_ACTION_VISIBLE_PANEL_IDS],
     workspace_actions: WORKSPACE_ACTION_REGISTRY.filter((entry) => entry.enabled).map((entry) => entry.action_key),
+    workspace_os_tools: [HELIX_WORKSPACE_OS_STATUS_CAPABILITY],
     open_panel_mappings: openPanelMappings,
     run_panel_action_mappings: runPanelActionMappings,
     manual_only_count: manualOnlyCount,

@@ -312,6 +312,7 @@ const sourceTargeted = new Set([
   "visual_scene_memory",
   "repo_code",
   "runtime_evidence",
+  "workspace_diagnostic",
   "docs_viewer",
   "active_doc",
   "process_graph",
@@ -321,13 +322,14 @@ const sourceTargeted = new Set([
 ]);
 
 const sourceRequiresEvidence = (sourceTarget: string): boolean =>
-  /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|docs_viewer|active_doc|world_event/i.test(sourceTarget);
+  /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_diagnostic|docs_viewer|active_doc|world_event/i.test(sourceTarget);
 
 const toolFamilyMutating = (family: string): boolean =>
   /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);
 
 const inferToolFamily = (toolId: string): string => {
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
+  if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
   if (/click|open|close|panel|workspace-action|workspace_action/i.test(toolId)) return "workstation_action";
   if (/workstation-notes|note/i.test(toolId)) return "notes";
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";

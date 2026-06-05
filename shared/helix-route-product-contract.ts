@@ -11,6 +11,7 @@ export type HelixRouteProductSourceTarget =
   | "repo_code"
   | "scholarly_research"
   | "runtime_evidence"
+  | "workspace_diagnostic"
   | "live_pipeline"
   | "live_environment"
   | "live_source_mailbox"

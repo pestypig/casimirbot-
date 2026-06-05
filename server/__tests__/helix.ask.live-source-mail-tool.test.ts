@@ -159,6 +159,26 @@ describe("live-source mail live environment tools", () => {
           terminalEligible: false,
           assistantAnswer: false,
         }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Objective",
+          body: "Objective: Watch the visual source and only announce if a hostile mob appears.",
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Source",
+          body: `Source: ${sourceId}`,
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Policy",
+          body: expect.stringContaining("text answer allowed"),
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Loop state",
+          body: "Loop state: armed for next summary.",
+        }),
       ],
       post_tool_model_step_required: true,
       assistant_answer: false,
@@ -212,6 +232,45 @@ describe("live-source mail live environment tools", () => {
       },
     });
     expect(payload.artifactId).not.toBe("stage_play_live_source_mail_read_result");
+    expect(payload.transcriptRows.map((row: any) => row.title)).toEqual([
+      "Watch job configured",
+      "Objective",
+      "Source",
+      "Policy",
+      "Loop state",
+    ]);
+    expect(payload.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Objective",
+        body: "Objective: Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+      }),
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Source",
+        body: `Source: ${sourceId}`,
+      }),
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining("text answer allowed"),
+      }),
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining("voice disabled"),
+      }),
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining("confirmation required"),
+      }),
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Loop state",
+        body: "Loop state: armed for next summary.",
+      }),
+    ]));
     expect(observation.assistant_answer).toBe(false);
     expect(payload.terminal_eligible).toBe(false);
   });

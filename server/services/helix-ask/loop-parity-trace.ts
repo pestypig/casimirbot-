@@ -79,6 +79,7 @@ const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const inferToolFamily = (toolId: string): string => {
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
+  if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
   if (/situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding)/i.test(toolId)) return "situation_run";
   if (/^docs-viewer\.|doc[_-]?viewer|docs_viewer/i.test(toolId)) return "docs_viewer";
   if (/calculator/i.test(toolId)) return "calculator";
@@ -160,6 +161,7 @@ const collectActualToolCalls = (payload: RecordLike, admittedToolFamilies: strin
         pushToolCall(calls, toolId, admittedFamilies, resultRef);
       }
     }
+    pushToolCall(calls, readString(artifactPayload?.capability_key), admittedFamilies, resultRef);
     pushToolCall(calls, readString(artifactPayload?.action_id) || readString(artifactPayload?.action_key), admittedFamilies, resultRef);
     for (const action of readStringArray(artifactPayload?.actions)) {
       pushToolCall(calls, action, admittedFamilies, resultRef);

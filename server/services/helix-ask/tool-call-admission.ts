@@ -12,6 +12,7 @@ import {
   isStagePlayJobPlanningPrompt,
   isStagePlayReflectionPrompt,
 } from "./stage-play-prompt-intent";
+import { isWorkspaceOsStatusPrompt } from "./workspace-os-status-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -28,6 +29,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "repo_code",
   "scholarly_research",
   "runtime_evidence",
+  "workspace_diagnostic",
   "docs_viewer",
   "active_doc",
   "process_graph",
@@ -156,6 +158,37 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
     reason = "document_open_prompt_requires_docs_viewer_path";
+  } else if (sourceTarget === "workspace_diagnostic" || isWorkspaceOsStatusPrompt(promptText)) {
+    required = true;
+    admittedToolFamilies = ["workspace_diagnostic"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "doc_open_receipt",
+      "doc_summary",
+      "active_doc_identity",
+      "situation_context_pack",
+      "visual_context_pack",
+      "client_projection",
+      "panel_generated_answer",
+      "no_tool_direct",
+      "model_only_concept",
+    ];
+    extraForbiddenRoutes = [
+      "workspace_panel",
+      "workstation_panel",
+      "workstation_action",
+      "active_doc_identity",
+      "active_doc_summary",
+      "doc_open_best",
+      "visual_deictic",
+      "visual_frame_evidence",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    reason = "workspace_diagnostic_requires_workspace_os_status_tool_path";
   } else if (sourceTarget === "workspace_panel" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_action") {
     admittedToolFamilies = ["workstation_action"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept"];

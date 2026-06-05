@@ -11,6 +11,7 @@ export type HelixCapabilityFamily =
   | "scholarly_research"
   | "process_graph"
   | "debug_export"
+  | "workspace_diagnostic"
   | "subagent_runtime_adapter";
 
 export type HelixCapabilityAdmissionStatus =

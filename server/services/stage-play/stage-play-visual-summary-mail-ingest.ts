@@ -3,9 +3,11 @@ import type { HelixVisualFrameEvidence } from "@shared/helix-visual-frame-eviden
 import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA,
   type AskTurnTranscriptRowDraftV1,
+  type StagePlayLiveSourceJobStateV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourceMailReadResultV1,
+  type StagePlayLiveSourceWatchJobPolicyV1,
   type StagePlayLiveSourceVoicePolicyV1,
   type StagePlayMailDecisionV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -16,9 +18,11 @@ import {
 } from "./stage-play-live-source-mail-voice-bridge";
 import {
   enqueueStagePlayLiveSourceMailItem,
+  getStagePlayLiveSourceWatchJobPolicy,
   getStagePlayLiveSourceMailItem,
   listStagePlayLiveSourceJobStates,
   listStagePlayMailDecisions,
+  listStagePlayLiveSourceWatchJobPolicies,
   listUnreadStagePlayLiveSourceMailItems,
   markStagePlayMailDeliveredToAsk,
   markStagePlayMailRead,
@@ -72,6 +76,73 @@ const mailItemCanBeDeliveredToAsk = (
   input?: { includeDelivered?: boolean },
 ): boolean =>
   item.status === "unread" || (input?.includeDelivered === true && item.status === "delivered_to_ask");
+
+const sourceScopeMatches = (
+  scopedSourceIds: string[] | null | undefined,
+  sourceIds: Set<string>,
+): boolean =>
+  sourceIds.size === 0 ||
+  !scopedSourceIds ||
+  scopedSourceIds.length === 0 ||
+  scopedSourceIds.some((sourceId) => sourceIds.has(sourceId));
+
+const resolveActiveWatchPolicyForMailRead = (input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  items: StagePlayLiveSourceMailItemV1[];
+}): {
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  jobState: StagePlayLiveSourceJobStateV1 | null;
+} => {
+  const sourceIds = new Set([
+    input.sourceId,
+    ...input.items.map((item) => item.sourceId),
+  ].filter((entry): entry is string => Boolean(entry)));
+  const jobState = listStagePlayLiveSourceJobStates({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    limit: 50,
+  })
+    .filter((state) => state.status === "armed" || state.status === "checking")
+    .filter((state) => sourceScopeMatches(state.sourceIds, sourceIds))
+    .filter((state) => Boolean(state.watchJobPolicyRef))
+    .at(-1) ?? null;
+  const policyFromJob = jobState?.watchJobPolicyRef
+    ? getStagePlayLiveSourceWatchJobPolicy(jobState.watchJobPolicyRef)
+    : null;
+  if (policyFromJob && policyFromJob.status === "armed") {
+    return { policy: policyFromJob, jobState };
+  }
+  const policy = listStagePlayLiveSourceWatchJobPolicies({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    status: "armed",
+    limit: 50,
+  })
+    .filter((candidate) => sourceScopeMatches(candidate.sourceIds, sourceIds))
+    .at(-1) ?? null;
+  return { policy, jobState };
+};
+
+const watchPolicyWantsDraftForEveryMailBatch = (
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null,
+): boolean => {
+  if (!policy) return false;
+  const policyText = [
+    policy.objectiveText,
+    policy.decisionPolicyPrompt,
+    ...policy.importanceCriteria,
+  ].join("\n");
+  return (
+    /\beach\s+(?:new\s+)?(?:visual-summary\s+)?mail\s+batch\b/i.test(policyText) ||
+    /\bany\s+new\s+visual-summary\s+mail\s+batch\b/i.test(policyText) ||
+    /\brecord\s+draft_text_answer\b/i.test(policyText)
+  );
+};
 
 export function enqueueVisualSummaryMailFromEvidence(input: {
   threadId: string;
@@ -351,6 +422,17 @@ export function readLiveSourceMailForAsk(input: {
   }
   const now = input.now ?? new Date().toISOString();
   const delivered = markStagePlayMailDeliveredToAsk(items.map((item) => item.mailId), now);
+  const activeWatch = resolveActiveWatchPolicyForMailRead({
+    threadId: input.threadId,
+    roomId,
+    environmentId: input.environmentId ?? environment?.environment_id ?? null,
+    sourceId: input.sourceId ?? null,
+    items: delivered,
+  });
+  const activeObjective =
+    activeWatch.policy?.objectiveText ??
+    activeWatch.jobState?.objective ??
+    objective;
   const readId = `stage_play_live_source_mail_read:${hashShort([
     input.threadId,
     roomId ?? null,
@@ -363,7 +445,8 @@ export function readLiveSourceMailForAsk(input: {
     roomId,
     environmentId: input.environmentId ?? environment?.environment_id ?? null,
     sourceIds: delivered.map((item) => item.sourceId),
-    objective,
+    objective: activeObjective,
+    watchJobPolicyRef: activeWatch.policy?.policyId ?? activeWatch.jobState?.watchJobPolicyRef ?? null,
     status: "checking",
     mailboxCursor: delivered.at(-1)?.mailId ?? null,
     lastMailId: delivered.at(-1)?.mailId ?? null,
@@ -380,7 +463,30 @@ export function readLiveSourceMailForAsk(input: {
     ...delivered.map((item) => item.mailId),
     ...delivered.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.slice(-3).map((decision) => decision.decisionId),
+    activeWatch.policy?.policyId,
+    activeWatch.policy?.jobId,
+    ...(activeWatch.policy?.evidenceRefs ?? []),
+    activeWatch.jobState?.jobId,
   ]);
+  const suggestedDecisionOptions: StagePlayMailDecisionV1[] = watchPolicyWantsDraftForEveryMailBatch(activeWatch.policy) && delivered.length > 0
+    ? [
+        "draft_text_answer",
+        "wait_for_next_summary",
+        "record_interpretation",
+        ...(defaultVoicePolicy(input.voicePolicy).voiceEnabled ? ["request_voice_callout" as const] : []),
+        "request_more_evidence",
+        "request_stage_play_checkpoint",
+        "fail_closed",
+      ]
+    : [
+        "wait_for_next_summary",
+        "record_interpretation",
+        "draft_text_answer",
+        ...(defaultVoicePolicy(input.voicePolicy).voiceEnabled ? ["request_voice_callout" as const] : []),
+        "request_more_evidence",
+        "request_stage_play_checkpoint",
+        "fail_closed",
+      ];
   return {
     artifactId: "stage_play_live_source_mail_read_result",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA,
@@ -389,19 +495,14 @@ export function readLiveSourceMailForAsk(input: {
     roomId,
     environmentId: input.environmentId ?? environment?.environment_id ?? null,
     items: delivered,
-    activeObjective: objective,
-    priorDecisionRefs: priorDecisions.map((decision) => decision.decisionId),
-    priorAnswerObservationRefs: [],
+    activeObjective,
+    priorDecisionRefs: uniqueStrings([
+      ...(activeWatch.policy?.priorDecisionRefs ?? []),
+      ...priorDecisions.map((decision) => decision.decisionId),
+    ]),
+    priorAnswerObservationRefs: activeWatch.policy?.priorAnswerRefs ?? [],
     voicePolicy: defaultVoicePolicy(input.voicePolicy),
-    suggestedDecisionOptions: [
-      "wait_for_next_summary",
-      "record_interpretation",
-      "draft_text_answer",
-      ...(defaultVoicePolicy(input.voicePolicy).voiceEnabled ? ["request_voice_callout" as const] : []),
-      "request_more_evidence",
-      "request_stage_play_checkpoint",
-      "fail_closed",
-    ],
+    suggestedDecisionOptions,
     evidenceRefs,
     assistant_answer: false,
     terminal_eligible: false,

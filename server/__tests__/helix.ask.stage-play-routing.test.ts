@@ -35,7 +35,10 @@ import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runti
 import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-badge-graph-builder";
 import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-play/stage-play-ask-checkpoint-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
-import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  configureStagePlayLiveSourceWatchJobPolicy,
+  resetStagePlayLiveSourceMailboxForTest,
+} from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 
@@ -320,6 +323,26 @@ describe("Helix Ask Stage Play routing", () => {
           rowKind: "loop_state",
           title: "Watch job configured",
         }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Objective",
+          body: `Objective: ${expectedObjective}`,
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Source",
+          body: "Source: all active live sources",
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Policy",
+          body: expect.stringContaining("text answer allowed"),
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Loop state",
+          body: "Loop state: armed for next summary.",
+        }),
       ],
     });
     expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
@@ -335,6 +358,86 @@ describe("Helix Ask Stage Play routing", () => {
     );
     expect(exportedObservation?.payload?.observation?.watchJobPolicyRef, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
     expect(exportedObservation?.payload?.observation?.watch_job_policy_ref, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
+  }, 30_000);
+
+  it("forces policy configuration when the model tries to read mail during standing watch setup", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Incorrectly try to read current mail before storing the standing policy.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.91,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+        reason: "Answer after the policy receipt.",
+        args: {},
+        expected_artifacts: ["model_synthesized_answer"],
+        confidence: 0.8,
+      },
+    ]);
+
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:standing-watch-wrong-read",
+      ts: "2026-06-04T16:30:30.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:standing-watch-wrong-read",
+      summary: "Minecraft-like scene with stable terrain and no urgent change.",
+      supports_claims: [
+        {
+          claim: "The active visual source has compact evidence.",
+          support_status: "supports",
+          confidence: 0.81,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Watch the active visual source and describe each new mail batch in one sentence.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      artifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_configure_live_source_watch_job");
+    expect(chosenCapabilities, routeDebug).toContain("live_env.configure_live_source_watch_job");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.read_live_source_mail");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.record_live_source_mail_decision");
+    const liveToolArtifacts = response.body?.current_turn_artifact_ledger
+      ?.filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
+      ?? [];
+    expect(liveToolArtifacts.map((artifact: any) => artifact?.payload?.tool_name), routeDebug)
+      .toEqual(["live_env.configure_live_source_watch_job"]);
+    expect(response.body?.answer, routeDebug).not.toContain("Three unread live-source mail items");
+    expect(response.body?.answer, routeDebug).not.toContain("decision is required");
   }, 30_000);
 
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {
@@ -423,6 +526,109 @@ describe("Helix Ask Stage Play routing", () => {
       ask_turn_id: response.body?.turn_id,
       decision_ids: expect.arrayContaining([decisionArtifact?.payload?.observation?.decisionId]),
     });
+  }, 30_000);
+
+  it("forces a draft_text_answer decision after reading mail for a describe-each-batch policy", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Read the mailbox batch.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+        reason: "Incorrectly try to answer before recording the mail decision.",
+        args: {},
+        expected_artifacts: ["model_synthesized_answer"],
+        confidence: 0.8,
+      },
+    ]);
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+      decisionPolicyPrompt: [
+        "For each unread mail batch, read the listed mail refs as the current observation window.",
+        "If the mail batch contains any compact visual summary, record draft_text_answer.",
+        "The textAnswerDraft must be one sentence describing what was observed.",
+      ].join("\n"),
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: false,
+        voiceRequiresUrgency: true,
+        confirmationRequired: true,
+      },
+      importanceCriteria: ["Any new visual-summary mail batch should produce a one-sentence text answer."],
+      suppressCriteria: ["Suppress only if no unread mail items exist or mail lacks compact summary text."],
+    });
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:describe-policy-read",
+      ts: "2026-06-04T16:31:30.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:describe-policy-read",
+      summary: "Minecraft-like scene with a player near a book stand, a cat, and moonlit mountains.",
+      supports_claims: [
+        {
+          claim: "The active visual source has compact evidence.",
+          support_status: "supports",
+          confidence: 0.84,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Check the active visual live-source mailbox now. Read the latest visual summary mail and record the decision.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      artifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    expect(chosenCapabilities, routeDebug).toEqual(expect.arrayContaining([
+      "live_env.read_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ]));
+    const decisionArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "draft_text_answer",
+      textAnswerDraft: {
+        text: expect.stringContaining("Minecraft-like scene with a player near a book stand"),
+        terminalEligible: true,
+      },
+      nextLoopState: "armed_for_next_summary",
+    });
+    expect(response.body?.answer, routeDebug).not.toContain("decision is required");
   }, 30_000);
 
   it("does not execute mailbox tools from a negated live-source mail mention", async () => {

@@ -8420,7 +8420,7 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "mail_wake_requested") return "Wake requested";
   if (row.rowKind === "mail_wake_deferred") return "Wake deferred";
   if (row.rowKind === "requested_tool") return "Requested tool";
-  if (row.rowKind === "loop_state") return "Loop state";
+  if (row.rowKind === "loop_state") return row.title || "Loop state";
   if (row.rowKind === "blocked") return "Wake blocked";
   return row.title || "Live source mail";
 }
@@ -11003,9 +11003,11 @@ function buildAskLiveAgenticEventText(event: AskLiveEventEntry): string {
 const LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS: RegExp[] = [
   /^answer cleaned preview:\s*final\.?$/i,
   /^citations:\s*optional\.?$/i,
+  /^clipboard copy:\s*live question\b.*$/i,
   /^clipboard copy:\s*live turn completed\.?$/i,
   /^finalization finished\.?$/i,
   /^live turn completed\.?$/i,
+  /^model decision:\s*composer\.?$/i,
   /^mode gate consistency:\s*ok\.?$/i,
   /^objective gate consistency:\s*ok\.?$/i,
   /^rattling gate:\s*pass\.?$/i,
