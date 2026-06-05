@@ -56,6 +56,9 @@ import {
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
 } from "../stage-play/stage-play-visual-summary-mail-ingest";
+import {
+  configureStagePlayLiveSourceWatchJobPolicy,
+} from "../stage-play/stage-play-live-source-mailbox-store";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -1000,6 +1003,71 @@ export function executeLiveEnvironmentTool(
         ask_context_policy: "evidence_only",
       },
       evidenceRefs: readResult.evidenceRefs,
+    });
+  }
+
+  if (input.tool_name === "live_env.configure_live_source_watch_job") {
+    const objectiveText =
+      readString(args.objective_text) ??
+      readString(args.objectiveText) ??
+      readString(args.objective) ??
+      readString(args.user_prompt) ??
+      readString(args.userPrompt) ??
+      "Watch the live source and record decisions when source mail arrives.";
+    const sourceIds = [
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ].filter((entry): entry is string => Boolean(entry));
+    const allowVoiceCallout =
+      args.allow_voice_callout === true ||
+      args.allowVoiceCallout === true ||
+      /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
+    const configured = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId: effectiveThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceIds,
+      objectiveText,
+      decisionPolicyPrompt:
+        readString(args.decision_policy_prompt) ??
+        readString(args.decisionPolicyPrompt) ??
+        objectiveText,
+      outputPolicy: {
+        allowTextAnswer: args.allow_text_answer !== false && args.allowTextAnswer !== false,
+        allowVoiceCallout,
+        voiceRequiresUrgency:
+          args.voice_requires_urgency === true ||
+          args.voiceRequiresUrgency === true ||
+          allowVoiceCallout,
+        confirmationRequired:
+          args.confirmation_required === true ||
+          args.confirmationRequired === true,
+      },
+      importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria),
+      suppressCriteria: readStringArray(args.suppress_criteria ?? args.suppressCriteria),
+      evidenceRefs: sourceIds,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: configured.policy.environmentId ?? environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Configured live-source watch job policy ${configured.policy.policyId}; no mail was read.`,
+      observation: {
+        artifactId: "stage_play_live_source_watch_job_policy_result",
+        schemaVersion: "stage_play_live_source_watch_job_policy_result/v1",
+        watchJobPolicyRef: configured.policy.policyId,
+        watch_job_policy_ref: configured.policy.policyId,
+        policy: configured.policy,
+        jobState: configured.jobState,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: [configured.policy.policyId, configured.jobState.jobId, ...configured.policy.evidenceRefs],
     });
   }
 

@@ -204,10 +204,88 @@ describe("Helix Ask Stage Play routing", () => {
       selected_target_source: "live_source_mailbox",
       selected_target_kind: "live_source_mailbox",
     });
-    expect(debugExport.body?.payload?.route_product_contract, routeDebug).toMatchObject({
+    expect(debugExport.body?.payload?.tool_call_admission_decision, routeDebug).toMatchObject({
       source_target: "live_source_mailbox",
-      precedence_reason: "live_source_mailbox_requires_mail_read_then_decision",
+      reason: "live_source_mailbox_requires_mail_read_then_decision",
     });
+  }, 30_000);
+
+  it("configures visual watch-job policy without reading mail when the user gives a standing watch objective", async () => {
+    const question = "Watch the visual source and only announce if a hostile mob appears.";
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      availableCapabilities: response.body?.available_capabilities,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      currentTurnArtifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+
+    expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toEqual(expect.arrayContaining([
+      "live_source_mail_loop_intent",
+      "live_source_watch_job_setup_intent",
+      "prefer_configure_live_source_watch_job",
+    ]));
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? [], routeDebug).not.toContain("prefer_read_live_source_mail");
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.configure_live_source_watch_job");
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    expect(chosenCapabilities, routeDebug).toContain("live_env.configure_live_source_watch_job");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.read_live_source_mail");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.record_live_source_mail_decision");
+    expect(response.body?.agent_runtime_loop?.stop_reason, routeDebug).not.toBe("budget_exhausted");
+    expect(response.body?.terminal_error_code, routeDebug).not.toBe("agent_loop_budget_exhausted");
+
+    const liveToolArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_live_source_watch_job"
+    );
+    expect(liveToolArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_result",
+      watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      watch_job_policy_ref: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      policy: {
+        objectiveText: question,
+        decisionPolicyPrompt: question,
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: true,
+          voiceRequiresUrgency: true,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      jobState: {
+        objective: question,
+        watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+        nextLoopState: "armed_for_next_summary",
+      },
+    });
+    expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
+    expect(response.body?.answer, routeDebug).not.toContain("latest unread source update");
+    expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
+
+    const debugExport = await request(createApp())
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
+      .expect(200);
+    const exportedObservation = debugExport.body?.payload?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_live_source_watch_job"
+    );
+    expect(exportedObservation?.payload?.observation?.watchJobPolicyRef, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
+    expect(exportedObservation?.payload?.observation?.watch_job_policy_ref, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
   }, 30_000);
 
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {

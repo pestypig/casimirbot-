@@ -30,6 +30,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.reflect_stage_play_context", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.check_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.read_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.configure_live_source_watch_job", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.record_live_source_mail_decision", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_source_health", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_constructs", requires_user_confirmation: false, can_run_automatically: true },

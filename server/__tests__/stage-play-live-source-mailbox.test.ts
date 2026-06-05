@@ -7,6 +7,7 @@ import {
   recordLiveSourceMailDecisionForAsk,
 } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
 import {
+  configureStagePlayLiveSourceWatchJobPolicy,
   enqueueStagePlayLiveSourceMailItem,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
@@ -19,6 +20,10 @@ import {
   markStagePlayMailWakeRunning,
   resetStagePlayLiveSourceMailWakeStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
+  listStagePlayLiveSourceMailTranscriptEntries,
+  resetStagePlayLiveSourceMailTranscriptStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
@@ -37,6 +42,7 @@ const sourceId = "visual_source:stage-play-mailbox";
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
+  resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -870,6 +876,214 @@ describe("Stage Play live-source mailbox", () => {
       askTurnId: "ask:wake-test",
       decisionIds: ["stage_play_live_source_mail_decision:wake-test"],
     });
+  });
+
+  it("records durable transcript entries when a wake completes", async () => {
+    seedVisualEvidence();
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async ({ wakeRequest }) => {
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId: wakeRequest.threadId,
+          roomId: wakeRequest.roomId,
+          environmentId: wakeRequest.environmentId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "The visual mail contains a high-salience update.",
+          voiceCalloutDraft: "A notable visual update appeared.",
+          voiceEnabled: true,
+          voiceRequiresConfirmation: false,
+          voiceAllowedNow: true,
+          evidenceRefs: wakeRequest.evidenceRefs,
+          now: "2026-06-04T12:00:03.000Z",
+        });
+        return {
+          turn_id: "ask:wake-durable-transcript",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    const entries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+    expect(entries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
+      "mail_received",
+      "mail_read_tool_call",
+      "mail_read_receipt",
+      "agent_decision",
+      "voice_callout_request",
+      "loop_state",
+    ]));
+    expect(entries.every((entry) =>
+      entry.artifactId === "stage_play_live_source_mail_transcript_entry" &&
+      entry.assistant_answer === false &&
+      entry.terminal_eligible === false &&
+      entry.context_role === "tool_evidence" &&
+      entry.raw_content_included === false
+    )).toBe(true);
+    expect(entries.every((entry) => entry.wakeRequestId === wake.wakeRequestId)).toBe(true);
+    expect(entries.every((entry) => entry.askTurnId === "ask:wake-durable-transcript")).toBe(true);
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining(entries.map((entry) => entry.entryId)));
+    expect(JSON.stringify(entries)).not.toMatch(/raw_image|data:image|base64/i);
+  });
+
+  it("binds wake Ask prompts to the active watch-job objective and compact mail batch", async () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:policy-bound-harmless",
+      evidenceRef: "visual_evidence:policy-bound-harmless",
+      summaryText: "Harmless Minecraft-like scene change: camera pans across the base and a cat remains nearby.",
+      createdAt: "2026-06-04T12:00:20.000Z",
+    });
+    const { policy } = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+      decisionPolicyPrompt: "Only announce hostile mobs. Ignore harmless camera movement and ordinary scene changes.",
+      importanceCriteria: ["hostile mob appears"],
+      suppressCriteria: ["harmless camera movement", "ordinary scene changes"],
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+    });
+
+    let prompt = "";
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async (input) => {
+        prompt = input.prompt;
+        return {
+          turn_id: "ask:wake-policy-bound-hostile",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-policy-bound-hostile",
+                  decision: "wait_for_next_summary",
+                  mailIds: input.wakeRequest.mailIds,
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-policy-bound-hostile"],
+    });
+    expect(prompt).toContain("Continuing live-source watch job:");
+    expect(prompt).toContain("Watch the visual source and only announce if a hostile mob appears.");
+    expect(prompt).toContain("Decision policy:");
+    expect(prompt).toContain("Only announce hostile mobs.");
+    expect(prompt).toContain("The mail is perturbation evidence for this continuing job.");
+    expect(prompt).toContain("Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.");
+    expect(prompt).toContain(mail.mailId);
+    expect(prompt).toContain("Harmless Minecraft-like scene change");
+    expect(prompt).toContain("voiceEnabled: true");
+    expect(prompt).toContain(policy.policyId);
+  });
+
+  it("lets the same mail summary produce different wake decisions under different job policies", async () => {
+    const runWithPolicy = async (input: {
+      objectiveText: string;
+      decisionPolicyPrompt: string;
+      expectedDecision: "wait_for_next_summary" | "draft_text_answer";
+      turnId: string;
+    }) => {
+      resetStagePlayLiveSourceMailboxForTest();
+      resetStagePlayLiveSourceMailWakeStoreForTest();
+      const mail = enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId,
+        sourceId,
+        sourceKind: "visual_frame",
+        frameRef: "visual_frame:same-summary-scene-change",
+        evidenceRef: "visual_evidence:same-summary-scene-change",
+        summaryText: "Minecraft-like scene change: the camera pans from the base interior to the moonlit mountain view. No hostile mobs are visible.",
+        createdAt: "2026-06-04T12:00:30.000Z",
+      });
+      configureStagePlayLiveSourceWatchJobPolicy({
+        threadId,
+        roomId,
+        sourceIds: [sourceId],
+        objectiveText: input.objectiveText,
+        decisionPolicyPrompt: input.decisionPolicyPrompt,
+        importanceCriteria: [input.expectedDecision === "draft_text_answer" ? "every scene change" : "hostile mob appears"],
+        suppressCriteria: [input.expectedDecision === "wait_for_next_summary" ? "harmless scene changes" : "none"],
+      });
+
+      let prompt = "";
+      const result = await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        askTurnRunner: async (runnerInput) => {
+          prompt = runnerInput.prompt;
+          const decisionId = `stage_play_live_source_mail_decision:${input.turnId}:${input.expectedDecision}`;
+          return {
+            turn_id: input.turnId,
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: {
+                    artifactId: "stage_play_live_source_mail_decision",
+                    decisionId,
+                    decision: input.expectedDecision,
+                    mailIds: runnerInput.wakeRequest.mailIds,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      });
+      return { mail, prompt, result };
+    };
+
+    const hostileOnly = await runWithPolicy({
+      objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+      decisionPolicyPrompt: "Only announce hostile mobs. Harmless scene changes should wait for the next summary.",
+      expectedDecision: "wait_for_next_summary",
+      turnId: "ask:wake-same-mail-hostile-policy",
+    });
+    const everySceneChange = await runWithPolicy({
+      objectiveText: "Watch the visual source and tell me every scene change.",
+      decisionPolicyPrompt: "Tell me every scene change. Draft a text answer when the compact summary reports a scene change.",
+      expectedDecision: "draft_text_answer",
+      turnId: "ask:wake-same-mail-scene-policy",
+    });
+
+    expect(hostileOnly.mail.summary.text).toBe(everySceneChange.mail.summary.text);
+    expect(hostileOnly.prompt).toContain("Only announce hostile mobs.");
+    expect(everySceneChange.prompt).toContain("Tell me every scene change.");
+    expect(hostileOnly.result?.decisionIds[0]).toContain("wait_for_next_summary");
+    expect(everySceneChange.result?.decisionIds[0]).toContain("draft_text_answer");
+    expect(hostileOnly.prompt).toContain("Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.");
+    expect(everySceneChange.prompt).toContain("Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.");
   });
 
   it("does not complete a wake from a generic agent-step decision without a mail decision receipt", async () => {

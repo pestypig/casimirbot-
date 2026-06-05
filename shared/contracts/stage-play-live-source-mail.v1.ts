@@ -2,6 +2,9 @@ export const STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA = "stage_play_live_source_m
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA = "stage_play_live_source_mail_read_result/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA = "stage_play_live_source_mail_decision/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA = "stage_play_live_source_job_state/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA = "stage_play_live_source_watch_job_policy/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_live_source_mail_transcript_entry/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
 
 export type StagePlayLiveSourceMailSourceKindV1 =
   | "visual_frame"
@@ -163,6 +166,7 @@ export type StagePlayLiveSourceJobStateV1 = {
   environmentId?: string | null;
   sourceIds: string[];
   objective?: string | null;
+  watchJobPolicyRef?: string | null;
   status: "armed" | "checking" | "paused" | "blocked" | "ended";
   mailboxCursor?: string | null;
   lastMailId?: string | null;
@@ -173,6 +177,37 @@ export type StagePlayLiveSourceJobStateV1 = {
     afterMs?: number | null;
     maxConsecutiveReads?: number | null;
   };
+  updatedAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+export type StagePlayLiveSourceWatchJobPolicyV1 = {
+  artifactId: "stage_play_live_source_watch_job_policy";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA;
+  policyId: string;
+  jobId: string;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds: string[];
+  objectiveText: string;
+  decisionPolicyPrompt: string;
+  outputPolicy: {
+    allowTextAnswer: boolean;
+    allowVoiceCallout: boolean;
+    voiceRequiresUrgency: boolean;
+    confirmationRequired: boolean;
+  };
+  importanceCriteria: string[];
+  suppressCriteria: string[];
+  status: "armed" | "paused" | "ended" | "blocked";
+  priorDecisionRefs: string[];
+  priorAnswerRefs: string[];
+  evidenceRefs: string[];
+  createdAt: string;
   updatedAt: string;
   assistant_answer: false;
   terminal_eligible: false;
@@ -206,4 +241,105 @@ export type AskTurnTranscriptRowDraftV1 = {
   assistantAnswer: boolean;
   terminalEligible: boolean;
   createdAt: string;
+};
+
+export type StagePlayLiveSourceMailTranscriptEntryV1 = {
+  artifactId: "stage_play_live_source_mail_transcript_entry";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA;
+  entryId: string;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  wakeRequestId?: string | null;
+  wakeResultId?: string | null;
+  askTurnId?: string | null;
+  decisionIds: string[];
+  mailIds: string[];
+  sourceIds: string[];
+  sequence: number;
+  row: AskTurnTranscriptRowDraftV1;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+export type StagePlayLiveSourceMailContextPackV1 = {
+  artifactId: "stage_play_live_source_mail_context_pack";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA;
+  contextPackId: string;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  includedReason:
+    | "armed_watch_job"
+    | "active_stage_play_environment"
+    | "none";
+  activeWatchJobs: Array<{
+    jobId: string;
+    policyId: string;
+    objectiveText: string;
+    decisionPolicyPrompt: string;
+    sourceIds: string[];
+    outputPolicy: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"];
+    importanceCriteria: string[];
+    suppressCriteria: string[];
+    status: StagePlayLiveSourceWatchJobPolicyV1["status"];
+    updatedAt: string;
+  }>;
+  jobStates: Array<{
+    jobId: string;
+    sourceIds: string[];
+    status: StagePlayLiveSourceJobStateV1["status"];
+    mailboxCursor?: string | null;
+    lastMailId?: string | null;
+    lastDecisionId?: string | null;
+    nextLoopState: StagePlayNextLoopStateV1;
+    updatedAt: string;
+  }>;
+  latestMailItems: Array<{
+    mailId: string;
+    sourceId: string;
+    sourceKind: StagePlayLiveSourceMailSourceKindV1 | string;
+    status: StagePlayLiveSourceMailStatusV1;
+    summaryPreview: string;
+    confidence?: number | null;
+    analysisState?: StagePlayLiveSourceMailItemV1["summary"]["analysisState"];
+    evidenceRefs: string[];
+    createdAt: string;
+  }>;
+  latestDecisions: Array<{
+    decisionId: string;
+    mailIds: string[];
+    decision: StagePlayMailDecisionV1;
+    rationalePreview: string;
+    textAnswerDraft?: string | null;
+    voiceCalloutDraft?: string | null;
+    activeJobId?: string | null;
+    mailboxCursor?: string | null;
+    evidenceRefs: string[];
+    createdAt: string;
+  }>;
+  latestTextAnswerDrafts: Array<{
+    decisionId: string;
+    text: string;
+    terminalEligible: boolean;
+    createdAt: string;
+  }>;
+  latestVoiceCalloutDrafts: Array<{
+    decisionId: string;
+    text: string;
+    voiceEligible: boolean;
+    requiresConfirmation: boolean;
+    createdAt: string;
+  }>;
+  currentMailboxCursor?: string | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
 };

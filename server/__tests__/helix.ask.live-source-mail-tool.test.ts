@@ -75,6 +75,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.configure_live_source_watch_job",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.record_live_source_mail_decision",
         family: "live_env",
         creates_assistant_answer: false,
@@ -82,6 +89,67 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
     ]));
+  });
+
+  it("configures a live-source watch job policy without reading mail or answering", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the visual source and only announce if a hostile mob appears.",
+        decision_policy_prompt: "Only call out hostile mobs. Ignore ordinary camera movement.",
+        importance_criteria: ["hostile mob appears"],
+        suppress_criteria: ["ordinary camera movement"],
+        allow_voice_callout: true,
+        voice_requires_urgency: true,
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.configure_live_source_watch_job",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toContain("Configured live-source watch job policy");
+    expect(observation.summary).toContain("no mail was read");
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_result",
+      watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      watch_job_policy_ref: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      policy: {
+        artifactId: "stage_play_live_source_watch_job_policy",
+        objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+        decisionPolicyPrompt: "Only call out hostile mobs. Ignore ordinary camera movement.",
+        sourceIds: [sourceId],
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: true,
+          voiceRequiresUrgency: true,
+        },
+        importanceCriteria: ["hostile mob appears"],
+        suppressCriteria: ["ordinary camera movement"],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      jobState: {
+        objective: "Watch the visual source and only announce if a hostile mob appears.",
+        watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+        nextLoopState: "armed_for_next_summary",
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(payload.artifactId).not.toBe("stage_play_live_source_mail_read_result");
   });
 
   it.each(["live_env.check_live_source_mail", "live_env.read_live_source_mail"] as const)(

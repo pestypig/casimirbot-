@@ -3,11 +3,13 @@ import {
   STAGE_PLAY_LIVE_SOURCE_JOB_STATE_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA,
+  STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA,
   type StagePlayLiveSourceJobStateV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourceMailSourceKindV1,
   type StagePlayLiveSourceMailStatusV1,
+  type StagePlayLiveSourceWatchJobPolicyV1,
   type StagePlayMailDecisionV1,
   type StagePlayNextLoopStateV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -16,6 +18,7 @@ import { queueStagePlayLiveSourceMailWakeRequest } from "./stage-play-live-sourc
 const mailById = new Map<string, StagePlayLiveSourceMailItemV1>();
 const decisionsById = new Map<string, StagePlayLiveSourceMailDecisionV1>();
 const jobStateById = new Map<string, StagePlayLiveSourceJobStateV1>();
+const watchJobPolicyById = new Map<string, StagePlayLiveSourceWatchJobPolicyV1>();
 const MAX_MAIL_PER_THREAD = 250;
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -39,6 +42,15 @@ const defaultJobId = (input: { threadId: string; roomId?: string | null; environ
 
 const defaultNextLoopStateForDecision = (decision: StagePlayMailDecisionV1): StagePlayNextLoopStateV1 => {
   if (decision === "fail_closed") return "blocked_tool_error";
+  return "armed_for_next_summary";
+};
+
+const nextLoopStateForWatchPolicyStatus = (
+  status: StagePlayLiveSourceWatchJobPolicyV1["status"],
+): StagePlayNextLoopStateV1 => {
+  if (status === "paused") return "paused_by_user";
+  if (status === "blocked") return "blocked_missing_source";
+  if (status === "ended") return "ended";
   return "armed_for_next_summary";
 };
 
@@ -410,6 +422,7 @@ export function upsertStagePlayLiveSourceJobState(input: {
   environmentId?: string | null;
   sourceIds?: string[];
   objective?: string | null;
+  watchJobPolicyRef?: string | null;
   status?: StagePlayLiveSourceJobStateV1["status"];
   mailboxCursor?: string | null;
   lastMailId?: string | null;
@@ -435,6 +448,7 @@ export function upsertStagePlayLiveSourceJobState(input: {
     environmentId: input.environmentId ?? existing?.environmentId ?? null,
     sourceIds: uniqueStrings([...(existing?.sourceIds ?? []), ...(input.sourceIds ?? [])]),
     objective: input.objective ?? existing?.objective ?? null,
+    watchJobPolicyRef: input.watchJobPolicyRef ?? existing?.watchJobPolicyRef ?? null,
     status: input.status ?? existing?.status ?? "armed",
     mailboxCursor: input.mailboxCursor ?? existing?.mailboxCursor ?? null,
     lastMailId: input.lastMailId ?? existing?.lastMailId ?? null,
@@ -453,6 +467,116 @@ export function upsertStagePlayLiveSourceJobState(input: {
   };
   jobStateById.set(jobId, state);
   return state;
+}
+
+export function configureStagePlayLiveSourceWatchJobPolicy(input: {
+  jobId?: string | null;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds?: string[];
+  objectiveText: string;
+  decisionPolicyPrompt?: string | null;
+  outputPolicy?: Partial<StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]> | null;
+  importanceCriteria?: string[];
+  suppressCriteria?: string[];
+  priorDecisionRefs?: string[];
+  priorAnswerRefs?: string[];
+  evidenceRefs?: string[];
+  status?: StagePlayLiveSourceWatchJobPolicyV1["status"];
+  now?: string;
+}): {
+  policy: StagePlayLiveSourceWatchJobPolicyV1;
+  jobState: StagePlayLiveSourceJobStateV1;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const sourceIds = uniqueStrings(input.sourceIds ?? []);
+  const jobId = input.jobId ?? defaultJobId({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: sourceIds[0] ?? null,
+  });
+  const policyId = `stage_play_live_source_watch_job_policy:${hashShort([
+    input.threadId,
+    input.roomId ?? null,
+    input.environmentId ?? null,
+    jobId,
+    sourceIds,
+    input.objectiveText,
+  ])}`;
+  const existing = watchJobPolicyById.get(policyId);
+  const outputPolicy = {
+    allowTextAnswer: input.outputPolicy?.allowTextAnswer ?? existing?.outputPolicy.allowTextAnswer ?? true,
+    allowVoiceCallout: input.outputPolicy?.allowVoiceCallout ?? existing?.outputPolicy.allowVoiceCallout ?? false,
+    voiceRequiresUrgency: input.outputPolicy?.voiceRequiresUrgency ?? existing?.outputPolicy.voiceRequiresUrgency ?? true,
+    confirmationRequired: input.outputPolicy?.confirmationRequired ?? existing?.outputPolicy.confirmationRequired ?? true,
+  };
+  const policy: StagePlayLiveSourceWatchJobPolicyV1 = {
+    artifactId: "stage_play_live_source_watch_job_policy",
+    schemaVersion: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA,
+    policyId,
+    jobId,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceIds,
+    objectiveText: input.objectiveText,
+    decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+    outputPolicy,
+    importanceCriteria: uniqueStrings(input.importanceCriteria ?? existing?.importanceCriteria ?? []),
+    suppressCriteria: uniqueStrings(input.suppressCriteria ?? existing?.suppressCriteria ?? []),
+    status: input.status ?? existing?.status ?? "armed",
+    priorDecisionRefs: uniqueStrings(input.priorDecisionRefs ?? existing?.priorDecisionRefs ?? []),
+    priorAnswerRefs: uniqueStrings(input.priorAnswerRefs ?? existing?.priorAnswerRefs ?? []),
+    evidenceRefs: uniqueStrings([policyId, jobId, ...sourceIds, ...(input.evidenceRefs ?? existing?.evidenceRefs ?? [])]),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+  watchJobPolicyById.set(policy.policyId, policy);
+  const jobState = upsertStagePlayLiveSourceJobState({
+    jobId,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceIds,
+    objective: input.objectiveText,
+    watchJobPolicyRef: policy.policyId,
+    status: policy.status === "armed" ? "armed" : policy.status,
+    nextLoopState: nextLoopStateForWatchPolicyStatus(policy.status),
+    updatedAt: now,
+  });
+  return { policy, jobState };
+}
+
+export function getStagePlayLiveSourceWatchJobPolicy(policyId: string): StagePlayLiveSourceWatchJobPolicyV1 | null {
+  return watchJobPolicyById.get(policyId) ?? null;
+}
+
+export function listStagePlayLiveSourceWatchJobPolicies(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  status?: StagePlayLiveSourceWatchJobPolicyV1["status"] | null;
+  limit?: number;
+} = {}): StagePlayLiveSourceWatchJobPolicyV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  return Array.from(watchJobPolicyById.values())
+    .filter((policy) => {
+      if (input.threadId && policy.threadId !== input.threadId) return false;
+      if (input.roomId && policy.roomId !== input.roomId) return false;
+      if (input.environmentId && policy.environmentId !== input.environmentId) return false;
+      if (input.jobId && policy.jobId !== input.jobId) return false;
+      if (input.status && policy.status !== input.status) return false;
+      return true;
+    })
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    .slice(-limit);
 }
 
 export function listStagePlayLiveSourceJobStates(input: {
@@ -477,4 +601,5 @@ export function resetStagePlayLiveSourceMailboxForTest(): void {
   mailById.clear();
   decisionsById.clear();
   jobStateById.clear();
+  watchJobPolicyById.clear();
 }

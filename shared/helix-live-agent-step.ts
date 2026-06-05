@@ -21,6 +21,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.reflect_stage_play_context"
   | "live_env.check_live_source_mail"
   | "live_env.read_live_source_mail"
+  | "live_env.configure_live_source_watch_job"
   | "live_env.record_live_source_mail_decision"
   | "live_env.query_source_health"
   | "live_env.query_constructs"

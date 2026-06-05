@@ -44,9 +44,30 @@ describe("physics atlas blocks", () => {
     expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
       "stellar.nucleosynthesis.reaction_network_context",
     );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "starsim.reference.stellar_spectral_abundance_context",
+    );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "stellar.spectroscopy.atomic_line_identification_context",
+    );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "stellar.spectroscopy.abundance_proxy_equivalent_width",
+    );
+    expect(byId.get("stellar_evolution")?.claimBoundaryBadgeIds).toContain(
+      "astrochemistry.claim_boundary.spectral_identification_only",
+    );
     expect(byId.get("astrochemistry_prebiotic")?.status).toBe("seed");
     expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
       "astrochemistry.fullerene.c60_stellar_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "starsim.nucleosynthesis.element_yield_prior",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "astrochemistry.spectroscopy.molecular_band_identification_context",
+    );
+    expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
+      "astrochemistry.claim_boundary.spectral_identification_only",
     );
     expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
       "astrochemistry.pah.spectral_family_context",

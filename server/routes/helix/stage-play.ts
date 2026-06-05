@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-play-badge-graph.v1";
+import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "../../../shared/contracts/stage-play-live-source-mail.v1";
 import { buildStagePlayGraphFromWorld } from "../../services/stage-play/stage-play-badge-graph-builder";
 import {
   buildStagePlayBuilderCatalog,
@@ -28,15 +29,18 @@ import {
   type StagePlayCheckpointQueueAction,
 } from "../../services/stage-play/stage-play-checkpoint-queue";
 import {
+  configureStagePlayLiveSourceWatchJobPolicy,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
+  listStagePlayLiveSourceWatchJobPolicies,
 } from "../../services/stage-play/stage-play-live-source-mailbox-store";
 import {
   listStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeResults,
   reconcileStagePlayMailWakeRequestsWithDecisions,
 } from "../../services/stage-play/stage-play-live-source-mail-wake-store";
+import { listStagePlayLiveSourceMailTranscriptEntries } from "../../services/stage-play/stage-play-live-source-mail-transcript-store";
 import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
@@ -231,6 +235,16 @@ helixStagePlayRouter.options("/live-source-mail/wake/run", (_req, res) => {
   res.status(200).end();
 });
 
+helixStagePlayRouter.options("/live-source-mail/job", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/transcript", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 const isRawKind = (value: unknown): value is StagePlayRawSessionBufferRawKindV1 =>
   typeof value === "string" && STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS.includes(value as StagePlayRawSessionBufferRawKindV1);
 
@@ -239,6 +253,9 @@ const isRetentionPolicy = (value: unknown): value is StagePlayRawSessionBufferRe
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : [];
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -631,6 +648,12 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
         environmentId,
         limit: 10,
       }),
+      watchJobPolicies: listStagePlayLiveSourceWatchJobPolicies({
+        threadId,
+        roomId,
+        environmentId,
+        limit: 10,
+      }),
       decisions,
       wakeRequests: listStagePlayLiveSourceMailWakeRequests({
         threadId,
@@ -652,6 +675,121 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       error: "stage-play-live-source-mail-list-failed",
       err,
       schema: "stage_play_live_source_mail_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/job", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const objectiveText =
+      readQueryString(body.objectiveText) ??
+      readQueryString(body.objective_text) ??
+      readQueryString(body.objective) ??
+      readQueryString(body.userPrompt) ??
+      readQueryString(body.user_prompt);
+    if (!objectiveText) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_live_source_watch_job_policy_response/v1",
+        error: "missing_objective_text",
+        message: "objectiveText or objective is required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const allowVoiceCallout =
+      readOptionalBoolean(body.allowVoiceCallout ?? body.allow_voice_callout) ??
+      /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
+    const configured = configureStagePlayLiveSourceWatchJobPolicy({
+      jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id),
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      sourceIds: readStringArray(body.sourceIds ?? body.source_ids),
+      objectiveText,
+      decisionPolicyPrompt:
+        readQueryString(body.decisionPolicyPrompt) ??
+        readQueryString(body.decision_policy_prompt) ??
+        objectiveText,
+      outputPolicy: {
+        allowTextAnswer: readOptionalBoolean(body.allowTextAnswer ?? body.allow_text_answer) ?? true,
+        allowVoiceCallout,
+        voiceRequiresUrgency: readOptionalBoolean(body.voiceRequiresUrgency ?? body.voice_requires_urgency) ?? allowVoiceCallout,
+        confirmationRequired: readOptionalBoolean(body.confirmationRequired ?? body.confirmation_required) ?? false,
+      },
+      importanceCriteria: readStringArray(body.importanceCriteria ?? body.importance_criteria),
+      suppressCriteria: readStringArray(body.suppressCriteria ?? body.suppress_criteria),
+      evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_watch_job_policy_response/v1",
+      policy: configured.policy,
+      jobState: configured.jobState,
+      watchJobPolicyRef: configured.policy.policyId,
+      watch_job_policy_ref: configured.policy.policyId,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-watch-job-policy-failed",
+      err,
+      schema: "stage_play_live_source_watch_job_policy_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? "helix-ask:desktop";
+    const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
+    const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
+    const wakeRequestId = readQueryString(req.query.wakeRequestId) ?? readQueryString(req.query.wake_request_id);
+    const askTurnId = readQueryString(req.query.askTurnId) ?? readQueryString(req.query.ask_turn_id);
+    const limit = readOptionalNumber(req.query.limit) ?? 80;
+    const entries: StagePlayLiveSourceMailTranscriptEntryV1[] = listStagePlayLiveSourceMailTranscriptEntries({
+      threadId,
+      roomId,
+      environmentId,
+      wakeRequestId,
+      askTurnId,
+      limit,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_transcript_response/v1",
+      threadId,
+      roomId,
+      environmentId,
+      entries,
+      transcriptRows: entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row),
+      transcriptEntryIds: entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId),
+      evidenceRefs: uniqueStrings(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
+        entry.entryId,
+        ...entry.evidenceRefs,
+      ])),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-transcript-list-failed",
+      err,
+      schema: "stage_play_live_source_mail_transcript_response/v1",
       contextRole: "tool_evidence",
     });
   }

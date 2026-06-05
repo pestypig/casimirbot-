@@ -11,6 +11,11 @@ import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
+import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  recordStagePlayLiveSourceMailTranscriptEntries,
+  resetStagePlayLiveSourceMailTranscriptStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 
 function makeApp() {
   const app = express();
@@ -22,6 +27,8 @@ function makeApp() {
 beforeEach(() => {
   resetLiveAnswerEnvironments();
   resetStagePlayCheckpointQueueForTest();
+  resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetLiveSourceChunkBufferForTest();
 });
 
@@ -501,6 +508,138 @@ describe("GET /api/helix/stage-play/graph", () => {
       "recommendation",
       "answer_snapshot",
       "voice_output",
+    ]));
+  });
+});
+
+describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
+  it("returns durable live-source mail transcript entries as evidence-only rows", async () => {
+    const app = makeApp();
+    const entries = recordStagePlayLiveSourceMailTranscriptEntries({
+      threadId: "thread:mail-transcript-route",
+      roomId: "room:mail-transcript-route",
+      wakeRequestId: "stage_play_live_source_mail_wake:route",
+      wakeResultId: "stage_play_live_source_mail_wake_result:route",
+      askTurnId: "ask:mail-transcript-route",
+      decisionIds: ["stage_play_live_source_mail_decision:route"],
+      mailIds: ["stage_play_live_source_mail:route"],
+      sourceIds: ["visual_source:route"],
+      evidenceRefs: ["visual_evidence:route"],
+      createdAt: "2026-06-04T12:00:00.000Z",
+      rows: [
+        {
+          rowId: "row:mail-received",
+          rowKind: "mail_received",
+          title: "Observation mail",
+          body: "Visual summary received. Preview: route summary.",
+          source: {
+            toolName: null,
+            artifactId: "stage_play_live_source_mail:route",
+            artifactKind: "stage_play_live_source_mail_item",
+          },
+          evidenceRefs: ["stage_play_live_source_mail:route", "visual_evidence:route"],
+          authority: "tool_evidence",
+          assistantAnswer: false,
+          terminalEligible: false,
+          createdAt: "2026-06-04T12:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get("/api/helix/stage-play/live-source-mail/transcript")
+      .query({ threadId: "thread:mail-transcript-route" })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_live_source_mail_transcript_response/v1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(response.body.transcriptEntryIds).toEqual([entries[0].entryId]);
+    expect(response.body.entries[0]).toMatchObject({
+      artifactId: "stage_play_live_source_mail_transcript_entry",
+      entryId: entries[0].entryId,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(response.body.transcriptRows[0]).toMatchObject({
+      rowKind: "mail_received",
+      body: "Visual summary received. Preview: route summary.",
+      assistantAnswer: false,
+      terminalEligible: false,
+    });
+    expect(response.body.evidenceRefs).toEqual(expect.arrayContaining([
+      entries[0].entryId,
+      "stage_play_live_source_mail:route",
+      "visual_evidence:route",
+    ]));
+  });
+});
+
+describe("POST /api/helix/stage-play/live-source-mail/job", () => {
+  it("stores a watch-job policy without reading mail", async () => {
+    const app = makeApp();
+
+    const response = await request(app)
+      .post("/api/helix/stage-play/live-source-mail/job")
+      .send({
+        threadId: "thread:stage-play-watch-policy-route",
+        roomId: "room:stage-play-watch-policy-route",
+        sourceIds: ["visual_source:watch-policy-route"],
+        objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+        decisionPolicyPrompt: "Only announce hostile mobs. Suppress ordinary motion.",
+        importanceCriteria: ["hostile mob appears"],
+        suppressCriteria: ["ordinary motion"],
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+      })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_live_source_watch_job_policy_response/v1",
+      watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      watch_job_policy_ref: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      policy: {
+        artifactId: "stage_play_live_source_watch_job_policy",
+        objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
+        decisionPolicyPrompt: "Only announce hostile mobs. Suppress ordinary motion.",
+        sourceIds: ["visual_source:watch-policy-route"],
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: true,
+          voiceRequiresUrgency: true,
+        },
+        importanceCriteria: ["hostile mob appears"],
+        suppressCriteria: ["ordinary motion"],
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      jobState: {
+        objective: "Watch the visual source and only announce if a hostile mob appears.",
+        watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+        nextLoopState: "armed_for_next_summary",
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+
+    const mailbox = await request(app)
+      .get("/api/helix/stage-play/live-source-mail")
+      .query({ threadId: "thread:stage-play-watch-policy-route" })
+      .expect(200);
+
+    expect(mailbox.body.mailItems).toEqual([]);
+    expect(mailbox.body.watchJobPolicies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        policyId: response.body.watchJobPolicyRef,
+      }),
     ]));
   });
 });

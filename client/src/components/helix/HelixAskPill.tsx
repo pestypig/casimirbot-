@@ -67,6 +67,7 @@ import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
   type StagePlayLiveSourceMailWakeTranscriptEventDetail,
 } from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
+import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   formatHelixVisibleTerminalSourceLabel,
   resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
@@ -8186,6 +8187,108 @@ type HelixMailLoopTranscriptRow = {
   terminalEligible: boolean;
 };
 
+type StagePlayLiveSourceMailTranscriptResponse = {
+  ok?: boolean;
+  threadId?: string | null;
+  entries?: StagePlayLiveSourceMailTranscriptEntryV1[];
+  transcriptRows?: unknown[];
+  transcriptEntryIds?: string[];
+  evidenceRefs?: string[];
+};
+
+const HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID = "helix-ask:desktop";
+
+const uniqueTextValues = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+async function fetchStagePlayLiveSourceMailTranscript(input: {
+  threadId: string;
+  limit?: number;
+}): Promise<StagePlayLiveSourceMailTranscriptResponse> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  params.set("limit", String(input.limit ?? 80));
+  const response = await fetch(`/api/helix/stage-play/live-source-mail/transcript?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play live-source mail transcript failed: ${response.status}`);
+  }
+  return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
+}
+
+function groupStagePlayMailTranscriptEntries(
+  entries: StagePlayLiveSourceMailTranscriptEntryV1[],
+): StagePlayLiveSourceMailTranscriptEntryV1[][] {
+  const groups = new Map<string, StagePlayLiveSourceMailTranscriptEntryV1[]>();
+  for (const entry of entries) {
+    const groupId = entry.wakeResultId ?? entry.askTurnId ?? entry.wakeRequestId ?? entry.entryId;
+    groups.set(groupId, [...(groups.get(groupId) ?? []), entry]);
+  }
+  return Array.from(groups.values())
+    .map((group: StagePlayLiveSourceMailTranscriptEntryV1[]) =>
+      [...group].sort((left: StagePlayLiveSourceMailTranscriptEntryV1, right: StagePlayLiveSourceMailTranscriptEntryV1) =>
+        left.createdAt.localeCompare(right.createdAt) ||
+        left.sequence - right.sequence ||
+        left.entryId.localeCompare(right.entryId)
+      )
+    )
+    .sort((left: StagePlayLiveSourceMailTranscriptEntryV1[], right: StagePlayLiveSourceMailTranscriptEntryV1[]) => {
+      const leftAt = left[0]?.createdAt ?? "";
+      const rightAt = right[0]?.createdAt ?? "";
+      return rightAt.localeCompare(leftAt);
+    });
+}
+
+function buildHelixAskReplyFromMailTranscriptEntries(
+  entries: StagePlayLiveSourceMailTranscriptEntryV1[],
+): HelixAskReply | null {
+  const first = entries[0] ?? null;
+  if (!first) return null;
+  const groupId = first.wakeResultId ?? first.askTurnId ?? first.wakeRequestId ?? first.entryId;
+  const createdAtMs = Math.max(
+    ...entries
+      .map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => Date.parse(entry.createdAt))
+      .filter((value: number) => Number.isFinite(value)),
+    Date.now(),
+  );
+  const transcriptRows = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row);
+  const transcriptEntryIds = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId);
+  const mailIds = uniqueTextValues(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.mailIds));
+  const evidenceRefs = uniqueTextValues(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
+    entry.entryId,
+    ...entry.evidenceRefs,
+  ]));
+  const currentTurnArtifactLedger = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => ({
+    kind: "stage_play_live_source_mail_transcript_entry",
+    ref: entry.entryId,
+    payload: entry,
+  }));
+  const debugPayload = {
+    createdAtMs,
+    live_source_mail_wake_transcript: true,
+    live_source_mail_wake_transcript_durable: true,
+    stage_play_live_source_mail_transcript_entries: entries,
+    stage_play_live_source_mail_transcript_entry_ids: transcriptEntryIds,
+    stage_play_live_source_mail_transcript_rows: transcriptRows,
+    transcriptRows,
+    current_turn_artifact_ledger: currentTurnArtifactLedger,
+  };
+  return {
+    id: `live-source-mail-transcript:${groupId}`,
+    content: "",
+    createdAtMs,
+    turn_id: first.askTurnId ?? groupId,
+    ok: true,
+    final_answer_source: "live_source_mail_wake",
+    terminal_artifact_kind: "tool_receipt",
+    question: `Live-source mail wake${mailIds.length > 0 ? ` (${mailIds.length} mail)` : ""}`,
+    debug: debugPayload as HelixAskReply["debug"],
+    sources: evidenceRefs,
+  };
+}
+
 function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
   if (/\b(?:failed|blocked|error|mismatch)\b/i.test(row.status) || row.label === "Notice") return "warning";
   if (row.label === "Observation" || row.label === "Recorded") return "observation";
@@ -15936,6 +16039,7 @@ export function HelixAskPill({
   const latestAskReply = askReplies[0] ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
   const liveSourceMailWakeReplyIdsRef = useRef<Set<string>>(new Set());
+  const [liveSourceMailTranscriptRefreshSeq, setLiveSourceMailTranscriptRefreshSeq] = useState(0);
   const debugCopyInFlightRef = useRef(false);
   const askReplyListRef = useRef<HTMLDivElement | null>(null);
   const askReplyListBottomRef = useRef<HTMLDivElement | null>(null);
@@ -15988,43 +16092,49 @@ export function HelixAskPill({
   useEffect(() => {
     const onWakeTranscript = (event: Event) => {
       const detail = (event as CustomEvent<StagePlayLiveSourceMailWakeTranscriptEventDetail>).detail;
-      if (!detail?.askTurnId || !detail.wakeResult?.wakeResultId) return;
-      const replyId = `live-source-mail-wake:${detail.wakeResult.wakeResultId}`;
-      if (liveSourceMailWakeReplyIdsRef.current.has(replyId)) return;
-      liveSourceMailWakeReplyIdsRef.current.add(replyId);
-      const createdAtMs = Date.parse(detail.createdAt);
-      const debugPayload = {
-        ...(detail.debugPayload ?? {}),
-        createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : Date.now(),
-        live_source_mail_wake_result: detail.wakeResult,
-        live_source_mail_wake_transcript: true,
-      };
-      const mailCount = detail.wakeResult.evidenceRefs.filter((ref) =>
-        /^stage_play_live_source_mail:/i.test(ref),
-      ).length;
-      setAskReplies((prev) =>
-        [
-          {
-            id: replyId,
-            content: "",
-            createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : Date.now(),
-            turn_id: detail.askTurnId,
-            ok: true,
-            final_answer_source: "live_source_mail_wake",
-            terminal_artifact_kind: "tool_receipt",
-            question: `Live-source mail wake${mailCount > 0 ? ` (${mailCount} mail)` : ""}`,
-            debug: debugPayload as HelixAskReply["debug"],
-            sources: detail.wakeResult.evidenceRefs,
-          },
-          ...prev,
-        ].slice(0, 8),
-      );
+      if (!detail?.wakeResult?.wakeResultId) return;
+      setLiveSourceMailTranscriptRefreshSeq((current) => current + 1);
     };
     window.addEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, onWakeTranscript);
     return () => {
       window.removeEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, onWakeTranscript);
     };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    const loadDurableMailTranscript = async () => {
+      try {
+        const response = await fetchStagePlayLiveSourceMailTranscript({
+          threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+          limit: 80,
+        });
+        if (cancelled || response.ok === false) return;
+        const entries = Array.isArray(response.entries) ? response.entries : [];
+        const durableReplies = groupStagePlayMailTranscriptEntries(entries)
+          .map(buildHelixAskReplyFromMailTranscriptEntries)
+          .filter((reply): reply is HelixAskReply => Boolean(reply));
+        if (durableReplies.length === 0) return;
+        setAskReplies((prev) => {
+          const existingIds = new Set(prev.map((reply) => reply.id));
+          const nextDurableReplies = durableReplies.filter((reply) => {
+            if (existingIds.has(reply.id) || liveSourceMailWakeReplyIdsRef.current.has(reply.id)) {
+              return false;
+            }
+            liveSourceMailWakeReplyIdsRef.current.add(reply.id);
+            return true;
+          });
+          if (nextDurableReplies.length === 0) return prev;
+          return [...nextDurableReplies, ...prev].slice(0, 8);
+        });
+      } catch (error) {
+        console.warn("[HelixAskPill] live-source mail transcript refresh failed", error);
+      }
+    };
+    void loadDurableMailTranscript();
+    return () => {
+      cancelled = true;
+    };
+  }, [liveSourceMailTranscriptRefreshSeq]);
   useEffect(() => {
     return () => {
       if (askImageAttachment?.previewUrl) {
