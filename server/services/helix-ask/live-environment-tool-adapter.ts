@@ -966,6 +966,7 @@ export function executeLiveEnvironmentTool(
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       sourceId: explicitSourceId,
       sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
+      mailIds: readStringArray(args.mail_ids ?? args.mailIds),
       limit: readNumber(args.limit, 3),
       includeRead: args.include_read === true || args.includeRead === true,
       voicePolicy: {

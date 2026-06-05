@@ -204,6 +204,52 @@ describe("Stage Play live-source mailbox", () => {
     expect(rows.every((row) => row.assistantAnswer === false && row.terminalEligible === false)).toBe(true);
   });
 
+  it("reads only exact wake mail ids instead of widening to all unread mail", () => {
+    const first = enqueueVisualSummaryMailFromEvidence({
+      threadId,
+      roomId,
+      sourceId,
+      visualFrameRef: "visual_frame:exact-first",
+      visualEvidenceRef: "visual_evidence:exact-first",
+      summary: "First compact visual summary.",
+      analysisState: "analysis_ready",
+      now: "2026-06-04T12:00:01.000Z",
+    });
+    const second = enqueueVisualSummaryMailFromEvidence({
+      threadId,
+      roomId,
+      sourceId,
+      visualFrameRef: "visual_frame:exact-second",
+      visualEvidenceRef: "visual_evidence:exact-second",
+      summary: "Second compact visual summary.",
+      analysisState: "analysis_ready",
+      now: "2026-06-04T12:00:02.000Z",
+    });
+
+    const readResult = readLiveSourceMailForAsk({
+      threadId,
+      roomId,
+      sourceId,
+      mailIds: [second.mailId],
+      limit: 3,
+      now: "2026-06-04T12:00:03.000Z",
+    });
+
+    expect(readResult.items.map((item) => item.mailId)).toEqual([second.mailId]);
+    expect(readResult.evidenceRefs).toEqual(expect.arrayContaining([
+      second.mailId,
+      "visual_frame:exact-second",
+      "visual_evidence:exact-second",
+    ]));
+    expect(listStagePlayLiveSourceMailItems({ threadId }).map((item) => ({
+      mailId: item.mailId,
+      status: item.status,
+    }))).toEqual([
+      { mailId: first.mailId, status: "unread" },
+      { mailId: second.mailId, status: "delivered_to_ask" },
+    ]);
+  });
+
   it("records a model decision as a receipt and re-arms for the next source update", () => {
     seedVisualEvidence();
     const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });

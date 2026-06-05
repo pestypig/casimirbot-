@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
@@ -209,6 +209,7 @@ type StagePlayMailLoopNode = {
   title: string;
   subtitle: string;
   status: string;
+  statusChips?: string[];
   inputLabel: string;
   inputRefs: string[];
   inputPreview: string;
@@ -400,6 +401,37 @@ async function fetchStagePlayLiveSourceMail(input: {
     throw new Error(`Stage Play live-source mail request failed: ${response.status}`);
   }
   return await response.json() as StagePlayLiveSourceMailListResponse;
+}
+
+async function runStagePlayLiveSourceMailWake(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+}): Promise<{
+  ok: boolean;
+  ran: boolean;
+  result: StagePlayLiveSourceMailWakeResultV1 | null;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+}> {
+  const response = await fetch("/api/helix/stage-play/live-source-mail/wake/run", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play live-source mail wake run failed: ${response.status}`);
+  }
+  return await response.json();
 }
 
 async function fetchStagePlayBuilderContext(input: {
@@ -1091,6 +1123,11 @@ function buildObserverMailLoopNodes(input: {
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
   const unreadCount = mailItems.filter((item) => item.status === "unread").length;
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
+  const queuedWakeCount = wakeRequests.filter((wake) => wake.status === "queued").length;
+  const runningWakeCount = wakeRequests.filter((wake) => wake.status === "running").length;
+  const changedMailCount = mailItems.filter((item) => item.hints.deterministicChangeHint === "summary_changed").length;
+  const visibleCheckpointRequest = selectStagePlayVisibleCheckpointRequest(graph);
+  const latestPerturbation = (graph.perturbations ?? []).at(-1) ?? null;
   const latestDecision =
     latestStagePlayMailDecision(decisions, visualMail?.mailId) ??
     latestStagePlayMailDecision(decisions, jobStates.at(-1)?.lastMailId ?? null) ??
@@ -1130,19 +1167,28 @@ function buildObserverMailLoopNodes(input: {
       title: "Observer",
       subtitle: "source registry",
       status: visualSource?.status ?? "waiting",
+      statusChips: [
+        graph.sourceWindow.freshness,
+        latestPerturbation ? labelize(latestPerturbation.reason) : null,
+        visibleCheckpointRequest ? `checkpoint ${visibleCheckpointRequest.status}` : null,
+      ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: ["source registry"],
       inputPreview: "source registry",
       transformLabel: "source registry -> live-source mailbox",
       outputLabel: "Output",
       outputRefs: observerOutputRefs,
-      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mail unread: ${unreadCount}`,
+      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | unread ${unreadCount} | delivered ${deliveredCount}`,
     },
     {
       id: "observer_mail_loop:visual_mail",
       title: "Visual Summary Mail",
       subtitle: "compact observation delivery",
       status: visualMail?.status ?? "missing",
+      statusChips: [
+        unreadCount > 0 ? `${unreadCount} unread` : "no unread",
+        changedMailCount > 0 ? `${changedMailCount} changed` : null,
+      ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: mailInputRefs,
       inputPreview: mailInputRefs.length > 0 ? mailInputRefs.slice(0, 2).join(", ") : "visual_frame / visual_evidence pending",
@@ -1158,6 +1204,11 @@ function buildObserverMailLoopNodes(input: {
       title: "Ask Wake",
       subtitle: "mail wake admission",
       status: latestWake?.status ?? (unreadCount > 0 ? "queued pending" : "missing"),
+      statusChips: [
+        queuedWakeCount > 0 ? `${queuedWakeCount} queued` : null,
+        runningWakeCount > 0 ? `${runningWakeCount} running` : null,
+        latestWake?.askTurnId ? "ask turn" : null,
+      ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: wakeInputRefs,
       inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "unread mail ids pending",
@@ -1180,6 +1231,10 @@ function buildObserverMailLoopNodes(input: {
       title: "Ask Decision",
       subtitle: "mail reader + model decision",
       status: latestDecision?.decision ?? (deliveredCount > 0 ? "delivered_to_ask" : "awaiting_mail_read"),
+      statusChips: [
+        latestDecision?.modelReviewed ? "model reviewed" : null,
+        latestDecision?.mailIds.length ? `${latestDecision.mailIds.length} mail` : null,
+      ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: decisionInputRefs,
       inputPreview: decisionInputRefs.length > 0 ? decisionInputRefs.join(", ") : "mail item ids pending",
@@ -1193,6 +1248,10 @@ function buildObserverMailLoopNodes(input: {
       title: "Output/Wait",
       subtitle: "text answer / voice draft / wait",
       status: latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary",
+      statusChips: [
+        latestDecision?.voicePolicy?.voiceEnabled ? "voice enabled" : "voice off",
+        activeJob?.status ? `job ${activeJob.status}` : null,
+      ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: latestDecision ? [latestDecision.decisionId] : [],
       inputPreview: latestDecision?.decisionId ?? "decision id pending",
@@ -1233,7 +1292,7 @@ function StagePlayObserverMailLoopCanvas({
         </div>
         <CopyStagePlayRefsButton refs={refs} label="Copy observer mail loop refs" />
       </div>
-      <div className="grid min-w-[980px] grid-cols-[repeat(4,220px)] items-start gap-8">
+      <div className="grid min-w-[1220px] grid-cols-[repeat(5,220px)] items-start gap-6">
         {nodes.map((node) => (
           <div
             key={node.id}
@@ -1244,6 +1303,15 @@ function StagePlayObserverMailLoopCanvas({
               <span className="text-xs font-semibold text-slate-100">{node.title}</span>
               <span className="mt-1 font-mono text-[10px] text-cyan-200">{labelize(node.status)}</span>
               <span className="mt-1 text-[10px] text-slate-500">{node.subtitle}</span>
+              {node.statusChips?.length ? (
+                <span className="mt-1 flex max-w-full flex-wrap justify-center gap-1">
+                  {node.statusChips.slice(0, 3).map((chip) => (
+                    <span key={chip} className="rounded border border-slate-700 bg-slate-950/70 px-1.5 py-0.5 text-[9px] text-slate-300">
+                      {chip}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </div>
             <div
               className="mt-2 h-[180px] overflow-hidden rounded-md border border-slate-800 bg-black/25 p-2 text-[10px] text-slate-300"
@@ -1276,7 +1344,7 @@ function StagePlayObserverMailLoopCanvas({
           </div>
         ))}
       </div>
-      <div className="mt-4 grid min-w-[980px] grid-cols-[repeat(4,220px)] gap-8 font-mono text-[10px] text-slate-500">
+      <div className="mt-4 grid min-w-[1220px] grid-cols-[repeat(5,220px)] gap-6 font-mono text-[10px] text-slate-500">
         {nodes.map((node, index) => (
           <div key={`${node.id}:edge`} className="flex items-center justify-center">
             {index < nodes.length - 1 ? <span>--&gt;</span> : <span>end</span>}
@@ -3871,6 +3939,7 @@ function Inspector({
 }
 
 export default function StagePlayBadgeGraphPanel() {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [bindingOverlayOpen, setBindingOverlayOpen] = useState(false);
   const [draftNodes, setDraftNodes] = useState<DraftStagePlayNode[]>([]);
@@ -3936,17 +4005,19 @@ export default function StagePlayBadgeGraphPanel() {
     );
     if (!queuedWake) return;
     launchedWakeIdsRef.current.add(queuedWake.wakeRequestId);
-    launchHelixAskPrompt({
-      question: buildStagePlayMailWakeAskQuestion({
-        wake: queuedWake,
-        mailItems: mailbox?.mailItems ?? [],
-      }),
-      autoSubmit: true,
-      panelId: "stage-play-badge-graph",
-      forceReasoningDispatch: true,
-      suppressWorkstationPayloadActions: true,
-    });
-  }, [mailbox?.mailItems, mailbox?.wakeRequests]);
+    void runStagePlayLiveSourceMailWake({
+      threadId,
+      roomId,
+      environmentId,
+    })
+      .catch((error) => {
+        console.warn("[StagePlayBadgeGraphPanel] live-source mail wake run failed", error);
+      })
+      .finally(() => {
+        void queryClient.invalidateQueries({ queryKey: ["/api/helix/stage-play/live-source-mail"] });
+        void queryClient.invalidateQueries({ queryKey: ["/api/helix/stage-play/graph"] });
+      });
+  }, [environmentId, mailbox?.wakeRequests, queryClient, roomId, threadId]);
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
     queryKey: [
       "/api/helix/stage-play/raw-session-buffer",
@@ -4822,13 +4893,15 @@ export default function StagePlayBadgeGraphPanel() {
           </div>
         ) : null}
 
-        <StagePlayToolActivityStrip
-          graph={graph}
-          diff={graphDiff}
-          projectionStatus={projectionStatus}
-          checkpointQueueStatus={checkpointQueueStatus}
-          onCheckpointQueueAction={handleCheckpointQueueAction}
-        />
+        {graphDisplayMode === "full_graph" ? (
+          <StagePlayToolActivityStrip
+            graph={graph}
+            diff={graphDiff}
+            projectionStatus={projectionStatus}
+            checkpointQueueStatus={checkpointQueueStatus}
+            onCheckpointQueueAction={handleCheckpointQueueAction}
+          />
+        ) : null}
 
         {selectedDraftNodeId ? (
           (() => {

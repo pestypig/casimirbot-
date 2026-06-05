@@ -25,7 +25,11 @@ import {
   resetLiveSourceDescriptorsForTest,
   upsertLiveSourceDescriptor,
 } from "../services/situation-room/live-source-descriptor-builder";
-import { classifyLiveSourceContinuationIntent } from "../services/helix-ask/live-source-continuation-intent";
+import {
+  classifyLiveSourceContinuationIntent,
+  isLiveSourceMailLoopPrompt,
+} from "../services/helix-ask/live-source-continuation-intent";
+import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA } from "../services/stage-play/stage-play-output-lane-reducer";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
 import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-badge-graph-builder";
@@ -60,6 +64,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
   delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+  delete process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE;
 });
 
 describe("Helix Ask Stage Play routing", () => {
@@ -188,6 +193,82 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("one unread live-source mail item requiring a decision");
   }, 30_000);
 
+  it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:stage-play-mail-wake-route",
+      ts: "2026-06-04T16:31:00.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:stage-play-mail-wake-route",
+      summary: "Minecraft-like scene with a player HUD and stable terrain.",
+      supports_claims: [
+        {
+          claim: "The active visual source has compact evidence.",
+          support_status: "supports",
+          confidence: 0.8,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: [
+          "Read the active live-source mailbox and decide what to do with the latest unread source update.",
+          "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
+          "Wake request: stage_play_live_source_mail_wake:test",
+          "Mail refs: stage_play_live_source_mail:test",
+          `Source refs: ${sourceId}`,
+        ].join("\n"),
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      terminal: response.body?.terminal_artifact_kind,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("live_pipeline_control");
+    expect(response.body?.terminal_artifact_kind, routeDebug).not.toBe("live_pipeline_receipt");
+    expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
+    expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
+      .toEqual(expect.arrayContaining([
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ]));
+    const liveToolArtifacts = response.body?.current_turn_artifact_ledger
+      ?.filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
+      ?? [];
+    const decisionArtifact = liveToolArtifacts.find((artifact: any) =>
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+    });
+  }, 30_000);
+
   it("does not execute mailbox tools from a negated live-source mail mention", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -208,6 +289,103 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [], routeDebug)
       .not.toContain("live_env.read_live_source_mail");
   }, 30_000);
+
+  it("routes natural active visual mailbox prompts away from Situation Room visual capture", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:natural-mailbox-route",
+      ts: "2026-06-04T16:32:00.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:natural-mailbox-route",
+      summary: "Cosmic ambient YouTube scene with a planet and star field.",
+      supports_claims: [
+        {
+          claim: "The active visual mailbox has compact evidence.",
+          support_status: "supports",
+          confidence: 0.82,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Check the active visual live-source mailbox now. Read the latest visual summary mail, record the decision, and wait for next summary if nothing important changed.",
+        sessionId: threadId,
+        workspace_context_snapshot: {
+          visual_context_capability: {
+            status: "error",
+            evidence_available: false,
+            error: "visual capture evidence is unavailable",
+          },
+        },
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      sourceTarget: response.body?.source_target_intent,
+      availableCapabilities: response.body?.available_capabilities,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      terminalErrorCode: response.body?.terminal_error_code,
+    }, null, 2);
+
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.source_target_intent?.requested_outputs, routeDebug).toEqual(expect.arrayContaining([
+      "stage_play_live_source_mail_read_result",
+      "stage_play_live_source_mail_decision",
+    ]));
+    expect(response.body?.source_target_intent?.suppressed_routes, routeDebug).toContain("visual_capture_describe");
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.read_live_source_mail");
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("clarify:missing_args");
+    expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
+      .toEqual(expect.arrayContaining([
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ]));
+    expect(response.body?.answer, routeDebug).not.toMatch(/visual capture evidence is unavailable|can't inspect the screen/i);
+  }, 60_000);
+
+  it("lets explicit observer mailbox wording suppress screen-capture routing", () => {
+    const prompt = "Check the observer mailbox for the latest visual summary, not screen capture.";
+
+    expect(isLiveSourceMailLoopPrompt(prompt)).toBe(true);
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: "ask:test-observer-mailbox",
+      threadId,
+      promptText: prompt,
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "live_environment",
+      target_kind: "live_environment",
+      precedence_reason: "explicit_live_source_mail_loop_source_target",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.suppressed_routes).toContain("visual_capture_describe");
+  });
 
   it("forces a wait decision after a no-mail read instead of repeating the read tool", async () => {
     process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
@@ -277,7 +455,8 @@ describe("Helix Ask Stage Play routing", () => {
       mailIds: [],
       nextLoopState: "armed_for_next_summary",
     });
-    expect(response.body?.answer, routeDebug).toMatch(/live-source updates|source update/i);
+    expect(response.body?.answer, routeDebug).toContain("No unread live-source updates were available at this check");
+    expect(response.body?.answer, routeDebug).toContain("live-source mailbox is still armed");
     expect(response.body?.answer, routeDebug).not.toMatch(/visual evidence is unavailable|next visual summary/i);
   }, 30_000);
 

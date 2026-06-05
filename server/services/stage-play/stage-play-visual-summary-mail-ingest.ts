@@ -13,6 +13,7 @@ import { listVisualFrameEvidence } from "../situation-room/visual-snapshot-store
 import { getActiveLiveAnswerEnvironmentForThread, getLiveAnswerEnvironment } from "../situation-room/live-answer-environment-store";
 import {
   enqueueStagePlayLiveSourceMailItem,
+  getStagePlayLiveSourceMailItem,
   listStagePlayLiveSourceJobStates,
   listStagePlayMailDecisions,
   listUnreadStagePlayLiveSourceMailItems,
@@ -288,6 +289,7 @@ export function readLiveSourceMailForAsk(input: {
   environmentId?: string | null;
   sourceId?: string | null;
   sourceKind?: string | null;
+  mailIds?: string[];
   limit?: number;
   includeRead?: boolean;
   voicePolicy?: Partial<StagePlayLiveSourceVoicePolicyV1> | null;
@@ -299,15 +301,33 @@ export function readLiveSourceMailForAsk(input: {
   const roomId = input.roomId ?? environment?.room_id ?? null;
   const objective = environment?.objective ?? null;
   const limit = Math.max(1, Math.min(input.limit ?? 3, 10));
-  let items = listUnreadStagePlayLiveSourceMailItems({
-    threadId: input.threadId,
-    roomId,
-    environmentId: input.environmentId ?? environment?.environment_id ?? null,
-    sourceId: input.sourceId ?? null,
-    sourceKind: input.sourceKind ?? null,
-    includeDelivered: input.includeRead === true,
-    limit,
-  });
+  const requestedMailIds = uniqueStrings(input.mailIds ?? []).slice(0, limit);
+  let items = requestedMailIds.length > 0
+    ? requestedMailIds
+        .map((mailId) => getStagePlayLiveSourceMailItem(mailId))
+        .filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item))
+        .filter((item) =>
+          item.threadId === input.threadId &&
+          (!roomId || item.roomId === roomId) &&
+          (!(input.environmentId ?? environment?.environment_id ?? null) || item.environmentId === (input.environmentId ?? environment?.environment_id ?? null)) &&
+          (!input.sourceId || item.sourceId === input.sourceId) &&
+          (!input.sourceKind || item.sourceKind === input.sourceKind) &&
+          mailItemCanBeDeliveredToAsk(item, { includeDelivered: true })
+        )
+        .sort((left, right) => {
+          const leftIndex = requestedMailIds.indexOf(left.mailId);
+          const rightIndex = requestedMailIds.indexOf(right.mailId);
+          return leftIndex - rightIndex || left.createdAt.localeCompare(right.createdAt);
+        })
+    : listUnreadStagePlayLiveSourceMailItems({
+        threadId: input.threadId,
+        roomId,
+        environmentId: input.environmentId ?? environment?.environment_id ?? null,
+        sourceId: input.sourceId ?? null,
+        sourceKind: input.sourceKind ?? null,
+        includeDelivered: input.includeRead === true,
+        limit,
+      });
   if (items.length === 0) {
     const latest = enqueueLatestVisualSummaryMailIfNeeded({
       threadId: input.threadId,
@@ -317,7 +337,7 @@ export function readLiveSourceMailForAsk(input: {
       objective,
       now: input.now,
     });
-    if (latest && mailItemCanBeDeliveredToAsk(latest, { includeDelivered: input.includeRead === true })) {
+    if (requestedMailIds.length === 0 && latest && mailItemCanBeDeliveredToAsk(latest, { includeDelivered: input.includeRead === true })) {
       items = [latest];
     }
   }

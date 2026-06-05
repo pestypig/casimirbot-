@@ -10,6 +10,9 @@ export type StagePlayLiveSourceMailWakeStatusV1 =
   | "queued"
   | "running"
   | "completed"
+  | "failed_retryable"
+  | "failed_terminal"
+  | "deferred_for_pressure"
   | "skipped"
   | "failed";
 
@@ -27,6 +30,10 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   status: StagePlayLiveSourceMailWakeStatusV1;
   askTurnId?: string | null;
   decisionIds: string[];
+  attemptCount: number;
+  lastAttemptAt?: string | null;
+  nextRetryAt?: string | null;
+  failureReason?: string | null;
   evidenceRefs: string[];
   queuedAt: string;
   updatedAt: string;
@@ -44,7 +51,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
-  status: "completed" | "skipped" | "failed";
+  status: "completed" | "skipped" | "failed" | "failed_retryable" | "failed_terminal" | "deferred_for_pressure";
   askTurnId?: string | null;
   decisionIds: string[];
   skippedReason?: string | null;

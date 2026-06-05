@@ -1122,12 +1122,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(scrollport.getAttribute("data-stage-play-graph-mode")).toBe("observer_mail_loop_v1");
     expect(screen.getByTestId("stage-play-observer-mail-loop-toggle")).toBeTruthy();
     expect(screen.getByTestId("stage-play-full-graph-toggle")).toBeTruthy();
-    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(4);
+    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(5);
     expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Visual Summary Mail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ask Wake").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ask Decision").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Output/Wait").length).toBeGreaterThan(0);
-    expect(screen.getByText(/mail unread: 1/i)).toBeTruthy();
+    expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
+    expect(screen.getByText(/unread 1/i)).toBeTruthy();
     expect(screen.getByText(/summary preview: Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
     expect(screen.getByText(/no output yet; armed for next source update/i)).toBeTruthy();

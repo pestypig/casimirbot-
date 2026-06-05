@@ -133,6 +133,8 @@ const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
   const text = artifactText(artifact);
   return /^Stage Play checkpoint request (?:queued|running|completed):/i.test(text ?? "")
     ? text!
+    : /^Stage Play job planned\b/i.test(text ?? "")
+      ? text!
     : /^Stage Play/i.test(text ?? "")
       ? stagePlayReceiptPendingText
       : text || stagePlayReceiptPendingText;

@@ -47,6 +47,7 @@ const buildWakePrompt = (wake: StagePlayLiveSourceMailWakeRequestV1): string =>
   [
     "Read the active live-source mailbox and decide what to do with the latest unread source update.",
     "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
+    "Read only the mail refs listed below for this wake request; do not widen to newer mailbox items in this turn.",
     "If there is no user-facing change, record wait_for_next_summary.",
     "If there is a meaningful user-facing change, draft a concise text answer.",
     "If voice is allowed and the update is urgent, request a voice callout.",
