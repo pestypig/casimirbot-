@@ -36,6 +36,7 @@ export type WorkstationToolIntent =
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"
+  | "theory_ideology_bridge_reflection"
   | "direct_answer";
 
 export type VoiceContextRequestKind =
@@ -962,6 +963,27 @@ function makeZenGraphReflectionAskToolStep(prompt: string): HelixWorkstationTool
   };
 }
 
+function makeTheoryIdeologyBridgeAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "bridge_theory_ideology_context",
+    kind: "run_ask_tool",
+    tool_id: "helix_ask.bridge_theory_ideology_context",
+    args: {
+      prompt,
+      refs: ["helix-ask:current-turn"],
+      theory_reflection_ref: "step:reflect_theory_context",
+      ideology_reflection_ref: "step:reflect_zen_graph_context",
+    },
+    depends_on: ["reflect_theory_context", "reflect_zen_graph_context"],
+    expected_receipt_kind: "helix_theory_ideology_bridge_tool_result",
+    expected_state_change: {
+      store: "theory-ideology-bridge",
+      proof_key: "bridge",
+    },
+    required: true,
+  };
+}
+
 function makePanelReflectionStep(prompt: string, depends_on: string[] = []): HelixWorkstationToolPlanStep {
   return {
     step_id: "reflect_discussion_context",
@@ -1057,6 +1079,27 @@ function hasZenGraphPromptCue(prompt: string): boolean {
   return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|procedural\s+(?:language|expression|action)|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
     prompt,
   );
+}
+
+function hasTheoryIdeologyBridgePromptCue(prompt: string): boolean {
+  const hasTheoryCue =
+    /\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|observable\s+physics|mathematics|entropy|conservation|self[-\s]?organization|chemistry|first\s+principles|boundary\s+conditions?|feedback\s+loops?|symmetry|invariance)\b/i.test(
+      prompt,
+    );
+
+  const hasZenJusticeCue =
+    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(
+      prompt,
+    );
+
+  return hasTheoryCue && hasZenJusticeCue;
+}
+
+function isTheoryIdeologyBridgeReflectionPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  if (userExplicitlyDisallowsZenGraphTools(prompt)) return false;
+  return hasTheoryIdeologyBridgePromptCue(prompt);
 }
 
 function isZenGraphReflectionPrompt(prompt: string): boolean {
@@ -1437,6 +1480,48 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks to store text in notes; note output should be a receipt-backed action.",
       missing_required_args: body ? [] : ["text"],
+    };
+  }
+
+  if (isTheoryIdeologyBridgeReflectionPrompt(normalized)) {
+    const steps: HelixWorkstationToolPlanStep[] = [
+      makeTheoryReflectionAskToolStep(normalized),
+      makeZenGraphReflectionAskToolStep(normalized),
+      makeTheoryIdeologyBridgeAskToolStep(normalized),
+      {
+        step_id: "evaluate_theory_ideology_bridge",
+        kind: "evaluate_result",
+        depends_on: ["bridge_theory_ideology_context"],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      },
+    ];
+
+    pushScore({
+      affordance_id: "helix_ask.bridge_theory_ideology_context",
+      panel_id: "helix_ask",
+      action_id: "bridge_theory_ideology_context",
+      score: 0.91,
+      reason:
+        "Prompt asks to connect theory/physics constraints with Zen/procedural justice lenses as non-terminal bridge evidence",
+      required_args_missing: [],
+    });
+
+    return {
+      intent: "theory_ideology_bridge_reflection",
+      action: null,
+      tool_plan: buildToolPlan({
+        prompt: normalized,
+        intent: "theory_ideology_bridge_reflection",
+        missing: [],
+        options,
+        steps,
+      }),
+      scores,
+      should_use_tool: true,
+      reason:
+        "Prompt asks to reflect theory/physics constraints against Zen/procedural justice lenses; produce bridge evidence before final answer.",
+      missing_required_args: [],
     };
   }
 

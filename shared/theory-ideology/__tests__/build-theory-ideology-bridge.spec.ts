@@ -8,7 +8,11 @@ import { validateTheoryIdeologyBridgeV1 } from "../../theory-ideology-bridge";
 
 const generatedAt = "2026-06-05T00:00:00.000Z";
 
-function baseTheoryReflection(text = "observation provenance falsifiability") {
+function baseTheoryReflection(
+  text = "observation provenance falsifiability",
+  badgeId = "theory.observation-evidence",
+  title = "Observation Evidence",
+) {
   return buildTheoryContextReflectionV1({
     generatedAt,
     reflectionId: "theory-context-reflection:test",
@@ -24,30 +28,30 @@ function baseTheoryReflection(text = "observation provenance falsifiability") {
     },
     exactMatches: [
       {
-        badgeId: "theory.observation-boundary",
-        title: "Observation Boundary",
+        badgeId,
+        title,
         score: 0.92,
         reasons: [text],
-        matchedSymbols: ["measurement"],
+        matchedSymbols: [],
         matchedEquationFamilies: [],
         matchedRepoPaths: [],
-        claimBoundaryNotes: ["Keep claims tied to observation refs."],
+        claimBoundaryNotes: [`Claim note: ${text}`],
       },
     ],
     likelyMatches: [],
     inferredDomains: [],
     overlay: {
-      centerBadgeIds: ["theory.observation-boundary"],
-      highlightedBadgeIds: ["theory.observation-boundary"],
+      centerBadgeIds: [badgeId],
+      highlightedBadgeIds: [badgeId],
       highlightedEdgeIds: [],
-      heatByBadgeId: { "theory.observation-boundary": 0.92 },
-      exactBadgeIds: ["theory.observation-boundary"],
+      heatByBadgeId: { [badgeId]: 0.92 },
+      exactBadgeIds: [badgeId],
       likelyBadgeIds: [],
       softRegion: null,
     },
     evidenceForAsk: {
       summary: text,
-      claimBoundaries: [`Claim boundary: ${text}`],
+      claimBoundaries: [`Claim note: ${text}`],
       recommendedNextActions: [],
     },
   });
@@ -114,7 +118,7 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
     expect(bridge.links).toHaveLength(1);
     expect(bridge.links[0]).toMatchObject({
       relation: "requires_evidence",
-      theoryBadgeIds: ["theory.observation-boundary", "claim_boundary:1"],
+      theoryBadgeIds: ["theory.observation-evidence", "claim_boundary:1"],
       ideologyNodeIds: ["direct-observation-before-claim"],
     });
     expect(bridge.authority).toMatchObject({
@@ -131,7 +135,11 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
       generatedAt,
       bridgeId: "theory-ideology-bridge:entropy",
       prompt: "Entropy and drift should keep the procedure revisable.",
-      theoryReflection: baseTheoryReflection("entropy drift irreversibility"),
+      theoryReflection: baseTheoryReflection(
+        "entropy drift irreversibility",
+        "theory.entropy-drift",
+        "Entropy and Drift",
+      ),
       ideologyReflection: baseIdeologyReflection(
         "impermanence-entropy-and-revision",
         "Impermanence, Entropy, and Revision",
@@ -150,7 +158,11 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
       generatedAt,
       bridgeId: "theory-ideology-bridge:boundary",
       prompt: "Conservation and boundary constraints should inform fairness review.",
-      theoryReflection: baseTheoryReflection("conservation boundary stress_energy_conservation"),
+      theoryReflection: baseTheoryReflection(
+        "conservation boundary stress_energy_conservation",
+        "theory.boundary-constraint",
+        "Boundary Constraint",
+      ),
       ideologyReflection: baseIdeologyReflection(
         "fairness-due-process-and-justification",
         "Fairness, Due Process, and Justification",
@@ -188,7 +200,11 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
       generatedAt,
       bridgeId: "theory-ideology-bridge:no-match",
       prompt: "This prompt has unrelated context.",
-      theoryReflection: baseTheoryReflection("unrelated calculus tangent"),
+      theoryReflection: baseTheoryReflection(
+        "unrelated calculus tangent",
+        "theory.unrelated-calculus",
+        "Unrelated Calculus",
+      ),
       ideologyReflection: baseIdeologyReflection("unrelated-node", "Unrelated Node"),
     });
 

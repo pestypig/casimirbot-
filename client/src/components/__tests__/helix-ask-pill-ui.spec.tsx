@@ -791,7 +791,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("shouldShowAskLiveAgenticEventRow");
     expect(source).toContain("live turn completed");
     expect(source).toContain("live question");
-    expect(source).toContain("model decision");
+    expect(source).toContain("/^model decision:\\s*.+\\.?$/i");
     expect(source).toContain("helix-ask-turn-enter");
     expect(source).toContain("helix-ask-turn-line-enter");
     expect(source).toContain("@keyframes helixAskTurnFadeIn");
@@ -886,8 +886,11 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8)");
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("chronologicalAskReplies.map");
+    expect(source).toContain("const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId");
+    expect(source).toContain("reply.id === transcriptLatestAskReplyId");
     expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
     expect(source).toContain("left.sequence - right.sequence");
+    expect(source).toContain("return right.index - left.index");
   });
 
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {

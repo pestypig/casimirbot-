@@ -14,6 +14,7 @@ export type HelixWorkstationToolPlanIntent =
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"
+  | "theory_ideology_bridge_reflection"
   | "direct_answer";
 
 export type HelixWorkstationToolPlanStepKind =

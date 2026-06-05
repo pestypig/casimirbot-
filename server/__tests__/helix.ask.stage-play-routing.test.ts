@@ -438,6 +438,8 @@ describe("Helix Ask Stage Play routing", () => {
       .toEqual(["live_env.configure_live_source_watch_job"]);
     expect(response.body?.answer, routeDebug).not.toContain("Three unread live-source mail items");
     expect(response.body?.answer, routeDebug).not.toContain("decision is required");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).not.toMatch(/\bno\s+(?:mail|live-source\s+updates?)\s+(?:was|were)?\s*(?:available|found)\b/i);
   }, 30_000);
 
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {
@@ -629,6 +631,9 @@ describe("Helix Ask Stage Play routing", () => {
       nextLoopState: "armed_for_next_summary",
     });
     expect(response.body?.answer, routeDebug).not.toContain("decision is required");
+    expect(response.body?.answer, routeDebug).toContain("Minecraft-like scene with a player near a book stand");
+    expect(response.body?.answer, routeDebug).toContain("draft_text_answer");
+    expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
   }, 30_000);
 
   it("does not execute mailbox tools from a negated live-source mail mention", async () => {

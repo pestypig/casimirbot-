@@ -7,6 +7,7 @@ import { validateHelixRecommendedActionAdmissionV1 } from "../../../shared/contr
 import { validateIdeologyContextReflectionV1 } from "../../../shared/ideology-context-reflection";
 import { validateZenBadgeLocatorV1 } from "../../../shared/zen-badge-locator";
 import { validateFruitionProcedureExpressionV1 } from "../../../shared/fruition-procedure-expression";
+import { validateTheoryIdeologyBridgeV1 } from "../../../shared/theory-ideology-bridge";
 
 export type EvaluateWorkstationToolReceiptInput = {
   thread_id: string;
@@ -142,6 +143,19 @@ function isZenGraphReflectionToolKind(kind: string | null, artifact: Record<stri
   );
 }
 
+function isTheoryIdeologyBridgeToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  const bridge = asRecord(artifact?.bridge);
+  return (
+    kind === "helix_theory_ideology_bridge_tool_result" ||
+    kind === "theory_ideology_bridge" ||
+    artifact?.tool_id === "helix_ask.bridge_theory_ideology_context" ||
+    bridge?.artifactId === "theory_ideology_bridge" ||
+    bridge?.schemaVersion === "theory_ideology_bridge/v1" ||
+    artifact?.artifactId === "theory_ideology_bridge" ||
+    artifact?.schemaVersion === "theory_ideology_bridge/v1"
+  );
+}
+
 function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>): string[] {
   const issues: string[] = [];
   const reflection = asRecord(artifact.reflection) ?? artifact;
@@ -163,6 +177,11 @@ function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>)
     issues.push("admission_authority_agent_executable_not_false");
   }
   return issues;
+}
+
+function validateTheoryIdeologyBridgeToolResult(artifact: Record<string, unknown>): string[] {
+  const bridge = asRecord(artifact.bridge) ?? artifact;
+  return validateTheoryIdeologyBridgeV1(bridge);
 }
 
 export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolReceiptInput): WorkstationToolEvaluation {
@@ -243,6 +262,19 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
         asRecord(zenArtifact.fruition) ? "Fruition procedure expression" : null,
         "missing checks, and admissions.",
       ].filter(Boolean).join(", ");
+    }
+  } else if (isTheoryIdeologyBridgeToolKind(topLevelKind, artifact ?? receipt)) {
+    const bridgeArtifact = artifact ?? receipt;
+    const issues = validateTheoryIdeologyBridgeToolResult(bridgeArtifact);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Theory-Zen bridge tool did not produce a usable receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `Theory-Zen bridge rejected as policy evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary = "Theory-Zen bridge produced evidence-only procedural links, missing-evidence checks, and overclaim guards.";
     }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";

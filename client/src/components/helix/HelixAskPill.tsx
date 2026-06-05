@@ -8622,7 +8622,7 @@ function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskR
       if (left.ts !== null && right.ts !== null && left.ts !== right.ts) return left.ts - right.ts;
       if (left.ts !== null && right.ts === null) return -1;
       if (left.ts === null && right.ts !== null) return 1;
-      return left.index - right.index;
+      return right.index - left.index;
     })
     .map((entry) => entry.reply);
 }
@@ -11007,7 +11007,7 @@ const LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS: RegExp[] = [
   /^clipboard copy:\s*live turn completed\.?$/i,
   /^finalization finished\.?$/i,
   /^live turn completed\.?$/i,
-  /^model decision:\s*composer\.?$/i,
+  /^model decision:\s*.+\.?$/i,
   /^mode gate consistency:\s*ok\.?$/i,
   /^objective gate consistency:\s*ok\.?$/i,
   /^rattling gate:\s*pass\.?$/i,
@@ -31158,6 +31158,7 @@ export function HelixAskPill({
       ? "mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
       : "mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
   const chronologicalAskReplies = sortHelixAskRepliesChronologically(askReplies);
+  const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
     micArmState,
@@ -32609,7 +32610,7 @@ export function HelixAskPill({
                   setAskTurnExpandedByReply((prev) => {
                     const next = { ...prev };
                     chronologicalAskReplies.forEach((reply) => {
-                      if (reply.id === latestAskReplyId) return;
+                      if (reply.id === transcriptLatestAskReplyId) return;
                       next[reply.id] = false;
                     });
                     return next;
@@ -32617,7 +32618,7 @@ export function HelixAskPill({
                   setAskExpandedByReply((prev) => {
                     const next = { ...prev };
                     chronologicalAskReplies.forEach((reply) => {
-                      if (reply.id === latestAskReplyId) return;
+                      if (reply.id === transcriptLatestAskReplyId) return;
                       next[reply.id] = false;
                     });
                     return next;
@@ -32680,7 +32681,7 @@ export function HelixAskPill({
                   .filter((entry): entry is Record<string, unknown> => Boolean(entry?.panel_id && entry?.action_id))
               : [];
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
-            const isLatestReply = reply.id === latestAskReplyId;
+            const isLatestReply = reply.id === transcriptLatestAskReplyId;
             const expanded = askExpandedByReply[reply.id] ?? isLatestReply;
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
             const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(

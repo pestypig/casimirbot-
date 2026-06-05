@@ -493,6 +493,56 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.action).toBeNull();
   });
 
+  it("plans a Theory-Zen bridge before standalone ZenGraph or theory reflection", () => {
+    const plan = planWorkstationToolUse(
+      "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.",
+    );
+
+    expect(plan.intent).toBe("theory_ideology_bridge_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.reason).toBe(
+      "Prompt asks to reflect theory/physics constraints against Zen/procedural justice lenses; produce bridge evidence before final answer.",
+    );
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toEqual([
+      "reflect_theory_context",
+      "reflect_zen_graph_context",
+      "bridge_theory_ideology_context",
+      "evaluate_theory_ideology_bridge",
+    ]);
+    expect(plan.tool_plan?.steps.find((step) => step.step_id === "bridge_theory_ideology_context")).toEqual(
+      expect.objectContaining({
+        kind: "run_ask_tool",
+        tool_id: "helix_ask.bridge_theory_ideology_context",
+        depends_on: ["reflect_theory_context", "reflect_zen_graph_context"],
+        expected_receipt_kind: "helix_theory_ideology_bridge_tool_result",
+        expected_state_change: {
+          store: "theory-ideology-bridge",
+          proof_key: "bridge",
+        },
+        args: expect.objectContaining({
+          prompt:
+            "Reflect fairness and due process through entropy and conservation in the Theory Badge Graph and ZenGraph.",
+          refs: ["helix-ask:current-turn"],
+          theory_reflection_ref: "step:reflect_theory_context",
+          ideology_reflection_ref: "step:reflect_zen_graph_context",
+        }),
+      }),
+    );
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_theory_badge_graph");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).not.toContain("open_zen_badge_graph");
+  });
+
+  it("does not bridge mixed Theory-Zen terms when tools are explicitly disallowed", () => {
+    const plan = planWorkstationToolUse(
+      "Do not use tools or panels; discuss entropy, conservation, fairness, and ZenGraph conceptually.",
+    );
+
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.tool_plan).toBeNull();
+  });
+
   it("admits ZenGraph reflection and Fruition expression prompts before the scientific calculator", () => {
     const plan = planWorkstationToolUse(
       "Use the Zen Badge Graph to reflect this situation: I need to respond to a teammate who made an uncertain safety claim. Plot direct observation, right speech, and two-key review, then show what Fruition would solve before any action.",
