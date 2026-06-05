@@ -16,6 +16,7 @@ import {
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import {
   listStagePlayLiveSourceMailWakeRequests,
+  markStagePlayMailWakeRunning,
   resetStagePlayLiveSourceMailWakeStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import {
@@ -813,7 +814,7 @@ describe("Stage Play live-source mailbox", () => {
 
     expect(result).toMatchObject({
       artifactId: "stage_play_live_source_mail_wake_result",
-      status: "failed",
+      status: "failed_terminal",
       askTurnId: "ask:wake-missing-mail-decision",
       failedReason: "mail_wake_decision_missing",
       decisionIds: [],
@@ -823,8 +824,169 @@ describe("Stage Play live-source mailbox", () => {
       raw_content_included: false,
     });
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
-      status: "failed",
+      status: "failed_terminal",
       decisionIds: [],
+    });
+  });
+
+  it("defers 503 wake failures for retry without recording a mail decision", async () => {
+    seedVisualEvidence();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:00.000Z",
+      askTurnRunner: async () => {
+        throw new Error("mail_wake_ask_turn_failed:503");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "deferred_for_pressure",
+      failedReason: "ask_turn_pressure_503",
+      decisionIds: [],
+    });
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    expect(wake).toMatchObject({
+      status: "deferred_for_pressure",
+      attemptCount: 1,
+      lastAttemptAt: "2026-06-04T12:01:00.000Z",
+      nextRetryAt: "2026-06-04T12:01:15.000Z",
+      failureReason: "ask_turn_pressure_503",
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+    expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
+  });
+
+  it("runs a retryable pressure wake after nextRetryAt while preserving exact mail ids", async () => {
+    seedVisualEvidence();
+    await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:00.000Z",
+      askTurnRunner: async () => {
+        throw new Error("mail_wake_ask_turn_failed:503");
+      },
+    });
+    const mailId = listStagePlayLiveSourceMailItems({ threadId })[0].mailId;
+
+    const early = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:10.000Z",
+      askTurnRunner: async () => {
+        throw new Error("should_not_run_before_retry");
+      },
+    });
+    expect(early).toBeNull();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:15.000Z",
+      askTurnRunner: async ({ wakeRequest }) => ({
+        turn_id: "ask:wake-retry",
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: "stage_play_live_source_mail_decision:wake-retry",
+                mailIds: wakeRequest.mailIds,
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-retry",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-retry"],
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      attemptCount: 2,
+      mailIds: [mailId],
+      nextRetryAt: null,
+    });
+  });
+
+  it("blocks later wakes while a non-stale wake is running", async () => {
+    enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:block-first",
+      evidenceRef: "visual_evidence:block-first",
+      summaryText: "First summary.",
+      createdAt: "2026-06-04T12:02:00.000Z",
+    });
+    enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:block-second",
+      evidenceRef: "visual_evidence:block-second",
+      summaryText: "Second summary.",
+      createdAt: "2026-06-04T12:02:01.000Z",
+    });
+    const first = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    markStagePlayMailWakeRunning(first.wakeRequestId, "2026-06-04T12:02:02.000Z");
+    const skipped = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:10.000Z",
+      askTurnRunner: async () => {
+        throw new Error("should_not_run_while_prior_running");
+      },
+    });
+
+    expect(skipped).toBeNull();
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, mailId: first.mailIds[0] })[0]).toMatchObject({
+      status: "running",
+      attemptCount: 1,
+    });
+  });
+
+  it("recovers a stale running wake into retryable state", async () => {
+    seedVisualEvidence();
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z");
+
+    const retry = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:04:31.000Z",
+      askTurnRunner: async () => ({
+        turn_id: "ask:wake-stale-retry",
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: "stage_play_live_source_mail_decision:wake-stale-retry",
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(retry).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-stale-retry",
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      attemptCount: 2,
     });
   });
 });
