@@ -143,9 +143,32 @@ export function listPendingStagePlayLiveSourceMailWakeRequests(input: {
   return listStagePlayLiveSourceMailWakeRequests({ ...input, status: "queued" });
 }
 
+export function listRunnableStagePlayLiveSourceMailWakeRequests(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  now?: string;
+  limit?: number;
+} = {}): StagePlayLiveSourceMailWakeRequestV1[] {
+  const nowMs = Date.parse(input.now ?? new Date().toISOString());
+  return listStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    limit: input.limit ?? 250,
+  }).filter((wake) => {
+    if (wake.status === "queued") return true;
+    if (wake.status !== "failed_retryable" && wake.status !== "deferred_for_pressure") return false;
+    const retryMs = Date.parse(wake.nextRetryAt ?? "");
+    return !Number.isFinite(retryMs) || retryMs <= nowMs;
+  });
+}
+
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -160,8 +183,18 @@ const updateWake = (
   return updated;
 };
 
-export const markStagePlayMailWakeRunning = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(wakeRequestId, { status: "running", updatedAt: now });
+export const markStagePlayMailWakeRunning = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(wakeRequestId);
+  const updatedAt = now ?? new Date().toISOString();
+  return updateWake(wakeRequestId, {
+    status: "running",
+    attemptCount: (existing?.attemptCount ?? 0) + 1,
+    lastAttemptAt: updatedAt,
+    nextRetryAt: null,
+    failureReason: null,
+    updatedAt,
+  });
+};
 
 export const markStagePlayMailWakeCompleted = (input: {
   wakeRequestId: string;
@@ -175,6 +208,8 @@ export const markStagePlayMailWakeCompleted = (input: {
     askTurnId: input.askTurnId ?? undefined,
     decisionIds: input.decisionIds,
     evidenceRefs: input.evidenceRefs,
+    nextRetryAt: null,
+    failureReason: null,
     updatedAt: input.now,
   });
 
@@ -184,12 +219,38 @@ export const markStagePlayMailWakeSkipped = (wakeRequestId: string, now?: string
 export const markStagePlayMailWakeFailed = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
   updateWake(wakeRequestId, { status: "failed", updatedAt: now });
 
+export const markStagePlayMailWakeRetryable = (input: {
+  wakeRequestId: string;
+  status?: "failed_retryable" | "deferred_for_pressure";
+  failureReason: string;
+  nextRetryAt?: string | null;
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1 | null =>
+  updateWake(input.wakeRequestId, {
+    status: input.status ?? "failed_retryable",
+    failureReason: input.failureReason,
+    nextRetryAt: input.nextRetryAt ?? null,
+    updatedAt: input.now,
+  });
+
+export const markStagePlayMailWakeTerminalFailed = (input: {
+  wakeRequestId: string;
+  failureReason: string;
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1 | null =>
+  updateWake(input.wakeRequestId, {
+    status: "failed_terminal",
+    failureReason: input.failureReason,
+    nextRetryAt: null,
+    updatedAt: input.now,
+  });
+
 export function recordStagePlayMailWakeResult(input: {
   wakeRequestId: string;
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
-  status: "completed" | "skipped" | "failed";
+  status: "completed" | "skipped" | "failed" | "failed_retryable" | "failed_terminal" | "deferred_for_pressure";
   askTurnId?: string | null;
   decisionIds?: string[];
   skippedReason?: string | null;
@@ -264,7 +325,7 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
     environmentId: input.environmentId ?? null,
     limit: 250,
   })) {
-    if (wake.status !== "queued" && wake.status !== "running") continue;
+    if (!ACTIVE_WAKE_STATUSES.has(wake.status)) continue;
     const decisions = uniqueStrings(wake.mailIds.flatMap((mailId) =>
       (decisionsByMailId.get(mailId) ?? []).map((decision) => decision.decisionId)
     ));
