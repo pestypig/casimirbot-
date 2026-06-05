@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA } from "@shared/helix-live-agent-step";
 import { runLiveEnvironmentAgentLoop } from "../services/helix-ask/live-environment-agent-loop";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
+import { resetInterimVoiceCalloutsForTest } from "../services/helix-ask/interim-voice-callout-store";
+import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
@@ -35,6 +37,8 @@ const resetAll = () => {
   resetLiveSituationRunsForTest();
   resetLiveFieldWorkersForTest();
   resetSituationConstructStoreForTest();
+  resetInterimVoiceCalloutsForTest();
+  runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
 };
 
 const seedEnvironment = () => createLiveAnswerEnvironment({
@@ -78,10 +82,185 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.query_event_log",
       "live_env.query_constructs",
       "live_env.query_navigation_state",
+      "live_env.request_interim_voice_callout",
       "live_env.request_probe",
     ]));
     expect(packet.policy.may_surface_user_text).toBe(false);
     expect(packet.recent_commentary_refs.length).toBeGreaterThan(0);
+  });
+
+  it("records interim voice callout requests as provisional tool evidence", () => {
+    const environment = seedEnvironment();
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:interim-voice",
+        kind: "tool_progress",
+        text: "I am checking the live environment evidence now.",
+        evidence_refs: ["tool_call:query_event_log"],
+        reason_codes: ["tool_progress"],
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.request_interim_voice_callout",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.observation).toMatchObject({
+      schema: "helix.interim_voice_callout_tool_result.v1",
+      request: {
+        artifactId: "helix_interim_voice_callout_request",
+        turnId: "turn:interim-voice",
+        threadId: environment.thread_id,
+        voicePlaybackKind: "tool_receipt",
+        authority: "provisional",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      receipt: {
+        artifactId: "helix_interim_voice_callout_receipt",
+        status: "queued",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("allows one immediate voice ack per turn and keeps later status callouts available", () => {
+    const environment = seedEnvironment();
+
+    const firstAck = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:immediate-ack",
+        kind: "immediate_ack",
+        text: "Okay, I will check that now and keep the full answer separate.",
+        max_chars: 220,
+        timing_hint_ms: 800,
+        reason_codes: ["immediate_ack"],
+      },
+    });
+
+    expect(firstAck.ok).toBe(true);
+    expect(firstAck.observation).toMatchObject({
+      request: {
+        kind: "immediate_ack",
+        maxChars: 96,
+        timingHintMs: 800,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      receipt: {
+        status: "queued",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      post_tool_model_step_required: true,
+    });
+
+    const duplicateAck = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:immediate-ack",
+        kind: "immediate_ack",
+        text: "Still starting.",
+      },
+    });
+
+    expect(duplicateAck.ok).toBe(false);
+    expect(duplicateAck.observation).toMatchObject({
+      request: {
+        kind: "immediate_ack",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      receipt: {
+        status: "blocked_policy",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+
+    const progress = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:immediate-ack",
+        kind: "tool_progress",
+        text: "I found the live-source mailbox and I am checking the latest item.",
+        evidence_refs: ["tool_call:read_live_source_mail"],
+        reason_codes: ["tool_progress"],
+      },
+    });
+
+    expect(progress.ok).toBe(true);
+    expect(progress.observation).toMatchObject({
+      request: {
+        kind: "tool_progress",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      receipt: {
+        status: "queued",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+  });
+
+  it("blocks interim voice callouts when voice TTS capacity is occupied", () => {
+    const environment = seedEnvironment();
+    const occupied = runtimeMemoryGovernor.admitRuntimeTask({
+      taskClass: "voice_tts",
+      source: "test.voice_tts_occupied",
+    });
+    expect(occupied.admitted).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:interim-voice-capacity",
+        kind: "tool_progress",
+        text: "I am still checking the evidence.",
+        evidence_refs: ["tool_call:query_event_log"],
+      },
+    });
+
+    expect(observation.ok).toBe(false);
+    expect(observation.assistant_answer).toBe(false);
+    expect(observation.observation).toMatchObject({
+      request: {
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      receipt: {
+        status: "blocked_capacity",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
+    occupied.lease?.release("completed");
   });
 
   it("runs model-chosen live-env tool steps before terminal answer permission", async () => {

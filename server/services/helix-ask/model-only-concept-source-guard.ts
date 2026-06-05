@@ -106,6 +106,11 @@ const explicitVisualInputPatterns: RegExp[] = [
   /\b(?:current|latest)\s+(?:screen|visual|frame|screenshot)\b/i,
 ];
 
+const explicitTheoryIdeologyBridgeSourcePatterns: RegExp[] = [
+  /\btheory\s+(?:badge\s*)?graph\b[\s\S]{0,180}\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|due\s+process|justice|fairness)\b/i,
+  /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition)\b[\s\S]{0,180}\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|entropy|conservation|self[-\s]?organization|observable\s+physics)\b/i,
+];
+
 const figurativePicturePatterns: RegExp[] = [
   /\b(?:popular|standard|usual|common|classical|physical|conceptual|mental|intuitive|big)\s+picture\b/i,
   /\b(?:vacuum[-\s]?fluctuation|field|quantum|geometric|statistical|historical|economic|philosophical|biological)\s+picture\b/i,
@@ -121,7 +126,8 @@ const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
 export function isExplicitProjectSourceRequest(promptText: string): boolean {
   const prompt = normalizePrompt(promptText);
-  return explicitProjectSourceRequestPatterns.some((pattern) => pattern.test(prompt));
+  return explicitProjectSourceRequestPatterns.some((pattern) => pattern.test(prompt)) ||
+    explicitTheoryIdeologyBridgeSourcePatterns.some((pattern) => pattern.test(prompt));
 }
 
 export function hasExplicitModelOnlyConceptScope(promptText: string): boolean {

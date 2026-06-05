@@ -47,6 +47,15 @@ Runtime task-manager controls:
 - Deferrable work such as Stage Play refresh is queued under pressure or when its lane is occupied.
 - Pausable background services can register with the governor. The Stage Play live-source mail wake service registers as pausable and yields while foreground work is under pressure.
 
+Interim voice callout controls:
+- `live_env.request_interim_voice_callout` records a short provisional speech request during an Ask/tool step.
+- The first conversational response should use kind `immediate_ack`. It is capped at 96 characters, may carry a `timingHintMs` such as `800`, and only one queued/delivered immediate ack is allowed per Ask turn.
+- Later tool-phase speech should use milestone kinds such as `tool_started`, `tool_progress`, `tool_result`, `waiting_for_evidence`, `memory_pressure`, or `clarifying_status`; these should correspond to real solver/tool progress, blockers, or wait states.
+- Interim callouts use playback kind `tool_receipt` or `translation_relay` and authority `provisional`.
+- Interim callout requests and receipts are tool evidence only: `assistant_answer:false`, `terminal_eligible:false`, `raw_content_included:false`, and `instruction_authority:"none"`.
+- The callout is admitted through the runtime `voice_tts` task class. If the voice TTS lane is occupied or under pressure, the receipt records `blocked_capacity` and no speech is attempted.
+- Interim callouts must not contain final-answer text and must not satisfy terminal answer gates. The completed Ask solver path remains the only answer route, and final answer reads must derive from a completed answer snapshot rather than an interim callout.
+
 ## Request body
 ```json
 {

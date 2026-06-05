@@ -86,6 +86,27 @@ describe("Helix Ask model-only concept source guard", () => {
     expect(repoIntent.repoEvidenceRequested).toBe(true);
   });
 
+  it("does not route explicit Theory Graph plus ZenGraph bridge prompts as model-only concepts", () => {
+    const prompt =
+      "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph.";
+    const signal = detectModelOnlyConceptSourceSignal(prompt);
+
+    expect(signal.applies).toBe(false);
+    expect(signal.should_prefer_model_only_concept).toBe(false);
+    expect(signal.explicit_project_source_request).toBe(true);
+    expect(signal.reason_codes).toEqual(expect.arrayContaining(["explicit_project_source_request"]));
+  });
+
+  it("keeps ordinary entropy and justice concept prompts model-only when no graph source is requested", () => {
+    const prompt =
+      "How can entropy and justice be compared conceptually without treating physics as moral proof?";
+    const signal = detectModelOnlyConceptSourceSignal(prompt);
+
+    expect(signal.applies).toBe(true);
+    expect(signal.should_prefer_model_only_concept).toBe(true);
+    expect(signal.explicit_project_source_request).toBe(false);
+  });
+
   it("keeps explicit conceptual Helix UI prompts out of repo/source routing", () => {
     const prompt =
       "For Helix UI, explain in plain language what the sampled quantum inequality margin means, why negative energy constraints matter for a warp or Casimir-style concept, and how to avoid mistaking the rubber-sheet or field-picture analogies for literal physics. Keep it conceptual, not code or repo-specific.";

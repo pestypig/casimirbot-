@@ -11,7 +11,89 @@ const createApp = (): express.Express => {
   return app;
 };
 
+const parseSseEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\n\n+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const eventLine = chunk.split(/\n/).find((line) => line.startsWith("event: "));
+      const dataLine = chunk.split(/\n/).find((line) => line.startsWith("data: "));
+      return {
+        event: eventLine?.slice("event: ".length) ?? "message",
+        data: dataLine ? JSON.parse(dataLine.slice("data: ".length)) : null,
+      };
+    });
+
 describe("Helix Ask theory reflection route", () => {
+  it("routes explicit Theory Graph plus ZenGraph bridge prompts through bridge receipts instead of model-only concept", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+        mode: "read",
+        debug: true,
+        sessionId: `theory-ideology-bridge-route-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const answer = String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "");
+
+    expect(body?.route_reason_code).toBe("theory_ideology_bridge_reflection");
+    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.canonical_goal_frame?.goal_kind).not.toBe("model_only_concept");
+    expect(body?.model_only_concept_source_signal?.should_prefer_model_only_concept).not.toBe(true);
+    expect(body?.workstation_tool_plan?.intent).toBe("theory_ideology_bridge_reflection");
+    expect(body?.workstation_tool_plan?.steps?.map((step: { tool_id?: string }) => step.tool_id)).toEqual(
+      expect.arrayContaining([
+        "helix_ask.reflect_theory_context",
+        "helix_ask.reflect_ideology_context",
+        "helix_ask.bridge_theory_ideology_context",
+      ]),
+    );
+    expect(answer).toMatch(/physics|conservation|entropy|self-organization/i);
+    expect(answer).toMatch(/do not prove moral certainty|moral certainty|moral proof/i);
+    expect(answer).toMatch(/procedural|evidence-only|missing checks/i);
+  });
+
+  it("streams explicit Theory Graph plus ZenGraph bridge prompts through bridge receipts", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question:
+          "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+        mode: "read",
+        debug: true,
+        sessionId: `theory-ideology-bridge-stream-${Date.now()}`,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text);
+    const terminalEvent = events.find((entry) => entry.event === "turn_transcript_event" && entry.data?.source_event_type === "terminal_answer");
+    const finalEvent = events.find((entry) => entry.event === "turn_final");
+    const body = finalEvent?.data;
+
+    expect(terminalEvent?.data?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.route_reason_code).toBe("theory_ideology_bridge_reflection");
+    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.workstation_tool_plan?.intent).toBe("theory_ideology_bridge_reflection");
+    expect(body?.theory_ideology_bridge_tool_result?.bridge?.schemaVersion).toBe("theory_ideology_bridge/v1");
+    expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(
+      /physics|conservation|entropy|self-organization/i,
+    );
+    expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(
+      /moral certainty|moral proof/i,
+    );
+  });
+
   it("routes reflection-only theory graph prompts through non-terminal reflection receipts", async () => {
     const app = createApp();
 

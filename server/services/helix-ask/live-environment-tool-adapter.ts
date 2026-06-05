@@ -71,6 +71,9 @@ import {
   buildStagePlayLiveSourceWatchJobPolicyDefaults,
 } from "../stage-play/stage-play-live-source-watch-policy-defaults";
 import {
+  recordInterimVoiceCalloutRequest,
+} from "./interim-voice-callout-store";
+import {
   resolveStagePlayLiveSourceMailboxThreadId,
 } from "../stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -1322,6 +1325,49 @@ export function executeLiveEnvironmentTool(
         ...recordedDecision.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+    });
+  }
+
+  if (input.tool_name === "live_env.request_interim_voice_callout") {
+    const turnId =
+      readString(args.turn_id) ??
+      readString(args.turnId) ??
+      `live_env_turn:${hashShort([input.thread_id, input.environment_id ?? null, args.evidence_refs ?? [], Date.now()])}`;
+    const result = recordInterimVoiceCalloutRequest({
+      turnId,
+      threadId: input.thread_id,
+      source: readString(args.source) ?? "ask_tool_loop",
+      kind: readString(args.kind) ?? "tool_progress",
+      text: readString(args.text) ?? readString(args.message),
+      maxChars: readNumber(args.max_chars ?? args.maxChars, 220),
+      timingHintMs: readNumber(args.timing_hint_ms ?? args.timingHintMs, NaN),
+      voicePlaybackKind: readString(args.voice_playback_kind) ?? readString(args.voicePlaybackKind),
+      requiresConfirmation:
+        readBooleanArg(args, "requires_confirmation", "requiresConfirmation") ?? false,
+      evidenceRefs: readStringArray(args.evidence_refs),
+      reasonCodes: readStringArray(args.reason_codes ?? args.reasonCodes),
+    });
+    const ok = result.receipt.status === "queued" || result.receipt.status === "delivered";
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok,
+      summary: ok
+        ? `Queued interim voice callout ${result.request.requestId}.`
+        : `Interim voice callout blocked: ${result.receipt.status}.`,
+      observation: {
+        schema: "helix.interim_voice_callout_tool_result.v1",
+        request: result.request,
+        receipt: result.receipt,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: [result.request.requestId, result.receipt.receiptId, ...result.receipt.evidenceRefs],
     });
   }
 

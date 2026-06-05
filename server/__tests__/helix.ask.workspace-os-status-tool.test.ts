@@ -1,3 +1,5 @@
+import express from "express";
+import request from "supertest";
 import { describe, expect, it } from "vitest";
 import {
   HELIX_WORKSPACE_OS_STATUS_SCHEMA,
@@ -18,6 +20,27 @@ import {
   HELIX_WORKSPACE_OS_STATUS_OBSERVATION_SCHEMA,
   buildWorkspaceOsStatusObservation,
 } from "../services/helix-ask/workspace-os-status-tool";
+import { planRouter } from "../routes/agi.plan";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json({ limit: "2mb" }));
+  app.use("/api/agi", planRouter);
+  return app;
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const readArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+const readString = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
+
+const artifactKind = (artifact: Record<string, unknown>): string | null =>
+  readString(artifact.artifact_kind) ?? readString(artifact.kind);
+
+const artifactPayload = (artifact: Record<string, unknown>): Record<string, unknown> =>
+  readRecord(artifact.payload) ?? {};
 
 const canonicalGoalFrame = {
   turn_id: "ask:workspace-os",
@@ -188,4 +211,75 @@ describe("Helix Ask Workspace OS status tool", () => {
       }),
     }));
   });
+
+  it("forces the zero-argument workspace_os.status runtime call before model-selected live tools", async () => {
+    const app = createApp();
+    const previousAgentStepLlm = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousAgentStepFixture = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentStepFixtureIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousFinalAnswerFixture = process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify({
+      next_step: "next_action",
+      chosen_capability: "live_env.query_event_log",
+      reason: "Bad fixture: live event logs are not equivalent to Workspace OS status.",
+      args: { limit: 1 },
+      expected_artifacts: ["live_environment_tool_observation"],
+      commentary: null,
+      confidence: 0.99,
+    });
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE =
+      "Workspace OS status was synthesized from the diagnostic observation.";
+
+    try {
+      const ask = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          sessionId: "helix-ask:workspace-os-force-test",
+          question:
+            "Use the Workspace OS status tool to report browser binding, clipboard health, source binding, and runtime memory. Do not execute workspace actions.",
+          mode: "read",
+          debug: true,
+        })
+        .expect(200);
+      const turnId = readString(ask.body.turn_id) ?? readString(ask.body.turnId);
+      expect(turnId).toBeTruthy();
+
+      const debug = await request(app)
+        .get(`/api/agi/ask/turn/${encodeURIComponent(String(turnId))}/debug-export`)
+        .expect(200);
+      const payload = readRecord(debug.body.payload) ?? readRecord(debug.body) ?? {};
+      const loop = readRecord(payload.agent_runtime_loop) ?? {};
+      const ledger = readArray(payload.current_turn_artifact_ledger).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+      const runtimeToolCalls = ledger
+        .filter((artifact) => artifactKind(artifact) === "runtime_tool_call")
+        .map(artifactPayload);
+
+      expect(readString(readRecord(payload.source_target_intent)?.target_source)).toBe("workspace_diagnostic");
+      expect(readString(readRecord(payload.capability_plan)?.requested_action)).toBe(HELIX_WORKSPACE_OS_STATUS_CAPABILITY);
+      expect(loop.executed_tool_call_count).toBe(1);
+      expect(runtimeToolCalls.map((call) => readString(call.capability_key))).toEqual([
+        HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
+      ]);
+      expect(runtimeToolCalls[0]?.args).toEqual({});
+      expect(runtimeToolCalls.map((call) => readString(call.capability_key))).not.toContain("live_env.query_event_log");
+      expect(ledger.some((artifact) => artifactKind(artifact) === "workspace_os_status_observation")).toBe(true);
+      expect(ledger.some((artifact) => artifactKind(artifact) === "live_environment_tool_observation")).toBe(false);
+      expect(readString(payload.terminal_artifact_kind) ?? readString(ask.body.terminal_artifact_kind)).toBe(
+        "model_synthesized_answer",
+      );
+      const audit = ledger.find((artifact) => artifactKind(artifact) === "runtime_authority_audit");
+      expect(artifactPayload(audit ?? {}).ok).toBe(true);
+    } finally {
+      if (previousAgentStepLlm === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousAgentStepLlm;
+      if (previousAgentStepFixture === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentStepFixture;
+      if (previousAgentStepFixtureIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentStepFixtureIndex;
+      if (previousFinalAnswerFixture === undefined) delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previousFinalAnswerFixture;
+    }
+  }, 20000);
 });
