@@ -8,6 +8,7 @@ import {
   startVisualSnapshotSource,
 } from "../services/situation-room/visual-snapshot-store";
 import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -15,6 +16,7 @@ const sourceId = "visual_source:helix-ask-live-source-mail-tool";
 
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailWakeStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 

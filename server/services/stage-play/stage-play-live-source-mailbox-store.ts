@@ -11,6 +11,7 @@ import {
   type StagePlayMailDecisionV1,
   type StagePlayNextLoopStateV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { queueStagePlayLiveSourceMailWakeRequest } from "./stage-play-live-source-mail-wake-store";
 
 const mailById = new Map<string, StagePlayLiveSourceMailItemV1>();
 const decisionsById = new Map<string, StagePlayLiveSourceMailDecisionV1>();
@@ -170,16 +171,29 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     updateMailStatus(superseded, "superseded", createdAt);
   }
   trimThreadMail(input.threadId);
-  upsertStagePlayLiveSourceJobState({
+  const jobState = upsertStagePlayLiveSourceJobState({
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     sourceIds: [input.sourceId],
     lastMailId: mail.mailId,
-    nextLoopState: "armed_for_next_summary",
+    nextLoopState: "continue_with_unread_mail",
     status: "armed",
     updatedAt: createdAt,
   });
+  if (jobState.status === "armed" && jobState.nextLoopState === "continue_with_unread_mail") {
+    queueStagePlayLiveSourceMailWakeRequest({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: jobState.jobId,
+      mailIds: [mail.mailId],
+      sourceIds: [input.sourceId],
+      reason: "unread_mail",
+      evidenceRefs,
+      now: createdAt,
+    });
+  }
   return mail;
 }
 

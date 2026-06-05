@@ -12,7 +12,16 @@ import {
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
   resetStagePlayLiveSourceMailboxForTest,
+  upsertStagePlayLiveSourceJobState,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  listStagePlayLiveSourceMailWakeRequests,
+  resetStagePlayLiveSourceMailWakeStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
+  queueMailWakeForUnreadItems,
+  runNextMailWakeRequest,
+} from "../services/stage-play/stage-play-live-source-mail-wake-runner";
 import {
   analyzeVisualFrame,
   recordVisualFrame,
@@ -26,6 +35,7 @@ const sourceId = "visual_source:stage-play-mailbox";
 
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailWakeStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -102,6 +112,45 @@ describe("Stage Play live-source mailbox", () => {
       raw_content_included: false,
     });
     expect(JSON.stringify(mail)).not.toMatch(/raw_image|image_ref|data:image|base64/i);
+  });
+
+  it("enqueues visual summary mail at the visual analysis producer boundary", () => {
+    const { evidence } = seedVisualEvidence();
+
+    const mailItems = listStagePlayLiveSourceMailItems({ threadId, sourceId });
+    expect(mailItems).toHaveLength(1);
+    expect(mailItems[0]).toMatchObject({
+      status: "unread",
+      sourceRefs: {
+        frameRef: evidence.frame_id,
+        evidenceRef: evidence.evidence_id,
+      },
+      summary: {
+        text: evidence.summary,
+        analysisState: "analysis_ready",
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceJobStates({ threadId })[0]).toMatchObject({
+      status: "armed",
+      lastMailId: mailItems[0].mailId,
+      nextLoopState: "continue_with_unread_mail",
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toHaveLength(1);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "queued",
+      mailIds: [mailItems[0].mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(mailItems[0])).not.toMatch(/raw_image|image_ref|data:image|base64/i);
   });
 
   it("turns latest compact visual evidence into unread Ask mail without raw content", () => {
@@ -547,6 +596,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(duplicate.mailId).toBe(first.mailId);
     expect(changed.mailId).not.toBe(first.mailId);
     expect(listStagePlayLiveSourceMailItems({ threadId })).toHaveLength(2);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toHaveLength(2);
     expect(listStagePlayLiveSourceMailItems({ threadId, status: "unread" }).map((item) => item.mailId)).toEqual([
       first.mailId,
       changed.mailId,
@@ -619,5 +669,116 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayLiveSourceMailItems({ threadId, status: "unread" }).map((item) => item.mailId)).toEqual([
       visualMail.mailId,
     ]);
+  });
+
+  it("does not queue a wake for a paused live-source job", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:paused",
+      evidenceRef: "visual_evidence:paused",
+      summaryText: "Paused source summary.",
+      createdAt: "2026-06-04T12:00:16.000Z",
+    });
+    upsertStagePlayLiveSourceJobState({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      status: "paused",
+      lastMailId: mail.mailId,
+      nextLoopState: "paused_by_user",
+      updatedAt: "2026-06-04T12:00:16.500Z",
+    });
+
+    const wake = queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      sourceId,
+      now: "2026-06-04T12:00:17.000Z",
+    });
+
+    expect(wake).toBeNull();
+  });
+
+  it("runs the next queued wake through the Ask turn runner and records completion", async () => {
+    seedVisualEvidence();
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    expect(wake).toMatchObject({ status: "queued" });
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async ({ wakeRequest }) => ({
+        turn_id: "ask:wake-test",
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: "stage_play_live_source_mail_decision:wake-test",
+              },
+            },
+          },
+        ],
+        wakeRequestId: wakeRequest.wakeRequestId,
+      }),
+    });
+
+    expect(result).toMatchObject({
+      artifactId: "stage_play_live_source_mail_wake_result",
+      status: "completed",
+      askTurnId: "ask:wake-test",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-test"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-test",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-test"],
+    });
+  });
+
+  it("does not complete a wake from a generic agent-step decision without a mail decision receipt", async () => {
+    seedVisualEvidence();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async () => ({
+        turn_id: "ask:wake-missing-mail-decision",
+        current_turn_artifact_ledger: [
+          {
+            kind: "agent_step_decision",
+            payload: {
+              decision_id: "ask:wake-missing-mail-decision:agent_step_decision",
+              chosen_capability: "model.direct_answer",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      artifactId: "stage_play_live_source_mail_wake_result",
+      status: "failed",
+      askTurnId: "ask:wake-missing-mail-decision",
+      failedReason: "mail_wake_decision_missing",
+      decisionIds: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "failed",
+      decisionIds: [],
+    });
   });
 });

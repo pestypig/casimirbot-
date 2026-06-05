@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
 import {
@@ -32,6 +32,7 @@ import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-
 import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-play/stage-play-ask-checkpoint-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -53,6 +54,12 @@ beforeEach(() => {
   resetStagePlayAskCheckpointReceiptsForTest();
   resetStagePlayCheckpointQueueForTest();
   resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailWakeStoreForTest();
+});
+
+afterEach(() => {
+  delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+  delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
 });
 
 describe("Helix Ask Stage Play routing", () => {
@@ -179,6 +186,99 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).toContain("wait_for_next_summary");
     expect(response.body?.answer, routeDebug).toContain("standing by for the next source update");
     expect(response.body?.answer, routeDebug).not.toContain("one unread live-source mail item requiring a decision");
+  }, 30_000);
+
+  it("does not execute mailbox tools from a negated live-source mail mention", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Do not read live source mail right now; explain conceptually what that mailbox is for.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? [], routeDebug).not.toContain("prefer_read_live_source_mail");
+    expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [], routeDebug)
+      .not.toContain("live_env.read_live_source_mail");
+  }, 30_000);
+
+  it("forces a wait decision after a no-mail read instead of repeating the read tool", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Read the live-source mailbox first.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Incorrectly repeat the mailbox read.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Incorrectly repeat the mailbox read again.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+    ]);
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Use live_env.read_live_source_mail for the active Stage Play live-source mailbox. Watch this visual source and tell me if anything important happens.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      terminal: response.body?.terminal_artifact_kind,
+      error: response.body?.terminal_error_code,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      currentTurnArtifactKinds: response.body?.current_turn_artifact_ledger?.map((artifact: any) => artifact?.kind),
+    }, null, 2);
+
+    expect(response.body?.terminal_error_code, routeDebug).not.toBe("agent_loop_budget_exhausted");
+    expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
+      .toEqual(expect.arrayContaining([
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ]));
+    const liveToolArtifacts = response.body?.current_turn_artifact_ledger
+      ?.filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
+      ?? [];
+    const readArtifacts = liveToolArtifacts.filter((artifact: any) =>
+      artifact?.payload?.tool_name === "live_env.read_live_source_mail"
+    );
+    expect(readArtifacts, routeDebug).toHaveLength(1);
+    const decisionArtifact = liveToolArtifacts.find((artifact: any) =>
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "wait_for_next_summary",
+      mailIds: [],
+      nextLoopState: "armed_for_next_summary",
+    });
+    expect(response.body?.answer, routeDebug).toMatch(/live-source updates|source update/i);
+    expect(response.body?.answer, routeDebug).not.toMatch(/visual evidence is unavailable|next visual summary/i);
   }, 30_000);
 
   it("answers Stage Play panel concept questions from repo/product evidence instead of live environment state", async () => {

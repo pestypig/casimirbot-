@@ -12,6 +12,10 @@ import type {
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  StagePlayLiveSourceMailWakeRequestV1,
+  StagePlayLiveSourceMailWakeResultV1,
+} from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import type { StagePlayRawSessionBufferEntryV1 } from "@shared/stage-play-raw-session-buffer";
 import type {
   StagePlayBuilderCatalogV1,
@@ -190,6 +194,8 @@ type StagePlayLiveSourceMailListResponse = {
   mailItems?: StagePlayLiveSourceMailItemV1[];
   jobStates?: StagePlayLiveSourceJobStateV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
+  wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
+  wakeResults?: StagePlayLiveSourceMailWakeResultV1[];
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
@@ -1060,6 +1066,16 @@ const latestStagePlayMailDecision = (
   return matching.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)).at(-1) ?? null;
 };
 
+const latestStagePlayMailWakeRequest = (
+  wakes: StagePlayLiveSourceMailWakeRequestV1[],
+  mailId?: string | null,
+): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const matching = mailId
+    ? wakes.filter((wake) => wake.mailIds.includes(mailId))
+    : wakes;
+  return matching.slice().sort((left, right) => left.queuedAt.localeCompare(right.queuedAt)).at(-1) ?? null;
+};
+
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
@@ -1068,6 +1084,7 @@ function buildObserverMailLoopNodes(input: {
   const mailItems = mailbox?.mailItems ?? [];
   const jobStates = mailbox?.jobStates ?? [];
   const decisions = mailbox?.decisions ?? [];
+  const wakeRequests = mailbox?.wakeRequests ?? [];
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
@@ -1078,6 +1095,9 @@ function buildObserverMailLoopNodes(input: {
     latestStagePlayMailDecision(decisions, visualMail?.mailId) ??
     latestStagePlayMailDecision(decisions, jobStates.at(-1)?.lastMailId ?? null) ??
     latestStagePlayMailDecision(decisions);
+  const latestWake =
+    latestStagePlayMailWakeRequest(wakeRequests, visualMail?.mailId) ??
+    latestStagePlayMailWakeRequest(wakeRequests);
   const activeJob = jobStates.at(-1) ?? null;
   const observerOutputRefs = uniqueSorted([
     visualSource?.sourceId ?? "",
@@ -1091,6 +1111,9 @@ function buildObserverMailLoopNodes(input: {
   ].filter(Boolean));
   const decisionInputRefs = uniqueSorted([
     ...(latestDecision?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
+  ]);
+  const wakeInputRefs = uniqueSorted([
+    ...(latestWake?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
   ]);
   const outputPreview = latestDecision?.voiceCalloutDraft?.text
     ? `voice draft: ${latestDecision.voiceCalloutDraft.text}`
@@ -1129,6 +1152,28 @@ function buildObserverMailLoopNodes(input: {
       outputPreview: visualMail
         ? `summary preview: ${visualMail.summary.preview}; status ${visualMail.status}`
         : "summary preview: none yet; status missing",
+    },
+    {
+      id: "observer_mail_loop:ask_wake",
+      title: "Ask Wake",
+      subtitle: "mail wake admission",
+      status: latestWake?.status ?? (unreadCount > 0 ? "queued pending" : "missing"),
+      inputLabel: "Input",
+      inputRefs: wakeInputRefs,
+      inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "unread mail ids pending",
+      transformLabel: "unread mail -> Helix Ask wake turn",
+      outputLabel: "Output",
+      outputRefs: latestWake ? uniqueSorted([
+        latestWake.wakeRequestId,
+        latestWake.askTurnId ?? "",
+        ...latestWake.decisionIds,
+        ...latestWake.evidenceRefs,
+      ].filter(Boolean)) : [],
+      outputPreview: latestWake
+        ? `${latestWake.status}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
+        : unreadCount > 0
+          ? "unread mail is waiting for wake admission"
+          : "no wake request yet",
     },
     {
       id: "observer_mail_loop:ask_decision",
@@ -1409,6 +1454,27 @@ function buildStagePlayCheckpointAskQuestion(input: {
     `Checkpoint focus: ${checkpointFocus}`,
     "Report checkpoint freshness, missing evidence, and whether a current model-reviewed Answer Snapshot exists after the reflection.",
     "Leave visual/audio capture cadence unchanged.",
+  ].filter(Boolean).join("\n");
+}
+
+function buildStagePlayMailWakeAskQuestion(input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  mailItems?: StagePlayLiveSourceMailItemV1[];
+}): string {
+  const mailPreviews = (input.mailItems ?? [])
+    .filter((item) => input.wake.mailIds.includes(item.mailId))
+    .map((item) => `${item.mailId}: ${item.summary.preview}`)
+    .slice(0, 3);
+  return [
+    "Use live_env.read_live_source_mail for the active Stage Play live-source mailbox.",
+    "Read the latest unread source update, then record a model-reviewed decision with live_env.record_live_source_mail_decision.",
+    "If there is no user-facing change, record wait_for_next_summary.",
+    "If there is a meaningful user-facing change, draft a concise text answer.",
+    "If voice is allowed and the update is urgent, request a voice callout.",
+    `Wake request: ${input.wake.wakeRequestId}.`,
+    input.wake.mailIds.length > 0 ? `Mail refs: ${input.wake.mailIds.join(", ")}.` : "",
+    input.wake.sourceIds.length > 0 ? `Source refs: ${input.wake.sourceIds.join(", ")}.` : "",
+    mailPreviews.length > 0 ? `Mail previews:\n${mailPreviews.join("\n")}` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -3863,6 +3929,24 @@ export default function StagePlayBadgeGraphPanel() {
     refetchInterval: 1000,
   });
   const mailbox = mailboxQuery.data ?? null;
+  const launchedWakeIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const queuedWake = (mailbox?.wakeRequests ?? []).find((wake) =>
+      wake.status === "queued" && !launchedWakeIdsRef.current.has(wake.wakeRequestId)
+    );
+    if (!queuedWake) return;
+    launchedWakeIdsRef.current.add(queuedWake.wakeRequestId);
+    launchHelixAskPrompt({
+      question: buildStagePlayMailWakeAskQuestion({
+        wake: queuedWake,
+        mailItems: mailbox?.mailItems ?? [],
+      }),
+      autoSubmit: true,
+      panelId: "stage-play-badge-graph",
+      forceReasoningDispatch: true,
+      suppressWorkstationPayloadActions: true,
+    });
+  }, [mailbox?.mailItems, mailbox?.wakeRequests]);
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
     queryKey: [
       "/api/helix/stage-play/raw-session-buffer",

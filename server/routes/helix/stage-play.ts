@@ -33,10 +33,19 @@ import {
   listStagePlayLiveSourceMailItems,
 } from "../../services/stage-play/stage-play-live-source-mailbox-store";
 import {
+  listStagePlayLiveSourceMailWakeRequests,
+  listStagePlayLiveSourceMailWakeResults,
+  reconcileStagePlayMailWakeRequestsWithDecisions,
+} from "../../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
 } from "../../services/stage-play/stage-play-visual-summary-mail-ingest";
+import {
+  queueMailWakeForUnreadItems,
+  runNextMailWakeRequest,
+} from "../../services/stage-play/stage-play-live-source-mail-wake-runner";
 import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
   STAGE_PLAY_RAW_SESSION_BUFFER_RETENTION_POLICIES,
@@ -208,6 +217,16 @@ helixStagePlayRouter.options("/live-source-mail/check", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/live-source-mail/decision", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/wake", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/wake/run", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -583,6 +602,18 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
     const status = readQueryString(req.query.status) as any;
     const limit = readOptionalNumber(req.query.limit) ?? 50;
+    const decisions = listStagePlayMailDecisions({
+      threadId,
+      roomId,
+      environmentId,
+      limit: 20,
+    });
+    reconcileStagePlayMailWakeRequestsWithDecisions({
+      threadId,
+      roomId,
+      environmentId,
+      decisions,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -600,10 +631,15 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
         environmentId,
         limit: 10,
       }),
-      decisions: listStagePlayMailDecisions({
+      decisions,
+      wakeRequests: listStagePlayLiveSourceMailWakeRequests({
         threadId,
         roomId,
         environmentId,
+        limit: 20,
+      }),
+      wakeResults: listStagePlayLiveSourceMailWakeResults({
+        threadId,
         limit: 20,
       }),
       assistant_answer: false,
@@ -616,6 +652,75 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       error: "stage-play-live-source-mail-list-failed",
       err,
       schema: "stage_play_live_source_mail_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/wake", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const wakeRequest = queueMailWakeForUnreadItems({
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId),
+      limit: readOptionalNumber(body.limit) ?? readOptionalNumber(req.query.limit) ?? 3,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_wake_queue_response/v1",
+      wakeRequest,
+      queued: Boolean(wakeRequest),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-wake-queue-failed",
+      err,
+      schema: "stage_play_live_source_mail_wake_queue_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const result = await runNextMailWakeRequest({
+      threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId),
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
+      jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
+      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_wake_run_response/v1",
+      result,
+      ran: Boolean(result),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-wake-run-failed",
+      err,
+      schema: "stage_play_live_source_mail_wake_run_response/v1",
       contextRole: "tool_evidence",
     });
   }

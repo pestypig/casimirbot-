@@ -23,6 +23,7 @@ import {
 } from "@shared/helix-visual-frame-evidence";
 import type { HelixVisualEventAlignment } from "@shared/helix-visual-event-alignment";
 import { HELIX_VISUAL_EVENT_ALIGNMENT_SCHEMA } from "@shared/helix-visual-event-alignment";
+import { enqueueStagePlayLiveSourceMailItem } from "../stage-play/stage-play-live-source-mailbox-store";
 
 const sourcesById = new Map<string, HelixVisualSnapshotSource>();
 const framesByThread = new Map<string, HelixVisualFrameRecord[]>();
@@ -302,6 +303,19 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
   const existing = evidenceByThread.get(frame.thread_id) ?? [];
   evidenceByThread.set(frame.thread_id, [...existing.filter((entry) => entry.evidence_id !== evidence.evidence_id), evidence].slice(-500));
   touchVisualSnapshotSource({ sourceId: frame.source_id, status: "active", ts: evidence.ts });
+  enqueueStagePlayLiveSourceMailItem({
+    threadId: evidence.thread_id,
+    roomId: frame.room_id ?? null,
+    sourceId: evidence.source_id,
+    sourceKind: "visual_frame",
+    frameRef: evidence.frame_id,
+    evidenceRef: evidence.evidence_id,
+    summaryText: evidence.summary,
+    confidence: evidence.supports_claims[0]?.confidence ?? null,
+    analysisState: "analysis_ready",
+    evidenceRefs: [evidence.source_id, evidence.frame_id, evidence.evidence_id],
+    createdAt: evidence.ts,
+  });
   return evidence;
 }
 

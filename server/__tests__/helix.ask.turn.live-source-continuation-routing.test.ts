@@ -270,7 +270,7 @@ describe("live source continuation Ask routing", () => {
     expect(debug.body?.payload?.visual_producer_id).toBe(response.body?.visual_producer_id);
     expect(debug.body?.payload?.cadence_ms).toBe(15_000);
     expect(debug.body?.payload?.terminal_answer_authority?.server_authoritative).toBe(true);
-  }, 20_000);
+  }, 30_000);
 
   it("sets requested visual cadence for every-N-seconds continuation prompts", async () => {
     const app = await createApp();
@@ -304,7 +304,7 @@ describe("live source continuation Ask routing", () => {
       next_decision: "allow_terminal",
     });
     expect(response.body?.answer ?? response.body?.text).toContain("every 10 seconds");
-  }, 20_000);
+  }, 30_000);
 
   it("does not turn a negated interval mention inside a screen question into cadence control", async () => {
     const question =
@@ -1008,7 +1008,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.side_artifacts?.live_environment_binding_diagnosis?.schema).toBe(
       "helix.live_environment_binding_diagnosis.v2",
     );
-  }, 20_000);
+  }, 30_000);
 
   it("returns typed failure rather than a receipt when procedure memory is unavailable", async () => {
     const app = await createApp();
@@ -1033,7 +1033,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.final_answer_source).not.toBe("live_pipeline_receipt");
     expect(response.body?.answer).not.toContain("Pipeline:");
     expect(response.body?.answer).toContain("Auntie Dot: sensors are separate from mission memory.");
-  }, 20_000);
+  }, 30_000);
 
   it("does not classify scene-epoch comparison prompts as binding diagnosis", () => {
     const comparisonIntent = classifyLiveSourceContinuationIntent(

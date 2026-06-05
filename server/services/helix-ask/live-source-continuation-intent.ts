@@ -158,11 +158,11 @@ export function classifyLiveSourceContinuationIntent(prompt: string): HelixLiveS
   if (workstationCalculatorLiveSource) return null;
   const inspect =
     /\b(?:inspect|status|why|what happened|not updating|stuck|blocked|ready|readiness|still updating|attached|bound)\b/.test(text) &&
-    /\b(?:live\s+(?:source|answer|pipeline)|visual\s+source|screen\s+capture|frame|producer|capture\s+binding|minecraft events|world events|minehut|world event)\b/.test(text);
+    /\b(?:live\s+(?:source|answer|pipeline|screen\s+source)|visual\s+source|screen\s+(?:source|capture)|frame|producer|capture\s+binding|minecraft events|world events|minehut|world event)\b/.test(text);
   const bindingDiagnosis = explicitBindingDiagnosis && !procedureEpochComparison;
   const repair =
     /\b(?:repair|fix|recover|run due|run analysis|analyze latest|analyse latest|capture now|capture frame|not updating|stale|attach)\b/.test(text) &&
-    /\b(?:live\s+(?:source|answer|pipeline)|visual|frame|screen\s+capture|capture\s+binding|minecraft events|world events|minehut)\b/.test(text);
+    /\b(?:live\s+(?:source|answer|pipeline|screen\s+source)|visual|frame|screen\s+(?:source|capture)|capture\s+binding|minecraft events|world events|minehut)\b/.test(text);
 
   if (bindingDiagnosis) {
     return {
