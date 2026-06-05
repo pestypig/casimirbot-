@@ -180,7 +180,19 @@ describe("Helix Ask Stage Play routing", () => {
       watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
       policy: {
         objectiveText: "Watch this visual source and tell me if anything important happens.",
-        decisionPolicyPrompt: "Watch this visual source and tell me if anything important happens.",
+        decisionPolicyPrompt: expect.stringContaining("If there is no meaningful user-facing change, record wait_for_next_summary."),
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: false,
+          voiceRequiresUrgency: true,
+          confirmationRequired: true,
+        },
+        importanceCriteria: [
+          "Risk, actor/object change, or a user-mentioned target appearing should produce a user-facing decision.",
+        ],
+        suppressCriteria: [
+          "If no meaningful user-facing change is present, record wait_for_next_summary.",
+        ],
         assistant_answer: false,
         terminal_eligible: false,
       },
@@ -189,7 +201,8 @@ describe("Helix Ask Stage Play routing", () => {
         nextLoopState: "armed_for_next_summary",
       },
     });
-    expect(response.body?.terminal_artifact_kind, routeDebug).toBe("model_synthesized_answer");
+    expect(response.body?.terminal_artifact_kind, routeDebug).not.toBe("stage_play_live_source_mail_read_result");
+    expect(response.body?.agent_runtime_loop?.iterations?.[0]?.satisfaction, routeDebug).toBe("satisfied");
     expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).not.toContain("terminal_route_mismatch");
     expect(response.body?.answer, routeDebug).not.toContain("visual evidence is unavailable");
     expect(response.body?.answer, routeDebug).not.toContain("visual capture evidence is unavailable");
@@ -224,6 +237,7 @@ describe("Helix Ask Stage Play routing", () => {
 
   it("configures visual watch-job policy without reading mail when the user gives a standing watch objective", async () => {
     const question = "Watch the active visual source and describe each new mail batch in one sentence.";
+    const expectedObjective = "Watch the active visual source and describe each new visual-summary mail batch in one sentence.";
 
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -272,18 +286,32 @@ describe("Helix Ask Stage Play routing", () => {
       watch_job_policy_ref: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
       policyCount: expect.any(Number),
       policy: {
-        objectiveText: question,
-        decisionPolicyPrompt: question,
+        objectiveText: expectedObjective,
+        decisionPolicyPrompt: [
+          "For each unread mail batch, read the listed mail refs as the current observation window.",
+          "If the mail batch contains any compact visual summary, record draft_text_answer.",
+          "The textAnswerDraft must be one sentence describing what was observed.",
+          "If the batch is empty, record wait_for_next_summary.",
+          "Do not claim visual evidence is unavailable when mail refs or compact summaries exist.",
+          "After recording the decision, set nextLoopState to armed_for_next_summary.",
+        ].join("\n"),
         outputPolicy: {
           allowTextAnswer: true,
           allowVoiceCallout: false,
-          voiceRequiresUrgency: false,
+          voiceRequiresUrgency: true,
+          confirmationRequired: true,
         },
+        importanceCriteria: [
+          "Any new visual-summary mail batch should produce a one-sentence text answer.",
+        ],
+        suppressCriteria: [
+          "Suppress only if no unread mail items exist or mail lacks compact summary text.",
+        ],
         assistant_answer: false,
         terminal_eligible: false,
       },
       jobState: {
-        objective: question,
+        objective: expectedObjective,
         watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
         nextLoopState: "armed_for_next_summary",
       },

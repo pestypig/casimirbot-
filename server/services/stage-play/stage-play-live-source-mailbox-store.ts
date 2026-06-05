@@ -21,6 +21,34 @@ const jobStateById = new Map<string, StagePlayLiveSourceJobStateV1>();
 const watchJobPolicyById = new Map<string, StagePlayLiveSourceWatchJobPolicyV1>();
 const MAX_MAIL_PER_THREAD = 250;
 
+export type StagePlayLiveSourceMailEnqueuedEvent = {
+  mail: StagePlayLiveSourceMailItemV1;
+  jobState: StagePlayLiveSourceJobStateV1;
+  wakeRequestId: string | null;
+};
+
+type StagePlayLiveSourceMailEnqueuedListener = (event: StagePlayLiveSourceMailEnqueuedEvent) => void;
+const mailEnqueuedListeners = new Set<StagePlayLiveSourceMailEnqueuedListener>();
+
+export function subscribeStagePlayLiveSourceMailEnqueued(
+  listener: StagePlayLiveSourceMailEnqueuedListener,
+): () => void {
+  mailEnqueuedListeners.add(listener);
+  return () => {
+    mailEnqueuedListeners.delete(listener);
+  };
+}
+
+const notifyStagePlayLiveSourceMailEnqueued = (event: StagePlayLiveSourceMailEnqueuedEvent): void => {
+  for (const listener of mailEnqueuedListeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      console.warn("[stage-play-live-source-mailbox] mail enqueue listener failed", err);
+    }
+  }
+};
+
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
@@ -193,8 +221,9 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     status: "armed",
     updatedAt: createdAt,
   });
+  let wakeRequestId: string | null = null;
   if (jobState.status === "armed" && jobState.nextLoopState === "continue_with_unread_mail") {
-    queueStagePlayLiveSourceMailWakeRequest({
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
       threadId: input.threadId,
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
@@ -205,7 +234,9 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       evidenceRefs,
       now: createdAt,
     });
+    wakeRequestId = wake.wakeRequestId;
   }
+  notifyStagePlayLiveSourceMailEnqueued({ mail, jobState, wakeRequestId });
   return mail;
 }
 
@@ -602,4 +633,5 @@ export function resetStagePlayLiveSourceMailboxForTest(): void {
   decisionsById.clear();
   jobStateById.clear();
   watchJobPolicyById.clear();
+  mailEnqueuedListeners.clear();
 }

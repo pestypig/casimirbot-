@@ -8291,7 +8291,7 @@ function buildHelixAskReplyFromMailTranscriptEntries(
     ok: true,
     final_answer_source: "live_source_mail_wake",
     terminal_artifact_kind: "tool_receipt",
-    question: `Live-source mail wake${mailIds.length > 0 ? ` (${mailIds.length} mail)` : ""}`,
+    question: "",
     debug: debugPayload as HelixAskReply["debug"],
     sources: evidenceRefs,
   };
@@ -8392,7 +8392,7 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
   if (row.rowKind === "mail_read_receipt") {
     const count = row.body.match(/\b(\d+)\s+unread\b/i)?.[1] ?? "1";
-    return `${count} unread live-source update${count === "1" ? "" : "s"}.`;
+    return `Read ${count} unread live-source mail item${count === "1" ? "" : "s"}.`;
   }
   if (row.rowKind === "agent_decision") {
     const match = row.body.match(/^([^:]+):\s*([\s\S]+)$/);
@@ -8413,7 +8413,8 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "mail_read_tool_call") return "Tool call";
   if (row.rowKind === "mail_read_receipt" || row.rowKind === "wait_for_next_summary") return "Tool receipt";
   if (row.rowKind === "agent_decision") return "Agent decision";
-  if (row.rowKind === "text_answer" || row.rowKind === "voice_callout_request") return "Text / Callout draft";
+  if (row.rowKind === "text_answer") return "Text draft";
+  if (row.rowKind === "voice_callout_request") return "Voice callout request";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
   if (row.rowKind === "voice_receipt") return "Voice receipt";
   if (row.rowKind === "mail_wake_requested") return "Wake requested";
@@ -16135,16 +16136,15 @@ export function HelixAskPill({
           .filter((reply): reply is HelixAskReply => Boolean(reply));
         if (durableReplies.length === 0) return;
         setAskReplies((prev) => {
-          const existingIds = new Set(prev.map((reply) => reply.id));
-          const nextDurableReplies = durableReplies.filter((reply) => {
-            if (existingIds.has(reply.id) || liveSourceMailWakeReplyIdsRef.current.has(reply.id)) {
-              return false;
-            }
+          const durableById = new Map(durableReplies.map((reply) => [reply.id, reply]));
+          const merged = prev.map((reply) => durableById.get(reply.id) ?? reply);
+          const existingIds = new Set(merged.map((reply) => reply.id));
+          const nextDurableReplies = durableReplies.filter((reply) => !existingIds.has(reply.id));
+          for (const reply of durableReplies) {
             liveSourceMailWakeReplyIdsRef.current.add(reply.id);
-            return true;
-          });
-          if (nextDurableReplies.length === 0) return prev;
-          return [...nextDurableReplies, ...prev].slice(0, 8);
+          }
+          if (nextDurableReplies.length === 0 && merged.every((reply, index) => reply === prev[index])) return prev;
+          return sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8);
         });
       } catch (error) {
         console.warn("[HelixAskPill] live-source mail transcript refresh failed", error);

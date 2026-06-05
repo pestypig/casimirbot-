@@ -857,10 +857,11 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"wait_for_next_summary"');
     expect(source).toContain("Visual summary received.\\nPreview:");
     expect(source).toContain("live_env.read_live_source_mail");
-    expect(source).toContain("unread live-source update");
+    expect(source).toContain("Read ${count} unread live-source mail item");
     expect(source).toContain('count === "1"');
     expect(source).toContain("Reason:");
-    expect(source).toContain("Text / Callout draft");
+    expect(source).toContain("Text draft");
+    expect(source).toContain("Voice callout request");
     expect(source).toContain("Voice tool call");
     expect(source).toContain("Voice receipt");
     expect(source).toContain('row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail"');
@@ -877,7 +878,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("stage_play_live_source_mail_transcript_entry_ids: transcriptEntryIds");
     expect(source).toContain("current_turn_artifact_ledger: currentTurnArtifactLedger");
     expect(source).toContain("setAskReplies((prev) =>");
-    expect(source).toContain("return [...nextDurableReplies, ...prev].slice(0, 8)");
+    expect(source).toContain('question: ""');
+    expect(source).toContain("durableById.get(reply.id) ?? reply");
+    expect(source).toContain("sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8)");
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");

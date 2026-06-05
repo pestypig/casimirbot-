@@ -282,6 +282,16 @@ const buildDurableWakeTranscriptRows = (input: {
     }));
   }
   rows.push(makeWakeTranscriptRow({
+    rowId: `wake_requested:${hashShort(input.wake.wakeRequestId)}`,
+    rowKind: "mail_wake_requested",
+    title: "Wake requested",
+    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake.`,
+    artifactId: input.wake.wakeRequestId,
+    artifactKind: input.wake.artifactId,
+    evidenceRefs: input.evidenceRefs,
+    createdAt: input.createdAt,
+  }));
+  rows.push(makeWakeTranscriptRow({
     rowId: `wake_mail_read_tool_call:${hashShort(input.wake.wakeRequestId)}`,
     rowKind: "mail_read_tool_call",
     title: "Tool call",

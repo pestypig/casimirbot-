@@ -14,6 +14,7 @@ import {
   listStagePlayLiveSourceMailItems,
   recordStagePlayMailDecision,
   resetStagePlayLiveSourceMailboxForTest,
+  subscribeStagePlayLiveSourceMailEnqueued,
   upsertStagePlayLiveSourceJobState,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/stage-play-live-source-mail-context-pack";
@@ -164,6 +165,53 @@ describe("Stage Play live-source mailbox", () => {
       raw_content_included: false,
     });
     expect(JSON.stringify(mailItems[0])).not.toMatch(/raw_image|image_ref|data:image|base64/i);
+  });
+
+  it("emits a wake-ready mail event when new unread mail is queued for an armed job", () => {
+    const events: Array<{
+      mailId: string;
+      jobId: string;
+      wakeRequestId: string | null;
+      nextLoopState: string;
+    }> = [];
+    const unsubscribe = subscribeStagePlayLiveSourceMailEnqueued((event) => {
+      events.push({
+        mailId: event.mail.mailId,
+        jobId: event.jobState.jobId,
+        wakeRequestId: event.wakeRequestId,
+        nextLoopState: event.jobState.nextLoopState,
+      });
+    });
+
+    try {
+      const mail = enqueueVisualSummaryMailFromEvidence({
+        threadId,
+        roomId,
+        environmentId: "live_env:stage-play-mailbox",
+        sourceId,
+        visualFrameRef: "visual_frame:auto-wake-event",
+        visualEvidenceRef: "visual_evidence:auto-wake-event",
+        summary: "Compact visual summary for automatic wake admission.",
+        confidence: 0.8,
+        analysisState: "analysis_ready",
+        now: "2026-06-04T12:00:05.000Z",
+      });
+
+      expect(events).toEqual([
+        expect.objectContaining({
+          mailId: mail.mailId,
+          jobId: expect.stringMatching(/^stage_play_live_source_job:/),
+          wakeRequestId: expect.stringMatching(/^stage_play_live_source_mail_wake:/),
+          nextLoopState: "continue_with_unread_mail",
+        }),
+      ]);
+      expect(listStagePlayLiveSourceJobStates({ threadId })[0]).toMatchObject({
+        lastMailId: mail.mailId,
+        nextLoopState: "continue_with_unread_mail",
+      });
+    } finally {
+      unsubscribe();
+    }
   });
 
   it("turns latest compact visual evidence into unread Ask mail without raw content", () => {
@@ -988,6 +1036,7 @@ describe("Stage Play live-source mailbox", () => {
     const entries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
     expect(entries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
       "mail_received",
+      "mail_wake_requested",
       "mail_read_tool_call",
       "mail_read_receipt",
       "agent_decision",
@@ -1085,6 +1134,87 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain("Harmless Minecraft-like scene change");
     expect(prompt).toContain("voiceEnabled: true");
     expect(prompt).toContain(policy.policyId);
+  });
+
+  it("binds generated describe-each-batch policy into future wake prompts and records draft text for non-empty mail", async () => {
+    const configureObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the active visual source and describe each new mail batch in one sentence.",
+      },
+    });
+    const configured = configureObservation.observation as any;
+    const policy = configured.policy;
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:describe-each-batch",
+      evidenceRef: "visual_evidence:describe-each-batch",
+      summaryText: "Minecraft-like scene with a player near a book stand, a cat, and moonlit mountains.",
+      createdAt: "2026-06-04T12:00:40.000Z",
+    });
+
+    let prompt = "";
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async (input) => {
+        prompt = input.prompt;
+        return {
+          turn_id: "ask:wake-describe-each-batch",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-describe-each-batch:draft_text_answer",
+                  decision: "draft_text_answer",
+                  mailIds: input.wakeRequest.mailIds,
+                  textAnswerDraft: {
+                    text: "The visual summary shows a Minecraft-like scene with a player near a book stand, a cat, and moonlit mountains.",
+                    terminalEligible: true,
+                  },
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(configured).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      policy: {
+        objectiveText: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+        decisionPolicyPrompt: expect.stringContaining("If the mail batch contains any compact visual summary, record draft_text_answer."),
+      },
+    });
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-describe-each-batch",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-describe-each-batch:draft_text_answer"],
+    });
+    expect(prompt).toContain("Continuing live-source watch job:");
+    expect(prompt).toContain("Watch the active visual source and describe each new visual-summary mail batch in one sentence.");
+    expect(prompt).toContain(`Watch policy ref: ${policy.policyId}`);
+    expect(prompt).toContain("Decision policy:");
+    expect(prompt).toContain("For each unread mail batch, read the listed mail refs as the current observation window.");
+    expect(prompt).toContain("If the mail batch contains any compact visual summary, record draft_text_answer.");
+    expect(prompt).toContain("The textAnswerDraft must be one sentence describing what was observed.");
+    expect(prompt).toContain("Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.");
+    expect(prompt).toContain("Importance criteria:");
+    expect(prompt).toContain("Any new visual-summary mail batch should produce a one-sentence text answer.");
+    expect(prompt).toContain("Suppress criteria:");
+    expect(prompt).toContain("Suppress only if no unread mail items exist or mail lacks compact summary text.");
+    expect(prompt).toContain(mail.mailId);
+    expect(prompt).toContain("Minecraft-like scene with a player near a book stand");
   });
 
   it("lets the same mail summary produce different wake decisions under different job policies", async () => {

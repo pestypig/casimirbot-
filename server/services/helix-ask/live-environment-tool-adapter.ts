@@ -68,6 +68,9 @@ import {
   listStagePlayLiveSourceWatchJobPolicies,
 } from "../stage-play/stage-play-live-source-mailbox-store";
 import {
+  buildStagePlayLiveSourceWatchJobPolicyDefaults,
+} from "../stage-play/stage-play-live-source-watch-policy-defaults";
+import {
   resolveStagePlayLiveSourceMailboxThreadId,
 } from "../stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -128,28 +131,27 @@ const readBooleanArg = (record: Record<string, unknown>, snakeKey: string, camel
 
 const readWatchJobOutputPolicy = (
   args: Record<string, unknown>,
-  objectiveText: string,
+  defaults: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"],
 ): Partial<StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]> => {
   const nested = readRecord(args.output_policy ?? args.outputPolicy) ?? {};
-  const allowVoiceFromObjective = /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
   const allowVoiceCallout =
     readBooleanArg(nested, "allow_voice_callout", "allowVoiceCallout") ??
     readBooleanArg(args, "allow_voice_callout", "allowVoiceCallout") ??
-    allowVoiceFromObjective;
+    defaults.allowVoiceCallout;
   return {
     allowTextAnswer:
       readBooleanArg(nested, "allow_text_answer", "allowTextAnswer") ??
       readBooleanArg(args, "allow_text_answer", "allowTextAnswer") ??
-      true,
+      defaults.allowTextAnswer,
     allowVoiceCallout,
     voiceRequiresUrgency:
       readBooleanArg(nested, "voice_requires_urgency", "voiceRequiresUrgency") ??
       readBooleanArg(args, "voice_requires_urgency", "voiceRequiresUrgency") ??
-      allowVoiceCallout,
+      defaults.voiceRequiresUrgency,
     confirmationRequired:
       readBooleanArg(nested, "confirmation_required", "confirmationRequired") ??
       readBooleanArg(args, "confirmation_required", "confirmationRequired") ??
-      false,
+      defaults.confirmationRequired,
   };
 };
 
@@ -1110,6 +1112,7 @@ export function executeLiveEnvironmentTool(
       readString(args.user_prompt) ??
       readString(args.userPrompt) ??
       "Watch the live source and record decisions when source mail arrives.";
+    const policyDefaults = buildStagePlayLiveSourceWatchJobPolicyDefaults(objectiveText);
     const sourceIds = [
       ...readStringArray(args.source_ids ?? args.sourceIds),
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
@@ -1119,14 +1122,18 @@ export function executeLiveEnvironmentTool(
       roomId,
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       sourceIds,
-      objectiveText,
+      objectiveText: policyDefaults.objectiveText,
       decisionPolicyPrompt:
         readString(args.decision_policy_prompt) ??
         readString(args.decisionPolicyPrompt) ??
-        objectiveText,
-      outputPolicy: readWatchJobOutputPolicy(args, objectiveText),
-      importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria),
-      suppressCriteria: readStringArray(args.suppress_criteria ?? args.suppressCriteria),
+        policyDefaults.decisionPolicyPrompt,
+      outputPolicy: readWatchJobOutputPolicy(args, policyDefaults.outputPolicy),
+      importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria).length > 0
+        ? readStringArray(args.importance_criteria ?? args.importanceCriteria)
+        : policyDefaults.importanceCriteria,
+      suppressCriteria: readStringArray(args.suppress_criteria ?? args.suppressCriteria).length > 0
+        ? readStringArray(args.suppress_criteria ?? args.suppressCriteria)
+        : policyDefaults.suppressCriteria,
       priorDecisionRefs: readStringArray(args.prior_decision_refs ?? args.priorDecisionRefs),
       priorAnswerRefs: readStringArray(args.prior_answer_refs ?? args.priorAnswerRefs),
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs).concat(sourceIds),

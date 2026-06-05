@@ -1,6 +1,10 @@
 import type { RuntimeAdmissionDecision } from "../runtime/runtime-memory-governor";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
-import { listStagePlayLiveSourceJobStates } from "./stage-play-live-source-mailbox-store";
+import {
+  listStagePlayLiveSourceJobStates,
+  subscribeStagePlayLiveSourceMailEnqueued,
+  type StagePlayLiveSourceMailEnqueuedEvent,
+} from "./stage-play-live-source-mailbox-store";
 import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
@@ -40,8 +44,10 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
 const DEFAULT_WAKE_SERVICE_INTERVAL_MS = 15_000;
 const WAKE_SERVICE_RUNTIME_TASK_ID = "stage_play_live_source_mail_wake_service";
 let serviceTimer: ReturnType<typeof setInterval> | null = null;
+let immediateRunTimer: ReturnType<typeof setTimeout> | null = null;
 let cycleRunning = false;
 let servicePaused = false;
+let unsubscribeMailEnqueued: (() => void) | null = null;
 
 const readPositiveIntEnv = (name: string, fallback: number): number => {
   const parsed = Number(process.env[name]);
@@ -68,6 +74,29 @@ const wakeRuntimePressureCheck = (runtimeAdmissionSink?: (decision: RuntimeAdmis
       reason: admission.reason,
     };
   };
+
+const immediateRunDelayMs = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_IMMEDIATE_DELAY_MS", 250);
+
+export function requestStagePlayLiveSourceMailWakeRun(
+  event?: StagePlayLiveSourceMailEnqueuedEvent,
+): boolean {
+  if (process.env.NODE_ENV === "test") return false;
+  if (process.env.STAGE_PLAY_MAIL_WAKE_RUNNER_ENABLED === "0") return false;
+  if (process.env.STAGE_PLAY_MAIL_WAKE_AUTO_RUN_ENABLED === "0") return false;
+  if (servicePaused) return false;
+  if (event && !event.wakeRequestId) return false;
+  if (immediateRunTimer) return false;
+  immediateRunTimer = setTimeout(() => {
+    immediateRunTimer = null;
+    if (servicePaused) return;
+    void runStagePlayLiveSourceMailWakeAdmissionCycle().catch((err) => {
+      console.warn("[stage-play-mail-wake-service] immediate admission cycle failed", err);
+    });
+  }, immediateRunDelayMs());
+  immediateRunTimer.unref?.();
+  return true;
+}
 
 const summarizeWakeState = (input: {
   now: string;
@@ -180,6 +209,9 @@ export function startStagePlayLiveSourceMailWakeService(): boolean {
   if (process.env.NODE_ENV === "test") return false;
   if (process.env.STAGE_PLAY_MAIL_WAKE_RUNNER_ENABLED === "0") return false;
   servicePaused = false;
+  unsubscribeMailEnqueued = subscribeStagePlayLiveSourceMailEnqueued((event) => {
+    requestStagePlayLiveSourceMailWakeRun(event);
+  });
   runtimeMemoryGovernor.registerPausableRuntimeTask({
     id: WAKE_SERVICE_RUNTIME_TASK_ID,
     taskClass: "stage_play_refresh",
@@ -207,6 +239,12 @@ export function stopStagePlayLiveSourceMailWakeServiceForTest(): void {
   if (serviceTimer) {
     clearInterval(serviceTimer);
   }
+  if (immediateRunTimer) {
+    clearTimeout(immediateRunTimer);
+  }
+  unsubscribeMailEnqueued?.();
+  unsubscribeMailEnqueued = null;
+  immediateRunTimer = null;
   serviceTimer = null;
   cycleRunning = false;
   servicePaused = false;

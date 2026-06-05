@@ -169,6 +169,53 @@ describe("live-source mail live environment tools", () => {
     expect(payload.mailboxThreadId).toBe(threadId);
   });
 
+  it("generates a strong default decision policy for describe-each-batch visual watch jobs", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the active visual source and describe each new mail batch in one sentence.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      policy: {
+        objectiveText: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+        decisionPolicyPrompt: [
+          "For each unread mail batch, read the listed mail refs as the current observation window.",
+          "If the mail batch contains any compact visual summary, record draft_text_answer.",
+          "The textAnswerDraft must be one sentence describing what was observed.",
+          "If the batch is empty, record wait_for_next_summary.",
+          "Do not claim visual evidence is unavailable when mail refs or compact summaries exist.",
+          "After recording the decision, set nextLoopState to armed_for_next_summary.",
+        ].join("\n"),
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: false,
+          voiceRequiresUrgency: true,
+          confirmationRequired: true,
+        },
+        importanceCriteria: [
+          "Any new visual-summary mail batch should produce a one-sentence text answer.",
+        ],
+        suppressCriteria: [
+          "Suppress only if no unread mail items exist or mail lacks compact summary text.",
+        ],
+      },
+      jobState: {
+        objective: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+        nextLoopState: "armed_for_next_summary",
+      },
+    });
+    expect(payload.artifactId).not.toBe("stage_play_live_source_mail_read_result");
+    expect(observation.assistant_answer).toBe(false);
+    expect(payload.terminal_eligible).toBe(false);
+  });
+
   it.each(["live_env.check_live_source_mail", "live_env.read_live_source_mail"] as const)(
     "reads latest visual summary mail as evidence through %s and requires a follow-up model decision",
     (toolName) => {

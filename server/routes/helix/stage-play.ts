@@ -46,6 +46,7 @@ import {
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
 } from "../../services/stage-play/stage-play-visual-summary-mail-ingest";
+import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../../services/stage-play/stage-play-live-source-watch-policy-defaults";
 import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
@@ -729,28 +730,30 @@ helixStagePlayRouter.post("/live-source-mail/job", (req: Request, res: Response)
         contextRole: "tool_evidence",
       });
     }
-    const allowVoiceCallout =
-      readOptionalBoolean(body.allowVoiceCallout ?? body.allow_voice_callout) ??
-      /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
+    const policyDefaults = buildStagePlayLiveSourceWatchJobPolicyDefaults(objectiveText);
     const configured = configureStagePlayLiveSourceWatchJobPolicy({
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id),
       threadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       sourceIds: readStringArray(body.sourceIds ?? body.source_ids),
-      objectiveText,
+      objectiveText: policyDefaults.objectiveText,
       decisionPolicyPrompt:
         readQueryString(body.decisionPolicyPrompt) ??
         readQueryString(body.decision_policy_prompt) ??
-        objectiveText,
+        policyDefaults.decisionPolicyPrompt,
       outputPolicy: {
-        allowTextAnswer: readOptionalBoolean(body.allowTextAnswer ?? body.allow_text_answer) ?? true,
-        allowVoiceCallout,
-        voiceRequiresUrgency: readOptionalBoolean(body.voiceRequiresUrgency ?? body.voice_requires_urgency) ?? allowVoiceCallout,
-        confirmationRequired: readOptionalBoolean(body.confirmationRequired ?? body.confirmation_required) ?? false,
+        allowTextAnswer: readOptionalBoolean(body.allowTextAnswer ?? body.allow_text_answer) ?? policyDefaults.outputPolicy.allowTextAnswer,
+        allowVoiceCallout: readOptionalBoolean(body.allowVoiceCallout ?? body.allow_voice_callout) ?? policyDefaults.outputPolicy.allowVoiceCallout,
+        voiceRequiresUrgency: readOptionalBoolean(body.voiceRequiresUrgency ?? body.voice_requires_urgency) ?? policyDefaults.outputPolicy.voiceRequiresUrgency,
+        confirmationRequired: readOptionalBoolean(body.confirmationRequired ?? body.confirmation_required) ?? policyDefaults.outputPolicy.confirmationRequired,
       },
-      importanceCriteria: readStringArray(body.importanceCriteria ?? body.importance_criteria),
-      suppressCriteria: readStringArray(body.suppressCriteria ?? body.suppress_criteria),
+      importanceCriteria: readStringArray(body.importanceCriteria ?? body.importance_criteria).length > 0
+        ? readStringArray(body.importanceCriteria ?? body.importance_criteria)
+        : policyDefaults.importanceCriteria,
+      suppressCriteria: readStringArray(body.suppressCriteria ?? body.suppress_criteria).length > 0
+        ? readStringArray(body.suppressCriteria ?? body.suppress_criteria)
+        : policyDefaults.suppressCriteria,
       evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
     });
     return res.json({
