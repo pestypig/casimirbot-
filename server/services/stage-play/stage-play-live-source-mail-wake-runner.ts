@@ -8,10 +8,12 @@ import {
   listUnreadStagePlayLiveSourceMailItems,
 } from "./stage-play-live-source-mailbox-store";
 import {
-  listPendingStagePlayLiveSourceMailWakeRequests,
+  listRunnableStagePlayLiveSourceMailWakeRequests,
+  listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeCompleted,
-  markStagePlayMailWakeFailed,
+  markStagePlayMailWakeRetryable,
   markStagePlayMailWakeRunning,
+  markStagePlayMailWakeTerminalFailed,
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
 } from "./stage-play-live-source-mail-wake-store";
@@ -38,6 +40,8 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
+
+const STALE_RUNNING_WAKE_MS = 90_000;
 
 const defaultAskBaseUrl = (): string =>
   process.env.HELIX_ASK_BASE_URL ??
@@ -107,6 +111,35 @@ const extractDecisionIds = (response: AskWakeTurnResponse): string[] => {
   return uniqueStrings(ids);
 };
 
+const wakeAttemptBackoffMs = (attemptCount: number): number => {
+  if (attemptCount <= 1) return 15_000;
+  if (attemptCount === 2) return 30_000;
+  if (attemptCount === 3) return 60_000;
+  return 120_000;
+};
+
+const addMs = (iso: string, ms: number): string =>
+  new Date(Date.parse(iso) + ms).toISOString();
+
+const isPressure503 = (err: unknown): boolean =>
+  /\b(?:mail_wake_ask_turn_failed:503|503)\b/i.test(err instanceof Error ? err.message : String(err));
+
+const wakeMatchesScope = (
+  wake: StagePlayLiveSourceMailWakeRequestV1,
+  input: {
+    threadId?: string | null;
+    roomId?: string | null;
+    environmentId?: string | null;
+    jobId?: string | null;
+  },
+): boolean => {
+  if (input.threadId && wake.threadId !== input.threadId) return false;
+  if (input.roomId && wake.roomId !== input.roomId) return false;
+  if (input.environmentId && wake.environmentId !== input.environmentId) return false;
+  if (input.jobId && wake.jobId !== input.jobId) return false;
+  return true;
+};
+
 export function queueMailWakeForUnreadItems(input: {
   threadId: string;
   roomId?: string | null;
@@ -128,7 +161,7 @@ export function queueMailWakeForUnreadItems(input: {
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     sourceId: input.sourceId ?? null,
-    limit: input.limit ?? 3,
+    limit: Math.min(input.limit ?? 1, 1),
   });
   if (unread.length === 0) return null;
   return queueStagePlayLiveSourceMailWakeRequest({
@@ -153,16 +186,49 @@ export async function runNextMailWakeRequest(input: {
   askTurnRunner?: AskWakeTurnRunner;
   now?: string;
 } = {}): Promise<StagePlayLiveSourceMailWakeResultV1 | null> {
-  const running = listPendingStagePlayLiveSourceMailWakeRequests({
+  const now = input.now ?? new Date().toISOString();
+  const scopedWakes = listStagePlayLiveSourceMailWakeRequests({
     threadId: input.threadId ?? null,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     jobId: input.jobId ?? null,
-    limit: 10,
+    limit: 250,
+  });
+  const activeRunning = scopedWakes.filter((wake) =>
+    wake.status === "running" &&
+    wakeMatchesScope(wake, input)
+  );
+  for (const wake of activeRunning) {
+    const lastAttemptMs = Date.parse(wake.lastAttemptAt ?? wake.updatedAt);
+    const stale = Number.isFinite(lastAttemptMs) && Date.parse(now) - lastAttemptMs > STALE_RUNNING_WAKE_MS;
+    if (stale && !wake.askTurnId) {
+      markStagePlayMailWakeRetryable({
+        wakeRequestId: wake.wakeRequestId,
+        failureReason: "stale_running_wake",
+        nextRetryAt: now,
+        now,
+      });
+    }
+  }
+  const stillRunning = listStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    status: "running",
+    limit: 250,
+  }).find((wake) => wakeMatchesScope(wake, input));
+  if (stillRunning) return null;
+  const running = listRunnableStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now,
+    limit: 250,
   }).at(0) ?? null;
   if (!running) return null;
-  const now = input.now ?? new Date().toISOString();
-  markStagePlayMailWakeRunning(running.wakeRequestId, now);
+  const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
   const evidenceRefs = uniqueStrings([...running.evidenceRefs, ...running.mailIds, ...running.sourceIds]);
   try {
     const prompt = buildWakePrompt(running);
@@ -176,13 +242,17 @@ export async function runNextMailWakeRequest(input: {
     const decisionIds = extractDecisionIds(response);
     if (decisionIds.length === 0) {
       const failedReason = "mail_wake_decision_missing";
-      markStagePlayMailWakeFailed(running.wakeRequestId, new Date().toISOString());
+      markStagePlayMailWakeTerminalFailed({
+        wakeRequestId: running.wakeRequestId,
+        failureReason: failedReason,
+        now: new Date().toISOString(),
+      });
       return recordStagePlayMailWakeResult({
         wakeRequestId: running.wakeRequestId,
         threadId: running.threadId,
         roomId: running.roomId ?? null,
         environmentId: running.environmentId ?? null,
-        status: "failed",
+        status: "failed_terminal",
         askTurnId,
         failedReason,
         evidenceRefs: uniqueStrings([...evidenceRefs, ...(askTurnId ? [askTurnId] : [])]),
@@ -208,16 +278,42 @@ export async function runNextMailWakeRequest(input: {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
-    markStagePlayMailWakeFailed(running.wakeRequestId, new Date().toISOString());
+    const failedAt = new Date().toISOString();
+    if (isPressure503(err)) {
+      const nextRetryAt = addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount));
+      markStagePlayMailWakeRetryable({
+        wakeRequestId: running.wakeRequestId,
+        status: "deferred_for_pressure",
+        failureReason: "ask_turn_pressure_503",
+        nextRetryAt,
+        now: failedAt,
+      });
+      return recordStagePlayMailWakeResult({
+        wakeRequestId: running.wakeRequestId,
+        threadId: running.threadId,
+        roomId: running.roomId ?? null,
+        environmentId: running.environmentId ?? null,
+        status: "deferred_for_pressure",
+        failedReason: "ask_turn_pressure_503",
+        evidenceRefs,
+        createdAt: failedAt,
+      });
+    }
+    markStagePlayMailWakeRetryable({
+      wakeRequestId: running.wakeRequestId,
+      failureReason: err instanceof Error ? err.message : String(err),
+      nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount)),
+      now: failedAt,
+    });
     return recordStagePlayMailWakeResult({
       wakeRequestId: running.wakeRequestId,
       threadId: running.threadId,
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
-      status: "failed",
+      status: "failed_retryable",
       failedReason: err instanceof Error ? err.message : String(err),
       evidenceRefs,
-      createdAt: new Date().toISOString(),
+      createdAt: failedAt,
     });
   }
 }
