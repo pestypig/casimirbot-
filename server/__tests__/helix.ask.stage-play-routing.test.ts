@@ -446,6 +446,14 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("decision is required");
     expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
     expect(response.body?.answer, routeDebug).not.toMatch(/\bno\s+(?:mail|live-source\s+updates?)\s+(?:was|were)?\s*(?:available|found)\b/i);
+    expect(response.body?.solver_controller_decision?.decision, routeDebug).toBe("allow_terminal");
+    expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).toEqual([]);
+    expect(response.body?.goal_satisfaction_evaluation, routeDebug).toMatchObject({
+      satisfaction: "satisfied",
+      next_decision: "allow_terminal",
+      reason: "watch_job_policy_receipt_satisfies_setup_turn",
+    });
+    expect(response.body?.terminal_equivalence_harness_result?.ok, routeDebug).toBe(true);
   }, 30_000);
 
   it("lets hard live-source mailbox watch setup supersede unrelated pending user input", async () => {
@@ -495,6 +503,9 @@ describe("Helix Ask Stage Play routing", () => {
     });
     expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
     expect(response.body?.answer, routeDebug).not.toMatch(/active_doc_path|missing artifact|Provide the missing artifact/i);
+    expect(response.body?.solver_controller_decision?.decision, routeDebug).toBe("allow_terminal");
+    expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).toEqual([]);
+    expect(response.body?.terminal_equivalence_harness_result?.ok, routeDebug).toBe(true);
   }, 30_000);
 
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {

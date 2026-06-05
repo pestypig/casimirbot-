@@ -147,6 +147,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
   askTurnRunner?: AskWakeTurnRunner;
   now?: string;
   pressureCheck?: StagePlayMailWakePressureCheck | null;
+  manualRun?: boolean;
 } = {}): Promise<StagePlayLiveSourceMailWakeAdmissionCycleResultV1> {
   if (cycleRunning) {
     return summarizeWakeState({
@@ -191,6 +192,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       baseUrl: input.baseUrl,
       askTurnRunner: input.askTurnRunner,
       pressureCheck,
+      manualRun: input.manualRun,
       now,
     });
     return summarizeWakeState({

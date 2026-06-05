@@ -74,7 +74,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
         wake.environmentId === (input.environmentId ?? null) &&
         wake.jobId === (input.jobId ?? null) &&
         wake.reason === (input.reason ?? "unread_mail") &&
-        wake.status === "queued" &&
+        (wake.status === "queued" || wake.status === "deferred_for_pressure") &&
         sortedKey(wake.sourceIds) === sortedKey(sourceIds) &&
         wake.mailIds.length < MAX_MAIL_IDS_PER_WAKE_BATCH
       )
@@ -94,6 +94,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
           ...sourceIds,
           ...(input.evidenceRefs ?? []),
         ]),
+        nextRetryAt: queuedSameSource.status === "deferred_for_pressure" ? queuedSameSource.nextRetryAt : null,
         updatedAt: now,
       };
       wakeById.set(merged.wakeRequestId, merged);
@@ -338,6 +339,12 @@ export function listStagePlayLiveSourceMailWakeResults(input: {
     })
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
     .slice(-limit);
+}
+
+export function latestStagePlayLiveSourceMailWakeResult(
+  wakeRequestId: string,
+): StagePlayLiveSourceMailWakeResultV1 | null {
+  return listStagePlayLiveSourceMailWakeResults({ wakeRequestId, limit: 1 }).at(-1) ?? null;
 }
 
 export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {

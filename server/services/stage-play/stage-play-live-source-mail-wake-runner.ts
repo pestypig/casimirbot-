@@ -34,6 +34,7 @@ import {
   markStagePlayMailWakeTerminalFailed,
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
+  latestStagePlayLiveSourceMailWakeResult,
 } from "./stage-play-live-source-mail-wake-store";
 
 type AskWakeTurnResponse = Record<string, unknown>;
@@ -754,6 +755,7 @@ export async function runNextMailWakeRequest(input: {
   askTurnRunner?: AskWakeTurnRunner;
   voiceDeliveryRunner?: StagePlayLiveSourceVoiceDeliveryRunner | null;
   pressureCheck?: StagePlayMailWakePressureCheck | null;
+  manualRun?: boolean;
   now?: string;
 } = {}): Promise<StagePlayLiveSourceMailWakeResultV1 | null> {
   const now = input.now ?? new Date().toISOString();
@@ -789,14 +791,28 @@ export async function runNextMailWakeRequest(input: {
     limit: 250,
   }).find((wake) => wakeMatchesScope(wake, input));
   if (stillRunning) return null;
-  const running = listRunnableStagePlayLiveSourceMailWakeRequests({
-    threadId: input.threadId ?? null,
-    roomId: input.roomId ?? null,
-    environmentId: input.environmentId ?? null,
-    jobId: input.jobId ?? null,
-    now,
-    limit: 250,
-  }).at(0) ?? null;
+  const running = (
+    input.manualRun
+      ? listStagePlayLiveSourceMailWakeRequests({
+          threadId: input.threadId ?? null,
+          roomId: input.roomId ?? null,
+          environmentId: input.environmentId ?? null,
+          jobId: input.jobId ?? null,
+          limit: 250,
+        }).filter((wake) =>
+          wake.status === "queued" ||
+          wake.status === "failed_retryable" ||
+          wake.status === "deferred_for_pressure"
+        )
+      : listRunnableStagePlayLiveSourceMailWakeRequests({
+          threadId: input.threadId ?? null,
+          roomId: input.roomId ?? null,
+          environmentId: input.environmentId ?? null,
+          jobId: input.jobId ?? null,
+          now,
+          limit: 250,
+        })
+  ).at(0) ?? null;
   if (!running) return null;
   const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
   const mailBatch = mailBatchForWake(running);
@@ -823,7 +839,10 @@ export async function runNextMailWakeRequest(input: {
   };
   if (pressure?.deferred) {
     const nextRetryAt = addMs(now, wakeAttemptBackoffMs(runningAttempt.attemptCount));
-    const reason = pressure.reason ?? "runtime_memory_pressure";
+    const rawReason = pressure.reason ?? "runtime_memory_pressure";
+    const reason = input.manualRun && !rawReason.startsWith("manual_wake_deferred_for_pressure")
+      ? `manual_wake_deferred_for_pressure:${rawReason}`
+      : rawReason;
     markStagePlayMailWakeRetryable({
       wakeRequestId: running.wakeRequestId,
       status: "deferred_for_pressure",
@@ -832,6 +851,11 @@ export async function runNextMailWakeRequest(input: {
       now,
     });
     releaseAdmission("rejected");
+    const priorDeferred = latestStagePlayLiveSourceMailWakeResult(running.wakeRequestId);
+    const priorCoversCurrentBatch = running.mailIds.every((mailId) => priorDeferred?.evidenceRefs.includes(mailId));
+    if (priorDeferred?.status === "deferred_for_pressure" && priorDeferred.failedReason === reason && priorCoversCurrentBatch) {
+      return priorDeferred;
+    }
     const wakeResult = recordStagePlayMailWakeResult({
       wakeRequestId: running.wakeRequestId,
       threadId: running.threadId,

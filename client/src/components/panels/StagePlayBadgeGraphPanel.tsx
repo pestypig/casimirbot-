@@ -412,6 +412,7 @@ async function runStagePlayLiveSourceMailWake(input: {
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
+  trigger?: "manual" | "auto";
 }): Promise<{
   ok: boolean;
   cycle: {
@@ -434,6 +435,8 @@ async function runStagePlayLiveSourceMailWake(input: {
       threadId: input.threadId,
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
+      trigger: input.trigger ?? "manual",
+      manualRun: input.trigger !== "auto",
     }),
   });
   if (!response.ok) {
@@ -1190,6 +1193,9 @@ function buildObserverMailLoopNodes(input: {
   ]);
   const queuedRunningText = `queued ${queuedWakeMailCount} / running ${runningWakeMailCount}`;
   const latestWakeAskText = latestWake?.askTurnId ? `latest ask ${latestWake.askTurnId}` : "no Ask turn yet";
+  const pressureText = pressureWakeCount > 0
+    ? `deferred for pressure; ${unreadCount} unread retained`
+    : null;
   const latestDecisionText = latestDecision
     ? `${latestDecision.decision}: ${latestDecision.rationalePreview || latestDecision.decisionId}`
     : "no decision yet";
@@ -1250,8 +1256,10 @@ function buildObserverMailLoopNodes(input: {
       title: "Wake Ask",
       subtitle: "mail wake admission",
       status: latestWake?.status ?? (unreadCount > 0 ? "queued pending" : "missing"),
-      preview: latestWake
-        ? `${queuedRunningText}; ${latestWakeAskText}`
+      preview: pressureText
+        ? pressureText
+        : latestWake
+          ? `${queuedRunningText}; ${latestWakeAskText}`
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
@@ -1271,7 +1279,9 @@ function buildObserverMailLoopNodes(input: {
         ...latestWake.evidenceRefs,
       ].filter(Boolean)) : [],
       outputPreview: latestWake
-        ? `${latestWake.status}${latestWake.failureReason ? `; ${latestWake.failureReason}` : ""}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
+        ? latestWake.status === "deferred_for_pressure"
+          ? `deferred_for_pressure; ${latestWake.failureReason ?? "runtime pressure"}; ${unreadCount} unread retained${latestWake.nextRetryAt ? `; retry ${latestWake.nextRetryAt}` : ""}`
+          : `${latestWake.status}${latestWake.failureReason ? `; ${latestWake.failureReason}` : ""}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
           : "no wake request yet",
@@ -4547,6 +4557,7 @@ export default function StagePlayBadgeGraphPanel() {
         threadId,
         roomId,
         environmentId,
+        trigger: "manual",
       });
       const result = response.cycle?.result ?? null;
       setWakeRunStatus(`${response.cycle?.status ?? "idle"}: ${response.cycle?.reason ?? "no status"}`);

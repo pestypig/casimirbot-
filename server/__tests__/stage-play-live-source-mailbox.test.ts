@@ -1415,6 +1415,109 @@ describe("Stage Play live-source mailbox", () => {
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
 
+  it("labels manual pressure deferrals without reading or deciding mail", async () => {
+    seedVisualEvidence();
+    let askCalls = 0;
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      manualRun: true,
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+      askTurnRunner: async () => {
+        askCalls += 1;
+        throw new Error("should_not_call_ask_under_pressure");
+      },
+    });
+
+    expect(askCalls).toBe(0);
+    expect(result).toMatchObject({
+      status: "deferred_for_pressure",
+      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
+      askTurnId: null,
+      decisionIds: [],
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+    expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
+    expect(listStagePlayLiveSourceMailTranscriptEntries({ threadId }).map((entry) => entry.row.rowKind))
+      .toEqual(expect.arrayContaining(["mail_wake_deferred", "loop_state"]));
+  });
+
+  it("coalesces repeated pressure deferrals for the same wake batch", async () => {
+    seedVisualEvidence();
+
+    const first = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      manualRun: true,
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+    });
+    const transcriptCount = listStagePlayLiveSourceMailTranscriptEntries({ threadId }).length;
+
+    const second = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:45.000Z",
+      manualRun: true,
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+    });
+
+    expect(second?.wakeResultId).toBe(first?.wakeResultId);
+    expect(listStagePlayLiveSourceMailTranscriptEntries({ threadId })).toHaveLength(transcriptCount);
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+  });
+
+  it("merges new same-source unread mail into an existing deferred wake", async () => {
+    seedVisualEvidence();
+    const first = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+    });
+
+    enqueueVisualSummaryMailFromEvidence({
+      threadId,
+      roomId,
+      sourceId,
+      visualFrameRef: "visual_frame:stage-play-mailbox-second",
+      visualEvidenceRef: "visual_evidence:stage-play-mailbox-second",
+      summary: "A second compact visual summary arrived from the same source.",
+      analysisState: "analysis_ready",
+      now: "2026-06-04T12:01:35.000Z",
+    });
+    queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      sourceId,
+      now: "2026-06-04T12:01:35.000Z",
+    });
+
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toHaveLength(1);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0].wakeRequestId).toBe(first?.wakeRequestId);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "deferred_for_pressure",
+      mailIds: expect.arrayContaining([
+        listStagePlayLiveSourceMailItems({ threadId })[0].mailId,
+        listStagePlayLiveSourceMailItems({ threadId })[1].mailId,
+      ]),
+    });
+  });
+
   it("runs a retryable pressure wake after nextRetryAt while preserving exact mail ids", async () => {
     seedVisualEvidence();
     await runNextMailWakeRequest({
@@ -1470,6 +1573,59 @@ describe("Stage Play live-source mailbox", () => {
       mailIds: [mailId],
       nextRetryAt: null,
     });
+  });
+
+  it("lets manual wake retry a pressure-deferred wake before nextRetryAt", async () => {
+    seedVisualEvidence();
+    await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:00.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+    });
+
+    const earlyAutomatic = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:10.000Z",
+      pressureCheck: () => ({
+        deferred: false,
+      }),
+      askTurnRunner: async () => {
+        throw new Error("automatic_should_wait_for_next_retry");
+      },
+    });
+    expect(earlyAutomatic).toBeNull();
+
+    const manual = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:10.000Z",
+      manualRun: true,
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+      askTurnRunner: async () => {
+        throw new Error("manual_should_not_call_ask_when_pressure_rejects");
+      },
+    });
+
+    expect(manual).toMatchObject({
+      status: "deferred_for_pressure",
+      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
+      askTurnId: null,
+      decisionIds: [],
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "deferred_for_pressure",
+      attemptCount: 2,
+      failureReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
   });
 
   it("blocks later wakes while a non-stale wake is running", async () => {

@@ -900,6 +900,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+      manualRun: true,
     });
     return res.json({
       ok: true,
@@ -941,6 +942,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+      manualRun: readQueryString(body.trigger) === "manual" || readQueryString(body.manualRun) === "true" || readQueryString(body.manual_run) === "true",
     });
     return res.json({
       ok: true,
