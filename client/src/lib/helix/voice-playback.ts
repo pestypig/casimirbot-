@@ -259,7 +259,9 @@ export function applyLatestWinsVoiceQueue(input: {
   let supersededActiveReason: VoicePlaybackCancelReason | null = null;
   let pendingPreemptPolicy: VoicePreemptPolicy = "none";
 
-  if (input.incoming.kind === "brief") {
+  if (input.incoming.kind === "tool_receipt" || input.incoming.kind === "translation_relay") {
+    queue.push(input.incoming);
+  } else if (input.incoming.kind === "brief") {
     queue = queue.filter((entry) => {
       if (entry.kind !== "brief") return true;
       if (entry.turnKey === incomingTurnKey) {
@@ -309,7 +311,10 @@ export function applyLatestWinsVoiceQueue(input: {
     pendingPreemptPolicy = pendingPreemptPolicy === "none" ? "pending_regen" : pendingPreemptPolicy;
   }
 
-  if (input.incoming.kind === "brief") {
+  if (input.incoming.kind === "tool_receipt" || input.incoming.kind === "translation_relay") {
+    // Interim tool receipts are chronological observations. They should not
+    // erase earlier acks/statuses for the same turn.
+  } else if (input.incoming.kind === "brief") {
     const firstFinalIndex = queue.findIndex((entry) => entry.kind === "final");
     if (firstFinalIndex >= 0) {
       queue.splice(firstFinalIndex, 0, input.incoming);

@@ -2484,8 +2484,154 @@ export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceInten
   };
 }
 
+type InterimVoiceCalloutKind =
+  | "immediate_ack"
+  | "tool_started"
+  | "tool_progress"
+  | "tool_result"
+  | "waiting_for_evidence"
+  | "memory_pressure"
+  | "clarifying_status"
+  | "translation_relay";
+
+export type InterimVoiceCalloutPlaybackIntent = VoicePlaybackUtteranceIntent & {
+  requestId: string;
+  receiptId: string;
+  receiptKey: string;
+  calloutKind: InterimVoiceCalloutKind;
+};
+
+const INTERIM_VOICE_CALLOUT_TOOL_RESULT_SCHEMA = "helix.interim_voice_callout_tool_result.v1";
+
+const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
+  "immediate_ack",
+  "tool_started",
+  "tool_progress",
+  "tool_result",
+  "waiting_for_evidence",
+  "memory_pressure",
+  "clarifying_status",
+  "translation_relay",
+]);
+
+const INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES = new Set(["queued", "delivered"]);
+
+const readInterimVoiceRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readInterimVoiceString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const isInterimVoiceAuthoritySafe = (record: Record<string, unknown>): boolean =>
+  record.assistant_answer === false &&
+  record.terminal_eligible === false &&
+  record.raw_content_included === false;
+
+const readInterimVoiceCalloutKind = (value: unknown): InterimVoiceCalloutKind | null => {
+  const kind = readInterimVoiceString(value);
+  return kind && INTERIM_VOICE_CALLOUT_KINDS.has(kind as InterimVoiceCalloutKind)
+    ? kind as InterimVoiceCalloutKind
+    : null;
+};
+
+const buildInterimVoiceReceiptPlaybackIntent = (
+  value: unknown,
+): InterimVoiceCalloutPlaybackIntent | null => {
+  const result = readInterimVoiceRecord(value);
+  if (!result || result.schema !== INTERIM_VOICE_CALLOUT_TOOL_RESULT_SCHEMA) return null;
+  const request = readInterimVoiceRecord(result.request);
+  const receipt = readInterimVoiceRecord(result.receipt);
+  if (!request || !receipt) return null;
+  if (!isInterimVoiceAuthoritySafe(request) || !isInterimVoiceAuthoritySafe(receipt)) return null;
+  if (request.authority !== "provisional") return null;
+  const status = readInterimVoiceString(receipt.status);
+  if (!status || !INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES.has(status)) return null;
+  const calloutKind = readInterimVoiceCalloutKind(request.kind);
+  if (!calloutKind) return null;
+  const text = readInterimVoiceString(request.text);
+  const turnKey = readInterimVoiceString(request.turnId) ?? readInterimVoiceString(request.turn_id);
+  const requestId = readInterimVoiceString(request.requestId) ?? readInterimVoiceString(request.request_id);
+  const receiptId = readInterimVoiceString(receipt.receiptId) ?? readInterimVoiceString(receipt.receipt_id);
+  if (!text || !turnKey || !requestId || !receiptId) return null;
+  const delivery = readInterimVoiceRecord(receipt.delivery);
+  const utteranceId = readInterimVoiceString(delivery?.utteranceId) ?? readInterimVoiceString(delivery?.utterance_id);
+  const receiptKey = utteranceId ?? receiptId;
+  const playbackKind =
+    readInterimVoiceString(request.voicePlaybackKind) === "translation_relay" || calloutKind === "translation_relay"
+      ? "translation_relay"
+      : "tool_receipt";
+  return {
+    kind: playbackKind,
+    authority: "provisional",
+    source: "agent_loop",
+    turnKey,
+    revision: 1,
+    text,
+    traceId: turnKey,
+    eventId: receiptId,
+    requestId,
+    receiptId,
+    receiptKey,
+    calloutKind,
+  };
+};
+
+export function collectInterimVoiceCalloutPlaybackIntents(input: {
+  artifacts: unknown[];
+  spokenReceiptKeys?: Iterable<string>;
+  spokenImmediateAckTurnKeys?: Iterable<string>;
+}): InterimVoiceCalloutPlaybackIntent[] {
+  const spokenReceiptKeys = new Set(input.spokenReceiptKeys ?? []);
+  const spokenImmediateAckTurnKeys = new Set(input.spokenImmediateAckTurnKeys ?? []);
+  const emittedReceiptKeys = new Set<string>();
+  const emittedImmediateAckTurnKeys = new Set<string>();
+  const intents: InterimVoiceCalloutPlaybackIntent[] = [];
+  const visited = new WeakSet<object>();
+
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    if (visited.has(value)) return;
+    visited.add(value);
+    const intent = buildInterimVoiceReceiptPlaybackIntent(value);
+    if (intent) {
+      const receiptKnown =
+        spokenReceiptKeys.has(intent.receiptKey) ||
+        spokenReceiptKeys.has(intent.receiptId) ||
+        emittedReceiptKeys.has(intent.receiptKey) ||
+        emittedReceiptKeys.has(intent.receiptId);
+      const immediateAckKnown =
+        intent.calloutKind === "immediate_ack" &&
+        (spokenImmediateAckTurnKeys.has(intent.turnKey) || emittedImmediateAckTurnKeys.has(intent.turnKey));
+      if (!receiptKnown && !immediateAckKnown) {
+        intents.push(intent);
+        emittedReceiptKeys.add(intent.receiptKey);
+        emittedReceiptKeys.add(intent.receiptId);
+        if (intent.calloutKind === "immediate_ack") {
+          emittedImmediateAckTurnKeys.add(intent.turnKey);
+        }
+      }
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    for (const child of Object.values(value as Record<string, unknown>)) {
+      visit(child);
+    }
+  };
+
+  input.artifacts.forEach(visit);
+  return intents;
+}
+
 function isManualVoicePlaybackUtterance(utterance: Pick<VoicePlaybackUtterance, "kind" | "source"> | null | undefined): boolean {
   return utterance?.kind === "manual_read_aloud" || utterance?.source === "manual";
+}
+
+function isInterimVoicePlaybackUtteranceKind(kind: VoicePlaybackUtteranceKind): boolean {
+  return kind === "tool_receipt" || kind === "translation_relay";
 }
 
 function canPlayVoiceUtteranceWithMicOff(
@@ -7372,6 +7518,12 @@ function readHelixRuntimeArtifactRefs(record: Record<string, unknown>): string[]
 function summarizeHelixRuntimeArtifactRefs(refs: string[]): string {
   if (refs.length === 0) return "";
   const labels = refs.map((ref) => {
+    if (/workstation[-_]tool[-_]eval|workstation_tool_evaluation/i.test(ref)) {
+      return "workstation_tool_evaluation";
+    }
+    if (/theory[-_]ideology[-_]bridge|helix_theory_ideology_bridge_tool_result/i.test(ref)) {
+      return "theory_ideology_bridge evidence";
+    }
     const match = ref.match(
       /\b(?:doc_search_results|doc_summary|doc_open_receipt|doc_location_matches|calculator_receipt|workspace_action_receipt|note_update_receipt|runtime_tool_observation|tool_observation|final_answer_draft|direct_answer_text)\b/i,
     );
@@ -7446,8 +7598,8 @@ function buildHelixRuntimeTranscriptEvents(reply: HelixAskReply): Record<string,
         type: "observation",
         status,
         text: artifactSummary
-          ? `Drafted final answer artifact: ${artifactSummary}.`
-          : "Drafted final answer artifact.",
+          ? `Reviewed observed artifacts for terminal answer: ${artifactSummary}.`
+          : "Reviewed observed artifacts for terminal answer.",
         detail: chosenCapability || "model.direct_answer",
         lane: authority,
         step_id: stepId,
@@ -16486,6 +16638,8 @@ export function HelixAskPill({
   const voiceAutoSpeakPendingPlaybackResolverRef = useRef<(() => void) | null>(null);
   const voiceAutoSpeakCancelReasonRef = useRef<VoicePlaybackCancelReason | null>(null);
   const voiceAutoSpeakLastMetricsRef = useRef<VoicePlaybackMetrics | null>(null);
+  const interimVoiceSpokenReceiptKeysRef = useRef<Set<string>>(new Set());
+  const interimVoiceSpokenImmediateAckTurnKeysRef = useRef<Set<string>>(new Set());
   const voiceBargeHoldActiveRef = useRef(false);
   const voiceBargeHoldTurnKeyRef = useRef<string | null>(null);
   const voiceBargeHoldUtteranceKindRef = useRef<VoicePlaybackUtterance["kind"] | null>(null);
@@ -18856,6 +19010,7 @@ export function HelixAskPill({
   );
 
   const isVoiceUtteranceRevisionStale = useCallback((revision: VoiceUtteranceRevision): boolean => {
+    if (isInterimVoicePlaybackUtteranceKind(revision.kind)) return false;
     const state = voiceTurnRevisionStateRef.current[revision.turnKey];
     if (!state) return false;
     return state.latestRevision > revision.revision;
@@ -20168,7 +20323,9 @@ export function HelixAskPill({
       }
       updateVoiceTurnRevisionState(task.turnKey, (current) => ({
         ...current,
-        latestRevision: Math.max(current.latestRevision, task.revision),
+        latestRevision: isInterimVoicePlaybackUtteranceKind(task.kind)
+          ? current.latestRevision
+          : Math.max(current.latestRevision, task.revision),
         latestBriefRevision:
           task.kind === "brief"
             ? Math.max(current.latestBriefRevision, task.revision)
@@ -20344,6 +20501,30 @@ export function HelixAskPill({
     (intent: VoicePlaybackUtteranceIntent): boolean =>
       enqueueVoiceAutoSpeakTask(mapVoicePlaybackIntentToTask(intent)),
     [enqueueVoiceAutoSpeakTask],
+  );
+
+  const enqueueInterimVoiceCalloutsFromAskArtifacts = useCallback(
+    (artifacts: unknown[]): number => {
+      if (micArmStateRef.current !== "on") return 0;
+      const intents = collectInterimVoiceCalloutPlaybackIntents({
+        artifacts,
+        spokenReceiptKeys: interimVoiceSpokenReceiptKeysRef.current,
+        spokenImmediateAckTurnKeys: interimVoiceSpokenImmediateAckTurnKeysRef.current,
+      });
+      let acceptedCount = 0;
+      for (const intent of intents) {
+        const accepted = enqueueVoicePlaybackIntent(intent);
+        if (!accepted) continue;
+        interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
+        interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
+        if (intent.calloutKind === "immediate_ack") {
+          interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
+        }
+        acceptedCount += 1;
+      }
+      return acceptedCount;
+    },
+    [enqueueVoicePlaybackIntent],
   );
 
   const scheduleVoiceAutoSpeakBrief = useCallback(
@@ -20592,6 +20773,8 @@ export function HelixAskPill({
     voiceAutoSpeakCancelReasonRef.current = "mic_off";
     voiceSuppressedFinalTurnKeysRef.current.clear();
     voiceBriefSpokenLifecycleByTurnRef.current.clear();
+    interimVoiceSpokenReceiptKeysRef.current.clear();
+    interimVoiceSpokenImmediateAckTurnKeysRef.current.clear();
     voiceQueuedSpeechLatchByTurnRef.current.clear();
     voiceRunningSpeechLatchByTurnRef.current.clear();
     voiceTurnRevisionStateRef.current = {};
@@ -29959,6 +30142,11 @@ export function HelixAskPill({
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
           const responseDebugPayload = responseDebugWithClientMode ?? responseDebug;
+          enqueueInterimVoiceCalloutsFromAskArtifacts([
+            localResponseForTerminal,
+            responseDebugPayload,
+            responseEnvelope,
+          ]);
           const evidenceGateDecision = evaluateEvidenceFinalizationGate({
             question: trimmed,
             mode: responseMode ?? inferredMode,

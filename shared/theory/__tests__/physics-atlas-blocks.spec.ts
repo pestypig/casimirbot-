@@ -17,6 +17,7 @@ describe("physics atlas blocks", () => {
       "☀",
       "▣",
       "G",
+      "N",
       "Q",
       "⊙",
       "◎",
@@ -97,6 +98,19 @@ describe("physics atlas blocks", () => {
       "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
+    expect(byId.get("nhm2_full_solve")?.status).toBe("seed");
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.observer.eulerian_normal",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.tensor.metric_required_stress_energy",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.closure.same_basis_regional_residual",
+    );
+    expect(byId.get("nhm2_full_solve")?.claimBoundaryBadgeIds).toContain(
+      "nhm2.claim_boundary.diagnostic_only",
+    );
     expect(byId.get("galactic_dynamics")?.primaryBadgeIds).toContain(
       "tidal.love_number.displacement_response",
     );

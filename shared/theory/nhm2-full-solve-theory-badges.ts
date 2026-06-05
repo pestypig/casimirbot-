@@ -1,0 +1,924 @@
+import {
+  type TheoryBadgeClaimBoundaryV1,
+  type TheoryBadgeEdgeV1,
+  type TheoryBadgeV1,
+} from "../contracts/theory-badge-graph.v1";
+
+const NHM2_FULL_SOLVE_WHITEPAPER =
+  "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
+const NHM2_OBSERVABLE_EQUATION_MAP =
+  "docs/research/nhm2-observable-equation-map.v1.json";
+const NHM2_OBSERVABLE_FIGURE_PLAN =
+  "docs/research/nhm2-observable-equation-figure-plan.md";
+const NHM2_PROOF_ANCHOR_INDEX =
+  "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md";
+const NHM2_FULL_SOLVE_REFERENCE_CAPSULE =
+  "docs/audits/research/warp-full-solve-reference-capsule-latest.md";
+
+const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
+  diagnosticOnly: true,
+  doesValidateNHM2: false,
+  validationClaimAllowed: false,
+  physicalMechanismClaimAllowed: false,
+  promotionAllowed: false,
+};
+
+const COMMON_ASSUMPTIONS = [
+  "NHM2 full-solve rows are same-chart diagnostic context.",
+  "Repository artifacts define row status and blocker state.",
+  "External literature supplies formalism, context, and limitations only.",
+  "No row validates NHM2, propulsion, physical feasibility, QEI completion, or a transport route.",
+];
+
+const docRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "doc",
+  path,
+  id: id ?? null,
+  note: note ?? null,
+});
+
+const artifactRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "artifact",
+  path,
+  id: id ?? null,
+  note: note ?? null,
+});
+
+const equationMapRef = (id: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "equation_map_node",
+  path: NHM2_OBSERVABLE_EQUATION_MAP,
+  id,
+  note: note ?? null,
+});
+
+const payload = (args: {
+  id: string;
+  expression: string;
+  displayLatex: string;
+  targetVariable: string;
+}): TheoryBadgeV1["calculatorPayloads"][number] => ({
+  id: args.id,
+  expression: args.expression,
+  displayLatex: args.displayLatex,
+  preferredAction: "solve_with_steps",
+  targetVariable: args.targetVariable,
+  setupContext: null,
+});
+
+const nhm2FullSolveBadge = (badge: Omit<TheoryBadgeV1, "claimBoundary">): TheoryBadgeV1 => ({
+  ...badge,
+  claimBoundary: NHM2_FULL_SOLVE_BOUNDARY,
+});
+
+export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
+  nhm2FullSolveBadge({
+    id: "nhm2.observer.eulerian_normal",
+    title: "Eulerian Normal Observer",
+    plainMeaning: "Defines the Eulerian normal observer from the same-chart lapse and shift fields.",
+    whyItMatters:
+      "It makes the observer basis explicit before any energy, momentum, stress, or energy-condition diagnostic is interpreted.",
+    subjects: ["nhm2", "observer", "eulerian", "adm", "same_chart"],
+    level: "derived_relation",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["observer_projection", "adm_decomposition"],
+    tags: ["eulerian_observer", "same_chart", "tensor_component"],
+    equations: [
+      {
+        id: "eulerian_normal_components",
+        role: "definition",
+        displayLatex: "n_\\mu=(-\\alpha,0,0,0),\\quad n^\\mu=(1/\\alpha,-\\beta^i/\\alpha)",
+        computableExpression: null,
+        operatorKind: "tensor_component",
+        inputSymbols: ["alpha", "beta_i"],
+        outputSymbols: ["n_mu", "n^mu"],
+      },
+    ],
+    units: [
+      { symbol: "alpha", unit: null, quantity: "lapse", dimensionSignature: "1" },
+      { symbol: "beta_i", quantity: "shift", dimensionSignature: "L T^-1" },
+      { symbol: "n_mu", quantity: "covariant_observer_normal", dimensionSignature: "1" },
+      { symbol: "n^mu", quantity: "contravariant_observer_normal", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Observer normalization depends on the declared lapse-shift chart.",
+      "Observer bookkeeping is not ordinary transport-speed authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "eulerian-observers", "Whitepaper observer-normal section."),
+      equationMapRef("eulerian_observer_normal", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "observer", "eulerian", "adm", "same_chart"],
+      symbols: ["alpha", "beta_i", "n_mu", "n^mu"],
+      unitSignatures: ["1", "L T^-1"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["observer_projection", "adm_decomposition"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.observer.energy_density_projection",
+    title: "Observer Energy-Density Projection",
+    plainMeaning: "Projects the same-chart stress-energy tensor into Eulerian energy density.",
+    whyItMatters:
+      "It separates observer-projected energy density from a raw coordinate component or scalar source proxy.",
+    subjects: ["nhm2", "observer", "stress_energy", "energy_density", "projection"],
+    level: "derived_relation",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["observer_projection", "stress_energy_projection"],
+    tags: ["energy_density", "tensor_component", "same_chart"],
+    equations: [
+      {
+        id: "observer_energy_density_projection",
+        role: "definition",
+        displayLatex: "E=T_{\\mu\\nu}n^\\mu n^\\nu",
+        computableExpression: null,
+        operatorKind: "tensor_component",
+        inputSymbols: ["T_mu_nu", "n^mu"],
+        outputSymbols: ["E"],
+      },
+    ],
+    units: [{ symbol: "E", unit: "J/m^3", quantity: "observer_energy_density", dimensionSignature: "M L^-1 T^-2" }],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Projected E is observer-family evidence, not a full energy-condition result.",
+      "The tensor and observer normal must share one chart and basis.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
+      equationMapRef("observer_energy_density", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "observer", "stress_energy", "energy_density", "projection"],
+      symbols: ["T_mu_nu", "n^mu", "E"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["observer_projection", "stress_energy_projection"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.observer.momentum_density_projection",
+    title: "Observer Momentum-Density Projection",
+    plainMeaning: "Projects the same-chart stress-energy tensor into Eulerian momentum density.",
+    whyItMatters:
+      "It makes the missing or review-gated momentum channels visible so diagonal-only source proxies cannot stand in for full observer authority.",
+    subjects: ["nhm2", "observer", "stress_energy", "momentum_density", "projection"],
+    level: "derived_relation",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["observer_projection", "stress_energy_projection"],
+    tags: ["momentum_density", "tensor_component", "same_chart", "diagonal_proxy_boundary"],
+    equations: [
+      {
+        id: "observer_momentum_density_projection",
+        role: "definition",
+        displayLatex: "J_i=-T_{\\mu\\nu}n^\\mu\\gamma^\\nu{}_i",
+        computableExpression: null,
+        operatorKind: "tensor_component",
+        inputSymbols: ["T_mu_nu", "n^mu", "gamma^nu_i"],
+        outputSymbols: ["J_i"],
+      },
+    ],
+    units: [{ symbol: "J_i", unit: "J/m^3", quantity: "momentum_density_projection", dimensionSignature: "M L^-1 T^-2" }],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A diagonal-only stress proxy cannot substitute for observer momentum-density channels.",
+      "Momentum projection remains review-gated unless component authority is attached.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
+      equationMapRef("momentum_density", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "observer", "stress_energy", "momentum_density", "projection"],
+      symbols: ["T_mu_nu", "n^mu", "gamma^nu_i", "J_i"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["observer_projection", "stress_energy_projection"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.observer.spatial_stress_projection",
+    title: "Observer Spatial-Stress Projection",
+    plainMeaning: "Projects the same-chart stress-energy tensor into spatial stress components.",
+    whyItMatters:
+      "It records the off-diagonal spatial-stress authority required before observer-family diagnostics can be interpreted strongly.",
+    subjects: ["nhm2", "observer", "stress_energy", "spatial_stress", "projection"],
+    level: "derived_relation",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["observer_projection", "stress_energy_projection"],
+    tags: ["spatial_stress", "tensor_component", "same_chart", "off_diagonal_authority"],
+    equations: [
+      {
+        id: "observer_spatial_stress_projection",
+        role: "definition",
+        displayLatex: "S_{ij}=T_{\\mu\\nu}\\gamma^\\mu{}_i\\gamma^\\nu{}_j",
+        computableExpression: null,
+        operatorKind: "tensor_component",
+        inputSymbols: ["T_mu_nu", "gamma^mu_i", "gamma^nu_j"],
+        outputSymbols: ["S_ij"],
+      },
+    ],
+    units: [{ symbol: "S_ij", unit: "J/m^3", quantity: "spatial_stress_projection", dimensionSignature: "M L^-1 T^-2" }],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Off-diagonal stress authority is required for full observer-family interpretation.",
+      "Review-gated tensor cells block promotion-sensitive wording.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "stress-energy-projections", "Whitepaper projection grammar."),
+      equationMapRef("spatial_stress", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "observer", "stress_energy", "spatial_stress", "projection"],
+      symbols: ["T_mu_nu", "gamma^mu_i", "gamma^nu_j", "S_ij"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["observer_projection", "stress_energy_projection"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.tensor.metric_required_stress_energy",
+    title: "Metric-Required Stress-Energy Tensor",
+    plainMeaning: "Names the geometry-first stress-energy tensor required by the selected same-chart metric.",
+    whyItMatters:
+      "It separates what the metric demands from any proposed source-side mechanism or tile-effective counterpart.",
+    subjects: ["nhm2", "tensor", "einstein_tensor", "metric_required_source", "same_chart"],
+    level: "simulation_specific",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["metric_required_source", "einstein_tensor_route"],
+    tags: ["metric_required", "tensor_component", "geometry_first"],
+    equations: [
+      {
+        id: "metric_required_stress_energy_tensor",
+        role: "definition",
+        displayLatex: "T^{geom}_{ab}=G_{ab}/(8\\pi)",
+        computableExpression: null,
+        operatorKind: "tensor_component",
+        inputSymbols: ["G_ab"],
+        outputSymbols: ["T_geom_ab"],
+      },
+    ],
+    units: [
+      { symbol: "G_ab", quantity: "einstein_tensor", dimensionSignature: "L^-2" },
+      { symbol: "T_geom_ab", unit: "geometric_units", quantity: "metric_required_stress_energy", dimensionSignature: "L^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Metric-required tensor authority is not source-side mechanism authority.",
+      "The Einstein-tensor route is repository-internal metric evaluation context.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "einstein-tensor-route", "Geometry-first tensor route."),
+      equationMapRef("einstein_tensor_source", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "tensor", "einstein_tensor", "metric_required_source", "same_chart"],
+      symbols: ["G_ab", "T_geom_ab"],
+      unitSignatures: ["L^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["metric_required_source", "einstein_tensor_route"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.tensor.tile_effective_counterpart",
+    title: "Tile-Effective Tensor Counterpart",
+    plainMeaning:
+      "Represents the source-side tile-effective tensor requirement in the same chart, basis, region mask, and normalization convention.",
+    whyItMatters:
+      "It prevents a mechanism-side Casimir narrative from being mistaken for the tensor counterpart required by the metric route.",
+    subjects: ["nhm2", "tensor", "tile_effective_counterpart", "source_side", "same_basis"],
+    level: "diagnostic_gate",
+    status: "review",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["tile_effective_counterpart", "source_side_tensor_requirement"],
+    tags: ["tile_effective", "source_side", "review_gated", "same_basis"],
+    equations: [
+      {
+        id: "tile_effective_tensor_requirement",
+        role: "gate",
+        displayLatex:
+          "T^{tile\\_eff}_{ab}\\;\\mathrm{requires}\\;sourceSide\\land sameBasis\\land regionMask\\land componentAuthority",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["sourceSide", "sameBasis", "regionMask", "componentAuthority"],
+        outputSymbols: ["T_tile_eff_ab"],
+      },
+    ],
+    units: [
+      { symbol: "T_tile_eff_ab", unit: "geometric_units", quantity: "tile_effective_stress_energy", dimensionSignature: "L^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Tile-effective counterpart evidence must be source-side and same-basis.",
+      "A mechanism-side source model is not the tensor counterpart by itself.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "source-side-full-tensor-counterpart", "Source-side tensor counterpart section."),
+      equationMapRef("tile_effective_tensor", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "tensor", "tile_effective_counterpart", "source_side", "same_basis"],
+      symbols: ["T_tile_eff_ab", "sourceSide", "sameBasis", "regionMask", "componentAuthority"],
+      unitSignatures: ["L^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["tile_effective_counterpart", "source_side_tensor_requirement"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.closure.same_basis_regional_residual",
+    title: "Same-Basis Regional Tensor Residual",
+    plainMeaning: "Compares metric-required and tile-effective tensors only after same-basis regional alignment.",
+    whyItMatters:
+      "It names the central full-solve divergence surface without implying the source-to-geometry bridge is complete.",
+    subjects: ["nhm2", "closure_residual", "same_basis", "regional_closure", "tensor"],
+    level: "diagnostic_gate",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["same_basis_regional_closure", "tensor_residual"],
+    tags: ["regional_residual", "same_basis", "review_gated", "tensor_comparison"],
+    equations: [
+      {
+        id: "same_basis_tensor_residual",
+        role: "residual",
+        displayLatex: "\\Delta T_{ab}=T^{geom}_{ab}-T^{tile\\_eff}_{ab}",
+        computableExpression: null,
+        operatorKind: "residual",
+        inputSymbols: ["T_geom_ab", "T_tile_eff_ab"],
+        outputSymbols: ["Delta_T_ab"],
+      },
+      {
+        id: "regional_tensor_residual_aggregate",
+        role: "residual",
+        displayLatex: "\\|\\Delta T\\|_R=\\mathrm{aggregate}_R(\\Delta T_{ab})",
+        computableExpression: null,
+        operatorKind: "region_aggregate",
+        inputSymbols: ["Delta_T_ab", "R"],
+        outputSymbols: ["Delta_T_norm_R"],
+      },
+    ],
+    units: [
+      { symbol: "Delta_T_ab", unit: "geometric_units", quantity: "tensor_residual", dimensionSignature: "L^-2" },
+      { symbol: "Delta_T_norm_R", unit: "geometric_units", quantity: "regional_tensor_residual", dimensionSignature: "L^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Residual comparison requires same chart, basis, region mask, aggregation mode, and normalization.",
+      "Small or incomplete residuals are diagnostic comparisons, not source closure completion.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "same-basis-closure", "Regional closure discussion."),
+      equationMapRef("same_basis_closure", "Same-basis closure node."),
+      equationMapRef("regional_source_closure", "Regional closure node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "closure_residual", "same_basis", "regional_closure", "tensor"],
+      symbols: ["Delta_T_ab", "Delta_T_norm_R", "T_geom_ab", "T_tile_eff_ab", "R"],
+      unitSignatures: ["L^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["same_basis_regional_closure", "tensor_residual"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.energy_condition.wec_nec_sec_dec_family",
+    title: "Observer-Family Energy-Condition Surface",
+    plainMeaning: "Collects WEC, NEC, SEC, and DEC as observer-family diagnostics over the projected tensor.",
+    whyItMatters:
+      "It prevents a single scalar or favorable slice from being treated as clearance for the whole observer-family surface.",
+    subjects: ["nhm2", "energy_conditions", "observer_family", "wec", "nec", "sec", "dec"],
+    level: "diagnostic_gate",
+    status: "review",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["energy_condition_family", "observer_projection"],
+    tags: ["wec", "nec", "sec", "dec", "observer_family", "review_gated"],
+    equations: [
+      {
+        id: "energy_condition_family_gate",
+        role: "gate",
+        displayLatex: "\\mathrm{EC}_{family}=\\{WEC,NEC,SEC,DEC\\}_{observer\\ family}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["E", "J_i", "S_ij", "observer_family"],
+        outputSymbols: ["EC_family_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Energy-condition status is observer-family evidence, not a binary pass.",
+      "A projected scalar does not clear all observer-family conditions.",
+      "Missing momentum or spatial-stress authority blocks promotion-sensitive language.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "observer-energy-condition-gates", "Whitepaper observer gate section."),
+      equationMapRef("energy_condition_family", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "energy_conditions", "observer_family", "wec", "nec", "sec", "dec"],
+      symbols: ["E", "J_i", "S_ij", "observer_family", "EC_family_status"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["energy_condition_family", "observer_projection"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.qei.worldline_sampling_requirement",
+    title: "QEI Worldline Sampling Requirement",
+    plainMeaning: "Records the weighted worldline stress-energy sampling requirement for a QEI dossier.",
+    whyItMatters:
+      "It keeps QEI discussion tied to an explicit sampling requirement instead of treating literature context as repository completion.",
+    subjects: ["nhm2", "qei", "worldline_sampling", "stress_energy", "blocked"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["qei_worldline_sampling", "stress_energy_sampling"],
+    tags: ["qei", "worldline_integral", "blocked", "dossier_requirement"],
+    equations: [
+      {
+        id: "qei_worldline_stress_energy_sampling",
+        role: "constraint",
+        displayLatex: "\\int f(\\tau)T_{\\mu\\nu}u^\\mu u^\\nu d\\tau",
+        computableExpression: null,
+        operatorKind: "worldline_integral",
+        inputSymbols: ["f_tau", "T_mu_nu", "u^mu", "tau"],
+        outputSymbols: ["qei_worldline_sample"],
+      },
+    ],
+    units: [
+      { symbol: "qei_worldline_sample", quantity: "weighted_stress_energy_integral", dimensionSignature: "M L^-1 T^-1" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "This is a dossier requirement, not a completed QEI comparison.",
+      "QEI literature constrains the route but does not complete repository evidence.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "qei-reproducibility-limits", "QEI blocker context."),
+      equationMapRef("qei_sampling_requirement", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "qei", "worldline_sampling", "stress_energy", "blocked"],
+      symbols: ["f_tau", "T_mu_nu", "u^mu", "tau", "qei_worldline_sample"],
+      unitSignatures: ["M L^-1 T^-1"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["qei_worldline_sampling", "stress_energy_sampling"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.clock.centerline_tau_alpha_T",
+    title: "Centerline Clocking Target",
+    plainMeaning: "Computes the selected-profile centerline proper-time target from lapse and coordinate duration.",
+    whyItMatters:
+      "It makes the whitepaper clocking relation calculator-loadable while blocking route, speed, and ETA interpretations.",
+    subjects: ["nhm2", "clocking", "centerline", "lapse", "proper_time"],
+    level: "derived_relation",
+    status: "diagnostic",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["centerline_clocking_target", "lapse_shift_profile"],
+    tags: ["clocking_target", "calculator_loadable", "claim_boundary"],
+    equations: [
+      {
+        id: "centerline_clocking_target",
+        role: "calculator_demo",
+        displayLatex: "\\tau=\\alpha_{centerline}T",
+        computableExpression: "tau = alpha_centerline*T_coordinate",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["alpha_centerline", "T_coordinate"],
+        outputSymbols: ["tau"],
+      },
+    ],
+    units: [
+      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
+      { symbol: "T_coordinate", unit: "s", quantity: "coordinate_duration", dimensionSignature: "T" },
+      { symbol: "tau", unit: "s", quantity: "proper_time_target", dimensionSignature: "T" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "This is a selected-profile clocking-law target under frozen coordinate schedule assumptions.",
+      "It is not a speed, route ETA, or full-loop certified pass.",
+      "Lower-alpha profiles require their own repository-measured full-loop artifacts.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "centerline_clocking_target_payload",
+        expression: "tau = alpha_centerline*T_coordinate",
+        displayLatex: "\\tau=\\alpha_{centerline}T",
+        targetVariable: "tau",
+      }),
+    ],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "centerline-lapse-clocking", "Selected centerline clocking relation."),
+      equationMapRef("alpha_lapse", "Lapse observable node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "clocking", "centerline", "lapse", "proper_time"],
+      symbols: ["alpha_centerline", "T_coordinate", "tau"],
+      unitSignatures: ["1", "T"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["centerline_clocking_target", "lapse_shift_profile"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.artifact.frozen_reference_run_provenance",
+    title: "Frozen Reference-Run Provenance",
+    plainMeaning: "Names the run, hash, grid, seed, ledger, and convergence evidence needed to interpret full-solve artifacts.",
+    whyItMatters:
+      "It keeps figure and solver outputs attached to reproducible artifact governance instead of answer-like summaries.",
+    subjects: ["nhm2", "artifact_governance", "reference_run", "convergence", "reproducibility"],
+    level: "diagnostic_gate",
+    status: "review",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["reference_run_provenance", "convergence_reproducibility"],
+    tags: ["reference_run", "provenance", "hash", "convergence", "review_gated"],
+    equations: [
+      {
+        id: "frozen_reference_run_provenance",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{referenceRun}=\\mathrm{hashes}+\\mathrm{grid}+\\mathrm{seed}+\\mathrm{artifactLedger}+\\mathrm{convergence}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["hashes", "grid", "seed", "artifactLedger", "convergence"],
+        outputSymbols: ["referenceRun"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Figures are not acceptance evidence unless source run, hashes, and convergence status are auditable.",
+      "Artifact governance reports status and blockers; it cannot promote physical mechanism claims.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_OBSERVABLE_FIGURE_PLAN, "convergence-reproducibility", "Figure-plan reproducibility surface."),
+      artifactRef(NHM2_FULL_SOLVE_REFERENCE_CAPSULE, "full-solve-reference-capsule", "Reference capsule status."),
+      docRef(NHM2_PROOF_ANCHOR_INDEX, "proof-anchor-index", "Proof anchor and regeneration command index."),
+      equationMapRef("convergence_reproducibility", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "artifact_governance", "reference_run", "convergence", "reproducibility"],
+      symbols: ["referenceRun", "hashes", "grid", "seed", "artifactLedger", "convergence"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_OBSERVABLE_FIGURE_PLAN,
+        NHM2_FULL_SOLVE_REFERENCE_CAPSULE,
+        NHM2_PROOF_ANCHOR_INDEX,
+        NHM2_OBSERVABLE_EQUATION_MAP,
+      ],
+      equationFamilies: ["reference_run_provenance", "convergence_reproducibility"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.shift_not_ship_speed",
+    title: "Shift Is Not Ship Speed Boundary",
+    plainMeaning: "Blocks treating the chart-dependent shift field as ordinary vehicle velocity.",
+    whyItMatters: "It protects NHM2 prompts from turning geometry bookkeeping into route or transport claims.",
+    subjects: ["nhm2", "claim_boundary", "shift", "speed_boundary", "geometry"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["nhm2_claim_boundary"],
+    tags: ["claim_boundary", "shift_boundary", "blocks_promotion"],
+    equations: [
+      {
+        id: "shift_not_speed_boundary",
+        role: "noncomputable_reference",
+        displayLatex: "\\beta^i\\neq v_{ordinary}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["beta_i"],
+        outputSymbols: ["shift_speed_boundary"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Shift is a chart-dependent transport descriptor, not ordinary ship speed.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "local-transport-descriptor-not-speed", "Shift boundary discussion."),
+      equationMapRef("beta_shift", "Shift observable node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "shift", "speed_boundary", "geometry"],
+      symbols: ["beta_i", "shift_speed_boundary"],
+      unitSignatures: ["L T^-1"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["nhm2_claim_boundary"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
+    title: "Diagonal Proxy Is Not Full Tensor Boundary",
+    plainMeaning: "Blocks treating diagonal stress-energy bookkeeping as full observer tensor authority.",
+    whyItMatters:
+      "It forces momentum-density and spatial-stress channels back into the trace before any observer-family interpretation.",
+    subjects: ["nhm2", "claim_boundary", "diagonal_proxy", "full_tensor", "observer"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["nhm2_claim_boundary", "observer_projection"],
+    tags: ["claim_boundary", "diagonal_proxy_boundary", "blocks_promotion"],
+    equations: [
+      {
+        id: "diagonal_proxy_not_full_tensor",
+        role: "noncomputable_reference",
+        displayLatex: "T_{00}^{proxy}\\not\\Rightarrow\\{E,J_i,S_{ij}\\}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T00_proxy"],
+        outputSymbols: ["full_tensor_boundary"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Diagonal T00 or diagonal tensor proxy is not full observer tensor authority.",
+      "Full observer interpretation requires same-chart E, J_i, and S_ij projection authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "why-diagonal-only-was-insufficient", "Diagonal-only limitation."),
+      equationMapRef("momentum_density", "Momentum projection boundary."),
+      equationMapRef("spatial_stress", "Spatial-stress projection boundary."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "diagonal_proxy", "full_tensor", "observer"],
+      symbols: ["T00_proxy", "E", "J_i", "S_ij", "full_tensor_boundary"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["nhm2_claim_boundary", "observer_projection"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.expected_clocking_not_route_result",
+    title: "Clocking Target Is Not Route Result Boundary",
+    plainMeaning: "Blocks treating the centerline lapse clocking target as a route result, ETA, or transport certification.",
+    whyItMatters:
+      "It keeps tau = alpha T in its proper role as a selected-profile timing calculation under frozen schedule assumptions.",
+    subjects: ["nhm2", "claim_boundary", "clocking", "route_boundary", "proper_time"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["nhm2_claim_boundary", "centerline_clocking_target"],
+    tags: ["claim_boundary", "clocking_boundary", "blocks_promotion"],
+    equations: [
+      {
+        id: "clocking_target_not_route_result",
+        role: "noncomputable_reference",
+        displayLatex: "\\tau=\\alpha T\\not\\Rightarrow\\mathrm{routeResult}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["tau", "alpha", "T"],
+        outputSymbols: ["clocking_route_boundary"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "tau = alpha T is a clocking target, not a route result or ETA.",
+      "Lower-alpha rows remain targets until their own repository-measured artifacts pass.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "centerline-lapse-clocking", "Clocking target boundary."),
+      equationMapRef("alpha_lapse", "Lapse observable node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "clocking", "route_boundary", "proper_time"],
+      symbols: ["tau", "alpha", "T", "clocking_route_boundary"],
+      unitSignatures: ["1", "T"],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["nhm2_claim_boundary", "centerline_clocking_target"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.literature_not_validation",
+    title: "Literature Is Context Boundary",
+    plainMeaning: "Blocks external papers from being treated as NHM2 artifact validation.",
+    whyItMatters:
+      "It preserves the whitepaper rule that papers provide formalism, constraints, and caution while repository artifacts define NHM2 row status.",
+    subjects: ["nhm2", "claim_boundary", "literature", "validation_boundary", "provenance"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["nhm2_claim_boundary", "literature_context"],
+    tags: ["claim_boundary", "literature_boundary", "blocks_promotion"],
+    equations: [
+      {
+        id: "literature_context_not_validation",
+        role: "noncomputable_reference",
+        displayLatex: "\\mathrm{literature}=\\mathrm{formalism/context/limits}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["literature_context"],
+        outputSymbols: ["literature_boundary"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "External literature supplies formalism, context, and limitations, not NHM2 validation.",
+      "Repository artifacts define pass, review, blocked, and unsupported status.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "why-literature-context-is-not-validation", "Literature role boundary."),
+      docRef(NHM2_OBSERVABLE_FIGURE_PLAN, "claim-boundary", "Observable figure claim boundary."),
+      equationMapRef("claim_locks", "Claim-lock node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "literature", "validation_boundary", "provenance"],
+      symbols: ["literature_context", "literature_boundary"],
+      unitSignatures: [],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_FIGURE_PLAN, NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["nhm2_claim_boundary", "literature_context"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+];
+
+export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
+  {
+    id: "adm_specializes_eulerian_normal",
+    from: "physics.gr.3p1_decomposition",
+    to: "nhm2.observer.eulerian_normal",
+    relation: "specializes",
+    label: "The 3+1 lapse-shift grammar defines the Eulerian normal observer field.",
+    claimBoundaryNote: "Observer bookkeeping is same-chart geometry, not transport validation.",
+  },
+  {
+    id: "efe_specializes_metric_required_tensor",
+    from: "physics.gr.einstein_field_equation",
+    to: "nhm2.tensor.metric_required_stress_energy",
+    relation: "specializes",
+    label: "The Einstein equation supplies the metric-required stress-energy route in geometric units.",
+    claimBoundaryNote: "Metric-required tensor authority is not a source-side mechanism claim.",
+  },
+  {
+    id: "eulerian_normal_requires_energy_projection",
+    from: "nhm2.observer.eulerian_normal",
+    to: "nhm2.observer.energy_density_projection",
+    relation: "requires",
+    label: "Observer energy density requires the declared Eulerian normal.",
+    claimBoundaryNote: "Projection evidence remains observer-family diagnostic context.",
+  },
+  {
+    id: "metric_tensor_requires_observer_energy",
+    from: "nhm2.tensor.metric_required_stress_energy",
+    to: "nhm2.observer.energy_density_projection",
+    relation: "requires",
+    label: "Metric-required tensor components feed observer energy-density projection.",
+    claimBoundaryNote: "Projected E is not energy-condition clearance.",
+  },
+  {
+    id: "metric_tensor_requires_momentum_projection",
+    from: "nhm2.tensor.metric_required_stress_energy",
+    to: "nhm2.observer.momentum_density_projection",
+    relation: "requires",
+    label: "Full observer authority requires momentum-density channels.",
+    claimBoundaryNote: "Diagonal-only evidence blocks promotion-sensitive language.",
+  },
+  {
+    id: "metric_tensor_requires_spatial_stress_projection",
+    from: "nhm2.tensor.metric_required_stress_energy",
+    to: "nhm2.observer.spatial_stress_projection",
+    relation: "requires",
+    label: "Full observer authority requires spatial-stress channels.",
+    claimBoundaryNote: "Off-diagonal authority remains review-gated unless evidenced.",
+  },
+  {
+    id: "tile_counterpart_checks_same_basis_closure",
+    from: "nhm2.tensor.tile_effective_counterpart",
+    to: "nhm2.closure.same_basis_regional_residual",
+    relation: "diagnostic_checks",
+    label: "The source-side counterpart is compared against the metric-required tensor only in the same basis.",
+    claimBoundaryNote: "Unavailable or review-gated counterpart data blocks mechanism language.",
+  },
+  {
+    id: "metric_tensor_checks_same_basis_closure",
+    from: "nhm2.tensor.metric_required_stress_energy",
+    to: "nhm2.closure.same_basis_regional_residual",
+    relation: "diagnostic_checks",
+    label: "The metric-required tensor is one side of the same-basis residual.",
+    claimBoundaryNote: "Restating the metric-required route is not source-side closure.",
+  },
+  {
+    id: "observer_energy_requires_energy_condition_family",
+    from: "nhm2.observer.energy_density_projection",
+    to: "nhm2.energy_condition.wec_nec_sec_dec_family",
+    relation: "requires",
+    label: "Observer energy-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote: "A scalar projection does not clear the energy-condition family.",
+  },
+  {
+    id: "observer_momentum_requires_energy_condition_family",
+    from: "nhm2.observer.momentum_density_projection",
+    to: "nhm2.energy_condition.wec_nec_sec_dec_family",
+    relation: "requires",
+    label: "Observer momentum-density projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote: "Momentum authority remains part of the observer-family surface.",
+  },
+  {
+    id: "observer_spatial_stress_requires_energy_condition_family",
+    from: "nhm2.observer.spatial_stress_projection",
+    to: "nhm2.energy_condition.wec_nec_sec_dec_family",
+    relation: "requires",
+    label: "Observer spatial-stress projection contributes to WEC/NEC/SEC/DEC diagnostics.",
+    claimBoundaryNote: "Spatial-stress authority remains part of the observer-family surface.",
+  },
+  {
+    id: "energy_condition_family_bounds_qei_worldline",
+    from: "nhm2.energy_condition.wec_nec_sec_dec_family",
+    to: "nhm2.qei.worldline_sampling_requirement",
+    relation: "bounds",
+    label: "Observer-family energy-condition diagnostics are constrained by QEI-style worldline sampling requirements.",
+    claimBoundaryNote: "Observer diagnostics and QEI sampling remain separate review surfaces.",
+  },
+  {
+    id: "same_basis_closure_blocks_diagonal_proxy_boundary",
+    from: "nhm2.closure.same_basis_regional_residual",
+    to: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
+    relation: "blocks",
+    label: "Closure remains blocked when tensor authority is partial, diagonal-only, or review-gated.",
+    claimBoundaryNote: "No source-closure completion language is allowed.",
+  },
+  {
+    id: "shift_profile_blocks_speed_boundary",
+    from: "nhm2.geometry.lapse_shift_profile",
+    to: "nhm2.claim_boundary.shift_not_ship_speed",
+    relation: "blocks",
+    label: "Lapse-shift profile rows must not be interpreted as ordinary vehicle velocity.",
+    claimBoundaryNote: "Shift is chart-dependent geometry context.",
+  },
+  {
+    id: "clock_target_blocks_route_language",
+    from: "nhm2.clock.centerline_tau_alpha_T",
+    to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+    relation: "blocks",
+    label: "Centerline clocking targets must not be promoted into route results.",
+    claimBoundaryNote: "No speed, ETA, or full-loop pass claim is allowed.",
+  },
+  {
+    id: "qei_worldline_blocks_literature_boundary",
+    from: "nhm2.qei.worldline_sampling_requirement",
+    to: "nhm2.claim_boundary.literature_not_validation",
+    relation: "blocks",
+    label: "QEI literature constrains the route but does not complete the repository dossier.",
+    claimBoundaryNote: "No QEI completion or external-validation claim is allowed.",
+  },
+  {
+    id: "full_solve_boundary_documents_nhm2_diagnostic_boundary",
+    from: "nhm2.artifact.frozen_reference_run_provenance",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "documents",
+    label: "Frozen-run provenance documents which rows are diagnostic, review, blocked, or unsupported.",
+    claimBoundaryNote: "Artifact governance cannot promote a physical mechanism claim by itself.",
+  },
+  {
+    id: "literature_boundary_documents_claim_locks",
+    from: "nhm2.claim_boundary.literature_not_validation",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "documents",
+    label: "The literature boundary documents the broader NHM2 diagnostic-only claim lock.",
+    claimBoundaryNote: "Formalism context never substitutes for repository artifact status.",
+  },
+];
+
+export function buildNhm2FullSolveTheoryBadgesV1(): {
+  badges: TheoryBadgeV1[];
+  edges: TheoryBadgeEdgeV1[];
+} {
+  return {
+    badges: NHM2_FULL_SOLVE_THEORY_BADGES.map((badge: TheoryBadgeV1) => ({ ...badge })),
+    edges: NHM2_FULL_SOLVE_THEORY_EDGES.map((edge: TheoryBadgeEdgeV1) => ({ ...edge })),
+  };
+}

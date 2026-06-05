@@ -171,6 +171,34 @@ const hasPendingToolWork = (payload: RecordLike): boolean => {
   return /\b(?:pending|running|started|in_progress|polling)\b/i.test(statusText);
 };
 
+const runtimeLoopHasCompletedToolObservation = (payload: RecordLike): boolean => {
+  const loop = readRecord(payload.agent_runtime_loop);
+  const iterations = Array.isArray(loop?.iterations) ? loop.iterations.map(readRecord).filter(Boolean) : [];
+  return iterations.some((iteration) => {
+    const observation = readRecord(iteration?.tool_observation);
+    return (
+      readString(observation?.status) === "completed" ||
+      readString(iteration?.stop_reason) === "answer" ||
+      (readString(iteration?.next_step) === "answer" && readString(iteration?.chosen_capability))
+    );
+  });
+};
+
+const hasCompletedToolEvidence = (payload: RecordLike, executedCapability: string | null): boolean => {
+  if (!executedCapability) return false;
+  if (readRecord(payload.workstation_tool_evaluation)) return true;
+  if (runtimeLoopHasCompletedToolObservation(payload)) return true;
+  return artifactLedger(payload).some((artifact) => {
+    const kind = readString(artifact.kind);
+    const payloadRecord = artifactPayload(artifact);
+    const schema = readString(payloadRecord?.schema);
+    const payloadKind = readString(payloadRecord?.kind);
+    return /tool_result|tool_receipt|tool_evaluation|workstation_tool_evaluation|receipt|evaluation/i.test(
+      [kind, schema, payloadKind].filter(Boolean).join(" "),
+    );
+  });
+};
+
 const isExternalChangeFailure = (failureReason: string | null): boolean =>
   Boolean(failureReason && /\b(?:server|backend|port|listener|connection|connect|fetch|econnrefused|timeout|timed out|unavailable|exited|stale process|restart)\b/i.test(failureReason));
 
@@ -193,6 +221,9 @@ const lifecycleFromPayload = (input: {
   if (resultStatus === "failed") return { stage: "failed", status: "failed" };
   if (input.failureReason && isExternalChangeFailure(input.failureReason)) return { stage: "failed", status: "failed" };
   if (readBoolean(input.result?.reentered_solver)) return { stage: "reentered_solver", status: "completed" };
+  if (hasCompletedToolEvidence(input.payload, input.executedCapability)) {
+    return { stage: "reentered_solver", status: "completed" };
+  }
   if (resultStatus === "succeeded" || resultStatus === "partial" || resultStatus === "not_run") {
     return { stage: "completed", status: resultStatus === "not_run" ? "blocked" : "completed" };
   }

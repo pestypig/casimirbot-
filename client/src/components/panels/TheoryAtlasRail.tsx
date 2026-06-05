@@ -6,10 +6,12 @@ export type TheoryAtlasLensId = PhysicsAtlasBlockId;
 
 const blockColors: Record<PhysicsAtlasBlockId, string> = {
   stellar_evolution: "bg-fuchsia-700",
+  astrochemistry_prebiotic: "bg-lime-700",
   cosmic_distance_ladder: "bg-amber-600",
   solar_surface_spectrum: "bg-yellow-500",
   casimir_cavity_modes: "bg-cyan-500",
   warp_gr_nhm2: "bg-violet-600",
+  nhm2_full_solve: "bg-indigo-600",
   qei_stress_energy: "bg-slate-500",
   tokamak_plasma: "bg-orange-500",
   galactic_dynamics: "bg-sky-500",

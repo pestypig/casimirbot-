@@ -219,4 +219,39 @@ describe("theory context reflector", () => {
     expect(isTheoryContextReflectionV1(reflection)).toBe(true);
     expect(reflection.overlay.softRegion).toBeNull();
   });
+
+  it("does not score generic route words as theory evidence", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Reflect fairness through entropy in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:no-route-word-noise",
+    });
+    const reasons = [...reflection.exactMatches, ...reflection.likelyMatches]
+      .flatMap((match) => match.reasons)
+      .join("\n");
+
+    expect(reasons).toMatch(/entropy/i);
+    expect(reasons).not.toMatch(/\btext match:.*\b(?:do|treat|physics|theory|badge|graph|proof)\b/i);
+  });
+
+  it("prioritizes requested physics concepts over atlas-neighborhood noise for Theory/Zen bridge prompts", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Reflect fairness and due process through entropy, conservation, and self-organization in the Theory Badge Graph and ZenGraph. Keep it evidence-only and do not treat physics as moral proof.",
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:bridge-focus-ranking",
+    });
+    const topBadgeIds = reflection.exactMatches.slice(0, 3).map((match) => match.badgeId);
+
+    expect(topBadgeIds).toContain("biophysics.membrane.open_system_entropy_flow");
+    expect(topBadgeIds).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/conservation/),
+      ]),
+    );
+    expect(topBadgeIds.join(" ")).not.toMatch(/astrochemistry|spectroscopy|pah|fullerene/i);
+  });
 });

@@ -222,6 +222,34 @@ describe("buildTheoryIdeologyBridgeFromReflections", () => {
     expect(bridge.links[0].reasonCodes).toContain("theory_counterpart_unverified");
   });
 
+  it("marks only a specific theory counterpart missing when theory reflection exists", () => {
+    const bridge = buildTheoryIdeologyBridgeFromReflections({
+      generatedAt,
+      bridgeId: "theory-ideology-bridge:missing-counterpart",
+      prompt: "Use due process and jurisdiction boundaries with ZenGraph.",
+      theoryReflection: baseTheoryReflection(
+        "observation provenance falsifiability",
+        "theory.observation-evidence",
+        "Observation Evidence",
+      ),
+      ideologyReflection: baseIdeologyReflection(
+        "fairness-due-process-and-justification",
+        "Fairness, Due Process, and Justification",
+      ),
+    });
+
+    expect(validateTheoryIdeologyBridgeV1(bridge)).toEqual([]);
+    expect(bridge.sourceTheoryReflectionId).toBe("theory-context-reflection:test");
+    expect(bridge.missingEvidence).not.toContain("theory_context_reflection");
+    expect(bridge.missingEvidence).toContain("theory_counterpart:jurisdiction+boundary-conditions");
+    expect(
+      bridge.links.some((link) =>
+        link.reasonCodes.includes("theory_counterpart_unverified") &&
+        link.missingEvidence?.includes("theory_counterpart:jurisdiction+boundary-conditions"),
+      ),
+    ).toBe(true);
+  });
+
   it("does not invent links when no mapping evidence is present", () => {
     const bridge = buildTheoryIdeologyBridgeFromReflections({
       generatedAt,

@@ -53,10 +53,12 @@ type TheoryAchievementMapProps = {
 
 const ATLAS_GLOW_COLORS: Record<PhysicsAtlasBlockId, string> = {
   stellar_evolution: "rgba(192, 38, 211, 0.72)",
+  astrochemistry_prebiotic: "rgba(77, 124, 15, 0.72)",
   cosmic_distance_ladder: "rgba(217, 119, 6, 0.72)",
   solar_surface_spectrum: "rgba(234, 179, 8, 0.76)",
   casimir_cavity_modes: "rgba(6, 182, 212, 0.72)",
   warp_gr_nhm2: "rgba(124, 58, 237, 0.72)",
+  nhm2_full_solve: "rgba(79, 70, 229, 0.72)",
   qei_stress_energy: "rgba(148, 163, 184, 0.72)",
   tokamak_plasma: "rgba(249, 115, 22, 0.72)",
   galactic_dynamics: "rgba(14, 165, 233, 0.72)",

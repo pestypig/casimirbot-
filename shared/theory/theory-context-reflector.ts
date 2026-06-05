@@ -312,6 +312,111 @@ function summaryText(args: {
   return "The discussion did not produce a strong theory badge location. No final answer is implied.";
 }
 
+const THEORY_IDEOLOGY_BRIDGE_THEORY_CUE =
+  /\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|observable\s+physics|mathematics|entropy|conservation|self[-\s]?organization|chemistry|first\s+principles|boundary\s+conditions?|feedback\s+loops?|symmetry|invariance)\b/i;
+
+const THEORY_IDEOLOGY_BRIDGE_ZEN_CUE =
+  /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i;
+
+const BRIDGE_FOCUS_GROUPS = [
+  {
+    label: "entropy",
+    lookupQuery: "entropy irreversibility open_system_entropy",
+    promptPattern: /\b(?:entropy|drift|irreversibility|impermanence)\b/i,
+    evidencePattern: /\b(?:entropy|drift|irreversibility|impermanence|open_system_entropy)\b/i,
+  },
+  {
+    label: "conservation",
+    lookupQuery: "conservation stress_energy_conservation energy_momentum_conservation",
+    promptPattern: /\b(?:conservation|stress[-_\s]?energy\s+conservation)\b/i,
+    evidencePattern: /\b(?:conservation|stress[-_\s]?energy\s+conservation|energy[-_\s]?momentum\s+conservation)\b/i,
+  },
+  {
+    label: "self-organization",
+    lookupQuery: "self organization feedback non_equilibrium open_system",
+    promptPattern: /\b(?:self[-_\s]?organization|self[-_\s]?organizing|feedback\s+loops?)\b/i,
+    evidencePattern: /\b(?:self[-_\s]?organization|self[-_\s]?organizing|feedback\s+loops?|open_system|non_equilibrium)\b/i,
+  },
+  {
+    label: "observation",
+    lookupQuery: "observation measurement provenance falsifiability",
+    promptPattern: /\b(?:observation|measurement|provenance|falsifiability|testable|source\s+refs?)\b/i,
+    evidencePattern: /\b(?:observation|measurement|provenance|falsifiability|testable|observational_proxy)\b/i,
+  },
+  {
+    label: "boundary conditions",
+    lookupQuery: "boundary conditions boundary_condition error_budget",
+    promptPattern: /\b(?:boundary\s+conditions?|jurisdiction|contestability)\b/i,
+    evidencePattern: /\b(?:boundary\s+conditions?|boundary_condition|error_budget|jurisdiction|contestability)\b/i,
+  },
+  {
+    label: "symmetry",
+    lookupQuery: "symmetry invariance unit dimension energy_momentum",
+    promptPattern: /\b(?:symmetry|invariance|equal[-_\s]?condition|unit|dimension)\b/i,
+    evidencePattern: /\b(?:symmetry|invariance|unit|dimension|energy[-_\s]?momentum)\b/i,
+  },
+] as const;
+
+function isTheoryIdeologyBridgePrompt(query: string): boolean {
+  return THEORY_IDEOLOGY_BRIDGE_THEORY_CUE.test(query) && THEORY_IDEOLOGY_BRIDGE_ZEN_CUE.test(query);
+}
+
+function requestedBridgeFocusGroups(query: string): Array<(typeof BRIDGE_FOCUS_GROUPS)[number]> {
+  return BRIDGE_FOCUS_GROUPS.filter((group) => group.promptPattern.test(query));
+}
+
+function bridgeFocusEvidenceText(match: TheoryBadgeLookupMatch): string {
+  const directReasons = match.reasons.filter((reason) =>
+    !/direct atlas primary badge|inside selected atlas lens|via atlas block|source path hint via atlas block|calculator example expression\/symbol match/i.test(
+      reason,
+    ),
+  );
+  return [
+    match.badgeId,
+    match.badgeTitle,
+    ...match.matchedSubjects,
+    ...match.matchedEquationFamilies,
+    ...match.matchedSymbols,
+    ...directReasons,
+  ].join(" ");
+}
+
+function bridgeFocusScore(match: TheoryBadgeLookupMatch, focusGroups: Array<(typeof BRIDGE_FOCUS_GROUPS)[number]>): number {
+  if (focusGroups.length === 0) return 0;
+  const evidenceText = bridgeFocusEvidenceText(match);
+  const matchedFocusGroups = focusGroups.filter((group) => group.evidencePattern.test(evidenceText));
+  if (matchedFocusGroups.length === 0) return 0;
+  const directReasonCount = match.reasons.filter((reason) =>
+    /subject\/tag match|equation family match|symbol match|calculator payload match|text match/i.test(reason),
+  ).length;
+  return matchedFocusGroups.length * 100 + Math.min(40, directReasonCount * 10);
+}
+
+function prioritizeTheoryIdeologyBridgeMatches(args: {
+  query: string;
+  matches: TheoryBadgeLookupMatch[];
+}): TheoryBadgeLookupMatch[] {
+  if (!isTheoryIdeologyBridgePrompt(args.query)) return args.matches;
+  const focusGroups = requestedBridgeFocusGroups(args.query);
+  if (focusGroups.length === 0) return args.matches;
+  return [...args.matches].sort((left, right) => {
+    const focusDelta = bridgeFocusScore(right, focusGroups) - bridgeFocusScore(left, focusGroups);
+    if (focusDelta !== 0) return focusDelta;
+    return right.score - left.score || left.badgeId.localeCompare(right.badgeId);
+  });
+}
+
+function mergeTheoryLookupMatches(matches: TheoryBadgeLookupMatch[]): TheoryBadgeLookupMatch[] {
+  const byBadgeId = new Map<string, TheoryBadgeLookupMatch>();
+  for (const match of matches) {
+    const existing = byBadgeId.get(match.badgeId);
+    if (!existing || match.score > existing.score) {
+      byBadgeId.set(match.badgeId, match);
+    }
+  }
+  return Array.from(byBadgeId.values());
+}
+
 export function buildTheoryContextReflection(
   args: BuildTheoryContextReflectionInput,
 ): TheoryContextReflectionV1 {
@@ -323,6 +428,7 @@ export function buildTheoryContextReflection(
   const mentionedEquations = args.mentionedEquations ?? [];
   const mentionedSymbols = args.mentionedSymbols ?? [];
   const mentionedDomains = args.mentionedDomains ?? [];
+  const bridgePrompt = isTheoryIdeologyBridgePrompt(query);
   const atlasBlockIds = inferAtlasBlockIds({
     atlasBlocks: atlas.blocks,
     mentionedDomains,
@@ -330,19 +436,35 @@ export function buildTheoryContextReflection(
   });
   const equationFamilies = inferEquationFamilies(args.graph, query, mentionedEquations);
   const simulationOwners = inferSimulationOwners(args.graph, query, mentionedDomains);
+  const lookupLimit = bridgePrompt ? Math.max(limit, 40) : limit;
+  const bridgeFocusGroups = bridgePrompt ? requestedBridgeFocusGroups(query) : [];
 
-  const locatedMatches = locateTheoryBadges({
-    graph: args.graph,
-    input: {
-      query,
-      symbols: mentionedSymbols,
-      subjects: mentionedDomains,
-      equationFamilies,
-      simulationOwners,
-      atlasBlockIds,
-      limit,
-    },
-  });
+  const locatedMatches = prioritizeTheoryIdeologyBridgeMatches({
+    query,
+    matches: mergeTheoryLookupMatches([
+      ...locateTheoryBadges({
+        graph: args.graph,
+        input: {
+          query,
+          symbols: mentionedSymbols,
+          subjects: mentionedDomains,
+          equationFamilies,
+          simulationOwners,
+          atlasBlockIds,
+          limit: lookupLimit,
+        },
+      }),
+      ...bridgeFocusGroups.flatMap((group) =>
+        locateTheoryBadges({
+          graph: args.graph,
+          input: {
+            query: group.lookupQuery,
+            limit: 8,
+          },
+        }),
+      ),
+    ]),
+  }).slice(0, limit);
 
   const exactLookupMatches = locatedMatches.filter(isExactMatch);
   const likelyLookupMatches =

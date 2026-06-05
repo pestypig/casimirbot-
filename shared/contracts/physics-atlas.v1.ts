@@ -8,6 +8,7 @@ export const PHYSICS_ATLAS_BLOCK_IDS = [
   "solar_surface_spectrum",
   "casimir_cavity_modes",
   "warp_gr_nhm2",
+  "nhm2_full_solve",
   "qei_stress_energy",
   "tokamak_plasma",
   "galactic_dynamics",

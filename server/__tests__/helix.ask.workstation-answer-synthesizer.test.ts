@@ -177,7 +177,7 @@ describe("Helix Ask workstation answer synthesizer", () => {
                 "Use conservation and boundary language as a constraint metaphor, not as final authority.",
             },
           ],
-          missingEvidence: ["theory_context_reflection", "jurisdiction_context"],
+          missingEvidence: ["theory_counterpart:jurisdiction+boundary-conditions", "jurisdiction_context"],
         },
       },
     });
@@ -187,7 +187,8 @@ describe("Helix Ask workstation answer synthesizer", () => {
     );
     expect(answer).toContain("Bridge links:");
     expect(answer).toContain("- constrains: Require revision triggers and uncertainty-aware next steps.");
-    expect(answer).toContain("Missing checks: theory_context_reflection, jurisdiction_context.");
+    expect(answer).toContain("Missing checks: theory counterpart for jurisdiction + boundary conditions, jurisdiction context.");
+    expect(answer).not.toContain("Missing checks: theory_context_reflection");
     expect(answer).toContain(
       "Boundary: physics, conservation, entropy, and self-organization can constrain how we reason about fairness, but they do not prove moral certainty or authorize execution.",
     );

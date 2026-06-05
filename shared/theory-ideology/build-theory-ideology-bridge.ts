@@ -84,6 +84,9 @@ function collectTheoryEntries(reflection: TheoryContextReflectionV1 | null | und
   if (!reflection) return [];
   const entries: EvidenceEntry[] = [];
   for (const match of [...reflection.exactMatches, ...reflection.likelyMatches]) {
+    const semanticReasons = match.reasons.filter((reason) =>
+      !/^(?:source path hint|text match|inside selected atlas lens|direct atlas primary badge)\b/i.test(reason),
+    );
     entries.push({
       id: match.badgeId,
       label: match.title,
@@ -91,7 +94,7 @@ function collectTheoryEntries(reflection: TheoryContextReflectionV1 | null | und
       text: [
         match.badgeId,
         match.title,
-        ...match.reasons,
+        ...semanticReasons,
         ...match.matchedSymbols,
         ...match.matchedEquationFamilies,
         ...match.matchedRepoPaths,
@@ -218,11 +221,21 @@ function sourceEvidenceRefs(input: BuildTheoryIdeologyBridgeInput): string[] {
 function linkMissingEvidence(
   theoryMatches: readonly EvidenceEntry[],
   ideologyMatches: readonly EvidenceEntry[],
+  mapping: TheoryIdeologyBridgeMapping,
+  input: BuildTheoryIdeologyBridgeInput,
   ideologyReflection: IdeologyContextReflectionV1,
 ): string[] {
+  const theoryMissing = theoryMatches.length === 0
+    ? input.theoryReflection
+      ? [`theory_counterpart:${mapping.theoryHints.slice(0, 2).map(slug).filter(Boolean).join("+") || "unverified"}`]
+      : ["theory_context_reflection"]
+    : [];
+  const ideologyMissing = ideologyMatches.length === 0
+    ? [`ideology_counterpart:${slug(mapping.ideologyNodeIds[0] ?? "unverified")}`]
+    : [];
   return unique([
-    ...(theoryMatches.length === 0 ? ["theory_context_reflection"] : []),
-    ...(ideologyMatches.length === 0 ? ["ideology_context_reflection"] : []),
+    ...theoryMissing,
+    ...ideologyMissing,
     ...(ideologyReflection.claim_boundaries.missing_evidence ?? []),
   ]);
 }
@@ -256,7 +269,7 @@ function makeLink(
   );
   const theoryLabels = unique(theoryMatches.map((entry) => entry.label));
   const ideologyLabels = unique(ideologyMatches.map((entry) => entry.label));
-  const missingEvidence = linkMissingEvidence(theoryMatches, ideologyMatches, input.ideologyReflection);
+  const missingEvidence = linkMissingEvidence(theoryMatches, ideologyMatches, mapping, input, input.ideologyReflection);
   return {
     id: `bridge:${index + 1}:${slug(mapping.relation)}:${slug(theoryIds[0] ?? "theory")}:to:${slug(
       ideologyIds[0] ?? "ideology",
@@ -308,7 +321,7 @@ function buildRecommendedActions(
     actions.push({
       id: "bridge-action:ask-for-missing-evidence",
       type: "ask_for_missing_evidence",
-      label: "Ask for the missing evidence listed by the bridge.",
+      label: "Ask for the missing counterpart evidence listed by the bridge.",
       reasonCodes: ["missing_evidence", "claim_boundary_guard"],
     });
   }

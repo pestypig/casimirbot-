@@ -56,9 +56,49 @@ describe("Helix Ask theory reflection route", () => {
         "helix_ask.bridge_theory_ideology_context",
       ]),
     );
+    const topTheoryBadgeIds =
+      body?.theory_context_reflection_tool_receipt?.reflectionV1?.exactMatches
+        ?.slice(0, 3)
+        ?.map((match: { badgeId?: string }) => match.badgeId) ?? [];
+    expect(topTheoryBadgeIds).toEqual(
+      expect.arrayContaining([
+        "biophysics.membrane.open_system_entropy_flow",
+        expect.stringMatching(/conservation/),
+      ]),
+    );
+    expect(topTheoryBadgeIds.join(" ")).not.toMatch(/astrochemistry|spectroscopy|pah|fullerene/i);
     expect(answer).toMatch(/physics|conservation|entropy|self-organization/i);
     expect(answer).toMatch(/do not prove moral certainty|moral certainty|moral proof/i);
     expect(answer).toMatch(/procedural|evidence-only|missing checks/i);
+    expect(answer).not.toMatch(/Missing checks:\s*theory_context_reflection/i);
+    expect(answer).toMatch(/theory counterpart/i);
+
+    const debugResponse = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(body?.turn_id))}/debug-export`)
+      .expect(200);
+    const debugPayload = debugResponse.body?.payload;
+    expect(debugPayload?.solver_controller_summary).toEqual(
+      expect.objectContaining({
+        decision: "allow_terminal",
+        route_authority_ok: true,
+        terminal_authority_route: "theory_ideology_bridge_reflection",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+      }),
+    );
+    expect(debugPayload?.tool_lifecycle_trace).toEqual(
+      expect.objectContaining({
+        requested_capability: "helix_ask.bridge_theory_ideology_context",
+        executed_capability: "helix_ask.bridge_theory_ideology_context",
+        lifecycle_stage: "reentered_solver",
+        status: "completed",
+      }),
+    );
+    expect(debugPayload?.tool_followup_decision).toEqual(
+      expect.objectContaining({
+        evidence_reentered: true,
+        next_action: "terminal_answer",
+      }),
+    );
   });
 
   it("streams explicit Theory Graph plus ZenGraph bridge prompts through bridge receipts", async () => {

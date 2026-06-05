@@ -18,6 +18,14 @@ describe("helix theory badge graph composer", () => {
       "astrochemistry.claim_boundary.spectral_identification_only",
     );
     expect(helixGraph.badges.map((badge: TheoryBadgeV1) => badge.id)).toEqual(
+      expect.arrayContaining([
+        "nhm2.observer.eulerian_normal",
+        "nhm2.tensor.metric_required_stress_energy",
+        "nhm2.closure.same_basis_regional_residual",
+        "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
+      ]),
+    );
+    expect(helixGraph.badges.map((badge: TheoryBadgeV1) => badge.id)).toEqual(
       legacyGraph.badges.map((badge: TheoryBadgeV1) => badge.id),
     );
     expect(helixGraph.edges.map((edge: TheoryBadgeEdgeV1) => edge.id)).toEqual(

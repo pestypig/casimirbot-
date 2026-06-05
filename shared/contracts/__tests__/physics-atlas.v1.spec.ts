@@ -15,7 +15,7 @@ describe("physics_atlas/v1", () => {
     expect(validatePhysicsAtlasV1(atlas)).toEqual([]);
     expect(isPhysicsAtlasV1(atlas)).toBe(true);
     expect(atlas.blocks.map((block: PhysicsAtlasBlockV1) => block.id)).toEqual([...PHYSICS_ATLAS_BLOCK_IDS]);
-    expect(atlas.summary.blockCount).toBe(10);
+    expect(atlas.summary.blockCount).toBe(11);
     expect(atlas.summary.activeCount).toBeGreaterThanOrEqual(3);
   });
 

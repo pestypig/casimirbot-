@@ -54,6 +54,7 @@ let shouldStopReadAloudOnButtonPress: typeof import("@/components/helix/HelixAsk
 let formatReadAloudButtonLabel: typeof import("@/components/helix/HelixAskPill").formatReadAloudButtonLabel;
 let buildManualReadAloudVoiceIntent: typeof import("@/components/helix/HelixAskPill").buildManualReadAloudVoiceIntent;
 let mapVoicePlaybackIntentToTask: typeof import("@/components/helix/HelixAskPill").mapVoicePlaybackIntentToTask;
+let collectInterimVoiceCalloutPlaybackIntents: typeof import("@/components/helix/HelixAskPill").collectInterimVoiceCalloutPlaybackIntents;
 let normalizeVoiceCommandLaneEnvelope: typeof import("@/components/helix/HelixAskPill").normalizeVoiceCommandLaneEnvelope;
 let resolveReasoningAttemptTimelineText: typeof import("@/components/helix/HelixAskPill").resolveReasoningAttemptTimelineText;
 let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill").describeVoiceCommandAction;
@@ -146,6 +147,7 @@ beforeAll(async () => {
     formatReadAloudButtonLabel,
     buildManualReadAloudVoiceIntent,
     mapVoicePlaybackIntentToTask,
+    collectInterimVoiceCalloutPlaybackIntents,
     normalizeVoiceCommandLaneEnvelope,
     resolveReasoningAttemptTimelineText,
     describeVoiceCommandAction,
@@ -1390,6 +1392,158 @@ describe("HelixAskPill mic helper behavior", () => {
       replyId: "reply-2",
       allowMicOffPlayback: true,
     });
+  });
+
+  const interimVoiceToolResult = (overrides: {
+    kind?: string;
+    text?: string;
+    turnId?: string;
+    requestId?: string;
+    receiptId?: string;
+    utteranceId?: string;
+    status?: string;
+    requestAuthority?: Partial<Record<string, unknown>>;
+    receiptAuthority?: Partial<Record<string, unknown>>;
+  } = {}) => ({
+    schema: "helix.interim_voice_callout_tool_result.v1",
+    request: {
+      artifactId: "helix_interim_voice_callout_request",
+      requestId: overrides.requestId ?? "request:interim:1",
+      turnId: overrides.turnId ?? "turn:interim:1",
+      kind: overrides.kind ?? "immediate_ack",
+      text: overrides.text ?? "Okay, I will check that now.",
+      voicePlaybackKind: overrides.kind === "translation_relay" ? "translation_relay" : "tool_receipt",
+      authority: "provisional",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      ...overrides.requestAuthority,
+    },
+    receipt: {
+      artifactId: "helix_interim_voice_callout_receipt",
+      receiptId: overrides.receiptId ?? "receipt:interim:1",
+      requestId: overrides.requestId ?? "request:interim:1",
+      status: overrides.status ?? "queued",
+      delivery: {
+        utteranceId: overrides.utteranceId ?? "utterance:interim:1",
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      ...overrides.receiptAuthority,
+    },
+    post_tool_model_step_required: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  });
+
+  it("maps queued immediate ack receipts into provisional tool-receipt playback", () => {
+    const intents = collectInterimVoiceCalloutPlaybackIntents({
+      artifacts: [
+        {
+          debug: {
+            nested: interimVoiceToolResult({
+              text: "Okay, I will look into this.",
+              turnId: "turn:voice:1",
+              receiptId: "receipt:voice:ack",
+              utteranceId: "utterance:voice:ack",
+            }),
+          },
+        },
+      ],
+    });
+
+    expect(intents).toHaveLength(1);
+    expect(intents[0]).toMatchObject({
+      kind: "tool_receipt",
+      authority: "provisional",
+      source: "agent_loop",
+      turnKey: "turn:voice:1",
+      traceId: "turn:voice:1",
+      eventId: "receipt:voice:ack",
+      receiptKey: "utterance:voice:ack",
+      calloutKind: "immediate_ack",
+      text: "Okay, I will look into this.",
+    });
+    expect(mapVoicePlaybackIntentToTask(intents[0]!)).toMatchObject({
+      kind: "tool_receipt",
+      authority: "provisional",
+      source: "agent_loop",
+      turnKey: "turn:voice:1",
+      eventId: "receipt:voice:ack",
+    });
+  });
+
+  it("dedupes duplicate immediate ack receipts while allowing later progress receipts", () => {
+    const intents = collectInterimVoiceCalloutPlaybackIntents({
+      artifacts: [
+        interimVoiceToolResult({
+          turnId: "turn:voice:dedupe",
+          receiptId: "receipt:ack:1",
+          utteranceId: "utterance:ack:1",
+          kind: "immediate_ack",
+        }),
+        interimVoiceToolResult({
+          turnId: "turn:voice:dedupe",
+          receiptId: "receipt:ack:2",
+          utteranceId: "utterance:ack:2",
+          kind: "immediate_ack",
+          text: "Still starting.",
+        }),
+        interimVoiceToolResult({
+          turnId: "turn:voice:dedupe",
+          requestId: "request:progress:1",
+          receiptId: "receipt:progress:1",
+          utteranceId: "utterance:progress:1",
+          kind: "tool_progress",
+          text: "I found the live-source mailbox and I am checking it.",
+        }),
+      ],
+    });
+
+    expect(intents.map((intent) => intent.calloutKind)).toEqual(["immediate_ack", "tool_progress"]);
+    expect(intents.map((intent) => intent.receiptId)).toEqual(["receipt:ack:1", "receipt:progress:1"]);
+  });
+
+  it("ignores already spoken receipts and unsafe terminal-authority receipts", () => {
+    const intents = collectInterimVoiceCalloutPlaybackIntents({
+      spokenReceiptKeys: ["utterance:already"],
+      spokenImmediateAckTurnKeys: ["turn:ack:already"],
+      artifacts: [
+        interimVoiceToolResult({
+          turnId: "turn:ack:already",
+          receiptId: "receipt:ack:already",
+          utteranceId: "utterance:ack:already",
+          kind: "immediate_ack",
+        }),
+        interimVoiceToolResult({
+          receiptId: "receipt:already",
+          utteranceId: "utterance:already",
+          kind: "tool_progress",
+        }),
+        interimVoiceToolResult({
+          requestId: "request:unsafe",
+          receiptId: "receipt:unsafe",
+          utteranceId: "utterance:unsafe",
+          kind: "tool_progress",
+          requestAuthority: {
+            assistant_answer: true,
+          },
+        }),
+        interimVoiceToolResult({
+          requestId: "request:terminal",
+          receiptId: "receipt:terminal",
+          utteranceId: "utterance:terminal",
+          kind: "tool_progress",
+          receiptAuthority: {
+            terminal_eligible: true,
+          },
+        }),
+      ],
+    });
+
+    expect(intents).toEqual([]);
   });
 
   it("parses close-this-panel phrasing into close_active_panel action", () => {

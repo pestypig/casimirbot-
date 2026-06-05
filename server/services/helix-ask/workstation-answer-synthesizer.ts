@@ -320,6 +320,21 @@ function synthesizeTheoryIdeologyBridgeAnswer(
     ? bridge.missingEvidence.map(String)
     : [];
 
+  const formatMissingEvidence = (entry: string): string => {
+    const normalized = entry.trim();
+    if (normalized === "theory_context_reflection") return "theory reflection receipt";
+    if (normalized === "ideology_context_reflection") return "Zen reflection receipt";
+    const theoryCounterpart = normalized.match(/^theory_counterpart:(.+)$/i)?.[1];
+    if (theoryCounterpart) {
+      return `theory counterpart for ${theoryCounterpart.split("+").map((part) => part.replace(/-/g, " ")).join(" + ")}`;
+    }
+    const ideologyCounterpart = normalized.match(/^ideology_counterpart:(.+)$/i)?.[1];
+    if (ideologyCounterpart) {
+      return `Zen counterpart for ${ideologyCounterpart.split("+").map((part) => part.replace(/-/g, " ")).join(" + ")}`;
+    }
+    return normalized.replace(/_/g, " ");
+  };
+
   const renderedLinks = links
     .map((entry) => (entry && typeof entry === "object" ? entry as Record<string, unknown> : null))
     .filter(Boolean)
@@ -338,7 +353,7 @@ function synthesizeTheoryIdeologyBridgeAnswer(
       ? ["Bridge links:", ...renderedLinks].join("\n")
       : "Bridge links: the bridge receipt did not expose named links, so the safe posture is to preserve uncertainty and ask for missing evidence.",
     missingEvidence.length
-      ? `Missing checks: ${missingEvidence.join(", ")}.`
+      ? `Missing checks: ${missingEvidence.map(formatMissingEvidence).join(", ")}.`
       : "Missing checks: none reported by the bridge receipt.",
     "Boundary: physics, conservation, entropy, and self-organization can constrain how we reason about fairness, but they do not prove moral certainty or authorize execution.",
     "Procedural posture: use the bridge to ask better questions, calibrate claim strength, preserve contestability, and route high-impact uncertainty toward review.",

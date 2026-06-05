@@ -448,6 +448,55 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toMatch(/\bno\s+(?:mail|live-source\s+updates?)\s+(?:was|were)?\s*(?:available|found)\b/i);
   }, 30_000);
 
+  it("lets hard live-source mailbox watch setup supersede unrelated pending user input", async () => {
+    const app = createApp();
+    const sessionId = `${threadId}:pending-supersede`;
+
+    const pending = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "open the panel",
+        mode: "read",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+    expect(pending.body?.pending_server_request, JSON.stringify(pending.body, null, 2)).toBeTruthy();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Watch the active visual source and describe each new mail batch in one sentence.",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      admission: response.body?.agent_runtime_loop_admission,
+      answer: response.body?.answer,
+      pending: response.body?.pending_server_request,
+      stalePending: response.body?.stale_pending_server_request,
+      mailbox: response.body?.stage_play_live_source_mailbox_debug,
+    }, null, 2);
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_configure_live_source_watch_job");
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("clarify:missing_args");
+    expect(response.body?.pending_server_request ?? null, routeDebug).toBeNull();
+    expect(response.body?.agent_runtime_loop_admission?.admitted, routeDebug).toBe(true);
+    expect(response.body?.agent_runtime_loop_admission?.reason, routeDebug).not.toBe("pending_user_input");
+    expect(chosenCapabilities, routeDebug).toContain("live_env.configure_live_source_watch_job");
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      capability: "live_env.configure_live_source_watch_job",
+      executed_capabilities_seen: expect.arrayContaining(["live_env.configure_live_source_watch_job"]),
+    });
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).not.toMatch(/active_doc_path|missing artifact|Provide the missing artifact/i);
+  }, 30_000);
+
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {
     startVisualSnapshotSource({
       source_id: sourceId,
