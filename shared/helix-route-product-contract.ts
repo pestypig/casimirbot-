@@ -13,6 +13,7 @@ export type HelixRouteProductSourceTarget =
   | "runtime_evidence"
   | "live_pipeline"
   | "live_environment"
+  | "live_source_mailbox"
   | "situation_epoch"
   | "visual_scene_memory"
   | "process_graph"

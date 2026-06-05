@@ -16,6 +16,10 @@ import {
   isStagePlayJobPlanningPrompt,
   isStagePlayReflectionPrompt,
 } from "./stage-play-prompt-intent";
+import {
+  isLiveSourceCadenceControlPrompt,
+  isLiveSourceMailLoopPrompt,
+} from "./live-source-continuation-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -198,6 +202,32 @@ export function buildAskEvidenceTargetArbitration(input: {
       terminalProductConstraints: ["live_environment_tool_observation", "model_synthesized_answer", "typed_failure"],
       disallowed: stagePlayNegative,
       disallowedReason: stagePlayNegative ? "negative_stage_play_scope" : null,
+    }));
+  }
+
+  if (!contextualSuppression && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+    promptIntentCandidates.push("live_source_mailbox");
+    candidates.push(makeCandidate({
+      candidateId: "live_source_mailbox.mail_loop",
+      targetSource: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
+      strength: "hard",
+      score: 0.98,
+      reasonCodes: ["live_source_mail_loop_intent", "requires_live_source_mailbox_tool_observation"],
+      requestedOutputs: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_read_result",
+        "stage_play_live_source_mail_decision",
+        "typed_failure",
+      ],
+      capabilityKeys: ["live_env.read_live_source_mail", "live_env.record_live_source_mail_decision"],
+      terminalProductConstraints: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_read_result",
+        "stage_play_live_source_mail_decision",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
     }));
   }
 

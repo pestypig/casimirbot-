@@ -161,9 +161,9 @@ export function buildMailLoopTranscriptRows(input: {
       rowId: `ask_turn_mail_read_tool_call:${hashShort(input.readResult.readId)}`,
       rowKind: "mail_read_tool_call",
       title: "Tool call",
-      body: "live_env.check_live_source_mail",
+      body: "live_env.read_live_source_mail",
       source: {
-        toolName: "live_env.check_live_source_mail",
+        toolName: "live_env.read_live_source_mail",
         artifactId: input.readResult.readId,
         artifactKind: input.readResult.artifactId,
       },
@@ -181,7 +181,7 @@ export function buildMailLoopTranscriptRows(input: {
         ? `${input.readResult.items.length} unread live-source mail item(s).`
         : "No unread live-source updates. Standing by for the next source update.",
       source: {
-        toolName: "live_env.check_live_source_mail",
+        toolName: "live_env.read_live_source_mail",
         artifactId: input.readResult.readId,
         artifactKind: input.readResult.artifactId,
       },

@@ -8,6 +8,7 @@ import {
   listUnreadStagePlayLiveSourceMailItems,
 } from "./stage-play-live-source-mailbox-store";
 import {
+  MAX_MAIL_IDS_PER_WAKE_BATCH,
   listRunnableStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeCompleted,
@@ -49,14 +50,16 @@ const defaultAskBaseUrl = (): string =>
 
 const buildWakePrompt = (wake: StagePlayLiveSourceMailWakeRequestV1): string =>
   [
-    "Read the active live-source mailbox and decide what to do with the latest unread source update.",
+    "Read the active live-source mailbox and decide what to do with this unread source update batch.",
     "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
     "Read only the mail refs listed below for this wake request; do not widen to newer mailbox items in this turn.",
+    "Treat the listed mail refs as one chronological observation window from the same live source.",
     "If there is no user-facing change, record wait_for_next_summary.",
     "If there is a meaningful user-facing change, draft a concise text answer.",
     "If voice is allowed and the update is urgent, request a voice callout.",
     "",
     `Wake request: ${wake.wakeRequestId}`,
+    `Batch size: ${wake.mailIds.length}`,
     `Mail refs: ${wake.mailIds.join(", ")}`,
     `Source refs: ${wake.sourceIds.join(", ")}`,
   ].join("\n");
@@ -161,18 +164,39 @@ export function queueMailWakeForUnreadItems(input: {
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     sourceId: input.sourceId ?? null,
-    limit: Math.min(input.limit ?? 1, 1),
+    limit: Math.max(MAX_MAIL_IDS_PER_WAKE_BATCH, input.limit ?? MAX_MAIL_IDS_PER_WAKE_BATCH),
   });
-  if (unread.length === 0) return null;
+  const activeWakeMailIds = new Set(
+    listStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: activeJob?.jobId ?? null,
+      limit: 250,
+    })
+      .filter((wake) =>
+        wake.status === "queued" ||
+        wake.status === "running" ||
+        wake.status === "failed_retryable" ||
+        wake.status === "deferred_for_pressure"
+      )
+      .flatMap((wake) => wake.mailIds),
+  );
+  const unclaimed = unread.filter((item) => !activeWakeMailIds.has(item.mailId));
+  if (unclaimed.length === 0) return null;
+  const oldestSourceId = unclaimed[0].sourceId;
+  const batchLimit = Math.max(1, Math.min(input.limit ?? MAX_MAIL_IDS_PER_WAKE_BATCH, MAX_MAIL_IDS_PER_WAKE_BATCH));
+  const batch = unclaimed.filter((item) => item.sourceId === oldestSourceId).slice(0, batchLimit);
+  if (batch.length === 0) return null;
   return queueStagePlayLiveSourceMailWakeRequest({
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     jobId: activeJob?.jobId ?? null,
-    mailIds: unread.map((item) => item.mailId),
-    sourceIds: unread.map((item) => item.sourceId),
+    mailIds: batch.map((item) => item.mailId),
+    sourceIds: batch.map((item) => item.sourceId),
     reason: "unread_mail",
-    evidenceRefs: unread.flatMap((item: StagePlayLiveSourceMailItemV1) => item.evidenceRefs),
+    evidenceRefs: batch.flatMap((item: StagePlayLiveSourceMailItemV1) => item.evidenceRefs),
     now: input.now,
   });
 }

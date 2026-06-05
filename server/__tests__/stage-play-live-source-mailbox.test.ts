@@ -643,10 +643,90 @@ describe("Stage Play live-source mailbox", () => {
     expect(duplicate.mailId).toBe(first.mailId);
     expect(changed.mailId).not.toBe(first.mailId);
     expect(listStagePlayLiveSourceMailItems({ threadId })).toHaveLength(2);
-    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toHaveLength(2);
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+    expect(wakeRequests).toHaveLength(1);
+    expect(wakeRequests[0].mailIds).toEqual([first.mailId, changed.mailId]);
     expect(listStagePlayLiveSourceMailItems({ threadId, status: "unread" }).map((item) => item.mailId)).toEqual([
       first.mailId,
       changed.mailId,
+    ]);
+  });
+
+  it("batches unread mail from the same live source into one chronological wake", () => {
+    const first = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:batch-first",
+      evidenceRef: "visual_evidence:batch-first",
+      summaryText: "First compact visual summary.",
+      createdAt: "2026-06-04T12:00:04.000Z",
+    });
+    const second = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:batch-second",
+      evidenceRef: "visual_evidence:batch-second",
+      summaryText: "Second compact visual summary.",
+      createdAt: "2026-06-04T12:00:05.000Z",
+    });
+    const third = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:batch-third",
+      evidenceRef: "visual_evidence:batch-third",
+      summaryText: "Third compact visual summary.",
+      createdAt: "2026-06-04T12:00:06.000Z",
+    });
+
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+    expect(wakeRequests).toHaveLength(1);
+    expect(wakeRequests[0]).toMatchObject({
+      status: "queued",
+      sourceIds: [sourceId],
+      mailIds: [first.mailId, second.mailId, third.mailId],
+    });
+    expect(wakeRequests[0].evidenceRefs).toEqual(expect.arrayContaining([
+      first.mailId,
+      second.mailId,
+      third.mailId,
+      "visual_evidence:batch-first",
+      "visual_evidence:batch-second",
+      "visual_evidence:batch-third",
+    ]));
+  });
+
+  it("keeps different live sources in separate wake batches", () => {
+    const visualMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId: "visual_source:batch-visual",
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:batch-visual",
+      evidenceRef: "visual_evidence:batch-visual",
+      summaryText: "Visual source compact summary.",
+      createdAt: "2026-06-04T12:00:04.000Z",
+    });
+    const screenMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId: "screen_source:batch-screen",
+      sourceKind: "screen_summary",
+      observationRef: "screen_observation:batch-screen",
+      summaryText: "Screen source compact summary.",
+      createdAt: "2026-06-04T12:00:05.000Z",
+    });
+
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+    expect(wakeRequests).toHaveLength(2);
+    expect(wakeRequests.map((wake) => wake.mailIds)).toEqual([
+      [visualMail.mailId],
+      [screenMail.mailId],
     ]);
   });
 

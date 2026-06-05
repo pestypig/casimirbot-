@@ -14,6 +14,7 @@ import {
 const wakeById = new Map<string, StagePlayLiveSourceMailWakeRequestV1>();
 const resultById = new Map<string, StagePlayLiveSourceMailWakeResultV1>();
 const MAX_WAKE_REQUESTS_PER_THREAD = 250;
+export const MAX_MAIL_IDS_PER_WAKE_BATCH = 12;
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -66,7 +67,42 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     ACTIVE_WAKE_STATUSES.has(wake.status)
   );
   if (existing) return existing;
+  const queuedSameSource = sourceIds.length > 0
+    ? Array.from(wakeById.values()).find((wake) =>
+        wake.threadId === input.threadId &&
+        wake.roomId === (input.roomId ?? null) &&
+        wake.environmentId === (input.environmentId ?? null) &&
+        wake.jobId === (input.jobId ?? null) &&
+        wake.reason === (input.reason ?? "unread_mail") &&
+        wake.status === "queued" &&
+        sortedKey(wake.sourceIds) === sortedKey(sourceIds) &&
+        wake.mailIds.length < MAX_MAIL_IDS_PER_WAKE_BATCH
+      )
+    : null;
+  if (queuedSameSource) {
+    const remaining = Math.max(0, MAX_MAIL_IDS_PER_WAKE_BATCH - queuedSameSource.mailIds.length);
+    const appendMailIds = mailIds.filter((mailId) => !queuedSameSource.mailIds.includes(mailId)).slice(0, remaining);
+    if (appendMailIds.length > 0) {
+      const now = input.now ?? new Date().toISOString();
+      const merged: StagePlayLiveSourceMailWakeRequestV1 = {
+        ...queuedSameSource,
+        mailIds: uniqueStrings([...queuedSameSource.mailIds, ...appendMailIds]),
+        sourceIds: uniqueStrings([...queuedSameSource.sourceIds, ...sourceIds]),
+        evidenceRefs: uniqueStrings([
+          ...queuedSameSource.evidenceRefs,
+          ...appendMailIds,
+          ...sourceIds,
+          ...(input.evidenceRefs ?? []),
+        ]),
+        updatedAt: now,
+      };
+      wakeById.set(merged.wakeRequestId, merged);
+      return merged;
+    }
+    return queuedSameSource;
+  }
   const now = input.now ?? new Date().toISOString();
+  const boundedMailIds = mailIds.slice(0, MAX_MAIL_IDS_PER_WAKE_BATCH);
   const wake: StagePlayLiveSourceMailWakeRequestV1 = {
     artifactId: "stage_play_live_source_mail_wake_request",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA,
@@ -75,14 +111,14 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
       input.roomId ?? null,
       input.environmentId ?? null,
       input.jobId ?? null,
-      mailIds,
+      boundedMailIds,
       now,
     ])}`,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     jobId: input.jobId ?? null,
-    mailIds,
+    mailIds: boundedMailIds,
     sourceIds,
     reason: input.reason ?? "unread_mail",
     status: "queued",
@@ -92,7 +128,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     lastAttemptAt: null,
     nextRetryAt: null,
     failureReason: null,
-    evidenceRefs: uniqueStrings([...mailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
+    evidenceRefs: uniqueStrings([...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
     queuedAt: now,
     updatedAt: now,
     assistant_answer: false,

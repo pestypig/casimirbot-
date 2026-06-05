@@ -28,6 +28,9 @@ import {
   buildAstrochemistryPrebioticTheoryBadgesV1,
 } from "./astrochemistry-prebiotic-theory-badges";
 import {
+  buildStellarSpectroscopyAstrochemistryTheoryBadgesV1,
+} from "./stellar-spectroscopy-astrochemistry-theory-badges";
+import {
   buildCasimirCavityTheoryBadgesV1,
 } from "./casimir-cavity-theory-badges";
 import {
@@ -766,6 +769,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const solar = buildSolarSpectrumTheoryBadgesV1();
   const solarStellar = buildSolarStellarReferenceTheoryBadgesV1();
   const astroPrebiotic = buildAstrochemistryPrebioticTheoryBadgesV1();
+  const stellarSpectroscopy = buildStellarSpectroscopyAstrochemistryTheoryBadgesV1();
   const casimir = buildCasimirCavityTheoryBadgesV1();
   const tokamak = buildTokamakPlasmaTheoryBadgesV1();
   const galactic = buildGalacticDynamicsTheoryBadgesV1();
@@ -777,7 +781,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, astrochemistry/prebiotic, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, and claim boundaries for NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
     badges: [
       ...FIRST_PRINCIPLES_THEORY_BADGES,
       ...badges,
@@ -786,6 +790,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...solar.badges,
       ...solarStellar.badges,
       ...astroPrebiotic.badges,
+      ...stellarSpectroscopy.badges,
       ...casimir.badges,
       ...tokamak.badges,
       ...galactic.badges,
@@ -801,6 +806,7 @@ export function buildNhm2TheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...solar.edges,
       ...solarStellar.edges,
       ...astroPrebiotic.edges,
+      ...stellarSpectroscopy.edges,
       ...casimir.edges,
       ...tokamak.edges,
       ...galactic.edges,

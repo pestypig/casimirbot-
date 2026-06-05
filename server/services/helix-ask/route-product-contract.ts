@@ -118,6 +118,7 @@ const normalizeSourceTarget = (
     sourceTarget === "docs_viewer" ||
     sourceTarget === "live_pipeline" ||
     sourceTarget === "live_environment" ||
+    sourceTarget === "live_source_mailbox" ||
     sourceTarget === "active_note" ||
     sourceTarget === "calculator_stream" ||
     sourceTarget === "repo_code" ||
@@ -481,11 +482,11 @@ export function buildRouteProductContract(input: {
     });
   }
 
-  if (sourceTarget === "live_environment") {
+  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") {
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,
-      sourceTarget: "live_environment",
+      sourceTarget,
       allowedCore: ["live_environment_tool_observation"],
       allowedExtra: ["direct_answer_text", "model_synthesized_answer", "turn_final_text", "tool_receipt", "source_binding_status", "source_binding_repair_candidate"],
       forbiddenExtra: [
@@ -508,7 +509,9 @@ export function buildRouteProductContract(input: {
         "stage_play_output_lane_projection",
         "live_answer_environment_delta",
       ],
-      precedenceReason: "live_environment_source_target_requires_tool_observation_then_model_synthesis",
+      precedenceReason: sourceTarget === "live_source_mailbox"
+        ? "live_source_mailbox_requires_mail_read_then_decision"
+        : "live_environment_source_target_requires_tool_observation_then_model_synthesis",
     });
   }
 

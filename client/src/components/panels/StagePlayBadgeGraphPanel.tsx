@@ -42,6 +42,10 @@ import {
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
+import {
+  STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
+  type StagePlayLiveSourceMailWakeTranscriptEventDetail,
+} from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 
@@ -432,6 +436,23 @@ async function runStagePlayLiveSourceMailWake(input: {
     throw new Error(`Stage Play live-source mail wake run failed: ${response.status}`);
   }
   return await response.json();
+}
+
+async function fetchHelixAskTurnDebugPayload(turnId: string): Promise<Record<string, unknown> | null> {
+  const response = await fetch(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) return null;
+  const body = await response.json() as Record<string, unknown>;
+  const payload = body.payload;
+  return payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : body;
+}
+
+function dispatchStagePlayMailWakeTranscript(detail: StagePlayLiveSourceMailWakeTranscriptEventDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, { detail }));
 }
 
 async function fetchStagePlayBuilderContext(input: {
@@ -1123,11 +1144,22 @@ function buildObserverMailLoopNodes(input: {
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
   const unreadCount = mailItems.filter((item) => item.status === "unread").length;
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
-  const queuedWakeCount = wakeRequests.filter((wake) => wake.status === "queued").length;
-  const runningWakeCount = wakeRequests.filter((wake) => wake.status === "running").length;
   const retryWakeCount = wakeRequests.filter((wake) => wake.status === "failed_retryable").length;
   const pressureWakeCount = wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
-  const behindCount = Math.max(0, unreadCount + deliveredCount + queuedWakeCount + retryWakeCount + pressureWakeCount);
+  const queuedWakeMailCount = wakeRequests
+    .filter((wake) => wake.status === "queued")
+    .reduce((total, wake) => total + wake.mailIds.length, 0);
+  const runningWakeMailCount = wakeRequests
+    .filter((wake) => wake.status === "running")
+    .reduce((total, wake) => total + wake.mailIds.length, 0);
+  const retryWakeMailCount = wakeRequests
+    .filter((wake) => wake.status === "failed_retryable")
+    .reduce((total, wake) => total + wake.mailIds.length, 0);
+  const pressureWakeMailCount = wakeRequests
+    .filter((wake) => wake.status === "deferred_for_pressure")
+    .reduce((total, wake) => total + wake.mailIds.length, 0);
+  const wakeBacklogMailCount = queuedWakeMailCount + runningWakeMailCount + retryWakeMailCount + pressureWakeMailCount;
+  const behindCount = Math.max(0, unreadCount + deliveredCount + wakeBacklogMailCount);
   const changedMailCount = mailItems.filter((item) => item.hints.deterministicChangeHint === "summary_changed").length;
   const visibleCheckpointRequest = selectStagePlayVisibleCheckpointRequest(graph);
   const latestPerturbation = (graph.perturbations ?? []).at(-1) ?? null;
@@ -1212,8 +1244,8 @@ function buildObserverMailLoopNodes(input: {
       statusChips: [
         pressureWakeCount > 0 ? "pressure" : null,
         retryWakeCount > 0 ? "retrying" : null,
-        queuedWakeCount > 0 ? `${queuedWakeCount} queued` : null,
-        runningWakeCount > 0 ? `${runningWakeCount} running` : null,
+        queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
+        runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
         latestWake?.askTurnId ? "ask turn" : null,
       ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
@@ -4018,6 +4050,17 @@ export default function StagePlayBadgeGraphPanel() {
       roomId,
       environmentId,
     })
+      .then(async (response) => {
+        const result = response.result;
+        if (!response.ran || !result?.askTurnId) return;
+        const debugPayload = await fetchHelixAskTurnDebugPayload(result.askTurnId).catch(() => null);
+        dispatchStagePlayMailWakeTranscript({
+          askTurnId: result.askTurnId,
+          wakeResult: result,
+          debugPayload,
+          createdAt: result.createdAt,
+        });
+      })
       .catch((error) => {
         console.warn("[StagePlayBadgeGraphPanel] live-source mail wake run failed", error);
       })

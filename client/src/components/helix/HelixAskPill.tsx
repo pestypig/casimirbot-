@@ -64,6 +64,10 @@ import {
   coerceHelixAskLiveEventBusPayload,
 } from "@/lib/helix/liveEventsBus";
 import {
+  STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
+  type StagePlayLiveSourceMailWakeTranscriptEventDetail,
+} from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
+import {
   formatHelixVisibleTerminalSourceLabel,
   resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
   shouldShowHelixRuntimeStopReason,
@@ -6042,6 +6046,7 @@ function isVoiceMemoryPressureError(error: unknown): boolean {
 type HelixAskReply = {
   id: string;
   content: string;
+  createdAtMs?: number;
   text?: string;
   assistant_answer?: string;
   selected_final_answer?: string | null;
@@ -8155,7 +8160,8 @@ type HelixMailLoopTranscriptRowKind =
   | "voice_callout_request"
   | "voice_tool_call"
   | "wait_for_next_summary"
-  | "requested_tool";
+  | "requested_tool"
+  | "loop_state";
 
 const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowKind>([
   "mail_received",
@@ -8167,6 +8173,7 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "voice_tool_call",
   "wait_for_next_summary",
   "requested_tool",
+  "loop_state",
 ]);
 
 type HelixMailLoopTranscriptRow = {
@@ -8294,12 +8301,13 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "text_answer" || row.rowKind === "voice_callout_request") return "Text / Callout draft";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
   if (row.rowKind === "requested_tool") return "Requested tool";
+  if (row.rowKind === "loop_state") return "Loop state";
   return row.title || "Live source mail";
 }
 
 function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
   if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
-  if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary") return "checkpoint";
+  if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
   if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
   if (row.rowKind === "voice_tool_call") return "working";
   return "working";
@@ -15927,6 +15935,7 @@ export function HelixAskPill({
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
   const latestAskReply = askReplies[0] ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
+  const liveSourceMailWakeReplyIdsRef = useRef<Set<string>>(new Set());
   const debugCopyInFlightRef = useRef(false);
   const askReplyListRef = useRef<HTMLDivElement | null>(null);
   const askReplyListBottomRef = useRef<HTMLDivElement | null>(null);
@@ -15976,6 +15985,46 @@ export function HelixAskPill({
       // ZenGraph answer blocks are a debug projection; Ask rendering must not depend on them.
     }
   }, [latestAskReply?.content, latestAskReply?.debug, latestAskReply?.id]);
+  useEffect(() => {
+    const onWakeTranscript = (event: Event) => {
+      const detail = (event as CustomEvent<StagePlayLiveSourceMailWakeTranscriptEventDetail>).detail;
+      if (!detail?.askTurnId || !detail.wakeResult?.wakeResultId) return;
+      const replyId = `live-source-mail-wake:${detail.wakeResult.wakeResultId}`;
+      if (liveSourceMailWakeReplyIdsRef.current.has(replyId)) return;
+      liveSourceMailWakeReplyIdsRef.current.add(replyId);
+      const createdAtMs = Date.parse(detail.createdAt);
+      const debugPayload = {
+        ...(detail.debugPayload ?? {}),
+        createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : Date.now(),
+        live_source_mail_wake_result: detail.wakeResult,
+        live_source_mail_wake_transcript: true,
+      };
+      const mailCount = detail.wakeResult.evidenceRefs.filter((ref) =>
+        /^stage_play_live_source_mail:/i.test(ref),
+      ).length;
+      setAskReplies((prev) =>
+        [
+          {
+            id: replyId,
+            content: "",
+            createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : Date.now(),
+            turn_id: detail.askTurnId,
+            ok: true,
+            final_answer_source: "live_source_mail_wake",
+            terminal_artifact_kind: "tool_receipt",
+            question: `Live-source mail wake${mailCount > 0 ? ` (${mailCount} mail)` : ""}`,
+            debug: debugPayload as HelixAskReply["debug"],
+            sources: detail.wakeResult.evidenceRefs,
+          },
+          ...prev,
+        ].slice(0, 8),
+      );
+    };
+    window.addEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, onWakeTranscript);
+    return () => {
+      window.removeEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, onWakeTranscript);
+    };
+  }, []);
   useEffect(() => {
     return () => {
       if (askImageAttachment?.previewUrl) {

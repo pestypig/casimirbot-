@@ -657,8 +657,8 @@ export function arbitrateAskSourceTarget(input: {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
-      target: "live_environment",
-      targetKind: "live_environment",
+      target: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
       strength: "hard",
       explicitCues: ["live_source_mail_loop"],
       reasons: ["explicit_live_source_mail_loop_source_target"],

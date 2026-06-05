@@ -86,7 +86,7 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "workstation_panel" || sourceTarget === "workspace_action" || sourceTarget === "workstation_state" || /panel_control|workspace_action/i.test(routeText)) {
     return "workstation_tool";
   }
-  if (sourceTarget === "live_environment" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_environment|live_job|dottie/i.test(routeText)) {
+  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_environment|live_source_mailbox|live_job|dottie/i.test(routeText)) {
     return "situation_room";
   }
   if (sourceTarget === "model_only" || sourceTarget === "general_background" || goalKind === "model_only_concept") {

@@ -75,6 +75,7 @@ const classifySourceFamily = (input: {
   }
   if (
     input.sourceTarget === "live_environment" ||
+    input.sourceTarget === "live_source_mailbox" ||
     input.admittedFamilies.includes("live_environment") ||
     /\b(?:stage\s*play|stage_play|reflect_stage_play_context|live\s+interpretation|answer\s+snapshot|checkpoint\s+freshness|narrative_stage_play)\b/.test(prompt)
   ) {
@@ -111,6 +112,9 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
     return "inspect_live_source";
   }
   if (family === "live_environment") {
+    if (/\b(?:live\s*source\s*mailbox|live\s*source\s*mail|source\s*mail|mailbox|visual\s*summary\s*mail|read_live_source_mail)\b/.test(prompt)) {
+      return "read_live_source_mail";
+    }
     if (/\b(?:stage\s*play|stage_play|reflect_stage_play_context|live\s+interpretation|answer\s+snapshot|checkpoint\s+freshness|narrative_stage_play)\b/.test(prompt)) {
       return "reflect_stage_play_context";
     }

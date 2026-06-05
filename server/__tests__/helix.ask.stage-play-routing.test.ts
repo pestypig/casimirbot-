@@ -124,7 +124,8 @@ describe("Helix Ask Stage Play routing", () => {
       ],
     });
 
-    const response = await request(createApp())
+    const app = createApp();
+    const response = await request(app)
       .post("/api/agi/ask/turn")
       .send({
         question: "Watch this visual source and tell me if anything important happens.",
@@ -148,8 +149,8 @@ describe("Helix Ask Stage Play routing", () => {
     });
     expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
     expect(response.body?.source_target_intent, routeDebug).toMatchObject({
-      target_source: "live_environment",
-      target_kind: "live_environment",
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
       must_enter_backend_ask: true,
       allow_client_shortcut: false,
       allow_no_tool_direct: false,
@@ -191,6 +192,22 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).toContain("wait_for_next_summary");
     expect(response.body?.answer, routeDebug).toContain("standing by for the next source update");
     expect(response.body?.answer, routeDebug).not.toContain("one unread live-source mail item requiring a decision");
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body.turn_id)}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+    });
+    expect(debugExport.body?.payload?.evidence_target_arbitration, routeDebug).toMatchObject({
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+    });
+    expect(debugExport.body?.payload?.route_product_contract, routeDebug).toMatchObject({
+      source_target: "live_source_mailbox",
+      precedence_reason: "live_source_mailbox_requires_mail_read_then_decision",
+    });
   }, 30_000);
 
   it("routes explicit live-source mail wake prompts through the mailbox loop", async () => {
@@ -347,8 +364,8 @@ describe("Helix Ask Stage Play routing", () => {
 
     expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
     expect(response.body?.source_target_intent, routeDebug).toMatchObject({
-      target_source: "live_environment",
-      target_kind: "live_environment",
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,
     });
@@ -378,8 +395,8 @@ describe("Helix Ask Stage Play routing", () => {
     });
 
     expect(sourceTarget).toMatchObject({
-      target_source: "live_environment",
-      target_kind: "live_environment",
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
       precedence_reason: "explicit_live_source_mail_loop_source_target",
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,

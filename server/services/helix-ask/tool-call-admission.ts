@@ -33,6 +33,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "process_graph",
   "live_pipeline",
   "live_environment",
+  "live_source_mailbox",
   "world_event",
   "active_note",
   "workspace_panel",
@@ -206,13 +207,15 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenTerminalKinds = ["situation_context_pack", "doc_summary", "active_doc_identity", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept"];
     reason = "live_pipeline_requires_receipt_presentation_path";
-  } else if (sourceTarget === "live_environment") {
+  } else if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") {
     admittedToolFamilies = ["live_environment"];
     extraForbiddenTerminalKinds = isStagePlayLiveEnvironmentPrompt
       ? ["situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "live_pipeline_receipt", "client_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"]
       : ["direct_answer_text", "situation_context_pack", "doc_summary", "active_doc_identity", "live_card_projection", "panel_generated_answer", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "active_doc_identity", "model_only_concept", "no_tool_direct", "panel_generated_answer"];
-    reason = isStagePlayLiveEnvironmentPrompt
+    reason = sourceTarget === "live_source_mailbox"
+      ? "live_source_mailbox_requires_mail_read_then_decision"
+      : isStagePlayLiveEnvironmentPrompt
       ? "stage_play_live_environment_requires_tool_observation_then_model_synthesis"
       : "live_environment_requires_tool_evidence_path";
   } else if (sourceTarget === "world_event") {

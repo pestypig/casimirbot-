@@ -60,6 +60,7 @@ const sourceTargeted = new Set([
   "active_doc",
   "process_graph",
   "live_pipeline",
+  "live_source_mailbox",
   "world_event",
   "active_note",
 ]);
