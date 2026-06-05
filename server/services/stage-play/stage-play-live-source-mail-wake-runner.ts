@@ -278,7 +278,7 @@ export async function runNextMailWakeRequest(input: {
       createdAt: new Date().toISOString(),
     });
   } catch (err) {
-    const failedAt = new Date().toISOString();
+    const failedAt = now;
     if (isPressure503(err)) {
       const nextRetryAt = addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount));
       markStagePlayMailWakeRetryable({

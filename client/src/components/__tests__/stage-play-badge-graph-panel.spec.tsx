@@ -849,6 +849,60 @@ function renderPanel(options: {
             raw_content_included: false,
           },
         ],
+        wakeRequests: [
+          {
+            artifactId: "stage_play_live_source_mail_wake_request",
+            schemaVersion: "stage_play_live_source_mail_wake_request/v1",
+            wakeRequestId: "stage_play_live_source_mail_wake:pressure-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            jobId: "stage_play_live_source_job:ui",
+            mailIds: ["stage_play_live_source_mail:ui"],
+            sourceIds: ["source:visual-tab"],
+            reason: "unread_mail",
+            status: "deferred_for_pressure",
+            askTurnId: null,
+            decisionIds: [],
+            attemptCount: 1,
+            lastAttemptAt: "2026-06-02T00:00:01.500Z",
+            nextRetryAt: "2026-06-02T00:00:16.500Z",
+            failureReason: "ask_turn_pressure_503",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            queuedAt: "2026-06-02T00:00:01.000Z",
+            updatedAt: "2026-06-02T00:00:01.500Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+          {
+            artifactId: "stage_play_live_source_mail_wake_request",
+            schemaVersion: "stage_play_live_source_mail_wake_request/v1",
+            wakeRequestId: "stage_play_live_source_mail_wake:retry-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            jobId: "stage_play_live_source_job:ui",
+            mailIds: ["stage_play_live_source_mail:ui"],
+            sourceIds: ["source:visual-tab"],
+            reason: "unread_mail",
+            status: "failed_retryable",
+            askTurnId: null,
+            decisionIds: [],
+            attemptCount: 2,
+            lastAttemptAt: "2026-06-02T00:00:02.000Z",
+            nextRetryAt: "2026-06-02T00:00:32.000Z",
+            failureReason: "temporary_mail_wake_error",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            queuedAt: "2026-06-02T00:00:02.000Z",
+            updatedAt: "2026-06-02T00:00:02.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
         decisions: [
           {
             artifactId: "stage_play_live_source_mail_decision",
@@ -1130,6 +1184,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText("Output/Wait").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
+    expect(screen.getByText("behind: 3")).toBeTruthy();
+    expect(screen.getByText("pressure")).toBeTruthy();
+    expect(screen.getByText("retrying")).toBeTruthy();
     expect(screen.getByText(/summary preview: Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
     expect(screen.getByText(/no output yet; armed for next source update/i)).toBeTruthy();
