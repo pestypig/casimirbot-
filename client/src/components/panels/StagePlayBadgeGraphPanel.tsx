@@ -1125,6 +1125,9 @@ function buildObserverMailLoopNodes(input: {
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
   const queuedWakeCount = wakeRequests.filter((wake) => wake.status === "queued").length;
   const runningWakeCount = wakeRequests.filter((wake) => wake.status === "running").length;
+  const retryWakeCount = wakeRequests.filter((wake) => wake.status === "failed_retryable").length;
+  const pressureWakeCount = wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
+  const behindCount = Math.max(0, unreadCount + deliveredCount + queuedWakeCount + retryWakeCount + pressureWakeCount);
   const changedMailCount = mailItems.filter((item) => item.hints.deterministicChangeHint === "summary_changed").length;
   const visibleCheckpointRequest = selectStagePlayVisibleCheckpointRequest(graph);
   const latestPerturbation = (graph.perturbations ?? []).at(-1) ?? null;
@@ -1169,6 +1172,7 @@ function buildObserverMailLoopNodes(input: {
       status: visualSource?.status ?? "waiting",
       statusChips: [
         graph.sourceWindow.freshness,
+        behindCount > 0 ? `behind: ${behindCount}` : null,
         latestPerturbation ? labelize(latestPerturbation.reason) : null,
         visibleCheckpointRequest ? `checkpoint ${visibleCheckpointRequest.status}` : null,
       ].filter((entry): entry is string => Boolean(entry)),
@@ -1187,6 +1191,7 @@ function buildObserverMailLoopNodes(input: {
       status: visualMail?.status ?? "missing",
       statusChips: [
         unreadCount > 0 ? `${unreadCount} unread` : "no unread",
+        deliveredCount > 0 ? `${deliveredCount} delivered` : null,
         changedMailCount > 0 ? `${changedMailCount} changed` : null,
       ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
@@ -1205,6 +1210,8 @@ function buildObserverMailLoopNodes(input: {
       subtitle: "mail wake admission",
       status: latestWake?.status ?? (unreadCount > 0 ? "queued pending" : "missing"),
       statusChips: [
+        pressureWakeCount > 0 ? "pressure" : null,
+        retryWakeCount > 0 ? "retrying" : null,
         queuedWakeCount > 0 ? `${queuedWakeCount} queued` : null,
         runningWakeCount > 0 ? `${runningWakeCount} running` : null,
         latestWake?.askTurnId ? "ask turn" : null,
@@ -1221,7 +1228,7 @@ function buildObserverMailLoopNodes(input: {
         ...latestWake.evidenceRefs,
       ].filter(Boolean)) : [],
       outputPreview: latestWake
-        ? `${latestWake.status}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
+        ? `${latestWake.status}${latestWake.failureReason ? `; ${latestWake.failureReason}` : ""}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
           : "no wake request yet",
@@ -1234,6 +1241,7 @@ function buildObserverMailLoopNodes(input: {
       statusChips: [
         latestDecision?.modelReviewed ? "model reviewed" : null,
         latestDecision?.mailIds.length ? `${latestDecision.mailIds.length} mail` : null,
+        latestDecision ? `last decision: ${latestDecision.decision}` : null,
       ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
       inputRefs: decisionInputRefs,
