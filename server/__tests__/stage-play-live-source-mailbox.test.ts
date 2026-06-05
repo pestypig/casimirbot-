@@ -17,6 +17,8 @@ import {
   upsertStagePlayLiveSourceJobState,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/stage-play-live-source-mail-context-pack";
+import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
+import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
@@ -44,6 +46,7 @@ const sourceId = "visual_source:stage-play-mailbox";
 
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailboxThreadResolverForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetVisualSnapshotStoreForTest();
@@ -212,6 +215,70 @@ describe("Stage Play live-source mailbox", () => {
       "mail_read_receipt",
     ]));
     expect(rows.every((row) => row.assistantAnswer === false && row.terminalEligible === false)).toBe(true);
+  });
+
+  it("resolves an Ask session thread to the populated Stage Play mailbox for tool reads and decisions", () => {
+    const askThreadId = "6a0976f7-aec2-4b9e-b9e3-72da639d3a0f";
+    const desktopThreadId = "helix-ask:desktop";
+    const mail = enqueueVisualSummaryMailFromEvidence({
+      threadId: desktopThreadId,
+      roomId,
+      environmentId: "live_env:desktop-mailbox",
+      sourceId,
+      visualFrameRef: "visual_frame:desktop-mailbox",
+      visualEvidenceRef: "visual_evidence:desktop-mailbox",
+      summary: "Compact visual summary stored under the desktop Stage Play mailbox namespace.",
+      confidence: 0.81,
+      analysisState: "analysis_ready",
+      now: "2026-06-04T12:00:02.000Z",
+    });
+
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: askThreadId,
+      args: {
+        source_kind: "visual_frame",
+        limit: 3,
+      },
+    });
+
+    expect(readObservation.ok).toBe(true);
+    expect(readObservation.observation).toMatchObject({
+      askThreadId,
+      mailboxThreadId: desktopThreadId,
+      mailboxThreadResolution: {
+        mailboxThreadId: desktopThreadId,
+        reason: "desktop_stage_play_mailbox_has_state",
+      },
+      items: [
+        {
+          mailId: mail.mailId,
+        },
+      ],
+    });
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: askThreadId,
+      args: {
+        mail_ids: [mail.mailId],
+        decision: "wait_for_next_summary",
+        rationale_preview: "No user-facing change yet.",
+      },
+    });
+
+    expect(decisionObservation.ok).toBe(true);
+    expect(decisionObservation.observation).toMatchObject({
+      askThreadId,
+      mailboxThreadId: desktopThreadId,
+      mailboxThreadResolution: {
+        mailboxThreadId: desktopThreadId,
+        reason: "mail_id_owner_thread",
+      },
+      threadId: desktopThreadId,
+      decision: "wait_for_next_summary",
+      mailIds: [mail.mailId],
+    });
   });
 
   it("reads only exact wake mail ids instead of widening to all unread mail", () => {
@@ -1164,6 +1231,15 @@ describe("Stage Play live-source mailbox", () => {
     });
     expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
     expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
+    const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+    expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
+      "mail_received",
+      "mail_wake_requested",
+      "mail_wake_deferred",
+      "loop_state",
+    ]));
+    expect(transcriptEntries.every((entry) => entry.wakeResultId === result?.wakeResultId)).toBe(true);
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
 
   it("defers a wake before Ask when runtime pressure admission rejects it", async () => {
@@ -1198,6 +1274,15 @@ describe("Stage Play live-source mailbox", () => {
       failureReason: "runtime_memory_queue_deferrable",
     });
     expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+    const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+    expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
+      "mail_received",
+      "mail_wake_requested",
+      "mail_wake_deferred",
+      "loop_state",
+    ]));
+    expect(transcriptEntries.every((entry) => entry.wakeResultId === result?.wakeResultId)).toBe(true);
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
 
   it("runs a retryable pressure wake after nextRetryAt while preserving exact mail ids", async () => {

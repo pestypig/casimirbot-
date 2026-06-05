@@ -8162,8 +8162,11 @@ type HelixMailLoopTranscriptRowKind =
   | "voice_tool_call"
   | "voice_receipt"
   | "wait_for_next_summary"
+  | "mail_wake_requested"
+  | "mail_wake_deferred"
   | "requested_tool"
-  | "loop_state";
+  | "loop_state"
+  | "blocked";
 
 const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowKind>([
   "mail_received",
@@ -8175,8 +8178,11 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "voice_tool_call",
   "voice_receipt",
   "wait_for_next_summary",
+  "mail_wake_requested",
+  "mail_wake_deferred",
   "requested_tool",
   "loop_state",
+  "blocked",
 ]);
 
 type HelixMailLoopTranscriptRow = {
@@ -8394,6 +8400,9 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
     return row.body;
   }
   if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
+  if (row.rowKind === "mail_wake_requested") return row.body || "Wake requested for live-source mail.";
+  if (row.rowKind === "mail_wake_deferred") return row.body || "Wake deferred; mailbox remains armed for the next summary.";
+  if (row.rowKind === "blocked") return row.body || "Wake blocked; mailbox remains available for a later check.";
   if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
   if (row.rowKind === "voice_receipt" && !row.body) return "Voice delivery receipt recorded.";
   return row.body;
@@ -8407,14 +8416,20 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "text_answer" || row.rowKind === "voice_callout_request") return "Text / Callout draft";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
   if (row.rowKind === "voice_receipt") return "Voice receipt";
+  if (row.rowKind === "mail_wake_requested") return "Wake requested";
+  if (row.rowKind === "mail_wake_deferred") return "Wake deferred";
   if (row.rowKind === "requested_tool") return "Requested tool";
   if (row.rowKind === "loop_state") return "Loop state";
+  if (row.rowKind === "blocked") return "Wake blocked";
   return row.title || "Live source mail";
 }
 
 function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
   if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
   if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
+  if (row.rowKind === "mail_wake_requested") return "working";
+  if (row.rowKind === "mail_wake_deferred") return "warning";
+  if (row.rowKind === "blocked") return "warning";
   if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
   if (row.rowKind === "voice_tool_call") return "working";
   if (row.rowKind === "voice_receipt") return "observation";

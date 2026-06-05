@@ -431,6 +431,114 @@ const buildDurableWakeTranscriptRows = (input: {
   return rows;
 };
 
+const buildNonTerminalWakeTranscriptRows = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  wakeResult: StagePlayLiveSourceMailWakeResultV1;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+  evidenceRefs: string[];
+  createdAt: string;
+}): DurableWakeTranscriptRow[] => {
+  const rows: DurableWakeTranscriptRow[] = [];
+  for (const item of input.mailBatch) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_mail_received:${hashShort([input.wake.wakeRequestId, item.mailId])}`,
+      rowKind: "mail_received",
+      title: "Observation mail",
+      body: `Visual summary received. Preview: ${item.summary.preview}`,
+      artifactId: item.mailId,
+      artifactKind: item.artifactId,
+      evidenceRefs: item.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  rows.push(makeWakeTranscriptRow({
+    rowId: `wake_requested:${hashShort(input.wake.wakeRequestId)}`,
+    rowKind: "mail_wake_requested",
+    title: "Wake requested",
+    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake.`,
+    artifactId: input.wake.wakeRequestId,
+    artifactKind: input.wake.artifactId,
+    evidenceRefs: input.evidenceRefs,
+    createdAt: input.createdAt,
+  }));
+  if (input.wakeResult.status === "deferred_for_pressure") {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_deferred:${hashShort(input.wakeResult.wakeResultId)}`,
+      rowKind: "mail_wake_deferred",
+      title: "Wake deferred",
+      body: `Deferred for pressure: ${input.wakeResult.failedReason ?? "runtime pressure"}. Mailbox remains armed for retry.`,
+      artifactId: input.wakeResult.wakeResultId,
+      artifactKind: input.wakeResult.artifactId,
+      evidenceRefs: input.evidenceRefs,
+      authority: "blocked",
+      createdAt: input.createdAt,
+    }));
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_loop_state:${hashShort(input.wakeResult.wakeResultId)}`,
+      rowKind: "loop_state",
+      title: "Loop state",
+      body: "Mailbox remains armed; unread mail is retained for the next wake.",
+      artifactId: input.wakeResult.wakeResultId,
+      artifactKind: input.wakeResult.artifactId,
+      evidenceRefs: input.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+    return rows;
+  }
+  rows.push(makeWakeTranscriptRow({
+    rowId: `wake_blocked:${hashShort(input.wakeResult.wakeResultId)}`,
+    rowKind: "blocked",
+    title: "Wake blocked",
+    body: `${input.wakeResult.status}: ${input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "wake did not complete"}`,
+    artifactId: input.wakeResult.wakeResultId,
+    artifactKind: input.wakeResult.artifactId,
+    evidenceRefs: input.evidenceRefs,
+    authority: "blocked",
+    createdAt: input.createdAt,
+  }));
+  rows.push(makeWakeTranscriptRow({
+    rowId: `wake_loop_state:${hashShort(input.wakeResult.wakeResultId)}`,
+    rowKind: "loop_state",
+    title: "Loop state",
+    body: "Wake did not complete; mailbox remains available for a later check.",
+    artifactId: input.wakeResult.wakeResultId,
+    artifactKind: input.wakeResult.artifactId,
+    evidenceRefs: input.evidenceRefs,
+    createdAt: input.createdAt,
+  }));
+  return rows;
+};
+
+const recordNonTerminalWakeTranscript = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  wakeResult: StagePlayLiveSourceMailWakeResultV1;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+  evidenceRefs: string[];
+  createdAt: string;
+}): StagePlayLiveSourceMailWakeResultV1 => {
+  const transcriptEntries = recordStagePlayLiveSourceMailTranscriptEntries({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    wakeRequestId: input.wake.wakeRequestId,
+    wakeResultId: input.wakeResult.wakeResultId,
+    askTurnId: input.wakeResult.askTurnId ?? null,
+    decisionIds: input.wakeResult.decisionIds,
+    mailIds: input.wake.mailIds,
+    sourceIds: input.wake.sourceIds,
+    rows: buildNonTerminalWakeTranscriptRows(input),
+    evidenceRefs: input.wakeResult.evidenceRefs,
+    createdAt: input.createdAt,
+  });
+  return {
+    ...input.wakeResult,
+    evidenceRefs: uniqueStrings([
+      ...input.wakeResult.evidenceRefs,
+      ...transcriptEntries.map((entry) => entry.entryId),
+    ]),
+  };
+};
+
 const buildWakePrompt = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
@@ -714,7 +822,7 @@ export async function runNextMailWakeRequest(input: {
       now,
     });
     releaseAdmission("rejected");
-    return recordStagePlayMailWakeResult({
+    const wakeResult = recordStagePlayMailWakeResult({
       wakeRequestId: running.wakeRequestId,
       threadId: running.threadId,
       roomId: running.roomId ?? null,
@@ -723,6 +831,13 @@ export async function runNextMailWakeRequest(input: {
       failedReason: reason,
       evidenceRefs,
       createdAt: now,
+    });
+    return recordNonTerminalWakeTranscript({
+      wake: runningAttempt,
+      wakeResult,
+      mailBatch,
+      evidenceRefs,
+      createdAt: wakeResult.createdAt,
     });
   }
   try {
@@ -749,7 +864,7 @@ export async function runNextMailWakeRequest(input: {
         now: new Date().toISOString(),
       });
       releaseAdmission("failed");
-      return recordStagePlayMailWakeResult({
+      const wakeResult = recordStagePlayMailWakeResult({
         wakeRequestId: running.wakeRequestId,
         threadId: running.threadId,
         roomId: running.roomId ?? null,
@@ -759,6 +874,13 @@ export async function runNextMailWakeRequest(input: {
         failedReason,
         evidenceRefs: uniqueStrings([...evidenceRefs, ...(askTurnId ? [askTurnId] : [])]),
         createdAt: new Date().toISOString(),
+      });
+      return recordNonTerminalWakeTranscript({
+        wake: running,
+        wakeResult,
+        mailBatch,
+        evidenceRefs: wakeResult.evidenceRefs,
+        createdAt: wakeResult.createdAt,
       });
     }
     const completed = markStagePlayMailWakeCompleted({
@@ -839,7 +961,7 @@ export async function runNextMailWakeRequest(input: {
         nextRetryAt,
         now: failedAt,
       });
-      return recordStagePlayMailWakeResult({
+      const wakeResult = recordStagePlayMailWakeResult({
         wakeRequestId: running.wakeRequestId,
         threadId: running.threadId,
         roomId: running.roomId ?? null,
@@ -849,6 +971,13 @@ export async function runNextMailWakeRequest(input: {
         evidenceRefs,
         createdAt: failedAt,
       });
+      return recordNonTerminalWakeTranscript({
+        wake: runningAttempt,
+        wakeResult,
+        mailBatch,
+        evidenceRefs,
+        createdAt: wakeResult.createdAt,
+      });
     }
     markStagePlayMailWakeRetryable({
       wakeRequestId: running.wakeRequestId,
@@ -856,7 +985,7 @@ export async function runNextMailWakeRequest(input: {
       nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount)),
       now: failedAt,
     });
-    return recordStagePlayMailWakeResult({
+    const wakeResult = recordStagePlayMailWakeResult({
       wakeRequestId: running.wakeRequestId,
       threadId: running.threadId,
       roomId: running.roomId ?? null,
@@ -865,6 +994,13 @@ export async function runNextMailWakeRequest(input: {
       failedReason: err instanceof Error ? err.message : String(err),
       evidenceRefs,
       createdAt: failedAt,
+    });
+    return recordNonTerminalWakeTranscript({
+      wake: runningAttempt,
+      wakeResult,
+      mailBatch,
+      evidenceRefs,
+      createdAt: wakeResult.createdAt,
     });
   } finally {
     releaseAdmission("completed");

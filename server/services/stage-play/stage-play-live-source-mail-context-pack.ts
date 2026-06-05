@@ -13,6 +13,7 @@ import {
   listStagePlayLiveSourceWatchJobPolicies,
   listStagePlayMailDecisions,
 } from "./stage-play-live-source-mailbox-store";
+import { resolveStagePlayLiveSourceMailboxThreadId } from "./stage-play-live-source-mailbox-thread-resolver";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -60,15 +61,21 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
   decisionLimit?: number;
 }): StagePlayLiveSourceMailContextPackV1 {
   const createdAt = input.now ?? new Date().toISOString();
+  const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+    askThreadId: input.threadId,
+    requestedThreadId: input.threadId,
+    explicitMailboxThreadId: null,
+  });
+  const mailboxThreadId = mailboxThreadResolution.mailboxThreadId;
   const armedPolicies: StagePlayLiveSourceWatchJobPolicyV1[] = listStagePlayLiveSourceWatchJobPolicies({
-    threadId: input.threadId,
+    threadId: mailboxThreadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     status: "armed",
     limit: 12,
   });
   const jobStates: StagePlayLiveSourceJobStateV1[] = listStagePlayLiveSourceJobStates({
-    threadId: input.threadId,
+    threadId: mailboxThreadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     limit: 20,
@@ -83,13 +90,16 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       artifactId: "stage_play_live_source_mail_context_pack",
       schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA,
       contextPackId: `stage_play_live_source_mail_context_pack:${hashShort([
-        input.threadId,
+        mailboxThreadId,
         input.roomId ?? null,
         input.environmentId ?? null,
         "none",
         createdAt,
       ])}`,
-      threadId: input.threadId,
+      threadId: mailboxThreadId,
+      askThreadId: input.threadId,
+      mailboxThreadId,
+      mailboxThreadResolution,
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
       includedReason,
@@ -113,7 +123,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
     ...jobStates.flatMap((state: StagePlayLiveSourceJobStateV1) => state.sourceIds),
   ]));
   const latestMailItems: StagePlayLiveSourceMailItemV1[] = listStagePlayLiveSourceMailItems({
-    threadId: input.threadId,
+    threadId: mailboxThreadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     limit: 100,
@@ -126,7 +136,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
     ...jobStates.map((state: StagePlayLiveSourceJobStateV1) => state.jobId),
   ]));
   const latestDecisions: StagePlayLiveSourceMailDecisionV1[] = listStagePlayMailDecisions({
-    threadId: input.threadId,
+    threadId: mailboxThreadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     limit: 100,
@@ -145,7 +155,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
     artifactId: "stage_play_live_source_mail_context_pack",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA,
     contextPackId: `stage_play_live_source_mail_context_pack:${hashShort([
-      input.threadId,
+      mailboxThreadId,
       input.roomId ?? null,
       input.environmentId ?? null,
       armedPolicies.map((policy: StagePlayLiveSourceWatchJobPolicyV1) => policy.policyId),
@@ -153,7 +163,10 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       currentMailboxCursor,
       createdAt,
     ])}`,
-    threadId: input.threadId,
+    threadId: mailboxThreadId,
+    askThreadId: input.threadId,
+    mailboxThreadId,
+    mailboxThreadResolution,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     includedReason,

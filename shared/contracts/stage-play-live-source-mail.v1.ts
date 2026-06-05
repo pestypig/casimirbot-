@@ -104,6 +104,9 @@ export type StagePlayLiveSourceMailReadResultV1 = {
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_READ_RESULT_SCHEMA;
   readId: string;
   threadId: string;
+  askThreadId?: string | null;
+  mailboxThreadId?: string | null;
+  mailboxThreadResolution?: Record<string, unknown> | null;
   roomId?: string | null;
   environmentId?: string | null;
   items: StagePlayLiveSourceMailItemV1[];
@@ -261,6 +264,8 @@ export type AskTurnTranscriptRowDraftV1 = {
   rowId: string;
   rowKind:
     | "mail_received"
+    | "mail_wake_requested"
+    | "mail_wake_deferred"
     | "mail_read_tool_call"
     | "mail_read_receipt"
     | "agent_decision"
@@ -314,6 +319,9 @@ export type StagePlayLiveSourceMailContextPackV1 = {
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA;
   contextPackId: string;
   threadId: string;
+  askThreadId?: string | null;
+  mailboxThreadId?: string | null;
+  mailboxThreadResolution?: Record<string, unknown> | null;
   roomId?: string | null;
   environmentId?: string | null;
   includedReason:

@@ -50,6 +50,7 @@ import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
 } from "../../services/stage-play/stage-play-live-source-mail-wake-runner";
+import { resolveStagePlayLiveSourceMailboxThreadId } from "../../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../../services/stage-play/stage-play-live-source-mail-wake-service";
 import {
   STAGE_PLAY_RAW_SESSION_BUFFER_RAW_KINDS,
@@ -60,6 +61,7 @@ import {
 
 const helixStagePlayRouter = Router();
 const STAGE_PLAY_ROUTE_MAX_BODY_BYTES = 256 * 1024;
+const DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID = "helix-ask:desktop";
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -262,6 +264,17 @@ const readStringArray = (value: unknown): string[] =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const resolveMailboxThreadForRoute = (input: {
+  threadId?: string | null;
+  mailboxThreadId?: string | null;
+  mailIds?: string[];
+}) => resolveStagePlayLiveSourceMailboxThreadId({
+  askThreadId: input.threadId ?? null,
+  requestedThreadId: input.threadId ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID,
+  explicitMailboxThreadId: input.mailboxThreadId ?? null,
+  mailIds: input.mailIds ?? [],
+});
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -619,7 +632,12 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-store");
 
   try {
-    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id);
+    const requestedThreadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId: readQueryString(req.query.mailboxThreadId) ?? readQueryString(req.query.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
     const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
     const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
@@ -640,6 +658,9 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
       mailItems: listStagePlayLiveSourceMailItems({
         threadId,
         roomId,
@@ -759,7 +780,12 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
   res.setHeader("Cache-Control", "no-store");
 
   try {
-    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? "helix-ask:desktop";
+    const requestedThreadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId: readQueryString(req.query.mailboxThreadId) ?? readQueryString(req.query.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
     const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
     const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
     const wakeRequestId = readQueryString(req.query.wakeRequestId) ?? readQueryString(req.query.wake_request_id);
@@ -776,6 +802,9 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_transcript_response/v1",
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
       threadId,
       roomId,
       environmentId,
@@ -808,7 +837,16 @@ helixStagePlayRouter.post("/live-source-mail/wake", (req: Request, res: Response
   try {
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
     if (!body) return;
-    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const requestedThreadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId:
+        readQueryString(body.mailboxThreadId) ??
+        readQueryString(body.mailbox_thread_id) ??
+        readQueryString(req.query.mailboxThreadId) ??
+        readQueryString(req.query.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
     const wakeRequest = queueMailWakeForUnreadItems({
       threadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
@@ -819,6 +857,9 @@ helixStagePlayRouter.post("/live-source-mail/wake", (req: Request, res: Response
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_wake_queue_response/v1",
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
       wakeRequest,
       queued: Boolean(wakeRequest),
       assistant_answer: false,
@@ -844,7 +885,14 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
     if (!body) return;
     const result = await runNextMailWakeRequest({
-      threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId),
+      threadId: resolveMailboxThreadForRoute({
+        threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID,
+        mailboxThreadId:
+          readQueryString(body.mailboxThreadId) ??
+          readQueryString(body.mailbox_thread_id) ??
+          readQueryString(req.query.mailboxThreadId) ??
+          readQueryString(req.query.mailbox_thread_id),
+      }).mailboxThreadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
@@ -878,7 +926,14 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
     if (!body) return;
     const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
-      threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId),
+      threadId: resolveMailboxThreadForRoute({
+        threadId: readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID,
+        mailboxThreadId:
+          readQueryString(body.mailboxThreadId) ??
+          readQueryString(body.mailbox_thread_id) ??
+          readQueryString(req.query.mailboxThreadId) ??
+          readQueryString(req.query.mailbox_thread_id),
+      }).mailboxThreadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
@@ -910,7 +965,16 @@ helixStagePlayRouter.post("/live-source-mail/check", (req: Request, res: Respons
   try {
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
     if (!body) return;
-    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const requestedThreadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId:
+        readQueryString(body.mailboxThreadId) ??
+        readQueryString(body.mailbox_thread_id) ??
+        readQueryString(req.query.mailboxThreadId) ??
+        readQueryString(req.query.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
     const readResult = readLiveSourceMailForAsk({
       threadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
@@ -929,6 +993,9 @@ helixStagePlayRouter.post("/live-source-mail/check", (req: Request, res: Respons
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_check_response/v1",
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
       readResult,
       transcriptRows: buildMailLoopTranscriptRows({
         mailItems: readResult.items,
@@ -956,7 +1023,18 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
   try {
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
     if (!body) return;
-    const threadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? "helix-ask:desktop";
+    const requestedThreadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? readQueryString(req.query.threadId) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailIds = readStringArray(body.mailIds ?? body.mail_ids);
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId:
+        readQueryString(body.mailboxThreadId) ??
+        readQueryString(body.mailbox_thread_id) ??
+        readQueryString(req.query.mailboxThreadId) ??
+        readQueryString(req.query.mailbox_thread_id),
+      mailIds,
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
     const decisionValue = readQueryString(body.decision) ?? "wait_for_next_summary";
     const decision = (
       [
@@ -975,7 +1053,7 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
       threadId,
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
-      mailIds: readStringArray(body.mailIds ?? body.mail_ids),
+      mailIds,
       decision,
       rationalePreview:
         readQueryString(body.rationalePreview) ??
@@ -996,6 +1074,9 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_decision_response/v1",
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
       decision: decisionReceipt,
       transcriptRows: buildMailLoopTranscriptRows({
         decision: decisionReceipt,

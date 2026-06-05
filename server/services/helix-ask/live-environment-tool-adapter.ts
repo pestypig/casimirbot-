@@ -59,6 +59,9 @@ import {
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
 } from "../stage-play/stage-play-live-source-mailbox-store";
+import {
+  resolveStagePlayLiveSourceMailboxThreadId,
+} from "../stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
 import {
   ensureLiveSituationRunForEnvironment,
@@ -963,8 +966,18 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.check_live_source_mail" || input.tool_name === "live_env.read_live_source_mail") {
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId),
+      mailIds: readStringArray(args.mail_ids ?? args.mailIds),
+    });
     const readResult = readLiveSourceMailForAsk({
-      threadId: effectiveThreadId,
+      threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       sourceId: explicitSourceId,
@@ -993,6 +1006,12 @@ export function executeLiveEnvironmentTool(
         : "No unread live-source updates yet; loop is armed for the next source update.",
       observation: {
         ...readResult,
+        askThreadId: input.thread_id,
+        ask_thread_id: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution,
+        mailbox_thread_resolution: mailboxThreadResolution,
         transcriptRows,
         loopState: readResult.items.length > 0 ? "continue_with_unread_mail" : "armed_for_next_summary",
         post_tool_model_step_required: true,
@@ -1002,7 +1021,10 @@ export function executeLiveEnvironmentTool(
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
       },
-      evidenceRefs: readResult.evidenceRefs,
+      evidenceRefs: [
+        ...readResult.evidenceRefs,
+        mailboxThreadResolution.mailboxThreadId,
+      ],
     });
   }
 
@@ -1086,6 +1108,16 @@ export function executeLiveEnvironmentTool(
       ? decisionRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"]
       : "wait_for_next_summary";
     const mailIds = readStringArray(args.mail_ids ?? args.mailIds);
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId),
+      mailIds,
+    });
     const nextLoopStateRaw = readString(args.next_loop_state) ?? readString(args.nextLoopState);
     const allowedLoopStates = new Set([
       "armed_for_next_summary",
@@ -1100,7 +1132,7 @@ export function executeLiveEnvironmentTool(
       ? nextLoopStateRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["nextLoopState"]
       : null;
     const recordedDecision = recordLiveSourceMailDecisionForAsk({
-      threadId: effectiveThreadId,
+      threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       mailIds,
@@ -1139,6 +1171,12 @@ export function executeLiveEnvironmentTool(
         : "Live-source mail decision could not link to mail ids.",
       observation: {
         ...recordedDecision,
+        askThreadId: input.thread_id,
+        ask_thread_id: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution,
+        mailbox_thread_resolution: mailboxThreadResolution,
         transcriptRows,
         post_tool_model_step_required: recordedDecision.decision !== "wait_for_next_summary",
         assistant_answer: false,
@@ -1147,7 +1185,11 @@ export function executeLiveEnvironmentTool(
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
       },
-      evidenceRefs: [recordedDecision.decisionId, ...recordedDecision.evidenceRefs],
+      evidenceRefs: [
+        recordedDecision.decisionId,
+        ...recordedDecision.evidenceRefs,
+        mailboxThreadResolution.mailboxThreadId,
+      ],
     });
   }
 
