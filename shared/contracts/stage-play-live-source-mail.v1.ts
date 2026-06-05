@@ -6,6 +6,8 @@ export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA = "stage_play_live_s
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_live_source_mail_transcript_entry/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA = "stage_play_live_source_voice_delivery_receipt/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
+  "stage_play_live_source_watch_job_policy_config_result/v1" as const;
 
 export type StagePlayLiveSourceMailSourceKindV1 =
   | "visual_frame"
@@ -258,6 +260,30 @@ export type StagePlayLiveSourceWatchJobPolicyV1 = {
   terminal_eligible: false;
   context_role: "tool_evidence";
   raw_content_included: false;
+};
+
+export type StagePlayLiveSourceWatchJobPolicyConfigResultV1 = {
+  artifactId: "stage_play_live_source_watch_job_policy_config_result";
+  schema: typeof STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA;
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA;
+  policy: StagePlayLiveSourceWatchJobPolicyV1;
+  jobState: StagePlayLiveSourceJobStateV1;
+  transcriptRows: AskTurnTranscriptRowDraftV1[];
+  policyCount: number;
+  watchJobPolicyRef: string;
+  watch_job_policy_ref: string;
+  askThreadId?: string | null;
+  ask_thread_id?: string | null;
+  mailboxThreadId?: string | null;
+  mailbox_thread_id?: string | null;
+  mailboxThreadResolution?: Record<string, unknown> | null;
+  mailbox_thread_resolution?: Record<string, unknown> | null;
+  post_tool_model_step_required: true;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+  ask_context_policy: "evidence_only";
 };
 
 export type AskTurnTranscriptRowDraftV1 = {

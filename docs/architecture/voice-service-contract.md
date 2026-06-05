@@ -29,8 +29,8 @@ STT runtime policy controls:
 
 Runtime memory admission controls:
 - `VOICE_TRANSCRIBE_MEMORY_GUARD`: `0` disables voice STT memory admission.
-- `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold. Default is `480`; development servers default to `720` because Vite/tsx middleware can idle above the production-sized guard.
-- `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold. Default is `900`; development servers default to `1400` for the same reason.
+- `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold. Default is `480`; development servers default to `2048` because Vite/tsx middleware, Stage Play diagnostics, and local Ask workbench state can idle far above the production-sized guard.
+- `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold. Default is `900`; development servers default to `3200` for the same reason.
 - `RUNTIME_MEMORY_GUARD`: `0` disables generic runtime memory admission.
 - `RUNTIME_MEMORY_MAX_HEAP_USED_MB`: generic heap threshold, default `520`.
 - `RUNTIME_MEMORY_MAX_RSS_MB`: generic RSS threshold, default `950`.
@@ -38,6 +38,14 @@ Runtime memory admission controls:
 - `RUNTIME_MEMORY_RESUME_RSS_MB`: resume threshold for paused work; defaults to 85% of max.
 - `RUNTIME_MEMORY_HOST_FREE_RATIO_MIN`: host free-memory ratio floor, default `0.08`.
 - `RUNTIME_MEMORY_STATUS_ENABLED`: `0` disables `/api/runtime/memory`.
+
+Runtime task-manager controls:
+- Runtime task classes include `critical_resident`, `active_user_turn`, `voice_capture`, `voice_stt`, `voice_tts`, `stage_play_refresh`, `situation_room_poll`, `debug_export`, and `repo_indexing`.
+- Each class has a priority, deferrable/pausable flags, a concurrency budget, and an optional burst budget.
+- Env overrides use the pattern `RUNTIME_TASK_<TASK_CLASS>_MAX_CONCURRENT`, `RUNTIME_TASK_<TASK_CLASS>_BURST_LIMIT`, and `RUNTIME_TASK_<TASK_CLASS>_BURST_WINDOW_MS`; for example `RUNTIME_TASK_VOICE_STT_MAX_CONCURRENT=1`.
+- Voice STT is a foreground burst task and defaults to single-flight admission. When a second voice STT request arrives while one is active, the governor rejects it as runtime capacity pressure rather than holding another multipart request open.
+- Deferrable work such as Stage Play refresh is queued under pressure or when its lane is occupied.
+- Pausable background services can register with the governor. The Stage Play live-source mail wake service registers as pausable and yields while foreground work is under pressure.
 
 ## Request body
 ```json
@@ -136,9 +144,11 @@ Example memory-pressure envelope:
 ```
 
 Runtime memory status is available at `GET /api/runtime/memory` when enabled.
-The status response exposes process memory, host free-memory ratio, active
-runtime task leases, paused task identifiers, recent admission decisions, and
-limits. It must not expose transcript text, prompts, audio, API keys, or raw
+Runtime task-manager status is available at `GET /api/runtime/tasks` when
+enabled. These status responses expose process memory, host free-memory ratio,
+active runtime task leases, paused task identifiers, registered pausable tasks,
+per-class task budgets, recent admission decisions, recent completions, and
+limits. They must not expose transcript text, prompts, audio, API keys, or raw
 request bodies.
 
 ## Ownership-first routing policy (mission callouts)

@@ -31317,11 +31317,6 @@ export function HelixAskPill({
     [activeHelixTimelineFeed],
   );
 
-  const latestTimelineEvent = useMemo(
-    () => activeHelixTimelineFeed.find((entry) => entry.type !== "conversation_brief") ?? null,
-    [activeHelixTimelineFeed],
-  );
-
   const sessionCapsuleState = useMemo(
     () => deriveSessionCapsuleState(contextCapsuleSessionLedger),
     [contextCapsuleSessionLedger],
@@ -32276,19 +32271,6 @@ export function HelixAskPill({
             {contextMemoryStatusText ? (
               <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-emerald-200/85">
                 {contextMemoryStatusText}
-              </div>
-            ) : null}
-            {latestTimelineEvent ? (
-              <div className="-mt-1 px-4 pb-2 text-[9px] uppercase tracking-[0.14em] text-slate-500">
-                <div className="flex items-center gap-1 overflow-hidden">
-                  <span className="shrink-0">{HELIX_TIMELINE_TYPE_LABEL[latestTimelineEvent.type]}</span>
-                  {latestTimelineEvent.status !== "done" ? (
-                    <span className="shrink-0 text-[8px] text-slate-400">{latestTimelineEvent.status}</span>
-                  ) : null}
-                  <span className="truncate normal-case tracking-normal text-[10px] text-slate-400/90">
-                    {clipText(latestTimelineEvent.text, 140)}
-                  </span>
-                </div>
               </div>
             ) : null}
           {askBusy ? (

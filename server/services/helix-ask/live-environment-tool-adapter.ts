@@ -15,6 +15,13 @@ import {
 import type { StagePlayCheckpointRequestReasonV1 } from "@shared/contracts/stage-play-checkpoint-request.v1";
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
 import type {
+  AskTurnTranscriptRowDraftV1,
+  StagePlayLiveSourceWatchJobPolicyV1,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
+import {
+  STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
   HelixLiveEnvironmentCommentaryKind,
   HelixLiveEnvironmentCommentaryStatus,
   HelixLiveEnvironmentCommentarySubject,
@@ -58,6 +65,7 @@ import {
 } from "../stage-play/stage-play-visual-summary-mail-ingest";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
+  listStagePlayLiveSourceWatchJobPolicies,
 } from "../stage-play/stage-play-live-source-mailbox-store";
 import {
   resolveStagePlayLiveSourceMailboxThreadId,
@@ -111,6 +119,63 @@ const readRequestedTool = (
     toolName,
     args: readRecord(record.args) ?? {},
   };
+};
+
+const readBooleanArg = (record: Record<string, unknown>, snakeKey: string, camelKey: string): boolean | null => {
+  const value = record[snakeKey] ?? record[camelKey];
+  return typeof value === "boolean" ? value : null;
+};
+
+const readWatchJobOutputPolicy = (
+  args: Record<string, unknown>,
+  objectiveText: string,
+): Partial<StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]> => {
+  const nested = readRecord(args.output_policy ?? args.outputPolicy) ?? {};
+  const allowVoiceFromObjective = /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
+  const allowVoiceCallout =
+    readBooleanArg(nested, "allow_voice_callout", "allowVoiceCallout") ??
+    readBooleanArg(args, "allow_voice_callout", "allowVoiceCallout") ??
+    allowVoiceFromObjective;
+  return {
+    allowTextAnswer:
+      readBooleanArg(nested, "allow_text_answer", "allowTextAnswer") ??
+      readBooleanArg(args, "allow_text_answer", "allowTextAnswer") ??
+      true,
+    allowVoiceCallout,
+    voiceRequiresUrgency:
+      readBooleanArg(nested, "voice_requires_urgency", "voiceRequiresUrgency") ??
+      readBooleanArg(args, "voice_requires_urgency", "voiceRequiresUrgency") ??
+      allowVoiceCallout,
+    confirmationRequired:
+      readBooleanArg(nested, "confirmation_required", "confirmationRequired") ??
+      readBooleanArg(args, "confirmation_required", "confirmationRequired") ??
+      false,
+  };
+};
+
+const buildWatchJobConfiguredTranscriptRows = (input: {
+  policy: StagePlayLiveSourceWatchJobPolicyV1;
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  return [
+    {
+      rowId: `ask_turn_watch_job_configured:${hashShort(input.policy.policyId)}`,
+      rowKind: "loop_state",
+      title: "Watch job configured",
+      body: `Armed watch policy: ${input.policy.objectiveText}`,
+      source: {
+        toolName: "live_env.configure_live_source_watch_job",
+        artifactId: input.policy.policyId,
+        artifactKind: input.policy.artifactId,
+      },
+      evidenceRefs: input.policy.evidenceRefs,
+      authority: "tool_evidence",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt,
+    },
+  ];
 };
 
 const readNumber = (value: unknown, fallback: number): number =>
@@ -1029,6 +1094,15 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.configure_live_source_watch_job") {
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId),
+    });
     const objectiveText =
       readString(args.objective_text) ??
       readString(args.objectiveText) ??
@@ -1040,12 +1114,8 @@ export function executeLiveEnvironmentTool(
       ...readStringArray(args.source_ids ?? args.sourceIds),
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
     ].filter((entry): entry is string => Boolean(entry));
-    const allowVoiceCallout =
-      args.allow_voice_callout === true ||
-      args.allowVoiceCallout === true ||
-      /\b(?:announce|voice|headphones|callout|tell me aloud)\b/i.test(objectiveText);
     const configured = configureStagePlayLiveSourceWatchJobPolicy({
-      threadId: effectiveThreadId,
+      threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
       environmentId: environment?.environment_id ?? input.environment_id ?? null,
       sourceIds,
@@ -1054,42 +1124,58 @@ export function executeLiveEnvironmentTool(
         readString(args.decision_policy_prompt) ??
         readString(args.decisionPolicyPrompt) ??
         objectiveText,
-      outputPolicy: {
-        allowTextAnswer: args.allow_text_answer !== false && args.allowTextAnswer !== false,
-        allowVoiceCallout,
-        voiceRequiresUrgency:
-          args.voice_requires_urgency === true ||
-          args.voiceRequiresUrgency === true ||
-          allowVoiceCallout,
-        confirmationRequired:
-          args.confirmation_required === true ||
-          args.confirmationRequired === true,
-      },
+      outputPolicy: readWatchJobOutputPolicy(args, objectiveText),
       importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria),
       suppressCriteria: readStringArray(args.suppress_criteria ?? args.suppressCriteria),
-      evidenceRefs: sourceIds,
+      priorDecisionRefs: readStringArray(args.prior_decision_refs ?? args.priorDecisionRefs),
+      priorAnswerRefs: readStringArray(args.prior_answer_refs ?? args.priorAnswerRefs),
+      evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs).concat(sourceIds),
     });
+    const policies = listStagePlayLiveSourceWatchJobPolicies({
+      threadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      limit: 100,
+    });
+    const transcriptRows = buildWatchJobConfiguredTranscriptRows({
+      policy: configured.policy,
+    });
+    const result = {
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      schema: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
+      schemaVersion: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
+      policy: configured.policy,
+      jobState: configured.jobState,
+      transcriptRows,
+      policyCount: policies.length,
+      watchJobPolicyRef: configured.policy.policyId,
+      watch_job_policy_ref: configured.policy.policyId,
+      askThreadId: input.thread_id,
+      ask_thread_id: input.thread_id,
+      mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+      mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+      mailboxThreadResolution,
+      mailbox_thread_resolution: mailboxThreadResolution,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
     return makeObservation({
       threadId: input.thread_id,
       environmentId: configured.policy.environmentId ?? environment?.environment_id ?? input.environment_id,
       toolName: input.tool_name,
       ok: true,
       summary: `Configured live-source watch job policy ${configured.policy.policyId}; no mail was read.`,
-      observation: {
-        artifactId: "stage_play_live_source_watch_job_policy_result",
-        schemaVersion: "stage_play_live_source_watch_job_policy_result/v1",
-        watchJobPolicyRef: configured.policy.policyId,
-        watch_job_policy_ref: configured.policy.policyId,
-        policy: configured.policy,
-        jobState: configured.jobState,
-        post_tool_model_step_required: true,
-        assistant_answer: false,
-        terminal_eligible: false,
-        raw_content_included: false,
-        context_role: "tool_evidence",
-        ask_context_policy: "evidence_only",
-      },
-      evidenceRefs: [configured.policy.policyId, configured.jobState.jobId, ...configured.policy.evidenceRefs],
+      observation: result,
+      evidenceRefs: [
+        configured.policy.policyId,
+        configured.jobState.jobId,
+        mailboxThreadResolution.mailboxThreadId,
+        ...configured.policy.evidenceRefs,
+      ],
     });
   }
 

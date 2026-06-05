@@ -32,6 +32,8 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
       hostMemoryReader: hostReader(),
@@ -48,6 +50,8 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   });
 
@@ -90,15 +94,39 @@ describe("runtime memory governor", () => {
     try {
       process.env.NODE_ENV = "development";
       runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
-        memoryReader: memoryReader({ heapUsed: 600 * mib, rss: 1100 * mib }),
+        memoryReader: memoryReader({ heapUsed: 1900 * mib, rss: 2400 * mib }),
         hostMemoryReader: hostReader(),
       });
 
       const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
 
       expect(decision.admitted).toBe(true);
-      expect(decision.limits.maxHeapUsedMiB).toBe(720);
-      expect(decision.limits.maxRssMiB).toBe(1400);
+      expect(decision.limits.maxHeapUsedMiB).toBe(2048);
+      expect(decision.limits.maxRssMiB).toBe(3200);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("still rejects development voice STT when local runtime headroom is exhausted", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 2100 * mib, rss: 3300 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.reason).toBe("heap_used_limit");
+      expect(decision.limits.maxHeapUsedMiB).toBe(2048);
+      expect(decision.limits.maxRssMiB).toBe(3200);
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;
@@ -210,6 +238,83 @@ describe("runtime memory governor", () => {
     admitted.lease?.release("completed");
 
     expect(runtimeMemoryGovernor.getRuntimeMemorySnapshot().activeTasks).toHaveLength(0);
+  });
+
+  it("rejects a second concurrent voice STT task before allocating another burst", () => {
+    const first = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+    expect(first.admitted).toBe(true);
+
+    const second = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+
+    expect(second.admitted).toBe(false);
+    expect(second.action).toBe("reject_runtime_capacity");
+    expect(second.reason).toBe("concurrency_limit");
+    expect(runtimeMemoryGovernor.getRuntimeTaskSnapshot().classes.find((entry) => entry.taskClass === "voice_stt")).toMatchObject({
+      activeCount: 1,
+      maxConcurrent: 1,
+    });
+    first.lease?.release("completed");
+  });
+
+  it("applies per-class burst budgets from env", () => {
+    process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT = "2";
+    process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS = "60000";
+
+    const first = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+    expect(first.admitted).toBe(true);
+    first.lease?.release("completed");
+    const second = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+    expect(second.admitted).toBe(true);
+    second.lease?.release("completed");
+
+    const third = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+
+    expect(third.admitted).toBe(false);
+    expect(third.action).toBe("reject_runtime_capacity");
+    expect(third.reason).toBe("burst_limit");
+  });
+
+  it("queues deferrable tasks when their concurrency lane is occupied", () => {
+    const first = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "stage_play_refresh" });
+    expect(first.admitted).toBe(true);
+
+    const second = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "stage_play_refresh" });
+
+    expect(second.admitted).toBe(false);
+    expect(second.action).toBe("queue");
+    expect(second.reason).toBe("concurrency_limit");
+    first.lease?.release("completed");
+  });
+
+  it("reports registered pausable tasks and recent completions in the task snapshot", () => {
+    let paused = false;
+    runtimeMemoryGovernor.registerPausableRuntimeTask({
+      id: "stage-play-service",
+      taskClass: "stage_play_refresh",
+      priority: 35,
+      isPaused: () => paused,
+      pause: () => {
+        paused = true;
+      },
+      resume: () => {
+        paused = false;
+      },
+    });
+    const admitted = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_stt" });
+    admitted.lease?.release("completed");
+
+    const snapshot = runtimeMemoryGovernor.getRuntimeTaskSnapshot();
+
+    expect(snapshot.registeredPausableTasks).toContainEqual({
+      id: "stage-play-service",
+      taskClass: "stage_play_refresh",
+      priority: 35,
+      paused: false,
+    });
+    expect(snapshot.recentCompletions.at(-1)).toMatchObject({
+      taskClass: "voice_stt",
+      outcome: "completed",
+    });
   });
 
   it("critical_resident bypasses memory pressure", () => {

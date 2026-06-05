@@ -102,8 +102,12 @@ describe("live-source mail live environment tools", () => {
         decision_policy_prompt: "Only call out hostile mobs. Ignore ordinary camera movement.",
         importance_criteria: ["hostile mob appears"],
         suppress_criteria: ["ordinary camera movement"],
-        allow_voice_callout: true,
-        voice_requires_urgency: true,
+        output_policy: {
+          allow_text_answer: true,
+          allow_voice_callout: true,
+          voice_requires_urgency: true,
+          confirmation_required: false,
+        },
       },
     });
 
@@ -122,9 +126,12 @@ describe("live-source mail live environment tools", () => {
     expect(observation.summary).toContain("no mail was read");
     const payload = observation.observation as any;
     expect(payload).toMatchObject({
-      artifactId: "stage_play_live_source_watch_job_policy_result",
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      schema: "stage_play_live_source_watch_job_policy_config_result/v1",
+      schemaVersion: "stage_play_live_source_watch_job_policy_config_result/v1",
       watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
       watch_job_policy_ref: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      policyCount: 1,
       policy: {
         artifactId: "stage_play_live_source_watch_job_policy",
         objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
@@ -145,11 +152,21 @@ describe("live-source mail live environment tools", () => {
         watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
         nextLoopState: "armed_for_next_summary",
       },
+      transcriptRows: [
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Watch job configured",
+          terminalEligible: false,
+          assistantAnswer: false,
+        }),
+      ],
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
+      context_role: "tool_evidence",
     });
     expect(payload.artifactId).not.toBe("stage_play_live_source_mail_read_result");
+    expect(payload.mailboxThreadId).toBe(threadId);
   });
 
   it.each(["live_env.check_live_source_mail", "live_env.read_live_source_mail"] as const)(

@@ -27,6 +27,7 @@ vi.mock("../server/services/audio/stt-format-recovery", () => ({
 }));
 
 import { resetVoiceRouteState, voiceRouter } from "../server/routes/voice";
+import { runtimeMemoryGovernor } from "../server/services/runtime/runtime-memory-governor";
 
 const ORIGINAL_ENV = {
   ENABLE_VOICE_TRANSCRIBE: process.env.ENABLE_VOICE_TRANSCRIBE,
@@ -46,6 +47,8 @@ const ORIGINAL_ENV = {
   HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT: process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT,
   HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE: process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE,
   HELIX_VOICE_COMMAND_LANE_KILL_SWITCH: process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH,
+  RUNTIME_TASK_VOICE_STT_BURST_LIMIT: process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT,
+  RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS: process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS,
 };
 
 const buildApp = () => {
@@ -58,6 +61,7 @@ const buildApp = () => {
 describe("voice transcribe route", () => {
   beforeEach(() => {
     resetVoiceRouteState();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     sttHttpHandlerMock.mockReset();
     sttWhisperHandlerMock.mockReset();
     recoverSttInvalidFormatToPcmWavMock.mockReset();
@@ -78,10 +82,13 @@ describe("voice transcribe route", () => {
     delete process.env.HELIX_VOICE_COMMAND_LANE_ACTIVE_PERCENT;
     delete process.env.HELIX_VOICE_COMMAND_LANE_STRICT_PREFIX_MODE;
     delete process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
+    delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
   });
 
   afterEach(() => {
     resetVoiceRouteState();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     if (ORIGINAL_ENV.ENABLE_VOICE_TRANSCRIBE === undefined) {
       delete process.env.ENABLE_VOICE_TRANSCRIBE;
     } else {
@@ -167,6 +174,16 @@ describe("voice transcribe route", () => {
       delete process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
     } else {
       process.env.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH = ORIGINAL_ENV.HELIX_VOICE_COMMAND_LANE_KILL_SWITCH;
+    }
+    if (ORIGINAL_ENV.RUNTIME_TASK_VOICE_STT_BURST_LIMIT === undefined) {
+      delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
+    } else {
+      process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT = ORIGINAL_ENV.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
+    }
+    if (ORIGINAL_ENV.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS === undefined) {
+      delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
+    } else {
+      process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS = ORIGINAL_ENV.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     }
   });
 

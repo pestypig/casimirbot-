@@ -1,9 +1,5 @@
 import { HelixAskPill } from "@/components/helix/HelixAskPill";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
-import {
-  useWorkstationLayoutStore,
-  type WorkstationLayoutState,
-} from "@/store/useWorkstationLayoutStore";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
 export function HelixAskDock({
@@ -21,7 +17,6 @@ export function HelixAskDock({
   onOpenPanel: (panelId: PanelDefinition["id"]) => void;
   onOpenConversation: (sessionId: string) => void;
 }) {
-  const toggleChatDock = useWorkstationLayoutStore((state: WorkstationLayoutState) => state.toggleChatDock);
   const isBottomPlacement = placement === "bottom";
 
   return (
@@ -38,16 +33,10 @@ export function HelixAskDock({
           isBottomPlacement ? "pb-2 pt-1" : "py-2"
         }`}
       >
-        <div className={`${isBottomPlacement ? "mb-1" : "mb-2"} flex items-center justify-between`}>
-          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Helix Ask</span>
-          <button
-            type="button"
-            onClick={toggleChatDock}
-            className="rounded border border-white/15 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300 hover:bg-white/10"
-          >
-            {collapsed ? "Expand" : "Collapse"}
-          </button>
-        </div>
+        <div
+          aria-hidden
+          className={`${isBottomPlacement ? "mb-1 h-0" : "mb-2 h-7"} shrink-0`}
+        />
         {!collapsed ? (
           <>
             <HelixAskPill

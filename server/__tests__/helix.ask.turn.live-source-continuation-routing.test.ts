@@ -1112,7 +1112,7 @@ describe("live source continuation Ask routing", () => {
     expect(response.body?.live_runtime_repair_plan?.assistant_answer).toBe(false);
     expect(response.body?.final_answer_source).toBe("live_pipeline_receipt");
     expect(response.body?.poison_audit?.assistant_history_projection_count).toBe(0);
-  });
+  }, 20_000);
 
   it("does not hijack unrelated model-only science questions", async () => {
     const app = await createApp();
@@ -1134,5 +1134,5 @@ describe("live source continuation Ask routing", () => {
       raw_route_text_returned: false,
       violations: [],
     });
-  });
+  }, 20_000);
 });

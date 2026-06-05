@@ -17,7 +17,8 @@ export type RuntimeAdmissionAction =
   | "admit_isolated_worker"
   | "queue"
   | "pause_existing_background"
-  | "reject_memory_pressure";
+  | "reject_memory_pressure"
+  | "reject_runtime_capacity";
 
 export type RuntimePressureLevel = "normal" | "soft_pressure" | "hard_pressure";
 
@@ -39,7 +40,9 @@ export type RuntimeAdmissionDecision = {
     | "host_memory_limit"
     | "background_paused"
     | "queue_deferrable"
-    | "critical_bypass";
+    | "critical_bypass"
+    | "concurrency_limit"
+    | "burst_limit";
   pressureLevel: RuntimePressureLevel;
   memory: {
     heapUsedMiB: number;
@@ -78,6 +81,9 @@ type RuntimeTaskBudget = {
   maxHeapUsedMiB?: number;
   maxRssMiB?: number;
   estimatedBurstMiB?: number;
+  maxConcurrent?: number;
+  burstLimit?: number;
+  burstWindowMs?: number;
 };
 
 type RuntimeAdmissionInput = {
@@ -123,15 +129,27 @@ type RecentRuntimeDecision = {
   memory: RuntimeAdmissionDecision["memory"];
 };
 
+type RecentRuntimeCompletion = {
+  tsMs: number;
+  id: string;
+  taskClass: RuntimeTaskClass;
+  admittedAtMs: number;
+  releasedAtMs: number;
+  durationMs: number;
+  outcome: "completed" | "failed" | "rejected" | "aborted";
+};
+
 const BYTES_PER_MIB = 1024 * 1024;
 const RECENT_DECISION_LIMIT = 50;
-const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 720;
-const DEV_VOICE_STT_MAX_RSS_MIB = 1400;
+const RECENT_COMPLETION_LIMIT = 50;
+const DEFAULT_BURST_WINDOW_MS = 60_000;
+const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 2048;
+const DEV_VOICE_STT_MAX_RSS_MIB = 3200;
 
 const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
-  critical_resident: { priority: 100, deferrable: false, pausable: false },
-  active_user_turn: { priority: 90, deferrable: false, pausable: false },
-  voice_capture: { priority: 75, deferrable: false, pausable: false },
+  critical_resident: { priority: 100, deferrable: false, pausable: false, maxConcurrent: 16 },
+  active_user_turn: { priority: 90, deferrable: false, pausable: false, maxConcurrent: 4, burstLimit: 24 },
+  voice_capture: { priority: 75, deferrable: false, pausable: false, maxConcurrent: 2, burstLimit: 30 },
   voice_stt: {
     priority: 70,
     deferrable: false,
@@ -139,6 +157,9 @@ const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
     maxHeapUsedMiB: 480,
     maxRssMiB: 900,
     estimatedBurstMiB: 96,
+    maxConcurrent: 1,
+    burstLimit: 10,
+    burstWindowMs: 60_000,
   },
   voice_tts: {
     priority: 65,
@@ -147,11 +168,14 @@ const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
     maxHeapUsedMiB: 520,
     maxRssMiB: 950,
     estimatedBurstMiB: 64,
+    maxConcurrent: 1,
+    burstLimit: 12,
+    burstWindowMs: 60_000,
   },
-  stage_play_refresh: { priority: 35, deferrable: true, pausable: true },
-  situation_room_poll: { priority: 30, deferrable: true, pausable: true },
-  debug_export: { priority: 25, deferrable: true, pausable: false },
-  repo_indexing: { priority: 20, deferrable: true, pausable: true },
+  stage_play_refresh: { priority: 35, deferrable: true, pausable: true, maxConcurrent: 1, burstLimit: 4, burstWindowMs: 60_000 },
+  situation_room_poll: { priority: 30, deferrable: true, pausable: true, maxConcurrent: 1, burstLimit: 6, burstWindowMs: 60_000 },
+  debug_export: { priority: 25, deferrable: true, pausable: false, maxConcurrent: 1, burstLimit: 3, burstWindowMs: 60_000 },
+  repo_indexing: { priority: 20, deferrable: true, pausable: true, maxConcurrent: 1, burstLimit: 1, burstWindowMs: 300_000 },
 };
 
 const isDevelopmentRuntime = (): boolean => process.env.NODE_ENV === "development";
@@ -183,12 +207,21 @@ const activeTasks = new Map<string, ActiveRuntimeTask>();
 const pausableTasks = new Map<string, PausableRuntimeTaskRegistration>();
 const pausedTaskIds = new Set<string>();
 const recentDecisions: RecentRuntimeDecision[] = [];
+const recentCompletions: RecentRuntimeCompletion[] = [];
+const admittedTaskStartsByClass = new Map<RuntimeTaskClass, number[]>();
 
 const readPositiveNumberEnv = (name: string, fallback: number): number => {
   const raw = process.env[name];
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const readPositiveIntegerEnv = (name: string, fallback: number): number => {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 };
 
 const envDisabled = (name: string): boolean => String(process.env[name] ?? "").trim() === "0";
@@ -288,6 +321,88 @@ const pushRecentDecision = (
   }
 };
 
+const pushRecentCompletion = (task: ActiveRuntimeTask, outcome: RecentRuntimeCompletion["outcome"]): void => {
+  const releasedAtMs = Date.now();
+  recentCompletions.push({
+    tsMs: releasedAtMs,
+    id: task.id,
+    taskClass: task.taskClass,
+    admittedAtMs: task.admittedAtMs,
+    releasedAtMs,
+    durationMs: Math.max(0, releasedAtMs - task.admittedAtMs),
+    outcome,
+  });
+  while (recentCompletions.length > RECENT_COMPLETION_LIMIT) {
+    recentCompletions.shift();
+  }
+};
+
+const activeTaskCountForClass = (taskClass: RuntimeTaskClass): number =>
+  Array.from(activeTasks.values()).filter((task) => task.taskClass === taskClass).length;
+
+const readClassConcurrencyLimit = (taskClass: RuntimeTaskClass): number => {
+  const budget = resolveDefaultTaskBudget(taskClass);
+  return readPositiveIntegerEnv(
+    `RUNTIME_TASK_${taskClass.toUpperCase()}_MAX_CONCURRENT`,
+    budget.maxConcurrent ?? Number.POSITIVE_INFINITY,
+  );
+};
+
+const readClassBurstBudget = (taskClass: RuntimeTaskClass): { limit: number; windowMs: number } => {
+  const budget = resolveDefaultTaskBudget(taskClass);
+  return {
+    limit: readPositiveIntegerEnv(
+      `RUNTIME_TASK_${taskClass.toUpperCase()}_BURST_LIMIT`,
+      budget.burstLimit ?? Number.POSITIVE_INFINITY,
+    ),
+    windowMs: readPositiveIntegerEnv(
+      `RUNTIME_TASK_${taskClass.toUpperCase()}_BURST_WINDOW_MS`,
+      budget.burstWindowMs ?? DEFAULT_BURST_WINDOW_MS,
+    ),
+  };
+};
+
+const pruneBurstStarts = (taskClass: RuntimeTaskClass, nowMs: number, windowMs: number): number[] => {
+  const starts = admittedTaskStartsByClass.get(taskClass) ?? [];
+  const retained = starts.filter((entryMs) => nowMs - entryMs < windowMs);
+  admittedTaskStartsByClass.set(taskClass, retained);
+  return retained;
+};
+
+const recordTaskStart = (taskClass: RuntimeTaskClass, admittedAtMs: number): void => {
+  const { windowMs } = readClassBurstBudget(taskClass);
+  const starts = pruneBurstStarts(taskClass, admittedAtMs, windowMs);
+  starts.push(admittedAtMs);
+  admittedTaskStartsByClass.set(taskClass, starts);
+};
+
+const readCapacityBlock = (
+  taskClass: RuntimeTaskClass,
+): { reason: "concurrency_limit" | "burst_limit"; activeForClass: number; limit: number } | null => {
+  const concurrencyLimit = readClassConcurrencyLimit(taskClass);
+  const activeForClass = activeTaskCountForClass(taskClass);
+  if (Number.isFinite(concurrencyLimit) && activeForClass >= concurrencyLimit) {
+    return { reason: "concurrency_limit", activeForClass, limit: concurrencyLimit };
+  }
+  const { limit, windowMs } = readClassBurstBudget(taskClass);
+  const recentStarts = pruneBurstStarts(taskClass, Date.now(), windowMs);
+  if (Number.isFinite(limit) && recentStarts.length >= limit) {
+    return { reason: "burst_limit", activeForClass, limit };
+  }
+  return null;
+};
+
+const capacityActionForTask = (
+  taskClass: RuntimeTaskClass,
+  budget: RuntimeTaskBudget,
+): RuntimeAdmissionAction => {
+  if (budget.deferrable) return "queue";
+  if (taskClass === "voice_stt" || taskClass === "voice_tts" || taskClass === "voice_capture") {
+    return "reject_runtime_capacity";
+  }
+  return "queue";
+};
+
 const buildLease = (taskClass: RuntimeTaskClass): RuntimeTaskLease => {
   const id = `runtime:${taskClass}:${randomUUID()}`;
   const activeTask: ActiveRuntimeTask = {
@@ -296,6 +411,7 @@ const buildLease = (taskClass: RuntimeTaskClass): RuntimeTaskLease => {
     admittedAtMs: Date.now(),
   };
   activeTasks.set(id, activeTask);
+  recordTaskStart(taskClass, activeTask.admittedAtMs);
   let released = false;
   const lease: RuntimeTaskLease = {
     id,
@@ -306,6 +422,7 @@ const buildLease = (taskClass: RuntimeTaskClass): RuntimeTaskLease => {
       released = true;
       activeTask.releasedAtMs = Date.now();
       activeTask.outcome = outcome;
+      pushRecentCompletion(activeTask, outcome);
       activeTasks.delete(id);
       void maybeResumePausedTasks();
     },
@@ -396,6 +513,47 @@ export const getRuntimeMemorySnapshot = () => {
   };
 };
 
+export const getRuntimeTaskSnapshot = () => {
+  const memorySnapshot = getRuntimeMemorySnapshot();
+  const nowMs = Date.now();
+  const taskClasses = Object.keys(DEFAULT_TASK_BUDGETS) as RuntimeTaskClass[];
+  const classes = taskClasses.map((taskClass) => {
+    const budget = resolveDefaultTaskBudget(taskClass);
+    const burst = readClassBurstBudget(taskClass);
+    const starts = pruneBurstStarts(taskClass, nowMs, burst.windowMs);
+    return {
+      taskClass,
+      priority: budget.priority,
+      deferrable: budget.deferrable,
+      pausable: budget.pausable,
+      maxConcurrent: readClassConcurrencyLimit(taskClass),
+      activeCount: activeTaskCountForClass(taskClass),
+      burstLimit: burst.limit,
+      burstWindowMs: burst.windowMs,
+      burstUsed: starts.length,
+      estimatedBurstMiB: budget.estimatedBurstMiB ?? null,
+    };
+  });
+  return {
+    schema: "casimir.runtime_tasks.v1",
+    pid: process.pid,
+    pressureLevel: memorySnapshot.pressureLevel,
+    memory: memorySnapshot.memory,
+    host: memorySnapshot.host,
+    activeTasks: memorySnapshot.activeTasks,
+    pausedTasks: memorySnapshot.pausedTasks,
+    registeredPausableTasks: Array.from(pausableTasks.values()).map((task) => ({
+      id: task.id,
+      taskClass: task.taskClass,
+      priority: task.priority,
+      paused: task.isPaused(),
+    })),
+    classes,
+    recentDecisions: recentDecisions.slice(-RECENT_DECISION_LIMIT),
+    recentCompletions: recentCompletions.slice(-RECENT_COMPLETION_LIMIT),
+  };
+};
+
 export const maybeResumePausedTasks = async (): Promise<number> => {
   if (pausedTaskIds.size === 0) return 0;
   const memory = toMemorySnapshot(memoryReader());
@@ -443,6 +601,20 @@ export const admitRuntimeTask = (
   if (input.taskClass === "active_user_turn") {
     const lease = buildLease(input.taskClass);
     return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
+  }
+
+  const capacityBlock = readCapacityBlock(input.taskClass);
+  if (capacityBlock) {
+    return makeDecision(
+      input,
+      capacityActionForTask(input.taskClass, budget),
+      false,
+      capacityBlock.reason,
+      pressure.level,
+      memory,
+      host,
+      limits,
+    );
   }
 
   if (pressure.level === "normal") {
@@ -501,6 +673,22 @@ export const recheckRuntimeTask = (
   if (input.taskClass === "critical_resident" || input.taskClass === "active_user_turn") {
     return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
   }
+  const budget = DEFAULT_TASK_BUDGETS[input.taskClass];
+  if (!lease) {
+    const capacityBlock = readCapacityBlock(input.taskClass);
+    if (capacityBlock) {
+      return makeDecision(
+        input,
+        capacityActionForTask(input.taskClass, budget),
+        false,
+        capacityBlock.reason,
+        pressure.level,
+        memory,
+        host,
+        limits,
+      );
+    }
+  }
   if (pressure.level === "hard_pressure") {
     lease?.release("rejected");
     return makeDecision(
@@ -534,6 +722,8 @@ export const resetRuntimeMemoryGovernorForTests = (options?: {
   pausableTasks.clear();
   pausedTaskIds.clear();
   recentDecisions.length = 0;
+  recentCompletions.length = 0;
+  admittedTaskStartsByClass.clear();
   memoryReader = options?.memoryReader ?? (() => process.memoryUsage());
   hostMemoryReader = options?.hostMemoryReader ?? (() => {
     const totalMiB = os.totalmem() / BYTES_PER_MIB;
@@ -553,5 +743,6 @@ export const runtimeMemoryGovernor = {
   unregisterPausableRuntimeTask,
   maybeResumePausedTasks,
   getRuntimeMemorySnapshot,
+  getRuntimeTaskSnapshot,
   resetRuntimeMemoryGovernorForTests,
 };

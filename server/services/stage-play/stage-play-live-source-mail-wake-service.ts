@@ -38,8 +38,10 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
 };
 
 const DEFAULT_WAKE_SERVICE_INTERVAL_MS = 15_000;
+const WAKE_SERVICE_RUNTIME_TASK_ID = "stage_play_live_source_mail_wake_service";
 let serviceTimer: ReturnType<typeof setInterval> | null = null;
 let cycleRunning = false;
+let servicePaused = false;
 
 const readPositiveIntEnv = (name: string, fallback: number): number => {
   const parsed = Number(process.env[name]);
@@ -177,8 +179,22 @@ export function startStagePlayLiveSourceMailWakeService(): boolean {
   if (serviceTimer) return false;
   if (process.env.NODE_ENV === "test") return false;
   if (process.env.STAGE_PLAY_MAIL_WAKE_RUNNER_ENABLED === "0") return false;
+  servicePaused = false;
+  runtimeMemoryGovernor.registerPausableRuntimeTask({
+    id: WAKE_SERVICE_RUNTIME_TASK_ID,
+    taskClass: "stage_play_refresh",
+    priority: 35,
+    isPaused: () => servicePaused,
+    pause: () => {
+      servicePaused = true;
+    },
+    resume: () => {
+      servicePaused = false;
+    },
+  });
   const intervalMs = readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_RUNNER_INTERVAL_MS", DEFAULT_WAKE_SERVICE_INTERVAL_MS);
   serviceTimer = setInterval(() => {
+    if (servicePaused) return;
     void runStagePlayLiveSourceMailWakeAdmissionCycle().catch((err) => {
       console.warn("[stage-play-mail-wake-service] admission cycle failed", err);
     });
@@ -188,8 +204,11 @@ export function startStagePlayLiveSourceMailWakeService(): boolean {
 }
 
 export function stopStagePlayLiveSourceMailWakeServiceForTest(): void {
-  if (!serviceTimer) return;
-  clearInterval(serviceTimer);
+  if (serviceTimer) {
+    clearInterval(serviceTimer);
+  }
   serviceTimer = null;
   cycleRunning = false;
+  servicePaused = false;
+  runtimeMemoryGovernor.unregisterPausableRuntimeTask(WAKE_SERVICE_RUNTIME_TASK_ID);
 }

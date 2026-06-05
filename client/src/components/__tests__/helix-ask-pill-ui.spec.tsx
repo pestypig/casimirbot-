@@ -222,7 +222,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).not.toContain("Last 5 segments");
     expect(source).not.toContain("chunk cadence");
     expect(source).toContain("latestConversationBrief");
-    expect(source).toContain("latestTimelineEvent");
+    expect(source).not.toContain("latestTimelineEvent");
     expect(source).not.toContain("max-h-44 space-y-1.5 overflow-y-auto");
     expect(source).not.toContain("Reasoning Attempts");
   });
