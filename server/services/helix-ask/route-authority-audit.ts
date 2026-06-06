@@ -112,7 +112,7 @@ const classifyViolations = (input: {
   const procedureMemoryAuthorityApplies =
     sourceTarget === "procedure_memory" ||
     targetKind === "situation_epoch" ||
-    (procedureMemoryPrompt && sourceTarget !== "live_environment");
+    (procedureMemoryPrompt && sourceTarget !== "live_environment" && sourceTarget !== "live_source_mailbox");
   const livePipelineProcedureReceipt =
     terminal === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, route);

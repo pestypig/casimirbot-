@@ -17,6 +17,11 @@ import {
   subscribeStagePlayLiveSourceMailEnqueued,
   upsertStagePlayLiveSourceJobState,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  getLatestStagePlayLiveSourceNarrativeState,
+  getStagePlayLiveSourceNarrativeState,
+  recordStagePlayLiveSourceNarrativeState,
+} from "../services/stage-play/stage-play-live-source-narrative-store";
 import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/stage-play-live-source-mail-context-pack";
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
@@ -165,6 +170,87 @@ describe("Stage Play live-source mailbox", () => {
       raw_content_included: false,
     });
     expect(JSON.stringify(mailItems[0])).not.toMatch(/raw_image|image_ref|data:image|base64/i);
+  });
+
+  it("stales narrative projections on new same-source mail and supersedes them on the next interpretation", () => {
+    const jobState = upsertStagePlayLiveSourceJobState({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      status: "armed",
+      updatedAt: "2026-06-04T12:00:00.000Z",
+    });
+    const firstNarrative = recordStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: jobState.jobId,
+      sourceIds: [sourceId],
+      mailBatchRefs: ["stage_play_live_source_mail:first"],
+      sourceEvidenceRefs: ["visual_evidence:first"],
+      currentSceneSummary: "The first compact scene shows a quiet base interior.",
+      runningStorySummary: "A quiet base interior is visible.",
+      createdAt: "2026-06-04T12:00:01.000Z",
+    });
+
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:narrative-stale",
+      evidenceRef: "visual_evidence:narrative-stale",
+      summaryText: "The camera has shifted to a moonlit exterior with mountains.",
+      createdAt: "2026-06-04T12:00:10.000Z",
+    });
+
+    expect(getStagePlayLiveSourceNarrativeState(firstNarrative.narrativeStateId)).toMatchObject({
+      staleness: {
+        state: "stale_after_new_mail",
+        staleAfterMailId: mail.mailId,
+        supersededByStateId: null,
+      },
+    });
+    expect(getLatestStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: jobState.jobId,
+      sourceId,
+      stalenessState: "current",
+    })).toBeNull();
+
+    const secondNarrative = recordStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: jobState.jobId,
+      sourceIds: [sourceId],
+      mailBatchRefs: [mail.mailId],
+      sourceEvidenceRefs: [mail.sourceRefs.evidenceRef ?? ""],
+      currentSceneSummary: "The latest compact scene shows a moonlit exterior with mountains.",
+      createdAt: "2026-06-04T12:00:20.000Z",
+    });
+
+    expect(secondNarrative).toMatchObject({
+      staleness: {
+        state: "current",
+        staleAfterMailId: null,
+        supersededByStateId: null,
+      },
+      priorNarrativeStateRef: firstNarrative.narrativeStateId,
+    });
+    expect(getStagePlayLiveSourceNarrativeState(firstNarrative.narrativeStateId)).toMatchObject({
+      staleness: {
+        state: "superseded",
+        staleAfterMailId: mail.mailId,
+        supersededByStateId: secondNarrative.narrativeStateId,
+      },
+    });
+    expect(getLatestStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: jobState.jobId,
+      sourceId,
+      stalenessState: "current",
+    })?.narrativeStateId).toBe(secondNarrative.narrativeStateId);
   });
 
   it("emits a wake-ready mail event when new unread mail is queued for an armed job", () => {
@@ -1193,6 +1279,7 @@ describe("Stage Play live-source mailbox", () => {
       artifactId: "stage_play_live_source_watch_job_policy_config_result",
       policy: {
         objectiveText: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+        interpretationMode: "latest_scene_answer",
         decisionPolicyPrompt: expect.stringContaining("If the mail batch contains any compact visual summary, record draft_text_answer."),
       },
     });
@@ -1204,6 +1291,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain("Continuing live-source watch job:");
     expect(prompt).toContain("Watch the active visual source and describe each new visual-summary mail batch in one sentence.");
     expect(prompt).toContain(`Watch policy ref: ${policy.policyId}`);
+    expect(prompt).toContain("Interpretation mode: latest_scene_answer");
     expect(prompt).toContain("Decision policy:");
     expect(prompt).toContain("For each unread mail batch, read the listed mail refs as the current observation window.");
     expect(prompt).toContain("If the mail batch contains any compact visual summary, record draft_text_answer.");
@@ -1215,6 +1303,151 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain("Suppress only if no unread mail items exist or mail lacks compact summary text.");
     expect(prompt).toContain(mail.mailId);
     expect(prompt).toContain("Minecraft-like scene with a player near a book stand");
+  });
+
+  it("binds generated interpretation policy into future wake prompts", () => {
+    const configureObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the active visual source, interpret what is happening across the summaries, predict what might happen next, and say what should be watched next.",
+      },
+    });
+    const configured = configureObservation.observation as any;
+
+    expect(configured).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      policy: {
+        objectiveText: "Watch the active visual source, interpret what is happening across the summaries, predict what might happen next, and say what should be watched next.",
+        interpretationMode: "prediction_watch",
+        decisionPolicyPrompt: expect.stringContaining("record the decision record_interpretation"),
+        outputPolicy: expect.objectContaining({
+          allowTextAnswer: true,
+          allowVoiceCallout: false,
+        }),
+        importanceCriteria: expect.arrayContaining([
+          expect.stringContaining("interpret, compare, predict, or decide what to watch next"),
+        ]),
+      },
+    });
+    expect(configured.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "loop_state",
+        body: "Loop state: armed for next summary.",
+      }),
+    ]));
+  });
+
+  it("includes latest narrative state in wake prompts before interpreting new mail", async () => {
+    const { policy } = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the visual source, interpret what is happening, predict likely next changes, and say what to watch next.",
+      decisionPolicyPrompt: "Interpret each non-empty visual-summary mail batch against the current story and update watch-next targets.",
+      importanceCriteria: ["scene changes", "new app/window content", "risk appears"],
+      suppressCriteria: ["no meaningful visual change"],
+    });
+    const narrative = recordStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: policy.jobId,
+      policyId: policy.policyId,
+      sourceIds: [sourceId],
+      mailBatchRefs: ["stage_play_live_source_mail:prior-story"],
+      sourceEvidenceRefs: ["visual_evidence:prior-story"],
+      currentSceneSummary: "The source showed a dark app-launcher interface.",
+      runningStorySummary: "The live source has been stable on a dark app-launcher/productivity interface.",
+      interpretedSituation: {
+        setting: "desktop visual source",
+        activeWindowOrScene: "dark app launcher",
+        objects: ["icon grid", "productivity apps"],
+        activities: ["app navigation"],
+        userRelevantMeaning: "The visual source appears stable and focused on app navigation rather than active gameplay or video.",
+      },
+      meaningfulChanges: ["No active app has opened yet."],
+      uncertainties: ["The exact selected app is unknown from compact mail only."],
+      watchNext: {
+        targets: ["active window change", "opened app", "new content replacing the grid"],
+        reason: "Watch for the launcher to transition into a specific app or content view.",
+      },
+      prediction: {
+        text: "The next mail may show either the same launcher grid or an opened app replacing it.",
+        horizon: "next_mail",
+        confidence: 0.58,
+        validationSignals: ["same launcher grid remains", "opened app replaces icon grid"],
+      },
+      createdAt: "2026-06-04T12:01:00.000Z",
+    });
+    expect(policy.interpretationMode).toBe("prediction_watch");
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:narrative-wake-next",
+      evidenceRef: "visual_evidence:narrative-wake-next",
+      summaryText: "The dark app launcher is still visible, with a grid of productivity and social app icons.",
+      createdAt: "2026-06-04T12:01:10.000Z",
+    });
+
+    let prompt = "";
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async (input) => {
+        prompt = input.prompt;
+        return {
+          turn_id: "ask:wake-with-prior-narrative",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-with-prior-narrative",
+                  decision: "record_interpretation",
+                  mailIds: input.wakeRequest.mailIds,
+                  narrativeStateRef: "stage_play_live_source_narrative_state:wake-with-prior-narrative",
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-with-prior-narrative",
+    });
+    expect(getStagePlayLiveSourceNarrativeState(narrative.narrativeStateId)).toMatchObject({
+      staleness: {
+        state: "stale_after_new_mail",
+        staleAfterMailId: mail.mailId,
+      },
+    });
+    expect(prompt).toContain("Interpretation mode: prediction_watch");
+    expect(prompt).toContain("Latest narrative state:");
+    expect(prompt).toContain(narrative.narrativeStateId);
+    expect(prompt).toContain("staleness: stale_after_new_mail");
+    expect(prompt).toContain("running_story_summary: The live source has been stable on a dark app-launcher/productivity interface.");
+    expect(prompt).toContain("active_window_or_scene: dark app launcher");
+    expect(prompt).toContain("user_relevant_meaning: The visual source appears stable and focused on app navigation rather than active gameplay or video.");
+    expect(prompt).toContain("targets: active window change, opened app, new content replacing the grid");
+    expect(prompt).toContain("last_prediction:");
+    expect(prompt).toContain("The next mail may show either the same launcher grid or an opened app replacing it.");
+    expect(prompt).toContain("Prior prediction:");
+    expect(prompt).toContain("validation_signals: same launcher grid remains | opened app replaces icon grid");
+    expect(prompt).toContain("If the new mail supports the prediction, include a meaningfulChanges entry beginning with \"Prediction supported:\".");
+    expect(prompt).toContain("If the new mail contradicts the prediction, include a meaningfulChanges entry beginning with \"Prediction contradicted:\".");
+    expect(prompt).toContain("If a prior prediction is listed below, compare the unread mail batch to its validation signals.");
+    expect(prompt).toContain("If the policy asks to interpret, compare, explain what is happening, predict, or say what to watch next, choose record_interpretation.");
+    expect(prompt).toContain("When choosing record_interpretation: include a concise batch interpretation, update the running story");
+    expect(prompt).toContain(mail.mailId);
   });
 
   it("lets the same mail summary produce different wake decisions under different job policies", async () => {
@@ -1870,6 +2103,7 @@ describe("Stage Play live-source mailbox", () => {
       policyId: policy.policyId,
       objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
       decisionPolicyPrompt: "Wait on harmless scene changes. Draft a callout only for hostile mobs.",
+      interpretationMode: "voice_callout_watch",
       sourceIds: [sourceId],
       status: "armed",
     });

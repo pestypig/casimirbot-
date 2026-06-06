@@ -108,7 +108,11 @@ const classifySourceFamily = (input: {
   return "debug_export";
 };
 
-const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): string => {
+const requestedActionFor = (
+  family: HelixCapabilityFamily,
+  promptText: string,
+  sourceTarget?: string,
+): string => {
   const prompt = normalize(promptText);
   if (family === "docs") {
     if (/\b(?:open|pull up|bring up|show)\b/.test(prompt)) return "open_or_validate_document";
@@ -124,6 +128,9 @@ const requestedActionFor = (family: HelixCapabilityFamily, promptText: string): 
     return "inspect_live_source";
   }
   if (family === "live_environment") {
+    if (sourceTarget === "live_source_mailbox") {
+      return "read_live_source_mail";
+    }
     if (/\b(?:live\s*source\s*mailbox|live\s*source\s*mail|source\s*mail|mailbox|visual\s*summary\s*mail|read_live_source_mail)\b/.test(prompt)) {
       return "read_live_source_mail";
     }
@@ -275,7 +282,7 @@ export const buildCapabilityPlan = (input: {
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"
-        : requestedActionFor(family, input.promptText);
+        : requestedActionFor(family, input.promptText, sourceTarget);
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
     (

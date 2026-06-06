@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type {
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayLiveSourceNarrativeStateV1,
   StagePlayLiveSourceVoiceDeliveryReceiptV1,
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -19,6 +20,10 @@ import {
   listStagePlayLiveSourceWatchJobPolicies,
   listUnreadStagePlayLiveSourceMailItems,
 } from "./stage-play-live-source-mailbox-store";
+import {
+  getLatestStagePlayLiveSourceNarrativeState,
+  getStagePlayLiveSourceNarrativeState,
+} from "./stage-play-live-source-narrative-store";
 import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-live-source-mail-transcript-store";
 import {
   maybeRunStagePlayLiveSourceVoiceDelivery,
@@ -67,6 +72,11 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const mailBatchLabel = (items: StagePlayLiveSourceMailItemV1[]): string =>
+  items.length > 0 && items.every((item) => item.sourceKind === "visual_frame")
+    ? "visual-summary"
+    : "live-source";
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -219,6 +229,7 @@ const formatPriorDecisions = (
         `  decision: ${decision.decision}`,
         `  mail: ${decision.mailIds.join(", ") || "none"}`,
         `  rationale: ${clipPromptText(decision.rationalePreview, 240)}`,
+        decision.narrativeStateRef ? `  narrative_state: ${decision.narrativeStateRef}` : null,
         decision.textAnswerDraft ? `  text_answer: ${clipPromptText(decision.textAnswerDraft.text, 180)}` : null,
         decision.voiceCalloutDraft ? `  voice_callout: ${clipPromptText(decision.voiceCalloutDraft.text, 180)}` : null,
       ].filter(Boolean).join("\n")).join("\n")
@@ -228,6 +239,60 @@ const formatPriorDecisions = (
     "",
     "Prior answer/callout refs:",
     priorAnswerRefs.length > 0 ? priorAnswerRefs.map((ref) => `- ${ref}`).join("\n") : "- none recorded",
+  ].join("\n");
+};
+
+const formatLatestNarrativeState = (
+  narrative: StagePlayLiveSourceNarrativeStateV1 | null,
+): string => {
+  if (!narrative) return "- none recorded";
+  const situation = narrative.interpretedSituation;
+  const prediction = narrative.prediction;
+  return [
+    `- state_id: ${narrative.narrativeStateId}`,
+    `  staleness: ${narrative.staleness.state}`,
+    narrative.staleness.staleAfterMailId ? `  stale_after_mail: ${narrative.staleness.staleAfterMailId}` : null,
+    narrative.staleness.supersededByStateId ? `  superseded_by: ${narrative.staleness.supersededByStateId}` : null,
+    `  running_story_summary: ${clipPromptText(narrative.runningStorySummary, 620)}`,
+    `  current_scene_summary: ${clipPromptText(narrative.currentSceneSummary, 420)}`,
+    "  last_interpreted_situation:",
+    situation.setting ? `    setting: ${clipPromptText(situation.setting, 180)}` : null,
+    situation.activeWindowOrScene ? `    active_window_or_scene: ${clipPromptText(situation.activeWindowOrScene, 180)}` : null,
+    situation.entities.length > 0 ? `    entities: ${situation.entities.join(", ")}` : null,
+    situation.objects.length > 0 ? `    objects: ${situation.objects.join(", ")}` : null,
+    situation.activities.length > 0 ? `    activities: ${situation.activities.join(", ")}` : null,
+    `    user_relevant_meaning: ${clipPromptText(situation.userRelevantMeaning, 420)}`,
+    narrative.meaningfulChanges.length > 0 ? `  meaningful_changes: ${narrative.meaningfulChanges.map((entry) => clipPromptText(entry, 160)).join(" | ")}` : null,
+    narrative.uncertainties.length > 0 ? `  uncertainties: ${narrative.uncertainties.map((entry) => clipPromptText(entry, 160)).join(" | ")}` : null,
+    "  watch_next:",
+    `    targets: ${narrative.watchNext.targets.join(", ") || "next compact source summary"}`,
+    `    reason: ${clipPromptText(narrative.watchNext.reason, 320)}`,
+    prediction ? "  last_prediction:" : null,
+    prediction ? `    text: ${clipPromptText(prediction.text, 360)}` : null,
+    prediction ? `    horizon: ${prediction.horizon}` : null,
+    prediction ? `    confidence: ${prediction.confidence}` : null,
+    prediction && prediction.validationSignals.length > 0 ? `    validation_signals: ${prediction.validationSignals.join(" | ")}` : null,
+  ].filter(Boolean).join("\n");
+};
+
+const formatPriorPrediction = (
+  narrative: StagePlayLiveSourceNarrativeStateV1 | null,
+): string => {
+  const prediction = narrative?.prediction ?? null;
+  if (!prediction) return "- none recorded";
+  return [
+    `- narrative_state: ${narrative.narrativeStateId}`,
+    `  text: ${clipPromptText(prediction.text, 520)}`,
+    `  horizon: ${prediction.horizon}`,
+    `  confidence: ${prediction.confidence}`,
+    prediction.validationSignals.length > 0
+      ? `  validation_signals: ${prediction.validationSignals.map((entry) => clipPromptText(entry, 160)).join(" | ")}`
+      : "  validation_signals: none recorded",
+    "  validation_hook:",
+    "    Compare the unread mail batch against this prediction.",
+    "    If the new mail supports the prediction, include a meaningfulChanges entry beginning with \"Prediction supported:\".",
+    "    If the new mail contradicts the prediction, include a meaningfulChanges entry beginning with \"Prediction contradicted:\".",
+    "    If the new mail is not enough to validate it, include a meaningfulChanges entry beginning with \"Prediction pending:\".",
   ].join("\n");
 };
 
@@ -307,7 +372,7 @@ const buildDurableWakeTranscriptRows = (input: {
     rowId: `wake_mail_read_receipt:${hashShort(input.wake.wakeRequestId)}`,
     rowKind: "mail_read_receipt",
     title: "Tool receipt",
-    body: `${input.mailBatch.length || input.wake.mailIds.length} unread live-source mail item(s).`,
+    body: `Read ${input.mailBatch.length || input.wake.mailIds.length} ${mailBatchLabel(input.mailBatch)} mail item${(input.mailBatch.length || input.wake.mailIds.length) === 1 ? "" : "s"}.`,
     toolName: "live_env.read_live_source_mail",
     artifactId: input.wake.wakeRequestId,
     artifactKind: input.wake.artifactId,
@@ -346,6 +411,68 @@ const buildDurableWakeTranscriptRows = (input: {
           evidenceRefs: decision.evidenceRefs,
           authority: "model_decision_receipt",
           terminalEligible: decision.textAnswerDraft.terminalEligible,
+          createdAt: input.createdAt,
+        }));
+      }
+      const narrativeState = decision.narrativeStateRef
+        ? getStagePlayLiveSourceNarrativeState(decision.narrativeStateRef)
+        : null;
+      if (narrativeState) {
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_interpretation:${hashShort(narrativeState.narrativeStateId)}`,
+          rowKind: "interpretation",
+          title: "Interpretation",
+          body: narrativeState.interpretedSituation.userRelevantMeaning,
+          artifactId: narrativeState.narrativeStateId,
+          artifactKind: narrativeState.artifactId,
+          evidenceRefs: narrativeState.evidenceRefs,
+          authority: "model_decision_receipt",
+          createdAt: input.createdAt,
+        }));
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_watch_next:${hashShort(narrativeState.narrativeStateId)}`,
+          rowKind: "watch_next",
+          title: "Watch next",
+          body: [
+            narrativeState.watchNext.targets.length > 0
+              ? `Targets: ${narrativeState.watchNext.targets.join(", ")}.`
+              : "Targets: next compact source summary.",
+            `Reason: ${narrativeState.watchNext.reason}`,
+          ].join("\n"),
+          artifactId: narrativeState.narrativeStateId,
+          artifactKind: narrativeState.artifactId,
+          evidenceRefs: narrativeState.evidenceRefs,
+          authority: "model_decision_receipt",
+          createdAt: input.createdAt,
+        }));
+        if (narrativeState.prediction) {
+          rows.push(makeWakeTranscriptRow({
+            rowId: `wake_prediction:${hashShort(narrativeState.narrativeStateId)}`,
+            rowKind: "prediction",
+            title: "Prediction",
+            body: [
+              narrativeState.prediction.text,
+              `Horizon: ${narrativeState.prediction.horizon}. Confidence: ${Math.round(narrativeState.prediction.confidence * 100)}%.`,
+              narrativeState.prediction.validationSignals.length > 0
+                ? `Validation: ${narrativeState.prediction.validationSignals.join("; ")}.`
+                : null,
+            ].filter(Boolean).join("\n"),
+            artifactId: narrativeState.narrativeStateId,
+            artifactKind: narrativeState.artifactId,
+            evidenceRefs: narrativeState.evidenceRefs,
+            authority: "model_decision_receipt",
+            createdAt: input.createdAt,
+          }));
+        }
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_narrative_state:${hashShort(narrativeState.narrativeStateId)}`,
+          rowKind: "narrative_state",
+          title: "Narrative state",
+          body: narrativeState.narrativeStateId,
+          artifactId: narrativeState.narrativeStateId,
+          artifactKind: narrativeState.artifactId,
+          evidenceRefs: narrativeState.evidenceRefs,
+          authority: "tool_evidence",
           createdAt: input.createdAt,
         }));
       }
@@ -555,15 +682,18 @@ const buildWakePrompt = (input: {
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
+  latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
   voicePolicy: StagePlayLiveSourceVoicePolicyV1;
 }): string => {
   const objective = input.policy?.objectiveText ?? "Read the live-source mailbox and decide what to do with this unread source update batch.";
   const decisionPolicy = input.policy?.decisionPolicyPrompt ?? "If there is no user-facing change, record wait_for_next_summary. If there is a meaningful user-facing change, draft a concise text answer.";
+  const interpretationMode = input.policy?.interpretationMode ?? "latest_scene_answer";
   return [
     "Continuing live-source watch job:",
     objective,
     `Watch policy ref: ${input.policy?.policyId ?? "none"}`,
     `Watch job ref: ${input.policy?.jobId ?? input.wake.jobId ?? "none"}`,
+    `Interpretation mode: ${interpretationMode}`,
     "",
     "Decision policy:",
     decisionPolicy,
@@ -573,6 +703,19 @@ const buildWakePrompt = (input: {
     "Read only the mail refs listed below for this wake request; do not widen to newer mailbox items in this turn.",
     "Treat the listed mail refs as one chronological observation window from the same live source.",
     "Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.",
+    "Decision mode guidance:",
+    "- latest_scene_answer: non-empty mail should normally produce draft_text_answer.",
+    "- batch_interpretation: non-empty mail should normally produce record_interpretation.",
+    "- salience_watch: compare to prior state and wait unless the policy salience criteria are matched.",
+    "- prediction_watch: produce record_interpretation with prediction and validation signals.",
+    "- voice_callout_watch: request_voice_callout only if policy allows voice and salience criteria are matched.",
+    "- Use draft_text_answer when the standing policy or current prompt asks what the latest mail shows or asks for a one-sentence scene answer.",
+    "- Use record_interpretation when the task asks what is happening, what changed, what should be watched next, or when the mail should update the continuing story without a direct answer.",
+    "- If the policy asks to interpret, compare, explain what is happening, predict, or say what to watch next, choose record_interpretation.",
+    "- When choosing record_interpretation: include a concise batch interpretation, update the running story, state what changed if anything, state uncertainties, state watch-next targets, optionally include a prediction and validation signals, then set nextLoopState = armed_for_next_summary.",
+    "- If a prior prediction is listed below, compare the unread mail batch to its validation signals. Mention support, contradiction, or pending validation in meaningfulChanges. Do not calculate a score yet.",
+    "- Use wait_for_next_summary only when the batch is empty or the standing policy suppresses harmless/non-salient changes.",
+    "- Use request_voice_callout only when the policy allows voice and the update meets the policy's salience/urgency threshold.",
     "",
     "Importance criteria:",
     formatCriteria(input.policy?.importanceCriteria ?? []),
@@ -587,6 +730,12 @@ const buildWakePrompt = (input: {
     "- If voiceEnabled is false, draft text only and do not request a voice tool.",
     "- If requiresConfirmation is true, produce the callout draft and wait for confirmation; do not request a voice tool.",
     "- If allowedNow is true and speech is appropriate, record the decision first and request the separate voice delivery tool from that decision.",
+    "",
+    "Latest narrative state:",
+    formatLatestNarrativeState(input.latestNarrativeState),
+    "",
+    "Prior prediction:",
+    formatPriorPrediction(input.latestNarrativeState),
     "",
     "Unread mail batch:",
     `Wake request: ${input.wake.wakeRequestId}`,
@@ -819,11 +968,19 @@ export async function runNextMailWakeRequest(input: {
   const policy = resolveActiveWatchPolicy({ wake: running, mailBatch });
   const priorDecisions = priorDecisionsForWake(running, policy);
   const voicePolicy = voicePolicyFromWatchPolicy(policy);
+  const latestNarrativeState = getLatestStagePlayLiveSourceNarrativeState({
+    threadId: running.threadId,
+    roomId: running.roomId ?? null,
+    environmentId: running.environmentId ?? null,
+    jobId: policy?.jobId ?? running.jobId ?? null,
+    sourceId: mailBatch[0]?.sourceId ?? running.sourceIds[0] ?? null,
+  });
   const evidenceRefs = uniqueStrings([
     ...running.evidenceRefs,
     ...running.mailIds,
     ...running.sourceIds,
     ...(policy ? [policy.policyId, policy.jobId, ...policy.evidenceRefs, ...policy.priorAnswerRefs, ...policy.priorDecisionRefs] : []),
+    latestNarrativeState?.narrativeStateId,
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
@@ -880,6 +1037,7 @@ export async function runNextMailWakeRequest(input: {
       policy,
       mailBatch,
       priorDecisions,
+      latestNarrativeState,
       voicePolicy,
     });
     const response = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({

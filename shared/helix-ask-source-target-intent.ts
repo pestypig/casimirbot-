@@ -54,6 +54,7 @@ export type HelixAskSourceTargetRequestedOutput =
   | "stage_play_live_answer_projection"
   | "stage_play_live_source_mail_read_result"
   | "stage_play_live_source_mail_decision"
+  | "stage_play_live_source_narrative_state"
   | "process_overview"
   | "visual_scene_query_intent"
   | "selected_visual_scene_set"

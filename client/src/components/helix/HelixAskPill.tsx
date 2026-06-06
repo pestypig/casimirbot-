@@ -8290,7 +8290,7 @@ type HelixContinuousTurnStreamTone =
   | "final"
   | "warning";
 
-type HelixContinuousTurnStreamRow = {
+export type HelixContinuousTurnStreamRow = {
   key: string;
   source: "question" | "agent_work" | "stage_play" | "live_bridge" | "live_source_mail" | "voice" | "final";
   label: string;
@@ -8304,11 +8304,16 @@ type HelixContinuousTurnStreamRow = {
   detailLimit?: number;
 };
 
-type HelixMailLoopTranscriptRowKind =
+export type HelixMailLoopTranscriptRowKind =
   | "mail_received"
   | "mail_read_tool_call"
   | "mail_read_receipt"
   | "agent_decision"
+  | "interpretation"
+  | "prediction"
+  | "watch_next"
+  | "narrative_state"
+  | "interpretation_state"
   | "text_answer"
   | "voice_callout_request"
   | "voice_tool_call"
@@ -8325,6 +8330,11 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "mail_read_tool_call",
   "mail_read_receipt",
   "agent_decision",
+  "interpretation",
+  "prediction",
+  "watch_next",
+  "narrative_state",
+  "interpretation_state",
   "text_answer",
   "voice_callout_request",
   "voice_tool_call",
@@ -8337,7 +8347,7 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "blocked",
 ]);
 
-type HelixMailLoopTranscriptRow = {
+export type HelixMailLoopTranscriptRow = {
   rowId: string;
   rowKind: HelixMailLoopTranscriptRowKind;
   title: string;
@@ -8543,6 +8553,7 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   }
   if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
   if (row.rowKind === "mail_read_receipt") {
+    if (/^\s*Read\s+\d+\s+/i.test(row.body)) return row.body;
     const count = row.body.match(/\b(\d+)\s+unread\b/i)?.[1] ?? "1";
     return `Read ${count} unread live-source mail item${count === "1" ? "" : "s"}.`;
   }
@@ -8551,6 +8562,11 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
     if (match) return `${match[1].trim()}\nReason: ${match[2].trim()}`;
     return row.body;
   }
+  if (row.rowKind === "interpretation") return row.body || "Interpretation recorded.";
+  if (row.rowKind === "watch_next") return row.body || "Watch the next compact source summary.";
+  if (row.rowKind === "prediction") return row.body || "Prediction recorded.";
+  if (row.rowKind === "narrative_state") return row.body || "Narrative state recorded.";
+  if (row.rowKind === "interpretation_state") return row.body || "Interpretation state recorded.";
   if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
   if (row.rowKind === "mail_wake_requested") return row.body || "Wake requested for live-source mail.";
   if (row.rowKind === "mail_wake_deferred") return row.body || "Wake deferred; mailbox remains armed for the next summary.";
@@ -8565,6 +8581,11 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "mail_read_tool_call") return "Tool call";
   if (row.rowKind === "mail_read_receipt" || row.rowKind === "wait_for_next_summary") return "Tool receipt";
   if (row.rowKind === "agent_decision") return "Agent decision";
+  if (row.rowKind === "interpretation") return "Interpretation";
+  if (row.rowKind === "watch_next") return "Watch next";
+  if (row.rowKind === "prediction") return "Prediction";
+  if (row.rowKind === "narrative_state") return "Narrative state";
+  if (row.rowKind === "interpretation_state") return row.title || "Interpretation";
   if (row.rowKind === "text_answer") return "Text draft";
   if (row.rowKind === "voice_callout_request") return "Voice callout request";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
@@ -8579,6 +8600,7 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
 
 function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
   if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
+  if (row.rowKind === "interpretation" || row.rowKind === "watch_next" || row.rowKind === "prediction" || row.rowKind === "narrative_state" || row.rowKind === "interpretation_state") return "checkpoint";
   if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
   if (row.rowKind === "mail_wake_requested") return "working";
   if (row.rowKind === "mail_wake_deferred") return "warning";
@@ -8589,7 +8611,7 @@ function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): Hel
   return "working";
 }
 
-function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
+export function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
   return mailRows.map((row) => ({
     key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
     source: row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail",

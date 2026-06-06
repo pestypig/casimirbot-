@@ -6,6 +6,7 @@ export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA = "stage_play_live_s
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_live_source_mail_transcript_entry/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA = "stage_play_live_source_voice_delivery_receipt/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA = "stage_play_live_source_narrative_state/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
   "stage_play_live_source_watch_job_policy_config_result/v1" as const;
 
@@ -33,6 +34,13 @@ export type StagePlayMailDecisionV1 =
   | "request_more_evidence"
   | "request_stage_play_checkpoint"
   | "fail_closed";
+
+export type StagePlayLiveSourceInterpretationModeV1 =
+  | "latest_scene_answer"
+  | "batch_interpretation"
+  | "salience_watch"
+  | "prediction_watch"
+  | "voice_callout_watch";
 
 export type StagePlayNextLoopStateV1 =
   | "armed_for_next_summary"
@@ -153,6 +161,7 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   nextExpectedAfterMs?: number | null;
   mailboxCursor?: string | null;
   activeJobId?: string | null;
+  narrativeStateRef?: string | null;
   rearmReason?: string | null;
   evidenceRefs: string[];
   modelReviewed: boolean;
@@ -161,6 +170,78 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   terminal_eligible: false;
   context_role: "tool_evidence";
   raw_content_included: false;
+};
+
+export type StagePlayLiveSourceNarrativeStateV1 = {
+  artifactId: "stage_play_live_source_narrative_state";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA;
+  narrativeStateId: string;
+  jobId: string;
+  policyId?: string | null;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds: string[];
+  priorNarrativeStateRef?: string | null;
+  mailBatchRefs: string[];
+  sourceEvidenceRefs: string[];
+  currentSceneSummary: string;
+  runningStorySummary: string;
+  interpretedSituation: {
+    setting?: string | null;
+    activeWindowOrScene?: string | null;
+    entities: string[];
+    objects: string[];
+    activities: string[];
+    userRelevantMeaning: string;
+  };
+  meaningfulChanges: string[];
+  uncertainties: string[];
+  watchNext: {
+    targets: string[];
+    reason: string;
+  };
+  prediction?: {
+    text: string;
+    horizon:
+      | "next_mail"
+      | "next_2_to_5_mail_batches"
+      | "until_source_changes"
+      | "unknown";
+    confidence: number;
+    validationSignals: string[];
+  } | null;
+  staleness: {
+    state: "current" | "stale_after_new_mail" | "superseded";
+    staleAfterMailId?: string | null;
+    supersededByStateId?: string | null;
+  };
+  lastDecisionRef?: string | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+export type StagePlayLiveSourceMailInterpretationPayloadV1 = {
+  currentSceneSummary?: string;
+  runningStorySummary?: string;
+  setting?: string | null;
+  activeWindowOrScene?: string | null;
+  entities?: string[];
+  objects?: string[];
+  activities?: string[];
+  userRelevantMeaning?: string;
+  meaningfulChanges?: string[];
+  uncertainties?: string[];
+  watchNextTargets?: string[];
+  watchNextReason?: string;
+  predictionText?: string | null;
+  predictionHorizon?: "next_mail" | "next_2_to_5_mail_batches" | "until_source_changes" | "unknown" | string | null;
+  predictionConfidence?: number | null;
+  validationSignals?: string[];
 };
 
 export type StagePlayLiveSourceVoiceDeliveryReceiptV1 = {
@@ -242,6 +323,7 @@ export type StagePlayLiveSourceWatchJobPolicyV1 = {
   sourceIds: string[];
   objectiveText: string;
   decisionPolicyPrompt: string;
+  interpretationMode?: StagePlayLiveSourceInterpretationModeV1;
   outputPolicy: {
     allowTextAnswer: boolean;
     allowVoiceCallout: boolean;
@@ -295,6 +377,11 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "mail_read_tool_call"
     | "mail_read_receipt"
     | "agent_decision"
+    | "interpretation"
+    | "prediction"
+    | "watch_next"
+    | "narrative_state"
+    | "interpretation_state"
     | "requested_tool"
     | "wait_for_next_summary"
     | "text_answer"
@@ -359,6 +446,7 @@ export type StagePlayLiveSourceMailContextPackV1 = {
     policyId: string;
     objectiveText: string;
     decisionPolicyPrompt: string;
+    interpretationMode?: StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"] | null;
     sourceIds: string[];
     outputPolicy: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"];
     importanceCriteria: string[];
@@ -395,7 +483,26 @@ export type StagePlayLiveSourceMailContextPackV1 = {
     textAnswerDraft?: string | null;
     voiceCalloutDraft?: string | null;
     activeJobId?: string | null;
+    narrativeStateRef?: string | null;
     mailboxCursor?: string | null;
+    evidenceRefs: string[];
+    createdAt: string;
+  }>;
+  latestNarrativeStates?: Array<{
+    narrativeStateId: string;
+    jobId: string;
+    policyId?: string | null;
+    mailBatchRefs: string[];
+    currentSceneSummary: string;
+    runningStorySummary: string;
+    userRelevantMeaning: string;
+    meaningfulChanges: string[];
+    watchNext: {
+      targets: string[];
+      reason: string;
+    };
+    prediction?: string | null;
+    lastDecisionRef?: string | null;
     evidenceRefs: string[];
     createdAt: string;
   }>;

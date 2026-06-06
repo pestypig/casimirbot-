@@ -39,6 +39,7 @@ import {
   configureStagePlayLiveSourceWatchJobPolicy,
   resetStagePlayLiveSourceMailboxForTest,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import { listStagePlayLiveSourceNarrativeStates } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 
@@ -292,6 +293,7 @@ describe("Helix Ask Stage Play routing", () => {
       policyCount: expect.any(Number),
       policy: {
         objectiveText: expectedObjective,
+        interpretationMode: "latest_scene_answer",
         decisionPolicyPrompt: [
           "For each unread mail batch, read the listed mail refs as the current observation window.",
           "If the mail batch contains any compact visual summary, record draft_text_answer.",
@@ -803,6 +805,219 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
   }, 30_000);
 
+  it("records an interpretation projection when the prompt asks what changed in live-source mail", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Read the latest mailbox items.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.record_live_source_mail_decision",
+        reason: "Incorrectly wait after the interpretation request.",
+        args: {
+          decision: "wait_for_next_summary",
+          rationale_preview: "No callout selected.",
+          next_loop_state: "armed_for_next_summary",
+        },
+        expected_artifacts: ["stage_play_live_source_mail_decision"],
+        confidence: 0.8,
+      },
+    ]);
+    process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
+      "Live-source mail decision recorded: wait_for_next_summary.";
+
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:mail-interpretation",
+      ts: "2026-06-04T16:33:30.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:mail-interpretation",
+      summary: "A productivity app grid changed to show Docs, Gmail, Drive, YouTube, and Instagram icons on a dark screen.",
+      supports_claims: [
+        {
+          claim: "The latest mailbox item includes compact visual summary text.",
+          support_status: "supports",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Check the active visual live-source mailbox now. Read the latest visual summary mail, interpret what changed, and say what should be watched next.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      mailboxDebug: response.body?.stage_play_live_source_mailbox_debug,
+      artifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+    const decisionArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "record_interpretation",
+      nextLoopState: "armed_for_next_summary",
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrativeState: expect.objectContaining({
+        artifactId: "stage_play_live_source_narrative_state",
+        currentSceneSummary: expect.stringContaining("productivity app grid"),
+        watchNext: expect.objectContaining({
+          targets: expect.any(Array),
+        }),
+      }),
+    });
+    expect(decisionArtifact?.payload?.observation?.textAnswerDraft, routeDebug).toBeFalsy();
+    const narratives = listStagePlayLiveSourceNarrativeStates({ threadId, limit: 5 });
+    expect(narratives, routeDebug).toHaveLength(1);
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      live_source_mail_output_intent: expect.objectContaining({
+        wantsInterpretation: true,
+      }),
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrative_state_ref: narratives[0].narrativeStateId,
+    });
+    expect(response.body?.answer, routeDebug).toContain("productivity app grid");
+    expect(response.body?.answer, routeDebug).toMatch(/Watch next/i);
+    expect(response.body?.answer, routeDebug).toMatch(/Prediction/i);
+    expect(response.body?.answer, routeDebug).not.toContain("Interpretation:");
+    expect(response.body?.answer, routeDebug).not.toContain("Mail read:");
+    expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
+  }, 30_000);
+
+  it("forces interpretation for compare/predict summary prompts after unread mail is read", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Read the unread summary batch before comparing it.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.record_live_source_mail_decision",
+        reason: "Incorrectly wait after the compare/predict request.",
+        args: {
+          decision: "wait_for_next_summary",
+          rationale_preview: "No callout selected.",
+          next_loop_state: "armed_for_next_summary",
+        },
+        expected_artifacts: ["stage_play_live_source_mail_decision"],
+        confidence: 0.8,
+      },
+    ]);
+    process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
+      "Live-source mail decision recorded: wait_for_next_summary.";
+
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:mail-compare-predict",
+      ts: "2026-06-04T16:35:30.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:mail-compare-predict",
+      summary: "The unread visual summary now shows the app grid replaced by a document editor on a dark desktop.",
+      supports_claims: [
+        {
+          claim: "The latest mailbox item includes compact visual summary text.",
+          support_status: "supports",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Compare these summaries from the active visual source and predict what might happen next.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      sourceTarget: response.body?.source_target_intent,
+      availableCapabilities: response.body?.available_capabilities,
+      answer: response.body?.answer,
+      mailboxDebug: response.body?.stage_play_live_source_mailbox_debug,
+      artifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+    const decisionArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+    });
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.read_live_source_mail");
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "record_interpretation",
+      nextLoopState: "armed_for_next_summary",
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrativeState: expect.objectContaining({
+        artifactId: "stage_play_live_source_narrative_state",
+        prediction: expect.objectContaining({
+          horizon: "next_mail",
+        }),
+      }),
+    });
+    expect(decisionArtifact?.payload?.observation?.textAnswerDraft, routeDebug).toBeFalsy();
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      live_source_mail_output_intent: expect.objectContaining({
+        wantsInterpretation: true,
+      }),
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+    });
+    expect(response.body?.answer, routeDebug).toMatch(/document editor|Watch next/i);
+    expect(response.body?.answer, routeDebug).toMatch(/Prediction/i);
+    expect(response.body?.answer, routeDebug).not.toContain("Mail read:");
+    expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
+  }, 30_000);
+
   it("does not execute mailbox tools from a negated live-source mail mention", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -1002,6 +1217,45 @@ describe("Helix Ask Stage Play routing", () => {
       must_enter_backend_ask: true,
       allow_no_tool_direct: false,
     });
+  });
+
+  it.each([
+    "interpret the mail",
+    "what is happening across the summaries",
+    "compare the unread mail",
+    "compare these summaries",
+    "record an interpretation for the visual summary mail",
+    "summarize the story so far from the observations",
+    "what do these observations mean",
+    "predict what might happen next from the visual summaries",
+    "watch the visual source and say what should be watched next",
+  ])("treats live-source interpretation wording as mailbox intent: %s", (prompt) => {
+    expect(isLiveSourceMailLoopPrompt(prompt)).toBe(true);
+    const sourceTarget = arbitrateAskSourceTarget({
+      turnId: `ask:test-mail-interpretation:${prompt}`,
+      threadId,
+      promptText: prompt,
+    });
+
+    expect(sourceTarget).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+      precedence_reason: "explicit_live_source_mail_loop_source_target",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTarget.requested_outputs).toEqual(expect.arrayContaining([
+      "stage_play_live_source_mail_read_result",
+      "stage_play_live_source_mail_decision",
+    ]));
+  });
+
+  it.each([
+    "what changed?",
+    "predict what might happen next",
+    "interpret what is happening",
+  ])("does not route generic interpretation wording to mailbox without source context: %s", (prompt) => {
+    expect(isLiveSourceMailLoopPrompt(prompt)).toBe(false);
   });
 
   it("forces a wait decision after a no-mail read instead of repeating the read tool", async () => {

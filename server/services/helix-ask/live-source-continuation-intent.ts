@@ -58,9 +58,19 @@ const hasExplicitLiveSourceMailCue = (text: string): boolean =>
   /\b(?:read|check|watch|monitor|observe|use|process)\b[\s\S]{0,160}\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
   /\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b[\s\S]{0,160}\b(?:read|check|watch|monitor|observe|process|decision|decide|record)\b/i.test(text);
 
+const hasLiveSourceMailInterpretationCue = (text: string): boolean => {
+  const interpretationCue =
+    /\b(?:interpret(?:ation)?|what\s+is\s+happening|what's\s+happening|what\s+happened|what\s+changed|changed|changes|compare|comparison|what\s+should\s+(?:be\s+)?watched\s+next|watch\s+next|what\s+to\s+watch\s+next|story\s+so\s+far|observations?\s+mean|predict(?:ion)?|might\s+happen\s+next|record\s+an?\s+interpretation|summari[sz]e\s+the\s+story)\b/i;
+  const sourceCue =
+    /\b(?:mail|mailbox|summary|summaries|observation|observations|live\s+source|live-source|visual\s+source|visual\s+summary|screen\s+summary|source\s+update|watch\s+next|story\s+so\s+far)\b/i;
+  return interpretationCue.test(text) && sourceCue.test(text);
+};
+
 const hasLiveSourceStandingWatchCue = (text: string): boolean =>
   /\b(?:watch|monitor|track|keep\s+watching|keep\s+an\s+eye\s+on|keep\s+watch|observe)\b[\s\S]{0,180}\b(?:describe|tell\s+me|summari[sz]e|announce|notify|speak|call\s*out|callout|report)\b[\s\S]{0,180}\b(?:mail\s+batch|new\s+mail|summary|summaries|observed|observation|changes?|happens?|important|source|visual|screen|this)\b/i.test(text) ||
   /\b(?:watch|monitor|track|keep\s+watching|keep\s+an\s+eye\s+on|keep\s+watch|observe)\b[\s\S]{0,180}\b(?:mail\s+batch|new\s+mail|summary|summaries|observed|observation|changes?|happens?|important|source|visual|screen|this)\b[\s\S]{0,180}\b(?:describe|tell\s+me|summari[sz]e|announce|notify|speak|call\s*out|callout|report)\b/i.test(text) ||
+  /\b(?:watch|monitor|track|keep\s+watching|keep\s+an\s+eye\s+on|observe)\b[\s\S]{0,180}\b(?:interpret|compare|what\s+changed|what\s+is\s+happening|watch\s+next|predict|story\s+so\s+far)\b[\s\S]{0,180}\b(?:mail|summary|summaries|observation|source|visual|screen|this)\b/i.test(text) ||
+  /\b(?:interpret|compare|what\s+changed|what\s+is\s+happening|watch\s+next|predict|story\s+so\s+far)\b[\s\S]{0,180}\b(?:mail|summary|summaries|observation|source|visual|screen|this)\b[\s\S]{0,180}\b(?:watch|monitor|track|keep\s+watching|observe)\b/i.test(text) ||
   /\b(?:every\s+time|whenever|when)\b[\s\S]{0,120}\b(?:summary|summaries|mail|mail\s+batch|update|observation|visual|source|it)\b[\s\S]{0,120}\b(?:comes?\s+in|arrives?|changes?|updates?|happens?|describe|tell\s+me|announce|notify|speak|report)\b/i.test(text) ||
   /\b(?:summary|summaries|mail|mail\s+batch|update|observation)\b[\s\S]{0,120}\b(?:comes?\s+in|arrives?|changes?|updates?)\b[\s\S]{0,120}\b(?:describe|tell\s+me|announce|notify|speak|report)\b/i.test(text) ||
   /\b(?:announce|notify|speak|call\s*out|callout|tell\s+me)\b[\s\S]{0,60}\bif\b[\s\S]{0,140}\b(?:anything\s+important|something\s+important|something\s+changes?|it\s+changes?|source\s+changes?|visual\s+changes?|screen\s+changes?|happens?)\b/i.test(text) ||
@@ -76,6 +86,7 @@ const hasContextualLiveSourceMailCue = (text: string): boolean =>
 export const isLiveSourceMailLoopPrompt = (text: string): boolean =>
   !hasContextualLiveSourceMailCue(text) && (
   hasExplicitLiveSourceMailCue(text) ||
+  hasLiveSourceMailInterpretationCue(text) ||
   hasLiveSourceStandingWatchCue(text) ||
   (
     !isStagePlayJobPlanningPrompt(text) &&

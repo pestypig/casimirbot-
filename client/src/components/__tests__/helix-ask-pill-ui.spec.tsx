@@ -857,6 +857,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"mail_read_tool_call"');
     expect(source).toContain('"mail_read_receipt"');
     expect(source).toContain('"agent_decision"');
+    expect(source).toContain('"interpretation"');
+    expect(source).toContain('"watch_next"');
+    expect(source).toContain('"prediction"');
+    expect(source).toContain('"narrative_state"');
     expect(source).toContain('"text_answer"');
     expect(source).toContain('"voice_callout_request"');
     expect(source).toContain('"voice_tool_call"');
@@ -867,6 +871,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Read ${count} unread live-source mail item");
     expect(source).toContain('count === "1"');
     expect(source).toContain("Reason:");
+    expect(source).toContain("Narrative state");
     expect(source).toContain("Text draft");
     expect(source).toContain("Voice callout request");
     expect(source).toContain("Voice tool call");

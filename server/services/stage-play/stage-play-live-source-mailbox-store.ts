@@ -5,6 +5,7 @@ import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA,
   type StagePlayLiveSourceJobStateV1,
+  type StagePlayLiveSourceInterpretationModeV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourceMailSourceKindV1,
@@ -14,6 +15,21 @@ import {
   type StagePlayNextLoopStateV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { queueStagePlayLiveSourceMailWakeRequest } from "./stage-play-live-source-mail-wake-store";
+import {
+  markNarrativeStateStaleAfterMail,
+  resetStagePlayLiveSourceNarrativeStoreForTest,
+} from "./stage-play-live-source-narrative-store";
+import { inferStagePlayLiveSourceInterpretationMode } from "./stage-play-live-source-watch-policy-defaults";
+
+export {
+  getLatestStagePlayLiveSourceNarrativeState,
+  getStagePlayLiveSourceNarrativeState,
+  listStagePlayLiveSourceNarrativeStates,
+  markNarrativeStateStaleAfterMail,
+  markNarrativeStateSuperseded,
+  recordStagePlayLiveSourceNarrativeState,
+  resetStagePlayLiveSourceNarrativeStoreForTest,
+} from "./stage-play-live-source-narrative-store";
 
 const mailById = new Map<string, StagePlayLiveSourceMailItemV1>();
 const decisionsById = new Map<string, StagePlayLiveSourceMailDecisionV1>();
@@ -221,6 +237,14 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     status: "armed",
     updatedAt: createdAt,
   });
+  markNarrativeStateStaleAfterMail({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: jobState.jobId,
+    sourceId: input.sourceId,
+    mailId: mail.mailId,
+  });
   let wakeRequestId: string | null = null;
   if (jobState.status === "armed" && jobState.nextLoopState === "continue_with_unread_mail") {
     const wake = queueStagePlayLiveSourceMailWakeRequest({
@@ -384,6 +408,7 @@ export function recordStagePlayMailDecision(input: {
     nextExpectedAfterMs: input.nextExpectedAfterMs ?? null,
     mailboxCursor: mailItems.at(-1)?.mailId ?? input.mailIds.at(-1) ?? null,
     activeJobId: jobId,
+    narrativeStateRef: null,
     rearmReason: input.rearmReason ?? (nextLoopState === "armed_for_next_summary" ? "decision_recorded_rearm" : null),
     evidenceRefs,
     modelReviewed: input.modelReviewed !== false,
@@ -444,6 +469,21 @@ export function listStagePlayMailDecisions(input: {
 
 export function getStagePlayMailDecision(decisionId: string): StagePlayLiveSourceMailDecisionV1 | null {
   return decisionsById.get(decisionId) ?? null;
+}
+
+export function attachStagePlayNarrativeStateToDecision(input: {
+  decisionId: string;
+  narrativeStateId: string;
+}): StagePlayLiveSourceMailDecisionV1 | null {
+  const decision = decisionsById.get(input.decisionId);
+  if (!decision) return null;
+  const updated: StagePlayLiveSourceMailDecisionV1 = {
+    ...decision,
+    narrativeStateRef: input.narrativeStateId,
+    evidenceRefs: uniqueStrings([...decision.evidenceRefs, input.narrativeStateId]),
+  };
+  decisionsById.set(input.decisionId, updated);
+  return updated;
 }
 
 export function upsertStagePlayLiveSourceJobState(input: {
@@ -508,6 +548,7 @@ export function configureStagePlayLiveSourceWatchJobPolicy(input: {
   sourceIds?: string[];
   objectiveText: string;
   decisionPolicyPrompt?: string | null;
+  interpretationMode?: StagePlayLiveSourceInterpretationModeV1 | null;
   outputPolicy?: Partial<StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]> | null;
   importanceCriteria?: string[];
   suppressCriteria?: string[];
@@ -554,6 +595,14 @@ export function configureStagePlayLiveSourceWatchJobPolicy(input: {
     sourceIds,
     objectiveText: input.objectiveText,
     decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+    interpretationMode:
+      input.interpretationMode ??
+      existing?.interpretationMode ??
+      inferStagePlayLiveSourceInterpretationMode({
+        objectiveText: input.objectiveText,
+        decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+        outputPolicy,
+      }),
     outputPolicy,
     importanceCriteria: uniqueStrings(input.importanceCriteria ?? existing?.importanceCriteria ?? []),
     suppressCriteria: uniqueStrings(input.suppressCriteria ?? existing?.suppressCriteria ?? []),
@@ -631,6 +680,7 @@ export function listStagePlayLiveSourceJobStates(input: {
 export function resetStagePlayLiveSourceMailboxForTest(): void {
   mailById.clear();
   decisionsById.clear();
+  resetStagePlayLiveSourceNarrativeStoreForTest();
   jobStateById.clear();
   watchJobPolicyById.clear();
   mailEnqueuedListeners.clear();

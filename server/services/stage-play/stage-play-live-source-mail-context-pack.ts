@@ -4,6 +4,7 @@ import {
   type StagePlayLiveSourceMailContextPackV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
+  type StagePlayLiveSourceNarrativeStateV1,
   type StagePlayLiveSourceJobStateV1,
   type StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -13,6 +14,7 @@ import {
   listStagePlayLiveSourceWatchJobPolicies,
   listStagePlayMailDecisions,
 } from "./stage-play-live-source-mailbox-store";
+import { listStagePlayLiveSourceNarrativeStates } from "./stage-play-live-source-narrative-store";
 import { resolveStagePlayLiveSourceMailboxThreadId } from "./stage-play-live-source-mailbox-thread-resolver";
 
 const hashShort = (value: unknown, size = 18): string =>
@@ -107,6 +109,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       jobStates: [],
       latestMailItems: [],
       latestDecisions: [],
+      latestNarrativeStates: [],
       latestTextAnswerDrafts: [],
       latestVoiceCalloutDrafts: [],
       currentMailboxCursor: null,
@@ -143,6 +146,18 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
   })
     .filter((decision: StagePlayLiveSourceMailDecisionV1) => decisionMatchesScope(decision, scopedMailIds, scopedJobIds))
     .slice(-(input.decisionLimit ?? 12));
+  const latestNarrativeStates: StagePlayLiveSourceNarrativeStateV1[] = listStagePlayLiveSourceNarrativeStates({
+    threadId: mailboxThreadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    limit: 100,
+  })
+    .filter((state: StagePlayLiveSourceNarrativeStateV1) =>
+      scopedJobIds.has(state.jobId) ||
+      state.mailBatchRefs.some((mailId) => scopedMailIds.has(mailId)) ||
+      state.sourceIds.some((sourceId) => scopedSourceIds.has(sourceId))
+    )
+    .slice(-6);
   const currentMailboxCursor =
     jobStates.map((state: StagePlayLiveSourceJobStateV1) => state.mailboxCursor ?? state.lastMailId ?? null).filter(Boolean).at(-1) ?? null;
   const evidenceRefs = uniqueStrings([
@@ -150,6 +165,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
     ...jobStates.flatMap((state: StagePlayLiveSourceJobStateV1) => [state.jobId, state.mailboxCursor, state.lastMailId, state.lastDecisionId]),
     ...latestMailItems.flatMap((item: StagePlayLiveSourceMailItemV1) => [item.mailId, ...item.evidenceRefs]),
     ...latestDecisions.flatMap((decision: StagePlayLiveSourceMailDecisionV1) => [decision.decisionId, ...decision.evidenceRefs]),
+    ...latestNarrativeStates.flatMap((state: StagePlayLiveSourceNarrativeStateV1) => [state.narrativeStateId, ...state.evidenceRefs]),
   ]);
   return {
     artifactId: "stage_play_live_source_mail_context_pack",
@@ -175,6 +191,7 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       policyId: policy.policyId,
       objectiveText: clipText(policy.objectiveText, 420),
       decisionPolicyPrompt: clipText(policy.decisionPolicyPrompt, 420),
+      interpretationMode: policy.interpretationMode ?? null,
       sourceIds: policy.sourceIds,
       outputPolicy: policy.outputPolicy,
       importanceCriteria: policy.importanceCriteria.map((entry: string) => clipText(entry, 120)).filter(Boolean),
@@ -211,9 +228,28 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       textAnswerDraft: decision.textAnswerDraft?.text ? clipText(decision.textAnswerDraft.text, 420) : null,
       voiceCalloutDraft: decision.voiceCalloutDraft?.text ? clipText(decision.voiceCalloutDraft.text, 220) : null,
       activeJobId: decision.activeJobId ?? null,
+      narrativeStateRef: decision.narrativeStateRef ?? null,
       mailboxCursor: decision.mailboxCursor ?? null,
       evidenceRefs: decision.evidenceRefs,
       createdAt: decision.createdAt,
+    })),
+    latestNarrativeStates: latestNarrativeStates.map((state: StagePlayLiveSourceNarrativeStateV1) => ({
+      narrativeStateId: state.narrativeStateId,
+      jobId: state.jobId,
+      policyId: state.policyId ?? null,
+      mailBatchRefs: state.mailBatchRefs,
+      currentSceneSummary: clipText(state.currentSceneSummary, 360),
+      runningStorySummary: clipText(state.runningStorySummary, 520),
+      userRelevantMeaning: clipText(state.interpretedSituation.userRelevantMeaning, 420),
+      meaningfulChanges: state.meaningfulChanges.map((entry: string) => clipText(entry, 160)).filter(Boolean),
+      watchNext: {
+        targets: state.watchNext.targets.map((entry: string) => clipText(entry, 80)).filter(Boolean),
+        reason: clipText(state.watchNext.reason, 220),
+      },
+      prediction: state.prediction?.text ? clipText(state.prediction.text, 260) : null,
+      lastDecisionRef: state.lastDecisionRef ?? null,
+      evidenceRefs: state.evidenceRefs,
+      createdAt: state.createdAt,
     })),
     latestTextAnswerDrafts: latestDecisions
       .filter((decision: StagePlayLiveSourceMailDecisionV1) => Boolean(decision.textAnswerDraft?.text))

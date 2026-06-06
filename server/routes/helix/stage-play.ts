@@ -1,7 +1,10 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-play-badge-graph.v1";
-import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "../../../shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  StagePlayLiveSourceMailInterpretationPayloadV1,
+  StagePlayLiveSourceMailTranscriptEntryV1,
+} from "../../../shared/contracts/stage-play-live-source-mail.v1";
 import { buildStagePlayGraphFromWorld } from "../../services/stage-play/stage-play-badge-graph-builder";
 import {
   buildStagePlayBuilderCatalog,
@@ -35,6 +38,7 @@ import {
   listStagePlayLiveSourceMailItems,
   listStagePlayLiveSourceWatchJobPolicies,
 } from "../../services/stage-play/stage-play-live-source-mailbox-store";
+import { getStagePlayLiveSourceNarrativeState } from "../../services/stage-play/stage-play-live-source-narrative-store";
 import {
   listStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeResults,
@@ -300,6 +304,54 @@ const readOptionalNumber = (value: unknown): number | null =>
     : typeof value === "string" && Number.isFinite(Number(value))
       ? Number(value)
       : null;
+
+const readInterpretationPayload = (
+  value: unknown,
+  fallbackSource?: Record<string, unknown>,
+): StagePlayLiveSourceMailInterpretationPayloadV1 | null => {
+  const record = readRecord(value) ?? fallbackSource ?? null;
+  if (!record) return null;
+  const payload: StagePlayLiveSourceMailInterpretationPayloadV1 = {
+    currentSceneSummary:
+      readQueryString(record.currentSceneSummary) ??
+      readQueryString(record.current_scene_summary) ??
+      undefined,
+    runningStorySummary:
+      readQueryString(record.runningStorySummary) ??
+      readQueryString(record.running_story_summary) ??
+      undefined,
+    setting: readQueryString(record.setting),
+    activeWindowOrScene:
+      readQueryString(record.activeWindowOrScene) ??
+      readQueryString(record.active_window_or_scene),
+    entities: readStringArray(record.entities),
+    objects: readStringArray(record.objects),
+    activities: readStringArray(record.activities),
+    userRelevantMeaning:
+      readQueryString(record.userRelevantMeaning) ??
+      readQueryString(record.user_relevant_meaning) ??
+      undefined,
+    meaningfulChanges: readStringArray(record.meaningfulChanges ?? record.meaningful_changes),
+    uncertainties: readStringArray(record.uncertainties),
+    watchNextTargets: readStringArray(record.watchNextTargets ?? record.watch_next_targets),
+    watchNextReason:
+      readQueryString(record.watchNextReason) ??
+      readQueryString(record.watch_next_reason) ??
+      undefined,
+    predictionText:
+      readQueryString(record.predictionText) ??
+      readQueryString(record.prediction_text),
+    predictionHorizon:
+      readQueryString(record.predictionHorizon) ??
+      readQueryString(record.prediction_horizon),
+    predictionConfidence: readOptionalNumber(record.predictionConfidence ?? record.prediction_confidence),
+    validationSignals: readStringArray(record.validationSignals ?? record.validation_signals),
+  };
+  const hasPayload = Object.values(payload).some((entry) =>
+    Array.isArray(entry) ? entry.length > 0 : entry !== undefined && entry !== null && entry !== ""
+  );
+  return hasPayload ? payload : null;
+};
 
 const readOptionalBoolean = (value: unknown): boolean | undefined =>
   typeof value === "boolean"
@@ -1073,6 +1125,7 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
       voiceAllowedNow: readOptionalBoolean(body.voiceAllowedNow ?? body.voice_allowed_now) ?? false,
       voicePolicyReason: readQueryString(body.voicePolicyReason) ?? readQueryString(body.voice_policy_reason),
       requestedTool: readRequestedTool(body.requestedTool ?? body.requested_tool),
+      interpretation: readInterpretationPayload(body.interpretation, body),
       nextLoopState: (readQueryString(body.nextLoopState) ?? readQueryString(body.next_loop_state)) as any,
       evidenceRefs: readStringArray(body.evidenceRefs ?? body.evidence_refs),
     });
@@ -1083,6 +1136,9 @@ helixStagePlayRouter.post("/live-source-mail/decision", (req: Request, res: Resp
       mailboxThreadId: threadId,
       mailboxThreadResolution,
       decision: decisionReceipt,
+      narrativeState: decisionReceipt.narrativeStateRef
+        ? getStagePlayLiveSourceNarrativeState(decisionReceipt.narrativeStateRef)
+        : null,
       transcriptRows: buildMailLoopTranscriptRows({
         decision: decisionReceipt,
       }),

@@ -205,6 +205,7 @@ describe("live-source mail live environment tools", () => {
       artifactId: "stage_play_live_source_watch_job_policy_config_result",
       policy: {
         objectiveText: "Watch the active visual source and describe each new visual-summary mail batch in one sentence.",
+        interpretationMode: "latest_scene_answer",
         decisionPolicyPrompt: [
           "For each unread mail batch, read the listed mail refs as the current observation window.",
           "If the mail batch contains any compact visual summary, record draft_text_answer.",
@@ -253,7 +254,7 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({
         rowKind: "loop_state",
         title: "Policy",
-        body: expect.stringContaining("text answer allowed"),
+        body: expect.stringContaining("latest_scene_answer"),
       }),
       expect.objectContaining({
         rowKind: "loop_state",
@@ -330,6 +331,54 @@ describe("live-source mail live environment tools", () => {
       sourceId,
       "visual_frame:helix-ask-live-source-mail-tool",
       "visual_evidence:helix-ask-live-source-mail-tool",
+    ]));
+  });
+
+  it.each([
+    {
+      objective: "Watch the active visual source and describe each new mail batch in one sentence.",
+      expectedMode: "latest_scene_answer",
+    },
+    {
+      objective: "Watch the active visual source and interpret what is happening across the summaries.",
+      expectedMode: "batch_interpretation",
+    },
+    {
+      objective: "Watch the active visual source and do not bother me unless something important changes.",
+      expectedMode: "salience_watch",
+    },
+    {
+      objective: "Watch the active visual source, interpret the summaries, and predict what might happen next.",
+      expectedMode: "prediction_watch",
+    },
+    {
+      objective: "Watch the active visual source and announce if anything important happens.",
+      expectedMode: "voice_callout_watch",
+    },
+  ])("classifies watch-job policy mode: $expectedMode", ({ objective, expectedMode }) => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      policy: {
+        interpretationMode: expectedMode,
+      },
+    });
+    expect(payload.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining(expectedMode),
+      }),
     ]));
   });
 
@@ -436,6 +485,110 @@ describe("live-source mail live environment tools", () => {
       "loop_state",
     ]));
     expect(payload.transcriptRows.find((row: any) => row.rowKind === "text_answer").terminalEligible).toBe(false);
+  });
+
+  it("records structured interpretation payloads as narrative state and transcript rows", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+      },
+    });
+    const mailId = (readObservation.observation as any).items[0].mailId;
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        decision: "record_interpretation",
+        rationale_preview: "The scene shifted into a readable Minecraft-like overwatch state.",
+        interpretation: {
+          currentSceneSummary: "A player is near a cat, book stand, and distant mountains.",
+          runningStorySummary: "The live source is showing a Minecraft-like scene around a player base.",
+          setting: "Minecraft-like game scene",
+          activeWindowOrScene: "player base overlook",
+          entities: ["player", "cat"],
+          objects: ["book stand", "distant mountains"],
+          activities: ["standing near base objects"],
+          userRelevantMeaning: "The player appears stationary near base objects while the outside scene remains visible.",
+          meaningfulChanges: ["The compact summary now highlights base objects and distant terrain."],
+          uncertainties: ["The raw frame is not included, so exact inventory or UI state is unknown."],
+          watchNextTargets: ["player movement", "nearby mobs", "base objects"],
+          watchNextReason: "Watch whether the player moves or a risk appears near the base.",
+          predictionText: "The next summary will likely confirm whether the player stays near the base or moves away.",
+          predictionHorizon: "next_mail",
+          predictionConfidence: 0.62,
+          validationSignals: ["player remains near base", "player moves away", "hostile mob appears"],
+        },
+      },
+    });
+
+    expect(decisionObservation).toMatchObject({
+      tool_name: "live_env.record_live_source_mail_decision",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+    const payload = decisionObservation.observation as any;
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "record_interpretation",
+      narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      narrativeState: {
+        narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+        currentSceneSummary: "A player is near a cat, book stand, and distant mountains.",
+        runningStorySummary: "The live source is showing a Minecraft-like scene around a player base.",
+        interpretedSituation: {
+          setting: "Minecraft-like game scene",
+          activeWindowOrScene: "player base overlook",
+          entities: ["player", "cat"],
+          objects: ["book stand", "distant mountains"],
+          activities: ["standing near base objects"],
+          userRelevantMeaning: "The player appears stationary near base objects while the outside scene remains visible.",
+        },
+        meaningfulChanges: ["The compact summary now highlights base objects and distant terrain."],
+        uncertainties: ["The raw frame is not included, so exact inventory or UI state is unknown."],
+        watchNext: {
+          targets: ["player movement", "nearby mobs", "base objects"],
+          reason: "Watch whether the player moves or a risk appears near the base.",
+        },
+        prediction: {
+          text: "The next summary will likely confirm whether the player stays near the base or moves away.",
+          horizon: "next_mail",
+          confidence: 0.62,
+          validationSignals: ["player remains near base", "player moves away", "hostile mob appears"],
+        },
+      },
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+    });
+    expect(payload.transcriptRows.map((row: any) => row.title)).toEqual(expect.arrayContaining([
+      "Interpretation",
+      "Watch next",
+      "Prediction",
+      "Narrative state",
+    ]));
+    expect(payload.transcriptRows.map((row: any) => row.rowKind)).toEqual(expect.arrayContaining([
+      "interpretation",
+      "watch_next",
+      "prediction",
+      "narrative_state",
+    ]));
+    expect(payload.transcriptRows.filter((row: any) => (
+      row.rowKind === "interpretation" ||
+      row.rowKind === "watch_next" ||
+      row.rowKind === "narrative_state"
+    )).every((row: any) => row.terminalEligible === false)).toBe(true);
+    expect(payload.transcriptRows.find((row: any) => row.title === "Watch next")?.body)
+      .toContain("player movement");
+    expect(payload.transcriptRows.find((row: any) => row.title === "Prediction")?.body)
+      .toContain("62%");
   });
 
   it("records requested_tool from the decision tool as the next requested action", () => {

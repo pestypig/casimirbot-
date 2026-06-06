@@ -16,6 +16,7 @@ import type { StagePlayCheckpointRequestReasonV1 } from "@shared/contracts/stage
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
 import type {
   AskTurnTranscriptRowDraftV1,
+  StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
@@ -67,8 +68,10 @@ import {
   configureStagePlayLiveSourceWatchJobPolicy,
   listStagePlayLiveSourceWatchJobPolicies,
 } from "../stage-play/stage-play-live-source-mailbox-store";
+import { getStagePlayLiveSourceNarrativeState } from "../stage-play/stage-play-live-source-narrative-store";
 import {
   buildStagePlayLiveSourceWatchJobPolicyDefaults,
+  inferStagePlayLiveSourceInterpretationMode,
 } from "../stage-play/stage-play-live-source-watch-policy-defaults";
 import {
   recordInterimVoiceCalloutRequest,
@@ -127,6 +130,59 @@ const readRequestedTool = (
   };
 };
 
+const readOptionalNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readInterpretationPayload = (
+  value: unknown,
+  fallbackSource?: Record<string, unknown>,
+): StagePlayLiveSourceMailInterpretationPayloadV1 | null => {
+  const record = readRecord(value) ?? fallbackSource ?? null;
+  if (!record) return null;
+  const payload: StagePlayLiveSourceMailInterpretationPayloadV1 = {
+    currentSceneSummary:
+      readString(record.current_scene_summary) ??
+      readString(record.currentSceneSummary) ??
+      undefined,
+    runningStorySummary:
+      readString(record.running_story_summary) ??
+      readString(record.runningStorySummary) ??
+      undefined,
+    setting: readString(record.setting),
+    activeWindowOrScene:
+      readString(record.active_window_or_scene) ??
+      readString(record.activeWindowOrScene),
+    entities: readStringArray(record.entities),
+    objects: readStringArray(record.objects),
+    activities: readStringArray(record.activities),
+    userRelevantMeaning:
+      readString(record.user_relevant_meaning) ??
+      readString(record.userRelevantMeaning) ??
+      undefined,
+    meaningfulChanges: readStringArray(record.meaningful_changes ?? record.meaningfulChanges),
+    uncertainties: readStringArray(record.uncertainties),
+    watchNextTargets: readStringArray(record.watch_next_targets ?? record.watchNextTargets),
+    watchNextReason:
+      readString(record.watch_next_reason) ??
+      readString(record.watchNextReason) ??
+      undefined,
+    predictionText:
+      readString(record.prediction_text) ??
+      readString(record.predictionText),
+    predictionHorizon:
+      readString(record.prediction_horizon) ??
+      readString(record.predictionHorizon),
+    predictionConfidence:
+      readOptionalNumber(record.prediction_confidence) ??
+      readOptionalNumber(record.predictionConfidence),
+    validationSignals: readStringArray(record.validation_signals ?? record.validationSignals),
+  };
+  const hasPayload = Object.values(payload).some((entry) =>
+    Array.isArray(entry) ? entry.length > 0 : entry !== undefined && entry !== null && entry !== ""
+  );
+  return hasPayload ? payload : null;
+};
+
 const readBooleanArg = (record: Record<string, unknown>, snakeKey: string, camelKey: string): boolean | null => {
   const value = record[snakeKey] ?? record[camelKey];
   return typeof value === "boolean" ? value : null;
@@ -164,6 +220,22 @@ const formatWatchJobOutputPolicy = (policy: StagePlayLiveSourceWatchJobPolicyV1[
   const confirmation = policy.confirmationRequired ? "confirmation required" : "no confirmation required";
   const urgency = policy.voiceRequiresUrgency ? "urgent voice only" : "voice urgency not required";
   return `${text}, ${voice}, ${confirmation}, ${urgency}.`;
+};
+
+const readWatchJobInterpretationMode = (
+  value: unknown,
+): StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"] | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return (
+    normalized === "latest_scene_answer" ||
+    normalized === "batch_interpretation" ||
+    normalized === "salience_watch" ||
+    normalized === "prediction_watch" ||
+    normalized === "voice_callout_watch"
+  )
+    ? normalized
+    : null;
 };
 
 const buildWatchJobConfiguredTranscriptRows = (input: {
@@ -209,7 +281,7 @@ const buildWatchJobConfiguredTranscriptRows = (input: {
       rowId: `ask_turn_watch_job_policy:${hashShort(input.policy.policyId)}`,
       rowKind: "loop_state",
       title: "Policy",
-      body: `Policy: ${formatWatchJobOutputPolicy(input.policy.outputPolicy)}`,
+      body: `Policy: ${input.policy.interpretationMode ?? "latest_scene_answer"}; ${formatWatchJobOutputPolicy(input.policy.outputPolicy)}`,
       ...rowBase,
     },
     {
@@ -1155,6 +1227,9 @@ export function executeLiveEnvironmentTool(
       readString(args.userPrompt) ??
       "Watch the live source and record decisions when source mail arrives.";
     const policyDefaults = buildStagePlayLiveSourceWatchJobPolicyDefaults(objectiveText);
+    const explicitInterpretationMode =
+      readWatchJobInterpretationMode(args.interpretation_mode) ??
+      readWatchJobInterpretationMode(args.interpretationMode);
     const sourceIds = [
       ...readStringArray(args.source_ids ?? args.sourceIds),
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
@@ -1169,6 +1244,14 @@ export function executeLiveEnvironmentTool(
         readString(args.decision_policy_prompt) ??
         readString(args.decisionPolicyPrompt) ??
         policyDefaults.decisionPolicyPrompt,
+      interpretationMode:
+        explicitInterpretationMode ??
+        policyDefaults.interpretationMode ??
+        inferStagePlayLiveSourceInterpretationMode({
+          objectiveText: policyDefaults.objectiveText,
+          decisionPolicyPrompt: policyDefaults.decisionPolicyPrompt,
+          outputPolicy: policyDefaults.outputPolicy,
+        }),
       outputPolicy: readWatchJobOutputPolicy(args, policyDefaults.outputPolicy),
       importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria).length > 0
         ? readStringArray(args.importance_criteria ?? args.importanceCriteria)
@@ -1285,6 +1368,7 @@ export function executeLiveEnvironmentTool(
       voiceAllowedNow: args.voice_allowed_now === true || args.voiceAllowedNow === true,
       voicePolicyReason: readString(args.voice_policy_reason) ?? readString(args.voicePolicyReason),
       requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool),
+      interpretation: readInterpretationPayload(args.interpretation, args),
       nextLoopState,
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
@@ -1292,6 +1376,9 @@ export function executeLiveEnvironmentTool(
     const transcriptRows = buildMailLoopTranscriptRows({
       decision: recordedDecision,
     });
+    const narrativeState = recordedDecision.narrativeStateRef
+      ? getStagePlayLiveSourceNarrativeState(recordedDecision.narrativeStateRef)
+      : null;
     const waitDecisionWithoutMail =
       mailIds.length === 0 && recordedDecision.decision === "wait_for_next_summary";
     return makeObservation({
@@ -1312,6 +1399,8 @@ export function executeLiveEnvironmentTool(
         mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
         mailboxThreadResolution,
         mailbox_thread_resolution: mailboxThreadResolution,
+        narrativeState,
+        narrative_state: narrativeState,
         transcriptRows,
         liveSourceMailOutputIntent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,
         live_source_mail_output_intent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,

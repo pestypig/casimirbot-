@@ -670,6 +670,7 @@ export function arbitrateAskSourceTarget(input: {
         "live_environment_tool_observation",
         "stage_play_live_source_mail_read_result",
         "stage_play_live_source_mail_decision",
+        "stage_play_live_source_narrative_state",
         "typed_failure",
       ],
       suppressedRoutes: [
