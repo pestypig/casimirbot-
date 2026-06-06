@@ -140,7 +140,7 @@ export const useTheoryMapOverlayStore = create<TheoryMapOverlayState>()((set) =>
       ...visibleOverlayFromReflection(artifact),
       lastReflectionArtifact: artifact,
       reflectionOverlay: artifact,
-      liveAnswerContextReflection: state.liveAnswerContextReflection ?? artifact,
+      liveAnswerContextReflection: artifact,
     })),
   setLiveAnswerContextReflection: (artifact) =>
     set((state) => ({

@@ -39,7 +39,7 @@ export default function TheoryAtlasRail({
       {hasLiveReflection ? (
         <button
           type="button"
-          aria-label="Current answer context"
+          aria-label="Live answer theory context"
           title="Latest Ask-level theory reflection. Evidence only, not a solved answer."
           onClick={onSelectLiveReflection}
           className={`flex h-6 w-6 items-center justify-center border-2 bg-emerald-600 text-[11px] font-black text-white shadow ${
