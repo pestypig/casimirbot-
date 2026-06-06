@@ -123,6 +123,7 @@ describe("useTheoryMapOverlayStore", () => {
     ]);
     expect(state.lastReflectionArtifact).toBe(artifact);
     expect(state.reflectionOverlay).toBe(artifact);
+    expect(state.liveAnswerContextReflection).toBe(artifact);
   });
 
   it("clearOverlay clears visible reflection state but keeps live answer memory", () => {
