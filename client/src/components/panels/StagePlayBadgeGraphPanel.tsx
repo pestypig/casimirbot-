@@ -1136,6 +1136,35 @@ const latestStagePlayMailWakeRequest = (
   return matching.slice().sort((left, right) => left.queuedAt.localeCompare(right.queuedAt)).at(-1) ?? null;
 };
 
+const latestStagePlayMailWakeResult = (
+  results: StagePlayLiveSourceMailWakeResultV1[],
+  wakeRequestId?: string | null,
+): StagePlayLiveSourceMailWakeResultV1 | null => {
+  const matching = wakeRequestId
+    ? results.filter((result) => result.wakeRequestId === wakeRequestId)
+    : results;
+  return matching.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)).at(-1) ?? null;
+};
+
+const isStagePlayMailWakePressureResult = (
+  result: StagePlayLiveSourceMailWakeResultV1,
+): boolean =>
+  result.status === "deferred_for_pressure" ||
+  /(?:pressure|runtime_memory|503)/i.test(result.failedReason ?? "");
+
+const isStagePlayMailWakeAskAttemptResult = (
+  result: StagePlayLiveSourceMailWakeResultV1,
+): boolean =>
+  result.status === "completed" ||
+  result.status === "failed_terminal" ||
+  result.status === "skipped" ||
+  Boolean(result.askTurnId) ||
+  result.decisionIds.length > 0 ||
+  (
+    result.status === "failed_retryable" &&
+    !isStagePlayMailWakePressureResult(result)
+  );
+
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
@@ -1145,6 +1174,7 @@ function buildObserverMailLoopNodes(input: {
   const jobStates = mailbox?.jobStates ?? [];
   const decisions = mailbox?.decisions ?? [];
   const wakeRequests = mailbox?.wakeRequests ?? [];
+  const wakeResults = mailbox?.wakeResults ?? [];
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
@@ -1174,6 +1204,27 @@ function buildObserverMailLoopNodes(input: {
   const latestWake =
     latestStagePlayMailWakeRequest(wakeRequests, visualMail?.mailId) ??
     latestStagePlayMailWakeRequest(wakeRequests);
+  const latestAskAttemptWakeResult =
+    latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakeAskAttemptResult), latestWake?.wakeRequestId ?? null) ??
+    latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakeAskAttemptResult));
+  const latestPressureWakeResult =
+    latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakePressureResult), latestWake?.wakeRequestId ?? null) ??
+    latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakePressureResult));
+  const latestWakeResult =
+    latestAskAttemptWakeResult ??
+    latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
+    latestStagePlayMailWakeResult(wakeResults);
+  const wakeById = new Map(wakeRequests.map((wake) => [wake.wakeRequestId, wake]));
+  const displayWake = latestWakeResult
+    ? wakeById.get(latestWakeResult.wakeRequestId) ?? latestWake
+    : latestWake;
+  const pressureIsSecondary =
+    Boolean(latestPressureWakeResult) &&
+    latestPressureWakeResult?.wakeResultId !== latestWakeResult?.wakeResultId;
+  const latestWakeStatus = latestWakeResult?.status ?? displayWake?.status ?? null;
+  const latestWakeFailureReason = latestWakeResult?.failedReason ?? displayWake?.failureReason ?? null;
+  const latestWakeAskTurnId = latestWakeResult?.askTurnId ?? displayWake?.askTurnId ?? null;
+  const latestWakeDecisionIds = latestWakeResult?.decisionIds ?? displayWake?.decisionIds ?? [];
   const activeJob = jobStates.at(-1) ?? null;
   const observerOutputRefs = uniqueSorted([
     visualSource?.sourceId ?? "",
@@ -1189,12 +1240,15 @@ function buildObserverMailLoopNodes(input: {
     ...(latestDecision?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
   ]);
   const wakeInputRefs = uniqueSorted([
-    ...(latestWake?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
+    ...(displayWake?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
   ]);
   const queuedRunningText = `queued ${queuedWakeMailCount} / running ${runningWakeMailCount}`;
-  const latestWakeAskText = latestWake?.askTurnId ? `latest ask ${latestWake.askTurnId}` : "no Ask turn yet";
-  const pressureText = pressureWakeCount > 0
+  const latestWakeAskText = latestWakeAskTurnId ? `latest ask ${latestWakeAskTurnId}` : "no Ask turn yet";
+  const pressureText = latestWakeStatus === "deferred_for_pressure"
     ? `deferred for pressure; ${unreadCount} unread retained`
+    : null;
+  const secondaryPressureText = pressureIsSecondary
+    ? `auto pressure retained ${unreadCount} unread`
     : null;
   const latestDecisionText = latestDecision
     ? `${latestDecision.decision}: ${latestDecision.rationalePreview || latestDecision.decisionId}`
@@ -1255,16 +1309,16 @@ function buildObserverMailLoopNodes(input: {
       id: "observer_mail_loop:ask_wake",
       title: "Wake Ask",
       subtitle: "mail wake admission",
-      status: latestWake?.status ?? (unreadCount > 0 ? "queued pending" : "missing"),
+      status: latestWakeStatus ?? (unreadCount > 0 ? "queued pending" : "missing"),
       preview: pressureText
         ? pressureText
-        : latestWake
-          ? `${queuedRunningText}; ${latestWakeAskText}`
+        : latestWakeStatus
+          ? `${latestWakeStatus}${latestWakeFailureReason ? `: ${latestWakeFailureReason}` : ""}; ${latestWakeAskText}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
         runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
-        pressureWakeCount > 0 ? "pressure" : null,
+        pressureWakeCount > 0 ? (pressureIsSecondary ? "auto pressure" : "pressure") : null,
         retryWakeCount > 0 ? "retrying" : null,
       ].filter((entry): entry is string => Boolean(entry)),
       inputLabel: "Input",
@@ -1272,16 +1326,18 @@ function buildObserverMailLoopNodes(input: {
       inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "unread mail ids pending",
       transformLabel: "unread mail -> Helix Ask wake turn",
       outputLabel: "Output",
-      outputRefs: latestWake ? uniqueSorted([
-        latestWake.wakeRequestId,
-        latestWake.askTurnId ?? "",
-        ...latestWake.decisionIds,
-        ...latestWake.evidenceRefs,
+      outputRefs: displayWake ? uniqueSorted([
+        displayWake.wakeRequestId,
+        latestWakeResult?.wakeResultId ?? "",
+        latestWakeAskTurnId ?? "",
+        ...latestWakeDecisionIds,
+        ...displayWake.evidenceRefs,
+        ...(latestWakeResult?.evidenceRefs ?? []),
       ].filter(Boolean)) : [],
-      outputPreview: latestWake
-        ? latestWake.status === "deferred_for_pressure"
-          ? `deferred_for_pressure; ${latestWake.failureReason ?? "runtime pressure"}; ${unreadCount} unread retained${latestWake.nextRetryAt ? `; retry ${latestWake.nextRetryAt}` : ""}`
-          : `${latestWake.status}${latestWake.failureReason ? `; ${latestWake.failureReason}` : ""}${latestWake.askTurnId ? `; ask ${latestWake.askTurnId}` : ""}${latestWake.decisionIds.length > 0 ? `; decisions ${latestWake.decisionIds.length}` : ""}`
+      outputPreview: latestWakeStatus
+        ? latestWakeStatus === "deferred_for_pressure"
+          ? `deferred_for_pressure; ${latestWakeFailureReason ?? "runtime pressure"}; ${unreadCount} unread retained${displayWake?.nextRetryAt ? `; retry ${displayWake.nextRetryAt}` : ""}`
+          : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
           : "no wake request yet",

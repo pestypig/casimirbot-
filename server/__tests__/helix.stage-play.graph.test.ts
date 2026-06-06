@@ -1,7 +1,10 @@
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { helixStagePlayRouter } from "../routes/helix/stage-play";
+import {
+  helixStagePlayRouter,
+  resolveStagePlayWakeManualRunForRoute,
+} from "../routes/helix/stage-play";
 import {
   createLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
@@ -641,5 +644,16 @@ describe("POST /api/helix/stage-play/live-source-mail/job", () => {
         policyId: response.body.watchJobPolicyRef,
       }),
     ]));
+  });
+});
+
+describe("live-source mail wake route parsing", () => {
+  it("treats boolean manualRun payloads as manual wake requests", () => {
+    expect(resolveStagePlayWakeManualRunForRoute({ trigger: "auto", manualRun: true }, {})).toBe(true);
+    expect(resolveStagePlayWakeManualRunForRoute({ trigger: "auto", manual_run: true }, {})).toBe(true);
+    expect(resolveStagePlayWakeManualRunForRoute({ trigger: "manual" }, {})).toBe(true);
+    expect(resolveStagePlayWakeManualRunForRoute({ trigger: "auto", manualRun: false }, {})).toBe(false);
+    expect(resolveStagePlayWakeManualRunForRoute({}, { manualRun: "true" })).toBe(true);
+    expect(resolveStagePlayWakeManualRunForRoute({}, { manual_run: "true" })).toBe(true);
   });
 });

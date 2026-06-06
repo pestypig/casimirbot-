@@ -931,6 +931,94 @@ function renderPanel(options: {
             context_role: "tool_evidence",
             raw_content_included: false,
           },
+          {
+            artifactId: "stage_play_live_source_mail_wake_request",
+            schemaVersion: "stage_play_live_source_mail_wake_request/v1",
+            wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            jobId: "stage_play_live_source_job:ui",
+            mailIds: ["stage_play_live_source_mail:ui"],
+            sourceIds: ["source:visual-tab"],
+            reason: "unread_mail",
+            status: "deferred_for_pressure",
+            askTurnId: null,
+            decisionIds: [],
+            attemptCount: 1,
+            lastAttemptAt: "2026-06-02T00:00:04.000Z",
+            nextRetryAt: "2026-06-02T00:00:34.000Z",
+            failureReason: "runtime_memory_queue_deferrable",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            queuedAt: "2026-06-02T00:00:04.000Z",
+            updatedAt: "2026-06-02T00:00:04.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        wakeResults: [
+          {
+            artifactId: "stage_play_live_source_mail_wake_result",
+            schemaVersion: "stage_play_live_source_mail_wake_result/v1",
+            wakeResultId: "stage_play_live_source_mail_wake_result:pressure-ui",
+            wakeRequestId: "stage_play_live_source_mail_wake:pressure-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            status: "deferred_for_pressure",
+            askTurnId: null,
+            decisionIds: [],
+            skippedReason: null,
+            failedReason: "ask_turn_pressure_503",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            createdAt: "2026-06-02T00:00:01.500Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+          {
+            artifactId: "stage_play_live_source_mail_wake_result",
+            schemaVersion: "stage_play_live_source_mail_wake_result/v1",
+            wakeResultId: "stage_play_live_source_mail_wake_result:retry-ui",
+            wakeRequestId: "stage_play_live_source_mail_wake:retry-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            status: "failed_retryable",
+            askTurnId: null,
+            decisionIds: [],
+            skippedReason: null,
+            failedReason: "mail_wake_ask_turn_timeout:120000",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            createdAt: "2026-06-02T00:00:03.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+          {
+            artifactId: "stage_play_live_source_mail_wake_result",
+            schemaVersion: "stage_play_live_source_mail_wake_result/v1",
+            wakeResultId: "stage_play_live_source_mail_wake_result:auto-pressure-after-timeout-ui",
+            wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            status: "deferred_for_pressure",
+            askTurnId: null,
+            decisionIds: [],
+            skippedReason: null,
+            failedReason: "runtime_memory_queue_deferrable",
+            evidenceRefs: ["stage_play_live_source_mail:ui", "visual_evidence:ui"],
+            createdAt: "2026-06-02T00:00:05.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
         ],
         decisions: [
           {
@@ -1213,13 +1301,15 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
-    expect(screen.getByText("pressure")).toBeTruthy();
+    expect(screen.getByText("auto pressure")).toBeTruthy();
     expect(screen.getByText("retrying")).toBeTruthy();
     expect(screen.getByText(/Observer -> Mailbox -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeTruthy();
     expect(screen.queryByText("14 badges")).toBeNull();
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getAllByText(/queued 0 \/ running 0/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/failed_retryable: mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
     expect(screen.getAllByText(/no output yet; armed for next source update/i).length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(5);

@@ -40,6 +40,7 @@ import {
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
   latestStagePlayLiveSourceMailWakeResult,
+  splitStagePlayLiveSourceMailWakeRequestForAsk,
 } from "./stage-play-live-source-mail-wake-store";
 
 type AskWakeTurnResponse = Record<string, unknown>;
@@ -89,9 +90,32 @@ const readArray = (value: unknown): unknown[] =>
 const STALE_RUNNING_WAKE_MS = 90_000;
 const PRIOR_DECISION_LIMIT = 6;
 
+const readPositiveIntEnv = (name: string, fallback: number): number => {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+
 const defaultAskBaseUrl = (): string =>
   process.env.HELIX_ASK_BASE_URL ??
   `http://127.0.0.1:${process.env.PORT || process.env.SERVER_PORT || "5050"}`;
+
+const wakeAskTurnTimeoutMs = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_TIMEOUT_MS", 120_000);
+
+const wakeAskBatchLimit = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT", 4);
+
+const wakeAskPromptMaxChars = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS", 18_000);
+
+const wakeMailSummaryPreviewChars = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_SUMMARY_CHARS", 360);
+
+const manualPressureOverrideEnabled = (): boolean =>
+  String(process.env.STAGE_PLAY_MAIL_WAKE_MANUAL_PRESSURE_OVERRIDE ?? "1").trim() !== "0";
+
+const isManualPressureOverrideReason = (reason: string | null | undefined): boolean =>
+  manualPressureOverrideEnabled() && /(?:^|:)(?:runtime_memory_queue_deferrable|queue_deferrable)$/i.test(String(reason ?? ""));
 
 const clipPromptText = (value: string | null | undefined, max = 420): string => {
   const trimmed = String(value ?? "").trim().replace(/\s+/g, " ");
@@ -204,6 +228,7 @@ const formatMailBatch = (items: StagePlayLiveSourceMailItemV1[], wake: StagePlay
   if (items.length === 0) {
     return wake.mailIds.map((mailId, index) => `${index + 1}. ${mailId} - compact summary unavailable in local store`).join("\n");
   }
+  const summaryChars = wakeMailSummaryPreviewChars();
   return items.map((item, index) => [
     `${index + 1}. ${item.mailId}`,
     `   created: ${item.createdAt}`,
@@ -213,7 +238,7 @@ const formatMailBatch = (items: StagePlayLiveSourceMailItemV1[], wake: StagePlay
       item.sourceRefs.evidenceRef,
       item.sourceRefs.observationRef,
     ]).join(", ") || "none"}`,
-    `   summary: ${clipPromptText(item.summary.text || item.summary.preview, 620)}`,
+    `   summary: ${clipPromptText(item.summary.text || item.summary.preview, summaryChars)}`,
     `   change_hint: ${item.hints.deterministicChangeHint ?? "unknown"}`,
   ].join("\n")).join("\n");
 };
@@ -577,6 +602,21 @@ const buildNonTerminalWakeTranscriptRows = (input: {
   createdAt: string;
 }): DurableWakeTranscriptRow[] => {
   const rows: DurableWakeTranscriptRow[] = [];
+  const failureReason = input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "wake did not complete";
+  const blockedTitle = /^mail_wake_ask_turn_timeout:/i.test(failureReason)
+    ? "Wake Ask timed out"
+    : /^wake_preflight_blocked:/i.test(failureReason)
+      ? "Wake preflight blocked"
+      : failureReason === "mail_wake_decision_missing"
+        ? "Wake decision missing"
+        : "Wake blocked";
+  const blockedBody = /^mail_wake_ask_turn_timeout:/i.test(failureReason)
+    ? `${failureReason}. The bounded mail batch was retained for retry; no model-reviewed decision was recorded.`
+    : /^wake_preflight_blocked:/i.test(failureReason)
+      ? `${failureReason}. Ask was not called; the bounded mail batch was retained for retry.`
+      : failureReason === "mail_wake_decision_missing"
+        ? "Ask returned without a stage_play_live_source_mail_decision receipt. The batch was not treated as answered."
+        : `${input.wakeResult.status}: ${failureReason}`;
   for (const item of input.mailBatch) {
     rows.push(makeWakeTranscriptRow({
       rowId: `wake_mail_received:${hashShort([input.wake.wakeRequestId, item.mailId])}`,
@@ -626,8 +666,8 @@ const buildNonTerminalWakeTranscriptRows = (input: {
   rows.push(makeWakeTranscriptRow({
     rowId: `wake_blocked:${hashShort(input.wakeResult.wakeResultId)}`,
     rowKind: "blocked",
-    title: "Wake blocked",
-    body: `${input.wakeResult.status}: ${input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "wake did not complete"}`,
+    title: blockedTitle,
+    body: blockedBody,
     artifactId: input.wakeResult.wakeResultId,
     artifactKind: input.wakeResult.artifactId,
     evidenceRefs: input.evidenceRefs,
@@ -638,7 +678,7 @@ const buildNonTerminalWakeTranscriptRows = (input: {
     rowId: `wake_loop_state:${hashShort(input.wakeResult.wakeResultId)}`,
     rowKind: "loop_state",
     title: "Loop state",
-    body: "Wake did not complete; mailbox remains available for a later check.",
+    body: "Wake did not complete; mailbox remains available for a later check and no final answer authority was granted.",
     artifactId: input.wakeResult.wakeResultId,
     artifactKind: input.wakeResult.artifactId,
     evidenceRefs: input.evidenceRefs,
@@ -684,6 +724,7 @@ const buildWakePrompt = (input: {
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
   voicePolicy: StagePlayLiveSourceVoicePolicyV1;
+  retainedMailCount?: number;
 }): string => {
   const objective = input.policy?.objectiveText ?? "Read the live-source mailbox and decide what to do with this unread source update batch.";
   const decisionPolicy = input.policy?.decisionPolicyPrompt ?? "If there is no user-facing change, record wait_for_next_summary. If there is a meaningful user-facing change, draft a concise text answer.";
@@ -740,6 +781,7 @@ const buildWakePrompt = (input: {
     "Unread mail batch:",
     `Wake request: ${input.wake.wakeRequestId}`,
     `Batch size: ${input.wake.mailIds.length}`,
+    `Retained unread mail outside this Ask batch: ${Math.max(0, input.retainedMailCount ?? 0)}`,
     `Mail refs: ${input.wake.mailIds.join(", ")}`,
     `Source refs: ${input.wake.sourceIds.join(", ")}`,
     formatMailBatch(input.mailBatch, input.wake),
@@ -760,21 +802,35 @@ const buildWakePrompt = (input: {
 
 const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
   async ({ prompt, threadId, evidenceRefs, wakeRequest }) => {
-    const response = await fetch(`${baseUrl ?? defaultAskBaseUrl()}/api/agi/ask/turn`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: prompt,
-        prompt,
-        sessionId: threadId,
-        debug: true,
-        evidence_refs: evidenceRefs,
-        stage_play_live_source_mail_wake_request_id: wakeRequest.wakeRequestId,
-      }),
-    });
+    const timeoutMs = wakeAskTurnTimeoutMs();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl ?? defaultAskBaseUrl()}/api/agi/ask/turn`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          question: prompt,
+          prompt,
+          sessionId: threadId,
+          debug: true,
+          evidence_refs: evidenceRefs,
+          stage_play_live_source_mail_wake_request_id: wakeRequest.wakeRequestId,
+        }),
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new Error(`mail_wake_ask_turn_timeout:${timeoutMs}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!response.ok) {
       throw new Error(`mail_wake_ask_turn_failed:${response.status}`);
     }
@@ -940,7 +996,7 @@ export async function runNextMailWakeRequest(input: {
     limit: 250,
   }).find((wake) => wakeMatchesScope(wake, input));
   if (stillRunning) return null;
-  const running = (
+  const selectedWake = (
     input.manualRun
       ? listStagePlayLiveSourceMailWakeRequests({
           threadId: input.threadId ?? null,
@@ -960,10 +1016,17 @@ export async function runNextMailWakeRequest(input: {
           jobId: input.jobId ?? null,
           now,
           limit: 250,
-        })
+      })
   ).at(0) ?? null;
-  if (!running) return null;
-  const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
+  if (!selectedWake) return null;
+
+  const splitWake = splitStagePlayLiveSourceMailWakeRequestForAsk({
+    wakeRequestId: selectedWake.wakeRequestId,
+    maxMailIds: wakeAskBatchLimit(),
+    now,
+  });
+  const running = splitWake?.wake ?? selectedWake;
+  const retainedMailCount = splitWake?.retainedMailIds.length ?? 0;
   const mailBatch = mailBatchForWake(running);
   const policy = resolveActiveWatchPolicy({ wake: running, mailBatch });
   const priorDecisions = priorDecisionsForWake(running, policy);
@@ -984,17 +1047,84 @@ export async function runNextMailWakeRequest(input: {
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
+  const batchLimit = wakeAskBatchLimit();
+  if (running.mailIds.length > batchLimit) {
+    const failedAt = now;
+    const failedReason = `wake_preflight_blocked:batch_too_large:${running.mailIds.length}>${batchLimit}`;
+    markStagePlayMailWakeRetryable({
+      wakeRequestId: running.wakeRequestId,
+      failureReason: failedReason,
+      nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(running.attemptCount)),
+      now: failedAt,
+    });
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: running.wakeRequestId,
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      status: "failed_retryable",
+      failedReason,
+      evidenceRefs,
+      createdAt: failedAt,
+    });
+    return recordNonTerminalWakeTranscript({
+      wake: running,
+      wakeResult,
+      mailBatch,
+      evidenceRefs,
+      createdAt: wakeResult.createdAt,
+    });
+  }
+  const prompt = buildWakePrompt({
+    wake: running,
+    policy,
+    mailBatch,
+    priorDecisions,
+    latestNarrativeState,
+    voicePolicy,
+    retainedMailCount,
+  });
+  const promptMaxChars = wakeAskPromptMaxChars();
+  if (prompt.length > promptMaxChars) {
+    const failedAt = now;
+    const failedReason = `wake_preflight_blocked:prompt_too_large:${prompt.length}>${promptMaxChars}`;
+    markStagePlayMailWakeRetryable({
+      wakeRequestId: running.wakeRequestId,
+      failureReason: failedReason,
+      nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(running.attemptCount)),
+      now: failedAt,
+    });
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: running.wakeRequestId,
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      status: "failed_retryable",
+      failedReason,
+      evidenceRefs,
+      createdAt: failedAt,
+    });
+    return recordNonTerminalWakeTranscript({
+      wake: running,
+      wakeResult,
+      mailBatch,
+      evidenceRefs,
+      createdAt: wakeResult.createdAt,
+    });
+  }
+  const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
   const pressure = input.pressureCheck?.({
     wakeRequest: runningAttempt,
     now,
   }) ?? null;
+  const manualPressureOverride = input.manualRun && pressure?.deferred === true && isManualPressureOverrideReason(pressure.reason);
   let admissionReleased = false;
   const releaseAdmission = (outcome: "completed" | "failed" | "rejected" | "aborted") => {
     if (admissionReleased) return;
     admissionReleased = true;
     pressure?.release?.(outcome);
   };
-  if (pressure?.deferred) {
+  if (pressure?.deferred && !manualPressureOverride) {
     const nextRetryAt = addMs(now, wakeAttemptBackoffMs(runningAttempt.attemptCount));
     const rawReason = pressure.reason ?? "runtime_memory_pressure";
     const reason = input.manualRun && !rawReason.startsWith("manual_wake_deferred_for_pressure")
@@ -1024,7 +1154,7 @@ export async function runNextMailWakeRequest(input: {
       createdAt: now,
     });
     return recordNonTerminalWakeTranscript({
-      wake: runningAttempt,
+      wake: running,
       wakeResult,
       mailBatch,
       evidenceRefs,
@@ -1032,19 +1162,11 @@ export async function runNextMailWakeRequest(input: {
     });
   }
   try {
-    const prompt = buildWakePrompt({
-      wake: running,
-      policy,
-      mailBatch,
-      priorDecisions,
-      latestNarrativeState,
-      voicePolicy,
-    });
     const response = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({
       prompt,
       threadId: running.threadId,
       evidenceRefs,
-      wakeRequest: running,
+      wakeRequest: runningAttempt,
     });
     const askTurnId = extractAskTurnId(response);
     const decisionIds = extractDecisionIds(response);

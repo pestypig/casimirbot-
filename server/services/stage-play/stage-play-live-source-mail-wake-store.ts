@@ -170,6 +170,77 @@ export function listStagePlayLiveSourceMailWakeRequests(input: {
     .slice(-limit);
 }
 
+export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
+  wakeRequestId: string;
+  maxMailIds: number;
+  now?: string;
+}): {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  retainedWake: StagePlayLiveSourceMailWakeRequestV1 | null;
+  retainedMailIds: string[];
+} | null {
+  const existing = wakeById.get(input.wakeRequestId);
+  if (!existing) return null;
+  const maxMailIds = Math.max(1, Math.floor(input.maxMailIds));
+  if (existing.mailIds.length <= maxMailIds) {
+    return {
+      wake: existing,
+      retainedWake: null,
+      retainedMailIds: [],
+    };
+  }
+
+  const now = input.now ?? new Date().toISOString();
+  const boundedMailIds = existing.mailIds.slice(0, maxMailIds);
+  const retainedMailIds = existing.mailIds.slice(maxMailIds);
+  const boundedWake: StagePlayLiveSourceMailWakeRequestV1 = {
+    ...existing,
+    mailIds: boundedMailIds,
+    evidenceRefs: uniqueStrings([
+      ...boundedMailIds,
+      ...existing.sourceIds,
+      ...existing.evidenceRefs.filter((ref) => boundedMailIds.includes(ref)),
+    ]),
+    updatedAt: now,
+  };
+  wakeById.set(boundedWake.wakeRequestId, boundedWake);
+
+  const retainedWake: StagePlayLiveSourceMailWakeRequestV1 = {
+    ...existing,
+    wakeRequestId: `stage_play_live_source_mail_wake:${hashShort([
+      existing.threadId,
+      existing.roomId ?? null,
+      existing.environmentId ?? null,
+      existing.jobId ?? null,
+      retainedMailIds,
+      "retained_after_bounded_ask",
+      now,
+    ])}`,
+    mailIds: retainedMailIds,
+    status: "queued",
+    askTurnId: null,
+    decisionIds: [],
+    attemptCount: 0,
+    lastAttemptAt: null,
+    nextRetryAt: null,
+    failureReason: null,
+    evidenceRefs: uniqueStrings([
+      ...retainedMailIds,
+      ...existing.sourceIds,
+      ...existing.evidenceRefs.filter((ref) => retainedMailIds.includes(ref)),
+    ]),
+    queuedAt: now,
+    updatedAt: now,
+  };
+  wakeById.set(retainedWake.wakeRequestId, retainedWake);
+  trimThreadWakes(existing.threadId);
+  return {
+    wake: boundedWake,
+    retainedWake,
+    retainedMailIds,
+  };
+}
+
 export function listPendingStagePlayLiveSourceMailWakeRequests(input: {
   threadId?: string | null;
   roomId?: string | null;

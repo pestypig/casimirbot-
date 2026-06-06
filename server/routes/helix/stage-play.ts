@@ -168,6 +168,21 @@ const readStagePlayJsonBody = (
 const readQueryString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+const readQueryBoolean = (value: unknown): boolean =>
+  value === true ||
+  (typeof value === "string" && value.trim().toLowerCase() === "true");
+
+export const resolveStagePlayWakeManualRunForRoute = (
+  body: Record<string, unknown>,
+  query: Record<string, unknown>,
+): boolean =>
+  readQueryString(body.trigger) === "manual" ||
+  readQueryBoolean(body.manualRun) ||
+  readQueryBoolean(body.manual_run) ||
+  readQueryString(query.trigger) === "manual" ||
+  readQueryBoolean(query.manualRun) ||
+  readQueryBoolean(query.manual_run);
+
 helixStagePlayRouter.options("/graph", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -994,7 +1009,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
-      manualRun: readQueryString(body.trigger) === "manual" || readQueryString(body.manualRun) === "true" || readQueryString(body.manual_run) === "true",
+      manualRun: resolveStagePlayWakeManualRunForRoute(body, req.query as Record<string, unknown>),
     });
     return res.json({
       ok: true,

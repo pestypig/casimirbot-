@@ -26,6 +26,7 @@ import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
+  listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
   resetStagePlayLiveSourceMailWakeStoreForTest,
@@ -1605,6 +1606,38 @@ describe("Stage Play live-source mailbox", () => {
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
 
+  it("records an Ask timeout as a retryable non-authoritative wake transcript", async () => {
+    seedVisualEvidence();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:10.000Z",
+      askTurnRunner: async () => {
+        throw new Error("mail_wake_ask_turn_timeout:120000");
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "failed_retryable",
+      failedReason: "mail_wake_ask_turn_timeout:120000",
+      askTurnId: null,
+      decisionIds: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
+    expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
+    const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+    expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
+      "Wake Ask timed out",
+      "Loop state",
+    ]));
+    expect(transcriptEntries.map((entry) => entry.row.body).join("\n")).toContain(
+      "no model-reviewed decision was recorded",
+    );
+  });
+
   it("defers a wake before Ask when runtime pressure admission rejects it", async () => {
     seedVisualEvidence();
     let askCalls = 0;
@@ -1659,7 +1692,7 @@ describe("Stage Play live-source mailbox", () => {
       manualRun: true,
       pressureCheck: () => ({
         deferred: true,
-        reason: "runtime_memory_queue_deferrable",
+        reason: "runtime_memory_host_memory_limit",
       }),
       askTurnRunner: async () => {
         askCalls += 1;
@@ -1670,7 +1703,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(askCalls).toBe(0);
     expect(result).toMatchObject({
       status: "deferred_for_pressure",
-      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
+      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_host_memory_limit",
       askTurnId: null,
       decisionIds: [],
     });
@@ -1690,7 +1723,7 @@ describe("Stage Play live-source mailbox", () => {
       manualRun: true,
       pressureCheck: () => ({
         deferred: true,
-        reason: "runtime_memory_queue_deferrable",
+        reason: "runtime_memory_host_memory_limit",
       }),
     });
     const transcriptCount = listStagePlayLiveSourceMailTranscriptEntries({ threadId }).length;
@@ -1702,7 +1735,7 @@ describe("Stage Play live-source mailbox", () => {
       manualRun: true,
       pressureCheck: () => ({
         deferred: true,
-        reason: "runtime_memory_queue_deferrable",
+        reason: "runtime_memory_host_memory_limit",
       }),
     });
 
@@ -1808,6 +1841,118 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("splits oversized same-source wake batches before calling Ask", async () => {
+    const mailIds = Array.from({ length: 6 }, (_unused, index) =>
+      enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId,
+        sourceId,
+        sourceKind: "visual_frame",
+        frameRef: `visual_frame:bounded-${index}`,
+        evidenceRef: `visual_evidence:bounded-${index}`,
+        summaryText: `Compact visual summary ${index}.`,
+        createdAt: `2026-06-04T12:02:0${index}.000Z`,
+      }).mailId
+    );
+
+    let prompt = "";
+    let askMailIds: string[] = [];
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:10.000Z",
+      askTurnRunner: async ({ prompt: wakePrompt, wakeRequest }) => {
+        prompt = wakePrompt;
+        askMailIds = wakeRequest.mailIds;
+        return {
+          turn_id: "ask:bounded-wake",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:bounded-wake",
+                  mailIds: wakeRequest.mailIds,
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:bounded-wake",
+    });
+    expect(askMailIds).toEqual(mailIds.slice(0, 4));
+    expect(prompt).toContain("Retained unread mail outside this Ask batch: 2");
+    expect(prompt).toContain(`Mail refs: ${mailIds.slice(0, 4).join(", ")}`);
+    expect(prompt).not.toContain(mailIds[5]);
+
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+    expect(wakeRequests.map((wake) => wake.status)).toEqual(["completed", "queued"]);
+    expect(wakeRequests[0].mailIds).toEqual(mailIds.slice(0, 4));
+    expect(wakeRequests[1].mailIds).toEqual(mailIds.slice(4));
+  });
+
+  it("records a typed preflight failure instead of calling Ask when the wake prompt is too large", async () => {
+    const previousMaxChars = process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS;
+    process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = "200";
+    try {
+      const mail = enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId,
+        sourceId,
+        sourceKind: "visual_frame",
+        frameRef: "visual_frame:preflight",
+        evidenceRef: "visual_evidence:preflight",
+        summaryText: "A compact visual summary that should never reach Ask because the preflight prompt limit is intentionally tiny.",
+        createdAt: "2026-06-04T12:02:20.000Z",
+      });
+
+      let askCalls = 0;
+      const result = await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:02:21.000Z",
+        askTurnRunner: async () => {
+          askCalls += 1;
+          throw new Error("ask_should_not_run_after_prompt_preflight_block");
+        },
+      });
+
+      expect(askCalls).toBe(0);
+      expect(result).toMatchObject({
+        status: "failed_retryable",
+        askTurnId: null,
+        failedReason: expect.stringMatching(/^wake_preflight_blocked:prompt_too_large:/),
+      });
+      expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+        status: "failed_retryable",
+        mailIds: [mail.mailId],
+        attemptCount: 0,
+        failureReason: expect.stringMatching(/^wake_preflight_blocked:prompt_too_large:/),
+      });
+      expect(listStagePlayLiveSourceMailWakeResults({ threadId })[0]).toMatchObject({
+        status: "failed_retryable",
+        failedReason: expect.stringMatching(/^wake_preflight_blocked:prompt_too_large:/),
+      });
+      expect(listStagePlayLiveSourceMailTranscriptEntries({ threadId })
+        .map((entry) => entry.row.body).join("\n")).toContain("wake_preflight_blocked:prompt_too_large:");
+      expect(listStagePlayLiveSourceMailTranscriptEntries({ threadId })
+        .map((entry) => entry.row.title)).toContain("Wake preflight blocked");
+    } finally {
+      if (previousMaxChars === undefined) {
+        delete process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS;
+      } else {
+        process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = previousMaxChars;
+      }
+    }
+  });
+
   it("lets manual wake retry a pressure-deferred wake before nextRetryAt", async () => {
     seedVisualEvidence();
     await runNextMailWakeRequest({
@@ -1833,6 +1978,7 @@ describe("Stage Play live-source mailbox", () => {
     });
     expect(earlyAutomatic).toBeNull();
 
+    let manualAskCalls = 0;
     const manual = await runNextMailWakeRequest({
       threadId,
       roomId,
@@ -1842,23 +1988,99 @@ describe("Stage Play live-source mailbox", () => {
         deferred: true,
         reason: "runtime_memory_queue_deferrable",
       }),
-      askTurnRunner: async () => {
-        throw new Error("manual_should_not_call_ask_when_pressure_rejects");
+      askTurnRunner: async ({ wakeRequest }) => {
+        manualAskCalls += 1;
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId: wakeRequest.threadId,
+          roomId: wakeRequest.roomId,
+          environmentId: wakeRequest.environmentId,
+          mailIds: wakeRequest.mailIds,
+          decision: "record_interpretation",
+          rationalePreview: "Manual wake consumed retained mail under deferrable pressure.",
+          interpretation: {
+            currentSceneSummary: "Manual wake read the retained visual summary.",
+            runningStorySummary: "Manual wake restored the retained mailbox loop.",
+            userRelevantMeaning: "The operator-requested wake can process retained mail even when automatic wakes are deferrable.",
+            watchNextTargets: ["next visual summary"],
+            watchNextReason: "Watch for the next compact visual summary after the retained batch is processed.",
+          },
+          nextLoopState: "armed_for_next_summary",
+          now: "2026-06-04T12:01:11.000Z",
+        });
+        return {
+          turn_id: "ask:manual-pressure-override",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
       },
     });
 
+    expect(manualAskCalls).toBe(1);
+    expect(manual).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:manual-pressure-override",
+      decisionIds: [expect.stringMatching(/^stage_play_live_source_mail_decision:/)],
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      attemptCount: 2,
+      failureReason: null,
+    });
+    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("decision_recorded");
+    expect(listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:manual-pressure-override" })
+      .map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
+        "mail_read_tool_call",
+        "mail_read_receipt",
+        "agent_decision",
+        "interpretation",
+        "watch_next",
+        "narrative_state",
+        "loop_state",
+      ]));
+  });
+
+  it("still defers manual wake on non-deferrable hard pressure reasons", async () => {
+    seedVisualEvidence();
+    await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:00.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+    });
+
+    let askCalls = 0;
+    const manual = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:10.000Z",
+      manualRun: true,
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_host_memory_limit",
+      }),
+      askTurnRunner: async () => {
+        askCalls += 1;
+        throw new Error("manual_should_not_call_ask_under_host_pressure");
+      },
+    });
+
+    expect(askCalls).toBe(0);
     expect(manual).toMatchObject({
       status: "deferred_for_pressure",
-      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
+      failedReason: "manual_wake_deferred_for_pressure:runtime_memory_host_memory_limit",
       askTurnId: null,
       decisionIds: [],
     });
-    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
-      status: "deferred_for_pressure",
-      attemptCount: 2,
-      failureReason: "manual_wake_deferred_for_pressure:runtime_memory_queue_deferrable",
-    });
-    expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
   });
 
   it("blocks later wakes while a non-stale wake is running", async () => {
