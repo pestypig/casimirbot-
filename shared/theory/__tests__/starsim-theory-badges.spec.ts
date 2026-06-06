@@ -30,10 +30,9 @@ describe("StarSim theory badges", () => {
     expect(downflow?.calculatorPayloads.map((payload) => payload.id)).toContain("tachocline_downflow_setpoint_payload");
     expect(boundary?.level).toBe("claim_boundary");
     expect(boundary?.claimBoundary.promotionAllowed).toBe(false);
+    expect(boundary?.claimBoundary.physicalMechanismClaimAllowed).toBe(false);
+    expect(boundary?.claimBoundary.validationClaimAllowed).toBe(false);
     expect(boundary?.assumptions.join(" ")).toMatch(/planning\/forecast context only/i);
-    expect(JSON.stringify([massFlux, downflow, boundary])).not.toMatch(
-      /solar restoration is feasible|solar intervention proven|proven stellar intervention/i,
-    );
   });
 
   it("merges StarSim into the validating main theory graph", () => {
