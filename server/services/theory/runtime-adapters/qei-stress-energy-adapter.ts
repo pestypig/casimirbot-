@@ -22,6 +22,7 @@ export const QEI_STRESS_ENERGY_SUPPORTED_BADGE_IDS = [
   "nhm2.source.energy_density_proxy",
   "nhm2.closure.source_residual",
   "nhm2.qei.sampling_window",
+  "nhm2.qei.worldline_dossier",
   "nhm2.energy_condition.diagnostic_gate",
 ] as const;
 
@@ -53,6 +54,7 @@ const SCALAR_KEYS = [
   "rhoProxy",
   "tauSelected",
   "tauWindow",
+  "regionalMargin",
 ] as const;
 
 const CONTEXT_KEYS = [
@@ -66,6 +68,11 @@ const CONTEXT_KEYS = [
   "semanticComparable",
   "bridgeReady",
   "uncertaintyDecisionClass",
+  "worldline",
+  "samplingFunction",
+  "rhoSource",
+  "qeiBoundSource",
+  "dutyLightCrossingConsistency",
 ] as const;
 
 type ParsedArtifact = {

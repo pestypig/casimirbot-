@@ -43,6 +43,9 @@ function completeGateArtifact(overrides: Record<string, unknown> = {}) {
       tauSelected: 0.1,
       betaOverAlphaMax: 0.8,
       wallHorizonMargin: 0.3,
+      wallT00RelLInf: 14.95,
+      weylScalar: 0.03,
+      ricciInvariant: 0.02,
     },
     sourceClosure: {
       sourceClosureResidualRms: 0.001,
@@ -164,9 +167,21 @@ describe("GR/NHM2 runtime adapter", () => {
 
       expect(receipt?.status).toBe("completed");
       expect(receipt?.outputs.scalars.curvatureRatio).toBe(0.2);
+      expect(receipt?.outputs.scalars.wallT00RelLInf).toBe(14.95);
+      expect(receipt?.outputs.scalars.weylScalar).toBe(0.03);
       expect(receipt?.outputs.scalars.sourceClosureResidualRms).toBe(0.001);
       expect(receipt?.outputs.scalars.properTimeS).toBe(12);
     });
+  });
+
+  it("advertises wall, tensor authority, and Natario badges", () => {
+    expect(grNhm2RuntimeAdapter.supportedBadgeIds).toEqual(
+      expect.arrayContaining([
+        "nhm2.source.wall_t00_trace",
+        "nhm2.tensor.full_authority_gate",
+        "nhm2.natario.curvature_invariants",
+      ]),
+    );
   });
 
   it("keeps the static GR reference trace available", () => {

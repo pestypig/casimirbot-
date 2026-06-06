@@ -68,5 +68,17 @@ describe("theory runtime entrypoint registry", () => {
     expect(nhm2Entrypoints).toEqual(
       expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
     );
+
+    const wallEntrypoints = findTheoryRuntimeEntrypointsForBadge("nhm2.source.wall_t00_trace").map(
+      (entrypoint) => entrypoint.runtimeId,
+    );
+    const casimirMaterialEntrypoints = findTheoryRuntimeEntrypointsForBadge("casimir.material_receipts").map(
+      (entrypoint) => entrypoint.runtimeId,
+    );
+
+    expect(wallEntrypoints).toEqual(
+      expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(casimirMaterialEntrypoints).toContain("casimir.verify");
   });
 });

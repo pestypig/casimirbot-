@@ -68,6 +68,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     theoryBadgeIds: [
       "nhm2.source.energy_density_proxy",
       "nhm2.closure.source_residual",
+      "nhm2.source.wall_t00_trace",
       "nhm2.energy_condition.diagnostic_gate",
       ...NHM2_BOUNDARY_BADGES,
     ],
@@ -101,6 +102,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
       "physics.energy.energy_density",
       "nhm2.source.energy_density_proxy",
       "nhm2.qei.sampling_window",
+      "nhm2.qei.worldline_dossier",
       ...NHM2_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [
@@ -128,7 +130,9 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     description: "Shows source residual and QEI margin feeding a diagnostic gate context.",
     theoryBadgeIds: [
       "nhm2.closure.source_residual",
+      "nhm2.source.wall_t00_trace",
       "nhm2.qei.sampling_window",
+      "nhm2.qei.worldline_dossier",
       "nhm2.energy_condition.diagnostic_gate",
       ...NHM2_BOUNDARY_BADGES,
     ],
@@ -158,7 +162,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     title: "Claim Boundary",
     band: "boundary",
     description: "Keeps QEI and stress-energy rows diagnostic-only.",
-    theoryBadgeIds: [...NHM2_BOUNDARY_BADGES],
+    theoryBadgeIds: ["nhm2.qei.worldline_dossier", ...NHM2_BOUNDARY_BADGES],
     calculatorPayloadRefs: [],
     claimBoundaryBadgeIds: NHM2_BOUNDARY_BADGES,
     objectBindings: [],

@@ -23,12 +23,14 @@ export const CASIMIR_SUPPORTED_BADGE_IDS = [
   "casimir.cavity.parallel_plate_pressure",
   "casimir.cavity.per_tile_energy",
   "casimir.cavity.static_tile_budget",
+  "casimir.tile.duty_budget",
   "casimir.cavity.geometry_gain",
   "casimir.cavity.output_energy_proxy",
   "casimir.cavity.mass_equivalent_proxy",
   "casimir.cavity.mode_frequency",
   "casimir.cavity.mode_photon_energy",
   "casimir.runtime.static_casimir_module",
+  "casimir.material_receipts",
   "casimir.claim_boundary.diagnostic_source_context",
 ] as const;
 
@@ -48,6 +50,11 @@ const SCALAR_KEYS = [
   "P_casimir",
   "E_tile",
   "U_static",
+  "d_burst",
+  "d_cycle",
+  "N_concurrent",
+  "N_sector",
+  "d_eff",
   "gammaGeo",
   "Q_L",
   "E_out",
@@ -167,6 +174,16 @@ function deriveScalarCuts(
   const massProxy = typeof scalars.M_proxy === "number" ? scalars.M_proxy : derived.M_proxy;
   if (typeof massProxy === "number") derived.f_mass_equiv = (massProxy * c ** 2) / h;
   if (typeof scalars.f_n === "number" && !("E_n" in scalars)) derived.E_n = h * scalars.f_n;
+  if (
+    typeof scalars.d_burst === "number" &&
+    typeof scalars.d_cycle === "number" &&
+    typeof scalars.N_concurrent === "number" &&
+    typeof scalars.N_sector === "number" &&
+    scalars.N_sector !== 0 &&
+    !("d_eff" in scalars)
+  ) {
+    derived.d_eff = scalars.d_burst * scalars.d_cycle * (scalars.N_concurrent / scalars.N_sector);
+  }
   return derived;
 }
 
@@ -248,6 +265,9 @@ function buildReceipt(input: {
     gates.material_context_present !== "pass" ? "material_context_missing" : "",
     gates.finite_temperature_context_present !== "pass" ? "finite_temperature_context_missing" : "",
     gates.telemetry_fresh === "fail" ? "telemetry_stale" : "",
+    gates.material_context_present !== "pass" || gates.finite_temperature_context_present !== "pass"
+      ? "material_receipts_missing"
+      : "",
   ]);
   const warnings = unique([
     "Read-only Casimir artifact adapter; no backend runtime executed.",
@@ -275,6 +295,7 @@ function buildReceipt(input: {
         "E_area = -(pi^2*hbar_c)/(720*a^3)",
         "P_casimir = -(pi^2*hbar_c)/(240*a^4)",
         "U_static",
+        "d_eff = d_burst*d_cycle*(N_concurrent/N_sector)",
         "E_out",
         "M_proxy = E_out/c^2",
         "f_mass_equiv = M_proxy*c^2/h",

@@ -2682,6 +2682,50 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).not.toMatch(/temporal comparison/i);
   }, 60000);
 
+  it("routes explicit interim voice callout requests to the live-env voice tool instead of docs or debug", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: [
+          "With the voice lane active, use the interim voice callout tool to queue a short provisional callout saying",
+          "\"I am checking this now\", then continue the normal Helix Ask answer.",
+          "In the final answer, say whether the callout receipt was evidence-only.",
+        ].join(" "),
+        mode: "read",
+        debug: true,
+        sessionId: `e52-interim-voice-callout-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_environment_review");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("voice_output_tool_arbitration");
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe("live_env.request_interim_voice_callout");
+    expect(response.body?.available_capabilities?.model_visible_capability_keys).toContain("live_env.request_interim_voice_callout");
+    expect(response.body?.agent_step_decision?.candidate_capabilities ?? []).toContain("live_env.request_interim_voice_callout");
+    expect(response.body?.agent_step_decision?.chosen_capability).not.toBe("docs-viewer.open");
+    expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("docs-viewer.open");
+    expect(response.body?.terminal_error_code ?? null).not.toBe("agent_loop_budget_exhausted");
+  }, 60000);
+
+  it("keeps contextual interim voice tool policy mentions non-executable", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What does the phrase \"use the interim voice callout tool\" mean in the previous debug, and what is the policy?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-interim-voice-policy-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).not.toContain("voice_output_tool_arbitration");
+    expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("live_env.request_interim_voice_callout");
+    expect(response.body?.agent_step_decision?.chosen_capability).not.toBe("live_env.request_interim_voice_callout");
+    expect(findAction(response.body, "docs-viewer")).toBeFalsy();
+  }, 60000);
+
   it("keeps contextual Dottie run analysis out of workstation action routing", async () => {
     const app = createApp();
     const response = await request(app)

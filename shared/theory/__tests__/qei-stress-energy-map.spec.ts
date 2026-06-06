@@ -16,6 +16,10 @@ describe("QEI / stress-energy map", () => {
       badgeId: "nhm2.qei.sampling_window",
       payloadId: "qei_margin_difference_payload",
     });
+    expect(qeiMargin?.theoryBadgeIds).toContain("nhm2.qei.worldline_dossier");
     expect(qeiMargin?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
+
+    const source = getQeiStressEnergyGroup("qei.stress_energy.source_residual");
+    expect(source?.theoryBadgeIds).toContain("nhm2.source.wall_t00_trace");
   });
 });

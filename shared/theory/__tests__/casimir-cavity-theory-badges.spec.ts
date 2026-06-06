@@ -19,6 +19,8 @@ describe("casimir cavity theory badges", () => {
     expect(badgeIds).toContain("casimir.cavity.parallel_plate_energy_density");
     expect(badgeIds).toContain("casimir.cavity.parallel_plate_pressure");
     expect(badgeIds).toContain("casimir.cavity.static_tile_budget");
+    expect(badgeIds).toContain("casimir.tile.duty_budget");
+    expect(badgeIds).toContain("casimir.material_receipts");
     expect(badgeIds).toContain("casimir.cavity.mode_frequency");
     expect(badgeIds).toContain("casimir.claim_boundary.diagnostic_source_context");
     expect(JSON.stringify(graph)).not.toMatch(/Casimir proves propulsion|validated propulsion|confirmed physical mechanism/i);
@@ -30,8 +32,9 @@ describe("casimir cavity theory badges", () => {
     const matches = locateTheoryBadges({
       graph,
       input: {
-        query: "Casimir parallel plate gap tile energy budget cavity mode",
+        query: "Casimir parallel plate gap tile energy budget cavity mode duty sector",
         simulationOwners: ["casimir"],
+        limit: 20,
       },
     });
 
@@ -39,6 +42,7 @@ describe("casimir cavity theory badges", () => {
       "casimir.cavity.parallel_plate_energy_density",
     );
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.cavity.per_tile_energy");
+    expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.tile.duty_budget");
   });
 
   it("builds a Casimir scalar loadout from selected badges", () => {
@@ -48,6 +52,7 @@ describe("casimir cavity theory badges", () => {
       badgeIds: [
         "casimir.cavity.parallel_plate_energy_density",
         "casimir.cavity.per_tile_energy",
+        "casimir.tile.duty_budget",
         "casimir.cavity.mode_frequency",
       ],
       mode: "selected_badges",
@@ -55,6 +60,10 @@ describe("casimir cavity theory badges", () => {
         a: 1e-9,
         A_tile: 2.5e-3,
         E_area: -0.4333,
+        d_burst: 0.12,
+        d_cycle: 0.12,
+        N_concurrent: 2,
+        N_sector: 80,
         L: 0.01,
         n: 1,
       }),
@@ -66,6 +75,7 @@ describe("casimir cavity theory badges", () => {
       expect.arrayContaining([
         "E_area = -(pi^2*hbar_c)/(720*a^3)",
         "E_tile = E_area*A_tile",
+        "d_eff = d_burst*d_cycle*(N_concurrent/N_sector)",
         "f_n = n*c/(2*L)",
       ]),
     );
@@ -73,6 +83,7 @@ describe("casimir cavity theory badges", () => {
       expect.arrayContaining([
         "E_area = -(3.141592653589793^2*3.16152677e-26)/(720*1e-9^3)",
         "E_tile = -0.4333*0.0025",
+        "d_eff = 0.12*0.12*(2/80)",
         "f_n = 1*299792458/(2*0.01)",
       ]),
     );

@@ -244,6 +244,77 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   casimirBadge({
+    id: "casimir.tile.duty_budget",
+    title: "Casimir Tile Duty Budget",
+    plainMeaning:
+      "Computes the sector-averaged duty term for a strobing tile budget from burst duty, cycle duty, and concurrent sector count.",
+    whyItMatters:
+      "It keeps strobing language tied to a cycle-averaged source proxy instead of actuator or steering claims.",
+    subjects: ["casimir", "tile", "duty_budget", "sector_schedule", "source_proxy"],
+    level: "simulation_specific",
+    status: "diagnostic",
+    simulationOwners: ["casimir", "NHM2"],
+    equationFamilies: ["casimir_tile_duty_budget", "sector_schedule"],
+    tags: ["d_eff", "sector_count", "concurrent_sectors", "calculator_loadable", "diagnostic_only"],
+    equations: [
+      {
+        id: "effective_sector_duty",
+        role: "calculator_demo",
+        displayLatex: "d_{eff}=d_{burst}d_{cycle}\\frac{N_{concurrent}}{N_{sector}}",
+        computableExpression: "d_eff = d_burst*d_cycle*(N_concurrent/N_sector)",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["d_burst", "d_cycle", "N_concurrent", "N_sector"],
+        outputSymbols: ["d_eff"],
+      },
+      {
+        id: "time_averaged_amplification",
+        role: "calculator_demo",
+        displayLatex: "A_{avg}=A_{pulse}d_{eff}",
+        computableExpression: "A_avg = A_pulse*d_eff",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["A_pulse", "d_eff"],
+        outputSymbols: ["A_avg"],
+      },
+    ],
+    units: [
+      { symbol: "d_eff", unit: null, quantity: "effective_duty", dimensionSignature: "1" },
+      { symbol: "N_concurrent", unit: null, quantity: "concurrent_sector_count", dimensionSignature: "1" },
+      { symbol: "N_sector", unit: null, quantity: "sector_count", dimensionSignature: "1" },
+      { symbol: "A_avg", unit: null, quantity: "time_averaged_amplification", dimensionSignature: "1" },
+    ],
+    assumptions: [
+      "Sector strobing controls a cycle-averaged source proxy only.",
+      "Duty budgeting does not prove directional stress-energy steering or macroscopic actuation.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "casimir_effective_sector_duty_payload",
+        expression: "d_eff = d_burst*d_cycle*(N_concurrent/N_sector)",
+        displayLatex: "d_{eff}=d_{burst}d_{cycle}\\frac{N_{concurrent}}{N_{sector}}",
+        targetVariable: "d_eff",
+      }),
+      payload({
+        id: "casimir_time_averaged_amplification_payload",
+        expression: "A_avg = A_pulse*d_eff",
+        displayLatex: "A_{avg}=A_{pulse}d_{eff}",
+        targetVariable: "A_avg",
+      }),
+    ],
+    sourceRefs: [
+      repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "geometry", "Frozen sectorCount and concurrentSectors."),
+      repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "loss", "Frozen duty and Q-spoiling terms."),
+      docRef("docs/casimir-tile-mechanism.md", "duty-cycle", "Mechanism note for duty-cycle ladder terms."),
+    ],
+    hintKeys: {
+      subjects: ["casimir", "tile", "duty_budget", "sector_schedule", "source_proxy"],
+      symbols: ["d_eff", "d_burst", "d_cycle", "N_concurrent", "N_sector", "A_avg", "A_pulse"],
+      unitSignatures: ["1"],
+      repoPaths: ["configs/needle-hull-mark2-cavity-contract.v1.json", "docs/casimir-tile-mechanism.md"],
+      equationFamilies: ["casimir_tile_duty_budget", "sector_schedule"],
+      simulationOwners: ["casimir", "NHM2"],
+    },
+  }),
+  casimirBadge({
     id: "casimir.cavity.geometry_gain",
     title: "Casimir Geometry Gain",
     plainMeaning: "Applies the geometry gain cube to the static tile budget.",
@@ -514,6 +585,56 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   casimirBadge({
+    id: "casimir.material_receipts",
+    title: "Casimir Material Receipts",
+    plainMeaning:
+      "Requires material response, finite conductivity, roughness, finite temperature, gap metrology, seal/vacuum, and geometry-validity receipts.",
+    whyItMatters:
+      "It blocks ideal parallel-plate or frozen-geometry rows from being read as fabrication readiness or actuator evidence.",
+    subjects: ["casimir", "materials", "metrology", "lifshitz", "geometry_validity"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["casimir", "NHM2"],
+    equationFamilies: ["casimir_material_receipts", "geometry_validity"],
+    tags: ["lifshitz", "finite_conductivity", "roughness", "finite_temperature", "gap_metrology", "blocked"],
+    equations: [
+      {
+        id: "casimir_material_receipts_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{receipts}=\\epsilon(\\omega)\\land conductivity\\land roughness\\land T\\land gap\\land geometry",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["epsilon_omega", "conductivity", "roughness", "temperature", "gap_metrology", "geometry_validity"],
+        outputSymbols: ["material_receipt_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      "Material receipts are required before ideal scalar rows can be interpreted beyond diagnostic source context.",
+      "Frozen geometry is review-only and does not certify fabrication readiness.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "boundary", "Geometry-freeze boundary statement."),
+      repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "layout.witnessCoupons", "Nanogap and sign-control witness coupon layout."),
+      repoRef("modules/sim_core/static-casimir.ts", "calculateCasimirEnergy", "Static idealized calculation that receipts must qualify."),
+      docRef("docs/casimir-tile-mechanism.md", "caveats", "Mechanism caveats and verification checklist."),
+    ],
+    hintKeys: {
+      subjects: ["casimir", "materials", "metrology", "lifshitz", "geometry_validity"],
+      symbols: ["epsilon_omega", "conductivity", "roughness", "temperature", "gap_metrology", "geometry_validity"],
+      unitSignatures: [],
+      repoPaths: [
+        "configs/needle-hull-mark2-cavity-contract.v1.json",
+        "modules/sim_core/static-casimir.ts",
+        "docs/casimir-tile-mechanism.md",
+      ],
+      equationFamilies: ["casimir_material_receipts", "geometry_validity"],
+      simulationOwners: ["casimir", "NHM2"],
+    },
+  }),
+  casimirBadge({
     id: "casimir.claim_boundary.diagnostic_source_context",
     title: "Casimir Diagnostic Source Boundary",
     plainMeaning: "Marks Casimir cavity rows as diagnostic/source-context rows, not physical confirmation.",
@@ -614,6 +735,14 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Tile count must come from layout/pipeline context.",
   },
   {
+    id: "casimir_static_budget_feeds_duty_budget",
+    from: "casimir.cavity.static_tile_budget",
+    to: "casimir.tile.duty_budget",
+    relation: "requires",
+    label: "Static tile budget requires sector-duty context before cycle-averaged source proxy language.",
+    claimBoundaryNote: "Duty averaging remains diagnostic source context only.",
+  },
+  {
     id: "casimir_static_budget_feeds_geometry_gain",
     from: "casimir.cavity.static_tile_budget",
     to: "casimir.cavity.geometry_gain",
@@ -630,6 +759,14 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Output energy is a proxy row in this map.",
   },
   {
+    id: "casimir_duty_budget_feeds_output_proxy",
+    from: "casimir.tile.duty_budget",
+    to: "casimir.cavity.output_energy_proxy",
+    relation: "requires",
+    label: "Output-energy proxy rows require the effective duty term used in the sector schedule.",
+    claimBoundaryNote: "Duty terms do not prove directional steering or actuation.",
+  },
+  {
     id: "casimir_output_proxy_feeds_mass_proxy",
     from: "casimir.cavity.output_energy_proxy",
     to: "casimir.cavity.mass_equivalent_proxy",
@@ -644,6 +781,14 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "Runtime references must carry the diagnostic source boundary.",
     claimBoundaryNote: "Runtime output requires receipt/provenance before interpretation.",
+  },
+  {
+    id: "casimir_material_receipts_document_boundary",
+    from: "casimir.material_receipts",
+    to: "casimir.claim_boundary.diagnostic_source_context",
+    relation: "blocks",
+    label: "Material receipts must be present before Casimir source rows can be interpreted beyond diagnostics.",
+    claimBoundaryNote: "Missing material and metrology receipts block physical mechanism language.",
   },
   {
     id: "casimir_mass_proxy_blocks_claim_promotion",

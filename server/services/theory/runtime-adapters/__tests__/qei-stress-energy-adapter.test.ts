@@ -163,6 +163,7 @@ describe("QEI / Stress-Energy adapter", () => {
       expect.arrayContaining([
         "physics.fields.stress_energy_tensor",
         "nhm2.qei.sampling_window",
+        "nhm2.qei.worldline_dossier",
         "nhm2.energy_condition.diagnostic_gate",
       ]),
     );

@@ -19,6 +19,14 @@ describe("Warp / GR / NHM2 map", () => {
       "source_residual_difference_payload",
       "qei_margin_difference_payload",
     ]);
+    expect(path?.theoryBadgeIds).toEqual(
+      expect.arrayContaining([
+        "nhm2.source.wall_t00_trace",
+        "nhm2.tensor.full_authority_gate",
+        "nhm2.qei.worldline_dossier",
+        "nhm2.natario.curvature_invariants",
+      ]),
+    );
     expect(path?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
   });
 });

@@ -17,7 +17,13 @@ export type CasimirCavityObjectBindingInput = {
   gammaGeo?: number;
   Q_L?: number;
   gamma_VdB?: number;
+  d_burst?: number;
+  d_cycle?: number;
+  N_concurrent?: number;
+  N_sector?: number;
   d_eff?: number;
+  A_pulse?: number;
+  A_avg?: number;
   E_out?: number;
   L?: number;
   n?: number;
@@ -51,7 +57,13 @@ export function buildCasimirCavityObjectBindings(
     gammaGeo: input.gammaGeo,
     Q_L: input.Q_L,
     gamma_VdB: input.gamma_VdB,
+    d_burst: input.d_burst,
+    d_cycle: input.d_cycle,
+    N_concurrent: input.N_concurrent,
+    N_sector: input.N_sector,
     d_eff: input.d_eff,
+    A_pulse: input.A_pulse,
+    A_avg: input.A_avg,
     E_out: input.E_out,
     L: input.L,
     n: input.n,
@@ -74,7 +86,13 @@ export function buildCasimirCavityObjectBindings(
       gammaGeo: input.gammaGeo ?? null,
       Q_L: input.Q_L ?? null,
       gamma_VdB: input.gamma_VdB ?? null,
+      d_burst: input.d_burst ?? null,
+      d_cycle: input.d_cycle ?? null,
+      N_concurrent: input.N_concurrent ?? null,
+      N_sector: input.N_sector ?? null,
       d_eff: input.d_eff ?? null,
+      A_pulse: input.A_pulse ?? null,
+      A_avg: input.A_avg ?? null,
       L: input.L ?? null,
       n: input.n ?? null,
       f_n: input.f_n ?? null,
@@ -96,7 +114,13 @@ export function buildCasimirCavityObjectBindings(
       gammaGeo: "1",
       Q_L: "1",
       gamma_VdB: "1",
+      d_burst: "1",
+      d_cycle: "1",
+      N_concurrent: "1",
+      N_sector: "1",
       d_eff: "1",
+      A_pulse: "1",
+      A_avg: "1",
       E_out: "J",
       L: "m",
       n: "1",

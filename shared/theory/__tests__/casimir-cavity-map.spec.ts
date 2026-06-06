@@ -20,5 +20,15 @@ describe("casimir cavity map", () => {
     ]);
     expect(tile?.objectBindings[0]?.input.a).toBe(1e-9);
     expect(tile?.claimBoundaryBadgeIds).toContain("casimir.claim_boundary.diagnostic_source_context");
+
+    const budget = CASIMIR_CAVITY_GROUPS.find((group) => group.id === "casimir.cavity.tile_budget");
+    expect(budget?.theoryBadgeIds).toEqual(
+      expect.arrayContaining(["casimir.tile.duty_budget", "casimir.material_receipts"]),
+    );
+    expect(budget?.calculatorPayloadRefs).toContainEqual({
+      badgeId: "casimir.tile.duty_budget",
+      payloadId: "casimir_effective_sector_duty_payload",
+    });
+    expect(budget?.objectBindings[0]?.input.N_sector).toBe(80);
   });
 });

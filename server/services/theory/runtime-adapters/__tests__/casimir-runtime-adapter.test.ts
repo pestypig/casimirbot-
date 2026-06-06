@@ -37,6 +37,10 @@ function fixture(overrides: Record<string, unknown> = {}) {
     P_casimir: -0.129,
     E_tile: -1.2e-4,
     U_static: -2.5e-3,
+    d_burst: 0.12,
+    d_cycle: 0.12,
+    N_concurrent: 2,
+    N_sector: 80,
     gammaGeo: 4,
     Q_L: 1200,
     E_out: 8.99e-9,
@@ -138,8 +142,10 @@ describe("Casimir runtime adapter", () => {
       expect(typeof receipt.outputs.scalars.M_proxy).toBe("number");
       expect(typeof receipt.outputs.scalars.f_mass_equiv).toBe("number");
       expect(typeof receipt.outputs.scalars.E_n).toBe("number");
+      expect(receipt.outputs.scalars.d_eff).toBeCloseTo(0.00036);
       expect(receipt.args.scalarCuts).toEqual(
         expect.arrayContaining([
+          "d_eff = d_burst*d_cycle*(N_concurrent/N_sector)",
           "M_proxy = E_out/c^2",
           "f_mass_equiv = M_proxy*c^2/h",
           "f_n = n*c/(2*L)",
@@ -169,6 +175,9 @@ describe("Casimir runtime adapter", () => {
       "artifact_reader",
       "quick_runtime",
     ]);
+    expect(casimirRuntimeAdapter.supportedBadgeIds).toEqual(
+      expect.arrayContaining(["casimir.tile.duty_budget", "casimir.material_receipts"]),
+    );
     expect(casimirRuntimeAdapter.runQuick).toBeDefined();
 
     const trace = casimirRuntimeAdapter.buildReferenceTrace?.({

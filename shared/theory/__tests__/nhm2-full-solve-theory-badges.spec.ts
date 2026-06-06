@@ -28,9 +28,13 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.observer.spatial_stress_projection");
     expect(ids).toContain("nhm2.tensor.metric_required_stress_energy");
     expect(ids).toContain("nhm2.tensor.tile_effective_counterpart");
+    expect(ids).toContain("nhm2.source.wall_t00_trace");
+    expect(ids).toContain("nhm2.tensor.full_authority_gate");
     expect(ids).toContain("nhm2.closure.same_basis_regional_residual");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
     expect(ids).toContain("nhm2.qei.worldline_sampling_requirement");
+    expect(ids).toContain("nhm2.qei.worldline_dossier");
+    expect(ids).toContain("nhm2.natario.curvature_invariants");
     expect(ids).toContain("nhm2.clock.centerline_tau_alpha_T");
     expect(ids).toContain("nhm2.artifact.frozen_reference_run_provenance");
   });
@@ -45,12 +49,27 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "blocks",
         }),
         expect.objectContaining({
+          from: "nhm2.source.wall_t00_trace",
+          to: "nhm2.claim_boundary.diagnostic_only",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.full_authority_gate",
+          to: "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
           from: "nhm2.clock.centerline_tau_alpha_T",
           to: "nhm2.claim_boundary.expected_clocking_not_route_result",
           relation: "blocks",
         }),
         expect.objectContaining({
           from: "nhm2.qei.worldline_sampling_requirement",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.qei.worldline_dossier",
+          to: "nhm2.claim_boundary.literature_not_validation",
           relation: "blocks",
         }),
       ]),
@@ -82,7 +101,11 @@ describe("NHM2 full-solve theory badges", () => {
       expect.arrayContaining([
         "nhm2.observer.eulerian_normal",
         "nhm2.tensor.metric_required_stress_energy",
+        "nhm2.source.wall_t00_trace",
+        "nhm2.tensor.full_authority_gate",
         "nhm2.closure.same_basis_regional_residual",
+        "nhm2.qei.worldline_dossier",
+        "nhm2.natario.curvature_invariants",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );

@@ -32,8 +32,27 @@ describe("NHM2 runtime field map", () => {
       "model_relation",
     );
     expect(isNhm2RuntimeBoundBadge("physics.gr.einstein_field_equation")).toBe(false);
+    expect(isNhm2RuntimeBoundBadge("nhm2.source.wall_t00_trace")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.tensor.full_authority_gate")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.sampling_window")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.qei.worldline_dossier")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.energy_condition.diagnostic_gate")).toBe(true);
+  });
+
+  it("maps wall T00 and full tensor authority badges to explicit blocker fields", () => {
+    const wall = getNhm2RuntimeFieldBinding("nhm2.source.wall_t00_trace");
+    const tensor = getNhm2RuntimeFieldBinding("nhm2.tensor.full_authority_gate");
+
+    expect(wall?.artifactFields).toEqual(
+      expect.arrayContaining(["sourceClosureWallT00RelLInf", "wallT00RelLInf", "t00_mismatch_present"]),
+    );
+    expect(wall?.gates).toEqual(expect.arrayContaining(["source_closure", "wall_t00_trace"]));
+    expect(tensor?.artifactFields).toEqual(
+      expect.arrayContaining(["observerMetricT0iAdmissionStatus", "observerMetricOffDiagonalTijAdmissionStatus"]),
+    );
+    expect(tensor?.requiredEvidence).toEqual(
+      expect.arrayContaining(["metric_t0i_emission", "metric_off_diagonal_tij_emission"]),
+    );
   });
 
   it("finds every binding involved in a runtime gate", () => {

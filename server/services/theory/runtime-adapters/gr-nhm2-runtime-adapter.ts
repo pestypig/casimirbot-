@@ -23,6 +23,9 @@ export const GR_NHM2_SUPPORTED_BADGE_IDS = [
   "nhm2.geometry.lapse_shift_profile",
   "nhm2.source.energy_density_proxy",
   "nhm2.closure.source_residual",
+  "nhm2.source.wall_t00_trace",
+  "nhm2.tensor.full_authority_gate",
+  "nhm2.natario.curvature_invariants",
   "nhm2.energy_condition.diagnostic_gate",
   "nhm2.claim_boundary.diagnostic_only",
 ] as const;
@@ -49,10 +52,14 @@ const SCALAR_KEYS = [
   "tauSelected",
   "sourceClosureResidualRms",
   "sourceClosureResidualMax",
+  "sourceClosureWallT00RelLInf",
+  "wallT00RelLInf",
   "properTimeS",
   "savedDays",
   "betaOverAlphaMax",
   "wallHorizonMargin",
+  "weylScalar",
+  "ricciInvariant",
 ] as const;
 
 type RequiredGateId = (typeof REQUIRED_GATE_IDS)[number];

@@ -147,6 +147,50 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     ],
   },
   {
+    badgeId: "nhm2.source.wall_t00_trace",
+    kind: "runtime_bound_output",
+    runtimeId: "gr_nhm2.artifact_reader",
+    laneId: "warp_gr_nhm2",
+    artifactFields: [
+      "sourceClosureResidualByRegion.wall.residualNorms.relLInf",
+      "sourceClosureWallT00RelLInf",
+      "wallT00RelLInf",
+      "t00_mismatch_present",
+    ],
+    scalarCuts: [
+      {
+        id: "wall_t00_rel_linf_cut",
+        expression: "wall_t00_relLInf = abs(T00_geom_wall - T00_tile_wall) / max(abs(T00_geom_wall), eps)",
+        displayLatex:
+          "\\mathrm{relLInf}_{wall}=|T_{00,geom}^{wall}-T_{00,tile}^{wall}|/\\max(|T_{00,geom}^{wall}|,\\epsilon)",
+        outputSymbols: ["wall_t00_relLInf"],
+      },
+    ],
+    gates: ["source_closure", "wall_t00_trace"],
+    requiredEvidence: ["source_closure_region_report", "metric_required_wall_tensor", "tile_effective_wall_tensor"],
+    claimBoundaryNotes: [
+      "Wall T00 trace is a runtime-bound blocker; global source closure summaries must not hide wall-region mismatch.",
+    ],
+  },
+  {
+    badgeId: "nhm2.tensor.full_authority_gate",
+    kind: "runtime_gate",
+    runtimeId: "gr_nhm2.artifact_reader",
+    laneId: "warp_gr_nhm2",
+    artifactFields: [
+      "observerMetricEmissionAdmissionStatus",
+      "observerMetricT0iAdmissionStatus",
+      "observerMetricOffDiagonalTijAdmissionStatus",
+      "tensorAuthorityStatus",
+    ],
+    scalarCuts: [],
+    gates: ["observer_audit", "tensor_authority"],
+    requiredEvidence: ["observer_audit", "metric_t0i_emission", "metric_off_diagonal_tij_emission"],
+    claimBoundaryNotes: [
+      "Full tensor authority remains blocked until same-chart T00, J_i, diagonal S_ij, and off-diagonal S_ij evidence is present.",
+    ],
+  },
+  {
     badgeId: "nhm2.qei.sampling_window",
     kind: "runtime_bound_output",
     runtimeId: "qei_stress_energy.artifact_reader",
@@ -178,6 +222,39 @@ export const NHM2_RUNTIME_FIELD_BINDINGS: Nhm2RuntimeFieldBinding[] = [
     requiredEvidence: ["qei_worldline_dossier", "operator_mapping", "semantic_bridge", "sampling_normalization"],
     claimBoundaryNotes: [
       "QEI sampling values are runtime-bound applicability diagnostics and must fail closed when semantics are missing.",
+    ],
+  },
+  {
+    badgeId: "nhm2.qei.worldline_dossier",
+    kind: "runtime_gate",
+    runtimeId: "qei_stress_energy.artifact_reader",
+    laneId: "qei_stress_energy",
+    artifactFields: [
+      "worldline",
+      "samplingFunction",
+      "rhoSource",
+      "qeiBoundSource",
+      "regionalMargins",
+      "dutyLightCrossingConsistency",
+    ],
+    scalarCuts: [],
+    gates: ["timelike_worldline", "sampling_normalization", "operator_mapping", "qei_margin", "qei_dossier"],
+    requiredEvidence: ["qei_worldline_dossier", "sampling_normalization", "operator_mapping", "regional_margin_report"],
+    claimBoundaryNotes: [
+      "QEI worldline dossier is a blocked provenance gate until worldline, sampling, source, bound, and regional margin receipts exist.",
+    ],
+  },
+  {
+    badgeId: "nhm2.natario.curvature_invariants",
+    kind: "runtime_bound_output",
+    runtimeId: "gr_nhm2.artifact_reader",
+    laneId: "warp_gr_nhm2",
+    artifactFields: ["weylScalar", "ricciInvariant", "petrovClass", "momentumDensity", "natarioInvariantStatus"],
+    scalarCuts: [],
+    gates: ["observer_audit", "tensor_authority", "curvature_invariants"],
+    requiredEvidence: ["curvature_invariant_report", "observer_audit", "metric_t0i_emission"],
+    claimBoundaryNotes: [
+      "Natario curvature invariants are runtime targets and cannot promote NHM2 without observer and tensor authority.",
     ],
   },
   {

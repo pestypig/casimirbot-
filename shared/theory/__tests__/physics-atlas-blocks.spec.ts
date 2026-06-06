@@ -98,12 +98,29 @@ describe("physics atlas blocks", () => {
       "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
+    expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.tile.duty_budget");
+    expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.material_receipts");
+    expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.source.wall_t00_trace");
+    expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.tensor.full_authority_gate");
+    expect(byId.get("qei_stress_energy")?.primaryBadgeIds).toContain("nhm2.qei.worldline_dossier");
     expect(byId.get("nhm2_full_solve")?.status).toBe("seed");
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.observer.eulerian_normal",
     );
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.tensor.metric_required_stress_energy",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.source.wall_t00_trace",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.tensor.full_authority_gate",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.qei.worldline_dossier",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.natario.curvature_invariants",
     );
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.closure.same_basis_regional_residual",
