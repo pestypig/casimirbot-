@@ -440,24 +440,48 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
     limit: 250,
   })) {
     if (!ACTIVE_WAKE_STATUSES.has(wake.status)) continue;
+    const coveredMailIds = wake.mailIds.filter((mailId) => (decisionsByMailId.get(mailId) ?? []).length > 0);
+    if (coveredMailIds.length !== wake.mailIds.length) continue;
     const decisions = uniqueStrings(wake.mailIds.flatMap((mailId) =>
       (decisionsByMailId.get(mailId) ?? []).map((decision) => decision.decisionId)
     ));
     if (decisions.length === 0) continue;
+    const matchingDecisionRecords = wake.mailIds.flatMap((mailId) => decisionsByMailId.get(mailId) ?? []);
+    const askTurnId = uniqueStrings(matchingDecisionRecords.flatMap((decision) =>
+      decision.evidenceRefs.filter((ref) => /^ask:/i.test(ref))
+    )).at(-1) ?? null;
     const evidenceRefs = uniqueStrings([
       ...wake.evidenceRefs,
       ...decisions,
-      ...wake.mailIds.flatMap((mailId) =>
-        (decisionsByMailId.get(mailId) ?? []).flatMap((decision) => decision.evidenceRefs)
-      ),
+      ...matchingDecisionRecords.flatMap((decision) => decision.evidenceRefs),
     ]);
     const updated = markStagePlayMailWakeCompleted({
       wakeRequestId: wake.wakeRequestId,
+      askTurnId,
       decisionIds: decisions,
       evidenceRefs,
       now,
     });
-    if (updated) reconciled.push(updated);
+    if (updated) {
+      const latestResult = latestStagePlayLiveSourceMailWakeResult(updated.wakeRequestId);
+      const latestResultCoversDecision =
+        latestResult?.status === "completed" &&
+        decisions.every((decisionId) => latestResult.decisionIds.includes(decisionId));
+      if (!latestResultCoversDecision) {
+        recordStagePlayMailWakeResult({
+          wakeRequestId: updated.wakeRequestId,
+          threadId: updated.threadId,
+          roomId: updated.roomId ?? null,
+          environmentId: updated.environmentId ?? null,
+          status: "completed",
+          askTurnId,
+          decisionIds: decisions,
+          evidenceRefs,
+          createdAt: now,
+        });
+      }
+      reconciled.push(updated);
+    }
   }
   return reconciled;
 }

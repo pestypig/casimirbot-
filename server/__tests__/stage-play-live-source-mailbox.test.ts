@@ -29,6 +29,8 @@ import {
   listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
+  queueStagePlayLiveSourceMailWakeRequest,
+  reconcileStagePlayMailWakeRequestsWithDecisions,
   resetStagePlayLiveSourceMailWakeStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import {
@@ -1636,6 +1638,124 @@ describe("Stage Play live-source mailbox", () => {
     expect(transcriptEntries.map((entry) => entry.row.body).join("\n")).toContain(
       "no model-reviewed decision was recorded",
     );
+  });
+
+  it("records a completed wake result when reconciliation finds a later mailbox decision", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:reconcile",
+      evidenceRef: "visual_evidence:reconcile",
+      summaryText: "A visual summary arrived before a direct Ask mailbox decision.",
+      createdAt: "2026-06-04T12:01:12.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:13.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+
+    const decision = recordStagePlayMailDecision({
+      mailIds: [mail.mailId],
+      threadId,
+      roomId,
+      decision: "record_interpretation",
+      rationalePreview: "Direct Ask recorded a model-reviewed mailbox interpretation.",
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [mail.mailId, "ask:direct-mailbox-turn"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:14.000Z",
+    });
+
+    const reconciled = reconcileStagePlayMailWakeRequestsWithDecisions({
+      threadId,
+      roomId,
+      decisions: [decision],
+      now: "2026-06-04T12:01:15.000Z",
+    });
+
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "completed",
+      askTurnId: "ask:direct-mailbox-turn",
+      decisionIds: [decision.decisionId],
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([
+      expect.objectContaining({
+        wakeRequestId: wake?.wakeRequestId,
+        status: "completed",
+        askTurnId: "ask:direct-mailbox-turn",
+        decisionIds: [decision.decisionId],
+      }),
+    ]);
+  });
+
+  it("does not complete a queued wake when a later decision covers only part of the wake batch", () => {
+    const first = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:reconcile-partial-first",
+      evidenceRef: "visual_evidence:reconcile-partial-first",
+      summaryText: "First visual summary in the queued wake batch.",
+      createdAt: "2026-06-04T12:01:12.000Z",
+    });
+    const second = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:reconcile-partial-second",
+      evidenceRef: "visual_evidence:reconcile-partial-second",
+      summaryText: "Second visual summary in the queued wake batch.",
+      createdAt: "2026-06-04T12:01:13.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [first.mailId, second.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [first.mailId, second.mailId, ...first.evidenceRefs, ...second.evidenceRefs],
+      now: "2026-06-04T12:01:14.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+
+    const partialDecision = recordStagePlayMailDecision({
+      mailIds: [second.mailId],
+      threadId,
+      roomId,
+      decision: "record_interpretation",
+      rationalePreview: "Direct Ask interpreted only the second mail item.",
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [second.mailId, "ask:partial-direct-mailbox-turn"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:15.000Z",
+    });
+
+    const reconciled = reconcileStagePlayMailWakeRequestsWithDecisions({
+      threadId,
+      roomId,
+      decisions: [partialDecision],
+      now: "2026-06-04T12:01:16.000Z",
+    });
+
+    expect(reconciled).toEqual([]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "queued",
+      decisionIds: [],
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([]);
   });
 
   it("defers a wake before Ask when runtime pressure admission rejects it", async () => {

@@ -11,6 +11,7 @@ import type {
   StagePlayLiveSourceJobStateV1,
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayLiveSourceNarrativeStateV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type {
   StagePlayLiveSourceMailWakeRequestV1,
@@ -198,6 +199,7 @@ type StagePlayLiveSourceMailListResponse = {
   mailItems?: StagePlayLiveSourceMailItemV1[];
   jobStates?: StagePlayLiveSourceJobStateV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
+  narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
   wakeResults?: StagePlayLiveSourceMailWakeResultV1[];
   assistant_answer: false;
@@ -1126,6 +1128,24 @@ const latestStagePlayMailDecision = (
   return matching.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)).at(-1) ?? null;
 };
 
+const latestStagePlayNarrativeStateForDecision = (
+  states: StagePlayLiveSourceNarrativeStateV1[],
+  decision: StagePlayLiveSourceMailDecisionV1 | null,
+): StagePlayLiveSourceNarrativeStateV1 | null => {
+  if (!decision) return null;
+  const byRef = decision.narrativeStateRef
+    ? states.find((state) => state.narrativeStateId === decision.narrativeStateRef)
+    : null;
+  if (byRef) return byRef;
+  return states
+    .filter((state) =>
+      state.lastDecisionRef === decision.decisionId ||
+      state.mailBatchRefs.some((mailId) => decision.mailIds.includes(mailId))
+    )
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .at(-1) ?? null;
+};
+
 const latestStagePlayMailWakeRequest = (
   wakes: StagePlayLiveSourceMailWakeRequestV1[],
   mailId?: string | null,
@@ -1173,6 +1193,7 @@ function buildObserverMailLoopNodes(input: {
   const mailItems = mailbox?.mailItems ?? [];
   const jobStates = mailbox?.jobStates ?? [];
   const decisions = mailbox?.decisions ?? [];
+  const narrativeStates = mailbox?.narrativeStates ?? [];
   const wakeRequests = mailbox?.wakeRequests ?? [];
   const wakeResults = mailbox?.wakeResults ?? [];
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
@@ -1201,6 +1222,7 @@ function buildObserverMailLoopNodes(input: {
     latestStagePlayMailDecision(decisions, visualMail?.mailId) ??
     latestStagePlayMailDecision(decisions, jobStates.at(-1)?.lastMailId ?? null) ??
     latestStagePlayMailDecision(decisions);
+  const latestNarrativeState = latestStagePlayNarrativeStateForDecision(narrativeStates, latestDecision);
   const latestWake =
     latestStagePlayMailWakeRequest(wakeRequests, visualMail?.mailId) ??
     latestStagePlayMailWakeRequest(wakeRequests);
@@ -1257,6 +1279,8 @@ function buildObserverMailLoopNodes(input: {
     ? `voice draft: ${latestDecision.voiceCalloutDraft.text}`
     : latestDecision?.textAnswerDraft?.text
       ? `text answer: ${latestDecision.textAnswerDraft.text}`
+      : latestNarrativeState
+        ? `interpretation: ${latestNarrativeState.interpretedSituation.userRelevantMeaning || latestNarrativeState.currentSceneSummary}`
       : latestDecision?.decision === "wait_for_next_summary"
         ? "no output yet; armed for next source update"
         : latestDecision?.requestedTool?.toolName
@@ -1378,10 +1402,15 @@ function buildObserverMailLoopNodes(input: {
       outputRefs: uniqueSorted([
         latestDecision?.voiceCalloutDraft?.text ? "voice_callout_draft" : "",
         latestDecision?.textAnswerDraft?.text ? "text_answer_draft" : "",
+        latestNarrativeState?.narrativeStateId ?? "",
         latestDecision?.requestedTool?.toolName ?? "",
       ].filter(Boolean)),
       outputPreview,
-      blockedUntil: latestDecision?.voiceCalloutDraft?.requiresConfirmation ? "voice confirmation" : null,
+      blockedUntil: latestDecision?.voiceCalloutDraft?.requiresConfirmation
+        ? "voice confirmation"
+        : latestNarrativeState?.watchNext?.reason
+          ? `watch next: ${latestNarrativeState.watchNext.reason}`
+          : null,
     },
   ];
 }

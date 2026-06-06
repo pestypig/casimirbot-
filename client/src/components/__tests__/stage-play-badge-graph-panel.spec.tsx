@@ -1029,8 +1029,8 @@ function renderPanel(options: {
             threadId: "thread:stage-play-ui",
             roomId: "room:minecraft",
             environmentId: "live_env:minecraft",
-            decision: "wait_for_next_summary",
-            rationalePreview: "No user-facing change yet.",
+            decision: "record_interpretation",
+            rationalePreview: "The unread mail batch was interpreted for the user.",
             textAnswerDraft: null,
             voiceCalloutDraft: null,
             voicePolicy: {
@@ -1045,10 +1045,56 @@ function renderPanel(options: {
             nextExpectedAfterMs: null,
             mailboxCursor: "stage_play_live_source_mail:ui",
             activeJobId: "stage_play_live_source_job:ui",
+            narrativeStateRef: "stage_play_live_source_narrative_state:ui",
             rearmReason: "decision recorded",
-            evidenceRefs: ["visual_evidence:ui"],
+            evidenceRefs: ["visual_evidence:ui", "stage_play_live_source_narrative_state:ui"],
             modelReviewed: true,
             createdAt: "2026-06-02T00:00:02.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        narrativeStates: [
+          {
+            artifactId: "stage_play_live_source_narrative_state",
+            schemaVersion: "stage_play_live_source_narrative_state/v1",
+            narrativeStateId: "stage_play_live_source_narrative_state:ui",
+            jobId: "stage_play_live_source_job:ui",
+            policyId: null,
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            sourceIds: ["source:visual-tab"],
+            priorNarrativeStateRef: null,
+            mailBatchRefs: ["stage_play_live_source_mail:ui"],
+            sourceEvidenceRefs: ["visual_evidence:ui"],
+            currentSceneSummary: "A Minecraft-like scene remains visible.",
+            runningStorySummary: "The live source is showing a stable Minecraft-like scene.",
+            interpretedSituation: {
+              setting: "Minecraft-like scene",
+              activeWindowOrScene: "game view",
+              entities: ["player"],
+              objects: ["visible terrain"],
+              activities: ["watching the scene"],
+              userRelevantMeaning: "The visual source still appears to show a stable Minecraft-like scene.",
+            },
+            meaningfulChanges: ["No major user-facing change in this fixture."],
+            uncertainties: ["Audio context is unavailable."],
+            watchNext: {
+              targets: ["scene change", "new threat"],
+              reason: "Watch for a new actor, opened UI, or scene transition.",
+            },
+            prediction: null,
+            staleness: {
+              state: "current",
+              staleAfterMailId: null,
+              supersededByStateId: null,
+            },
+            lastDecisionRef: "stage_play_live_source_mail_decision:ui",
+            evidenceRefs: ["stage_play_live_source_mail_decision:ui", "visual_evidence:ui"],
+            createdAt: "2026-06-02T00:00:02.100Z",
             assistant_answer: false,
             terminal_eligible: false,
             context_role: "tool_evidence",
@@ -1310,8 +1356,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/queued 0 \/ running 0/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/failed_retryable: mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("wait_for_next_summary")).toBeTruthy();
-    expect(screen.getAllByText(/no output yet; armed for next source update/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("record_interpretation")).toBeTruthy();
+    expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/watch next: Watch for a new actor, opened UI, or scene transition/i).length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(5);
   });
 
