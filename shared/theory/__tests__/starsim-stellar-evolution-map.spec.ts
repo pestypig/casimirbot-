@@ -29,12 +29,19 @@ describe("StarSim stellar evolution map", () => {
         "starsim.fusion.pp_chain_prior",
         "starsim.fusion.cno_cycle_prior",
         "starsim.runtime.evaluate_fusion_microphysics",
+        "starsim.restoration.deep_mixing_mass_flux",
+        "starsim.restoration.tachocline_downflow_setpoint",
+        "starsim.restoration.claim_boundary.planning_forecast_only",
         "starsim.claim_boundary.stage1_reduced_order_prior",
       ]),
     );
     expect(stage?.calculatorPayloadRefs.map((payload) => payload.payloadId)).toContain(
       "teff_from_luminosity_radius_payload",
     );
+    expect(stage?.calculatorPayloadRefs.map((payload) => payload.payloadId)).toContain(
+      "tachocline_downflow_setpoint_payload",
+    );
+    expect(stage?.claimBoundaryBadgeIds).toContain("starsim.restoration.claim_boundary.planning_forecast_only");
     expect(stage?.objectBindings.map((binding) => binding.id)).toContain("main-sequence-solar-analog");
   });
 

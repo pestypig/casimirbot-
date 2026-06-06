@@ -108,6 +108,57 @@ describe("StarSim runtime adapter", () => {
     });
   });
 
+  it("derives solar-restoration scalar cuts from deep-mixing artifacts", async () => {
+    await withTempRoot(async (tempRoot) => {
+      await writeJson(
+        tempRoot,
+        "artifacts/starsim/solar-restoration-deep-mixing.json",
+        artifactFixture({
+          deepMixing: {
+            epsilon: 0.01,
+            Mdot_burn_sun: 6.0e11,
+            r_tach: 4.8699e8,
+            rho_tach: 200,
+            f_area: 0.1,
+            X_e: 0.7,
+            X_c: 0.34,
+            M_c: 3.5e29,
+            alpha: 0.01,
+            M_env_H: 1.1e30,
+            dlnL_limit: 1e-3,
+            dlnL_abs: 0,
+            dlnTc_limit: 1e-3,
+            dlnTc_abs: 0,
+            h0: 0.002,
+            beta: 6,
+            deficit: 0,
+            T: 1,
+          },
+        }),
+      );
+
+      const receipt = await readStarSimArtifacts({
+        projectRoot: tempRoot,
+        badgeIds: ["starsim.restoration.tachocline_downflow_setpoint"],
+      });
+
+      expect(receipt.status).toBe("completed");
+      expect(receipt.outputs.gates.solar_restoration_branch).toBe("pass");
+      expect(receipt.outputs.gates.solar_restoration_planning_boundary).toBe("pass");
+      expect(receipt.outputs.scalars.Mdot_mix).toBeCloseTo(6.0e9);
+      expect(receipt.outputs.scalars.v_r).toBeCloseTo(1.008e-10, 12);
+      expect(receipt.outputs.scalars.v_r_mm_yr).toBeCloseTo(3.18, 1);
+      expect(receipt.outputs.scalars.Delta_t_Myr).toBeCloseTo(581, 0);
+      expect(receipt.outputs.scalars.luminosity_margin).toBe(1e-3);
+      expect(receipt.outputs.scalars.core_temp_margin).toBe(1e-3);
+      expect(receipt.outputs.scalars.P).toBeCloseTo(0.001998, 6);
+      expect(receipt.outputs.warnings).toContain(
+        "Solar restoration rows are planning/forecast context only and do not establish feasible stellar intervention.",
+      );
+      expect(receipt.claimBoundary.promotionAllowed).toBe(false);
+    });
+  });
+
   it("keeps the reduced-order claim boundary visible", async () => {
     await withTempRoot(async (tempRoot) => {
       await writeJson(tempRoot, "artifacts/starsim/boundary.json", artifactFixture());
@@ -158,5 +209,6 @@ describe("StarSim runtime adapter", () => {
 
     expect(isTheoryRuntimeMathTraceV1(trace)).toBe(true);
     expect(JSON.stringify(trace)).toContain("Static reference trace only; no backend runtime executed.");
+    expect(JSON.stringify(trace)).toContain("Mdot_mix = epsilon*Mdot_burn_sun");
   });
 });

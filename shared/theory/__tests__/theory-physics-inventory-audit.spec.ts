@@ -34,7 +34,7 @@ describe("theory physics inventory audit", () => {
     expect(byId.get("granular_tidal_love_number")?.sampleRepoPaths).toContain(
       "docs/knowledge/physics/tidal-bulge-response.md",
     );
-    expect(byId.get("solar_restoration_red_giant")?.status).toBe("repo_present_graph_gap");
+    expect(byId.get("solar_restoration_red_giant")?.status).toBe("represented");
     expect(byId.get("solar_reference_pack")?.status).toBe("represented");
     expect(byId.get("solar_flare_sunquake_nanoflare")?.status).toBe("represented");
     expect(byId.get("stellar_structure_nucleosynthesis")?.status).toBe("represented");

@@ -63,4 +63,36 @@ describe("theory calculator loadout builder", () => {
     expect(loadout.items.some((item) => item.solveExpression === "z = (656.35e-9 - 656.28e-9)/656.28e-9")).toBe(true);
     expect(loadout.summary.solvedCount).toBe(0);
   });
+
+  it("builds calculator rows for the StarSim solar-restoration branch", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const loadout = buildTheoryCalculatorLoadout({
+      graph,
+      badgeIds: [
+        "starsim.restoration.deep_mixing_mass_flux",
+        "starsim.restoration.tachocline_downflow_setpoint",
+        "starsim.restoration.lifetime_extension_proxy",
+        "starsim.restoration.claim_boundary.planning_forecast_only",
+      ],
+      mode: "selected_badges",
+      source: "achievement_map",
+      variableBindings: {
+        epsilon: "0.01",
+        Mdot_burn_sun: "6.0e11",
+        r_tach: "4.8699e8",
+        rho_tach: "200",
+        f_area: "0.1",
+        alpha: "0.01",
+        M_env_H: "1.1e30",
+      },
+      includeContextItems: true,
+    });
+
+    expect(isTheoryCalculatorLoadoutV1(loadout)).toBe(true);
+    expect(loadout.items.some((item) => item.badgeId === "starsim.restoration.deep_mixing_mass_flux")).toBe(true);
+    expect(loadout.items.some((item) => item.solveExpression?.includes("0.01*6.0e11"))).toBe(true);
+    expect(loadout.items.some((item) => item.solveExpression?.includes("4.8699e8^2"))).toBe(true);
+    expect(loadout.items.some((item) => item.badgeId === "starsim.restoration.claim_boundary.planning_forecast_only")).toBe(true);
+    expect(loadout.claimBoundaryNotes.some((note) => note.includes("promotion not allowed"))).toBe(true);
+  });
 });

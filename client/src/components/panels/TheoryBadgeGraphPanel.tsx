@@ -1401,8 +1401,9 @@ export default function TheoryBadgeGraphPanel() {
       ...binding.input,
       source: "manual",
     });
+    const restorationBadgeIds = stage.theoryBadgeIds.filter((badgeId) => badgeId.startsWith("starsim.restoration."));
     const targetBadgeIds = stage.theoryBadgeIds.includes("starsim.runtime.evaluate_fusion_microphysics")
-      ? ["starsim.runtime.evaluate_fusion_microphysics"]
+      ? ["starsim.runtime.evaluate_fusion_microphysics", ...restorationBadgeIds]
       : stage.theoryBadgeIds;
     const loadout = buildTheoryCalculatorLoadout({
       graph,

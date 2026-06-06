@@ -77,8 +77,8 @@ export const DEFAULT_THEORY_PHYSICS_INVENTORY_DOMAINS: TheoryPhysicsInventoryDom
     keywords: ["stellar restoration", "solar restoration", "red giant", "deep mixing", "stellar ledger"],
     pathPatterns: ["stellar-restoration", "solar-restoration", "red-giant", "stellar-ledger"],
     expectedAtlasBlockIds: ["stellar_evolution"],
-    expectedBadgePrefixes: ["stellar.restoration.", "solar.restoration.", "starsim.restoration."],
-    recommendedNextPatch: "feat(theory): add solar-restoration/red-giant planning badges as non-actionable forecast rows",
+    expectedBadgePrefixes: ["starsim.restoration."],
+    recommendedNextPatch: "chore(theory): keep solar-restoration/red-giant planning rows non-actionable and forecast-only",
     claimBoundaryNote:
       "Solar restoration rows must be planning/forecast context only and cannot imply feasible stellar intervention.",
   },

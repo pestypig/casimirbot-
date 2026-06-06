@@ -20,7 +20,7 @@ import type {
 export const STARSIM_RUNTIME_ADAPTER_ID = "starsim.artifact_reader" as const;
 export const STARSIM_LANE_ID = "stellar_evolution" as const;
 
-export const STARSIM_SUPPORTED_BADGE_IDS = [
+const STARSIM_CORE_BADGE_IDS = [
   "starsim.observable.surface_temperature_proxy",
   "starsim.observable.surface_gravity",
   "starsim.observable.mean_density",
@@ -31,12 +31,31 @@ export const STARSIM_SUPPORTED_BADGE_IDS = [
   "starsim.claim_boundary.stage1_reduced_order_prior",
 ] as const;
 
+const STARSIM_RESTORATION_BADGE_IDS = [
+  "starsim.restoration.deep_mixing_mass_flux",
+  "starsim.restoration.tachocline_downflow_setpoint",
+  "starsim.restoration.core_hydrogen_balance",
+  "starsim.restoration.lifetime_extension_proxy",
+  "starsim.restoration.guardrail_constraints",
+  "starsim.restoration.transition_hazard_proxy",
+  "starsim.restoration.claim_boundary.planning_forecast_only",
+] as const;
+
+export const STARSIM_SUPPORTED_BADGE_IDS = [
+  ...STARSIM_CORE_BADGE_IDS,
+  ...STARSIM_RESTORATION_BADGE_IDS,
+] as const;
+
 export const STARSIM_ARTIFACT_PATTERNS = [
   "artifacts/starsim/**/*.json",
   "reports/**/*starsim*.json",
   "artifacts/**/*starsim*fusion*benchmark*.json",
   "artifacts/**/*starsim*solar*reference*.json",
   "artifacts/**/*starsim*mesa*.json",
+  "artifacts/**/*deep*mix*.json",
+  "artifacts/**/*solar*restoration*.json",
+  "reports/**/*deep*mix*.json",
+  "reports/**/*solar*restoration*.json",
   "artifacts/**/*opacity*.json",
   "artifacts/**/*fusion*microphysics*.json",
   "reports/**/*mesa*.json",
@@ -51,6 +70,39 @@ const SCALAR_KEYS = [
   "g_surface",
   "compactness",
   "fusionMargin",
+  "epsilon",
+  "areaFraction",
+  "f_area",
+  "r_tach",
+  "rho_tach",
+  "Mdot_mix",
+  "Mdot_burn_sun",
+  "Mdot_burn",
+  "v_r",
+  "v_r_mm_yr",
+  "L_sun_W",
+  "Q_H",
+  "X_c",
+  "X_e",
+  "M_c",
+  "dXc_dt",
+  "alpha",
+  "M_env_H",
+  "Delta_t_Myr",
+  "dlnL_limit",
+  "dlnL_abs",
+  "dlnTc_limit",
+  "dlnTc_abs",
+  "luminosity_margin",
+  "core_temp_margin",
+  "seismicGrowth",
+  "neutrinoDelta",
+  "h0",
+  "beta",
+  "deficit",
+  "h",
+  "T",
+  "P",
 ] as const;
 
 const CONTEXT_KEYS = [
@@ -107,6 +159,45 @@ function aliasForScalarKey(key: string): (typeof SCALAR_KEYS)[number] | null {
   if (["gsurface", "surfacegravity", "surfacegravityms2", "logg"].includes(normalized)) return "g_surface";
   if (["compactness", "compactnessscale"].includes(normalized)) return "compactness";
   if (["fusionmargin", "cnomargin", "ppmargin", "fusionstagemargin"].includes(normalized)) return "fusionMargin";
+  if (["epsilon", "mixingstrength", "deepmixingepsilon"].includes(normalized)) return "epsilon";
+  if (["areafraction", "beltfraction", "engagedareafraction"].includes(normalized)) return "areaFraction";
+  if (["farea", "areafractionf", "actuatorareafraction"].includes(normalized)) return "f_area";
+  if (["rtach", "rtachm", "tachoclineradius", "tachoclineradiusm"].includes(normalized)) return "r_tach";
+  if (["rhotach", "rhotachkgm3", "tachoclinedensity", "tachoclinedensitykgm3"].includes(normalized)) return "rho_tach";
+  if (["mdotmix", "mdotmixkgs", "mixingmassflux", "deepmixingmassflux"].includes(normalized)) return "Mdot_mix";
+  if (["mdotburnsun", "mdotburnsunkgs", "solarburnrate", "solarhydrogenburnrate"].includes(normalized)) {
+    return "Mdot_burn_sun";
+  }
+  if (["mdotburn", "mdotburnkgs", "hydrogenburnrate", "burnmassrate"].includes(normalized)) return "Mdot_burn";
+  if (["vr", "vrmps", "radialdownflow", "downflowspeed", "tachoclinedownflow"].includes(normalized)) return "v_r";
+  if (["vrmmyr", "vrmmperyr", "downflowmmyr"].includes(normalized)) return "v_r_mm_yr";
+  if (["lsunw", "luminosityw", "solarluminosityw"].includes(normalized)) return "L_sun_W";
+  if (["qh", "fusionenergyspecific", "hydrogenfusionenergyscale", "epsilonfusion"].includes(normalized)) return "Q_H";
+  if (["xc", "corehydrogen", "corehydrogenfraction"].includes(normalized)) return "X_c";
+  if (["xe", "envelopehydrogen", "envelopehydrogenfraction"].includes(normalized)) return "X_e";
+  if (["mc", "coremass", "coremasskg"].includes(normalized)) return "M_c";
+  if (["dxcdt", "corehydrogendrift", "corehydrogenfractionrate"].includes(normalized)) return "dXc_dt";
+  if (["alpha", "accessiblefraction", "envelopefractionaccessible"].includes(normalized)) return "alpha";
+  if (["menvh", "menvhydrogen", "envelopehydrogenmass", "envelopehydrogenmasskg"].includes(normalized)) return "M_env_H";
+  if (["deltatmyr", "lifetimemyr", "lifetimeextensionmyr", "targetdeltatmyr"].includes(normalized)) {
+    return "Delta_t_Myr";
+  }
+  if (["dlnllimit", "dlogllimit", "dloglpermyrmax"].includes(normalized)) return "dlnL_limit";
+  if (["dlnlabs", "dloglabs", "dloglpermyrabs"].includes(normalized)) return "dlnL_abs";
+  if (["dlntclimit", "dlogtclimit", "dlogtcpermyrmax"].includes(normalized)) return "dlnTc_limit";
+  if (["dlntcabs", "dlogtcabs", "dlogtcpermyrabs"].includes(normalized)) return "dlnTc_abs";
+  if (["luminositymargin", "dlnlmargin", "dloglmargin"].includes(normalized)) return "luminosity_margin";
+  if (["coretempmargin", "coretemperaturemargin", "dlntcmargin", "dlogtcmargin"].includes(normalized)) {
+    return "core_temp_margin";
+  }
+  if (["seismicgrowth", "seismicgrowthrate"].includes(normalized)) return "seismicGrowth";
+  if (["neutrinodelta", "neutrinodrift"].includes(normalized)) return "neutrinoDelta";
+  if (["h0", "hazardbaseline"].includes(normalized)) return "h0";
+  if (["beta", "hazardbeta"].includes(normalized)) return "beta";
+  if (["deficit", "xdeficit", "corehydrogendeficit"].includes(normalized)) return "deficit";
+  if (["h", "hazard", "transitionhazard"].includes(normalized)) return "h";
+  if (["t", "horizon", "horizongyr"].includes(normalized)) return "T";
+  if (["p", "probability", "transitionprobability"].includes(normalized)) return "P";
   return null;
 }
 
@@ -188,6 +279,7 @@ function deriveScalarCuts(
   const G = 6.67430e-11;
   const c = 299_792_458;
   const TSun = 5772;
+  const secondsPerYear = 31_557_600;
   if (typeof scalars.L === "number" && typeof scalars.R === "number" && !("T_eff" in scalars)) {
     derived.T_eff = TSun * (scalars.L / scalars.R ** 2) ** 0.25;
   }
@@ -195,6 +287,99 @@ function deriveScalarCuts(
     if (!("g_surface" in scalars)) derived.g_surface = (G * scalars.M) / scalars.R ** 2;
     if (!("rho_mean" in scalars)) derived.rho_mean = (3 * scalars.M) / (4 * Math.PI * scalars.R ** 3);
     if (!("compactness" in scalars)) derived.compactness = (G * scalars.M) / (scalars.R * c ** 2);
+  }
+  const areaFraction =
+    typeof scalars.areaFraction === "number"
+      ? scalars.areaFraction
+      : typeof scalars.f_area === "number"
+        ? scalars.f_area
+        : undefined;
+  if (
+    typeof scalars.L_sun_W === "number" &&
+    typeof scalars.Q_H === "number" &&
+    scalars.Q_H !== 0 &&
+    !("Mdot_burn" in scalars) &&
+    !("Mdot_burn_sun" in scalars)
+  ) {
+    derived.Mdot_burn = scalars.L_sun_W / scalars.Q_H;
+    derived.Mdot_burn_sun = derived.Mdot_burn;
+  }
+  const burnRate =
+    typeof scalars.Mdot_burn_sun === "number"
+      ? scalars.Mdot_burn_sun
+      : typeof scalars.Mdot_burn === "number"
+        ? scalars.Mdot_burn
+        : typeof derived.Mdot_burn_sun === "number"
+          ? derived.Mdot_burn_sun
+          : undefined;
+  if (typeof scalars.epsilon === "number" && typeof burnRate === "number" && !("Mdot_mix" in scalars)) {
+    derived.Mdot_mix = scalars.epsilon * burnRate;
+  }
+  const mixRate = typeof scalars.Mdot_mix === "number" ? scalars.Mdot_mix : derived.Mdot_mix;
+  if (
+    typeof scalars.epsilon === "number" &&
+    typeof burnRate === "number" &&
+    typeof scalars.r_tach === "number" &&
+    typeof scalars.rho_tach === "number" &&
+    typeof areaFraction === "number" &&
+    scalars.r_tach !== 0 &&
+    scalars.rho_tach !== 0 &&
+    areaFraction !== 0 &&
+    !("v_r" in scalars)
+  ) {
+    derived.v_r =
+      (scalars.epsilon * burnRate) /
+      (4 * Math.PI * scalars.r_tach ** 2 * scalars.rho_tach * areaFraction);
+  }
+  const downflow = typeof scalars.v_r === "number" ? scalars.v_r : derived.v_r;
+  if (typeof downflow === "number" && !("v_r_mm_yr" in scalars)) {
+    derived.v_r_mm_yr = downflow * 1000 * secondsPerYear;
+  }
+  if (
+    typeof mixRate === "number" &&
+    typeof scalars.X_e === "number" &&
+    typeof scalars.X_c === "number" &&
+    typeof burnRate === "number" &&
+    typeof scalars.M_c === "number" &&
+    scalars.M_c !== 0 &&
+    !("dXc_dt" in scalars)
+  ) {
+    derived.dXc_dt = (mixRate * (scalars.X_e - scalars.X_c) - burnRate) / scalars.M_c;
+  }
+  if (
+    typeof scalars.alpha === "number" &&
+    typeof scalars.M_env_H === "number" &&
+    typeof burnRate === "number" &&
+    burnRate !== 0 &&
+    !("Delta_t_Myr" in scalars)
+  ) {
+    derived.Delta_t_Myr = (scalars.alpha * scalars.M_env_H) / (burnRate * secondsPerYear * 1e6);
+  }
+  if (
+    typeof scalars.dlnL_limit === "number" &&
+    typeof scalars.dlnL_abs === "number" &&
+    !("luminosity_margin" in scalars)
+  ) {
+    derived.luminosity_margin = scalars.dlnL_limit - scalars.dlnL_abs;
+  }
+  if (
+    typeof scalars.dlnTc_limit === "number" &&
+    typeof scalars.dlnTc_abs === "number" &&
+    !("core_temp_margin" in scalars)
+  ) {
+    derived.core_temp_margin = scalars.dlnTc_limit - scalars.dlnTc_abs;
+  }
+  if (
+    typeof scalars.h0 === "number" &&
+    typeof scalars.beta === "number" &&
+    typeof scalars.deficit === "number" &&
+    !("h" in scalars)
+  ) {
+    derived.h = scalars.h0 * Math.exp(scalars.beta * scalars.deficit);
+  }
+  const hazard = typeof scalars.h === "number" ? scalars.h : derived.h;
+  if (typeof hazard === "number" && typeof scalars.T === "number" && !("P" in scalars)) {
+    derived.P = 1 - Math.exp(-hazard * scalars.T);
   }
   return derived;
 }
@@ -214,6 +399,7 @@ function hasKeyLike(artifacts: ParsedArtifact[], pattern: RegExp): boolean {
 function collectGates(
   artifacts: ParsedArtifact[],
   scalars: Record<string, number | string | boolean | null>,
+  options: { restorationRequested?: boolean } = {},
 ): Record<string, TheoryRuntimeGateStatus> {
   const opacityPresent =
     hasKeyLike(artifacts, /opacityProvenance|opacitySource|opacityTable|opacityManifest/i) ||
@@ -221,7 +407,10 @@ function collectGates(
   const solarReferencePresent = hasKeyLike(artifacts, /solar.*reference|solar.*anchor|solar.*analog/i);
   const mesaReproAvailable = hasKeyLike(artifacts, /mesa|profile|history|repro/i);
   const fusionStageGate = Boolean(scalars.dominantFusionChannel || scalars.fusionMargin);
-  return {
+  const restorationPresent =
+    hasKeyLike(artifacts, /deep.?mix|solar.?restoration|tachocline|red.?giant/i) ||
+    Boolean(scalars.Mdot_mix || scalars.v_r || scalars.Delta_t_Myr || scalars.dXc_dt);
+  const gates: Record<string, TheoryRuntimeGateStatus> = {
     reduced_order_prior: artifacts.length > 0 ? "pass" : "not_ready",
     opacity_provenance_present: opacityPresent ? "pass" : "not_ready",
     solar_reference_present: solarReferencePresent ? "pass" : "not_ready",
@@ -229,6 +418,11 @@ function collectGates(
     fusion_stage_gate: fusionStageGate ? "pass" : "not_ready",
     claim_boundary_stage1: "pass",
   };
+  if (options.restorationRequested || restorationPresent) {
+    gates.solar_restoration_branch = restorationPresent ? "pass" : "not_ready";
+    gates.solar_restoration_planning_boundary = "pass";
+  }
+  return gates;
 }
 
 function receiptStatus(args: {
@@ -261,7 +455,7 @@ export function buildStaticStarSimRuntimeTraceV1(input: TheoryRuntimeAdapterInpu
     traceId: "static-starsim-runtime-trace",
     runtimeId: STARSIM_RUNTIME_ADAPTER_ID,
     graphId: input.graphId ?? "nhm2-theory-badge-graph",
-    badgeIds: input.badgeIds?.length ? input.badgeIds : [...STARSIM_SUPPORTED_BADGE_IDS],
+    badgeIds: input.badgeIds?.length ? input.badgeIds : [...STARSIM_CORE_BADGE_IDS],
     request: {
       family: "starsim_runtime",
       target: "Static StarSim reduced-order reference chain",
@@ -362,8 +556,109 @@ export function buildStaticStarSimRuntimeTraceV1(input: TheoryRuntimeAdapterInpu
         ],
       }),
       makeStep({
-        id: "stage1-runtime-boundary",
+        id: "solar-restoration-mass-flux",
         index: 5,
+        title: "Solar Restoration Mass Flux",
+        operatorKind: "scalar_cut",
+        displayLatex: "\\dot{M}_{mix}=\\epsilon\\dot{M}_{burn,sun}",
+        expression: "Mdot_mix = epsilon*Mdot_burn_sun",
+        inputSymbols: ["epsilon", "Mdot_burn_sun"],
+        outputSymbols: ["Mdot_mix"],
+        status: "computed",
+        artifactRef: null,
+        scalarCuts: [
+          {
+            id: "starsim-restoration-mass-flux-cut",
+            label: "Deep-mixing mass flux",
+            expression: "Mdot_mix = epsilon*Mdot_burn_sun",
+            displayLatex: "\\dot{M}_{mix}=\\epsilon\\dot{M}_{burn,sun}",
+            targetVariable: "Mdot_mix",
+            calculatorArtifactV1: null,
+          },
+        ],
+      }),
+      makeStep({
+        id: "tachocline-downflow-setpoint",
+        index: 6,
+        title: "Tachocline Downflow Setpoint",
+        operatorKind: "scalar_cut",
+        displayLatex: "v_r=\\frac{\\epsilon\\dot{M}_{burn,sun}}{4\\pi r_{tach}^{2}\\rho_{tach}f_{area}}",
+        expression: "v_r = epsilon*Mdot_burn_sun/(4*pi*r_tach^2*rho_tach*f_area)",
+        inputSymbols: ["epsilon", "Mdot_burn_sun", "r_tach", "rho_tach", "f_area"],
+        outputSymbols: ["v_r"],
+        status: "computed",
+        artifactRef: null,
+        scalarCuts: [
+          {
+            id: "starsim-restoration-downflow-cut",
+            label: "Tachocline downflow setpoint",
+            expression: "v_r = epsilon*Mdot_burn_sun/(4*pi*r_tach^2*rho_tach*f_area)",
+            displayLatex: "v_r=\\frac{\\epsilon\\dot{M}_{burn,sun}}{4\\pi r_{tach}^{2}\\rho_{tach}f_{area}}",
+            targetVariable: "v_r",
+            calculatorArtifactV1: null,
+          },
+        ],
+      }),
+      makeStep({
+        id: "core-hydrogen-balance",
+        index: 7,
+        title: "Core Hydrogen Balance Proxy",
+        operatorKind: "scalar_cut",
+        displayLatex: "\\frac{dX_c}{dt}=\\frac{\\dot{M}_{mix}(X_e-X_c)-\\dot{M}_{burn}}{M_c}",
+        expression: "dXc_dt = (Mdot_mix*(X_e - X_c) - Mdot_burn)/M_c",
+        inputSymbols: ["Mdot_mix", "X_e", "X_c", "Mdot_burn", "M_c"],
+        outputSymbols: ["dXc_dt"],
+        status: "computed",
+        artifactRef: null,
+        scalarCuts: [
+          {
+            id: "starsim-restoration-core-h-balance-cut",
+            label: "Core hydrogen balance",
+            expression: "dXc_dt = (Mdot_mix*(X_e - X_c) - Mdot_burn)/M_c",
+            displayLatex: "\\frac{dX_c}{dt}=\\frac{\\dot{M}_{mix}(X_e-X_c)-\\dot{M}_{burn}}{M_c}",
+            targetVariable: "dXc_dt",
+            calculatorArtifactV1: null,
+          },
+        ],
+      }),
+      makeStep({
+        id: "solar-lifetime-extension-proxy",
+        index: 8,
+        title: "Solar Lifetime Extension Proxy",
+        operatorKind: "scalar_cut",
+        displayLatex: "\\Delta t_{Myr}\\approx\\frac{\\alpha M_{env,H}}{\\dot{M}_{burn,sun}(31557600)(10^6)}",
+        expression: "Delta_t_Myr = alpha*M_env_H/(Mdot_burn_sun*31557600*1e6)",
+        inputSymbols: ["alpha", "M_env_H", "Mdot_burn_sun"],
+        outputSymbols: ["Delta_t_Myr"],
+        status: "computed",
+        artifactRef: null,
+        scalarCuts: [
+          {
+            id: "starsim-restoration-lifetime-cut",
+            label: "Solar lifetime extension proxy",
+            expression: "Delta_t_Myr = alpha*M_env_H/(Mdot_burn_sun*31557600*1e6)",
+            displayLatex: "\\Delta t_{Myr}\\approx\\frac{\\alpha M_{env,H}}{\\dot{M}_{burn,sun}(31557600)(10^6)}",
+            targetVariable: "Delta_t_Myr",
+            calculatorArtifactV1: null,
+          },
+        ],
+      }),
+      makeStep({
+        id: "solar-restoration-planning-boundary",
+        index: 9,
+        title: "Solar Restoration Planning Boundary",
+        operatorKind: "gate_status",
+        displayLatex: "\\mathrm{solar\\ restoration}=\\mathrm{planning\\ forecast\\ only}",
+        expression: null,
+        inputSymbols: ["restoration_receipt"],
+        outputSymbols: ["planning_forecast_only"],
+        status: "computed",
+        artifactRef: null,
+        scalarCuts: [],
+      }),
+      makeStep({
+        id: "stage1-runtime-boundary",
+        index: 10,
         title: "Stage 1 Claim Boundary",
         operatorKind: "gate_status",
         displayLatex: "\\mathrm{StarSim}=\\mathrm{reduced\\ order\\ prior}",
@@ -378,6 +673,7 @@ export function buildStaticStarSimRuntimeTraceV1(input: TheoryRuntimeAdapterInpu
     summary: {
       claimBoundaryNotes: [
         "StarSim Stage 1 is a reduced-order astrophysical prior, not a full stellar-evolution solve.",
+        "Solar restoration rows are planning/forecast context only and do not establish feasible stellar intervention.",
       ],
     },
   });
@@ -392,13 +688,16 @@ function buildReceipt(input: {
   const graphId = input.adapterInput.graphId ?? "nhm2-theory-badge-graph";
   const badgeIds = input.adapterInput.badgeIds?.length
     ? input.adapterInput.badgeIds
-    : [...STARSIM_SUPPORTED_BADGE_IDS];
+    : [...STARSIM_CORE_BADGE_IDS];
+  const restorationRequested = Boolean(
+    input.adapterInput.badgeIds?.some((badgeId) => badgeId.startsWith("starsim.restoration.")),
+  );
   const baseScalars = input.parseError ? {} : collectScalars(input.artifacts);
   const scalars = {
     ...baseScalars,
     ...deriveScalarCuts(baseScalars),
   };
-  const gates = input.parseError ? {} : collectGates(input.artifacts, scalars);
+  const gates = input.parseError ? {} : collectGates(input.artifacts, scalars, { restorationRequested });
   const status = receiptStatus({
     artifactCount: input.artifacts.length,
     parseFailed: Boolean(input.parseError),
@@ -411,16 +710,25 @@ function buildReceipt(input: {
     gates.solar_reference_present !== "pass" ? "solar_reference_missing" : "",
     gates.mesa_repro_available !== "pass" ? "mesa_repro_missing" : "",
     gates.fusion_stage_gate !== "pass" ? "fusion_stage_gate_missing" : "",
+    gates.solar_restoration_branch && gates.solar_restoration_branch !== "pass"
+      ? "solar_restoration_branch_missing"
+      : "",
   ]);
   const warnings = unique([
     "Read-only StarSim artifact adapter; no backend runtime executed.",
     "StarSim Stage 1 is a reduced-order astrophysical prior, not a full stellar-evolution solve.",
+    gates.solar_restoration_planning_boundary
+      ? "Solar restoration rows are planning/forecast context only and do not establish feasible stellar intervention."
+      : "",
     input.artifacts.length === 0 && !input.parseError ? "No StarSim artifacts were found." : "",
     input.parseError ?? "",
     gates.opacity_provenance_present !== "pass" ? "Opacity provenance is missing." : "",
     gates.solar_reference_present !== "pass" ? "Solar reference artifact is missing." : "",
     gates.mesa_repro_available !== "pass" ? "MESA reproduction artifact is missing." : "",
     gates.fusion_stage_gate !== "pass" ? "Fusion stage gate context is missing." : "",
+    gates.solar_restoration_branch && gates.solar_restoration_branch !== "pass"
+      ? "Solar restoration branch scalars are missing."
+      : "",
   ]);
 
   return buildTheoryRuntimeReceiptV1({
@@ -440,6 +748,10 @@ function buildReceipt(input: {
         "rho_mean = 3*M/(4*pi*R^3)",
         "compactness = G*M/(R*c^2)",
         "fusion margin if present",
+        "Mdot_mix = epsilon*Mdot_burn_sun",
+        "v_r = epsilon*Mdot_burn_sun/(4*pi*r_tach^2*rho_tach*f_area)",
+        "dXc_dt = (Mdot_mix*(X_e - X_c) - Mdot_burn)/M_c",
+        "Delta_t_Myr = alpha*M_env_H/(Mdot_burn_sun*31557600*1e6)",
       ],
     },
     status,

@@ -92,6 +92,9 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
       "abundance_proxy",
       "equivalent_width_context",
       "solar_neutrino_context",
+      "solar_restoration_deep_mixing",
+      "tachocline_transport",
+      "fuel_budget_proxy",
     ],
     simulationOwners: ["starsim", "stellar_reference", "astrochemistry_prebiotic"],
     repoPathHints: [
@@ -101,7 +104,10 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
       "shared/theory/starsim-stellar-evolution-map.ts",
       "shared/starsim-fusion-microphysics.ts",
       "shared/starsim-fusion-neutrino-closure.ts",
+      "client/src/lib/deepMixingPhysics.ts",
+      "client/src/lib/deepMixingPreset.ts",
       "docs/knowledge/star-hydrostatic.md",
+      "docs/knowledge/deep-mixing.md",
       "docs/audits/research/stellar-structure-nucleosynthesis-source-check-2026-03-25.md",
     ],
     primaryBadgeIds: [
@@ -110,6 +116,11 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
       "starsim.observable.mean_density",
       "starsim.runtime.evaluate_fusion_microphysics",
       "starsim.claim_boundary.stage1_reduced_order_prior",
+      "starsim.restoration.deep_mixing_mass_flux",
+      "starsim.restoration.tachocline_downflow_setpoint",
+      "starsim.restoration.core_hydrogen_balance",
+      "starsim.restoration.lifetime_extension_proxy",
+      "starsim.restoration.claim_boundary.planning_forecast_only",
       "stellar.structure.hydrostatic_equilibrium",
       "stellar.nucleosynthesis.reaction_network_context",
       "starsim.reference.stellar_spectral_abundance_context",
@@ -122,6 +133,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     rootBadgeIds: ["physics.energy.energy_density", "physics.energy.power_rate"],
     claimBoundaryBadgeIds: [
       "starsim.claim_boundary.stage1_reduced_order_prior",
+      "starsim.restoration.claim_boundary.planning_forecast_only",
       "astrochemistry.claim_boundary.spectral_identification_only",
       "stellar.claim_boundary.reduced_order_observational_context",
     ],
@@ -144,6 +156,12 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
         displayLatex: "A_{proxy}=S_{line}/S_{ref}",
         symbols: ["abundance_proxy", "line_strength", "reference_line_strength"],
       },
+      {
+        label: "Tachocline downflow setpoint",
+        expression: "v_r = epsilon*Mdot_burn_sun/(4*pi*r_tach^2*rho_tach*f_area)",
+        displayLatex: "v_r=\\frac{\\epsilon\\dot{M}_{burn,sun}}{4\\pi r_{tach}^{2}\\rho_{tach}f_{area}}",
+        symbols: ["v_r", "epsilon", "Mdot_burn_sun", "r_tach", "rho_tach", "f_area"],
+      },
     ],
     runtimeActions: [
       {
@@ -157,11 +175,14 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
       sourceRef("repo_module", "shared/starsim-fusion-microphysics.ts", "StarSim Stage 1 reduced-order runtime."),
       sourceRef("repo_module", "shared/theory/starsim-theory-badges.ts", "Theory badge branch."),
       sourceRef("repo_module", "shared/theory/solar-stellar-reference-theory-badges.ts", "Solar/stellar reference badge seed."),
+      sourceRef("repo_module", "client/src/lib/deepMixingPhysics.ts", "Deep-mixing tachocline scalar helpers."),
+      sourceRef("repo_module", "client/src/lib/deepMixingPreset.ts", "Deep-mixing preset and guardrail constants."),
       sourceRef(
         "repo_module",
         "shared/theory/stellar-spectroscopy-astrochemistry-theory-badges.ts",
         "Stellar spectroscopy to astrochemistry bridge.",
       ),
+      sourceRef("doc", "docs/knowledge/deep-mixing.md", "Solar deep-mixing knowledge branch."),
       sourceRef("doc", "docs/research/starsim-fusion-microphysics-stage1.md", "Stage 1 caveats and boundaries."),
       sourceRef("doc", "docs/knowledge/star-hydrostatic.md", "Stellar hydrostatic reference."),
       sourceRef(
@@ -173,6 +194,7 @@ export const PHYSICS_ATLAS_BLOCKS: PhysicsAtlasBlockV1[] = [
     claimBoundaryNotes: [
       "StarSim Stage 1 is a reduced-order astrophysical prior lane, not a full stellar-evolution solve.",
       "StarSim paths stay in reduced-order prior scope and cannot promote external physics claims.",
+      "Solar restoration rows are planning/forecast context only and cannot imply feasible stellar intervention.",
       "Hydrostatic and nucleosynthesis rows are reference/model context unless runtime receipts are attached.",
       "Spectral abundance rows are diagnostic priors and candidate line matches, not formation-pathway proof.",
     ],

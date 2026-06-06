@@ -13,8 +13,27 @@ describe("StarSim theory badges", () => {
     expect(badgeIds).toContain("starsim.classifier.cno_temperature_margin");
     expect(badgeIds).toContain("starsim.classifier.brown_dwarf_mass_margin");
     expect(badgeIds).toContain("starsim.claim_boundary.stage1_reduced_order_prior");
+    expect(badgeIds).toContain("starsim.restoration.deep_mixing_mass_flux");
+    expect(badgeIds).toContain("starsim.restoration.claim_boundary.planning_forecast_only");
     expect(branch.badges.filter((badge) => badge.calculatorPayloads.length > 0).length).toBeGreaterThanOrEqual(6);
     expect(branch.edges.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("defines solar-restoration rows as calculator-loadable planning forecasts", () => {
+    const branch = buildStarSimTheoryBadgesV1();
+    const badgesById = new Map(branch.badges.map((badge) => [badge.id, badge]));
+    const massFlux = badgesById.get("starsim.restoration.deep_mixing_mass_flux");
+    const downflow = badgesById.get("starsim.restoration.tachocline_downflow_setpoint");
+    const boundary = badgesById.get("starsim.restoration.claim_boundary.planning_forecast_only");
+
+    expect(massFlux?.calculatorPayloads.map((payload) => payload.id)).toContain("deep_mixing_mass_flux_payload");
+    expect(downflow?.calculatorPayloads.map((payload) => payload.id)).toContain("tachocline_downflow_setpoint_payload");
+    expect(boundary?.level).toBe("claim_boundary");
+    expect(boundary?.claimBoundary.promotionAllowed).toBe(false);
+    expect(boundary?.assumptions.join(" ")).toMatch(/planning\/forecast context only/i);
+    expect(JSON.stringify([massFlux, downflow, boundary])).not.toMatch(
+      /solar restoration is feasible|solar intervention proven|proven stellar intervention/i,
+    );
   });
 
   it("merges StarSim into the validating main theory graph", () => {

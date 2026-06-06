@@ -71,6 +71,51 @@ const COMMON_CALCULATOR_PAYLOADS = [
 
 const STARSIM_BOUNDARY_BADGES = ["starsim.claim_boundary.stage1_reduced_order_prior"];
 
+export const STARSIM_RESTORATION_BRANCH_BADGES = [
+  "starsim.restoration.deep_mixing_mass_flux",
+  "starsim.restoration.tachocline_downflow_setpoint",
+  "starsim.restoration.core_hydrogen_balance",
+  "starsim.restoration.lifetime_extension_proxy",
+  "starsim.restoration.guardrail_constraints",
+  "starsim.restoration.transition_hazard_proxy",
+  "starsim.restoration.claim_boundary.planning_forecast_only",
+] as const;
+
+const STARSIM_RESTORATION_CALCULATOR_PAYLOADS = [
+  {
+    badgeId: "starsim.restoration.deep_mixing_mass_flux",
+    payloadId: "deep_mixing_mass_flux_payload",
+  },
+  {
+    badgeId: "starsim.restoration.tachocline_downflow_setpoint",
+    payloadId: "tachocline_downflow_setpoint_payload",
+  },
+  {
+    badgeId: "starsim.restoration.core_hydrogen_balance",
+    payloadId: "hydrogen_burning_mass_rate_payload",
+  },
+  {
+    badgeId: "starsim.restoration.core_hydrogen_balance",
+    payloadId: "core_hydrogen_balance_payload",
+  },
+  {
+    badgeId: "starsim.restoration.lifetime_extension_proxy",
+    payloadId: "lifetime_extension_proxy_payload",
+  },
+  {
+    badgeId: "starsim.restoration.guardrail_constraints",
+    payloadId: "luminosity_guardrail_margin_payload",
+  },
+  {
+    badgeId: "starsim.restoration.guardrail_constraints",
+    payloadId: "core_temperature_guardrail_margin_payload",
+  },
+  {
+    badgeId: "starsim.restoration.transition_hazard_proxy",
+    payloadId: "transition_hazard_proxy_payload",
+  },
+] as const;
+
 const normalizedSolarG = 1;
 
 const baseChannel = {
@@ -176,6 +221,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
       "starsim.fusion.cno_cycle_prior",
       "starsim.fusion_zone.active_volume_fraction",
       "starsim.runtime.evaluate_fusion_microphysics",
+      ...STARSIM_RESTORATION_BRANCH_BADGES,
       ...STARSIM_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [
@@ -192,6 +238,7 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
         badgeId: "starsim.fusion_zone.active_volume_fraction",
         payloadId: "active_volume_fraction_payload",
       },
+      ...STARSIM_RESTORATION_CALCULATOR_PAYLOADS,
     ],
     objectBindings: [
       {
@@ -231,7 +278,10 @@ export const STARSIM_STELLAR_EVOLUTION_STAGES: StarSimStellarEvolutionStage[] = 
         },
       },
     ],
-    claimBoundaryBadgeIds: STARSIM_BOUNDARY_BADGES,
+    claimBoundaryBadgeIds: [
+      ...STARSIM_BOUNDARY_BADGES,
+      "starsim.restoration.claim_boundary.planning_forecast_only",
+    ],
   },
   {
     id: "starsim.lifecycle.red_giant",

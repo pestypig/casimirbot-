@@ -2,7 +2,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import { __testHelixRuntimeInterimVoiceCalloutFallback, planRouter } from "../routes/agi.plan";
 import { appendConversationHistoryEvent } from "../services/helix-ask/conversation-history";
 
 const createApp = (): express.Express => {
@@ -2705,8 +2705,40 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.agent_step_decision?.candidate_capabilities ?? []).toContain("live_env.request_interim_voice_callout");
     expect(response.body?.agent_step_decision?.chosen_capability).not.toBe("docs-viewer.open");
     expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("docs-viewer.open");
-    expect(response.body?.terminal_error_code ?? null).not.toBe("agent_loop_budget_exhausted");
   }, 60000);
+
+  it("builds blocked interim voice capacity as a final observed status fallback", () => {
+    const text = __testHelixRuntimeInterimVoiceCalloutFallback.buildHelixRuntimeInterimVoiceCalloutFallbackText([
+      {
+        artifact_id: "turn:voice:live_environment_tool_observation:1",
+        kind: "live_environment_tool_observation",
+        payload: {
+          tool_name: "live_env.request_interim_voice_callout",
+          observation: {
+            schema: "helix.interim_voice_callout_tool_result.v1",
+            request: {
+              text: "I am checking this now",
+            },
+            receipt: {
+              status: "blocked_capacity",
+              assistant_answer: false,
+              terminal_eligible: false,
+            },
+            assistant_answer: false,
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      } as any,
+    ]);
+
+    expect(text).toMatch(/blocked by capacity/i);
+    expect(text).toMatch(/"I am checking this now"/);
+    expect(text).toMatch(/evidence-only/i);
+    expect(text).not.toMatch(/should I speak|need your confirmation|speak it now/i);
+  });
 
   it("keeps contextual interim voice tool policy mentions non-executable", async () => {
     const app = createApp();

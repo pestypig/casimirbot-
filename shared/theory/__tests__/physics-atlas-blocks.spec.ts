@@ -54,8 +54,14 @@ describe("physics atlas blocks", () => {
     expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
       "stellar.spectroscopy.abundance_proxy_equivalent_width",
     );
+    expect(byId.get("stellar_evolution")?.primaryBadgeIds).toContain(
+      "starsim.restoration.deep_mixing_mass_flux",
+    );
     expect(byId.get("stellar_evolution")?.claimBoundaryBadgeIds).toContain(
       "astrochemistry.claim_boundary.spectral_identification_only",
+    );
+    expect(byId.get("stellar_evolution")?.claimBoundaryBadgeIds).toContain(
+      "starsim.restoration.claim_boundary.planning_forecast_only",
     );
     expect(byId.get("astrochemistry_prebiotic")?.status).toBe("seed");
     expect(byId.get("astrochemistry_prebiotic")?.primaryBadgeIds).toContain(
