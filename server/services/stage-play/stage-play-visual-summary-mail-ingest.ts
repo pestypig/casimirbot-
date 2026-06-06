@@ -40,6 +40,8 @@ import {
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
 
+const DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT = 12;
+
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
@@ -653,7 +655,7 @@ export function readLiveSourceMailForAsk(input: {
     getActiveLiveAnswerEnvironmentForThread(input.threadId);
   const roomId = input.roomId ?? environment?.room_id ?? null;
   const objective = environment?.objective ?? null;
-  const limit = Math.max(1, Math.min(input.limit ?? 3, 10));
+  const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT, DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT));
   const requestedMailIds = uniqueStrings(input.mailIds ?? []).slice(0, limit);
   let items = requestedMailIds.length > 0
     ? requestedMailIds

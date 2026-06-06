@@ -1164,7 +1164,7 @@ export function executeLiveEnvironmentTool(
       sourceId: explicitSourceId,
       sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
       mailIds: readStringArray(args.mail_ids ?? args.mailIds),
-      limit: readNumber(args.limit, 3),
+      limit: readNumber(args.limit, input.tool_name === "live_env.read_live_source_mail" ? 12 : 3),
       includeRead: args.include_read === true || args.includeRead === true,
       voicePolicy: {
         voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,

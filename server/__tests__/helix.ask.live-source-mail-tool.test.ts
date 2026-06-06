@@ -51,6 +51,39 @@ const seedVisualSummary = () => {
   });
 };
 
+const seedVisualSummaries = (count: number) => {
+  startVisualSnapshotSource({
+    source_id: sourceId,
+    thread_id: threadId,
+    room_id: roomId,
+    source_surface: "browser_tab",
+    capture_mode: "interval",
+    status: "active",
+  });
+  for (let index = 0; index < count; index += 1) {
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: `visual_frame:helix-ask-live-source-mail-tool:${index}`,
+      ts: `2026-06-04T12:10:${String(index).padStart(2, "0")}.000Z`,
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: `visual_evidence:helix-ask-live-source-mail-tool:${index}`,
+      summary: `Live frame ${index + 1} shows a fabric recommendation interface with cotton ripstop option ${index + 1}.`,
+      supports_claims: [
+        {
+          claim: "The active visual source has compact evidence.",
+          support_status: "supports",
+          confidence: 0.78,
+        },
+      ],
+    });
+  }
+};
+
 describe("live-source mail live environment tools", () => {
   it("advertises live-source mail tools as automatic evidence-only capabilities", () => {
     const packet = buildLiveEnvironmentRuntimePacket({
@@ -332,6 +365,49 @@ describe("live-source mail live environment tools", () => {
       "visual_frame:helix-ask-live-source-mail-tool",
       "visual_evidence:helix-ask-live-source-mail-tool",
     ]));
+  });
+
+  it("reads a full default same-source batch through live_env.read_live_source_mail when args are empty", () => {
+    seedVisualSummaries(5);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.summary).toBe("Read 5 unread live-source mail item(s); decision required.");
+    expect(payload.items.map((item: any) => item.mailId)).toHaveLength(5);
+    expect(payload.items.map((item: any) => item.summary.text)).toEqual([
+      expect.stringContaining("Live frame 1"),
+      expect.stringContaining("Live frame 2"),
+      expect.stringContaining("Live frame 3"),
+      expect.stringContaining("Live frame 4"),
+      expect.stringContaining("Live frame 5"),
+    ]);
+  });
+
+  it("keeps live_env.check_live_source_mail as a lightweight three-item status check", () => {
+    seedVisualSummaries(5);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.check_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.summary).toBe("Read 3 unread live-source mail item(s); decision required.");
+    expect(payload.items).toHaveLength(3);
   });
 
   it.each([
