@@ -698,7 +698,108 @@ describe("Helix Ask Stage Play routing", () => {
     });
     expect(response.body?.answer, routeDebug).not.toContain("decision is required");
     expect(response.body?.answer, routeDebug).toContain("Minecraft-like scene with a player near a book stand");
-    expect(response.body?.answer, routeDebug).toContain("draft_text_answer");
+    expect(response.body?.answer, routeDebug).not.toContain("Live-source mail decision recorded");
+    expect(response.body?.answer, routeDebug).not.toContain("draft_text_answer");
+    expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
+  }, 30_000);
+
+  it("forces a text draft after a one-shot mailbox read prompt asks what the latest mail shows", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_live_source_mail",
+        reason: "Read the latest mailbox items.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_mail_read_result"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.record_live_source_mail_decision",
+        reason: "Incorrectly wait after the read.",
+        args: {
+          decision: "wait_for_next_summary",
+          rationale_preview: "No user-facing callout was selected.",
+          next_loop_state: "armed_for_next_summary",
+        },
+        expected_artifacts: ["stage_play_live_source_mail_decision"],
+        confidence: 0.8,
+      },
+    ]);
+    process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
+      "The latest visual summary mail indicates that there are three unread items requiring a decision.";
+
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:one-shot-mail-answer",
+      ts: "2026-06-04T16:32:30.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:one-shot-mail-answer",
+      summary: "A dark app-launcher interface with Google Docs, Gmail, Drive, YouTube, and Instagram icons.",
+      supports_claims: [
+        {
+          claim: "The latest mailbox item includes compact visual summary text.",
+          support_status: "supports",
+          confidence: 0.9,
+        },
+      ],
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Check the active visual live-source mailbox now. Use live_env.read_live_source_mail to read unread visual-summary mail, then answer in one sentence what the latest mail shows.",
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      mailboxDebug: response.body?.stage_play_live_source_mailbox_debug,
+      artifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+    const decisionArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
+    );
+    expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_mail_decision",
+      decision: "draft_text_answer",
+      textAnswerDraft: {
+        text: expect.stringContaining("dark app-launcher interface"),
+        terminalEligible: true,
+      },
+      nextLoopState: "armed_for_next_summary",
+    });
+    expect(decisionArtifact?.payload?.observation?.decision_validation_result, routeDebug)
+      .toBe("forced_draft_text_answer_for_read_mail_output_intent");
+    expect(response.body?.stage_play_live_source_mailbox_debug, routeDebug).toMatchObject({
+      live_source_mail_output_intent: expect.objectContaining({
+        wantsTextAnswer: true,
+        wantsOneSentence: true,
+      }),
+      decision_validation_result: "forced_draft_text_answer_for_read_mail_output_intent",
+      text_answer_draft_present: true,
+    });
+    expect(response.body?.answer, routeDebug).toContain("dark app-launcher interface");
+    expect(response.body?.answer, routeDebug).not.toContain("three unread items requiring a decision");
     expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
   }, 30_000);
 
