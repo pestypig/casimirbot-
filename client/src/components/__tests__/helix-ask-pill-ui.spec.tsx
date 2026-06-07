@@ -1428,9 +1428,12 @@ describe("HelixAskPill mic helper behavior", () => {
       artifactId: "helix_interim_voice_callout_receipt",
       receiptId: overrides.receiptId ?? "receipt:interim:1",
       requestId: overrides.requestId ?? "request:interim:1",
-      status: overrides.status ?? "queued",
+      status: overrides.status ?? "awaiting_client_playback",
       delivery: {
         utteranceId: overrides.utteranceId ?? "utterance:interim:1",
+        playbackConfirmationRequired: true,
+        playbackAuthority: "client_runtime_required",
+        playbackStatus: "awaiting_client_receipt",
       },
       assistant_answer: false,
       terminal_eligible: false,
@@ -1443,7 +1446,7 @@ describe("HelixAskPill mic helper behavior", () => {
     raw_content_included: false,
   });
 
-  it("maps queued immediate ack receipts into provisional tool-receipt playback", () => {
+  it("maps client-playback handoff immediate ack receipts into provisional tool-receipt playback", () => {
     const intents = collectInterimVoiceCalloutPlaybackIntents({
       artifacts: [
         {

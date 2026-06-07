@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA } from "@shared/helix-live-agent-step";
 import { runLiveEnvironmentAgentLoop } from "../services/helix-ask/live-environment-agent-loop";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
-import { resetInterimVoiceCalloutsForTest } from "../services/helix-ask/interim-voice-callout-store";
+import {
+  resetInterimVoiceCalloutsForTest,
+  retryQueuedInterimVoiceCalloutDeliveries,
+} from "../services/helix-ask/interim-voice-callout-store";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
@@ -129,7 +132,12 @@ describe("Helix Ask live environment agent loop", () => {
       },
       receipt: {
         artifactId: "helix_interim_voice_callout_receipt",
-        status: "queued",
+        status: "awaiting_client_playback",
+        delivery: {
+          playbackConfirmationRequired: true,
+          playbackAuthority: "client_runtime_required",
+          playbackStatus: "awaiting_client_receipt",
+        },
         assistant_answer: false,
         terminal_eligible: false,
       },
@@ -167,7 +175,7 @@ describe("Helix Ask live environment agent loop", () => {
         raw_content_included: false,
       },
       receipt: {
-        status: "queued",
+        status: "awaiting_client_playback",
         assistant_answer: false,
         terminal_eligible: false,
       },
@@ -220,14 +228,14 @@ describe("Helix Ask live environment agent loop", () => {
         terminal_eligible: false,
       },
       receipt: {
-        status: "queued",
+        status: "awaiting_client_playback",
         assistant_answer: false,
         terminal_eligible: false,
       },
     });
   });
 
-  it("blocks interim voice callouts when voice TTS capacity is occupied", () => {
+  it("queues interim voice callouts for retry when voice TTS capacity is occupied", () => {
     const environment = seedEnvironment();
     const occupied = runtimeMemoryGovernor.admitRuntimeTask({
       taskClass: "voice_tts",
@@ -247,7 +255,7 @@ describe("Helix Ask live environment agent loop", () => {
       },
     });
 
-    expect(observation.ok).toBe(false);
+    expect(observation.ok).toBe(true);
     expect(observation.assistant_answer).toBe(false);
     expect(observation.observation).toMatchObject({
       request: {
@@ -255,12 +263,30 @@ describe("Helix Ask live environment agent loop", () => {
         terminal_eligible: false,
       },
       receipt: {
-        status: "blocked_capacity",
+        status: "queued_for_retry",
         assistant_answer: false,
         terminal_eligible: false,
       },
     });
     occupied.lease?.release("completed");
+
+    const retryReceipts = retryQueuedInterimVoiceCalloutDeliveries({
+      threadId: environment.thread_id,
+      turnId: "turn:interim-voice-capacity",
+      force: true,
+    });
+
+    expect(retryReceipts.at(-1)).toMatchObject({
+      status: "awaiting_client_playback",
+      delivery: {
+        utteranceId: expect.stringContaining("interim_voice:"),
+        playbackConfirmationRequired: true,
+        playbackAuthority: "client_runtime_required",
+        playbackStatus: "awaiting_client_receipt",
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
   });
 
   it("runs model-chosen live-env tool steps before terminal answer permission", async () => {

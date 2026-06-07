@@ -13,9 +13,28 @@ import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
 const MAX_INTERIM_CALLOUT_CHARS = 220;
 const MAX_IMMEDIATE_ACK_CHARS = 96;
 const RECENT_CALLOUT_LIMIT = 120;
+const DEFAULT_RETRY_TTL_MS = 90_000;
+const DEFAULT_RETRY_DELAY_MS = 5_000;
+const MAX_RETRY_JOBS_PER_THREAD = 5;
 
 const requestById = new Map<string, HelixInterimVoiceCalloutRequestV1>();
 const receiptById = new Map<string, HelixInterimVoiceCalloutReceiptV1>();
+
+type InterimVoiceDeliveryRetryJob = {
+  jobId: string;
+  requestId: string;
+  threadId: string;
+  turnId: string;
+  createdAtMs: number;
+  nextRetryAtMs: number;
+  expiresAtMs: number;
+  retryCount: number;
+  blockedReason: string;
+  status: "queued_for_retry" | "awaiting_client_playback" | "expired" | "superseded" | "failed";
+  latestReceiptId: string;
+};
+
+const retryJobByRequestId = new Map<string, InterimVoiceDeliveryRetryJob>();
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -61,7 +80,12 @@ const hasQueuedImmediateAckForTurn = (turnId: string, threadId: string): boolean
     if (request.turnId !== turnId || request.threadId !== threadId || request.kind !== "immediate_ack") return false;
     return Array.from(receiptById.values()).some((receipt) =>
       receipt.requestId === request.requestId &&
-      (receipt.status === "queued" || receipt.status === "delivered")
+      (
+        receipt.status === "awaiting_client_playback" ||
+        receipt.status === "queued" ||
+        receipt.status === "queued_for_retry" ||
+        receipt.status === "delivered"
+      )
     );
   });
 
@@ -97,6 +121,9 @@ const buildReceipt = (input: {
   message?: string | null;
   utteranceId?: string | null;
   provider?: string | null;
+  nextRetryAtMs?: number | null;
+  retryCount?: number | null;
+  blockedReason?: string | null;
 }): HelixInterimVoiceCalloutReceiptV1 => {
   const receipt: HelixInterimVoiceCalloutReceiptV1 = {
     artifactId: "helix_interim_voice_callout_receipt",
@@ -113,6 +140,27 @@ const buildReceipt = (input: {
       utteranceId: input.utteranceId ?? null,
       provider: input.provider ?? "helix_interim_voice_callout",
       message: input.message ?? null,
+      nextRetryAtMs: input.nextRetryAtMs ?? null,
+      retryCount: input.retryCount ?? null,
+      blockedReason: input.blockedReason ?? null,
+      playbackConfirmationRequired:
+        input.status === "awaiting_client_playback" ||
+        input.status === "queued" ||
+        input.status === "queued_for_retry",
+      playbackAuthority:
+        input.status === "awaiting_client_playback" || input.status === "queued"
+          ? "client_runtime_required"
+          : input.status === "queued_for_retry"
+            ? "backend_retry_pending"
+            : "backend_terminal_status",
+      playbackStatus:
+        input.status === "awaiting_client_playback" || input.status === "queued"
+          ? "awaiting_client_receipt"
+          : input.status === "queued_for_retry"
+            ? "backend_retry_pending"
+            : input.status === "delivered"
+              ? "client_confirmed"
+              : "blocked_before_client",
     },
     evidenceRefs: uniqueStrings([input.request.requestId, ...input.request.evidenceRefs]),
     assistant_answer: false,
@@ -124,6 +172,127 @@ const buildReceipt = (input: {
   pruneRecent(receiptById);
   return receipt;
 };
+
+const expireRetryJob = (
+  job: InterimVoiceDeliveryRetryJob,
+  request: HelixInterimVoiceCalloutRequestV1,
+  status: "expired" | "superseded" = "expired",
+): HelixInterimVoiceCalloutReceiptV1 => {
+  job.status = status;
+  const receipt = buildReceipt({
+    request,
+    status,
+    message: status === "expired"
+      ? "Interim voice callout retry expired before TTS capacity recovered."
+      : "Interim voice callout retry was superseded by a newer delivery state.",
+    retryCount: job.retryCount,
+    blockedReason: job.blockedReason,
+  });
+  job.latestReceiptId = receipt.receiptId;
+  retryJobByRequestId.delete(job.requestId);
+  return receipt;
+};
+
+const enqueueRetryJob = (
+  request: HelixInterimVoiceCalloutRequestV1,
+  blockedReason: string,
+): HelixInterimVoiceCalloutReceiptV1 => {
+  const nowMs = Date.now();
+  const threadJobs = Array.from(retryJobByRequestId.values())
+    .filter((job) => job.threadId === request.threadId && job.status === "queued_for_retry")
+    .sort((a, b) => a.createdAtMs - b.createdAtMs);
+  while (threadJobs.length >= MAX_RETRY_JOBS_PER_THREAD) {
+    const oldest = threadJobs.shift();
+    const oldRequest = oldest ? requestById.get(oldest.requestId) : null;
+    if (oldest && oldRequest) {
+      expireRetryJob(oldest, oldRequest, "superseded");
+    } else if (oldest) {
+      retryJobByRequestId.delete(oldest.requestId);
+    }
+  }
+  const receipt = buildReceipt({
+    request,
+    status: "queued_for_retry",
+    message: `Voice TTS admission blocked: ${blockedReason}; queued for retry.`,
+    nextRetryAtMs: nowMs + DEFAULT_RETRY_DELAY_MS,
+    retryCount: 0,
+    blockedReason,
+  });
+  retryJobByRequestId.set(request.requestId, {
+    jobId: `helix_interim_voice_delivery_job:${hashShort([request.requestId, nowMs])}`,
+    requestId: request.requestId,
+    threadId: request.threadId,
+    turnId: request.turnId,
+    createdAtMs: nowMs,
+    nextRetryAtMs: nowMs + DEFAULT_RETRY_DELAY_MS,
+    expiresAtMs: nowMs + DEFAULT_RETRY_TTL_MS,
+    retryCount: 0,
+    blockedReason,
+    status: "queued_for_retry",
+    latestReceiptId: receipt.receiptId,
+  });
+  return receipt;
+};
+
+export function retryQueuedInterimVoiceCalloutDeliveries(input: {
+  threadId?: string | null;
+  turnId?: string | null;
+  nowMs?: number;
+  force?: boolean;
+} = {}): HelixInterimVoiceCalloutReceiptV1[] {
+  const nowMs = input.nowMs ?? Date.now();
+  const receipts: HelixInterimVoiceCalloutReceiptV1[] = [];
+  for (const job of Array.from(retryJobByRequestId.values())) {
+    if (input.threadId && job.threadId !== input.threadId) continue;
+    if (input.turnId && job.turnId !== input.turnId) continue;
+    if (job.status !== "queued_for_retry") continue;
+    const request = requestById.get(job.requestId);
+    if (!request) {
+      retryJobByRequestId.delete(job.requestId);
+      continue;
+    }
+    if (nowMs >= job.expiresAtMs) {
+      receipts.push(expireRetryJob(job, request, "expired"));
+      continue;
+    }
+    if (!input.force && nowMs < job.nextRetryAtMs) continue;
+    const admission = runtimeMemoryGovernor.admitRuntimeTask({
+      taskClass: "voice_tts",
+      traceId: request.requestId,
+      source: "helix.interim_voice_callout.retry",
+    });
+    if (!admission.admitted) {
+      job.retryCount += 1;
+      job.blockedReason = admission.reason;
+      job.nextRetryAtMs = nowMs + Math.min(DEFAULT_RETRY_DELAY_MS * Math.max(1, job.retryCount + 1), 30_000);
+      const receipt = buildReceipt({
+        request,
+        status: "queued_for_retry",
+        message: `Voice TTS retry still blocked: ${admission.reason}.`,
+        nextRetryAtMs: job.nextRetryAtMs,
+        retryCount: job.retryCount,
+        blockedReason: admission.reason,
+      });
+      job.latestReceiptId = receipt.receiptId;
+      receipts.push(receipt);
+      continue;
+    }
+    admission.lease?.release("completed");
+    job.status = "awaiting_client_playback";
+    const receipt = buildReceipt({
+      request,
+      status: "awaiting_client_playback",
+      utteranceId: `interim_voice:${hashShort([request.requestId, "retry", job.retryCount])}`,
+      message: "Interim voice callout accepted for client playback handoff after capacity retry; awaiting browser playback receipt.",
+      retryCount: job.retryCount,
+      blockedReason: job.blockedReason,
+    });
+    job.latestReceiptId = receipt.receiptId;
+    retryJobByRequestId.delete(job.requestId);
+    receipts.push(receipt);
+  }
+  return receipts;
+}
 
 export function recordInterimVoiceCalloutRequest(input: {
   turnId: string;
@@ -141,6 +310,7 @@ export function recordInterimVoiceCalloutRequest(input: {
   request: HelixInterimVoiceCalloutRequestV1;
   receipt: HelixInterimVoiceCalloutReceiptV1;
 } {
+  retryQueuedInterimVoiceCalloutDeliveries({ threadId: input.threadId });
   const kind = normalizeKind(input.kind);
   const kindMaxChars = kind === "immediate_ack" ? MAX_IMMEDIATE_ACK_CHARS : MAX_INTERIM_CALLOUT_CHARS;
   const maxChars = Math.max(1, Math.min(Math.floor(input.maxChars ?? kindMaxChars), kindMaxChars));
@@ -219,11 +389,7 @@ export function recordInterimVoiceCalloutRequest(input: {
   if (!admission.admitted) {
     return {
       request,
-      receipt: buildReceipt({
-        request,
-        status: "blocked_capacity",
-        message: `Voice TTS admission blocked: ${admission.reason}.`,
-      }),
+      receipt: enqueueRetryJob(request, admission.reason),
     };
   }
   admission.lease?.release("completed");
@@ -231,9 +397,9 @@ export function recordInterimVoiceCalloutRequest(input: {
     request,
     receipt: buildReceipt({
       request,
-      status: "queued",
+      status: "awaiting_client_playback",
       utteranceId: `interim_voice:${hashShort(request.requestId)}`,
-      message: "Interim voice callout queued for voice playback.",
+      message: "Interim voice callout accepted for client playback handoff; awaiting browser playback receipt.",
     }),
   };
 }
@@ -254,6 +420,7 @@ export function listInterimVoiceCalloutReceipts(input: {
   requestId?: string | null;
   limit?: number;
 } = {}): HelixInterimVoiceCalloutReceiptV1[] {
+  retryQueuedInterimVoiceCalloutDeliveries();
   const limit = Math.max(1, Math.min(input.limit ?? 50, RECENT_CALLOUT_LIMIT));
   return Array.from(receiptById.values())
     .filter((entry) => !input.requestId || entry.requestId === input.requestId)
@@ -263,4 +430,5 @@ export function listInterimVoiceCalloutReceipts(input: {
 export function resetInterimVoiceCalloutsForTest(): void {
   requestById.clear();
   receiptById.clear();
+  retryJobByRequestId.clear();
 }

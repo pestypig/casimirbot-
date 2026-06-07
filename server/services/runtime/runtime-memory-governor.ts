@@ -145,6 +145,8 @@ const RECENT_COMPLETION_LIMIT = 50;
 const DEFAULT_BURST_WINDOW_MS = 60_000;
 const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 2048;
 const DEV_VOICE_STT_MAX_RSS_MIB = 3200;
+const DEV_VOICE_TTS_MAX_HEAP_USED_MIB = 2048;
+const DEV_VOICE_TTS_MAX_RSS_MIB = 3200;
 
 const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
   critical_resident: { priority: 100, deferrable: false, pausable: false, maxConcurrent: 16 },
@@ -187,6 +189,13 @@ const resolveDefaultTaskBudget = (taskClass: RuntimeTaskClass): RuntimeTaskBudge
       ...budget,
       maxHeapUsedMiB: DEV_VOICE_STT_MAX_HEAP_USED_MIB,
       maxRssMiB: DEV_VOICE_STT_MAX_RSS_MIB,
+    };
+  }
+  if (taskClass === "voice_tts" && isDevelopmentRuntime()) {
+    return {
+      ...budget,
+      maxHeapUsedMiB: DEV_VOICE_TTS_MAX_HEAP_USED_MIB,
+      maxRssMiB: DEV_VOICE_TTS_MAX_RSS_MIB,
     };
   }
   return budget;
@@ -246,17 +255,21 @@ const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limi
   const maxHeapUsedMiB =
     taskClass === "voice_stt"
       ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_HEAP_USED_MB", genericMaxHeap)
+      : taskClass === "voice_tts"
+        ? readPositiveNumberEnv("VOICE_TTS_MAX_HEAP_USED_MB", genericMaxHeap)
       : genericMaxHeap;
   const maxRssMiB =
     taskClass === "voice_stt"
       ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_RSS_MB", genericMaxRss)
+      : taskClass === "voice_tts"
+        ? readPositiveNumberEnv("VOICE_TTS_MAX_RSS_MB", genericMaxRss)
       : genericMaxRss;
   const resumeHeapUsedMiB = readPositiveNumberEnv(
-    "RUNTIME_MEMORY_RESUME_HEAP_USED_MB",
+    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_HEAP_USED_MB" : "RUNTIME_MEMORY_RESUME_HEAP_USED_MB",
     Math.floor(maxHeapUsedMiB * 0.85),
   );
   const resumeRssMiB = readPositiveNumberEnv(
-    "RUNTIME_MEMORY_RESUME_RSS_MB",
+    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_RSS_MB" : "RUNTIME_MEMORY_RESUME_RSS_MB",
     Math.floor(maxRssMiB * 0.85),
   );
   return {

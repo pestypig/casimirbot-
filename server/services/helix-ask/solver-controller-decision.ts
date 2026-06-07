@@ -30,7 +30,10 @@ export const normalizeHelixRouteBase = (route: string | null | undefined): strin
 };
 
 const isNonAnswerTerminal = (payload: RecordLike): boolean => {
-  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const terminalArtifactKind =
+    readString(payload.terminal_artifact_kind) ??
+    readString(terminalAuthority?.terminal_artifact_kind);
   const finalAnswerSource = readString(payload.final_answer_source);
   const responseType = readString(payload.response_type);
   const finalStatus = readString(payload.final_status);
@@ -166,6 +169,27 @@ const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKi
     );
   });
 };
+
+const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
+  readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "live_environment_tool_observation") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    if (readString(artifactPayload?.tool_name) !== "live_env.request_interim_voice_callout") return false;
+    const observation = readRecord(artifactPayload?.observation);
+    if (readString(observation?.schema) !== "helix.interim_voice_callout_tool_result.v1") return false;
+    const receiptStatus = readString(readRecord(observation?.receipt)?.status);
+    return Boolean(receiptStatus && [
+      "awaiting_client_playback",
+      "queued",
+      "queued_for_retry",
+      "delivered",
+      "expired",
+      "blocked_capacity",
+      "blocked_policy",
+      "blocked_missing_text",
+    ].includes(receiptStatus));
+  });
 
 const hasIncompletePromptRequirementCoverage = (payload: RecordLike): boolean => {
   const coverage = readRecord(payload.prompt_requirement_coverage);
@@ -424,6 +448,12 @@ export function buildSolverControllerDecision(input: {
       canonicalGoalKind === "conversation" ||
       canonicalGoalKind === "live_environment_review"
     );
+  const interimVoiceCalloutStatusTerminal =
+    canonicalGoalKind === "live_environment_review" &&
+    terminalArtifactKind === "model_synthesized_answer" &&
+    readString(payload.final_answer_source) === "final_answer_draft" &&
+    readBoolean(readRecord(payload.terminal_consistency_check)?.consistent) === true &&
+    hasFinalInterimVoiceCalloutReceipt(payload);
   const capabilityGuardRequired =
     !modelDirectAnswerTerminal &&
     (
@@ -463,7 +493,7 @@ export function buildSolverControllerDecision(input: {
   if (!nonAnswerTerminal) {
     if (!goalSatisfaction) {
       pushUnique(blockingReasons, "goal_satisfaction_missing");
-    } else if (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal") {
+    } else if (!interimVoiceCalloutStatusTerminal && (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal")) {
       pushUnique(blockingReasons, "goal_not_satisfied");
     }
     if (disciplineGuardRequired && !hasRequiredArtifactContract(terminalContract)) {
@@ -482,7 +512,7 @@ export function buildSolverControllerDecision(input: {
     }
     if (!terminalEquivalence) {
       pushUnique(blockingReasons, "terminal_equivalence_missing");
-    } else if (readBoolean(terminalEquivalence.ok) !== true) {
+    } else if (!interimVoiceCalloutStatusTerminal && readBoolean(terminalEquivalence.ok) !== true) {
       pushUnique(blockingReasons, "terminal_equivalence_failed");
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
@@ -544,7 +574,7 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
-  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
   if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
   if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) {
     pushUnique(blockingReasons, "route_authority_failed");

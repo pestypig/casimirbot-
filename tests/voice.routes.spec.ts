@@ -288,6 +288,35 @@ describe("voice routes", () => {
     expect(res.body.reason).toBe("missing_terminal_authority");
   });
 
+  it("allows provisional interim tool receipt playback without terminal answer authority", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const app = buildApp();
+    const receiptId = "helix_interim_voice_callout_receipt:test";
+
+    const res = await request(app).post("/api/voice/speak").send({
+      text: "I am checking this now.",
+      mode: "briefing",
+      priority: "info",
+      provider: "local-chatterbox",
+      traceId: "ask:test-interim-voice",
+      eventId: receiptId,
+      utteranceId: `tool_receipt:ask:test-interim-voice:${receiptId}`,
+      chunkKind: "tool_receipt",
+      turnKey: "ask:test-interim-voice",
+      evidenceRefs: [receiptId, `tool_receipt:ask:test-interim-voice:${receiptId}`],
+      repoAttributed: false,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      ok: true,
+      dryRun: true,
+      provider: "dry-run",
+    });
+    expect(res.body.suppressed).not.toBe(true);
+    expect(res.body.reason).not.toBe("missing_terminal_authority");
+  });
+
   it("suppresses status_voice from legacy context packs", async () => {
     process.env.VOICE_PROXY_DRY_RUN = "1";
     const app = buildApp();

@@ -32,6 +32,10 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
+    delete process.env.VOICE_TTS_MAX_HEAP_USED_MB;
+    delete process.env.VOICE_TTS_MAX_RSS_MB;
+    delete process.env.VOICE_TTS_RESUME_HEAP_USED_MB;
+    delete process.env.VOICE_TTS_RESUME_RSS_MB;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
@@ -50,6 +54,10 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
+    delete process.env.VOICE_TTS_MAX_HEAP_USED_MB;
+    delete process.env.VOICE_TTS_MAX_RSS_MB;
+    delete process.env.VOICE_TTS_RESUME_HEAP_USED_MB;
+    delete process.env.VOICE_TTS_RESUME_RSS_MB;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
@@ -153,6 +161,56 @@ describe("runtime memory governor", () => {
       expect(decision.reason).toBe("heap_used_limit");
       expect(decision.limits.maxHeapUsedMiB).toBe(480);
       expect(decision.limits.maxRssMiB).toBe(900);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("uses separate higher default voice TTS headroom in development", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 1500 * mib, rss: 1800 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_tts" });
+
+      expect(decision.admitted).toBe(true);
+      expect(decision.limits.maxHeapUsedMiB).toBe(2048);
+      expect(decision.limits.maxRssMiB).toBe(3200);
+      decision.lease?.release("completed");
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("keeps explicit voice TTS env limits authoritative in development", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.VOICE_TTS_MAX_HEAP_USED_MB = "700";
+      process.env.VOICE_TTS_MAX_RSS_MB = "1200";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 800 * mib, rss: 900 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_tts" });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.reason).toBe("heap_used_limit");
+      expect(decision.limits.maxHeapUsedMiB).toBe(700);
+      expect(decision.limits.maxRssMiB).toBe(1200);
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;

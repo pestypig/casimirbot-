@@ -137,6 +137,8 @@ import {
   type VoiceCaptureDiagnosticsSnapshot,
   type VoiceCaptureSegmentSnapshot,
   type VoiceLaneTimelineDebugEvent,
+  type VoicePlaybackOutcomeReceipt,
+  type VoicePlaybackOutcomeStatus,
 } from "@/lib/helix/voice-capture-diagnostics";
 import {
   getVoiceCallDiagnosticsSnapshot,
@@ -2422,6 +2424,10 @@ export type VoiceAutoSpeakTask = {
   source?: VoicePlaybackIntentSource;
   replyId?: string;
   allowMicOffPlayback?: boolean;
+  interimVoiceRequestId?: string;
+  interimVoiceReceiptId?: string;
+  interimVoiceReceiptKey?: string;
+  interimVoiceCalloutKind?: string;
   briefSource?: "llm" | "none";
   finalSource?: "normal_reasoning" | "strict_gate_override";
 };
@@ -2436,6 +2442,10 @@ export type VoicePlaybackUtteranceIntent = {
   eventId: string;
   replyId?: string;
   allowMicOffPlayback?: boolean;
+  interimVoiceRequestId?: string;
+  interimVoiceReceiptId?: string;
+  interimVoiceReceiptKey?: string;
+  interimVoiceCalloutKind?: string;
   source: VoicePlaybackIntentSource;
   briefSource?: "llm" | "none";
   finalSource?: "normal_reasoning" | "strict_gate_override";
@@ -2479,6 +2489,10 @@ export function mapVoicePlaybackIntentToTask(intent: VoicePlaybackUtteranceInten
     source: intent.source,
     replyId: intent.replyId,
     allowMicOffPlayback: intent.allowMicOffPlayback,
+    interimVoiceRequestId: intent.interimVoiceRequestId,
+    interimVoiceReceiptId: intent.interimVoiceReceiptId,
+    interimVoiceReceiptKey: intent.interimVoiceReceiptKey,
+    interimVoiceCalloutKind: intent.interimVoiceCalloutKind,
     briefSource: intent.briefSource,
     finalSource: intent.finalSource,
   };
@@ -2514,7 +2528,11 @@ const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
   "translation_relay",
 ]);
 
-const INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES = new Set(["queued", "delivered"]);
+const INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES = new Set([
+  "awaiting_client_playback",
+  "queued",
+  "delivered",
+]);
 
 const readInterimVoiceRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -2575,6 +2593,10 @@ const buildInterimVoiceReceiptPlaybackIntent = (
     receiptId,
     receiptKey,
     calloutKind,
+    interimVoiceRequestId: requestId,
+    interimVoiceReceiptId: receiptId,
+    interimVoiceReceiptKey: receiptKey,
+    interimVoiceCalloutKind: calloutKind,
   };
 };
 
@@ -2640,12 +2662,20 @@ function canPlayVoiceUtteranceWithMicOff(
   return isManualVoicePlaybackUtterance(utterance) || utterance?.allowMicOffPlayback === true;
 }
 
+function isMissionVoiceOutputModeEnabled(voiceMode: string | null | undefined): boolean {
+  return voiceMode === "normal";
+}
+
 type VoiceUtteranceTimelineMeta = {
   briefSource: "llm" | "none" | null;
   finalSource: "normal_reasoning" | "strict_gate_override" | null;
   authority: VoicePlaybackIntentAuthority | null;
   source: VoicePlaybackIntentSource | null;
   replyId: string | null;
+  interimVoiceRequestId: string | null;
+  interimVoiceReceiptId: string | null;
+  interimVoiceReceiptKey: string | null;
+  interimVoiceCalloutKind: string | null;
   hlcMs: number | null;
   seq: number | null;
   revision: number | null;
@@ -11709,7 +11739,7 @@ function readEventMetaString(
 
 type UnifiedDebugEventRow = {
   index: number;
-  channel: "ask_live" | "voice_timeline" | "voice_call" | "observer_lane";
+  channel: "ask_live" | "voice_timeline" | "voice_call" | "voice_playback_receipt" | "observer_lane";
   id: string;
   tsMs: number | null;
   tool: string | null;
@@ -11909,6 +11939,34 @@ function sanitizeVoiceDiagnosticsForExport(
           audioGraphAttached: snapshot.playbackOutput.audioGraphAttached,
         }
       : null,
+    playbackReceipts: Array.isArray(snapshot.playbackReceipts)
+      ? snapshot.playbackReceipts.slice(-80).map((receipt) => ({
+          schema: receipt.schema,
+          receiptId: receipt.receiptId,
+          sourceReceiptId: receipt.sourceReceiptId,
+          sourceReceiptKey: receipt.sourceReceiptKey,
+          requestId: receipt.requestId,
+          calloutKind: receipt.calloutKind,
+          utteranceId: receipt.utteranceId,
+          turnKey: receipt.turnKey,
+          kind: receipt.kind,
+          status: receipt.status,
+          atMs: receipt.atMs,
+          providerHeader: receipt.providerHeader,
+          profileHeader: receipt.profileHeader,
+          cacheHitCount: receipt.cacheHitCount,
+          cacheMissCount: receipt.cacheMissCount,
+          totalPlaybackMs: receipt.totalPlaybackMs,
+          cancelReason: receipt.cancelReason,
+          error: receipt.error,
+          audioUnlocked: receipt.audioUnlocked,
+          playbackPath: receipt.playbackPath,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          output_authority: "playback_observation",
+        }))
+      : [],
     voiceCalls: Array.isArray(snapshot.voiceCalls)
       ? snapshot.voiceCalls.slice(-80).map((call) => ({
           id: call.id,
@@ -11954,6 +12012,7 @@ function sanitizeVoiceDiagnosticsForExport(
       replyId: event.replyId ?? null,
       detail: event.detail ?? null,
       text: event.text ?? null,
+      debugContext: event.debugContext ?? null,
     })),
   };
 }
@@ -12313,6 +12372,33 @@ function buildReplyMasterEventClockExport(args: {
         };
       })
     : [];
+  const voicePlaybackReceiptRows: UnifiedDebugEventRow[] = Array.isArray(args.voiceDiagnostics?.playbackReceipts)
+    ? args.voiceDiagnostics.playbackReceipts.slice(-80).map((receipt, idx) => {
+        if (receipt.turnKey) turnKeys.add(receipt.turnKey);
+        return {
+          index: idx + 1,
+          channel: "voice_playback_receipt" as const,
+          id: receipt.receiptId,
+          tsMs: Number.isFinite(receipt.atMs) ? receipt.atMs : null,
+          tool: "voice.playback_receipt",
+          traceId: null,
+          turnKey: receipt.turnKey,
+          attemptId: null,
+          stage: receipt.status,
+          detail: [
+            receipt.calloutKind ? `callout:${receipt.calloutKind}` : null,
+            receipt.sourceReceiptId ? `source_receipt:${receipt.sourceReceiptId}` : null,
+            receipt.providerHeader ? `provider:${receipt.providerHeader}` : null,
+            receipt.profileHeader ? `profile:${receipt.profileHeader}` : null,
+            receipt.cancelReason ? `cancel:${receipt.cancelReason}` : null,
+            receipt.error ? `error:${receipt.error}` : null,
+          ]
+            .filter(Boolean)
+            .join(" | "),
+          text: `interim voice playback ${receipt.status}`,
+        };
+      })
+    : [];
   const observerRows: UnifiedDebugEventRow[] = askRows
     .map((row): UnifiedDebugEventRow | null => {
       const commentary = buildObserverCommentaryForRow(row, {
@@ -12335,7 +12421,13 @@ function buildReplyMasterEventClockExport(args: {
     })
     .filter((row): row is UnifiedDebugEventRow => row !== null)
     .slice(-160);
-  const unifiedTimeline: UnifiedDebugEventRow[] = [...askRows, ...observerRows, ...voiceRows, ...voiceCallRows]
+  const unifiedTimeline: UnifiedDebugEventRow[] = [
+    ...askRows,
+    ...observerRows,
+    ...voiceRows,
+    ...voiceCallRows,
+    ...voicePlaybackReceiptRows,
+  ]
     .sort((left, right) => {
       const leftTs = left.tsMs ?? Number.MAX_SAFE_INTEGER;
       const rightTs = right.tsMs ?? Number.MAX_SAFE_INTEGER;
@@ -13507,6 +13599,46 @@ const waitForDebugClipboardReadback = async (attempt: number): Promise<void> => 
   await new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
 };
 
+function buildClientProjectionDebugFields(localPayload: Record<string, unknown>): Record<string, unknown> {
+  const channels = readAgentLoopAuditRecord(localPayload.channels);
+  const liveVoiceSnapshot = getVoiceCaptureDiagnosticsSnapshot();
+  const liveVoice = liveVoiceSnapshot ? sanitizeVoiceDiagnosticsForExport(liveVoiceSnapshot) : null;
+  const voice =
+    readAgentLoopAuditRecord(localPayload.voice) ??
+    readAgentLoopAuditRecord(channels?.voice) ??
+    readAgentLoopAuditRecord(localPayload.client_voice_debug) ??
+    readAgentLoopAuditRecord(readAgentLoopAuditRecord(localPayload.client_debug_projection)?.voice) ??
+    liveVoice;
+  const unifiedTimeline = Array.isArray(localPayload.unifiedTimeline)
+    ? localPayload.unifiedTimeline
+    : Array.isArray(localPayload.unified_timeline)
+      ? localPayload.unified_timeline
+      : null;
+  const clientProjection: Record<string, unknown> = {
+    schema: "helix.client_debug_projection.v1",
+    source: "browser_runtime",
+    voice: voice ?? null,
+    voice_playback_receipts: voice && Array.isArray(voice.playbackReceipts) ? voice.playbackReceipts : [],
+    voice_playback_output: voice && readAgentLoopAuditRecord(voice.playbackOutput) ? voice.playbackOutput : null,
+    voice_playback_metrics: voice && readAgentLoopAuditRecord(voice.playback) ? voice.playback : null,
+    voice_calls: voice && Array.isArray(voice.voiceCalls) ? voice.voiceCalls : [],
+    captured_at_ms:
+      typeof localPayload.exportedAtMs === "number"
+        ? localPayload.exportedAtMs
+        : typeof localPayload.exported_at_ms === "number"
+          ? localPayload.exported_at_ms
+          : Date.now(),
+  };
+  if (unifiedTimeline) {
+    clientProjection.unified_timeline_voice_rows = unifiedTimeline.filter((row) => {
+      const record = readAgentLoopAuditRecord(row);
+      const channel = coerceText(record?.channel).trim();
+      return channel === "voice_timeline" || channel === "voice_call" || channel === "voice_playback_receipt";
+    });
+  }
+  return clientProjection;
+}
+
 async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
   if (typeof fetch !== "function") return localPayload;
   let parsed: Record<string, unknown>;
@@ -13532,10 +13664,17 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
     if (!authoritativePayload) return localPayload;
     const authoritativeTurnId = coerceText(authoritativePayload.active_turn_id).trim();
     if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) return localPayload;
+    const clientProjection = buildClientProjectionDebugFields(parsed);
     return JSON.stringify({
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
       client_projection_payload_hash: hashDebugExportText(localPayload),
+      client_debug_projection: clientProjection,
+      client_voice_debug: clientProjection.voice,
+      client_voice_playback_receipts: clientProjection.voice_playback_receipts,
+      client_voice_playback_output: clientProjection.voice_playback_output,
+      client_voice_playback_metrics: clientProjection.voice_playback_metrics,
+      client_voice_calls: clientProjection.voice_calls,
     }, null, 2);
   } catch {
     return localPayload;
@@ -16660,6 +16799,7 @@ export function HelixAskPill({
   const voiceAutoSpeakPendingPlaybackResolverRef = useRef<(() => void) | null>(null);
   const voiceAutoSpeakCancelReasonRef = useRef<VoicePlaybackCancelReason | null>(null);
   const voiceAutoSpeakLastMetricsRef = useRef<VoicePlaybackMetrics | null>(null);
+  const voicePlaybackOutcomeReceiptsRef = useRef<VoicePlaybackOutcomeReceipt[]>([]);
   const interimVoiceSpokenReceiptKeysRef = useRef<Set<string>>(new Set());
   const interimVoiceSpokenImmediateAckTurnKeysRef = useRef<Set<string>>(new Set());
   const voiceBargeHoldActiveRef = useRef(false);
@@ -16695,6 +16835,7 @@ export function HelixAskPill({
     timeoutId: number | null;
   } | null>(null);
   const [voiceAutoSpeakLastMetrics, setVoiceAutoSpeakLastMetrics] = useState<VoicePlaybackMetrics | null>(null);
+  const [voicePlaybackOutcomeReceipts, setVoicePlaybackOutcomeReceipts] = useState<VoicePlaybackOutcomeReceipt[]>([]);
   const voiceRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceStreamRef = useRef<MediaStream | null>(null);
   const voiceChunksRef = useRef<Array<{ chunk: Blob; atMs: number }>>([]);
@@ -18756,6 +18897,55 @@ export function HelixAskPill({
     setVoiceAutoSpeakLastMetrics(metrics);
   }, []);
 
+  const recordVoicePlaybackOutcomeReceipt = useCallback((input: {
+    status: VoicePlaybackOutcomeStatus;
+    utteranceId: string;
+    turnKey: string;
+    kind: VoicePlaybackUtteranceKind;
+    sourceReceiptId?: string | null;
+    sourceReceiptKey?: string | null;
+    requestId?: string | null;
+    calloutKind?: string | null;
+    metrics?: VoicePlaybackMetrics | null;
+    error?: string | null;
+  }) => {
+    const atMs = Date.now();
+    const receipt: VoicePlaybackOutcomeReceipt = {
+      schema: "helix.voice_playback_outcome_receipt.v1",
+      receiptId: `voice_playback_outcome:${hashVoiceUtteranceKey([
+        input.utteranceId,
+        input.status,
+        input.sourceReceiptId ?? input.sourceReceiptKey ?? "",
+        String(atMs),
+      ].join(":"))}`,
+      sourceReceiptId: input.sourceReceiptId ?? null,
+      sourceReceiptKey: input.sourceReceiptKey ?? null,
+      requestId: input.requestId ?? null,
+      calloutKind: input.calloutKind ?? null,
+      utteranceId: input.utteranceId,
+      turnKey: input.turnKey,
+      kind: input.kind,
+      status: input.status,
+      atMs,
+      providerHeader: input.metrics?.providerHeader ?? null,
+      profileHeader: input.metrics?.profileHeader ?? null,
+      cacheHitCount: input.metrics?.cacheHitCount ?? null,
+      cacheMissCount: input.metrics?.cacheMissCount ?? null,
+      totalPlaybackMs: input.metrics?.totalPlaybackMs ?? null,
+      cancelReason: input.metrics?.cancelReason ?? null,
+      error: input.error ?? null,
+      audioUnlocked: voiceAudioUnlockedRef.current,
+      playbackPath: voicePlaybackCurrentPathRef.current,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "playback_observation",
+    };
+    const next = [...voicePlaybackOutcomeReceiptsRef.current, receipt].slice(-80);
+    voicePlaybackOutcomeReceiptsRef.current = next;
+    setVoicePlaybackOutcomeReceipts(next);
+  }, []);
+
   const buildInitialVoiceTurnAssemblerState = useCallback(
     (turnKey: string): VoiceTurnAssemblerState => {
       const now = Date.now();
@@ -19021,6 +19211,7 @@ export function HelixAskPill({
         authorityRejectStage: input.authorityRejectStage ?? null,
         finalSource: input.finalSource ?? utteranceMeta?.finalSource ?? null,
         causalRefId: input.causalRefId ?? null,
+        debugContext: input.debugContext ?? null,
       };
       const nextEvents = [...voiceChunkTimelineEventsRef.current, event].slice(
         -HELIX_VOICE_DEBUG_TIMELINE_LIMIT,
@@ -19704,6 +19895,14 @@ export function HelixAskPill({
               chunkCount: input.chunk.chunkCount,
               chunkKind: input.chunk.kind,
               turnKey: input.chunk.turnKey,
+              evidenceRefs: isInterimVoicePlaybackUtteranceKind(input.chunk.kind)
+                ? [
+                    input.utterance.eventId,
+                    input.utterance.utteranceId,
+                    input.chunk.turnKey,
+                  ].filter((value): value is string => Boolean(value?.trim()))
+                : undefined,
+              repoAttributed: isInterimVoicePlaybackUtteranceKind(input.chunk.kind) ? false : undefined,
             },
             { signal: input.signal },
           );
@@ -19855,6 +20054,9 @@ export function HelixAskPill({
           cacheHitCount: 0,
           cacheMissCount: 0,
         };
+        const playbackMeta = voiceUtteranceTimelineMetaByIdRef.current.get(utterance.utteranceId) ?? null;
+        let playbackOutcomeStatusOverride: VoicePlaybackOutcomeStatus | null = null;
+        let playbackOutcomeError: string | null = null;
         updateVoiceAutoSpeakMetrics(metrics);
         const utteranceStartedAtMs = Date.now();
         let lastChunkEndedAtMs: number | null = null;
@@ -20224,6 +20426,8 @@ export function HelixAskPill({
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             if (/abort|signal is aborted without reason/i.test(message)) {
+              playbackOutcomeStatusOverride = "cancelled";
+              playbackOutcomeError = message;
               const abortReason = voiceAutoSpeakCancelReasonRef.current ?? "barge_in";
               const detail = /signal is aborted without reason/i.test(message)
                 ? `signal_aborted:${abortReason}`
@@ -20242,6 +20446,8 @@ export function HelixAskPill({
               });
               metrics.cancelReason = metrics.cancelReason ?? voiceAutoSpeakCancelReasonRef.current ?? "barge_in";
             } else if (/^voice_auto_speak_suppressed:/i.test(message)) {
+              playbackOutcomeStatusOverride = "suppressed";
+              playbackOutcomeError = message;
               pushVoiceChunkTimelineEvent({
                 kind: "chunk_drop",
                 status: "suppressed",
@@ -20262,6 +20468,8 @@ export function HelixAskPill({
                 }));
               }
             } else {
+              playbackOutcomeStatusOverride = "failed";
+              playbackOutcomeError = message;
               pushVoiceChunkTimelineEvent({
                 kind: "chunk_synth_error",
                 status: "failed",
@@ -20284,6 +20492,39 @@ export function HelixAskPill({
           }
         }
         metrics.totalPlaybackMs = Math.max(0, Date.now() - utteranceStartedAtMs);
+        if (playbackMeta?.interimVoiceReceiptId || playbackMeta?.interimVoiceReceiptKey) {
+          const outcomeStatus =
+            playbackOutcomeStatusOverride ??
+            (metrics.cancelReason === null
+              ? "delivered"
+              : metrics.cancelReason === "error"
+                ? "failed"
+                : "cancelled");
+          recordVoicePlaybackOutcomeReceipt({
+            status: outcomeStatus,
+            utteranceId: utterance.utteranceId,
+            turnKey: utterance.turnKey,
+            kind: utterance.kind,
+            sourceReceiptId: playbackMeta.interimVoiceReceiptId,
+            sourceReceiptKey: playbackMeta.interimVoiceReceiptKey,
+            requestId: playbackMeta.interimVoiceRequestId,
+            calloutKind: playbackMeta.interimVoiceCalloutKind,
+            metrics,
+            error: playbackOutcomeError,
+          });
+          pushVoiceChunkTimelineEvent({
+            kind: outcomeStatus === "delivered" ? "chunk_play_end" : "chunk_drop",
+            status: outcomeStatus,
+            traceId: utterance.traceId ?? null,
+            turnKey: utterance.turnKey,
+            utteranceId: utterance.utteranceId,
+            chunkCount: utterance.chunks.length,
+            detail: `interim_voice_playback_${outcomeStatus}`,
+            utteranceAuthority: utterance.authority ?? null,
+            utteranceSource: utterance.source ?? null,
+            replyId: utterance.replyId ?? null,
+          });
+        }
         updateVoiceAutoSpeakMetrics(metrics);
         updateVoiceTurnRevisionState(utterance.turnKey, (current) => ({
           ...current,
@@ -20314,6 +20555,7 @@ export function HelixAskPill({
     playVoiceAudioBlob,
     pushVoiceChunkTimelineEvent,
     recordVoiceDivergenceEvent,
+    recordVoicePlaybackOutcomeReceipt,
     synthesizeVoiceChunk,
     updateVoiceAutoSpeakMetrics,
     updateVoiceTurnRevisionState,
@@ -20427,6 +20669,18 @@ export function HelixAskPill({
       if (!accepted) {
         return false;
       }
+      if (task.interimVoiceReceiptId || task.interimVoiceReceiptKey) {
+        recordVoicePlaybackOutcomeReceipt({
+          status: "queued",
+          utteranceId: nextUtterance.utteranceId,
+          turnKey: nextUtterance.turnKey,
+          kind: nextUtterance.kind,
+          sourceReceiptId: task.interimVoiceReceiptId ?? null,
+          sourceReceiptKey: task.interimVoiceReceiptKey ?? null,
+          requestId: task.interimVoiceRequestId ?? null,
+          calloutKind: task.interimVoiceCalloutKind ?? null,
+        });
+      }
       const assemblerState = getVoiceTurnAssemblerState(task.turnKey);
       const utteranceTimelineMeta: VoiceUtteranceTimelineMeta = {
         briefSource: task.briefSource ?? null,
@@ -20434,6 +20688,10 @@ export function HelixAskPill({
         authority: task.authority ?? null,
         source: task.source ?? null,
         replyId: task.replyId ?? null,
+        interimVoiceRequestId: task.interimVoiceRequestId ?? null,
+        interimVoiceReceiptId: task.interimVoiceReceiptId ?? null,
+        interimVoiceReceiptKey: task.interimVoiceReceiptKey ?? null,
+        interimVoiceCalloutKind: task.interimVoiceCalloutKind ?? null,
         hlcMs: assemblerState?.hlcMs ?? null,
         seq: assemblerState?.eventSeq ?? null,
         revision: task.revision,
@@ -20511,6 +20769,7 @@ export function HelixAskPill({
       getVoiceTurnAssemblerState,
       isVoiceUtteranceRevisionStale,
       recordVoiceDivergenceEvent,
+      recordVoicePlaybackOutcomeReceipt,
       runVoiceAutoSpeakQueue,
       setVoicePendingPreempt,
       stopReadAloud,
@@ -20527,16 +20786,127 @@ export function HelixAskPill({
 
   const enqueueInterimVoiceCalloutsFromAskArtifacts = useCallback(
     (artifacts: unknown[]): number => {
-      if (micArmStateRef.current !== "on") return 0;
       const intents = collectInterimVoiceCalloutPlaybackIntents({
         artifacts,
         spokenReceiptKeys: interimVoiceSpokenReceiptKeysRef.current,
         spokenImmediateAckTurnKeys: interimVoiceSpokenImmediateAckTurnKeysRef.current,
       });
+      const micArmed = micArmStateRef.current === "on";
+      const outputModeEnabled = isMissionVoiceOutputModeEnabled(missionContextControls.voiceMode);
+      const outputArmed = micArmed || outputModeEnabled;
       let acceptedCount = 0;
       for (const intent of intents) {
-        const accepted = enqueueVoicePlaybackIntent(intent);
-        if (!accepted) continue;
+        const outputStateDebug = {
+          schema: "helix.interim_voice_client_handoff_debug.v1",
+          micArmState: micArmStateRef.current,
+          voiceMode: missionContextControls.voiceMode ?? null,
+          micArmed,
+          outputModeEnabled,
+          outputArmed,
+          requestId: intent.requestId,
+          receiptId: intent.receiptId,
+          receiptKey: intent.receiptKey,
+          calloutKind: intent.calloutKind,
+          playbackKind: intent.kind,
+          allowMicOffPlayback: intent.allowMicOffPlayback ?? null,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        };
+        pushVoiceChunkTimelineEvent({
+          kind: "interim_voice_handoff_seen",
+          status: "seen",
+          traceId: intent.traceId ?? null,
+          turnKey: intent.turnKey,
+          utteranceId: intent.receiptKey,
+          detail: `interim_voice_handoff_seen:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
+          utteranceAuthority: intent.authority ?? null,
+          utteranceSource: intent.source ?? null,
+          debugContext: outputStateDebug,
+        });
+        if (!outputArmed) {
+          const task = mapVoicePlaybackIntentToTask(intent);
+          recordVoicePlaybackOutcomeReceipt({
+            status: "suppressed",
+            utteranceId: task.key,
+            turnKey: intent.turnKey,
+            kind: intent.kind,
+            sourceReceiptId: intent.receiptId,
+            sourceReceiptKey: intent.receiptKey,
+            requestId: intent.requestId,
+            calloutKind: intent.calloutKind,
+            error: `voice_output_not_armed:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}`,
+          });
+          pushVoiceChunkTimelineEvent({
+            kind: "chunk_drop",
+            status: "suppressed",
+            traceId: intent.traceId ?? null,
+            turnKey: intent.turnKey,
+            utteranceId: task.key,
+            detail: `voice_output_not_armed:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}`,
+            utteranceAuthority: intent.authority ?? null,
+            utteranceSource: intent.source ?? null,
+            suppressionCause: "inactive_attempt",
+            authorityRejectStage: "preflight",
+          });
+          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
+          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
+          if (intent.calloutKind === "immediate_ack") {
+            interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
+          }
+          continue;
+        }
+        pushVoiceChunkTimelineEvent({
+          kind: "interim_voice_enqueue_attempted",
+          status: "attempted",
+          traceId: intent.traceId ?? null,
+          turnKey: intent.turnKey,
+          utteranceId: intent.receiptKey,
+          text: intent.text,
+          detail: `interim_voice_enqueue_attempted:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
+          utteranceAuthority: intent.authority ?? null,
+          utteranceSource: intent.source ?? null,
+          debugContext: {
+            ...outputStateDebug,
+            allowMicOffPlayback: intent.allowMicOffPlayback ?? !micArmed,
+          },
+        });
+        const accepted = enqueueVoicePlaybackIntent({
+          ...intent,
+          allowMicOffPlayback: intent.allowMicOffPlayback ?? !micArmed,
+        });
+        if (!accepted) {
+          const task = mapVoicePlaybackIntentToTask(intent);
+          recordVoicePlaybackOutcomeReceipt({
+            status: "suppressed",
+            utteranceId: task.key,
+            turnKey: intent.turnKey,
+            kind: intent.kind,
+            sourceReceiptId: intent.receiptId,
+            sourceReceiptKey: intent.receiptKey,
+            requestId: intent.requestId,
+            calloutKind: intent.calloutKind,
+            error: `interim_voice_enqueue_rejected:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
+          });
+          pushVoiceChunkTimelineEvent({
+            kind: "chunk_drop",
+            status: "suppressed",
+            traceId: intent.traceId ?? null,
+            turnKey: intent.turnKey,
+            utteranceId: task.key,
+            detail: `interim_voice_enqueue_rejected:mic=${micArmStateRef.current}:mode=${missionContextControls.voiceMode}:outputArmed=${outputArmed}`,
+            utteranceAuthority: intent.authority ?? null,
+            utteranceSource: intent.source ?? null,
+            suppressionCause: "inactive_attempt",
+            authorityRejectStage: "preflight",
+          });
+          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
+          interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
+          if (intent.calloutKind === "immediate_ack") {
+            interimVoiceSpokenImmediateAckTurnKeysRef.current.add(intent.turnKey);
+          }
+          continue;
+        }
         interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptKey);
         interimVoiceSpokenReceiptKeysRef.current.add(intent.receiptId);
         if (intent.calloutKind === "immediate_ack") {
@@ -20546,7 +20916,12 @@ export function HelixAskPill({
       }
       return acceptedCount;
     },
-    [enqueueVoicePlaybackIntent],
+    [
+      enqueueVoicePlaybackIntent,
+      missionContextControls.voiceMode,
+      pushVoiceChunkTimelineEvent,
+      recordVoicePlaybackOutcomeReceipt,
+    ],
   );
 
   const scheduleVoiceAutoSpeakBrief = useCallback(
@@ -20797,6 +21172,8 @@ export function HelixAskPill({
     voiceBriefSpokenLifecycleByTurnRef.current.clear();
     interimVoiceSpokenReceiptKeysRef.current.clear();
     interimVoiceSpokenImmediateAckTurnKeysRef.current.clear();
+    voicePlaybackOutcomeReceiptsRef.current = [];
+    setVoicePlaybackOutcomeReceipts([]);
     voiceQueuedSpeechLatchByTurnRef.current.clear();
     voiceRunningSpeechLatchByTurnRef.current.clear();
     voiceTurnRevisionStateRef.current = {};
@@ -31395,7 +31772,6 @@ export function HelixAskPill({
     });
   }, []);
 
-  const voiceDiagnosticsSnapshot = getVoiceCaptureDiagnosticsSnapshot();
   const docViewerDebugSnapshot = readDocViewerDebugSnapshot();
   const workstationLayoutDebugSnapshot = readWorkstationLayoutDebugSnapshot();
   const showTopInputLevelMonitor = micArmState === "on";
@@ -31741,6 +32117,131 @@ export function HelixAskPill({
       .slice(-HELIX_VOICE_DEBUG_TIMELINE_LIMIT);
   }, [helixTimeline, voiceSegmentAttempts, voiceTimelineBuildInfo, voiceTimelineDebugVersion]);
 
+  const buildCurrentVoiceDiagnosticsSnapshot = useCallback((): VoiceCaptureDiagnosticsSnapshot => {
+    const published = getVoiceCaptureDiagnosticsSnapshot();
+    const playbackReceipts = [...voicePlaybackOutcomeReceiptsRef.current];
+    const fallbackTimelineEvents = [...voiceChunkTimelineEventsRef.current].slice(-HELIX_VOICE_DEBUG_TIMELINE_LIMIT);
+    if (published) {
+      return {
+        ...published,
+        updatedAtMs: Date.now(),
+        micArmState,
+        playbackReceipts,
+        voiceCalls: voiceCallDiagnostics.slice(-80),
+        timelineEvents: published.timelineEvents ?? fallbackTimelineEvents,
+      };
+    }
+    return {
+      updatedAtMs: Date.now(),
+      micArmState,
+      voiceInputState,
+      voiceSignalState,
+      voiceMonitorLevel,
+      voiceMonitorThreshold,
+      voiceRecorderMimeType,
+      voiceInputDeviceLabel,
+      voiceTrackMuted,
+      rmsRaw: voiceCaptureHealth.rmsRaw,
+      rmsDb: voiceCaptureHealth.rmsDb,
+      peak: voiceCaptureHealth.peak,
+      noiseFloor: voiceCaptureHealth.noiseFloor,
+      chunksPerSecond: voiceCaptureHealth.chunksPerSecond,
+      mediaChunkCount: voiceCaptureHealth.mediaChunkCount,
+      mediaBytes: voiceCaptureHealth.mediaBytes,
+      lastChunkAgeMs: voiceCaptureHealth.lastChunkAgeMs,
+      lastRoundtripMs: voiceCaptureHealth.lastRoundtripMs,
+      warnings: [...voiceCaptureWarnings],
+      checkpoints: voiceCaptureCheckpointList.map((checkpoint) => ({
+        key: checkpoint.key,
+        label: VOICE_CAPTURE_CHECKPOINT_LABEL[checkpoint.key],
+        status: checkpoint.status,
+        message: checkpoint.message,
+        lastAtMs: checkpoint.lastAtMs,
+      })),
+      segments: voiceSegmentAttempts.map((segment) => ({
+        id: segment.id,
+        cutAtMs: segment.cutAtMs,
+        durationMs: segment.durationMs,
+        status: segment.status,
+        sttLatencyMs: segment.sttLatencyMs,
+        transcriptPreview: segment.transcriptPreview,
+        translated: segment.translated,
+        dispatch: segment.dispatch,
+        engine: segment.engine,
+        error: segment.error,
+        speakerId: segment.speakerId ?? null,
+        speakerConfidence: segment.speakerConfidence ?? null,
+        speechProbability: segment.speechProbability ?? null,
+        snrDb: segment.snrDb ?? null,
+        confirmAutoEligible: segment.confirmAutoEligible ?? null,
+        confirmBlockReason: segment.confirmBlockReason ?? null,
+      })),
+      pendingConfirmation: transcriptConfirmState
+        ? {
+            dispatchState: transcriptConfirmState.dispatchState ?? null,
+            needsConfirmation: true,
+            pivotConfidence:
+              typeof transcriptConfirmState.pivotConfidence === "number"
+                ? transcriptConfirmState.pivotConfidence
+                : null,
+            speechProbability:
+              typeof transcriptConfirmState.speechProbability === "number"
+                ? transcriptConfirmState.speechProbability
+                : null,
+            snrDb: typeof transcriptConfirmState.snrDb === "number" ? transcriptConfirmState.snrDb : null,
+            speakerId: transcriptConfirmState.speakerId ?? null,
+            speakerConfidence:
+              typeof transcriptConfirmState.speakerConfidence === "number"
+                ? transcriptConfirmState.speakerConfidence
+                : null,
+            confirmAutoEligible:
+              typeof transcriptConfirmState.confirmAutoEligible === "boolean"
+                ? transcriptConfirmState.confirmAutoEligible
+                : null,
+            confirmBlockReason: transcriptConfirmState.confirmBlockReason ?? null,
+          }
+        : null,
+      voiceFeatureFlags: {
+        confirmV2RolloutEligible: voiceConfirmV2RolloutEligible,
+        confirmV2Active: voiceConfirmV2Active,
+        confirmV2ShadowMode: voiceConfirmV2ShadowMode,
+        commandLaneUiEnabled: voiceCommandLaneUiEnabled,
+        localAudioGateActive: voiceLocalAudioGateActive,
+        sessionSpeakerActive: voiceSessionSpeakerActive,
+        multiSpeakerUiActive: voiceMultiSpeakerUiActive,
+        noisyEnvironmentMode: voiceNoisyEnvironmentMode,
+      },
+      playback: null,
+      playbackOutput: null,
+      playbackReceipts,
+      voiceCalls: voiceCallDiagnostics.slice(-80),
+      timelineEvents: fallbackTimelineEvents,
+    };
+  }, [
+    micArmState,
+    transcriptConfirmState,
+    voiceCallDiagnostics,
+    voiceCaptureCheckpointList,
+    voiceCaptureHealth,
+    voiceCaptureWarnings,
+    voiceCommandLaneUiEnabled,
+    voiceConfirmV2Active,
+    voiceConfirmV2RolloutEligible,
+    voiceConfirmV2ShadowMode,
+    voiceInputDeviceLabel,
+    voiceInputState,
+    voiceLocalAudioGateActive,
+    voiceMonitorLevel,
+    voiceMonitorThreshold,
+    voiceMultiSpeakerUiActive,
+    voiceNoisyEnvironmentMode,
+    voiceRecorderMimeType,
+    voiceSegmentAttempts,
+    voiceSessionSpeakerActive,
+    voiceSignalState,
+    voiceTrackMuted,
+  ]);
+
   useEffect(() => {
     publishVoiceCaptureDiagnosticsSnapshot({
       updatedAtMs: Date.now(),
@@ -31926,6 +32427,7 @@ export function HelixAskPill({
           compressorRelease: typeof compressor?.release?.value === "number" ? compressor.release.value : null,
         };
       })(),
+      playbackReceipts: voicePlaybackOutcomeReceipts,
       voiceCalls: voiceCallDiagnostics.slice(-80),
       timelineEvents: voiceLaneTimelineEvents,
     });
@@ -31942,6 +32444,7 @@ export function HelixAskPill({
     voiceRecorderMimeType,
     voiceSegmentAttempts,
     voiceAutoSpeakLastMetrics,
+    voicePlaybackOutcomeReceipts,
     voiceCallDiagnostics,
     voiceLaneTimelineEvents,
     voiceSignalState,
@@ -32842,7 +33345,7 @@ export function HelixAskPill({
               reply,
               events: replyEventsChronological,
               debugContext: replyDebugContextSummary,
-              voiceDiagnostics: voiceDiagnosticsSnapshot,
+              voiceDiagnostics: buildCurrentVoiceDiagnosticsSnapshot(),
               docViewerState: docViewerDebugSnapshot,
               workstationLayoutState: workstationLayoutDebugSnapshot,
             });

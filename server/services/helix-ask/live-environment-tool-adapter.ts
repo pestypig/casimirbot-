@@ -1442,14 +1442,22 @@ export function executeLiveEnvironmentTool(
       evidenceRefs: readStringArray(args.evidence_refs),
       reasonCodes: readStringArray(args.reason_codes ?? args.reasonCodes),
     });
-    const ok = result.receipt.status === "queued" || result.receipt.status === "delivered";
+    const ok =
+      result.receipt.status === "awaiting_client_playback" ||
+      result.receipt.status === "queued" ||
+      result.receipt.status === "queued_for_retry" ||
+      result.receipt.status === "delivered";
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
       ok,
       summary: ok
-        ? `Queued interim voice callout ${result.request.requestId}.`
+        ? result.receipt.status === "queued_for_retry"
+          ? `Queued interim voice callout ${result.request.requestId} for retry.`
+          : result.receipt.status === "awaiting_client_playback" || result.receipt.status === "queued"
+            ? `Accepted interim voice callout ${result.request.requestId} for client playback handoff.`
+            : `Delivered interim voice callout ${result.request.requestId}.`
         : `Interim voice callout blocked: ${result.receipt.status}.`,
       observation: {
         schema: "helix.interim_voice_callout_tool_result.v1",

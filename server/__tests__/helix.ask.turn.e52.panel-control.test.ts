@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { __testHelixRuntimeInterimVoiceCalloutFallback, planRouter } from "../routes/agi.plan";
 import { appendConversationHistoryEvent } from "../services/helix-ask/conversation-history";
+import { resetInterimVoiceCalloutsForTest } from "../services/helix-ask/interim-voice-callout-store";
+import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
+import { createLiveAnswerEnvironment } from "../services/situation-room/live-answer-environment-store";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -2739,6 +2742,94 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(text).toMatch(/evidence-only/i);
     expect(text).not.toMatch(/should I speak|need your confirmation|speak it now/i);
   });
+
+  it("reports retry-queued interim voice capacity as final status instead of confirmation", async () => {
+    const previousRuntimeMaxHeap = process.env.RUNTIME_MEMORY_MAX_HEAP_USED_MB;
+    const previousRuntimeMaxRss = process.env.RUNTIME_MEMORY_MAX_RSS_MB;
+    const previousAgentStepLlm = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousAgentStepResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentStepResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    resetInterimVoiceCalloutsForTest();
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+    process.env.RUNTIME_MEMORY_MAX_HEAP_USED_MB = "999999";
+    process.env.RUNTIME_MEMORY_MAX_RSS_MB = "999999";
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.request_interim_voice_callout",
+        reason: "The user explicitly asked for a provisional voice callout while the voice lane is active.",
+        args: {
+          kind: "immediate_ack",
+          text: "I am checking this now",
+          urgency: "normal",
+          reason: "Acknowledge the live voice request without replacing the final answer.",
+        },
+        expected_artifacts: [
+          "live_environment_tool_observation",
+          "helix_interim_voice_callout_receipt",
+        ],
+        confidence: 0.96,
+      },
+    ]);
+    const occupiedTts = runtimeMemoryGovernor.admitRuntimeTask({
+      taskClass: "voice_tts",
+      source: "test.e52.interim_voice_capacity_occupied",
+    });
+    expect(occupiedTts.admitted).toBe(true);
+
+    try {
+      const sessionId = `e52-interim-voice-capacity-${Date.now()}`;
+      createLiveAnswerEnvironment({
+        thread_id: sessionId,
+        created_turn_id: "turn:e52-interim-voice-capacity-seed",
+        objective: "Exercise interim voice callout receipt handling.",
+        preset: "mission_control",
+        room_id: "room:e52-interim-voice-capacity",
+        source_ids: ["source:e52-interim-voice-capacity"],
+      });
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: [
+            "With the voice lane active, use the interim voice callout tool to queue a short provisional callout saying",
+            "\"I am checking this now\", then continue the normal Helix Ask answer.",
+            "In the final answer, say whether the callout receipt was evidence-only.",
+          ].join(" "),
+          mode: "read",
+          debug: true,
+          sessionId,
+        })
+        .expect(200);
+
+      const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+      expect(response.body?.final_answer_source).not.toBe("request_user_input");
+      expect(response.body?.terminal_artifact_kind).not.toBe("request_user_input");
+      expect(response.body?.goal_satisfaction_evaluation).toMatchObject({
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      });
+      expect(finalAnswer).toMatch(/queued for retry/i);
+      expect(finalAnswer).toMatch(/evidence-only/i);
+      expect(finalAnswer).not.toMatch(/should I speak|need your confirmation|speak it now/i);
+    } finally {
+      occupiedTts.lease?.release("completed");
+      if (previousRuntimeMaxHeap === undefined) delete process.env.RUNTIME_MEMORY_MAX_HEAP_USED_MB;
+      else process.env.RUNTIME_MEMORY_MAX_HEAP_USED_MB = previousRuntimeMaxHeap;
+      if (previousRuntimeMaxRss === undefined) delete process.env.RUNTIME_MEMORY_MAX_RSS_MB;
+      else process.env.RUNTIME_MEMORY_MAX_RSS_MB = previousRuntimeMaxRss;
+      if (previousAgentStepLlm === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousAgentStepLlm;
+      if (previousAgentStepResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentStepResponse;
+      if (previousAgentStepResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentStepResponseIndex;
+      resetInterimVoiceCalloutsForTest();
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+    }
+  }, 60000);
 
   it("keeps contextual interim voice tool policy mentions non-executable", async () => {
     const app = createApp();

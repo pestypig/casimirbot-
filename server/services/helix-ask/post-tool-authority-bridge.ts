@@ -107,6 +107,35 @@ const finalDraftText = (payload: RecordLike): string => {
   );
 };
 
+const selectedVisibleAnswerText = (payload: RecordLike): string =>
+  readString(payload.selected_final_answer) ||
+  readString(payload.assistant_answer) ||
+  readString(payload.answer) ||
+  readString(payload.text);
+
+const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
+  readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is RecordLike => Boolean(artifact))
+    .some((artifact) => {
+      if (readString(artifact.kind) !== "live_environment_tool_observation") return false;
+      const artifactPayload = readRecord(artifact.payload);
+      if (readString(artifactPayload?.tool_name) !== "live_env.request_interim_voice_callout") return false;
+      const observation = readRecord(artifactPayload?.observation);
+      if (readString(observation?.schema) !== "helix.interim_voice_callout_tool_result.v1") return false;
+      const receipt = readRecord(observation?.receipt);
+      return [
+        "awaiting_client_playback",
+        "queued",
+        "queued_for_retry",
+        "delivered",
+        "expired",
+        "blocked_capacity",
+        "blocked_policy",
+        "blocked_missing_text",
+      ].includes(readString(receipt?.status));
+    });
+
 const selectedCapability = (payload: RecordLike): string =>
   readString(readRecord(payload.agent_step_decision)?.chosen_capability) ||
   readString(readRecord(readRecord(payload.agent_step_decision)?.model_decision)?.chosen_capability) ||
@@ -150,6 +179,24 @@ export function buildPostToolAuthorityBridge(input: {
       terminal_repair_action: "materialize_model_synthesized_answer",
       pending_requirements: [],
       reason: "calculator_result_and_answer_draft_support_goal",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (capability === "live_env.request_interim_voice_callout" && hasFinalInterimVoiceCalloutReceipt(input.payload)) {
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: true,
+      selected_capability: capability,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: "supports_answer",
+      route_family: "voice_delivery",
+      required_terminal_kind: "model_synthesized_answer",
+      terminal_repair_action: "materialize_model_synthesized_answer",
+      pending_requirements: [],
+      reason: "interim_voice_callout_receipt_supports_status_answer",
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -256,12 +303,15 @@ export function applyPostToolAuthorityBridgeRepair(input: {
   if (!bridge.applies) return bridge;
 
   if (bridge.observation_support_status === "supports_answer" && bridge.required_terminal_kind === "model_synthesized_answer") {
-    const text = finalDraftText(input.payload);
+    const text =
+      finalDraftText(input.payload) ||
+      (bridge.selected_capability === "live_env.request_interim_voice_callout" ? selectedVisibleAnswerText(input.payload) : "");
     if (text) {
       input.payload.ok = true;
       input.payload.response_type = "final_answer";
       input.payload.final_status = "final_answer";
       input.payload.terminal_artifact_kind = "model_synthesized_answer";
+      input.payload.terminal_artifact_id = readString(input.payload.terminal_artifact_id) || `${input.turnId}:final_answer_draft`;
       input.payload.final_answer_source = "final_answer_draft";
       input.payload.selected_final_answer = text;
       input.payload.answer = text;

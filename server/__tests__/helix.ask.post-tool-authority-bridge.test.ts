@@ -76,6 +76,56 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect(payload.terminal_error_code).toBeUndefined();
   });
 
+  it("materializes interim voice callout status as synthesized answer from visible selected text", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Use an interim voice callout, then continue the normal answer.",
+      selected_final_answer:
+        "The interim voice callout was requested, but playback was blocked by capacity. The receipt is evidence-only.",
+      answer:
+        "The interim voice callout was requested, but playback was blocked by capacity. The receipt is evidence-only.",
+      text:
+        "The interim voice callout was requested, but playback was blocked by capacity. The receipt is evidence-only.",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      terminal_error_code: "terminal_boundary_ineligible",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      agent_step_decision: { chosen_capability: "live_env.request_interim_voice_callout" },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:interim_voice`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.request_interim_voice_callout",
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              receipt: {
+                status: "blocked_capacity",
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
+    expect(bridge.reason).toBe("interim_voice_callout_receipt_supports_status_answer");
+    expect(bridge.observation_support_status).toBe("supports_answer");
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
+  });
+
   it("catches visible policy inversion about receipts and final answers", () => {
     const gate = evaluateVisibleAnswerPolicyFaithfulnessGate({
       turnId,

@@ -5,12 +5,16 @@ import type {
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
 import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "@shared/contracts/physics-atlas.v1";
+import type { TheoryBiomeBand, TheoryBiomeChunkV1 } from "@shared/contracts/theory-biome-layout.v1";
+import { THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 } from "@shared/contracts/theory-biome-layout.v1";
+import { THEORY_BIOME_BAND_ORDER } from "@shared/theory/theory-biome-scale-taxonomy";
 import { PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
 import {
   layoutTheoryAchievementMap,
   type TheoryAchievementLayoutEdge,
   type TheoryAchievementLayoutNode,
 } from "@/lib/theory/theoryAchievementLayout";
+import { biomeNoise2D } from "@/lib/theory/theoryBiomeField";
 
 type TheoryAchievementMapProps = {
   graph: TheoryBadgeGraphV1;
@@ -64,6 +68,46 @@ const ATLAS_GLOW_COLORS: Record<PhysicsAtlasBlockId, string> = {
   galactic_dynamics: "rgba(14, 165, 233, 0.72)",
   curvature_collapse: "rgba(16, 185, 129, 0.72)",
 };
+
+const BAND_LABELS: Record<TheoryBiomeBand, string> = {
+  abstract_formal: "Formal",
+  planck_quantum: "Quantum",
+  nuclear: "Nuclear",
+  atomic: "Atomic",
+  molecular: "Molecular",
+  cellular_biophysical: "Biophysical",
+  device_laboratory: "Device / Lab",
+  human_engineering: "Engineering",
+  planetary: "Planetary",
+  stellar: "Stellar",
+  galactic_cosmic: "Galactic",
+  claim_boundary: "Boundary",
+};
+
+const BAND_COLORS: Record<TheoryBiomeBand, string> = {
+  abstract_formal: "rgba(71, 85, 105, 0.42)",
+  planck_quantum: "rgba(30, 64, 175, 0.42)",
+  nuclear: "rgba(37, 99, 235, 0.36)",
+  atomic: "rgba(8, 145, 178, 0.36)",
+  molecular: "rgba(22, 101, 52, 0.38)",
+  cellular_biophysical: "rgba(77, 124, 15, 0.38)",
+  device_laboratory: "rgba(202, 138, 4, 0.34)",
+  human_engineering: "rgba(124, 58, 237, 0.36)",
+  planetary: "rgba(14, 116, 144, 0.34)",
+  stellar: "rgba(194, 65, 12, 0.34)",
+  galactic_cosmic: "rgba(88, 28, 135, 0.42)",
+  claim_boundary: "rgba(127, 29, 29, 0.46)",
+};
+
+const BIOME_BAND_WIDTH = THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.scaleBandWidthPx;
+const BIOME_X_OFFSET = 92;
+
+function chunkFill(chunk: TheoryBiomeChunkV1, seed: string): string {
+  const base = BAND_COLORS[chunk.dominantScaleBand];
+  const noise = biomeNoise2D(seed, chunk.chunkX * 0.65, chunk.chunkY * 0.65, 3);
+  const alphaBoost = Math.min(0.2, chunk.averageClaimPressure * 0.16 + noise * 0.08);
+  return base.replace(/0\.\d+\)$/, `${(0.22 + alphaBoost).toFixed(2)})`);
+}
 
 function badgeAtlasBlockId(badge: TheoryBadgeV1): PhysicsAtlasBlockId | null {
   const direct = PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) =>
@@ -132,6 +176,13 @@ function edgeClass(edge: TheoryAchievementLayoutEdge, highlightedEdgeIds: Set<st
 
 function isContextEdge(edge: TheoryAchievementLayoutEdge): boolean {
   return edge.relation === "shares_units" || edge.relation === "documents" || edge.relation === "blocks";
+}
+
+function edgeDashArray(edge: TheoryAchievementLayoutEdge): string | undefined {
+  if (edge.relation === "blocks") return "4 5";
+  if (edge.scaleDistanceKind === "cross_scale") return "9 8";
+  if (isContextEdge(edge)) return "5 7";
+  return undefined;
 }
 
 function badgeClass(args: {
@@ -298,18 +349,89 @@ export default function TheoryAchievementMap({
         style={{
           width: layout.width,
           height: layout.height,
-          backgroundImage: [
-            "linear-gradient(rgba(10,10,10,0.22) 1px, transparent 1px)",
-            "linear-gradient(90deg, rgba(10,10,10,0.22) 1px, transparent 1px)",
-            "radial-gradient(circle at 14% 20%, rgba(127,29,29,0.32) 0 8px, transparent 9px)",
-            "radial-gradient(circle at 78% 22%, rgba(22,78,99,0.28) 0 7px, transparent 8px)",
-            "radial-gradient(circle at 35% 68%, rgba(113,63,18,0.28) 0 10px, transparent 11px)",
-            "linear-gradient(to bottom, #4b3324 0 70px, #3f3f46 70px 78%, #171717 78% 100%)",
-          ].join(", "),
-          backgroundSize: "32px 32px, 32px 32px, 220px 180px, 260px 210px, 300px 240px, auto",
+          backgroundColor: "#111827",
         }}
       >
-        <div className="pointer-events-none absolute inset-x-0 top-[70px] h-10 bg-[linear-gradient(135deg,transparent_0_16px,rgba(39,39,42,0.9)_17px_32px,transparent_33px_48px)] bg-[length:96px_40px]" />
+        {layout.biome ? (
+          <svg
+            className="pointer-events-none absolute inset-0"
+            data-testid="theory-biome-terrain"
+            width={layout.width}
+            height={layout.height}
+          >
+            <defs>
+              <linearGradient id="theory-biome-scale-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1e293b" />
+                <stop offset="15%" stopColor="#1d4ed8" />
+                <stop offset="36%" stopColor="#166534" />
+                <stop offset="55%" stopColor="#a16207" />
+                <stop offset="75%" stopColor="#c2410c" />
+                <stop offset="100%" stopColor="#581c87" />
+              </linearGradient>
+              <pattern id="theory-biome-grid" width="64" height="64" patternUnits="userSpaceOnUse">
+                <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width={layout.width} height={layout.height} fill="url(#theory-biome-scale-gradient)" opacity={0.24} />
+            {THEORY_BIOME_BAND_ORDER.map((band: TheoryBiomeBand, index: number) => {
+              const x = BIOME_X_OFFSET + index * BIOME_BAND_WIDTH;
+              return (
+                <g key={band}>
+                  <rect
+                    x={x}
+                    y={0}
+                    width={BIOME_BAND_WIDTH}
+                    height={layout.height}
+                    fill={BAND_COLORS[band]}
+                    opacity={band === "claim_boundary" ? 0.48 : 0.32}
+                  />
+                  <line x1={x} x2={x} y1={0} y2={layout.height} stroke="rgba(255,255,255,0.09)" />
+                  <text
+                    x={x + 18}
+                    y={28}
+                    fill="rgba(241,245,249,0.78)"
+                    fontSize={12}
+                    fontWeight={800}
+                    letterSpacing={0}
+                  >
+                    {BAND_LABELS[band]}
+                  </text>
+                </g>
+              );
+            })}
+            {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => {
+              const width = chunk.bounds.x1 - chunk.bounds.x0;
+              const height = chunk.bounds.y1 - chunk.bounds.y0;
+              return (
+                <g key={chunk.id}>
+                  <rect
+                    x={chunk.bounds.x0}
+                    y={chunk.bounds.y0}
+                    width={width}
+                    height={height}
+                    fill={chunkFill(chunk, layout.biome?.seed ?? "theory-biome")}
+                    stroke={chunk.averageClaimPressure > 0.7 ? "rgba(251,191,36,0.32)" : "rgba(255,255,255,0.07)"}
+                    strokeWidth={chunk.averageClaimPressure > 0.7 ? 2 : 1}
+                    strokeDasharray={chunk.averageClaimPressure > 0.7 ? "10 7" : undefined}
+                  />
+                  {chunk.badgeIds.length > 3 ? (
+                    <text
+                      x={chunk.bounds.x0 + 14}
+                      y={chunk.bounds.y0 + 26}
+                      fill="rgba(226,232,240,0.5)"
+                      fontSize={11}
+                      fontWeight={700}
+                      letterSpacing={0}
+                    >
+                      {chunk.dominantDomainKey} / {chunk.badgeIds.length}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+            <rect width={layout.width} height={layout.height} fill="url(#theory-biome-grid)" opacity={0.74} />
+          </svg>
+        ) : null}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(255,255,255,0.08),transparent_36%),radial-gradient(circle_at_50%_82%,rgba(0,0,0,0.48),transparent_42%)]" />
         <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height}>
           <defs>
@@ -357,7 +479,7 @@ export default function TheoryAchievementMap({
               d={toPath(edge.points)}
               className={edgeClass(edge, edgeHighlightSet, hasFocus)}
               strokeWidth={edgeHighlightSet.has(edge.edgeId) ? 3 : 2}
-              strokeDasharray={isContextEdge(edge) ? "5 7" : undefined}
+              strokeDasharray={edgeDashArray(edge)}
               fill="none"
               strokeLinecap="square"
               strokeLinejoin="miter"

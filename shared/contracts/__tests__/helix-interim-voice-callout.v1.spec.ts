@@ -37,11 +37,14 @@ describe("helix interim voice callout contract", () => {
     schemaVersion: HELIX_INTERIM_VOICE_CALLOUT_RECEIPT_SCHEMA,
     receiptId: "interim_voice_receipt:1",
     requestId: request.requestId,
-    status: "queued",
+    status: "awaiting_client_playback",
     delivery: {
       utteranceId: "utterance:1",
       provider: "helix_interim_voice_callout",
-      message: "Queued.",
+      message: "Accepted for client playback handoff.",
+      playbackConfirmationRequired: true,
+      playbackAuthority: "client_runtime_required",
+      playbackStatus: "awaiting_client_receipt",
     },
     evidenceRefs: [request.requestId],
     assistant_answer: false,
@@ -82,6 +85,19 @@ describe("helix interim voice callout contract", () => {
     })).toEqual(expect.arrayContaining([
       "assistant_answer must be false",
       "terminal_eligible must be false",
+    ]));
+  });
+
+  it("rejects client-confirmed playback without delivered status", () => {
+    expect(validateHelixInterimVoiceCalloutReceiptV1({
+      ...receipt,
+      status: "awaiting_client_playback",
+      delivery: {
+        ...receipt.delivery,
+        playbackStatus: "client_confirmed",
+      },
+    })).toEqual(expect.arrayContaining([
+      "client_confirmed playback requires delivered status",
     ]));
   });
 });

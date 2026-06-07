@@ -31,6 +31,10 @@ Runtime memory admission controls:
 - `VOICE_TRANSCRIBE_MEMORY_GUARD`: `0` disables voice STT memory admission.
 - `VOICE_TRANSCRIBE_MAX_HEAP_USED_MB`: voice STT heap threshold. Default is `480`; development servers default to `2048` because Vite/tsx middleware, Stage Play diagnostics, and local Ask workbench state can idle far above the production-sized guard.
 - `VOICE_TRANSCRIBE_MAX_RSS_MB`: voice STT RSS threshold. Default is `900`; development servers default to `3200` for the same reason.
+- `VOICE_TTS_MAX_HEAP_USED_MB`: voice TTS heap threshold. Default follows the `voice_tts` task budget; development servers default to `2048` so short callouts are not blocked by the lower STT-style upload guard.
+- `VOICE_TTS_MAX_RSS_MB`: voice TTS RSS threshold. Default follows the `voice_tts` task budget; development servers default to `3200`.
+- `VOICE_TTS_RESUME_HEAP_USED_MB`: voice TTS retry/resume heap threshold; defaults to 85% of the TTS max.
+- `VOICE_TTS_RESUME_RSS_MB`: voice TTS retry/resume RSS threshold; defaults to 85% of the TTS max.
 - `RUNTIME_MEMORY_GUARD`: `0` disables generic runtime memory admission.
 - `RUNTIME_MEMORY_MAX_HEAP_USED_MB`: generic heap threshold, default `520`.
 - `RUNTIME_MEMORY_MAX_RSS_MB`: generic RSS threshold, default `950`.
@@ -49,11 +53,14 @@ Runtime task-manager controls:
 
 Interim voice callout controls:
 - `live_env.request_interim_voice_callout` records a short provisional speech request during an Ask/tool step.
-- The first conversational response should use kind `immediate_ack`. It is capped at 96 characters, may carry a `timingHintMs` such as `800`, and only one queued/delivered immediate ack is allowed per Ask turn.
+- The first conversational response should use kind `immediate_ack`. It is capped at 96 characters, may carry a `timingHintMs` such as `800`, and only one pending/delivered immediate ack is allowed per Ask turn.
 - Later tool-phase speech should use milestone kinds such as `tool_started`, `tool_progress`, `tool_result`, `waiting_for_evidence`, `memory_pressure`, or `clarifying_status`; these should correspond to real solver/tool progress, blockers, or wait states.
 - Interim callouts use playback kind `tool_receipt` or `translation_relay` and authority `provisional`.
 - Interim callout requests and receipts are tool evidence only: `assistant_answer:false`, `terminal_eligible:false`, `raw_content_included:false`, and `instruction_authority:"none"`.
-- The callout is admitted through the runtime `voice_tts` task class. If the voice TTS lane is occupied or under pressure, the receipt records `blocked_capacity` and no speech is attempted.
+- The callout is admitted through the runtime `voice_tts` task class. If admitted, the backend receipt records `awaiting_client_playback` with `playbackStatus:"awaiting_client_receipt"`; this is a browser playback handoff, not proof that audio bytes played.
+- If the voice TTS lane is occupied or under pressure, the receipt records `queued_for_retry` and keeps a short-lived delivery job containing only text, request metadata, evidence refs, retry count, and expiry.
+- Retry jobs do not hold audio buffers or open HTTP requests. When capacity recovers, the retry produces `awaiting_client_playback` with an `utteranceId`; if capacity does not recover before expiry, the receipt records `expired`.
+- Actual heard-audio confirmation must come from the client playback receipt stream, for example `helix.voice_playback_outcome_receipt.v1` with a delivered outcome. A backend interim callout receipt alone must not be narrated as completed playback.
 - Interim callouts must not contain final-answer text and must not satisfy terminal answer gates. The completed Ask solver path remains the only answer route, and final answer reads must derive from a completed answer snapshot rather than an interim callout.
 
 ## Request body

@@ -128,6 +128,40 @@ export type VoicePlaybackOutputDiagnosticsSnapshot = {
   compressorRelease: number | null;
 };
 
+export type VoicePlaybackOutcomeStatus =
+  | "queued"
+  | "delivered"
+  | "failed"
+  | "cancelled"
+  | "suppressed";
+
+export type VoicePlaybackOutcomeReceipt = {
+  schema: "helix.voice_playback_outcome_receipt.v1";
+  receiptId: string;
+  sourceReceiptId: string | null;
+  sourceReceiptKey: string | null;
+  requestId: string | null;
+  calloutKind: string | null;
+  utteranceId: string;
+  turnKey: string;
+  kind: VoicePlaybackUtteranceKind;
+  status: VoicePlaybackOutcomeStatus;
+  atMs: number;
+  providerHeader: string | null;
+  profileHeader: string | null;
+  cacheHitCount: number | null;
+  cacheMissCount: number | null;
+  totalPlaybackMs: number | null;
+  cancelReason: string | null;
+  error: string | null;
+  audioUnlocked: boolean | null;
+  playbackPath: "audio_graph" | "direct_element" | "direct_fallback" | null;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  output_authority: "playback_observation";
+};
+
 export type VoiceLaneTimelineDebugSource =
   | "voice_capture"
   | "conversation"
@@ -147,6 +181,8 @@ export type VoiceLaneTimelineDebugKind =
   | "action_receipt"
   | "suppressed"
   | "segment"
+  | "interim_voice_handoff_seen"
+  | "interim_voice_enqueue_attempted"
   | "chunk_enqueue"
   | "chunk_synth_start"
   | "chunk_synth_ok"
@@ -229,6 +265,7 @@ export type VoiceCaptureDiagnosticsSnapshot = {
   };
   playback?: VoicePlaybackDiagnosticsSnapshot | null;
   playbackOutput?: VoicePlaybackOutputDiagnosticsSnapshot | null;
+  playbackReceipts?: VoicePlaybackOutcomeReceipt[];
   voiceCalls?: VoiceCallDiagnosticSnapshot[];
   timelineEvents?: VoiceLaneTimelineDebugEvent[];
 };

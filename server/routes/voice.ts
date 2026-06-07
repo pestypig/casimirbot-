@@ -1179,6 +1179,23 @@ const hasDotTraceMetadata = (payload: VoiceRequest): boolean =>
     /(?:^|[:_-])(?:helix|dot|dottie)(?:[:_-]|$)|^ask:/i.test(value?.trim() ?? ""),
   );
 
+const isInterimVoiceReceiptChunk = (payload: VoiceRequest): boolean =>
+  payload.chunkKind === "tool_receipt" || payload.chunkKind === "translation_relay";
+
+const hasInterimVoiceReceiptAuthority = (payload: VoiceRequest): boolean => {
+  if (!isInterimVoiceReceiptChunk(payload)) return false;
+  const eventId = payload.eventId?.trim() ?? "";
+  const utteranceId = payload.utteranceId?.trim() ?? "";
+  const traceId = payload.traceId?.trim() ?? "";
+  const evidenceRefs = payload.evidenceRefs?.map((ref) => ref.trim()).filter(Boolean) ?? [];
+  const isInterimReceipt =
+    /^helix_interim_voice_callout_receipt:/i.test(eventId) ||
+    /^translation_obs:/i.test(eventId);
+  if (!isInterimReceipt || !utteranceId || !traceId) return false;
+  if (utteranceId.includes(eventId)) return true;
+  return evidenceRefs.some((ref) => ref === eventId || ref.includes(eventId));
+};
+
 const isDotVoiceRequest = (payload: VoiceRequest): boolean => {
   if (hasDotVoiceAuthorityFields(payload)) return true;
   if (isDotVoiceProfile(payload.voiceProfile) || isDotVoiceProfile(payload.voice_profile_id)) return true;
@@ -2564,7 +2581,8 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
     breadcrumbId,
     request: readVoiceLaneRequestSummary(payload),
   });
-  if (isDotVoiceRequest(payload)) {
+  const hasProvisionalInterimReceiptAuthority = hasInterimVoiceReceiptAuthority(payload);
+  if (isDotVoiceRequest(payload) && !hasProvisionalInterimReceiptAuthority) {
     writeVoiceLaneBreadcrumb("voice.speak.dot_authority_check", {
       breadcrumbId,
       traceId: payload.traceId ?? null,
@@ -2597,6 +2615,14 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
         traceId: payload.traceId ?? null,
       });
     }
+  } else if (hasProvisionalInterimReceiptAuthority) {
+    writeVoiceLaneBreadcrumb("voice.speak.interim_receipt_authority", {
+      breadcrumbId,
+      traceId: payload.traceId ?? null,
+      eventId: payload.eventId ?? null,
+      utteranceId: payload.utteranceId ?? null,
+      chunkKind: payload.chunkKind ?? null,
+    });
   }
   if (payload.mode === "callout") {
     const contextEligibility = evaluateSharedEligibility({

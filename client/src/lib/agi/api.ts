@@ -1012,6 +1012,8 @@ export type VoiceSpeakPayload = {
   chunkCount?: number;
   chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay";
   turnKey?: string;
+  evidenceRefs?: string[];
+  repoAttributed?: boolean;
   dedupe_key?: string;
 };
 

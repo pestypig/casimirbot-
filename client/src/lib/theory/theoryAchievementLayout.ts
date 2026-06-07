@@ -1,9 +1,14 @@
 import type {
+  TheoryBiomeBand,
+  TheoryBiomeLayoutV1,
+} from "@shared/contracts/theory-biome-layout.v1";
+import type {
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeLevel,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
+import { layoutTheoryBiomeMap } from "./theoryBiomeLayout";
 
 export type TheoryAchievementLayoutNode = {
   badgeId: string;
@@ -11,6 +16,12 @@ export type TheoryAchievementLayoutNode = {
   y: number;
   depth: number;
   lane: number;
+  scaleBand?: TheoryBiomeBand;
+  scaleLog10M?: number | null;
+  domainKey?: string;
+  chunkX?: number;
+  chunkY?: number;
+  claimPressure?: number;
 };
 
 export type TheoryAchievementLayoutEdge = {
@@ -19,6 +30,7 @@ export type TheoryAchievementLayoutEdge = {
   to: string;
   relation: string;
   points: Array<{ x: number; y: number }>;
+  scaleDistanceKind?: "same_biome" | "neighbor_biome" | "cross_scale";
 };
 
 export type TheoryAchievementLayout = {
@@ -26,6 +38,7 @@ export type TheoryAchievementLayout = {
   height: number;
   nodes: TheoryAchievementLayoutNode[];
   edges: TheoryAchievementLayoutEdge[];
+  biome?: TheoryBiomeLayoutV1;
 };
 
 const X_SPACING = 116;
@@ -134,7 +147,7 @@ function edgePoints(from: TheoryAchievementLayoutNode, to: TheoryAchievementLayo
   return [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
 }
 
-export function layoutTheoryAchievementMap(graph: TheoryBadgeGraphV1): TheoryAchievementLayout {
+export function layoutTheoryAchievementMapGrid(graph: TheoryBadgeGraphV1): TheoryAchievementLayout {
   const depths = computeDepths(graph);
   const occupied = new Set<string>();
   const nodes = graph.badges.map((badge: TheoryBadgeV1) => {
@@ -176,4 +189,8 @@ export function layoutTheoryAchievementMap(graph: TheoryBadgeGraphV1): TheoryAch
     nodes,
     edges,
   };
+}
+
+export function layoutTheoryAchievementMap(graph: TheoryBadgeGraphV1): TheoryAchievementLayout {
+  return layoutTheoryBiomeMap(graph);
 }

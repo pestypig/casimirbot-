@@ -51,8 +51,12 @@ export type HelixInterimVoiceCalloutReceiptV1 = {
   receiptId: string;
   requestId: string;
   status:
+    | "awaiting_client_playback"
     | "queued"
+    | "queued_for_retry"
     | "delivered"
+    | "expired"
+    | "superseded"
     | "blocked_policy"
     | "blocked_capacity"
     | "blocked_missing_text"
@@ -61,6 +65,19 @@ export type HelixInterimVoiceCalloutReceiptV1 = {
     utteranceId?: string | null;
     provider?: string | null;
     message?: string | null;
+    nextRetryAtMs?: number | null;
+    retryCount?: number | null;
+    blockedReason?: string | null;
+    playbackConfirmationRequired?: boolean;
+    playbackAuthority?:
+      | "client_runtime_required"
+      | "backend_retry_pending"
+      | "backend_terminal_status";
+    playbackStatus?:
+      | "awaiting_client_receipt"
+      | "backend_retry_pending"
+      | "client_confirmed"
+      | "blocked_before_client";
   } | null;
   evidenceRefs: string[];
   assistant_answer: false;
@@ -119,6 +136,13 @@ export function validateHelixInterimVoiceCalloutReceiptV1(
   if (value.schemaVersion !== HELIX_INTERIM_VOICE_CALLOUT_RECEIPT_SCHEMA) issues.push("schemaVersion must match receipt schema");
   if (!value.receiptId) issues.push("receiptId is required");
   if (!value.requestId) issues.push("requestId is required");
+  if (
+    value.delivery?.playbackConfirmationRequired === true &&
+    value.delivery.playbackStatus === "client_confirmed" &&
+    value.status !== "delivered"
+  ) {
+    issues.push("client_confirmed playback requires delivered status");
+  }
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
   if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");
   if (value.raw_content_included !== false) issues.push("raw_content_included must be false");
