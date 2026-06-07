@@ -12,6 +12,8 @@ import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
 
 const MAX_INTERIM_CALLOUT_CHARS = 220;
 const MAX_IMMEDIATE_ACK_CHARS = 96;
+const MAX_STEERING_ACK_CHARS = 96;
+const VOICE_STEERING_EVENT_REF_PREFIX = "helix_voice_steering_event:";
 const RECENT_CALLOUT_LIMIT = 120;
 const DEFAULT_RETRY_TTL_MS = 90_000;
 const DEFAULT_RETRY_DELAY_MS = 5_000;
@@ -63,6 +65,7 @@ const normalizeKind = (value: string | null | undefined): HelixInterimVoiceCallo
     value === "waiting_for_evidence" ||
     value === "memory_pressure" ||
     value === "clarifying_status" ||
+    value === "steering_ack" ||
     value === "translation_relay"
   ) {
     return value;
@@ -89,10 +92,28 @@ const hasQueuedImmediateAckForTurn = (turnId: string, threadId: string): boolean
     );
   });
 
+const readVoiceSteeringEventRef = (evidenceRefs: string[]): string | null =>
+  evidenceRefs.find((ref) => ref.startsWith(VOICE_STEERING_EVENT_REF_PREFIX)) ?? null;
+
+const hasQueuedSteeringAckForEvent = (steeringEventId: string): boolean =>
+  Array.from(requestById.values()).some((request) => {
+    if (request.kind !== "steering_ack" || !request.evidenceRefs.includes(steeringEventId)) return false;
+    return Array.from(receiptById.values()).some((receipt) =>
+      receipt.requestId === request.requestId &&
+      (
+        receipt.status === "awaiting_client_playback" ||
+        receipt.status === "queued" ||
+        receipt.status === "queued_for_retry" ||
+        receipt.status === "delivered"
+      )
+    );
+  });
+
 const normalizeSource = (value: string | null | undefined): HelixInterimVoiceCalloutSource => {
   if (
     value === "ask_tool_loop" ||
     value === "live_source_mail_loop" ||
+    value === "voice_steering_queue" ||
     value === "runtime_governor" ||
     value === "manual_read"
   ) {
@@ -312,7 +333,12 @@ export function recordInterimVoiceCalloutRequest(input: {
 } {
   retryQueuedInterimVoiceCalloutDeliveries({ threadId: input.threadId });
   const kind = normalizeKind(input.kind);
-  const kindMaxChars = kind === "immediate_ack" ? MAX_IMMEDIATE_ACK_CHARS : MAX_INTERIM_CALLOUT_CHARS;
+  const kindMaxChars =
+    kind === "immediate_ack"
+      ? MAX_IMMEDIATE_ACK_CHARS
+      : kind === "steering_ack"
+        ? MAX_STEERING_ACK_CHARS
+        : MAX_INTERIM_CALLOUT_CHARS;
   const maxChars = Math.max(1, Math.min(Math.floor(input.maxChars ?? kindMaxChars), kindMaxChars));
   const text = normalizeText(input.text, maxChars);
   const requestId = `helix_interim_voice_callout_request:${hashShort([
@@ -368,6 +394,40 @@ export function recordInterimVoiceCalloutRequest(input: {
         message: "Interim voice callout requires confirmation.",
       }),
     };
+  }
+
+  if (request.kind === "steering_ack") {
+    const steeringEventId = readVoiceSteeringEventRef(request.evidenceRefs);
+    if (!steeringEventId) {
+      return {
+        request,
+        receipt: buildReceipt({
+          request,
+          status: "blocked_policy",
+          message: "Steering acknowledgements require a voice steering event evidence ref.",
+        }),
+      };
+    }
+    if (hasQueuedSteeringAckForEvent(steeringEventId)) {
+      return {
+        request,
+        receipt: buildReceipt({
+          request,
+          status: "blocked_policy",
+          message: "Only one steering acknowledgement may be queued per voice steering event.",
+        }),
+      };
+    }
+    if (/\b(final answer|answer is|i'?m done|completed|complete|finished|result is)\b/i.test(request.text)) {
+      return {
+        request,
+        receipt: buildReceipt({
+          request,
+          status: "blocked_policy",
+          message: "Steering acknowledgements cannot claim final answer status.",
+        }),
+      };
+    }
   }
 
   if (request.kind === "immediate_ack" && hasQueuedImmediateAckForTurn(request.turnId, request.threadId)) {

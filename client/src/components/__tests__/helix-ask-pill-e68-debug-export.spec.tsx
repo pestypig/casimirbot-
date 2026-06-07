@@ -374,6 +374,103 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.voice_playback_reconciliation.corrected_status_text).toMatch(/delivered audio/i);
   });
 
+  it("exports voice steering debug separately from playback reconciliation", () => {
+    const steeringEvent = {
+      artifactId: "helix_voice_steering_event",
+      schemaVersion: "helix.voice_steering_event.v1",
+      steeringEventId: "helix_voice_steering_event:unit-correction",
+      threadId: "thread:voice-steering",
+      turnId: "ask:voice-steering",
+      transcriptText: "Actually use meters per second, not feet.",
+      queueDecision: "queued_for_safe_boundary",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const steeringDecision = {
+      artifactId: "helix_voice_steering_decision",
+      schemaVersion: "helix.voice_steering_decision.v1",
+      decisionId: "helix_voice_steering_decision:unit-correction",
+      steeringEventId: steeringEvent.steeringEventId,
+      decision: "steering_applied",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:voice-steering",
+        question: "Use voice steering while reasoning.",
+        content: "I applied the correction in the final answer.",
+      } as any,
+      {
+        selected_final_answer: "I applied the correction in the final answer.",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_answer_authority: {
+          turn_id: "ask:voice-steering",
+          terminal_text_preview: "I applied the correction in the final answer.",
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+        agentLoop: {
+          current_turn_artifact_ledger: [
+            {
+              artifact_id: steeringEvent.steeringEventId,
+              kind: "helix_voice_steering_event",
+              payload: steeringEvent,
+            },
+            {
+              artifact_id: steeringDecision.decisionId,
+              kind: "helix_voice_steering_decision",
+              payload: steeringDecision,
+            },
+            {
+              artifact_id: "helix_interim_voice_callout_request:steering-ack",
+              kind: "interim_voice_callout",
+              payload: {
+                schema: "helix.interim_voice_callout_tool_result.v1",
+                request: {
+                  artifactId: "helix_interim_voice_callout_request",
+                  requestId: "helix_interim_voice_callout_request:steering-ack",
+                  kind: "steering_ack",
+                  text: "I heard the correction. I'll apply it after this step.",
+                },
+                receipt: {
+                  artifactId: "helix_interim_voice_callout_receipt",
+                  receiptId: "helix_interim_voice_callout_receipt:steering-ack",
+                  requestId: "helix_interim_voice_callout_request:steering-ack",
+                  status: "delivered",
+                },
+              },
+            },
+          ],
+        },
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.voice_steering_debug).toMatchObject({
+      schema: "helix.voice_steering_debug.v1",
+      active_turn_id: "ask:voice-steering",
+      pending_count: 0,
+      assistant_answer: false,
+      terminal_eligible: false,
+      output_authority: "tool_evidence",
+    });
+    expect(parsed.voice_steering_debug.events.map((event: any) => event.steeringEventId)).toContain(
+      steeringEvent.steeringEventId,
+    );
+    expect(parsed.voice_steering_debug.decisions.map((decision: any) => decision.decisionId)).toContain(
+      steeringDecision.decisionId,
+    );
+    expect(parsed.voice_steering_debug.latest_steering_ack_receipts.map((receipt: any) => receipt.receiptId)).toContain(
+      "helix_interim_voice_callout_receipt:steering-ack",
+    );
+    expect(parsed.voice_playback_reconciliation.schema).toBe("helix.voice_playback_reconciliation.v1");
+    expect(parsed.voice_playback_reconciliation).not.toHaveProperty("events");
+  });
+
   it("exports compact theory reflection and calculator tool trace disclosure", () => {
     const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
       {

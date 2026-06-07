@@ -58,6 +58,22 @@ describe("helix interim voice callout contract", () => {
     expect(validateHelixInterimVoiceCalloutReceiptV1(receipt)).toEqual([]);
   });
 
+  it("accepts steering acknowledgements as provisional tool receipts", () => {
+    expect(validateHelixInterimVoiceCalloutRequestV1({
+      ...request,
+      source: "voice_steering_queue",
+      kind: "steering_ack",
+      text: "I heard the correction. I'll apply it after this step.",
+      maxChars: 96,
+      evidenceRefs: ["helix_voice_steering_event:1", "helix_voice_steering_decision:1"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      context_role: "tool_evidence",
+    })).toEqual([]);
+  });
+
   it("rejects out-of-range timing hints", () => {
     expect(validateHelixInterimVoiceCalloutRequestV1({
       ...request,

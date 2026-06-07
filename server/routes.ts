@@ -31,6 +31,7 @@ import { helixQiRouter } from "./routes/helix/qi";
 import { helixMathRouter } from "./routes/helix/math";
 import { helixTheoryRouter } from "./routes/helix/theory";
 import { helixStagePlayRouter } from "./routes/helix/stage-play";
+import { helixLiveEnvironmentRouter } from "./routes/helix/live-environment";
 import { helixAuditTreeRouter } from "./routes/helix/audit-tree";
 import { helixRelativisticMapRouter } from "./routes/helix/relativistic-map";
 import { helixTimeDilationRouter } from "./routes/helix/time-dilation";
@@ -1259,6 +1260,7 @@ export async function registerRoutes(app: Express, existingServer?: Server): Pro
   app.use("/api/helix/math", helixMathRouter);
   app.use("/api/helix/theory", helixTheoryRouter);
   app.use("/api/helix/stage-play", helixStagePlayRouter);
+  app.use("/api/helix/live-environment", helixLiveEnvironmentRouter);
   app.use("/api/helix/audit", helixAuditTreeRouter);
   app.use("/api/helix/relativistic-map", helixRelativisticMapRouter);
   app.use("/api/helix/time-dilation", helixTimeDilationRouter);

@@ -7,8 +7,14 @@ import {
   type HelixLiveEnvironmentToolName,
   type HelixLiveEnvironmentToolObservation,
 } from "@shared/helix-live-agent-step";
+import type { HelixVoiceSteeringEventV1 } from "@shared/contracts/helix-voice-steering-event.v1";
+import type { AskTurnTranscriptRowDraftV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { buildLiveEnvironmentRuntimePacket } from "../situation-room/live-environment-runtime-packet-builder";
-import { executeLiveEnvironmentTool } from "./live-environment-tool-adapter";
+import {
+  buildVoiceSteeringTranscriptRows,
+  executeLiveEnvironmentTool,
+} from "./live-environment-tool-adapter";
+import { drainPendingVoiceSteeringEvents } from "./voice-steering-event-store";
 
 export type LiveEnvironmentStepChooser = (input: {
   packet: HelixLiveEnvironmentRuntimePacket;
@@ -45,8 +51,31 @@ const commentaryRefsFromObservation = (observation: HelixLiveEnvironmentToolObse
   return uniqueStrings([eventId, ...observation.evidence_refs.filter((ref) => ref.startsWith("interpreted:"))]);
 };
 
+const summarizeVoiceSteeringForModel = (
+  events: HelixVoiceSteeringEventV1[],
+): NonNullable<HelixLiveEnvironmentRuntimePacket["voice_steering_summary"]> | null => {
+  if (events.length === 0) return null;
+  return {
+    count: events.length,
+    items: events.map((event) => ({
+      steeringEventId: event.steeringEventId,
+      classification: event.classification,
+      modelVisibleSummary: `User voice steering received: ${event.transcriptText}`,
+      confidence: event.confidence,
+      evidenceRefs: uniqueStrings([event.steeringEventId, ...event.evidenceRefs]),
+      reasonCodes: event.reasonCodes,
+    })),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+  };
+};
+
 export async function runLiveEnvironmentAgentLoop(input: {
   threadId: string;
+  turnId?: string | null;
   environmentId?: string | null;
   roomId?: string | null;
   chooser: LiveEnvironmentStepChooser;
@@ -55,16 +84,39 @@ export async function runLiveEnvironmentAgentLoop(input: {
 }): Promise<HelixLiveEnvironmentAgentLoopResult> {
   const now = input.now ?? new Date().toISOString();
   const iterations: HelixLiveEnvironmentAgentLoopResult["iterations"] = [];
+  const transcriptRows: AskTurnTranscriptRowDraftV1[] = [];
   const maxIterations = Math.max(1, Math.min(8, Math.trunc(input.maxIterations ?? 4)));
   let terminalDecision: HelixLiveEnvironmentAgentLoopResult["terminal_decision"] = "needs_more_observation";
+  const currentTurnId = String(input.turnId ?? input.environmentId ?? input.threadId).trim();
 
   for (let stepIndex = 0; stepIndex < maxIterations; stepIndex += 1) {
-    const packet = buildLiveEnvironmentRuntimePacket({
+    const drainedSteering = currentTurnId
+      ? drainPendingVoiceSteeringEvents({
+          threadId: input.threadId,
+          turnId: currentTurnId,
+          boundary: "before_next_model_step",
+          limit: 3,
+        })
+      : { events: [], decisions: [] };
+    const pendingSteering = drainedSteering.events;
+    for (let index = 0; index < drainedSteering.events.length; index += 1) {
+      transcriptRows.push(...buildVoiceSteeringTranscriptRows({
+        steeringEvent: drainedSteering.events[index]!,
+        decision: drainedSteering.decisions[index] ?? null,
+        createdAt: now,
+      }));
+    }
+    const basePacket = buildLiveEnvironmentRuntimePacket({
       threadId: input.threadId,
       environmentId: input.environmentId,
       roomId: input.roomId,
       now,
     });
+    const packet: HelixLiveEnvironmentRuntimePacket = {
+      ...basePacket,
+      pending_voice_steering_refs: pendingSteering.map((event) => event.steeringEventId),
+      voice_steering_summary: summarizeVoiceSteeringForModel(pendingSteering),
+    };
     const decision = await input.chooser({
       packet,
       history: iterations,
@@ -135,6 +187,7 @@ export async function runLiveEnvironmentAgentLoop(input: {
       ...(iteration.tool_observation?.evidence_refs ?? []),
       ...iteration.commentary_refs,
     ])),
+    transcriptRows,
     assistant_answer: false,
     raw_content_included: false,
     context_role: "tool_evidence",

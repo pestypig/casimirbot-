@@ -55,6 +55,9 @@ let formatReadAloudButtonLabel: typeof import("@/components/helix/HelixAskPill")
 let buildManualReadAloudVoiceIntent: typeof import("@/components/helix/HelixAskPill").buildManualReadAloudVoiceIntent;
 let mapVoicePlaybackIntentToTask: typeof import("@/components/helix/HelixAskPill").mapVoicePlaybackIntentToTask;
 let collectInterimVoiceCalloutPlaybackIntents: typeof import("@/components/helix/HelixAskPill").collectInterimVoiceCalloutPlaybackIntents;
+let classifyVoiceSteeringClientTranscript: typeof import("@/components/helix/HelixAskPill").classifyVoiceSteeringClientTranscript;
+let buildVoiceSteeringClientRequest: typeof import("@/components/helix/HelixAskPill").buildVoiceSteeringClientRequest;
+let isVoiceSteeringDuringToolCall: typeof import("@/components/helix/HelixAskPill").isVoiceSteeringDuringToolCall;
 let normalizeVoiceCommandLaneEnvelope: typeof import("@/components/helix/HelixAskPill").normalizeVoiceCommandLaneEnvelope;
 let resolveReasoningAttemptTimelineText: typeof import("@/components/helix/HelixAskPill").resolveReasoningAttemptTimelineText;
 let describeVoiceCommandAction: typeof import("@/components/helix/HelixAskPill").describeVoiceCommandAction;
@@ -148,6 +151,9 @@ beforeAll(async () => {
     buildManualReadAloudVoiceIntent,
     mapVoicePlaybackIntentToTask,
     collectInterimVoiceCalloutPlaybackIntents,
+    classifyVoiceSteeringClientTranscript,
+    buildVoiceSteeringClientRequest,
+    isVoiceSteeringDuringToolCall,
     normalizeVoiceCommandLaneEnvelope,
     resolveReasoningAttemptTimelineText,
     describeVoiceCommandAction,
@@ -200,6 +206,54 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("legacy voice-side routing is disabled");
     expect(source).toContain("HELIX_VOICE_LEGACY_DISPATCH_FALLBACK");
     expect(source).not.toContain("env?.HELIX_E6_ASK_TURN_VOICE_PARITY");
+  });
+
+  it("routes finalized voice into active-turn steering before normal Ask dispatch", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+    expect(source).toContain("activeAskTurnIdRef.current");
+    expect(source).toContain("type VoiceSteeringReservation");
+    expect(source).toContain("buildVoiceSteeringReservation");
+    expect(source).toContain("steeringReservation: buildVoiceSteeringReservation()");
+    expect(source).toContain("active_turn_completed_before_stt_final");
+    expect(source).toContain("buildVoiceSteeringClientRequest({");
+    expect(source).toContain('toolName: "live_env.record_voice_steering"');
+    expect(source).toContain('classification === "cancel_or_stop"');
+    expect(source).toContain('queue_decision: "deferred_to_new_turn"');
+    expect(source.indexOf("activeVoiceSteeringTurnId")).toBeLessThan(source.indexOf("const runAskUnified = runAskRef.current"));
+  });
+
+  it("classifies active-turn voice steering separately from idle voice commands", () => {
+    expect(classifyVoiceSteeringClientTranscript("Actually use meters per second.")).toMatchObject({
+      classification: "correction",
+      queueDecision: "queued_for_safe_boundary",
+    });
+    expect(classifyVoiceSteeringClientTranscript("Stop, cancel that.")).toMatchObject({
+      classification: "cancel_or_stop",
+      queueDecision: "cancel_requested",
+    });
+    expect(classifyVoiceSteeringClientTranscript("What is the weather tomorrow?")).toMatchObject({
+      classification: "off_topic_new_goal",
+      queueDecision: "deferred_to_new_turn",
+    });
+    expect(buildVoiceSteeringClientRequest({
+      threadId: "thread:voice",
+      turnId: "ask:active",
+      transcriptText: "Also check the units.",
+      timing: "during_tool_call",
+      evidenceRefs: ["voice:segment"],
+    })).toMatchObject({
+      thread_id: "thread:voice",
+      turn_id: "ask:active",
+      expected_turn_id: "ask:active",
+      transcript_text: "Also check the units.",
+      timing: "during_tool_call",
+      classification: "on_topic_additive",
+      queue_decision: "queued_for_safe_boundary",
+      evidence_refs: ["voice:segment"],
+    });
+    expect(isVoiceSteeringDuringToolCall([
+      { type: "tool_call", tool: "live_env.query_event_log", status: "running" },
+    ])).toBe(true);
   });
 
   it("keeps removed operator controls out of the primary composer markup", () => {
@@ -865,6 +919,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"voice_callout_request"');
     expect(source).toContain('"voice_tool_call"');
     expect(source).toContain('"voice_receipt"');
+    expect(source).toContain('"voice_steering_received"');
+    expect(source).toContain('"voice_steering_queued"');
+    expect(source).toContain('"voice_steering_applied"');
+    expect(source).toContain('"steering_ack_receipt"');
     expect(source).toContain('"wait_for_next_summary"');
     expect(source).toContain("Visual summary received.\\nPreview:");
     expect(source).toContain("live_env.read_live_source_mail");
@@ -876,8 +934,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Voice callout request");
     expect(source).toContain("Voice tool call");
     expect(source).toContain("Voice receipt");
+    expect(source).toContain("Voice steering received");
+    expect(source).toContain("Steering ack receipt");
     expect(source).toContain('if (row.rowKind === "loop_state") return row.title || "Loop state"');
-    expect(source).toContain('row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail"');
+    expect(source).toContain('row.rowKind.startsWith("voice_steering_")');
   });
 
   it("persists wake mail transcript rows through backend fetch and chronological reply merge", () => {
@@ -1481,6 +1541,60 @@ describe("HelixAskPill mic helper behavior", () => {
       turnKey: "turn:voice:1",
       eventId: "receipt:voice:ack",
     });
+  });
+
+  it("maps steering acknowledgement receipts into provisional tool-receipt playback", () => {
+    const intents = collectInterimVoiceCalloutPlaybackIntents({
+      artifacts: [
+        interimVoiceToolResult({
+          kind: "steering_ack",
+          text: "I heard the correction. I'll apply it after this step.",
+          turnId: "turn:voice:steering",
+          requestId: "request:voice:steering",
+          receiptId: "receipt:voice:steering",
+          utteranceId: "utterance:voice:steering",
+        }),
+      ],
+    });
+
+    expect(intents).toHaveLength(1);
+    expect(intents[0]).toMatchObject({
+      kind: "tool_receipt",
+      authority: "provisional",
+      source: "agent_loop",
+      turnKey: "turn:voice:steering",
+      eventId: "receipt:voice:steering",
+      receiptKey: "utterance:voice:steering",
+      calloutKind: "steering_ack",
+      text: "I heard the correction. I'll apply it after this step.",
+    });
+  });
+
+  it("does not dedupe steering acknowledgements because an immediate ack already played", () => {
+    const intents = collectInterimVoiceCalloutPlaybackIntents({
+      artifacts: [
+        interimVoiceToolResult({
+          turnId: "turn:voice:steering-dedupe",
+          receiptId: "receipt:ack:steering-dedupe",
+          utteranceId: "utterance:ack:steering-dedupe",
+          kind: "immediate_ack",
+        }),
+        interimVoiceToolResult({
+          turnId: "turn:voice:steering-dedupe",
+          requestId: "request:steering-ack:1",
+          receiptId: "receipt:steering-ack:1",
+          utteranceId: "utterance:steering-ack:1",
+          kind: "steering_ack",
+          text: "I heard the correction. I'll apply it after this step.",
+        }),
+      ],
+    });
+
+    expect(intents.map((intent) => intent.calloutKind)).toEqual(["immediate_ack", "steering_ack"]);
+    expect(intents.map((intent) => intent.receiptId)).toEqual([
+      "receipt:ack:steering-dedupe",
+      "receipt:steering-ack:1",
+    ]);
   });
 
   it("dedupes duplicate immediate ack receipts while allowing later progress receipts", () => {

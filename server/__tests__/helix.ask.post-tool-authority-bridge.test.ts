@@ -76,10 +76,10 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect(payload.terminal_error_code).toBeUndefined();
   });
 
-  it("materializes interim voice callout status as synthesized answer from visible selected text", () => {
+  it("materializes status-only interim voice callout status as synthesized answer from visible selected text", () => {
     const payload: Record<string, unknown> = {
       turn_id: turnId,
-      active_prompt: "Use an interim voice callout, then continue the normal answer.",
+      active_prompt: "Did the interim voice callout get accepted for playback?",
       selected_final_answer:
         "The interim voice callout was requested, but playback was blocked by capacity. The receipt is evidence-only.",
       answer:
@@ -124,6 +124,54 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_error_code).toBeUndefined();
     expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
+  });
+
+  it("does not let an interim voice receipt alone satisfy compound explanation prompts", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt:
+        "Use the live environment tool path and take a few steps before the final answer. Check the active turn context, make one interim voice callout, and then explain what evidence-only voice tool receipts mean.",
+      selected_final_answer:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      answer:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      text:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      terminal_error_code: "terminal_boundary_ineligible",
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      agent_step_decision: { chosen_capability: "live_env.request_interim_voice_callout" },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:interim_voice`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.request_interim_voice_callout",
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              receipt: {
+                status: "awaiting_client_playback",
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = buildPostToolAuthorityBridge({ turnId, payload });
+    expect(bridge.reason).toBe("interim_voice_callout_receipt_only_covers_callout_subgoal");
+    expect(bridge.observation_support_status).toBe("not_enough_information");
+    expect(bridge.pending_requirements.map((requirement) => requirement.code)).toContain("missing_post_tool_answer_draft");
   });
 
   it("catches visible policy inversion about receipts and final answers", () => {

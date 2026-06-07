@@ -27,4 +27,23 @@ describe("Helix Ask receipt framing suppression", () => {
       }),
     ).toBe("The docs viewer has been successfully opened, as indicated by the workspace action receipt.");
   });
+
+  it("preserves markdown bullet boundaries while suppressing receipt framing", () => {
+    expect(
+      suppressReceiptFramingInFinalAnswer({
+        prompt: "Explain in two bullets what evidence-only voice tool receipts mean.",
+        text: [
+          "The interim voice callout was queued, according to the workspace action receipt.",
+          "",
+          "- Evidence-only voice tool receipts record what the voice tool observed.",
+          "- They can support the final answer, but cannot become terminal authority.",
+        ].join("\n"),
+      }),
+    ).toBe([
+      "The interim voice callout was queued.",
+      "",
+      "- Evidence-only voice tool receipts record what the voice tool observed.",
+      "- They can support the final answer, but cannot become terminal authority.",
+    ].join("\n"));
+  });
 });

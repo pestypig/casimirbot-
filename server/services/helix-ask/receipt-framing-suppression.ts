@@ -8,6 +8,25 @@ const cleanSentenceSpacing = (text: string): string =>
     .replace(/\s{2,}/g, " ")
     .trim();
 
+const hasMarkdownBulletLines = (text: string): boolean =>
+  /(?:^|\n)\s*[-*]\s+\S/m.test(text);
+
+const cleanLineSentenceSpacing = (text: string): string =>
+  text
+    .replace(/[ \t]+([,.!?;:])/g, "$1")
+    .replace(/([.!?])([A-Z])/g, "$1 $2")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+const cleanStructuredSentenceSpacing = (text: string): string =>
+  text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => cleanLineSentenceSpacing(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
 export function suppressReceiptFramingInFinalAnswer(input: {
   text: string;
   prompt?: string | null;
@@ -34,6 +53,8 @@ export function suppressReceiptFramingInFinalAnswer(input: {
       ".",
     );
 
-  cleaned = cleanSentenceSpacing(cleaned);
+  cleaned = hasMarkdownBulletLines(cleaned)
+    ? cleanStructuredSentenceSpacing(cleaned)
+    : cleanSentenceSpacing(cleaned);
   return cleaned || text.trim();
 }

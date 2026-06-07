@@ -113,6 +113,20 @@ const selectedVisibleAnswerText = (payload: RecordLike): string =>
   readString(payload.answer) ||
   readString(payload.text);
 
+const isCompoundInterimVoiceCalloutPrompt = (payload: RecordLike): boolean => {
+  const prompt = [
+    readString(payload.active_prompt),
+    readString(payload.prompt),
+    readString(payload.question),
+  ].find(Boolean) ?? "";
+  if (!prompt) return false;
+  const asksForVoiceCallout =
+    /\b(?:interim\s+voice\s+callout|voice\s+callout|callout\s+saying|say(?:ing)?\s+exactly|speak|read\s+out\s+loud)\b/i.test(prompt) ||
+    /\blive_env\.request_interim_voice_callout\b/i.test(prompt);
+  if (!asksForVoiceCallout) return false;
+  return /\b(?:take\s+(?:a\s+)?few\s+steps|multi[-\s]?step|step(?:s)?\s+before|continue|then\s+(?:finish|explain|answer)|explain\s+(?:what|how|why)|what\s+.+\bmean(?:s)?\b|meaning|full[-\s]?fledged|full\s+answer)\b/i.test(prompt);
+};
+
 const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
   readArray(payload.current_turn_artifact_ledger)
     .map(readRecord)
@@ -183,7 +197,11 @@ export function buildPostToolAuthorityBridge(input: {
       raw_content_included: false,
     };
   }
-  if (capability === "live_env.request_interim_voice_callout" && hasFinalInterimVoiceCalloutReceipt(input.payload)) {
+  if (
+    capability === "live_env.request_interim_voice_callout" &&
+    hasFinalInterimVoiceCalloutReceipt(input.payload) &&
+    !isCompoundInterimVoiceCalloutPrompt(input.payload)
+  ) {
     return {
       schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
       turn_id: input.turnId,
@@ -197,6 +215,29 @@ export function buildPostToolAuthorityBridge(input: {
       terminal_repair_action: "materialize_model_synthesized_answer",
       pending_requirements: [],
       reason: "interim_voice_callout_receipt_supports_status_answer",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (capability === "live_env.request_interim_voice_callout" && hasFinalInterimVoiceCalloutReceipt(input.payload)) {
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: true,
+      selected_capability: capability,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: answerDraftRefs.length > 0 ? "supports_answer" : "not_enough_information",
+      route_family: "voice_delivery",
+      required_terminal_kind: "model_synthesized_answer",
+      terminal_repair_action: answerDraftRefs.length > 0 ? "materialize_model_synthesized_answer" : "none",
+      pending_requirements: answerDraftRefs.length > 0 ? [] : [{
+        code: "missing_post_tool_answer_draft",
+        message: "The interim voice callout receipt satisfies only the callout subgoal; a post-tool answer draft is still required for the explanatory prompt.",
+      }],
+      reason: answerDraftRefs.length > 0
+        ? "interim_voice_callout_receipt_plus_answer_draft_supports_compound_goal"
+        : "interim_voice_callout_receipt_only_covers_callout_subgoal",
       assistant_answer: false,
       raw_content_included: false,
     };

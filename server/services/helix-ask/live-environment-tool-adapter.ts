@@ -77,6 +77,13 @@ import {
   recordInterimVoiceCalloutRequest,
 } from "./interim-voice-callout-store";
 import {
+  recordVoiceSteeringEvent,
+} from "./voice-steering-event-store";
+import type {
+  HelixVoiceSteeringDecisionV1,
+  HelixVoiceSteeringEventV1,
+} from "@shared/contracts/helix-voice-steering-event.v1";
+import {
   resolveStagePlayLiveSourceMailboxThreadId,
 } from "../stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -132,6 +139,61 @@ const readRequestedTool = (
 
 const readOptionalNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readVoiceSteeringSource = (
+  value: unknown,
+): Parameters<typeof recordVoiceSteeringEvent>[0]["source"] | null => {
+  const raw = readString(value);
+  return raw === "voice_capture" || raw === "text_capture" || raw === "ui_button" ? raw : null;
+};
+
+const readVoiceSteeringTiming = (
+  value: unknown,
+): Parameters<typeof recordVoiceSteeringEvent>[0]["timing"] | null => {
+  const raw = readString(value);
+  return (
+    raw === "during_reasoning" ||
+    raw === "during_tool_call" ||
+    raw === "between_steps" ||
+    raw === "before_final_synthesis" ||
+    raw === "idle"
+  )
+    ? raw
+    : null;
+};
+
+const readVoiceSteeringClassification = (
+  value: unknown,
+): Parameters<typeof recordVoiceSteeringEvent>[0]["classification"] | null => {
+  const raw = readString(value);
+  return (
+    raw === "on_topic_additive" ||
+    raw === "constraint" ||
+    raw === "correction" ||
+    raw === "off_topic_new_goal" ||
+    raw === "cancel_or_stop" ||
+    raw === "ambient" ||
+    raw === "unsafe_or_untrusted"
+  )
+    ? raw
+    : null;
+};
+
+const readVoiceSteeringQueueDecision = (
+  value: unknown,
+): Parameters<typeof recordVoiceSteeringEvent>[0]["queueDecision"] | null => {
+  const raw = readString(value);
+  return (
+    raw === "queued_for_safe_boundary" ||
+    raw === "applied_to_next_step" ||
+    raw === "deferred_to_new_turn" ||
+    raw === "rejected_off_topic" ||
+    raw === "cancel_requested" ||
+    raw === "ambient_ignored"
+  )
+    ? raw
+    : null;
+};
 
 const readInterpretationPayload = (
   value: unknown,
@@ -294,6 +356,133 @@ const buildWatchJobConfiguredTranscriptRows = (input: {
   ];
 };
 
+const rowKindForVoiceSteeringQueueDecision = (
+  queueDecision: HelixVoiceSteeringEventV1["queueDecision"],
+): AskTurnTranscriptRowDraftV1["rowKind"] => {
+  switch (queueDecision) {
+    case "queued_for_safe_boundary":
+    case "applied_to_next_step":
+      return "voice_steering_queued";
+    case "deferred_to_new_turn":
+      return "voice_steering_deferred";
+    case "rejected_off_topic":
+    case "ambient_ignored":
+      return "voice_steering_rejected";
+    case "cancel_requested":
+      return "voice_steering_cancel_requested";
+  }
+};
+
+const titleForVoiceSteeringQueueDecision = (
+  queueDecision: HelixVoiceSteeringEventV1["queueDecision"],
+): string => {
+  switch (queueDecision) {
+    case "queued_for_safe_boundary":
+    case "applied_to_next_step":
+      return "Voice steering queued";
+    case "deferred_to_new_turn":
+      return "Voice steering deferred";
+    case "rejected_off_topic":
+    case "ambient_ignored":
+      return "Voice steering rejected";
+    case "cancel_requested":
+      return "Voice steering cancel requested";
+  }
+};
+
+export const buildVoiceSteeringTranscriptRows = (input: {
+  steeringEvent: HelixVoiceSteeringEventV1;
+  decision?: HelixVoiceSteeringDecisionV1 | null;
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? input.steeringEvent.capturedAt ?? new Date().toISOString();
+  const steeringEvent = input.steeringEvent;
+  const evidenceRefs = uniqueStrings([steeringEvent.steeringEventId, ...steeringEvent.evidenceRefs]);
+  const source = {
+    toolName: "live_env.record_voice_steering",
+    artifactId: steeringEvent.steeringEventId,
+    artifactKind: "helix.voice_steering_event.v1",
+  };
+  const base = {
+    source,
+    evidenceRefs,
+    authority: "tool_evidence" as const,
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  };
+  const rows: AskTurnTranscriptRowDraftV1[] = [
+    {
+      rowId: `voice_steering_received:${hashShort(steeringEvent.steeringEventId)}`,
+      rowKind: "voice_steering_received",
+      title: "Voice steering received",
+      body: steeringEvent.transcriptText,
+      ...base,
+    },
+    {
+      rowId: `${rowKindForVoiceSteeringQueueDecision(steeringEvent.queueDecision)}:${hashShort(steeringEvent.steeringEventId)}`,
+      rowKind: rowKindForVoiceSteeringQueueDecision(steeringEvent.queueDecision),
+      title: titleForVoiceSteeringQueueDecision(steeringEvent.queueDecision),
+      body: `${steeringEvent.classification}: ${steeringEvent.queueDecision}`,
+      ...base,
+    },
+  ];
+  if (input.decision) {
+    rows.push({
+      rowId: `voice_steering_applied:${hashShort(input.decision.decisionId)}`,
+      rowKind: input.decision.decision === "steering_applied"
+        ? "voice_steering_applied"
+        : input.decision.decision === "steering_requires_new_turn" || input.decision.decision === "steering_deferred"
+          ? "voice_steering_deferred"
+          : input.decision.decision === "turn_cancel_requested"
+            ? "voice_steering_cancel_requested"
+            : "voice_steering_rejected",
+      title: input.decision.decision === "steering_applied"
+        ? "Voice steering applied"
+        : input.decision.decision === "turn_cancel_requested"
+          ? "Voice steering cancel requested"
+          : input.decision.decision === "steering_requires_new_turn" || input.decision.decision === "steering_deferred"
+            ? "Voice steering deferred"
+            : "Voice steering rejected",
+      body: input.decision.modelVisibleSummary ?? input.decision.decision,
+      source: {
+        toolName: "live_env.record_voice_steering",
+        artifactId: input.decision.decisionId,
+        artifactKind: "helix.voice_steering_decision.v1",
+      },
+      evidenceRefs: uniqueStrings([input.decision.decisionId, ...input.decision.evidenceRefs]),
+      authority: "tool_evidence",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt,
+    });
+  }
+  return rows;
+};
+
+const buildSteeringAckTranscriptRows = (input: {
+  requestId: string;
+  receiptId: string;
+  text: string;
+  evidenceRefs: string[];
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => [{
+  rowId: `steering_ack_receipt:${hashShort([input.requestId, input.receiptId])}`,
+  rowKind: "steering_ack_receipt",
+  title: "Steering acknowledgement receipt",
+  body: input.text,
+  source: {
+    toolName: "live_env.request_interim_voice_callout",
+    artifactId: input.receiptId,
+    artifactKind: "helix.interim_voice_callout_receipt.v1",
+  },
+  evidenceRefs: uniqueStrings([input.requestId, input.receiptId, ...input.evidenceRefs]),
+  authority: "tool_evidence",
+  assistantAnswer: false,
+  terminalEligible: false,
+  createdAt: input.createdAt ?? new Date().toISOString(),
+}];
+
 const readNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
@@ -447,6 +636,7 @@ const makeObservation = (input: {
   summary: string;
   observation: unknown;
   evidenceRefs?: string[];
+  transcriptRows?: AskTurnTranscriptRowDraftV1[];
 }): HelixLiveEnvironmentToolObservation => ({
   schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
   observation_id: `live_env_tool_observation:${hashShort([
@@ -462,6 +652,7 @@ const makeObservation = (input: {
   ok: input.ok,
   summary: input.summary,
   observation: input.observation,
+  ...(input.transcriptRows && input.transcriptRows.length > 0 ? { transcriptRows: input.transcriptRows } : {}),
   evidence_refs: Array.from(new Set(input.evidenceRefs ?? [])),
   instruction_authority: "none",
   ask_instruction_authority: "none",
@@ -1447,6 +1638,14 @@ export function executeLiveEnvironmentTool(
       result.receipt.status === "queued" ||
       result.receipt.status === "queued_for_retry" ||
       result.receipt.status === "delivered";
+    const transcriptRows = result.request.kind === "steering_ack"
+      ? buildSteeringAckTranscriptRows({
+          requestId: result.request.requestId,
+          receiptId: result.receipt.receiptId,
+          text: result.request.text,
+          evidenceRefs: result.receipt.evidenceRefs,
+        })
+      : [];
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -1469,8 +1668,94 @@ export function executeLiveEnvironmentTool(
         raw_content_included: false,
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
+        transcriptRows,
       },
+      transcriptRows,
       evidenceRefs: [result.request.requestId, result.receipt.receiptId, ...result.receipt.evidenceRefs],
+    });
+  }
+
+  if (input.tool_name === "live_env.record_voice_steering") {
+    const transcriptText = readString(args.transcript_text) ?? readString(args.transcriptText);
+    const turnId = readString(args.turn_id) ?? readString(args.turnId);
+    if (!turnId) {
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: input.environment_id,
+        toolName: input.tool_name,
+        ok: false,
+        summary: "Voice steering could not be recorded because turn_id is required.",
+        observation: {
+          schema: "helix.voice_steering_tool_result.v1",
+          error: "missing_turn_id",
+          post_tool_model_step_required: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: readStringArray(args.evidence_refs),
+      });
+    }
+    if (!transcriptText) {
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: input.environment_id,
+        toolName: input.tool_name,
+        ok: false,
+        summary: "Voice steering could not be recorded because transcript_text is required.",
+        observation: {
+          schema: "helix.voice_steering_tool_result.v1",
+          error: "missing_transcript_text",
+          post_tool_model_step_required: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: readStringArray(args.evidence_refs),
+      });
+    }
+    const steeringEvent = recordVoiceSteeringEvent({
+      threadId: readString(args.thread_id) ?? readString(args.threadId) ?? input.thread_id,
+      turnId,
+      expectedTurnId: readString(args.expected_turn_id) ?? readString(args.expectedTurnId),
+      source: readVoiceSteeringSource(args.source),
+      transcriptText,
+      timing: readVoiceSteeringTiming(args.timing),
+      classification: readVoiceSteeringClassification(args.classification),
+      queueDecision: readVoiceSteeringQueueDecision(args.queue_decision ?? args.queueDecision),
+      activeGoalText: readString(args.active_goal_text) ?? readString(args.activeGoalText),
+      capturedAt: readString(args.captured_at) ?? readString(args.capturedAt),
+      evidenceRefs: readStringArray(args.evidence_refs),
+      reasonCodes: readStringArray(args.reason_codes ?? args.reasonCodes),
+    });
+    const transcriptRows = buildVoiceSteeringTranscriptRows({ steeringEvent });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary:
+        steeringEvent.queueDecision === "queued_for_safe_boundary"
+          ? `Queued voice steering ${steeringEvent.steeringEventId} for the next safe boundary.`
+          : `Recorded voice steering ${steeringEvent.steeringEventId} as ${steeringEvent.queueDecision}.`,
+      observation: {
+        schema: "helix.voice_steering_tool_result.v1",
+        steeringEvent,
+        queuedForSafeBoundary: steeringEvent.queueDecision === "queued_for_safe_boundary",
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+        transcriptRows,
+      },
+      transcriptRows,
+      evidenceRefs: [steeringEvent.steeringEventId, ...steeringEvent.evidenceRefs],
     });
   }
 

@@ -2251,6 +2251,15 @@ type VoiceSessionSpeakerProfile = {
   snrDbMean: number;
 };
 
+type VoiceSteeringReservation = {
+  reservationId: string;
+  activeTurnId: string;
+  expectedTurnId: string;
+  timing: "during_reasoning" | "during_tool_call";
+  capturedAtMs: number;
+  activeAtCapture: boolean;
+};
+
 type VoiceConfirmedTurn = {
   id: string;
   traceId: string;
@@ -2284,6 +2293,7 @@ type VoiceConfirmedTurn = {
   confidenceReason: string | null;
   needsConfirmation: boolean;
   translationUncertain: boolean;
+  steeringReservation?: VoiceSteeringReservation | null;
 };
 
 type VoiceTranscribeQueuedSegment = {
@@ -2298,6 +2308,7 @@ type VoiceTranscribeQueuedSegment = {
   snrDb?: number | null;
   lowAudioQuality?: boolean;
   confirmBias?: number;
+  steeringReservation?: VoiceSteeringReservation | null;
 };
 
 type RetainedVoiceTranscriptionRetry = {
@@ -2333,6 +2344,116 @@ export type VoiceAutoDispatchGovernance = {
   output_authority: "admission_trace";
   instruction_authority: "none";
 };
+
+export type VoiceSteeringClientClassification =
+  | "on_topic_additive"
+  | "constraint"
+  | "correction"
+  | "off_topic_new_goal"
+  | "cancel_or_stop"
+  | "ambient";
+
+export type VoiceSteeringClientRequest = {
+  thread_id: string;
+  turn_id: string;
+  expected_turn_id: string;
+  transcript_text: string;
+  source: "voice_capture";
+  timing: "during_reasoning" | "during_tool_call";
+  classification: VoiceSteeringClientClassification;
+  queue_decision:
+    | "queued_for_safe_boundary"
+    | "deferred_to_new_turn"
+    | "cancel_requested"
+    | "ambient_ignored";
+  evidence_refs: string[];
+  reason_codes: string[];
+};
+
+export function classifyVoiceSteeringClientTranscript(transcript: string): {
+  classification: VoiceSteeringClientClassification;
+  queueDecision: VoiceSteeringClientRequest["queue_decision"];
+  reasonCodes: string[];
+} {
+  const text = transcript.trim();
+  if (!text || text.length < 3) {
+    return {
+      classification: "ambient",
+      queueDecision: "ambient_ignored",
+      reasonCodes: ["too_short_or_empty"],
+    };
+  }
+  if (/\b(stop|cancel|abort|pause|never mind|nevermind)\b/i.test(text)) {
+    return {
+      classification: "cancel_or_stop",
+      queueDecision: "cancel_requested",
+      reasonCodes: ["explicit_cancel_phrase"],
+    };
+  }
+  if (/\b(actually|correction|i meant|not that|use .* instead)\b/i.test(text)) {
+    return {
+      classification: "correction",
+      queueDecision: "queued_for_safe_boundary",
+      reasonCodes: ["correction_phrase"],
+    };
+  }
+  if (/\b(do not|don't|dont|only|never|make sure|must|instead)\b/i.test(text)) {
+    return {
+      classification: "constraint",
+      queueDecision: "queued_for_safe_boundary",
+      reasonCodes: ["constraint_phrase"],
+    };
+  }
+  if (/\b(also|while you|check|look at|remember|include)\b/i.test(text)) {
+    return {
+      classification: "on_topic_additive",
+      queueDecision: "queued_for_safe_boundary",
+      reasonCodes: ["additive_phrase"],
+    };
+  }
+  return {
+    classification: "off_topic_new_goal",
+    queueDecision: "deferred_to_new_turn",
+    reasonCodes: ["default_active_turn_new_goal"],
+  };
+}
+
+export function buildVoiceSteeringClientRequest(args: {
+  threadId: string;
+  turnId: string;
+  expectedTurnId?: string | null;
+  transcriptText: string;
+  timing: "during_reasoning" | "during_tool_call";
+  evidenceRefs?: string[];
+}): VoiceSteeringClientRequest {
+  const classified = classifyVoiceSteeringClientTranscript(args.transcriptText);
+  return {
+    thread_id: args.threadId,
+    turn_id: args.turnId,
+    expected_turn_id: args.expectedTurnId?.trim() || args.turnId,
+    transcript_text: args.transcriptText.trim(),
+    source: "voice_capture",
+    timing: args.timing,
+    classification: classified.classification,
+    queue_decision: classified.queueDecision,
+    evidence_refs: Array.from(new Set(args.evidenceRefs ?? [])),
+    reason_codes: classified.reasonCodes,
+  };
+}
+
+export function isVoiceSteeringDuringToolCall(events: Array<{ tool?: unknown; status?: unknown; type?: unknown }>): boolean {
+  return events.some((event) => {
+    const status = String(event.status ?? "").toLowerCase();
+    const type = String(event.type ?? "").toLowerCase();
+    const tool = String(event.tool ?? "").trim();
+    return Boolean(tool) && (
+      status === "running" ||
+      status === "queued" ||
+      type.includes("tool") ||
+      type.includes("action")
+    );
+  });
+}
 
 function isExplicitVoiceAskTurnCandidate(transcript: string): boolean {
   const text = transcript.trim();
@@ -2506,6 +2627,7 @@ type InterimVoiceCalloutKind =
   | "waiting_for_evidence"
   | "memory_pressure"
   | "clarifying_status"
+  | "steering_ack"
   | "translation_relay";
 
 export type InterimVoiceCalloutPlaybackIntent = VoicePlaybackUtteranceIntent & {
@@ -2525,6 +2647,7 @@ const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
   "waiting_for_evidence",
   "memory_pressure",
   "clarifying_status",
+  "steering_ack",
   "translation_relay",
 ]);
 
@@ -2756,6 +2879,7 @@ type VoiceTurnAssemblerState = {
   completion: CompletionScore;
   turnComplete: TurnCompleteScore;
   segmentId: string | null;
+  steeringReservation: VoiceSteeringReservation | null;
   updatedAtMs: number;
 };
 
@@ -2810,6 +2934,7 @@ type TranscriptConfirmState = {
   completion: CompletionScore;
   turnComplete: TurnCompleteScore;
   sttEngine: string | null;
+  steeringReservation?: VoiceSteeringReservation | null;
 };
 
 type VoiceCommandConfirmState = {
@@ -3107,6 +3232,7 @@ type HeldTranscriptState = {
   completion: CompletionScore;
   turnComplete: TurnCompleteScore;
   holdReason: HeldTranscriptReason;
+  steeringReservation?: VoiceSteeringReservation | null;
   updatedAtMs: number;
 };
 
@@ -8348,6 +8474,13 @@ export type HelixMailLoopTranscriptRowKind =
   | "voice_callout_request"
   | "voice_tool_call"
   | "voice_receipt"
+  | "voice_steering_received"
+  | "voice_steering_queued"
+  | "voice_steering_applied"
+  | "voice_steering_deferred"
+  | "voice_steering_rejected"
+  | "voice_steering_cancel_requested"
+  | "steering_ack_receipt"
   | "wait_for_next_summary"
   | "mail_wake_requested"
   | "mail_wake_deferred"
@@ -8369,6 +8502,13 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "voice_callout_request",
   "voice_tool_call",
   "voice_receipt",
+  "voice_steering_received",
+  "voice_steering_queued",
+  "voice_steering_applied",
+  "voice_steering_deferred",
+  "voice_steering_rejected",
+  "voice_steering_cancel_requested",
+  "steering_ack_receipt",
   "wait_for_next_summary",
   "mail_wake_requested",
   "mail_wake_deferred",
@@ -8603,6 +8743,13 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   if (row.rowKind === "blocked") return row.body || "Wake blocked; mailbox remains available for a later check.";
   if (row.rowKind === "voice_tool_call" && !row.body) return "voice_delivery";
   if (row.rowKind === "voice_receipt" && !row.body) return "Voice delivery receipt recorded.";
+  if (row.rowKind === "voice_steering_received") return row.body || "Voice steering received.";
+  if (row.rowKind === "voice_steering_queued") return row.body || "Voice steering queued for a safe boundary.";
+  if (row.rowKind === "voice_steering_applied") return row.body || "Voice steering applied at a safe boundary.";
+  if (row.rowKind === "voice_steering_deferred") return row.body || "Voice steering deferred.";
+  if (row.rowKind === "voice_steering_rejected") return row.body || "Voice steering rejected.";
+  if (row.rowKind === "voice_steering_cancel_requested") return row.body || "Voice steering cancel requested.";
+  if (row.rowKind === "steering_ack_receipt") return row.body || "Steering acknowledgement receipt recorded.";
   return row.body;
 }
 
@@ -8620,6 +8767,13 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "voice_callout_request") return "Voice callout request";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
   if (row.rowKind === "voice_receipt") return "Voice receipt";
+  if (row.rowKind === "voice_steering_received") return "Voice steering received";
+  if (row.rowKind === "voice_steering_queued") return "Voice steering queued";
+  if (row.rowKind === "voice_steering_applied") return "Voice steering applied";
+  if (row.rowKind === "voice_steering_deferred") return "Voice steering deferred";
+  if (row.rowKind === "voice_steering_rejected") return "Voice steering rejected";
+  if (row.rowKind === "voice_steering_cancel_requested") return "Voice steering cancel";
+  if (row.rowKind === "steering_ack_receipt") return "Steering ack receipt";
   if (row.rowKind === "mail_wake_requested") return "Wake requested";
   if (row.rowKind === "mail_wake_deferred") return "Wake deferred";
   if (row.rowKind === "requested_tool") return "Requested tool";
@@ -8638,13 +8792,21 @@ function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): Hel
   if (row.rowKind === "text_answer") return row.terminalEligible ? "final" : "checkpoint";
   if (row.rowKind === "voice_tool_call") return "working";
   if (row.rowKind === "voice_receipt") return "observation";
+  if (row.rowKind === "voice_steering_received" || row.rowKind === "steering_ack_receipt") return "observation";
+  if (row.rowKind === "voice_steering_rejected" || row.rowKind === "voice_steering_cancel_requested") return "warning";
+  if (row.rowKind === "voice_steering_queued" || row.rowKind === "voice_steering_applied" || row.rowKind === "voice_steering_deferred") return "checkpoint";
   return "working";
 }
 
 export function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: HelixMailLoopTranscriptRow[]): HelixContinuousTurnStreamRow[] {
   return mailRows.map((row) => ({
     key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
-    source: row.rowKind === "voice_tool_call" || row.rowKind === "voice_receipt" ? "voice" : "live_source_mail",
+    source: row.rowKind === "voice_tool_call" ||
+      row.rowKind === "voice_receipt" ||
+      row.rowKind.startsWith("voice_steering_") ||
+      row.rowKind === "steering_ack_receipt"
+      ? "voice"
+      : "live_source_mail",
     label: labelForHelixMailLoopTranscriptRow(row),
     text: formatHelixMailLoopTranscriptBody(row),
     meta: row.authority || "tool_evidence",
@@ -16454,6 +16616,7 @@ export function HelixAskPill({
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [askBusy, setAskBusy] = useState(false);
+  const activeAskTurnIdRef = useRef<string | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askImageAttachment, setAskImageAttachment] = useState<HelixAskImageAttachment | null>(null);
@@ -19078,6 +19241,7 @@ export function HelixAskPill({
         completion: { score: 0, route: "ask_more" },
         turnComplete: { score: 0, band: "low", reason: "insufficient_pause" },
         segmentId: null,
+        steeringReservation: null,
         updatedAtMs: now,
       };
     },
@@ -24956,6 +25120,36 @@ export function HelixAskPill({
     ) => Promise<void>) | null
   >(null);
 
+  const postLiveEnvironmentToolObservation = useCallback(async (input: {
+    toolName: "live_env.record_voice_steering" | "live_env.request_interim_voice_callout";
+    threadId: string;
+    environmentId?: string | null;
+    args: Record<string, unknown>;
+  }): Promise<Record<string, unknown> | null> => {
+    const response = await fetch("/api/helix/live-environment/tool", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        tool_name: input.toolName,
+        thread_id: input.threadId,
+        environment_id: input.environmentId ?? null,
+        args: input.args,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(
+        `live environment tool ${input.toolName} failed: ${response.status}`,
+      );
+    }
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? payload as Record<string, unknown>
+      : null;
+  }, []);
+
   const dispatchConfirmedVoiceTranscript = useCallback(
     async (
       input: VoiceConfirmedTurn,
@@ -25011,6 +25205,147 @@ export function HelixAskPill({
           eventSeq: assemblerSnapshot?.eventSeq ?? null,
         },
       });
+      const steeringReservation = input.steeringReservation ?? null;
+      const activeVoiceSteeringTurnId = steeringReservation?.activeTurnId ?? activeAskTurnIdRef.current;
+      const activeAskTurnRunning = Boolean(activeAskTurnIdRef.current && (askBusy || askAbortRef.current));
+      const reservedTurnStillActive = Boolean(
+        steeringReservation &&
+        activeAskTurnIdRef.current === steeringReservation.activeTurnId &&
+        activeAskTurnRunning,
+      );
+      const shouldRouteVoiceSteering = Boolean(
+        micArmStateRef.current === "on" &&
+        activeVoiceSteeringTurnId &&
+        (activeAskTurnRunning || steeringReservation?.activeAtCapture),
+      );
+      if (shouldRouteVoiceSteering && activeVoiceSteeringTurnId) {
+        const timing = steeringReservation?.timing ??
+          (isVoiceSteeringDuringToolCall(askLiveEventsRef.current)
+            ? "during_tool_call"
+            : "during_reasoning");
+        const steeringActiveNow = !steeringReservation || reservedTurnStillActive;
+        const steering = buildVoiceSteeringClientRequest({
+          threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+          turnId: activeVoiceSteeringTurnId,
+          expectedTurnId: activeVoiceSteeringTurnId,
+          transcriptText: transcript,
+          timing,
+          evidenceRefs: [input.traceId],
+        });
+        const queuedSteering: VoiceSteeringClientRequest = steeringActiveNow
+          ? steering
+          : {
+              ...steering,
+              queue_decision: "deferred_to_new_turn",
+              reason_codes: Array.from(new Set([
+                ...steering.reason_codes,
+                "active_turn_completed_before_stt_final",
+              ])),
+            };
+        try {
+          const classification = queuedSteering.classification;
+          if (classification === "cancel_or_stop" && steeringActiveNow) {
+            askAbortRef.current?.abort("voice_cancel_requested");
+          }
+          const payload = await postLiveEnvironmentToolObservation({
+            toolName: "live_env.record_voice_steering",
+            threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            environmentId: situationRoomId,
+            args: {
+              ...queuedSteering,
+              captured_at: steeringReservation
+                ? new Date(steeringReservation.capturedAtMs).toISOString()
+                : undefined,
+              active_goal_text: askActiveQuestion ?? "",
+            },
+          });
+          const observation = readAgentLoopAuditRecord(readAgentLoopAuditRecord(payload?.observation)?.observation);
+          const steeringEvent = readAgentLoopAuditRecord(observation?.steeringEvent);
+          const steeringEventId = coerceText(steeringEvent?.steeringEventId).trim();
+          addHelixTimelineEntry({
+            type: classification === "cancel_or_stop" ? "action_receipt" : "conversation_brief",
+            source: "voice_auto",
+            status: queuedSteering.queue_decision === "deferred_to_new_turn" ? "queued" : "done",
+            text: queuedSteering.queue_decision === "deferred_to_new_turn"
+              ? `Queued follow-up: ${clipText(transcript, 180)}`
+              : `Voice steering recorded: ${clipText(transcript, 180)}`,
+            detail: `voice_steering:${queuedSteering.queue_decision}`,
+            mode: "observe",
+            traceId: input.traceId,
+            meta: {
+              kind: "voice_steering_client_route",
+              active_turn_id: activeVoiceSteeringTurnId,
+              reservation_id: steeringReservation?.reservationId ?? null,
+              reserved_active_at_capture: steeringReservation?.activeAtCapture ?? null,
+              reserved_turn_still_active: steeringReservation ? reservedTurnStillActive : null,
+              classification,
+              queue_decision: queuedSteering.queue_decision,
+              timing,
+              steering_event_id: steeringEventId || null,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+              output_authority: "tool_evidence",
+            },
+          });
+          if (classification === "cancel_or_stop" && steeringActiveNow && steeringEventId) {
+            void postLiveEnvironmentToolObservation({
+              toolName: "live_env.request_interim_voice_callout",
+              threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+              environmentId: situationRoomId,
+              args: {
+                turn_id: activeVoiceSteeringTurnId,
+                kind: "steering_ack",
+                source: "voice_steering_queue",
+                text: "I heard stop. Cancelling the active turn.",
+                evidence_refs: [steeringEventId],
+                reason_codes: ["voice_cancel_ack"],
+              },
+            }).catch((error) => {
+              console.warn("[HelixAskPill] steering cancel acknowledgement failed", error);
+            });
+          }
+          updateVoiceDecisionBrief({
+            baseBrief: queuedSteering.queue_decision === "deferred_to_new_turn"
+              ? "Queued that as a follow-up after the active turn."
+              : classification === "cancel_or_stop"
+                ? "I heard stop. Cancelling the active turn."
+                : "I heard that and routed it into the active turn.",
+            lifecycle: queuedSteering.queue_decision === "deferred_to_new_turn" ? "queued" : "done",
+            mode: "observe",
+            routeReasonCode: `dispatch:voice_steering:${queuedSteering.queue_decision}`,
+            traceId: input.traceId,
+            meta: {
+              dispatchHint: false,
+              classifierSource: "fallback",
+              classifierConfidence: null,
+              classifierReason: classification,
+              routeReasonCode: `dispatch:voice_steering:${queuedSteering.queue_decision}`,
+              confidence: input.confidence,
+              confidenceReason: input.confidenceReason,
+              transcript,
+              activeTurnId: activeVoiceSteeringTurnId,
+              steeringEventId: steeringEventId || null,
+              steeringReservationId: steeringReservation?.reservationId ?? null,
+              reservedTurnStillActive: steeringReservation ? reservedTurnStillActive : null,
+              briefSource: "none",
+            },
+          });
+          markVoiceCheckpoint(
+            "dispatch_completed",
+            queuedSteering.queue_decision === "deferred_to_new_turn" ? "warn" : "ok",
+            queuedSteering.queue_decision === "deferred_to_new_turn"
+              ? "Voice steering deferred as a follow-up; active turn was not changed."
+              : "Voice steering routed to active Ask turn.",
+          );
+          patchVoiceSegmentAttempt(input.segmentId, { dispatch: "completed" });
+        } catch (error) {
+          console.warn("[HelixAskPill] voice steering dispatch failed", error);
+          markVoiceCheckpoint("dispatch_suppressed", "warn", "Voice steering dispatch failed.");
+          patchVoiceSegmentAttempt(input.segmentId, { dispatch: "suppressed" });
+        }
+        return;
+      }
       const nowMs = Date.now();
       voiceAutoDispatchWindowRef.current = voiceAutoDispatchWindowRef.current.filter(
         (entryMs) => nowMs - entryMs < HELIX_VOICE_AUTO_DISPATCH_WINDOW_MS,
@@ -25732,6 +26067,8 @@ export function HelixAskPill({
       addHelixTimelineEntry,
       addMessage,
       appendSyntheticLiveEvent,
+      askActiveQuestion,
+      askBusy,
       bumpVoiceTurnRevision,
       cancelPendingWorkstationRequestForTurnTransition,
       classifyWorkstationActionIntent,
@@ -25746,6 +26083,7 @@ export function HelixAskPill({
       markVoiceCheckpoint,
       patchHelixTimelineEntry,
       patchVoiceSegmentAttempt,
+      postLiveEnvironmentToolObservation,
       rememberConversationTurn,
       replaceVoiceConversationTimelineEntry,
       resolveWorkstationActionFromPendingInput,
@@ -25755,6 +26093,7 @@ export function HelixAskPill({
       runWorkstationAction,
       setAskStatus,
       setIntentRevisionState,
+      situationRoomId,
       suppressSupersededVoiceAttemptsForNewTurn,
       updateReasoningAttempt,
       updateVoiceDecisionBrief,
@@ -25869,6 +26208,7 @@ export function HelixAskPill({
         confidenceReason: state.confidenceReason,
         needsConfirmation: false,
         translationUncertain: false,
+        steeringReservation: state.steeringReservation,
       };
       void dispatchConfirmedVoiceTranscript(sealedTurn, {
         transcriptRevision: sealedRevision,
@@ -25939,6 +26279,7 @@ export function HelixAskPill({
         confidenceReason: state.confidenceReason,
         needsConfirmation: false,
         translationUncertain: false,
+        steeringReservation: state.steeringReservation,
       };
       void dispatchConfirmedVoiceTranscript(sealedTurn, {
         transcriptRevision: sealedRevision,
@@ -26023,6 +26364,7 @@ export function HelixAskPill({
       confidenceReason: string | null;
       completion: CompletionScore;
       turnComplete: TurnCompleteScore;
+      steeringReservation?: VoiceSteeringReservation | null;
     }) => {
       const transcript = input.transcript.trim();
       if (!transcript) return null;
@@ -26075,6 +26417,7 @@ export function HelixAskPill({
           completion: input.completion,
           turnComplete: input.turnComplete,
           segmentId: input.segmentId,
+          steeringReservation: input.steeringReservation ?? current.steeringReservation ?? null,
         };
       });
       voiceActiveAssemblerTurnKeyRef.current = input.turnKey;
@@ -26239,6 +26582,7 @@ export function HelixAskPill({
           turnComplete: pendingHeld.turnComplete,
           sttEngine: pendingHeld.sttEngine,
           needsConfirmation: false,
+          steeringReservation: pendingHeld.steeringReservation ?? null,
         };
         voiceConfirmedTurnQueueRef.current.unshift(recoveredTurn);
         patchVoiceSegmentAttempt(pendingHeld.segmentId, {
@@ -26294,6 +26638,7 @@ export function HelixAskPill({
             confidenceReason: confirmedTurn.confidenceReason,
             completion: confirmedTurn.completion,
             turnComplete: confirmedTurn.turnComplete,
+            steeringReservation: confirmedTurn.steeringReservation ?? null,
           });
           setVoiceInputError(null);
           setVoiceInputState("cooldown");
@@ -26430,6 +26775,7 @@ export function HelixAskPill({
                 turnComplete: heldTurnComplete,
                 sttEngine: result.engine ?? null,
                 needsConfirmation: false,
+                steeringReservation: nextSegment.steeringReservation ?? null,
               };
               voiceConfirmedTurnQueueRef.current.unshift(recoveredTurn);
               patchVoiceSegmentAttempt(nextSegment.id, {
@@ -26528,6 +26874,7 @@ export function HelixAskPill({
                 confidenceReason: pendingConfirmation.confidenceReason,
                 needsConfirmation: true,
                 translationUncertain: pendingConfirmation.translationUncertain,
+                steeringReservation: pendingConfirmation.steeringReservation ?? null,
               };
               voiceConfirmedTurnQueueRef.current = [
                 confirmedTurn,
@@ -27124,6 +27471,7 @@ export function HelixAskPill({
               completion,
               turnComplete,
               sttEngine: result.engine ?? null,
+              steeringReservation: nextSegment.steeringReservation ?? null,
             });
             clearHeldTranscriptState();
             if (voiceConfirmV2Active && confirmPolicy.confirmBlockReason) {
@@ -27219,6 +27567,7 @@ export function HelixAskPill({
               completion,
               turnComplete,
               holdReason: "continuation_hold",
+              steeringReservation: nextSegment.steeringReservation ?? null,
               updatedAtMs: Date.now(),
             });
             const holdReason = hasHardContinuationSignal
@@ -27256,6 +27605,7 @@ export function HelixAskPill({
               completion,
               turnComplete,
               holdReason: "low_info_tail",
+              steeringReservation: nextSegment.steeringReservation ?? null,
               updatedAtMs: Date.now(),
             });
             markVoiceCheckpoint(
@@ -27322,6 +27672,7 @@ export function HelixAskPill({
             confidenceReason: result.confidence_reason ?? confidenceMeta.reason,
             completion,
             turnComplete,
+            steeringReservation: nextSegment.steeringReservation ?? null,
           });
           if (assembled) {
             markVoiceCheckpoint(
@@ -27495,6 +27846,7 @@ export function HelixAskPill({
       confidenceReason: pending.confidenceReason,
       needsConfirmation: true,
       translationUncertain: pending.translationUncertain,
+      steeringReservation: pending.steeringReservation ?? null,
     };
     voiceConfirmedTurnQueueRef.current = [
       confirmedTurn,
@@ -27731,6 +28083,23 @@ export function HelixAskPill({
     voiceNoiseProfile.localGateLowQualitySpeechProbability,
   ]);
 
+  const buildVoiceSteeringReservation = useCallback((): VoiceSteeringReservation | null => {
+    const activeTurnId = activeAskTurnIdRef.current;
+    if (micArmStateRef.current !== "on" || !activeTurnId) return null;
+    const activeAtCapture = Boolean(askBusy || askAbortRef.current);
+    if (!activeAtCapture) return null;
+    return {
+      reservationId: `voice_steering_reservation:${crypto.randomUUID()}`,
+      activeTurnId,
+      expectedTurnId: activeTurnId,
+      timing: isVoiceSteeringDuringToolCall(askLiveEventsRef.current)
+        ? "during_tool_call"
+        : "during_reasoning",
+      capturedAtMs: Date.now(),
+      activeAtCapture,
+    };
+  }, [askBusy]);
+
   const queueSegmentForTranscription = useCallback(
     (
       blob: Blob,
@@ -27767,6 +28136,7 @@ export function HelixAskPill({
         durationMs,
         cutAtMs,
         turnKey,
+        steeringReservation: buildVoiceSteeringReservation(),
         speakerId: quality?.speakerId ?? null,
         speakerConfidence: quality?.speakerConfidence ?? null,
         speechProbability: quality?.speechProbability ?? null,
@@ -27840,6 +28210,7 @@ export function HelixAskPill({
       processTranscriptionQueue,
       resolveVoiceAssemblerTurnKeyForIncomingSegment,
       updateVoiceTurnAssemblerState,
+      buildVoiceSteeringReservation,
     ],
   );
 
@@ -29996,6 +30367,7 @@ export function HelixAskPill({
             ? "dispatch:simple_conversation_turn"
           : "dispatch:direct_prompt_lane"
         : "dispatch:manual_default";
+      activeAskTurnIdRef.current = runAskTurnId;
       setAskBusy(true);
       setAskStatus("Interpreting prompt...");
       setAskError(null);
@@ -31149,6 +31521,9 @@ export function HelixAskPill({
       } finally {
         if (askRunIdRef.current === runId) {
           setAskBusy(false);
+          if (activeAskTurnIdRef.current === runAskTurnId) {
+            activeAskTurnIdRef.current = null;
+          }
           setAskStatus(null);
           setAskLiveSessionId(null);
           setAskLiveTraceId(null);

@@ -2749,6 +2749,7 @@ describe("helix ask E52 panel control terminal contract", () => {
     const previousAgentStepLlm = process.env.HELIX_AGENT_STEP_DECISION_LLM;
     const previousAgentStepResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
     const previousAgentStepResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousRuntimeFinalAnswer = process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
     resetInterimVoiceCalloutsForTest();
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     process.env.RUNTIME_MEMORY_MAX_HEAP_USED_MB = "999999";
@@ -2773,6 +2774,10 @@ describe("helix ask E52 panel control terminal contract", () => {
         confidence: 0.96,
       },
     ]);
+    process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = [
+      '- The interim voice callout "I am checking this now" was successfully queued for client playback handoff, indicating that the system is processing the request.',
+      "- Evidence-only voice tool receipts document the actions taken by the voice tool, such as the acceptance of callouts or any playback issues, without providing a definitive outcome or replacing the final answer.",
+    ].join("\n");
     const occupiedTts = runtimeMemoryGovernor.admitRuntimeTask({
       taskClass: "voice_tts",
       source: "test.e52.interim_voice_capacity_occupied",
@@ -2796,7 +2801,7 @@ describe("helix ask E52 panel control terminal contract", () => {
           question: [
             "With the voice lane active, use the interim voice callout tool to queue a short provisional callout saying",
             "\"I am checking this now\", then continue the normal Helix Ask answer.",
-            "In the final answer, say whether the callout receipt was evidence-only.",
+            "In the final answer, explain in two bullets what evidence-only voice tool receipts mean.",
           ].join(" "),
           mode: "read",
           debug: true,
@@ -2813,6 +2818,11 @@ describe("helix ask E52 panel control terminal contract", () => {
       });
       expect(finalAnswer).toMatch(/queued for retry/i);
       expect(finalAnswer).toMatch(/evidence-only/i);
+      expect(finalAnswer).toMatch(/^- Evidence-only voice tool receipts record/m);
+      expect(finalAnswer).toMatch(/^- They can support the final answer/m);
+      expect(response.body?.final_answer_draft?.llm_error_code).toBe(
+        "post_observation_composer_undercovered_compound_interim_voice_goal",
+      );
       expect(finalAnswer).not.toMatch(/should I speak|need your confirmation|speak it now/i);
     } finally {
       occupiedTts.lease?.release("completed");
@@ -2826,6 +2836,8 @@ describe("helix ask E52 panel control terminal contract", () => {
       else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentStepResponse;
       if (previousAgentStepResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
       else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentStepResponseIndex;
+      if (previousRuntimeFinalAnswer === undefined) delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previousRuntimeFinalAnswer;
       resetInterimVoiceCalloutsForTest();
       runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
     }

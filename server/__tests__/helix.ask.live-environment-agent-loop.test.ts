@@ -6,6 +6,11 @@ import {
   resetInterimVoiceCalloutsForTest,
   retryQueuedInterimVoiceCalloutDeliveries,
 } from "../services/helix-ask/interim-voice-callout-store";
+import {
+  listPendingVoiceSteeringEvents,
+  recordVoiceSteeringEvent,
+  resetVoiceSteeringEventsForTest,
+} from "../services/helix-ask/voice-steering-event-store";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
@@ -41,6 +46,7 @@ const resetAll = () => {
   resetLiveFieldWorkersForTest();
   resetSituationConstructStoreForTest();
   resetInterimVoiceCalloutsForTest();
+  resetVoiceSteeringEventsForTest();
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
 };
 
@@ -85,6 +91,7 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.query_event_log",
       "live_env.query_constructs",
       "live_env.query_navigation_state",
+      "live_env.record_voice_steering",
       "live_env.request_interim_voice_callout",
       "live_env.request_probe",
     ]));
@@ -145,6 +152,86 @@ describe("Helix Ask live environment agent loop", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
+  });
+
+  it("records voice steering as queued tool evidence for the active turn", () => {
+    const environment = seedEnvironment();
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_voice_steering",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:voice-steering",
+        expected_turn_id: "turn:voice-steering",
+        transcript_text: "Actually use meters instead.",
+        source: "voice_capture",
+        timing: "during_tool_call",
+        evidence_refs: ["voice_transcript:1"],
+        reason_codes: ["operator_correction"],
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.record_voice_steering",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.observation).toMatchObject({
+      schema: "helix.voice_steering_tool_result.v1",
+      queuedForSafeBoundary: true,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      steeringEvent: {
+        artifactId: "helix_voice_steering_event",
+        turnId: "turn:voice-steering",
+        expectedTurnId: "turn:voice-steering",
+        classification: "correction",
+        queueDecision: "queued_for_safe_boundary",
+        target: "active_turn",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        instruction_authority: "none",
+        ask_instruction_authority: "none",
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+    });
+    expect((observation as any).transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "voice_steering_received",
+        title: "Voice steering received",
+        body: "Actually use meters instead.",
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+      }),
+      expect.objectContaining({
+        rowKind: "voice_steering_queued",
+        title: "Voice steering queued",
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+      }),
+    ]));
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining(["voice_transcript:1"]));
+    const steeringEvent = (observation.observation as any).steeringEvent;
+    expect(observation.evidence_refs).toContain(steeringEvent.steeringEventId);
+    expect(listPendingVoiceSteeringEvents({
+      threadId: environment.thread_id,
+      turnId: "turn:voice-steering",
+    }).map((event) => event.steeringEventId)).toEqual([steeringEvent.steeringEventId]);
   });
 
   it("allows one immediate voice ack per turn and keeps later status callouts available", () => {
@@ -231,6 +318,154 @@ describe("Helix Ask live environment agent loop", () => {
         status: "awaiting_client_playback",
         assistant_answer: false,
         terminal_eligible: false,
+      },
+    });
+  });
+
+  it("allows one steering acknowledgement per voice steering event without blocking immediate ack", () => {
+    const environment = seedEnvironment();
+    const steeringEventId = "helix_voice_steering_event:ack-1";
+    const steeringDecisionId = "helix_voice_steering_decision:ack-1";
+
+    const immediateAck = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:steering-ack",
+        kind: "immediate_ack",
+        text: "Okay, I will check that now.",
+        reason_codes: ["immediate_ack"],
+      },
+    });
+    expect(immediateAck.ok).toBe(true);
+
+    const steeringAck = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:steering-ack",
+        kind: "steering_ack",
+        source: "voice_steering_queue",
+        text: "I heard the correction. I'll apply it after this step.",
+        max_chars: 220,
+        evidence_refs: [steeringEventId, steeringDecisionId],
+        reason_codes: ["voice_steering_ack"],
+      },
+    });
+
+    expect(steeringAck.ok).toBe(true);
+    expect(steeringAck.observation).toMatchObject({
+      request: {
+        kind: "steering_ack",
+        source: "voice_steering_queue",
+        maxChars: 96,
+        voicePlaybackKind: "tool_receipt",
+        authority: "provisional",
+        evidenceRefs: [steeringEventId, steeringDecisionId],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      receipt: {
+        status: "awaiting_client_playback",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect((steeringAck as any).transcriptRows).toEqual([
+      expect.objectContaining({
+        rowKind: "steering_ack_receipt",
+        title: "Steering acknowledgement receipt",
+        body: "I heard the correction. I'll apply it after this step.",
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+      }),
+    ]);
+
+    const duplicateAck = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:steering-ack",
+        kind: "steering_ack",
+        source: "voice_steering_queue",
+        text: "I heard that. I'll fold it in next.",
+        evidence_refs: [steeringEventId],
+      },
+    });
+
+    expect(duplicateAck.ok).toBe(false);
+    expect(duplicateAck.observation).toMatchObject({
+      receipt: {
+        status: "blocked_policy",
+        delivery: {
+          message: "Only one steering acknowledgement may be queued per voice steering event.",
+        },
+      },
+    });
+  });
+
+  it("blocks steering acknowledgements without steering evidence or with final-answer claims", () => {
+    const environment = seedEnvironment();
+
+    const missingRef = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:steering-ack-policy",
+        kind: "steering_ack",
+        source: "voice_steering_queue",
+        text: "I heard the correction. I'll apply it after this step.",
+        evidence_refs: ["helix_voice_steering_decision:missing-event"],
+      },
+    });
+
+    expect(missingRef.ok).toBe(false);
+    expect(missingRef.observation).toMatchObject({
+      receipt: {
+        status: "blocked_policy",
+        delivery: {
+          message: "Steering acknowledgements require a voice steering event evidence ref.",
+        },
+      },
+    });
+
+    const finalClaim = executeLiveEnvironmentTool({
+      tool_name: "live_env.request_interim_voice_callout",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        turn_id: "turn:steering-ack-policy",
+        kind: "steering_ack",
+        source: "voice_steering_queue",
+        text: "The final answer is complete.",
+        evidence_refs: ["helix_voice_steering_event:final-claim"],
+      },
+    });
+
+    expect(finalClaim.ok).toBe(false);
+    expect(finalClaim.observation).toMatchObject({
+      request: {
+        kind: "steering_ack",
+        authority: "provisional",
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+      receipt: {
+        status: "blocked_policy",
+        delivery: {
+          message: "Steering acknowledgements cannot claim final answer status.",
+        },
       },
     });
   });
@@ -360,6 +595,82 @@ describe("Helix Ask live environment agent loop", () => {
       ask_context_policy: "evidence_only",
     });
     expect(loop.evidence_refs).toEqual(expect.arrayContaining(["navigation_state:1"]));
+  });
+
+  it("drains pending voice steering before the next model step as compact evidence", async () => {
+    const environment = seedEnvironment();
+    const steering = recordVoiceSteeringEvent({
+      threadId: environment.thread_id,
+      turnId: "turn:steering-loop",
+      transcriptText: "Actually use meters per second, not feet.",
+      evidenceRefs: ["voice_transcript:unit-correction"],
+      capturedAt: "2026-05-26T12:00:04.000Z",
+    });
+    const packets: any[] = [];
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      turnId: "turn:steering-loop",
+      environmentId: environment.environment_id,
+      maxIterations: 1,
+      now: "2026-05-26T12:00:05.000Z",
+      chooser: ({ packet, stepIndex }) => {
+        packets.push(packet);
+        return {
+          schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+          decision_id: "live_step:answer-after-steering",
+          thread_id: environment.thread_id,
+          environment_id: environment.environment_id,
+          step_index: stepIndex,
+          decision_authority: "model",
+          decision_timing: "pre_observation",
+          next_step: "answer",
+          selected_tool: null,
+          tool_args: null,
+          rationale_summary: "Voice steering is available as evidence for terminal review.",
+          expected_evidence_kind: null,
+          evidence_refs: [steering.steeringEventId],
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      },
+    });
+
+    expect(packets).toHaveLength(1);
+    expect(packets[0]).toMatchObject({
+      pending_voice_steering_refs: [steering.steeringEventId],
+      voice_steering_summary: {
+        count: 1,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+    });
+    expect(packets[0].voice_steering_summary.items[0]).toMatchObject({
+      steeringEventId: steering.steeringEventId,
+      classification: "correction",
+      modelVisibleSummary: "User voice steering received: Actually use meters per second, not feet.",
+      confidence: "high",
+      evidenceRefs: expect.arrayContaining([steering.steeringEventId, "voice_transcript:unit-correction"]),
+    });
+    expect(listPendingVoiceSteeringEvents({
+      threadId: environment.thread_id,
+      turnId: "turn:steering-loop",
+    })).toEqual([]);
+    expect(loop.terminal_decision).toBe("answer_allowed");
+    expect(loop.evidence_refs).toContain(steering.steeringEventId);
+    expect(loop.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "voice_steering_applied",
+        title: "Voice steering applied",
+        body: "User voice steering received: Actually use meters per second, not feet.",
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+      }),
+    ]));
   });
 
   it("records live commentary as interpreted evidence, not an assistant answer", () => {

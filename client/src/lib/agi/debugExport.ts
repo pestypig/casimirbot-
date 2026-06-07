@@ -125,6 +125,98 @@ const buildVoicePlaybackReconciliationDebug = (input: {
   };
 };
 
+const collectRecordsDeep = (value: unknown, predicate: (record: Record<string, unknown>) => boolean): Record<string, unknown>[] => {
+  const results: Record<string, unknown>[] = [];
+  const visited = new WeakSet<object>();
+  const visit = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return;
+    if (visited.has(entry as object)) return;
+    visited.add(entry as object);
+    const record = asRecord(entry);
+    if (record && predicate(record)) results.push(record);
+    if (Array.isArray(entry)) {
+      entry.forEach(visit);
+      return;
+    }
+    Object.values(entry as Record<string, unknown>).forEach(visit);
+  };
+  visit(value);
+  return results;
+};
+
+const uniqueRecordsById = (
+  records: Record<string, unknown>[],
+  idKeys: string[],
+): Record<string, unknown>[] => {
+  const seen = new Set<string>();
+  return records.filter((record) => {
+    const key = idKeys.map((idKey) => readString(record[idKey])).find(Boolean) ?? stableStringify(record);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const buildVoiceSteeringDebug = (input: {
+  activeTurnId: string | null;
+  source: Record<string, unknown>;
+  ledger: unknown[];
+}): Record<string, unknown> => {
+  const candidates = [
+    input.source,
+    asRecord(input.source.debug),
+    asRecord(input.source.agentLoop),
+    ...input.ledger,
+  ];
+  const events = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      record.artifactId === "helix_voice_steering_event" ||
+      record.schemaVersion === "helix.voice_steering_event.v1" ||
+      record.schema === "helix.voice_steering_event.v1"
+    )),
+    ["steeringEventId", "steering_event_id"],
+  );
+  const decisions = uniqueRecordsById(
+    candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+      record.artifactId === "helix_voice_steering_decision" ||
+      record.schemaVersion === "helix.voice_steering_decision.v1" ||
+      record.schema === "helix.voice_steering_decision.v1"
+    )),
+    ["decisionId", "decision_id"],
+  );
+  const steeringAckToolResults = candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+    record.schema === "helix.interim_voice_callout_tool_result.v1" &&
+    readString(asRecord(record.request)?.kind) === "steering_ack"
+  ));
+  const latestSteeringAckReceipts = uniqueRecordsById(
+    [
+      ...steeringAckToolResults
+        .map((result) => asRecord(result.receipt))
+        .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt)),
+      ...candidates.flatMap((candidate) => collectRecordsDeep(candidate, (record) =>
+        record.artifactId === "helix_interim_voice_callout_receipt" &&
+        String(readString(record.requestId) ?? "").includes("steering")
+      )),
+    ],
+    ["receiptId", "receipt_id"],
+  ).slice(-10);
+  const pendingCount = events.filter((event) =>
+    readString(event.queueDecision) === "queued_for_safe_boundary" &&
+    !decisions.some((decision) => readString(decision.steeringEventId) === readString(event.steeringEventId))
+  ).length;
+  return {
+    schema: "helix.voice_steering_debug.v1",
+    active_turn_id: input.activeTurnId,
+    pending_count: pendingCount,
+    events,
+    decisions,
+    latest_steering_ack_receipts: latestSteeringAckReceipts,
+    assistant_answer: false,
+    terminal_eligible: false,
+    output_authority: "tool_evidence",
+  };
+};
+
 const classifyCompactToolTraceAction = (panelId: string | null, actionId: string | null) => {
   const panel = (panelId ?? "").toLowerCase();
   const action = (actionId ?? "").toLowerCase();
@@ -510,6 +602,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     selectedFinalAnswer,
     source: payload,
   });
+  const voiceSteeringDebug = buildVoiceSteeringDebug({
+    activeTurnId: canonicalActiveTurnId,
+    source: payload,
+    ledger,
+  });
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
@@ -523,6 +620,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     selected_final_answer: selectedFinalAnswer,
     final_answer_source: finalAnswerSource,
     voice_playback_reconciliation: voicePlaybackReconciliation,
+    voice_steering_debug: voiceSteeringDebug,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status: "final_answer",

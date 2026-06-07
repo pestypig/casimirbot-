@@ -388,6 +388,13 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "voice_callout_request"
     | "voice_tool_call"
     | "voice_receipt"
+    | "voice_steering_received"
+    | "voice_steering_queued"
+    | "voice_steering_applied"
+    | "voice_steering_deferred"
+    | "voice_steering_rejected"
+    | "voice_steering_cancel_requested"
+    | "steering_ack_receipt"
     | "loop_state"
     | "blocked";
   title: string;

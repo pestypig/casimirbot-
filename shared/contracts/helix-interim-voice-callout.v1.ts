@@ -12,6 +12,7 @@ export type HelixInterimVoiceCalloutKind =
   | "waiting_for_evidence"
   | "memory_pressure"
   | "clarifying_status"
+  | "steering_ack"
   | "translation_relay";
 
 export type HelixInterimVoicePlaybackKind = "tool_receipt" | "translation_relay";
@@ -19,6 +20,7 @@ export type HelixInterimVoicePlaybackKind = "tool_receipt" | "translation_relay"
 export type HelixInterimVoiceCalloutSource =
   | "ask_tool_loop"
   | "live_source_mail_loop"
+  | "voice_steering_queue"
   | "runtime_governor"
   | "manual_read";
 
@@ -94,6 +96,7 @@ const REQUEST_STATUSES = new Set([
   "waiting_for_evidence",
   "memory_pressure",
   "clarifying_status",
+  "steering_ack",
   "translation_relay",
 ]);
 

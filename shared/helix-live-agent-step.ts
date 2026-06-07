@@ -1,3 +1,5 @@
+import type { AskTurnTranscriptRowDraftV1 } from "./contracts/stage-play-live-source-mail.v1";
+
 export const HELIX_LIVE_ENVIRONMENT_RUNTIME_PACKET_SCHEMA =
   "helix.live_environment_runtime_packet.v1" as const;
 export const HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA =
@@ -23,6 +25,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.read_live_source_mail"
   | "live_env.configure_live_source_watch_job"
   | "live_env.record_live_source_mail_decision"
+  | "live_env.record_voice_steering"
   | "live_env.request_interim_voice_callout"
   | "live_env.query_source_health"
   | "live_env.query_constructs"
@@ -74,6 +77,23 @@ export type HelixLiveEnvironmentRuntimePacket = {
   source_health_refs: string[];
   navigation_state_ref?: string | null;
   missing_evidence: string[];
+  pending_voice_steering_refs?: string[];
+  voice_steering_summary?: {
+    count: number;
+    items: Array<{
+      steeringEventId: string;
+      classification: string;
+      modelVisibleSummary: string;
+      confidence: "low" | "medium" | "high";
+      evidenceRefs: string[];
+      reasonCodes: string[];
+    }>;
+    assistant_answer: false;
+    terminal_eligible: false;
+    raw_content_included: false;
+    context_role: "tool_evidence";
+    ask_context_policy: "evidence_only";
+  } | null;
   available_tools: Array<{
     tool_id: HelixLiveEnvironmentToolName;
     family: "live_env";
@@ -121,6 +141,7 @@ export type HelixLiveEnvironmentToolObservation = {
   ok: boolean;
   summary: string;
   observation: unknown;
+  transcriptRows?: AskTurnTranscriptRowDraftV1[];
   evidence_refs: string[];
   instruction_authority: "none";
   ask_instruction_authority: "none";
@@ -148,6 +169,7 @@ export type HelixLiveEnvironmentAgentLoopResult = {
     | "fail_closed"
     | "budget_exhausted";
   evidence_refs: string[];
+  transcriptRows?: AskTurnTranscriptRowDraftV1[];
   assistant_answer: false;
   raw_content_included: false;
   context_role: "tool_evidence";
