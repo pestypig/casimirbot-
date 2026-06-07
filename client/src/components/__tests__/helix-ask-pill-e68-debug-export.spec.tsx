@@ -312,6 +312,68 @@ describe("helix ask pill E68 debug export envelope", () => {
     expect(parsed.selected_final_answer).not.toBe("Short projection.");
   });
 
+  it("reconciles client playback receipts without mutating the final answer", () => {
+    const pendingAnswer =
+      'The interim voice callout "I am checking this now" was accepted for client playback handoff; browser playback confirmation is still pending.';
+    const utteranceId =
+      "tool_receipt:ask:voice-reconcile:helix_interim_voice_callout_receipt:voice-reconcile";
+    const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
+      {
+        id: "ask:voice-reconcile",
+        question: "Use the interim voice callout tool.",
+        content: pendingAnswer,
+      } as any,
+      {
+        selected_final_answer: pendingAnswer,
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_answer_authority: {
+          turn_id: "ask:voice-reconcile",
+          terminal_text_preview: pendingAnswer,
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+        debug: {
+          turn_id: "ask:voice-reconcile",
+          selected_final_answer: pendingAnswer,
+          final_answer_source: "final_answer_draft",
+          terminal_artifact_kind: "model_synthesized_answer",
+        },
+        client_voice_playback_receipts: [
+          {
+            schema: "helix.voice_playback_outcome_receipt.v1",
+            status: "delivered",
+            turnKey: "ask:voice-reconcile",
+            utteranceId,
+            sourceReceiptId: "helix_interim_voice_callout_receipt:voice-reconcile",
+          },
+        ],
+        client_voice_calls: [
+          {
+            kind: "speak",
+            utteranceId,
+            audioBytes: 39541,
+          },
+        ],
+      },
+    );
+    const parsed = JSON.parse(payload);
+
+    expect(parsed.selected_final_answer).toBe(pendingAnswer);
+    expect(parsed.voice_playback_reconciliation).toMatchObject({
+      schema: "helix.voice_playback_reconciliation.v1",
+      selected_final_answer_claim: "pending_client_playback",
+      playback_confirmation: "delivered",
+      delivered_receipt_count: 1,
+      audio_bytes_observed: 39541,
+      terminal_answer_mutated: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      output_authority: "client_playback_observation",
+    });
+    expect(parsed.voice_playback_reconciliation.corrected_status_text).toMatch(/delivered audio/i);
+  });
+
   it("exports compact theory reflection and calculator tool trace disclosure", () => {
     const payload = buildHelixDebugExportEnvelopeFromMasterPayload(
       {

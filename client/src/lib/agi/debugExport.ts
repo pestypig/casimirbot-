@@ -50,6 +50,81 @@ const readString = (value: unknown): string | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const buildVoicePlaybackReconciliationDebug = (input: {
+  activeTurnId: string | null;
+  selectedFinalAnswer: string | null;
+  source: Record<string, unknown>;
+}): Record<string, unknown> => {
+  const clientProjection = asRecord(input.source.client_debug_projection);
+  const clientVoice = asRecord(input.source.client_voice_debug ?? clientProjection?.voice);
+  const receiptSources = [
+    input.source.client_voice_playback_receipts,
+    clientProjection?.voice_playback_receipts,
+    clientVoice?.playbackReceipts,
+  ];
+  const receipts = receiptSources
+    .flatMap((source) => (Array.isArray(source) ? source : []))
+    .map(asRecord)
+    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+  const voiceCallSources = [input.source.client_voice_calls, clientProjection?.voice_calls, clientVoice?.voiceCalls];
+  const voiceCalls = voiceCallSources
+    .flatMap((source) => (Array.isArray(source) ? source : []))
+    .map(asRecord)
+    .filter((call): call is Record<string, unknown> => Boolean(call));
+  const activeTurnId = input.activeTurnId?.trim() ?? "";
+  const isActiveTurnReceipt = (receipt: Record<string, unknown>): boolean => {
+    if (!activeTurnId) return true;
+    return [
+      receipt.turnKey,
+      receipt.utteranceId,
+      receipt.sourceReceiptId,
+      receipt.sourceReceiptKey,
+      receipt.requestId,
+    ].some((value) => readString(value)?.includes(activeTurnId));
+  };
+  const deliveredReceipts = receipts.filter(
+    (receipt) => readString(receipt.status) === "delivered" && isActiveTurnReceipt(receipt),
+  );
+  const deliveredUtteranceIds = Array.from(
+    new Set(deliveredReceipts.map((receipt) => readString(receipt.utteranceId)).filter(Boolean)),
+  );
+  const audioBytesObserved = voiceCalls
+    .filter((call) => {
+      const utteranceId = readString(call.utteranceId);
+      return deliveredUtteranceIds.length === 0 || Boolean(utteranceId && deliveredUtteranceIds.includes(utteranceId));
+    })
+    .reduce((total, call) => {
+      const bytes = typeof call.audioBytes === "number" && Number.isFinite(call.audioBytes) ? call.audioBytes : 0;
+      return total + Math.max(0, bytes);
+    }, 0);
+  const selectedFinalAnswerClaim =
+    /browser playback confirmation is still pending|playback confirmation is still pending/i.test(
+      input.selectedFinalAnswer ?? "",
+    )
+      ? "pending_client_playback"
+      : "none";
+  const playbackConfirmation = deliveredReceipts.length > 0 ? "delivered" : "not_observed";
+  return {
+    schema: "helix.voice_playback_reconciliation.v1",
+    source: "client_playback_receipts",
+    active_turn_id: activeTurnId || null,
+    selected_final_answer_claim: selectedFinalAnswerClaim,
+    playback_confirmation: playbackConfirmation,
+    delivered_receipt_count: deliveredReceipts.length,
+    delivered_utterance_ids: deliveredUtteranceIds,
+    audio_bytes_observed: audioBytesObserved,
+    corrected_status_text:
+      selectedFinalAnswerClaim === "pending_client_playback" && playbackConfirmation === "delivered"
+        ? "Client playback receipt confirms delivered audio after the final answer was composed."
+        : null,
+    terminal_answer_mutated: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "client_playback_observation",
+  };
+};
+
 const classifyCompactToolTraceAction = (panelId: string | null, actionId: string | null) => {
   const panel = (panelId ?? "").toLowerCase();
   const action = (actionId ?? "").toLowerCase();
@@ -430,6 +505,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
   const canonicalActiveTurnId = readString(terminalAuthority?.turn_id) ?? activeTurnId;
   const clientActiveTurnId = readString(reply.id);
   const toolTraceDisclosure = buildCompactToolTraceDisclosure(actionEnvelope, canonicalActiveTurnId);
+  const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
+    activeTurnId: canonicalActiveTurnId,
+    selectedFinalAnswer,
+    source: payload,
+  });
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
@@ -442,6 +522,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     active_prompt_hash: hashDebugExportText(readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? ""),
     selected_final_answer: selectedFinalAnswer,
     final_answer_source: finalAnswerSource,
+    voice_playback_reconciliation: voicePlaybackReconciliation,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status: "final_answer",

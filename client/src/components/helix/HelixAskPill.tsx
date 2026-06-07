@@ -13283,6 +13283,11 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
   const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
   const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(actionEnvelopeForDebug, canonicalActiveTurnId);
+  const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
+    activeTurnId: canonicalActiveTurnId,
+    selectedFinalAnswer,
+    source: payload,
+  });
   const lifecycleEvents = Array.isArray(workspaceActionSource?.workspace_action_lifecycle_events)
     ? workspaceActionSource.workspace_action_lifecycle_events
     : Array.isArray(payload.workspace_action_lifecycle_events)
@@ -13299,6 +13304,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
     final_answer_source: finalAnswerSource,
+    voice_playback_reconciliation: voicePlaybackReconciliation,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {
@@ -13639,6 +13645,80 @@ function buildClientProjectionDebugFields(localPayload: Record<string, unknown>)
   return clientProjection;
 }
 
+function buildVoicePlaybackReconciliationDebug(input: {
+  activeTurnId: string | null;
+  selectedFinalAnswer: string | null;
+  source: Record<string, unknown>;
+}): Record<string, unknown> {
+  const clientProjection = readAgentLoopAuditRecord(input.source.client_debug_projection);
+  const clientVoice = readAgentLoopAuditRecord(input.source.client_voice_debug ?? clientProjection?.voice);
+  const receiptSources = [
+    input.source.client_voice_playback_receipts,
+    clientProjection?.voice_playback_receipts,
+    clientVoice?.playbackReceipts,
+  ];
+  const receipts = receiptSources
+    .flatMap((source) => (Array.isArray(source) ? source : []))
+    .map((receipt) => readAgentLoopAuditRecord(receipt))
+    .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+  const voiceCallSources = [input.source.client_voice_calls, clientProjection?.voice_calls, clientVoice?.voiceCalls];
+  const voiceCalls = voiceCallSources
+    .flatMap((source) => (Array.isArray(source) ? source : []))
+    .map((call) => readAgentLoopAuditRecord(call))
+    .filter((call): call is Record<string, unknown> => Boolean(call));
+  const activeTurnId = input.activeTurnId?.trim() ?? "";
+  const isActiveTurnReceipt = (receipt: Record<string, unknown>): boolean => {
+    if (!activeTurnId) return true;
+    return [
+      receipt.turnKey,
+      receipt.utteranceId,
+      receipt.sourceReceiptId,
+      receipt.sourceReceiptKey,
+      receipt.requestId,
+    ].some((value) => coerceText(value).includes(activeTurnId));
+  };
+  const deliveredReceipts = receipts.filter(
+    (receipt) => coerceText(receipt.status).trim() === "delivered" && isActiveTurnReceipt(receipt),
+  );
+  const deliveredUtteranceIds = Array.from(
+    new Set(deliveredReceipts.map((receipt) => coerceText(receipt.utteranceId).trim()).filter(Boolean)),
+  );
+  const audioBytesObserved = voiceCalls
+    .filter((call) => {
+      const utteranceId = coerceText(call.utteranceId).trim();
+      return deliveredUtteranceIds.length === 0 || deliveredUtteranceIds.includes(utteranceId);
+    })
+    .reduce((total, call) => {
+      const bytes = typeof call.audioBytes === "number" && Number.isFinite(call.audioBytes) ? call.audioBytes : 0;
+      return total + Math.max(0, bytes);
+    }, 0);
+  const selectedText = input.selectedFinalAnswer ?? "";
+  const selectedFinalAnswerClaim = /browser playback confirmation is still pending|playback confirmation is still pending/i.test(selectedText)
+    ? "pending_client_playback"
+    : "none";
+  const playbackConfirmation = deliveredReceipts.length > 0 ? "delivered" : "not_observed";
+  const correctedStatusText =
+    selectedFinalAnswerClaim === "pending_client_playback" && playbackConfirmation === "delivered"
+      ? "Client playback receipt confirms delivered audio after the final answer was composed."
+      : null;
+  return {
+    schema: "helix.voice_playback_reconciliation.v1",
+    source: "client_playback_receipts",
+    active_turn_id: activeTurnId || null,
+    selected_final_answer_claim: selectedFinalAnswerClaim,
+    playback_confirmation: playbackConfirmation,
+    delivered_receipt_count: deliveredReceipts.length,
+    delivered_utterance_ids: deliveredUtteranceIds,
+    audio_bytes_observed: audioBytesObserved,
+    corrected_status_text: correctedStatusText,
+    terminal_answer_mutated: false,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    output_authority: "client_playback_observation",
+  };
+}
+
 async function resolveAuthoritativeDebugExportPayload(localPayload: string): Promise<string> {
   if (typeof fetch !== "function") return localPayload;
   let parsed: Record<string, unknown>;
@@ -13665,7 +13745,7 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
     const authoritativeTurnId = coerceText(authoritativePayload.active_turn_id).trim();
     if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) return localPayload;
     const clientProjection = buildClientProjectionDebugFields(parsed);
-    return JSON.stringify({
+    const mergedPayload = {
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
       client_projection_payload_hash: hashDebugExportText(localPayload),
@@ -13675,6 +13755,14 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       client_voice_playback_output: clientProjection.voice_playback_output,
       client_voice_playback_metrics: clientProjection.voice_playback_metrics,
       client_voice_calls: clientProjection.voice_calls,
+    };
+    return JSON.stringify({
+      ...mergedPayload,
+      voice_playback_reconciliation: buildVoicePlaybackReconciliationDebug({
+        activeTurnId: coerceText(mergedPayload.active_turn_id).trim() || null,
+        selectedFinalAnswer: coerceText(mergedPayload.selected_final_answer).trim() || null,
+        source: mergedPayload,
+      }),
     }, null, 2);
   } catch {
     return localPayload;
