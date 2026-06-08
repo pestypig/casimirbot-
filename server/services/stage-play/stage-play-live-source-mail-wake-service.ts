@@ -5,6 +5,7 @@ import {
   subscribeStagePlayLiveSourceMailEnqueued,
   type StagePlayLiveSourceMailEnqueuedEvent,
 } from "./stage-play-live-source-mailbox-store";
+import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-live-source-mail-transcript-store";
 import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
@@ -204,6 +205,84 @@ const maybeScheduleContinuation = (input: {
   };
 };
 
+const continuationBody = (
+  status: StagePlayLiveSourceMailWakeResultV1["status"],
+  continuation: StagePlayLiveSourceMailWakeAdmissionCycleResultV1["continuation"],
+  retainedMailCount: number,
+): string => {
+  const continuationText = continuation.scheduled
+    ? "scheduled"
+    : continuation.reason === "manual_cycle_no_auto_continuation"
+      ? "manual cycle no auto continuation"
+      : continuation.reason === "wake_runner_disabled"
+        ? "deferred; wake runner disabled"
+        : continuation.reason === "no_runnable_wake_remaining"
+          ? "armed for next summary"
+          : "deferred";
+  return [
+    status === "completed" ? "Batch completed." : `Batch ${status}.`,
+    `Continuation: ${continuationText}.`,
+    `Loop state: armed_for_next_summary.`,
+    retainedMailCount > 0 ? `Unread retained: ${retainedMailCount}.` : null,
+    continuation.runnableWakeIds.length > 0
+      ? `Runnable wake ids: ${continuation.runnableWakeIds.join(", ")}.`
+      : null,
+  ].filter(Boolean).join("\n");
+};
+
+const recordContinuationTranscriptRow = (input: {
+  result: StagePlayLiveSourceMailWakeResultV1 | null;
+  continuation: StagePlayLiveSourceMailWakeAdmissionCycleResultV1["continuation"];
+  now: string;
+}): void => {
+  if (!input.result) return;
+  if (input.result.status !== "completed" && input.result.status !== "failed_retryable") return;
+  const wake = listStagePlayLiveSourceMailWakeRequests({ limit: 250 })
+    .find((entry) => entry.wakeRequestId === input.result?.wakeRequestId) ?? null;
+  const retainedMailCount = listStagePlayLiveSourceMailWakeRequests({ limit: 250 })
+    .filter((entry) => input.continuation.runnableWakeIds.includes(entry.wakeRequestId))
+    .reduce((total, entry) => total + entry.mailIds.length, 0);
+  recordStagePlayLiveSourceMailTranscriptEntries({
+    threadId: input.result.threadId,
+    roomId: input.result.roomId ?? null,
+    environmentId: input.result.environmentId ?? null,
+    wakeRequestId: input.result.wakeRequestId,
+    wakeResultId: input.result.wakeResultId,
+    askTurnId: input.result.askTurnId ?? null,
+    decisionIds: input.result.decisionIds,
+    mailIds: wake?.mailIds ?? [],
+    sourceIds: wake?.sourceIds ?? [],
+    evidenceRefs: [
+      input.result.wakeResultId,
+      input.result.wakeRequestId,
+      ...input.result.evidenceRefs,
+      ...input.continuation.runnableWakeIds,
+    ],
+    causalTrace: input.result.causalTrace ?? wake?.causalTrace,
+    createdAt: input.now,
+    rows: [{
+      rowId: `wake_continuation_state:${input.result.wakeResultId}`,
+      rowKind: "loop_state",
+      title: "Continuation state",
+      body: continuationBody(input.result.status, input.continuation, retainedMailCount),
+      source: {
+        artifactId: input.result.wakeResultId,
+        artifactKind: input.result.artifactId,
+      },
+      evidenceRefs: [
+        input.result.wakeResultId,
+        input.result.wakeRequestId,
+        ...input.continuation.runnableWakeIds,
+      ],
+      causalTrace: input.result.causalTrace ?? wake?.causalTrace,
+      authority: "tool_evidence",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt: input.now,
+    }],
+  });
+};
+
 export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
   threadId?: string | null;
   roomId?: string | null;
@@ -269,6 +348,11 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
       jobId: input.jobId ?? null,
+    });
+    recordContinuationTranscriptRow({
+      result,
+      continuation,
+      now,
     });
     return summarizeWakeState({
       now,

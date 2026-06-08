@@ -634,6 +634,7 @@ function renderPanel(options: {
   descriptors?: Array<Record<string, unknown>>;
   producers?: Array<Record<string, unknown>>;
   graph?: StagePlayBadgeGraphV1;
+  mailboxResponse?: Record<string, unknown>;
 } = {}) {
   const graph = options.graph ?? buildFixture();
   const sourceHandles = buildSourceHandles(options);
@@ -803,6 +804,12 @@ function renderPanel(options: {
       });
     }
     if (url.includes("/api/helix/stage-play/live-source-mail")) {
+      if (options.mailboxResponse) {
+        return new Response(JSON.stringify(options.mailboxResponse), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({
         ok: true,
         schema: "stage_play_live_source_mail_list_response/v1",

@@ -1409,6 +1409,25 @@ function buildObserverMailLoopNodes(input: {
     null;
   const runtimePressureLevel = mailbox?.wakeAdmissionCycle?.runtimeAdmission?.pressureLevel ?? null;
   const continuation = mailbox?.wakeAdmissionCycle?.continuation ?? null;
+  const continuationRunnableWakeIds = continuation?.runnableWakeIds ?? [];
+  const continuationRetainedMailCount = continuationRunnableWakeIds
+    .map((wakeId) => wakeById.get(wakeId))
+    .filter((wake): wake is StagePlayLiveSourceMailWakeRequestV1 => Boolean(wake))
+    .reduce((total, wake) => total + wake.mailIds.length, 0);
+  const continuationReason = continuation?.reason ?? null;
+  const continuationStateText = continuation
+    ? continuation.scheduled
+      ? `scheduled (${labelize(continuationReason ?? "runnable_wake_remaining")})`
+      : continuationReason === "manual_cycle_no_auto_continuation"
+        ? "manual cycle no auto continuation"
+        : continuationReason === "wake_runner_disabled"
+          ? "deferred; wake runner disabled"
+          : continuationReason === "no_runnable_wake_remaining"
+            ? "armed for next summary"
+            : labelize(continuationReason ?? "deferred")
+    : latestPolicy
+      ? "armed for next summary"
+      : "no watch policy";
   const pressureContinuationText = continuation
     ? continuation.scheduled
       ? `Auto continuation: scheduled (${labelize(continuation.reason ?? "runnable_wake_remaining")})`
@@ -1427,6 +1446,32 @@ function buildObserverMailLoopNodes(input: {
           pressureContinuationText,
         ].filter((line): line is string => Boolean(line)),
         tone: "pressure" as const,
+      }
+    : null;
+  const wakeContinuationActive =
+    Boolean(latestPolicy) &&
+    !wakePressureActive &&
+    Boolean(
+      continuation ||
+      latestWakeStatus === "completed" ||
+      latestDecision?.nextLoopState === "armed_for_next_summary" ||
+      activeJob?.nextLoopState === "armed_for_next_summary",
+    );
+  const wakeContinuationBand = wakeContinuationActive
+    ? {
+        title: "Continuation",
+        lines: [
+          latestWakeStatus === "completed" ? "Batch completed." : latestDecision ? "Checkpoint completed." : "Watch job active.",
+          `Continuation: ${continuationStateText}`,
+          `Loop state: ${latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary"}`,
+          continuationRetainedMailCount > 0
+            ? `Unread retained: ${continuationRetainedMailCount}`
+            : unreadCount > 0
+              ? `Unread retained: ${unreadCount}`
+              : null,
+          continuationRunnableWakeIds.length > 0 ? `Runnable wakes: ${continuationRunnableWakeIds.length}` : null,
+        ].filter((line): line is string => Boolean(line)),
+        tone: continuation?.scheduled ? "good" as const : "pending" as const,
       }
     : null;
   const latestDecisionText = latestDecision
@@ -1676,13 +1721,14 @@ function buildObserverMailLoopNodes(input: {
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
         manualCheckpointWithoutPolicy ? "policy missing" : null,
+        wakeContinuationActive ? "continuation armed" : null,
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
         runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
         wakePressureActive ? "wake pressure" : null,
         pressureWakeMailCount > 0 ? `${pressureWakeMailCount} retained mail` : null,
         retryWakeCount > 0 ? "retrying" : null,
       ].filter((entry): entry is string => Boolean(entry)),
-      statusBand: wakePressureBand,
+      statusBand: wakePressureBand ?? wakeContinuationBand,
       payloadRows: [
         {
           label: "Tool",
@@ -1702,11 +1748,11 @@ function buildObserverMailLoopNodes(input: {
             : latestWakeStatus === "deferred_for_pressure" || unreadCount > 0 ? "warn" : latestWakeStatus ? "good" : "default",
         },
         {
-          label: "Pressure",
+          label: wakePressureActive ? "Pressure" : "Continuation",
           value: wakePressureActive
             ? `deferred; ${unreadCount} unread retained${pressureNextRetryAt ? `; next retry ${formatStagePlayClock(pressureNextRetryAt)}` : ""}`
-            : "no pressure defer",
-          tone: wakePressureActive ? "warn" : "good",
+            : `${continuationStateText}${continuationRetainedMailCount > 0 ? `; ${continuationRetainedMailCount} unread retained` : ""}`,
+          tone: wakePressureActive ? "warn" : wakeContinuationActive ? "good" : "default",
         },
       ],
       edgeToNext: {
@@ -1735,7 +1781,7 @@ function buildObserverMailLoopNodes(input: {
           ? `manual checkpoint complete; ${unreadCount} unread retained; configure live_env.configure_live_source_watch_job for the continuing loop`
           : latestWakeStatus === "deferred_for_pressure"
           ? `deferred_for_pressure; ${runtimePressureReason ?? "runtime pressure"}; ${unreadCount} unread retained${pressureNextRetryAt ? `; next retry ${formatStagePlayClock(pressureNextRetryAt)}` : ""}; ${pressureContinuationText}`
-          : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
+          : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; continuation ${continuationStateText}; ${continuationRetainedMailCount || unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
           : "no wake request yet",
@@ -1787,8 +1833,10 @@ function buildObserverMailLoopNodes(input: {
       preview: outputPreview,
       statusChips: [
         latestDecision?.voicePolicy?.voiceEnabled ? "voice enabled" : "voice off",
+        wakeContinuationActive ? "armed" : null,
         manualCheckpointWithoutPolicy ? "configure watch job" : activeJob?.status ? `job ${activeJob.status}` : null,
       ].filter((entry): entry is string => Boolean(entry)),
+      statusBand: wakePressureBand ?? wakeContinuationBand,
       payloadRows: [
         {
           label: "Output",
@@ -1807,9 +1855,14 @@ function buildObserverMailLoopNodes(input: {
           value: manualCheckpointWithoutPolicy
             ? "Missing inner loop: configure a live-source watch job so new mail re-enters Ask under a stored objective."
             : latestPolicy
-              ? `Watch policy: ${latestPolicy.interpretationMode ?? "armed"}`
+              ? `Watch policy: ${latestPolicy.interpretationMode ?? "armed"}; continuation ${continuationStateText}`
               : "No watch policy.",
           tone: manualCheckpointWithoutPolicy ? "blocked" : latestPolicy ? "good" : "warn",
+        },
+        {
+          label: "Retained",
+          value: `${continuationRetainedMailCount || unreadCount} unread retained`,
+          tone: continuationRetainedMailCount > 0 || unreadCount > 0 ? "warn" : "good",
         },
       ],
       edgeToNext: null,
@@ -1879,7 +1932,7 @@ function StagePlayObserverMailLoopCanvas({
               <div className="mt-2 line-clamp-2 text-[11px] text-slate-200">{node.preview}</div>
               {node.payloadRows?.length ? (
                 <div className="mt-2 space-y-1 text-left" data-testid="stage-play-mail-loop-node-payload">
-                  {node.payloadRows.slice(0, 3).map((row) => (
+                  {node.payloadRows.slice(0, 4).map((row) => (
                     <div
                       key={`${node.id}:${row.label}`}
                       className={`rounded border px-2 py-1 ${

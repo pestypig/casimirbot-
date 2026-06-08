@@ -131,7 +131,10 @@ const wakeAskTurnTimeoutMs = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_TIMEOUT_MS", 120_000);
 
 const wakeAskBatchLimit = (): number =>
-  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT", 4);
+  readPositiveIntEnv(
+    "STAGE_PLAY_MAIL_WAKE_MAX_BATCH",
+    readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT", 4),
+  );
 
 const wakeAskPromptMaxChars = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS", 18_000);

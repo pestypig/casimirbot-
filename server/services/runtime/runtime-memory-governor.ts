@@ -41,6 +41,7 @@ export type RuntimeAdmissionDecision = {
     | "background_paused"
     | "queue_deferrable"
     | "critical_bypass"
+    | "local_stage_play_refresh_bypass"
     | "concurrency_limit"
     | "burst_limit";
   pressureLevel: RuntimePressureLevel;
@@ -235,6 +236,8 @@ const readPositiveIntegerEnv = (name: string, fallback: number): number => {
 
 const envDisabled = (name: string): boolean => String(process.env[name] ?? "").trim() === "0";
 
+const envEnabled = (name: string): boolean => String(process.env[name] ?? "").trim() === "1";
+
 const roundMiB = (value: number): number => Math.round(value * 10) / 10;
 
 const toMemorySnapshot = (memory: NodeJS.MemoryUsage): RuntimeAdmissionDecision["memory"] => ({
@@ -247,30 +250,39 @@ const toMemorySnapshot = (memory: NodeJS.MemoryUsage): RuntimeAdmissionDecision[
 
 const readLimits = (taskClass: RuntimeTaskClass): RuntimeAdmissionDecision["limits"] => {
   const budget = resolveDefaultTaskBudget(taskClass);
+  const taskPrefix = `RUNTIME_TASK_${taskClass.toUpperCase()}`;
   const genericMaxHeap = readPositiveNumberEnv(
     "RUNTIME_MEMORY_MAX_HEAP_USED_MB",
     budget.maxHeapUsedMiB ?? 520,
   );
   const genericMaxRss = readPositiveNumberEnv("RUNTIME_MEMORY_MAX_RSS_MB", budget.maxRssMiB ?? 950);
+  const taskMaxHeap = readPositiveNumberEnv(`${taskPrefix}_MAX_HEAP_USED_MB`, genericMaxHeap);
+  const taskMaxRss = readPositiveNumberEnv(`${taskPrefix}_MAX_RSS_MB`, genericMaxRss);
   const maxHeapUsedMiB =
     taskClass === "voice_stt"
-      ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_HEAP_USED_MB", genericMaxHeap)
+      ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_HEAP_USED_MB", taskMaxHeap)
       : taskClass === "voice_tts"
-        ? readPositiveNumberEnv("VOICE_TTS_MAX_HEAP_USED_MB", genericMaxHeap)
-      : genericMaxHeap;
+        ? readPositiveNumberEnv("VOICE_TTS_MAX_HEAP_USED_MB", taskMaxHeap)
+        : taskMaxHeap;
   const maxRssMiB =
     taskClass === "voice_stt"
-      ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_RSS_MB", genericMaxRss)
+      ? readPositiveNumberEnv("VOICE_TRANSCRIBE_MAX_RSS_MB", taskMaxRss)
       : taskClass === "voice_tts"
-        ? readPositiveNumberEnv("VOICE_TTS_MAX_RSS_MB", genericMaxRss)
-      : genericMaxRss;
+        ? readPositiveNumberEnv("VOICE_TTS_MAX_RSS_MB", taskMaxRss)
+        : taskMaxRss;
   const resumeHeapUsedMiB = readPositiveNumberEnv(
-    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_HEAP_USED_MB" : "RUNTIME_MEMORY_RESUME_HEAP_USED_MB",
-    Math.floor(maxHeapUsedMiB * 0.85),
+    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_HEAP_USED_MB" : `${taskPrefix}_RESUME_HEAP_USED_MB`,
+    readPositiveNumberEnv(
+      "RUNTIME_MEMORY_RESUME_HEAP_USED_MB",
+      Math.floor(maxHeapUsedMiB * 0.85),
+    ),
   );
   const resumeRssMiB = readPositiveNumberEnv(
-    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_RSS_MB" : "RUNTIME_MEMORY_RESUME_RSS_MB",
-    Math.floor(maxRssMiB * 0.85),
+    taskClass === "voice_tts" ? "VOICE_TTS_RESUME_RSS_MB" : `${taskPrefix}_RESUME_RSS_MB`,
+    readPositiveNumberEnv(
+      "RUNTIME_MEMORY_RESUME_RSS_MB",
+      Math.floor(maxRssMiB * 0.85),
+    ),
   );
   return {
     maxHeapUsedMiB,
@@ -352,6 +364,23 @@ const pushRecentCompletion = (task: ActiveRuntimeTask, outcome: RecentRuntimeCom
 
 const activeTaskCountForClass = (taskClass: RuntimeTaskClass): number =>
   Array.from(activeTasks.values()).filter((task) => task.taskClass === taskClass).length;
+
+const hasActiveForegroundOrVoiceTask = (): boolean =>
+  activeTaskCountForClass("active_user_turn") > 0 ||
+  activeTaskCountForClass("voice_capture") > 0 ||
+  activeTaskCountForClass("voice_stt") > 0 ||
+  activeTaskCountForClass("voice_tts") > 0;
+
+const stagePlayLocalPressureBypassAllowed = (
+  input: RuntimeAdmissionInput,
+  pressure: { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] },
+): boolean =>
+  process.env.NODE_ENV !== "production" &&
+  input.taskClass === "stage_play_refresh" &&
+  envEnabled("STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL") &&
+  pressure.level !== "normal" &&
+  pressure.reason !== "host_memory_limit" &&
+  !hasActiveForegroundOrVoiceTask();
 
 const readClassConcurrencyLimit = (taskClass: RuntimeTaskClass): number => {
   const budget = resolveDefaultTaskBudget(taskClass);
@@ -633,6 +662,21 @@ export const admitRuntimeTask = (
   if (pressure.level === "normal") {
     const lease = buildLease(input.taskClass);
     return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
+  }
+
+  if (stagePlayLocalPressureBypassAllowed(input, pressure)) {
+    const lease = buildLease(input.taskClass);
+    return makeDecision(
+      input,
+      "admit",
+      true,
+      "local_stage_play_refresh_bypass",
+      pressure.level,
+      memory,
+      host,
+      limits,
+      lease,
+    );
   }
 
   if (budget.deferrable) {

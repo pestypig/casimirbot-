@@ -38,6 +38,14 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TTS_RESUME_RSS_MB;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_RSS_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_CONCURRENT;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_LIMIT;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
       hostMemoryReader: hostReader(),
@@ -60,6 +68,14 @@ describe("runtime memory governor", () => {
     delete process.env.VOICE_TTS_RESUME_RSS_MB;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_VOICE_STT_BURST_WINDOW_MS;
+    delete process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_RESUME_RSS_MB;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_CONCURRENT;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_LIMIT;
+    delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   });
 
@@ -342,6 +358,116 @@ describe("runtime memory governor", () => {
     expect(second.action).toBe("queue");
     expect(second.reason).toBe("concurrency_limit");
     first.lease?.release("completed");
+  });
+
+  it("allows local stage play refresh pressure bypass without foreground or voice work", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL = "1";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "stage_play_refresh",
+        source: "stage_play_live_source_mail_wake",
+      });
+
+      expect(decision.admitted).toBe(true);
+      expect(decision.action).toBe("admit");
+      expect(decision.reason).toBe("local_stage_play_refresh_bypass");
+      expect(decision.pressureLevel).toBe("hard_pressure");
+      decision.lease?.release("completed");
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("does not bypass stage play refresh pressure while an active user turn is running", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL = "1";
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+        hostMemoryReader: hostReader(),
+      });
+      const userTurn = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+      expect(userTurn.admitted).toBe(true);
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "stage_play_refresh",
+        source: "stage_play_live_source_mail_wake",
+      });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.action).toBe("queue");
+      expect(decision.reason).toBe("queue_deferrable");
+      userTurn.lease?.release("completed");
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("does not bypass stage play refresh pressure while voice work is running", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = "development";
+      process.env.STAGE_PLAY_MAIL_WAKE_PRESSURE_BYPASS_FOR_LOCAL = "1";
+      let heapUsed = 100 * mib;
+      let rss = 200 * mib;
+      runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+        memoryReader: () => memoryReader({ heapUsed, rss })(),
+        hostMemoryReader: hostReader(),
+      });
+      const voice = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "voice_tts" });
+      expect(voice.admitted).toBe(true);
+      heapUsed = 700 * mib;
+      rss = 1200 * mib;
+
+      const decision = runtimeMemoryGovernor.admitRuntimeTask({
+        taskClass: "stage_play_refresh",
+        source: "stage_play_live_source_mail_wake",
+      });
+
+      expect(decision.admitted).toBe(false);
+      expect(decision.action).toBe("queue");
+      expect(decision.reason).toBe("queue_deferrable");
+      voice.lease?.release("completed");
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("applies per-class memory limits to stage play refresh", () => {
+    process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_HEAP_USED_MB = "1000";
+    process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_RSS_MB = "1500";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "stage_play_refresh" });
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.reason).toBe("ok");
+    expect(decision.limits.maxHeapUsedMiB).toBe(1000);
+    expect(decision.limits.maxRssMiB).toBe(1500);
+    decision.lease?.release("completed");
   });
 
   it("reports registered pausable tasks and recent completions in the task snapshot", () => {

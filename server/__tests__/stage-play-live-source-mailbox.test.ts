@@ -2798,6 +2798,13 @@ describe("Stage Play live-source mailbox", () => {
         reason: "wake_runner_disabled",
         runnableWakeIds: [retainedWake?.wakeRequestId],
       });
+      const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+      const continuationRows = transcriptEntries.filter((entry) => entry.row.title === "Continuation state");
+      expect(continuationRows).toHaveLength(1);
+      expect(continuationRows[0].row.body).toContain("Batch completed.");
+      expect(continuationRows[0].row.body).toContain("Continuation: deferred; wake runner disabled.");
+      expect(continuationRows[0].row.body).toContain("Loop state: armed_for_next_summary.");
+      expect(continuationRows[0].row.body).toContain("Unread retained: 1.");
     } finally {
       if (previousBatchLimit === undefined) {
         delete process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT;
