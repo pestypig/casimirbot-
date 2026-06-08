@@ -140,7 +140,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     seedVisualMail("A Minecraft menu is visible, but this turn is only configuring interpretation policy.");
 
     const { response, liveEnvironmentToolNames, debug } = await askMailbox(
-      "Create an interpreter profile for this live source. Act like a Minecraft survival coach.",
+      "Create a Minecraft Survival Coach interpreter profile for this source. Call out danger, rare resources, and strategic decisions; ignore routine walking.",
     );
 
     expect(liveEnvironmentToolNames, debug).toContain("live_env.configure_interpreter_profile");

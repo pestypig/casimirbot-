@@ -35,6 +35,11 @@ const readStringArray = (value: unknown): string[] => {
 export const isSituationRoomSetupPrompt = (prompt: string): boolean => {
   const normalized = prompt.trim().toLowerCase();
   if (!normalized) return false;
+  const liveSourceInterpreterProfileCue =
+    /\b(?:interpreter\s+profile|profile\s+for\s+(?:this|the)\s+(?:source|live\s+source|visual\s+source)|guidelines\s+for\s+interpreting\s+(?:the\s+)?(?:source|live\s+source|visual\s+source)|survival\s+coach|browser\s+workflow\s+watcher|video\s+scene\s+interpreter|code\s+log\s+failure\s+watcher|call\s+out\s+(?:danger|rare\s+resources|strategic\s+decisions?)|ignore\s+routine)\b/.test(
+      normalized,
+    );
+  if (liveSourceInterpreterProfileCue) return false;
   const promptComposerCue =
     /\b(?:prompt\s+composer|compose\s+a\s+prompt|make\s+a\s+prompt|turn\s+(?:the\s+)?(?:call|conversation|voice\s+chat)\s+into\s+a\s+prompt)\b/.test(
       normalized,
@@ -46,7 +51,7 @@ export const isSituationRoomSetupPrompt = (prompt: string): boolean => {
     return false;
   }
   const conversationCue =
-    /\b(?:conversation|call|voice\s+chat|discord(?:\s+voice\s+chat)?|meeting|room|microphone|mic|same\s+microphone|shared\s+mic|one\s+mic|browser\s+tab|browser\s+call|tab\s+audio)\b/.test(
+    /\b(?:conversation|call(?!\s+out\b)|voice\s+chat|discord(?:\s+voice\s+chat)?|meeting|room|microphone|mic|same\s+microphone|shared\s+mic|one\s+mic|browser\s+tab|browser\s+call|tab\s+audio)\b/.test(
       normalized,
     );
   const setupCue =

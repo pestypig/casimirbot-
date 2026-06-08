@@ -17,6 +17,16 @@ describe("helix ask E2 situation room setup intent", () => {
     vi.resetModules();
   });
 
+  it("does not capture live-source interpreter profile setup as Situation Room audio setup", async () => {
+    const { isSituationRoomSetupPrompt } = await import("../services/helix-ask/situation-room-setup-intent");
+
+    expect(
+      isSituationRoomSetupPrompt(
+        "Create a Minecraft Survival Coach interpreter profile for this source. Call out danger, rare resources, and strategic decisions; ignore routine walking.",
+      ),
+    ).toBe(false);
+  });
+
   it("plans Discord tab translation setup as a permission-bound Situation Room action", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";
     process.env.HELIX_E14_OBSERVATION_MODEL_DECISION = "0";
