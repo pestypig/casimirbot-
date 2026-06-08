@@ -197,6 +197,9 @@ type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointR
 type StagePlayLiveSourceMailListResponse = {
   ok: boolean;
   schema: "stage_play_live_source_mail_list_response/v1";
+  requestedThreadId?: string;
+  mailboxThreadId?: string;
+  mailboxThreadResolution?: Record<string, unknown>;
   mailItems?: StagePlayLiveSourceMailItemV1[];
   jobStates?: StagePlayLiveSourceJobStateV1[];
   watchJobPolicies?: StagePlayLiveSourceWatchJobPolicyV1[];
@@ -414,11 +417,13 @@ async function fetchStagePlayBadgeGraph(input: {
 
 async function fetchStagePlayLiveSourceMail(input: {
   threadId: string;
+  mailboxThreadId?: string | null;
   roomId?: string | null;
   environmentId?: string | null;
 }): Promise<StagePlayLiveSourceMailListResponse> {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
+  if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
   if (input.roomId) params.set("roomId", input.roomId);
   if (input.environmentId) params.set("environmentId", input.environmentId);
   params.set("limit", "20");
@@ -1152,6 +1157,77 @@ const isStagePlayMailWakeAskAttemptResult = (
     !isStagePlayMailWakePressureResult(result)
   );
 
+function resolveActiveWatchPolicy(input: {
+  jobStates: StagePlayLiveSourceJobStateV1[];
+  policies: StagePlayLiveSourceWatchJobPolicyV1[];
+  sourceId?: string | null;
+}): {
+  activeJob: StagePlayLiveSourceJobStateV1 | null;
+  activePolicy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  reason: "direct_job_ref" | "source_match" | "latest_armed_policy" | "policy_without_job_state" | "no_policy";
+} {
+  const policiesById = new Map(input.policies.map((policy) => [policy.policyId, policy]));
+  const findJobForPolicy = (policy: StagePlayLiveSourceWatchJobPolicyV1): StagePlayLiveSourceJobStateV1 | null =>
+    [...input.jobStates].reverse().find((job) =>
+      job.jobId === policy.jobId ||
+      job.watchJobPolicyRef === policy.policyId
+    ) ?? null;
+  const activeJobWithPolicy = [...input.jobStates]
+    .reverse()
+    .find((job) =>
+      (job.status === "armed" || job.status === "checking") &&
+      Boolean(job.watchJobPolicyRef && policiesById.has(job.watchJobPolicyRef))
+    );
+  if (activeJobWithPolicy?.watchJobPolicyRef) {
+    const directPolicy = policiesById.get(activeJobWithPolicy.watchJobPolicyRef) ?? null;
+    if (directPolicy) {
+      return {
+        activeJob: activeJobWithPolicy,
+        activePolicy: directPolicy,
+        reason: "direct_job_ref",
+      };
+    }
+  }
+
+  const sourceMatchedPolicy = input.sourceId
+    ? [...input.policies].reverse().find((policy) =>
+      policy.status === "armed" &&
+      policy.sourceIds.includes(input.sourceId as string)
+    ) ?? null
+    : null;
+  if (sourceMatchedPolicy) {
+    return {
+      activeJob: findJobForPolicy(sourceMatchedPolicy),
+      activePolicy: sourceMatchedPolicy,
+      reason: "source_match",
+    };
+  }
+
+  const latestArmedPolicy = [...input.policies].reverse().find((policy) => policy.status === "armed") ?? null;
+  if (latestArmedPolicy) {
+    return {
+      activeJob: findJobForPolicy(latestArmedPolicy),
+      activePolicy: latestArmedPolicy,
+      reason: "latest_armed_policy",
+    };
+  }
+
+  const latestPolicy = input.policies.at(-1) ?? null;
+  if (latestPolicy) {
+    return {
+      activeJob: findJobForPolicy(latestPolicy),
+      activePolicy: latestPolicy,
+      reason: "policy_without_job_state",
+    };
+  }
+
+  return {
+    activeJob: null,
+    activePolicy: null,
+    reason: "no_policy",
+  };
+}
+
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
@@ -1165,10 +1241,19 @@ function buildObserverMailLoopNodes(input: {
   const wakeResults = mailbox?.wakeResults ?? [];
   const interpreterProfiles = mailbox?.interpreterProfiles ?? [];
   const interpreterProfileComparisons = mailbox?.interpreterProfileComparisons ?? [];
+  const mailboxThreadId = mailbox?.mailboxThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
+  const requestedThreadId = mailbox?.requestedThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const watchPolicyResolution = resolveActiveWatchPolicy({
+    jobStates,
+    policies: mailbox?.watchJobPolicies ?? [],
+    sourceId: visualSource?.sourceId ?? visualMail?.sourceId ?? null,
+  });
+  const activeJob = watchPolicyResolution.activeJob;
+  const latestPolicy = watchPolicyResolution.activePolicy;
   const unreadCount = mailItems.filter((item) => item.status === "unread").length;
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
   const retryWakeCount = wakeRequests.filter((wake) => wake.status === "failed_retryable").length;
@@ -1216,10 +1301,6 @@ function buildObserverMailLoopNodes(input: {
   const latestWakeFailureReason = latestWakeResult?.failedReason ?? displayWake?.failureReason ?? null;
   const latestWakeAskTurnId = latestWakeResult?.askTurnId ?? displayWake?.askTurnId ?? null;
   const latestWakeDecisionIds = latestWakeResult?.decisionIds ?? displayWake?.decisionIds ?? [];
-  const activeJob = jobStates.at(-1) ?? null;
-  const latestPolicy = (mailbox?.watchJobPolicies ?? [])
-    .filter((policy) => !activeJob || policy.jobId === activeJob.jobId || activeJob.watchJobPolicyRef === policy.policyId)
-    .at(-1) ?? null;
   const hasWatchPolicy = Boolean(latestPolicy);
   const manualCheckpointWithoutPolicy = Boolean(
     latestDecision &&
@@ -1248,6 +1329,7 @@ function buildObserverMailLoopNodes(input: {
     interpreterProfileComparisons.at(-1) ??
     null;
   const observerOutputRefs = uniqueSorted([
+    mailboxThreadId,
     visualSource?.sourceId ?? "",
     activeJob?.jobId ?? "",
     visualMail?.mailId ?? "",
@@ -1325,6 +1407,11 @@ function buildObserverMailLoopNodes(input: {
               : activeJob?.objective ?? visualMail?.objective?.text ?? "No watch objective armed yet."),
           tone: latestPolicy ? "good" : "warn",
         },
+        {
+          label: "Mailbox",
+          value: mailboxThreadId,
+          tone: mailboxThreadId === STAGE_PLAY_PANEL_THREAD_ID ? "good" : "warn",
+        },
       ],
       edgeToNext: {
         label: visualMail ? "summary mail" : visualSource ? "waiting for summary" : "source missing",
@@ -1333,10 +1420,10 @@ function buildObserverMailLoopNodes(input: {
       inputLabel: "Input",
       inputRefs: ["source registry"],
       inputPreview: "source registry",
-      transformLabel: "source registry -> live-source mailbox",
+      transformLabel: `source registry -> live-source mailbox (${mailboxThreadId})`,
       outputLabel: "Output",
       outputRefs: observerOutputRefs,
-      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | unread ${unreadCount} | delivered ${deliveredCount}`,
+      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mailbox ${mailboxThreadId} | unread ${unreadCount} | delivered ${deliveredCount}`,
     },
     {
       id: "observer_mail_loop:visual_mail",
@@ -1361,6 +1448,11 @@ function buildObserverMailLoopNodes(input: {
           value: `${unreadCount} unread | ${deliveredCount} delivered | ${queuedWakeMailCount} queued`,
           tone: unreadCount > 0 ? "warn" : "default",
         },
+        {
+          label: "Namespace",
+          value: `requested ${requestedThreadId} -> mailbox ${mailboxThreadId}`,
+          tone: mailboxThreadId === STAGE_PLAY_PANEL_THREAD_ID ? "good" : "warn",
+        },
       ],
       edgeToNext: {
         label: activeInterpreterProfile ? "profile lens" : latestPolicy ? "watch policy" : "no policy",
@@ -1368,7 +1460,9 @@ function buildObserverMailLoopNodes(input: {
       },
       inputLabel: "Input",
       inputRefs: mailInputRefs,
-      inputPreview: mailInputRefs.length > 0 ? mailInputRefs.slice(0, 2).join(", ") : "visual_frame / visual_evidence pending",
+      inputPreview: mailInputRefs.length > 0
+        ? `${mailInputRefs.slice(0, 2).join(", ")} | mailbox ${mailboxThreadId}`
+        : `visual_frame / visual_evidence pending | mailbox ${mailboxThreadId}`,
       transformLabel: "visual summary enqueue -> mailbox item",
       outputLabel: "Output",
       outputRefs: visualMail ? [visualMail.mailId, ...visualMail.evidenceRefs] : [],
@@ -1407,6 +1501,11 @@ function buildObserverMailLoopNodes(input: {
           label: "Suppress",
           value: activeInterpreterProfile?.suppressCriteria.slice(0, 2).join(", ") || latestPolicy?.suppressCriteria.slice(0, 2).join(", ") || "none",
         },
+        {
+          label: "Policy resolution",
+          value: watchPolicyResolution.reason,
+          tone: latestPolicy ? "good" : "blocked",
+        },
       ],
       edgeToNext: {
         label: latestProfileComparison ? "comparison" : activeInterpreterProfile ? "needs comparison" : "profile missing",
@@ -1415,7 +1514,7 @@ function buildObserverMailLoopNodes(input: {
       inputLabel: "Input",
       inputRefs: profileInputRefs,
       inputPreview: profileInputRefs.length > 0 ? profileInputRefs.join(", ") : "watch job / policy",
-      transformLabel: "profile contract -> comparison lens",
+      transformLabel: `profile contract -> comparison lens; policy resolution: ${watchPolicyResolution.reason}`,
       outputLabel: "Output",
       outputRefs: activeInterpreterProfile ? [activeInterpreterProfile.profileId, ...activeInterpreterProfile.evidenceRefs] : [],
       outputPreview: activeInterpreterProfile
@@ -4484,11 +4583,13 @@ export default function StagePlayBadgeGraphPanel() {
   const mailboxQuery = useQuery<StagePlayLiveSourceMailListResponse>({
     queryKey: [
       "/api/helix/stage-play/live-source-mail",
-      threadId,
-      roomId,
-      environmentId,
+      STAGE_PLAY_PANEL_THREAD_ID,
+      STAGE_PLAY_PANEL_THREAD_ID,
     ],
-    queryFn: () => fetchStagePlayLiveSourceMail({ threadId, roomId, environmentId }),
+    queryFn: () => fetchStagePlayLiveSourceMail({
+      threadId: STAGE_PLAY_PANEL_THREAD_ID,
+      mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
+    }),
     refetchInterval: 1000,
   });
   const mailbox = mailboxQuery.data ?? null;

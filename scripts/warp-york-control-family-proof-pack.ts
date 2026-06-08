@@ -82,6 +82,7 @@ import {
   type Nhm2FullLoopAuditSectionId,
   type Nhm2FullLoopAuditSectionsInput,
   type Nhm2FullLoopAuditState,
+  type Nhm2SourceClosureLeadBlockerProjection,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import {
   NHM2_CERTIFICATE_POLICY_ARTIFACT_ID,
@@ -7218,6 +7219,26 @@ const collectFullLoopArtifactRefs = (
   inspections
     .map((entry) => entry.artifactRef ?? null)
     .filter((entry): entry is Nhm2FullLoopAuditArtifactRef => entry != null);
+
+const projectSourceClosureLeadBlocker = (
+  artifact: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact | null | undefined,
+): Nhm2SourceClosureLeadBlockerProjection | null => {
+  if (artifact?.schemaVersion !== "nhm2_source_closure/v2") return null;
+  const leadBlocker = artifact.leadBlocker;
+  if (leadBlocker == null) return null;
+  return {
+    regionId: leadBlocker.regionId,
+    kind: leadBlocker.kind,
+    relLInf: leadBlocker.relLInf,
+    t00Rel: leadBlocker.t00Rel,
+    metricT00Ref: leadBlocker.metricT00Ref,
+    tileT00Ref: leadBlocker.tileT00Ref,
+    t00TraceDivergenceStage: leadBlocker.t00TraceDivergenceStage,
+    t00TraceNextInspectionTarget: leadBlocker.t00TraceNextInspectionTarget,
+    t00TraceFirstSemanticBoundary: leadBlocker.t00TraceFirstSemanticBoundary,
+    nextStep: leadBlocker.nextStep,
+  };
+};
 
 type RepoConvergenceTrainingTraceRecord = {
   traceId?: unknown;
@@ -38480,6 +38501,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       },
       toleranceRef: sourceClosureToleranceRef,
       assumptionsDrifted: sourceClosureArtifact?.assumptionsDrifted ?? null,
+      leadBlocker: projectSourceClosureLeadBlocker(sourceClosureArtifact),
     },
     observer_audit: {
       sectionId: "observer_audit",

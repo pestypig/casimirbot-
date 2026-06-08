@@ -1122,6 +1122,12 @@ describe("warp viability congruence wiring", () => {
     );
     expect(layer?.artifact.sections.source_closure.assumptionsDrifted).toBe(false);
     expect(layer?.artifact.sections.source_closure.residualByRegion.hull).toBeGreaterThan(0.1);
+    expect(layer?.artifact.sections.source_closure.leadBlocker).toMatchObject({
+      regionId: "hull",
+      kind: "regional_residual_exceeded",
+      metricT00Ref: "artifact://metric-hull",
+      tileT00Ref: "artifact://tile-hull",
+    });
   });
 
   it("maps missing source-closure tolerance to a conservative NHM2 blocker", async () => {

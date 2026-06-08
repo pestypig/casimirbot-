@@ -64,6 +64,8 @@ function baseReflection(
       },
       exactBadgeIds: ["nhm2.qei.sampling_window"],
       likelyBadgeIds: ["nhm2.closure.source_residual"],
+      suggestedBiomeChunkIds: ["7:2"],
+      suggestedScaleBands: ["human_engineering"],
       softRegion: {
         id: "discussion-zone:test",
         label: "Current discussion zone",
@@ -104,6 +106,8 @@ describe("theory context reflection v1", () => {
     expect(reflection.context_role).toBe("tool_evidence");
     expect(reflection.ask_context_policy).toBe("evidence_only");
     expect(reflection.deterministic_content_role).toBe("observation_not_assistant_answer");
+    expect(reflection.overlay.suggestedBiomeChunkIds).toEqual(["7:2"]);
+    expect(reflection.overlay.suggestedScaleBands).toEqual(["human_engineering"]);
   });
 
   it("rejects terminal eligible receipts", () => {
@@ -181,6 +185,21 @@ describe("theory context reflection v1", () => {
     });
 
     expect(validateTheoryContextReflectionV1(reflection).join("\n")).toMatch(/forbidden overclaiming/i);
+  });
+
+  it("rejects invalid suggested biome scale bands", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      overlay: {
+        ...reflection.overlay,
+        suggestedScaleBands: ["invalid_band"],
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "overlay.suggestedScaleBands contains invalid scale band: invalid_band",
+    );
   });
 
   it("rejects empty prompts", () => {

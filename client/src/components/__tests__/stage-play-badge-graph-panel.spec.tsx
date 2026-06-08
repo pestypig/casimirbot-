@@ -805,6 +805,21 @@ function renderPanel(options: {
       return new Response(JSON.stringify({
         ok: true,
         schema: "stage_play_live_source_mail_list_response/v1",
+        requestedThreadId: "helix-ask:desktop",
+        mailboxThreadId: "helix-ask:desktop",
+        mailboxThreadResolution: {
+          schema: "stage_play_live_source_mailbox_thread_resolution/v1",
+          askThreadId: "helix-ask:desktop",
+          requestedThreadId: "helix-ask:desktop",
+          mailboxThreadId: "helix-ask:desktop",
+          reason: "explicit_mailbox_thread",
+          candidateThreadIds: ["helix-ask:desktop"],
+          aliasRecorded: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_evidence",
+          raw_content_included: false,
+        },
         mailItems: [
           {
             artifactId: "stage_play_live_source_mail_item",
@@ -862,6 +877,7 @@ function renderPanel(options: {
             sourceIds: ["source:visual-tab"],
             objective: "Watch the active visual source.",
             status: "armed",
+            watchJobPolicyRef: "stage_play_live_source_watch_job_policy:ui",
             mailboxCursor: "stage_play_live_source_mail:ui",
             lastMailId: "stage_play_live_source_mail:ui",
             lastDecisionId: "stage_play_live_source_mail_decision:ui",
@@ -872,6 +888,31 @@ function renderPanel(options: {
               maxConsecutiveReads: 3,
             },
             updatedAt: "2026-06-02T00:00:02.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+          {
+            artifactId: "stage_play_live_source_job_state",
+            schemaVersion: "stage_play_live_source_job_state/v1",
+            jobId: "stage_play_live_source_job:stale-other-source",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            sourceIds: ["source:other-tab"],
+            objective: "Watch an older unrelated source.",
+            status: "armed",
+            mailboxCursor: null,
+            lastMailId: null,
+            lastDecisionId: null,
+            nextLoopState: "armed_for_next_summary",
+            nextWakePolicy: {
+              sourceKind: "visual_frame",
+              afterMs: null,
+              maxConsecutiveReads: 3,
+            },
+            updatedAt: "2026-06-02T00:00:03.000Z",
             assistant_answer: false,
             terminal_eligible: false,
             context_role: "tool_evidence",
@@ -1488,6 +1529,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("record_interpretation").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Minecraft Survival Coach/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Policy resolution/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/direct_job_ref/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Watch policy: batch_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Matched: low light, cave exploration/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Recommended: record_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
@@ -2120,6 +2164,12 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(graphUrl).toContain("threadId=helix-ask%3Adesktop");
     expect(graphUrl).toContain("roomId=room%3Aminecraft-env");
     expect(graphUrl).toContain("environmentId=live_env%3Aui");
+    const mailboxUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/live-source-mail?")) ?? "";
+    expect(mailboxUrl).toContain("/api/helix/stage-play/live-source-mail?");
+    expect(mailboxUrl).toContain("threadId=helix-ask%3Adesktop");
+    expect(mailboxUrl).toContain("mailboxThreadId=helix-ask%3Adesktop");
+    expect(mailboxUrl).not.toContain("roomId=");
+    expect(mailboxUrl).not.toContain("environmentId=");
     const builderUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/builder?")) ?? "";
     expect(builderUrl).toContain("/api/helix/stage-play/builder?");
     expect(builderUrl).toContain("threadId=helix-ask%3Adesktop");

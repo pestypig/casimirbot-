@@ -64,6 +64,15 @@ export const NHM2_SOURCE_CLOSURE_REGION_T00_TRACE_STAGE_VALUES = [
   "unknown",
 ] as const;
 
+export const NHM2_SOURCE_CLOSURE_V2_LEAD_BLOCKER_KIND_VALUES = [
+  "wall_t00_source_path_mismatch",
+  "t00_source_path_mismatch",
+  "regional_residual_exceeded",
+  "counterpart_missing",
+  "region_unavailable",
+  "none",
+] as const;
+
 const NHM2_SOURCE_CLOSURE_PRESSURE_COMPONENTS = ["T11", "T22", "T33"] as const;
 
 export type Nhm2SourceClosureV2ReasonCode =
@@ -143,6 +152,8 @@ export type Nhm2SourceClosureV2RegionComparisonPolicyStatus =
   | "awaiting_new_counterpart_surface"
   | "same_basis_counterpart_defined"
   | "unknown";
+export type Nhm2SourceClosureV2LeadBlockerKind =
+  (typeof NHM2_SOURCE_CLOSURE_V2_LEAD_BLOCKER_KIND_VALUES)[number];
 
 export type Nhm2SourceClosureV2RegionAccounting = {
   sampleCount: number | null;
@@ -335,6 +346,19 @@ export type Nhm2SourceClosureV2RegionComparison = {
   note: string | null;
 };
 
+export type Nhm2SourceClosureV2LeadBlocker = {
+  regionId: string | null;
+  kind: Nhm2SourceClosureV2LeadBlockerKind;
+  relLInf: number | null;
+  t00Rel: number | null;
+  metricT00Ref: string | null;
+  tileT00Ref: string | null;
+  t00TraceDivergenceStage: Nhm2SourceClosureV2RegionT00TraceDivergenceStage | null;
+  t00TraceNextInspectionTarget: string | null;
+  t00TraceFirstSemanticBoundary: string | null;
+  nextStep: Nhm2SourceClosureV2RegionT00MechanismNextStep | null;
+};
+
 export type Nhm2SourceClosureV2Artifact = {
   artifactId: typeof NHM2_SOURCE_CLOSURE_ARTIFACT_ID;
   schemaVersion: typeof NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION;
@@ -360,6 +384,7 @@ export type Nhm2SourceClosureV2Artifact = {
     requiredRegionIds: string[];
     regions: Nhm2SourceClosureV2RegionComparison[];
   };
+  leadBlocker: Nhm2SourceClosureV2LeadBlocker;
   scalarProjections: {
     cl3RhoDeltaRel: number | null;
     metricVsTileT00Rel: number | null;
@@ -2024,6 +2049,138 @@ const buildRegionComparison = (args: {
   };
 };
 
+const normalizeRegionId = (value: string): string => value.trim().toLowerCase().replace(/-/g, "_");
+
+const leadBlockerNone = (): Nhm2SourceClosureV2LeadBlocker => ({
+  regionId: null,
+  kind: "none",
+  relLInf: null,
+  t00Rel: null,
+  metricT00Ref: null,
+  tileT00Ref: null,
+  t00TraceDivergenceStage: null,
+  t00TraceNextInspectionTarget: null,
+  t00TraceFirstSemanticBoundary: null,
+  nextStep: null,
+});
+
+const t00RefFromDiagnostics = (
+  diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null,
+  tensorRef: string | null,
+): string | null =>
+  toRepoPath(
+    diagnostics?.sourceRef ??
+      diagnostics?.trace?.valueRef ??
+      diagnostics?.trace?.tensorRef ??
+      tensorRef,
+  );
+
+const buildLeadBlockerForRegion = (
+  region: Nhm2SourceClosureV2RegionComparison,
+  kind: Nhm2SourceClosureV2LeadBlockerKind,
+): Nhm2SourceClosureV2LeadBlocker => ({
+  regionId: region.regionId,
+  kind,
+  relLInf: toFiniteOrNull(region.residualNorms.relLInf),
+  t00Rel: toFiniteOrNull(region.residualComponents.T00?.relResidual),
+  metricT00Ref: t00RefFromDiagnostics(region.metricT00Diagnostics, region.metricTensorRef),
+  tileT00Ref: t00RefFromDiagnostics(region.tileT00Diagnostics, region.tileTensorRef),
+  t00TraceDivergenceStage:
+    region.mismatchDiagnostics?.t00TraceDivergenceStage ?? null,
+  t00TraceNextInspectionTarget:
+    region.mismatchDiagnostics?.t00TraceNextInspectionTarget ?? null,
+  t00TraceFirstSemanticBoundary:
+    region.mismatchDiagnostics?.t00TraceFirstSemanticBoundary ?? null,
+  nextStep: region.mismatchDiagnostics?.t00MechanismNextStep ?? null,
+});
+
+const buildMissingRegionLeadBlocker = (regionId: string): Nhm2SourceClosureV2LeadBlocker => ({
+  ...leadBlockerNone(),
+  regionId,
+  kind: "region_unavailable",
+});
+
+const regionLeadScore = (region: Nhm2SourceClosureV2RegionComparison): number =>
+  toFiniteOrNull(region.residualNorms.relLInf) ??
+  toFiniteOrNull(region.residualComponents.T00?.relResidual) ??
+  -Infinity;
+
+const sortRegionsByLeadScore = (
+  regions: Nhm2SourceClosureV2RegionComparison[],
+): Nhm2SourceClosureV2RegionComparison[] =>
+  [...regions].sort((a, b) => {
+    const lhs = regionLeadScore(a);
+    const rhs = regionLeadScore(b);
+    if (lhs === rhs) return 0;
+    return lhs > rhs ? -1 : 1;
+  });
+
+const buildNhm2SourceClosureLeadBlocker = (args: {
+  regions: Nhm2SourceClosureV2RegionComparison[];
+  requiredRegionIds: string[];
+}): Nhm2SourceClosureV2LeadBlocker => {
+  const availableRequiredRegions =
+    args.requiredRegionIds.length > 0
+      ? args.requiredRegionIds
+          .map((regionId) => args.regions.find((entry) => entry.regionId === regionId) ?? null)
+          .filter((entry): entry is Nhm2SourceClosureV2RegionComparison => entry != null)
+      : args.regions;
+  const missingRequiredRegionId =
+    args.requiredRegionIds.find(
+      (regionId) => !args.regions.some((entry) => entry.regionId === regionId),
+    ) ?? null;
+  const sourcePathMismatchRegions = availableRequiredRegions.filter(
+    (region) =>
+      region.mismatchDiagnostics?.t00MechanismCategory === "t00_mismatch_present" &&
+      region.mismatchDiagnostics?.t00TraceDivergenceStage === "source_path_mismatch",
+  );
+  const wallSourcePathMismatch =
+    sourcePathMismatchRegions.find((region) => normalizeRegionId(region.regionId) === "wall") ??
+    null;
+  if (wallSourcePathMismatch != null) {
+    return buildLeadBlockerForRegion(
+      wallSourcePathMismatch,
+      "wall_t00_source_path_mismatch",
+    );
+  }
+  const sourcePathMismatch = sortRegionsByLeadScore(sourcePathMismatchRegions)[0] ?? null;
+  if (sourcePathMismatch != null) {
+    return buildLeadBlockerForRegion(sourcePathMismatch, "t00_source_path_mismatch");
+  }
+  const residualExceeded = sortRegionsByLeadScore(
+    availableRequiredRegions.filter(
+      (region) =>
+        region.comparisonBasisStatus === "same_basis" && region.residualNorms.pass === false,
+    ),
+  )[0];
+  if (residualExceeded != null) {
+    return buildLeadBlockerForRegion(residualExceeded, "regional_residual_exceeded");
+  }
+  const counterpartMissing = sortRegionsByLeadScore(
+    availableRequiredRegions.filter(
+      (region) =>
+        region.comparisonBasisAuthorityStatus === "counterpart_missing" ||
+        region.regionalComparisonContractStatus === "narrowed_to_observation_only" ||
+        region.comparisonBasisStatus === "diagnostic_only",
+    ),
+  )[0];
+  if (counterpartMissing != null) {
+    return buildLeadBlockerForRegion(counterpartMissing, "counterpart_missing");
+  }
+  if (missingRequiredRegionId != null) {
+    return buildMissingRegionLeadBlocker(missingRequiredRegionId);
+  }
+  const unavailableRegion =
+    availableRequiredRegions.find(
+      (region) =>
+        region.comparisonBasisStatus === "unavailable" || region.completeness !== "complete",
+    ) ?? null;
+  if (unavailableRegion != null) {
+    return buildLeadBlockerForRegion(unavailableRegion, "region_unavailable");
+  }
+  return leadBlockerNone();
+};
+
 export const buildNhm2SourceClosureArtifactV2 = (
   input: BuildNhm2SourceClosureArtifactV2Input,
 ): Nhm2SourceClosureV2Artifact => {
@@ -2133,6 +2290,10 @@ export const buildNhm2SourceClosureArtifactV2 = (
     residualComponents,
     scalarCl3RhoDeltaRel: toFiniteOrNull(input.scalarCl3RhoDeltaRel),
   });
+  const leadBlocker = buildNhm2SourceClosureLeadBlocker({
+    regions,
+    requiredRegionIds,
+  });
 
   return {
     artifactId: NHM2_SOURCE_CLOSURE_ARTIFACT_ID,
@@ -2156,6 +2317,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
       requiredRegionIds,
       regions,
     },
+    leadBlocker,
     scalarProjections,
     distinction: {
       scalarCongruenceSecondary: true,

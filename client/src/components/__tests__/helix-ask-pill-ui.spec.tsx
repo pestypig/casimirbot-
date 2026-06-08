@@ -957,6 +957,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("fetchStagePlayLiveSourceMailTranscript");
     expect(source).toContain("/api/helix/stage-play/live-source-mail/transcript?");
+    expect(source).toContain("mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID");
     expect(source).toContain("groupStagePlayMailTranscriptEntries(entries)");
     expect(source).toContain("buildHelixAskReplyFromMailTranscriptEntries");
     expect(source).toContain("live_source_mail_wake_transcript_durable: true");

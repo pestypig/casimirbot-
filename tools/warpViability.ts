@@ -25,6 +25,7 @@ import {
   type Nhm2FullLoopAuditClaimTier,
   type Nhm2FullLoopAuditReasonCode,
   type Nhm2FullLoopAuditSectionsInput,
+  type Nhm2SourceClosureLeadBlockerProjection,
   type Nhm2FullLoopAuditState,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import {
@@ -605,6 +606,26 @@ const getSourceClosureRegions = (
       ? artifact.regionComparisons.regions
       : artifact.sampledSummaries.regions;
 
+const projectSourceClosureLeadBlocker = (
+  artifact: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact | null,
+): Nhm2SourceClosureLeadBlockerProjection | null => {
+  if (artifact?.schemaVersion !== "nhm2_source_closure/v2") return null;
+  const leadBlocker = artifact.leadBlocker;
+  if (leadBlocker == null) return null;
+  return {
+    regionId: leadBlocker.regionId,
+    kind: leadBlocker.kind,
+    relLInf: leadBlocker.relLInf,
+    t00Rel: leadBlocker.t00Rel,
+    metricT00Ref: leadBlocker.metricT00Ref,
+    tileT00Ref: leadBlocker.tileT00Ref,
+    t00TraceDivergenceStage: leadBlocker.t00TraceDivergenceStage,
+    t00TraceNextInspectionTarget: leadBlocker.t00TraceNextInspectionTarget,
+    t00TraceFirstSemanticBoundary: leadBlocker.t00TraceFirstSemanticBoundary,
+    nextStep: leadBlocker.nextStep,
+  };
+};
+
 const makeAuditRef = (
   artifactId: string,
   path: string,
@@ -1174,6 +1195,7 @@ const buildNhm2FullLoopPolicyLayer = (args: {
         typeof sourceClosure?.assumptionsDrifted === "boolean"
           ? sourceClosure.assumptionsDrifted
           : null,
+      leadBlocker: projectSourceClosureLeadBlocker(sourceClosure),
     },
     observer_audit: {
       sectionId: "observer_audit",

@@ -8554,6 +8554,9 @@ export type HelixMailLoopTranscriptRow = {
 type StagePlayLiveSourceMailTranscriptResponse = {
   ok?: boolean;
   threadId?: string | null;
+  requestedThreadId?: string | null;
+  mailboxThreadId?: string | null;
+  mailboxThreadResolution?: Record<string, unknown> | null;
   entries?: StagePlayLiveSourceMailTranscriptEntryV1[];
   transcriptRows?: unknown[];
   transcriptEntryIds?: string[];
@@ -8567,10 +8570,12 @@ const uniqueTextValues = (values: Array<string | null | undefined>): string[] =>
 
 async function fetchStagePlayLiveSourceMailTranscript(input: {
   threadId: string;
+  mailboxThreadId?: string | null;
   limit?: number;
 }): Promise<StagePlayLiveSourceMailTranscriptResponse> {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
+  if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
   params.set("limit", String(input.limit ?? 80));
   const response = await fetch(`/api/helix/stage-play/live-source-mail/transcript?${params.toString()}`, {
     method: "GET",
@@ -16771,6 +16776,7 @@ export function HelixAskPill({
       try {
         const response = await fetchStagePlayLiveSourceMailTranscript({
           threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+          mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
           limit: 80,
         });
         if (cancelled || response.ok === false) return;

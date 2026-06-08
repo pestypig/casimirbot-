@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isTheoryContextReflectionV1 } from "../../contracts/theory-context-reflection.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
+import { buildTheoryBiomeLayoutV1 } from "../theory-biome-layout";
 import { buildTheoryContextReflection } from "../theory-context-reflector";
 
 describe("theory context reflector", () => {
@@ -253,5 +254,29 @@ describe("theory context reflector", () => {
       ]),
     );
     expect(topBadgeIds.join(" ")).not.toMatch(/astrochemistry|spectroscopy|pah|fullerene/i);
+  });
+
+  it("returns biome chunk and scale-band hints aligned with the rendered layout", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const layout = buildTheoryBiomeLayoutV1(graph);
+    const c60Coordinate = layout.coordinates.find(
+      (coordinate) => coordinate.badgeId === "astrochemistry.fullerene.c60_stellar_context",
+    );
+    if (!c60Coordinate) throw new Error("missing C60 astrochemistry coordinate fixture");
+
+    const reflection = buildTheoryContextReflection({
+      graph,
+      prompt: "Map buckyballs, stellar carbon, and astrochemistry on the theory badge graph.",
+      generatedAt: "2026-06-08T00:00:00.000Z",
+      reflectionId: "reflection:biome-resolution",
+      limit: 8,
+    });
+
+    expect(isTheoryContextReflectionV1(reflection)).toBe(true);
+    expect(reflection.overlay.highlightedBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
+    expect(reflection.overlay.suggestedScaleBands).toEqual(expect.arrayContaining(["molecular", "stellar"]));
+    expect(reflection.overlay.suggestedBiomeChunkIds).toContain(
+      `${c60Coordinate.chunkX}:${c60Coordinate.chunkY}`,
+    );
   });
 });

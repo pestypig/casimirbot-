@@ -1,4 +1,5 @@
 import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "../contracts/physics-atlas.v1";
+import type { TheoryBiomeBand } from "../contracts/theory-biome-layout.v1";
 import {
   buildTheoryContextReflectionV1,
   type TheoryContextReflectionConfidenceMode,
@@ -10,6 +11,7 @@ import {
 import type { TheoryBadgeGraphV1, TheoryBadgeV1 } from "../contracts/theory-badge-graph.v1";
 import { buildHelixPhysicsAtlasV1 } from "./physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "./physics-atlas-lens";
+import { buildTheoryBiomeLayoutV1 } from "./theory-biome-layout";
 import {
   locateTheoryBadges,
   traceTheoryBadgeConnections,
@@ -501,6 +503,18 @@ export function buildTheoryContextReflection(
   const likelyBadgeIds = likelyMatches.map((match) => match.badgeId);
   const centerBadgeIds = exactBadgeIds.length > 0 ? exactBadgeIds.slice(0, 3) : likelyBadgeIds.slice(0, 3);
   const softRegionBadgeIds = unique([...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds]);
+  const biomeLayout = buildTheoryBiomeLayoutV1(args.graph);
+  const biomeCoordinateByBadgeId = new Map(biomeLayout.coordinates.map((coordinate) => [coordinate.badgeId, coordinate]));
+  const biomeFocusCoordinates = unique([...centerBadgeIds, ...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds])
+    .map((badgeId) => biomeCoordinateByBadgeId.get(badgeId))
+    .filter((coordinate): coordinate is NonNullable<typeof coordinate> => Boolean(coordinate));
+  const suggestedBiomeChunkIds = unique(
+    biomeFocusCoordinates.map((coordinate) => `${coordinate.chunkX}:${coordinate.chunkY}`),
+  ).slice(0, 8);
+  const suggestedScaleBands = unique(biomeFocusCoordinates.map((coordinate) => coordinate.scaleBand)).slice(
+    0,
+    8,
+  ) as TheoryBiomeBand[];
   const allowSoftRegion =
     softRegionBadgeIds.length >= 2 &&
     (confidenceMode === "soft_locator" || exactLookupMatches.some(hasDirectMatchReason));
@@ -539,6 +553,8 @@ export function buildTheoryContextReflection(
       heatByBadgeId,
       exactBadgeIds,
       likelyBadgeIds,
+      suggestedBiomeChunkIds,
+      suggestedScaleBands,
       softRegion: allowSoftRegion
         ? {
             id: `discussion-zone:${args.graph.graphId}:${centerBadgeIds[0] ?? softRegionBadgeIds[0]}`,

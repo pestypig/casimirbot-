@@ -205,6 +205,19 @@ export type Nhm2StrictSignalReadinessSection =
     missingSignals: Nhm2StrictSignalId[];
   };
 
+export type Nhm2SourceClosureLeadBlockerProjection = {
+  regionId: string | null;
+  kind: string | null;
+  relLInf: number | null;
+  t00Rel: number | null;
+  metricT00Ref: string | null;
+  tileT00Ref: string | null;
+  t00TraceDivergenceStage: string | null;
+  t00TraceNextInspectionTarget: string | null;
+  t00TraceFirstSemanticBoundary: string | null;
+  nextStep: string | null;
+};
+
 export type Nhm2SourceClosureSection =
   Nhm2FullLoopAuditSectionBase<"source_closure"> & {
     metricTensorRef: string | null;
@@ -218,6 +231,7 @@ export type Nhm2SourceClosureSection =
     };
     toleranceRef: string | null;
     assumptionsDrifted: boolean | null;
+    leadBlocker?: Nhm2SourceClosureLeadBlockerProjection | null;
   };
 
 export type Nhm2ObserverFamilyAudit = {
@@ -722,6 +736,25 @@ const cloneArtifactRefs = (
     status: ref.status,
   }));
 
+const cloneSourceClosureLeadBlocker = (
+  leadBlocker: Nhm2SourceClosureLeadBlockerProjection | null | undefined,
+): Nhm2SourceClosureLeadBlockerProjection | null | undefined => {
+  if (leadBlocker === undefined) return undefined;
+  if (leadBlocker === null) return null;
+  return {
+    regionId: leadBlocker.regionId,
+    kind: leadBlocker.kind,
+    relLInf: leadBlocker.relLInf,
+    t00Rel: leadBlocker.t00Rel,
+    metricT00Ref: leadBlocker.metricT00Ref,
+    tileT00Ref: leadBlocker.tileT00Ref,
+    t00TraceDivergenceStage: leadBlocker.t00TraceDivergenceStage,
+    t00TraceNextInspectionTarget: leadBlocker.t00TraceNextInspectionTarget,
+    t00TraceFirstSemanticBoundary: leadBlocker.t00TraceFirstSemanticBoundary,
+    nextStep: leadBlocker.nextStep,
+  };
+};
+
 const cloneObserverFamilyAudit = (
   audit: Nhm2ObserverFamilyAudit,
 ): Nhm2ObserverFamilyAudit => ({
@@ -839,6 +872,9 @@ const cloneSections = (
     ...sections.source_closure,
     reasons: orderReasonCodes([...sections.source_closure.reasons]),
     residualByRegion: { ...sections.source_closure.residualByRegion },
+    ...(sections.source_closure.leadBlocker !== undefined
+      ? { leadBlocker: cloneSourceClosureLeadBlocker(sections.source_closure.leadBlocker) }
+      : {}),
     supportedClaimTiers: computeTierListForSection("source_closure"),
     artifactRefs: cloneArtifactRefs(sections.source_closure.artifactRefs),
   },
@@ -1141,6 +1177,23 @@ const isSourceClosureSection = (
 ): value is Nhm2SourceClosureSection => {
   const record = asRecord(value);
   const residualByRegion = asRecord(record.residualByRegion);
+  const leadBlocker = asRecord(record.leadBlocker);
+  const hasValidLeadBlocker =
+    record.leadBlocker === undefined ||
+    record.leadBlocker === null ||
+    ((leadBlocker.regionId === null || asText(leadBlocker.regionId) != null) &&
+      (leadBlocker.kind === null || asText(leadBlocker.kind) != null) &&
+      isNullableFiniteNumber(leadBlocker.relLInf) &&
+      isNullableFiniteNumber(leadBlocker.t00Rel) &&
+      (leadBlocker.metricT00Ref === null || asText(leadBlocker.metricT00Ref) != null) &&
+      (leadBlocker.tileT00Ref === null || asText(leadBlocker.tileT00Ref) != null) &&
+      (leadBlocker.t00TraceDivergenceStage === null ||
+        asText(leadBlocker.t00TraceDivergenceStage) != null) &&
+      (leadBlocker.t00TraceNextInspectionTarget === null ||
+        asText(leadBlocker.t00TraceNextInspectionTarget) != null) &&
+      (leadBlocker.t00TraceFirstSemanticBoundary === null ||
+        asText(leadBlocker.t00TraceFirstSemanticBoundary) != null) &&
+      (leadBlocker.nextStep === null || asText(leadBlocker.nextStep) != null));
   return (
     hasValidSectionBase(record, "source_closure") &&
     (record.metricTensorRef === null || asText(record.metricTensorRef) != null) &&
@@ -1152,7 +1205,8 @@ const isSourceClosureSection = (
     isNullableFiniteNumber(residualByRegion.wall) &&
     isNullableFiniteNumber(residualByRegion.exteriorShell) &&
     (record.toleranceRef === null || asText(record.toleranceRef) != null) &&
-    isNullableBoolean(record.assumptionsDrifted)
+    isNullableBoolean(record.assumptionsDrifted) &&
+    hasValidLeadBlocker
   );
 };
 

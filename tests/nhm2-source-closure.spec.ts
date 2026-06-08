@@ -938,6 +938,18 @@ describe("nhm2 source closure artifact v2", () => {
     expect(region.mismatchDiagnostics?.t00TraceNextInspectionTarget).toBe(
       "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
     );
+    expect(artifact.leadBlocker).toMatchObject({
+      regionId: "wall",
+      kind: "wall_t00_source_path_mismatch",
+      relLInf: 0.4,
+      t00Rel: 0.4,
+      metricT00Ref: "runtime.metricRequired.regionMeans.wall.diagonalTensor.T00",
+      tileT00Ref: "gr.matter.stressEnergy.tensorSampledSummaries.wall.t00Diagnostics.meanT00",
+      t00TraceDivergenceStage: "source_path_mismatch",
+      t00TraceNextInspectionTarget:
+        "modules/warp/natario-warp.ts::calculateMetricStressEnergyTensorRegionMeansFromShiftField vs server/stress-energy-brick.ts::buildTensorRegionSummary",
+      nextStep: "direct_t00_source_model_mapping",
+    });
   });
 
   it("keeps same-basis authority when a semantically aligned tile direct T00 counterpart is present", () => {
@@ -1061,6 +1073,12 @@ describe("nhm2 source closure artifact v2", () => {
     );
     expect(region.comparisonContractNote).toContain("semantically aligned");
     expect(region.status).toBe("pass");
+    expect(artifact.leadBlocker).toMatchObject({
+      regionId: null,
+      kind: "none",
+      relLInf: null,
+      t00Rel: null,
+    });
   });
 
   it("preserves null includedCount when reducer-native evidence is absent", () => {

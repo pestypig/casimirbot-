@@ -1,3 +1,5 @@
+import type { TheoryBiomeBand } from "./theory-biome-layout.v1";
+
 export const THEORY_CONTEXT_REFLECTION_ARTIFACT_ID = "theory_context_reflection" as const;
 export const THEORY_CONTEXT_REFLECTION_SCHEMA_VERSION = "theory_context_reflection/v1" as const;
 
@@ -12,6 +14,21 @@ export const THEORY_CONTEXT_REFLECTION_CONFIDENCE_MODES = [
   "soft_locator",
   "strict_badge_match",
 ] as const;
+
+const THEORY_CONTEXT_REFLECTION_BIOME_BANDS = [
+  "planck_quantum",
+  "nuclear",
+  "atomic",
+  "molecular",
+  "cellular_biophysical",
+  "device_laboratory",
+  "human_engineering",
+  "planetary",
+  "stellar",
+  "galactic_cosmic",
+  "abstract_formal",
+  "claim_boundary",
+] as const satisfies readonly TheoryBiomeBand[];
 
 export type TheoryContextReflectionSource =
   (typeof THEORY_CONTEXT_REFLECTION_SOURCES)[number];
@@ -44,6 +61,8 @@ export type TheoryContextReflectionOverlayV1 = {
   heatByBadgeId: Record<string, number>;
   exactBadgeIds: string[];
   likelyBadgeIds: string[];
+  suggestedBiomeChunkIds?: string[];
+  suggestedScaleBands?: TheoryBiomeBand[];
   softRegion: {
     id: string;
     label: string;
@@ -133,7 +152,7 @@ const isNullableString = (value: unknown): value is string | null =>
   value === null || typeof value === "string";
 
 const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((item) => typeof item === "string");
+  Array.isArray(value) && value.every((item: unknown) => typeof item === "string");
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
@@ -174,7 +193,7 @@ function validateMatchArray(prefix: string, value: unknown, issues: string[]): v
     issues.push(`${prefix} must be an array`);
     return;
   }
-  value.forEach((entry, index) => validateMatch(`${prefix}[${index}]`, entry, issues));
+  (value as unknown[]).forEach((entry: unknown, index: number) => validateMatch(`${prefix}[${index}]`, entry, issues));
 }
 
 function validateDomain(prefix: string, value: unknown, issues: string[]): void {
@@ -211,6 +230,21 @@ function validateOverlay(value: unknown, issues: string[]): void {
     for (const [badgeId, heat] of Object.entries(value.heatByBadgeId)) {
       if (!badgeId) issues.push("overlay.heatByBadgeId keys must be non-empty");
       if (!isFiniteNumber(heat)) issues.push(`overlay.heatByBadgeId.${badgeId} must be a finite number`);
+    }
+  }
+
+  if (value.suggestedBiomeChunkIds !== undefined && !isStringArray(value.suggestedBiomeChunkIds)) {
+    issues.push("overlay.suggestedBiomeChunkIds must be an array of strings");
+  }
+  if (value.suggestedScaleBands !== undefined) {
+    if (!isStringArray(value.suggestedScaleBands)) {
+      issues.push("overlay.suggestedScaleBands must be an array of strings");
+    } else {
+      for (const scaleBand of value.suggestedScaleBands) {
+        if (!THEORY_CONTEXT_REFLECTION_BIOME_BANDS.includes(scaleBand as TheoryBiomeBand)) {
+          issues.push(`overlay.suggestedScaleBands contains invalid scale band: ${scaleBand}`);
+        }
+      }
     }
   }
 
@@ -269,7 +303,7 @@ function validateEvidenceForAsk(value: unknown, issues: string[]): void {
     issues.push("evidenceForAsk.recommendedNextActions must be an array");
     return;
   }
-  value.recommendedNextActions.forEach((action, index) =>
+  (value.recommendedNextActions as unknown[]).forEach((action: unknown, index: number) =>
     validateRecommendedAction(`evidenceForAsk.recommendedNextActions[${index}]`, action, issues),
   );
 }
@@ -336,7 +370,7 @@ export function validateTheoryContextReflectionV1(value: unknown): string[] {
   if (!Array.isArray(value.inferredDomains)) {
     issues.push("inferredDomains must be an array");
   } else {
-    value.inferredDomains.forEach((domain, index) =>
+    (value.inferredDomains as unknown[]).forEach((domain: unknown, index: number) =>
       validateDomain(`inferredDomains[${index}]`, domain, issues),
     );
   }
