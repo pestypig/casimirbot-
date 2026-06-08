@@ -7,6 +7,14 @@ import type {
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type { StagePlayHeldCalloutV1 } from "@shared/contracts/stage-play-held-callout.v1";
+import type {
+  StagePlayLiveSourceConversationContextPackV1,
+} from "@shared/contracts/stage-play-live-source-conversation.v1";
+import type {
+  StagePlayLiveSourceTaskQueueSnapshotV1,
+  StagePlayLiveSourceTaskV1,
+} from "@shared/contracts/stage-play-live-source-task.v1";
 import type {
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
@@ -24,6 +32,10 @@ import {
   getLatestStagePlayLiveSourceNarrativeState,
   getStagePlayLiveSourceNarrativeState,
 } from "./stage-play-live-source-narrative-store";
+import { getStagePlayLiveSourceTaskQueueSnapshot } from "./stage-play-live-source-task-queue";
+import { buildStagePlayLiveSourceConversationContextPack } from "./stage-play-live-source-conversation-store";
+import { listStagePlayHeldCallouts } from "./stage-play-held-callout-store";
+import { maybeQueueStagePlayLiveSourceMemoryConsolidation } from "./stage-play-live-source-memory-consolidation";
 import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-live-source-mail-transcript-store";
 import {
   maybeRunStagePlayLiveSourceVoiceDelivery,
@@ -321,6 +333,133 @@ const formatPriorPrediction = (
   ].join("\n");
 };
 
+const formatTaskLine = (task: StagePlayLiveSourceTaskV1 | null | undefined): string | null => {
+  if (!task) return null;
+  return [
+    `- ${task.taskId}`,
+    `  kind: ${task.taskKind}`,
+    `  status: ${task.status}`,
+    `  priority: ${task.priority}`,
+    task.statusReason ? `  reason: ${clipPromptText(task.statusReason, 180)}` : null,
+    task.mailIds.length > 0 ? `  mail_refs: ${task.mailIds.slice(0, 8).join(", ")}` : null,
+    task.narrativeStateRef ? `  narrative_state: ${task.narrativeStateRef}` : null,
+    task.deadlineHintMs ? `  deadline_hint_ms: ${task.deadlineHintMs}` : null,
+  ].filter(Boolean).join("\n");
+};
+
+const formatTaskQueueSnapshot = (
+  snapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null,
+): string => {
+  if (!snapshot) return "- none recorded";
+  const queued = snapshot.queuedTasks.slice(0, 6).map(formatTaskLine).filter((entry): entry is string => Boolean(entry));
+  const deferred = snapshot.deferredTasks.slice(0, 4).map(formatTaskLine).filter((entry): entry is string => Boolean(entry));
+  const blocked = snapshot.blockedTasks.slice(0, 3).map(formatTaskLine).filter((entry): entry is string => Boolean(entry));
+  return [
+    `snapshot_at: ${snapshot.createdAt}`,
+    `soft_interrupt_recommended: ${snapshot.softInterruptRecommended}`,
+    snapshot.softInterruptReason ? `soft_interrupt_reason: ${snapshot.softInterruptReason}` : null,
+    "running_task:",
+    formatTaskLine(snapshot.runningTask) ?? "- none",
+    "queued_tasks:",
+    ...(queued.length > 0 ? queued : ["- none"]),
+    "deferred_tasks:",
+    ...(deferred.length > 0 ? deferred : ["- none"]),
+    ...(blocked.length > 0 ? ["blocked_tasks:", ...blocked] : []),
+  ].filter(Boolean).join("\n");
+};
+
+const activeTaskKindFromSnapshot = (
+  snapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null,
+): string | null =>
+  snapshot?.runningTask?.taskKind ??
+  snapshot?.queuedTasks[0]?.taskKind ??
+  null;
+
+const formatConversationContextPack = (
+  pack: StagePlayLiveSourceConversationContextPackV1 | null,
+): string => {
+  if (!pack) return "- none recorded";
+  const formatCompact = (entry: { eventId: string; textPreview: string; priority?: string; intent?: string }) =>
+    `- ${entry.eventId}${entry.intent ? ` [${entry.intent}]` : ""}${entry.priority ? ` (${entry.priority})` : ""}: ${clipPromptText(entry.textPreview, 220)}`;
+  return [
+    `context_pack: ${pack.contextPackId}`,
+    "recent_user_questions:",
+    ...(pack.recentUserQuestions.length > 0 ? pack.recentUserQuestions.slice(-4).map(formatCompact) : ["- none"]),
+    "active_constraints:",
+    ...(pack.activeConstraints.length > 0 ? pack.activeConstraints.slice(-5).map(formatCompact) : ["- none"]),
+    "open_questions:",
+    ...(pack.openQuestions.length > 0
+      ? pack.openQuestions.slice(-4).map((entry) => `- ${entry.eventId} [${entry.source}]: ${clipPromptText(entry.textPreview, 220)}`)
+      : ["- none"]),
+    "voice_preferences:",
+    ...(pack.voicePreferences.length > 0 ? pack.voicePreferences.slice(-4).map(formatCompact) : ["- none"]),
+    "last_agreed_objective:",
+    pack.lastAgreedObjective
+      ? `- ${pack.lastAgreedObjective.eventId}: ${clipPromptText(pack.lastAgreedObjective.textPreview, 260)}`
+      : "- none",
+  ].join("\n");
+};
+
+const hasActiveUserPromptContext = (
+  pack: StagePlayLiveSourceConversationContextPackV1 | null,
+): boolean =>
+  Boolean(pack?.recentUserQuestions.some((entry) => entry.priority === "active_user_prompt" || entry.priority === "urgent_user_interrupt"));
+
+const formatHeldCallouts = (callouts: StagePlayHeldCalloutV1[]): string =>
+  callouts.length > 0
+    ? callouts.slice(-6).map((callout) => [
+        `- ${callout.calloutId}`,
+        `  status: ${callout.status}`,
+        `  urgency: ${callout.urgency}`,
+        `  decision: ${callout.decisionId}`,
+        callout.mailIds.length > 0 ? `  mail_refs: ${callout.mailIds.slice(0, 6).join(", ")}` : null,
+        `  text: ${clipPromptText(callout.text, 220)}`,
+        callout.statusReason ? `  reason: ${clipPromptText(callout.statusReason, 180)}` : null,
+      ].filter(Boolean).join("\n")).join("\n")
+    : "- none recorded";
+
+const formatLatestPredictionErrorReceipt = (
+  narrative: StagePlayLiveSourceNarrativeStateV1 | null,
+): string =>
+  narrative?.prediction
+    ? [
+        "- none persisted yet for this wake.",
+        `  prior_prediction_ref: ${narrative.narrativeStateId}`,
+        "  use live_env.compare_live_source_prediction when the current task is prediction_error_review or when validating prior prediction signals.",
+      ].join("\n")
+    : "- none recorded";
+
+const immediatePredictionTextForMail = (
+  mailBatch: StagePlayLiveSourceMailItemV1[],
+): string => {
+  const latestSummary = clipPromptText(mailBatch.at(-1)?.summary.text ?? mailBatch.at(-1)?.summary.preview ?? "", 260);
+  if (!latestSummary) return "Likely next: waiting for the next compact source summary to establish the visible state.";
+  if (/\b(?:night|dark|darker|low light|sunset|evening)\b/i.test(latestSummary)) {
+    return "Likely next: seeking shelter, adding light, or reassessing outdoor movement.";
+  }
+  if (/\b(?:forest|tree|wood|log|daylight|player)\b/i.test(latestSummary)) {
+    return "Likely next: gathering wood or scanning resources.";
+  }
+  if (/\b(?:hostile|mob|creeper|skeleton|zombie|danger|attack)\b/i.test(latestSummary)) {
+    return "Likely next: responding to the threat or repositioning.";
+  }
+  return `Likely next: checking whether this state changes or remains stable: ${latestSummary}`;
+};
+
+const predictionCheckTextForNarrative = (
+  narrative: StagePlayLiveSourceNarrativeStateV1 | null,
+): string => {
+  if (!narrative?.prediction) return "No prior prediction.";
+  const prediction = clipPromptText(narrative.prediction.text, 260);
+  if (narrative.staleness.state === "stale_after_new_mail") {
+    return `Prior prediction is stale after new mail: ${prediction}`;
+  }
+  if (narrative.staleness.state === "superseded") {
+    return `Prior prediction was superseded: ${prediction}`;
+  }
+  return `Prior prediction available: ${prediction}`;
+};
+
 const makeWakeTranscriptRow = (input: {
   rowId: string;
   rowKind: DurableWakeTranscriptRow["rowKind"];
@@ -354,6 +493,7 @@ const buildDurableWakeTranscriptRows = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
+  priorNarrativeState?: StagePlayLiveSourceNarrativeStateV1 | null;
   decisionIds: string[];
   voiceReceipts?: StagePlayLiveSourceVoiceDeliveryReceiptV1[];
   evidenceRefs: string[];
@@ -365,10 +505,38 @@ const buildDurableWakeTranscriptRows = (input: {
       rowId: `wake_mail_received:${hashShort([input.wake.wakeRequestId, item.mailId])}`,
       rowKind: "mail_received",
       title: "Observation mail",
-      body: `Visual summary received. Preview: ${item.summary.preview}`,
+      body: item.summary.preview,
       artifactId: item.mailId,
       artifactKind: item.artifactId,
       evidenceRefs: item.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  rows.push(makeWakeTranscriptRow({
+    rowId: `wake_prediction_check:${hashShort(input.wake.wakeRequestId)}`,
+    rowKind: "prediction_check",
+    title: "Prediction check",
+    body: predictionCheckTextForNarrative(input.priorNarrativeState ?? null),
+    toolName: "live_env.compare_live_source_prediction",
+    artifactId: input.priorNarrativeState?.narrativeStateId ?? input.wake.wakeRequestId,
+    artifactKind: input.priorNarrativeState?.artifactId ?? input.wake.artifactId,
+    evidenceRefs: uniqueStrings([
+      input.priorNarrativeState?.narrativeStateId,
+      ...(input.priorNarrativeState?.evidenceRefs ?? []),
+      ...input.evidenceRefs,
+    ]),
+    createdAt: input.createdAt,
+  }));
+  if (!input.priorNarrativeState?.prediction) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_immediate_prediction:${hashShort(input.wake.wakeRequestId)}`,
+      rowKind: "prediction",
+      title: "Immediate prediction",
+      body: immediatePredictionTextForMail(input.mailBatch),
+      toolName: "live_env.predict_live_source_immediate",
+      artifactId: input.wake.wakeRequestId,
+      artifactKind: input.wake.artifactId,
+      evidenceRefs: input.evidenceRefs,
       createdAt: input.createdAt,
     }));
   }
@@ -723,18 +891,25 @@ const buildWakePrompt = (input: {
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
+  taskQueueSnapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null;
+  conversationContextPack: StagePlayLiveSourceConversationContextPackV1 | null;
+  heldCallouts: StagePlayHeldCalloutV1[];
   voicePolicy: StagePlayLiveSourceVoicePolicyV1;
   retainedMailCount?: number;
 }): string => {
   const objective = input.policy?.objectiveText ?? "Read the live-source mailbox and decide what to do with this unread source update batch.";
   const decisionPolicy = input.policy?.decisionPolicyPrompt ?? "If there is no user-facing change, record wait_for_next_summary. If there is a meaningful user-facing change, draft a concise text answer.";
   const interpretationMode = input.policy?.interpretationMode ?? "latest_scene_answer";
+  const activeTaskKind = activeTaskKindFromSnapshot(input.taskQueueSnapshot);
+  const activeUserPrompt = hasActiveUserPromptContext(input.conversationContextPack);
   return [
     "Continuing live-source watch job:",
     objective,
     `Watch policy ref: ${input.policy?.policyId ?? "none"}`,
     `Watch job ref: ${input.policy?.jobId ?? input.wake.jobId ?? "none"}`,
     `Interpretation mode: ${interpretationMode}`,
+    `Current task: ${activeTaskKind ?? "mail_batch_interpretation"}`,
+    `Active user prompt context: ${activeUserPrompt}`,
     "",
     "Decision policy:",
     decisionPolicy,
@@ -750,6 +925,12 @@ const buildWakePrompt = (input: {
     "- salience_watch: compare to prior state and wait unless the policy salience criteria are matched.",
     "- prediction_watch: produce record_interpretation with prediction and validation signals.",
     "- voice_callout_watch: request_voice_callout only if policy allows voice and salience criteria are matched.",
+    "- If current task is immediate_prediction_check: use live_env.compare_live_source_prediction when prior prediction exists; otherwise use live_env.predict_live_source_immediate.",
+    "- If current task is prediction_error_review: use live_env.compare_live_source_prediction before deciding whether to wait, interpret, draft text, or request a callout.",
+    "- If current task is mail_batch_interpretation: use live_env.project_live_source_narrative and record_interpretation.",
+    "- If current task is voice_callout_candidate: confirm salience and voice policy before requesting voice callout; if confirmationRequired is true, draft only.",
+    "- If current task is long_horizon_projection: use live_env.project_live_source_narrative unless an active user prompt or urgent voice candidate has priority.",
+    "- If active user prompt context is true: answer the user first, and merge or recheck held callouts instead of speaking an older warning separately.",
     "- Use draft_text_answer when the standing policy or current prompt asks what the latest mail shows or asks for a one-sentence scene answer.",
     "- Use record_interpretation when the task asks what is happening, what changed, what should be watched next, or when the mail should update the continuing story without a direct answer.",
     "- If the policy asks to interpret, compare, explain what is happening, predict, or say what to watch next, choose record_interpretation.",
@@ -771,12 +952,25 @@ const buildWakePrompt = (input: {
     "- If voiceEnabled is false, draft text only and do not request a voice tool.",
     "- If requiresConfirmation is true, produce the callout draft and wait for confirmation; do not request a voice tool.",
     "- If allowedNow is true and speech is appropriate, record the decision first and request the separate voice delivery tool from that decision.",
+    "- Live-source voice must come from a model-reviewed mail decision. Visual capture, prediction receipts, narrative projection receipts, and task queue receipts do not speak automatically.",
+    "",
+    "Task queue state:",
+    formatTaskQueueSnapshot(input.taskQueueSnapshot),
     "",
     "Latest narrative state:",
     formatLatestNarrativeState(input.latestNarrativeState),
     "",
     "Prior prediction:",
     formatPriorPrediction(input.latestNarrativeState),
+    "",
+    "Latest prediction error receipt:",
+    formatLatestPredictionErrorReceipt(input.latestNarrativeState),
+    "",
+    "Conversation steering context:",
+    formatConversationContextPack(input.conversationContextPack),
+    "",
+    "Held callouts:",
+    formatHeldCallouts(input.heldCallouts),
     "",
     "Unread mail batch:",
     `Wake request: ${input.wake.wakeRequestId}`,
@@ -1038,12 +1232,35 @@ export async function runNextMailWakeRequest(input: {
     jobId: policy?.jobId ?? running.jobId ?? null,
     sourceId: mailBatch[0]?.sourceId ?? running.sourceIds[0] ?? null,
   });
+  const taskQueueSnapshot = getStagePlayLiveSourceTaskQueueSnapshot({
+    threadId: running.threadId,
+    roomId: running.roomId ?? null,
+    environmentId: running.environmentId ?? null,
+    jobId: policy?.jobId ?? running.jobId ?? null,
+    limit: 8,
+    now,
+  });
+  const conversationContextPack = buildStagePlayLiveSourceConversationContextPack({
+    threadId: running.threadId,
+    jobId: policy?.jobId ?? running.jobId ?? null,
+    limit: 30,
+    now,
+  });
+  const heldCallouts = listStagePlayHeldCallouts({
+    threadId: running.threadId,
+    jobId: policy?.jobId ?? running.jobId ?? null,
+    limit: 8,
+  });
   const evidenceRefs = uniqueStrings([
     ...running.evidenceRefs,
     ...running.mailIds,
     ...running.sourceIds,
     ...(policy ? [policy.policyId, policy.jobId, ...policy.evidenceRefs, ...policy.priorAnswerRefs, ...policy.priorDecisionRefs] : []),
     latestNarrativeState?.narrativeStateId,
+    ...taskQueueSnapshot.evidenceRefs,
+    conversationContextPack.contextPackId,
+    ...conversationContextPack.evidenceRefs,
+    ...heldCallouts.flatMap((callout) => [callout.calloutId, ...callout.evidenceRefs]),
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
@@ -1081,6 +1298,9 @@ export async function runNextMailWakeRequest(input: {
     mailBatch,
     priorDecisions,
     latestNarrativeState,
+    taskQueueSnapshot,
+    conversationContextPack,
+    heldCallouts,
     voicePolicy,
     retainedMailCount,
   });
@@ -1231,6 +1451,7 @@ export async function runNextMailWakeRequest(input: {
       wake: completed ?? running,
       wakeResult,
       mailBatch,
+      priorNarrativeState: latestNarrativeState,
       decisionIds: completed?.decisionIds ?? decisionIds,
       voiceReceipts,
       evidenceRefs: uniqueStrings([
@@ -1256,11 +1477,21 @@ export async function runNextMailWakeRequest(input: {
       ]),
       createdAt: wakeResult.createdAt,
     });
+    const consolidation = maybeQueueStagePlayLiveSourceMemoryConsolidation({
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      jobId: policy?.jobId ?? running.jobId ?? null,
+      policyId: policy?.policyId ?? null,
+      sourceIds: running.sourceIds,
+      now: wakeResult.createdAt,
+    });
     return {
       ...wakeResult,
       evidenceRefs: uniqueStrings([
         ...wakeResult.evidenceRefs,
         ...transcriptEntries.map((entry) => entry.entryId),
+        consolidation.task?.taskId,
       ]),
     };
   } catch (err) {

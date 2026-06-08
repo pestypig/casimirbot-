@@ -261,6 +261,11 @@ export type StagePlayLiveSourceVoiceDeliveryReceiptV1 = {
     | "blocked_voice_not_allowed"
     | "blocked_missing_callout_draft"
     | "blocked_missing_voice_tool"
+    | "held_user_speaking"
+    | "held_manual_prompt_active"
+    | "merged_into_answer"
+    | "stale_after_new_mail"
+    | "dropped"
     | "failed";
   voiceCalloutDraft?: {
     text: string;
@@ -376,6 +381,12 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "mail_wake_deferred"
     | "mail_read_tool_call"
     | "mail_read_receipt"
+    | "task_queued"
+    | "task_deferred"
+    | "task_running"
+    | "task_completed"
+    | "prediction_check"
+    | "narrative_projection"
     | "agent_decision"
     | "interpretation"
     | "prediction"

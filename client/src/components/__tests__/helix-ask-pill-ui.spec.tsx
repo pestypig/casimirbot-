@@ -910,6 +910,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"mail_received"');
     expect(source).toContain('"mail_read_tool_call"');
     expect(source).toContain('"mail_read_receipt"');
+    expect(source).toContain('"prediction_check"');
+    expect(source).toContain('"task_queued"');
+    expect(source).toContain('"narrative_projection"');
     expect(source).toContain('"agent_decision"');
     expect(source).toContain('"interpretation"');
     expect(source).toContain('"watch_next"');
@@ -924,11 +927,13 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"voice_steering_applied"');
     expect(source).toContain('"steering_ack_receipt"');
     expect(source).toContain('"wait_for_next_summary"');
-    expect(source).toContain("Visual summary received.\\nPreview:");
+    expect(source).toContain('if (row.rowKind === "prediction_check") return row.body || "No prior prediction."');
     expect(source).toContain("live_env.read_live_source_mail");
     expect(source).toContain("Read ${count} unread live-source mail item");
     expect(source).toContain('count === "1"');
     expect(source).toContain("Reason:");
+    expect(source).toContain("Prediction check");
+    expect(source).toContain("Narrative projection");
     expect(source).toContain("Narrative state");
     expect(source).toContain("Text draft");
     expect(source).toContain("Voice callout request");

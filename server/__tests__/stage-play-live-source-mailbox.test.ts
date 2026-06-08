@@ -41,6 +41,18 @@ import {
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-runner";
+import {
+  enqueueStagePlayLiveSourceTask,
+  resetStagePlayLiveSourceTaskQueueForTest,
+} from "../services/stage-play/stage-play-live-source-task-queue";
+import {
+  recordStagePlayLiveSourceConversationEvent,
+  resetStagePlayLiveSourceConversationStoreForTest,
+} from "../services/stage-play/stage-play-live-source-conversation-store";
+import {
+  recordStagePlayHeldCallout,
+  resetStagePlayHeldCalloutStoreForTest,
+} from "../services/stage-play/stage-play-held-callout-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
 import {
   analyzeVisualFrame,
@@ -48,6 +60,7 @@ import {
   resetVisualSnapshotStoreForTest,
   startVisualSnapshotSource,
 } from "../services/situation-room/visual-snapshot-store";
+import { resetInterimVoiceCalloutsForTest } from "../services/helix-ask/interim-voice-callout-store";
 
 const threadId = "thread:stage-play-mailbox";
 const roomId = "room:stage-play-mailbox";
@@ -59,6 +72,10 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetVisualSnapshotStoreForTest();
+  resetInterimVoiceCalloutsForTest();
+  resetStagePlayLiveSourceTaskQueueForTest();
+  resetStagePlayLiveSourceConversationStoreForTest();
+  resetStagePlayHeldCalloutStoreForTest();
 });
 
 const seedVisualEvidence = () => {
@@ -1145,6 +1162,179 @@ describe("Stage Play live-source mailbox", () => {
     expect(JSON.stringify(entries)).not.toMatch(/raw_image|data:image|base64/i);
   });
 
+  it("surfaces Minecraft-style prediction, decision, voice, and loop rows without fake user prompts", async () => {
+    const { policy } = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft live source and call out important risk.",
+      decisionPolicyPrompt: "Wait on safe daylight scenes. Request a voice callout when darkness risk appears outdoors.",
+      importanceCriteria: ["night approaching", "danger outdoors"],
+      suppressCriteria: ["safe daylight scene"],
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      now: "2026-06-04T12:20:00.000Z",
+    });
+    const daylightMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:minecraft-daylight",
+      evidenceRef: "visual_evidence:minecraft-daylight",
+      summaryText: "Forest daylight scene; player visible.",
+      createdAt: "2026-06-04T12:20:01.000Z",
+    });
+
+    await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:20:02.000Z",
+      askTurnRunner: async ({ wakeRequest }) => {
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId,
+          roomId,
+          mailIds: wakeRequest.mailIds,
+          decision: "wait_for_next_summary",
+          rationalePreview: "Safe daylight scene; wait for next summary.",
+          activeJobId: policy.jobId,
+          now: "2026-06-04T12:20:03.000Z",
+        });
+        return {
+          turn_id: "ask:minecraft-daylight",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    const daylightRows = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:minecraft-daylight" })
+      .map((entry) => entry.row);
+    expect(daylightRows.map((row) => row.title)).toEqual(expect.arrayContaining([
+      "Observation mail",
+      "Prediction check",
+      "Immediate prediction",
+      "Agent decision",
+      "Loop state",
+    ]));
+    expect(daylightRows.find((row) => row.title === "Observation mail")?.body).toBe("Forest daylight scene; player visible.");
+    expect(daylightRows.find((row) => row.title === "Prediction check")?.body).toBe("No prior prediction.");
+    expect(daylightRows.find((row) => row.title === "Immediate prediction")?.body).toContain("Likely next: gathering wood or scanning resources.");
+    expect(daylightRows.find((row) => row.title === "Agent decision")?.body).toContain("wait_for_next_summary");
+    expect(daylightRows.find((row) => row.title === "Loop state")?.body).toBe("Armed for the next live-source update.");
+
+    const priorNarrative = recordStagePlayLiveSourceNarrativeState({
+      threadId,
+      roomId,
+      jobId: policy.jobId,
+      policyId: policy.policyId,
+      sourceIds: [sourceId],
+      mailBatchRefs: [daylightMail.mailId],
+      currentSceneSummary: "Forest daylight scene; player visible.",
+      runningStorySummary: "The Minecraft player is outside in daylight.",
+      interpretedSituation: {
+        setting: "Minecraft outdoors",
+        objects: ["forest", "player"],
+        activities: ["scanning resources"],
+        userRelevantMeaning: "The player appears safe outside in daylight.",
+      },
+      watchNext: {
+        targets: ["lighting", "shelter", "hostile mobs"],
+        reason: "Watch whether the daylight-safe assumption changes.",
+      },
+      prediction: {
+        text: "The next mail will likely remain daylight-safe while the player gathers resources.",
+        horizon: "next_mail",
+        confidence: 0.68,
+        validationSignals: ["daylight remains", "player gathers resources"],
+      },
+      createdAt: "2026-06-04T12:20:04.000Z",
+    });
+    const darkerMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:minecraft-darker",
+      evidenceRef: "visual_evidence:minecraft-darker",
+      summaryText: "Lighting darker; player outdoors.",
+      createdAt: "2026-06-04T12:20:05.000Z",
+    });
+
+    await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:20:06.000Z",
+      askTurnRunner: async ({ wakeRequest }) => {
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId,
+          roomId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "Prior daylight-safe assumption is stale and darkness risk is relevant outdoors.",
+          voiceCalloutDraft: "Night appears to be approaching while you are outside; consider shelter or light.",
+          voicePolicy: {
+            voiceEnabled: true,
+            requiresConfirmation: false,
+            allowedNow: true,
+            reason: "urgent_voice_allowed",
+          },
+          requestedTool: {
+            toolName: "live_env.request_interim_voice_callout",
+            args: {
+              kind: "tool_result",
+              text: "Night appears to be approaching while you are outside; consider shelter or light.",
+              max_chars: 140,
+              evidence_refs: [darkerMail.mailId],
+              reason_codes: ["minecraft_darkness_risk"],
+            },
+          },
+          activeJobId: policy.jobId,
+          now: "2026-06-04T12:20:07.000Z",
+        });
+        return {
+          turn_id: "ask:minecraft-darker",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(getStagePlayLiveSourceNarrativeState(priorNarrative.narrativeStateId)?.staleness.state).toBe("stale_after_new_mail");
+    const darkerRows = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:minecraft-darker" })
+      .map((entry) => entry.row);
+    const rowKinds = darkerRows.map((row) => row.rowKind);
+    expect(rowKinds.indexOf("prediction_check")).toBeGreaterThan(rowKinds.indexOf("mail_received"));
+    expect(rowKinds.indexOf("agent_decision")).toBeGreaterThan(rowKinds.indexOf("prediction_check"));
+    expect(rowKinds.indexOf("voice_tool_call")).toBeGreaterThan(rowKinds.indexOf("voice_callout_request"));
+    expect(darkerRows.find((row) => row.title === "Observation mail")?.body).toBe("Lighting darker; player outdoors.");
+    expect(darkerRows.find((row) => row.title === "Prediction check")?.body).toContain("Prior prediction is stale after new mail");
+    expect(darkerRows.find((row) => row.title === "Agent decision")?.body).toContain("request_voice_callout");
+    expect(darkerRows.find((row) => row.title === "Voice callout draft")?.body)
+      .toBe("Night appears to be approaching while you are outside; consider shelter or light.");
+    expect(darkerRows.find((row) => row.title === "Voice tool call")?.body).toContain("live_env.request_interim_voice_callout");
+    expect(darkerRows.find((row) => row.title === "Loop state")?.body).toBe("Armed for the next live-source update.");
+    expect(JSON.stringify([...daylightRows, ...darkerRows])).not.toMatch(/\"question\":|fake user|raw_image|data:image|base64/i);
+  });
+
   it("binds wake Ask prompts to the active watch-job objective and compact mail batch", async () => {
     const priorDecision = recordStagePlayMailDecision({
       threadId,
@@ -1178,6 +1368,38 @@ describe("Stage Play live-source mailbox", () => {
         voiceRequiresUrgency: true,
         confirmationRequired: false,
       },
+    });
+    const task = enqueueStagePlayLiveSourceTask({
+      threadId,
+      roomId,
+      jobId: policy.jobId,
+      policyId: policy.policyId,
+      sourceIds: [sourceId],
+      mailIds: [mail.mailId],
+      taskKind: "voice_callout_candidate",
+      priority: "urgent",
+      evidenceRefs: [mail.mailId],
+      now: "2026-06-04T12:00:21.000Z",
+    });
+    const conversationEvent = recordStagePlayLiveSourceConversationEvent({
+      threadId,
+      jobId: policy.jobId,
+      source: "user_text",
+      text: "Should I go back or keep mining if a hostile mob appears?",
+      mailIds: [mail.mailId],
+      watchJobPolicyRef: policy.policyId,
+      now: "2026-06-04T12:00:22.000Z",
+    });
+    const heldCallout = recordStagePlayHeldCallout({
+      threadId,
+      roomId,
+      jobId: policy.jobId,
+      decisionId: priorDecision.decisionId,
+      mailIds: [mail.mailId],
+      text: "Hostile mob may be approaching.",
+      status: "held_user_speaking",
+      evidenceRefs: [priorDecision.decisionId, mail.mailId],
+      now: "2026-06-04T12:00:23.000Z",
     });
 
     let prompt = "";
@@ -1222,6 +1444,20 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain(mail.mailId);
     expect(prompt).toContain("Harmless Minecraft-like scene change");
     expect(prompt).toContain("voiceEnabled: true");
+    expect(prompt).toContain("Current task: voice_callout_candidate");
+    expect(prompt).toContain("Active user prompt context: true");
+    expect(prompt).toContain("Task queue state:");
+    expect(prompt).toContain(task.taskId);
+    expect(prompt).toContain("If current task is voice_callout_candidate: confirm salience and voice policy before requesting voice callout");
+    expect(prompt).toContain("If active user prompt context is true: answer the user first, and merge or recheck held callouts");
+    expect(prompt).toContain("Conversation steering context:");
+    expect(prompt).toContain(conversationEvent.eventId);
+    expect(prompt).toContain("Should I go back or keep mining");
+    expect(prompt).toContain("Held callouts:");
+    expect(prompt).toContain(heldCallout.calloutId);
+    expect(prompt).toContain("Hostile mob may be approaching.");
+    expect(prompt).toContain("Latest prediction error receipt:");
+    expect(prompt).toContain("Live-source voice must come from a model-reviewed mail decision.");
     expect(prompt).toContain(policy.policyId);
   });
 
@@ -2601,8 +2837,6 @@ describe("Stage Play live-source mailbox", () => {
     });
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId }).find((entry) => entry.mailIds.includes(mail.mailId));
     expect(wake).toBeTruthy();
-    const delivered: Array<{ decisionId: string; text: string; evidenceRefs: string[] }> = [];
-
     const result = await runNextMailWakeRequest({
       threadId,
       roomId,
@@ -2622,10 +2856,12 @@ describe("Stage Play live-source mailbox", () => {
             reason: "urgent_voice_allowed",
           },
           requestedTool: {
-            toolName: "voice_delivery.confirm_speak",
+            toolName: "live_env.request_interim_voice_callout",
             args: {
-              decisionId: "from_decision_receipt",
+              kind: "tool_result",
               text: "Hostile mob appeared near the player.",
+              max_chars: 120,
+              reason_codes: ["urgent_live_source_policy_match"],
             },
           },
           now: "2026-06-04T12:09:03.000Z",
@@ -2643,25 +2879,11 @@ describe("Stage Play live-source mailbox", () => {
           ],
         };
       },
-      voiceDeliveryRunner: async ({ decisionId, text, evidenceRefs }) => {
-        delivered.push({ decisionId, text, evidenceRefs });
-        return {
-          ok: true,
-          status: "delivered",
-          provider: "test_voice_delivery",
-          artifactRef: "voice_audio:allowed",
-          message: "Voice callout delivered.",
-        };
-      },
     });
 
     expect(result).toMatchObject({
       status: "completed",
       askTurnId: "ask:wake-voice-allowed",
-    });
-    expect(delivered).toHaveLength(1);
-    expect(delivered[0]).toMatchObject({
-      text: "Hostile mob appeared near the player.",
     });
     const entries = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:wake-voice-allowed" });
     const rowKinds = entries.map((entry) => entry.row.rowKind);
@@ -2671,7 +2893,8 @@ describe("Stage Play live-source mailbox", () => {
     expect(decisionIndex).toBeGreaterThanOrEqual(0);
     expect(toolIndex).toBeGreaterThan(decisionIndex);
     expect(receiptIndex).toBeGreaterThan(toolIndex);
-    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/delivered/);
-    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/voice_audio:allowed/);
+    expect(entries.find((entry) => entry.row.rowKind === "voice_tool_call")?.row.body).toMatch(/live_env\.request_interim_voice_callout/);
+    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/Interim voice callout accepted|queued for retry/i);
+    expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/helix_interim_voice_callout_receipt:/);
   });
 });

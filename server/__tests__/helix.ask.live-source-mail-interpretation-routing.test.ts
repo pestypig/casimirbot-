@@ -117,6 +117,12 @@ const askMailbox = async (question: string) => {
   };
 };
 
+const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void => {
+  expect(String(answer ?? ""), debug).not.toMatch(/unread live-source mail item\(s\) were read/i);
+  expect(String(answer ?? ""), debug).not.toMatch(/require a recorded agent decision/i);
+  expect(String(answer ?? ""), debug).not.toMatch(/Latest preview:/i);
+};
+
 describe("Helix Ask live-source mail interpretation routing", () => {
   it("routes latest-mail visibility prompts to draft_text_answer", async () => {
     seedVisualMail("A dark app launcher shows Docs, Gmail, Drive, YouTube, and Instagram icons.");
@@ -132,6 +138,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       },
     });
     expect(response.body?.answer, debug).toContain("dark app launcher");
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
 
   it("routes interpretation and watch-next prompts to record_interpretation", async () => {
@@ -151,6 +158,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       }),
     });
     expect(response.body?.answer, debug).toMatch(/document editor|Watch next/i);
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
 
   it("routes change-across-summaries prompts to record_interpretation", async () => {
@@ -169,7 +177,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
   it("keeps importance-only prompts waiting when no salience fixture is present", async () => {
     seedVisualMail("The same dark launcher remains visible with no obvious user-facing risk.");
 
-    const { decision, debug } = await askMailbox(
+    const { response, decision, debug } = await askMailbox(
       "Check the active visual live-source mailbox, but only tell me if important.",
     );
 
@@ -179,6 +187,28 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     });
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
     expect(decision?.narrativeStateRef, debug).toBeFalsy();
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 30_000);
+
+  it("routes explicit important voice prompts to request_voice_callout without terminalizing the raw mail receipt", async () => {
+    seedVisualMail("A hostile mob appears near the player and should be called out quickly.");
+
+    const { response, decision, debug } = await askMailbox(
+      "Check the active visual live-source mailbox and announce if important.",
+    );
+
+    expect(decision, debug).toMatchObject({
+      decision: "request_voice_callout",
+      decision_validation_result: "forced_request_voice_callout_for_read_mail_voice_intent",
+      voiceCalloutDraft: {
+        text: expect.stringContaining("hostile mob"),
+        voiceEligible: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(response.body?.answer, debug).toContain("hostile mob");
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
 
   it("records voice callouts only when voice policy allows the decision", () => {

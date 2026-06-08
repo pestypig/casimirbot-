@@ -9,6 +9,7 @@ import {
 } from "../services/situation-room/visual-snapshot-store";
 import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -17,6 +18,7 @@ const sourceId = "visual_source:helix-ask-live-source-mail-tool";
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
+  resetStagePlayLiveSourceNarrativeStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -116,6 +118,27 @@ describe("live-source mail live environment tools", () => {
       }),
       expect.objectContaining({
         tool_id: "live_env.record_live_source_mail_decision",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.predict_live_source_immediate",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.compare_live_source_prediction",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.project_live_source_narrative",
         family: "live_env",
         creates_assistant_answer: false,
         requires_user_confirmation: false,
@@ -665,6 +688,167 @@ describe("live-source mail live environment tools", () => {
       .toContain("player movement");
     expect(payload.transcriptRows.find((row: any) => row.title === "Prediction")?.body)
       .toContain("62%");
+  });
+
+  it("predicts the immediate next live-source mail as evidence only", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+      },
+    });
+    const mailId = (readObservation.observation as any).items[0].mailId;
+
+    const predictionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.predict_live_source_immediate",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+      },
+    });
+
+    expect(predictionObservation).toMatchObject({
+      tool_name: "live_env.predict_live_source_immediate",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(predictionObservation.observation).toMatchObject({
+      schema: "helix.live_source_immediate_prediction.v1",
+      predictionHorizon: "next_mail",
+      expectedChanges: expect.any(Array),
+      watchTargets: expect.arrayContaining(["player"]),
+      validationSignals: expect.any(Array),
+      salienceHint: expect.stringMatching(/low|medium|high|urgent/),
+      evidenceRefs: expect.arrayContaining([mailId]),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("compares latest mail against prior narrative prediction as evidence only", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+      },
+    });
+    const mailId = (readObservation.observation as any).items[0].mailId;
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        decision: "record_interpretation",
+        rationale_preview: "Record prediction for the next mail.",
+        interpretation: {
+          currentSceneSummary: "A player is near a cat, book stand, and distant mountains.",
+          userRelevantMeaning: "The scene is stable around a player base.",
+          watchNextTargets: ["player", "cat"],
+          watchNextReason: "Watch whether the player or cat moves.",
+          predictionText: "The next summary will likely still show the player and cat near the base.",
+          predictionHorizon: "next_mail",
+          predictionConfidence: 0.62,
+          validationSignals: ["player remains visible", "cat remains visible"],
+        },
+      },
+    });
+    const narrativeStateId = (decisionObservation.observation as any).narrativeStateRef;
+
+    const comparisonObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.compare_live_source_prediction",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        narrative_state_id: narrativeStateId,
+      },
+    });
+
+    expect(comparisonObservation).toMatchObject({
+      tool_name: "live_env.compare_live_source_prediction",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+    expect(comparisonObservation.observation).toMatchObject({
+      schema: "helix.live_source_prediction_comparison.v1",
+      result: expect.stringMatching(/supported|contradicted|unresolved|no_prior_prediction/),
+      meaningfulDifferences: expect.any(Array),
+      salienceHint: expect.stringMatching(/low|medium|high|urgent/),
+      wakeRecommendation: expect.stringMatching(/wait|record_interpretation|draft_text_answer|request_voice_callout|request_checkpoint/),
+      evidenceRefs: expect.arrayContaining([mailId, narrativeStateId]),
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("projects live-source narrative through the existing narrative state store", () => {
+    seedVisualSummary();
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+      },
+    });
+    const mailId = (readObservation.observation as any).items[0].mailId;
+
+    const projectionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.project_live_source_narrative",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        mail_ids: [mailId],
+        user_relevant_meaning: "The player base scene should be watched for movement or hostile mobs.",
+        watch_next_targets: ["player movement", "hostile mobs"],
+        watch_next_reason: "Movement or hostile mobs would change the operator response.",
+        prediction_text: "The next mail should confirm whether the player remains near the base.",
+        prediction_confidence: 0.57,
+      },
+    });
+
+    expect(projectionObservation).toMatchObject({
+      tool_name: "live_env.project_live_source_narrative",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+    expect(projectionObservation.observation).toMatchObject({
+      schema: "helix.live_source_narrative_projection.v1",
+      narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      runningStorySummary: expect.any(String),
+      userRelevantMeaning: "The player base scene should be watched for movement or hostile mobs.",
+      watchNext: {
+        targets: ["player movement", "hostile mobs"],
+        reason: "Movement or hostile mobs would change the operator response.",
+      },
+      prediction: {
+        text: "The next mail should confirm whether the player remains near the base.",
+        horizon: "next_mail",
+        confidence: 0.57,
+      },
+      evidenceRefs: expect.arrayContaining([mailId]),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
   });
 
   it("records requested_tool from the decision tool as the next requested action", () => {

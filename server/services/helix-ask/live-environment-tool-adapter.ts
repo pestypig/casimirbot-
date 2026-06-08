@@ -17,6 +17,7 @@ import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-
 import type {
   AskTurnTranscriptRowDraftV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
+  StagePlayLiveSourceMailItemV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
@@ -66,9 +67,16 @@ import {
 } from "../stage-play/stage-play-visual-summary-mail-ingest";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
+  getStagePlayLiveSourceMailItem,
+  listStagePlayLiveSourceMailItems,
+  listStagePlayMailDecisions,
   listStagePlayLiveSourceWatchJobPolicies,
 } from "../stage-play/stage-play-live-source-mailbox-store";
-import { getStagePlayLiveSourceNarrativeState } from "../stage-play/stage-play-live-source-narrative-store";
+import {
+  getLatestStagePlayLiveSourceNarrativeState,
+  getStagePlayLiveSourceNarrativeState,
+  recordStagePlayLiveSourceNarrativeState,
+} from "../stage-play/stage-play-live-source-narrative-store";
 import {
   buildStagePlayLiveSourceWatchJobPolicyDefaults,
   inferStagePlayLiveSourceInterpretationMode,
@@ -485,6 +493,133 @@ const buildSteeringAckTranscriptRows = (input: {
 
 const readNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const clipText = (value: string | null | undefined, limit = 260): string => {
+  const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
+};
+
+const wordsFromText = (value: string): string[] =>
+  Array.from(new Set(value.toLowerCase().match(/\b[a-z0-9][a-z0-9-]{2,}\b/g) ?? []))
+    .filter((word) => !new Set([
+      "the", "and", "for", "with", "that", "this", "from", "into", "visual", "source", "summary",
+      "mail", "latest", "shows", "showing", "appears", "near", "should", "next",
+    ]).has(word));
+
+const salienceHintFromText = (value: string): "low" | "medium" | "high" | "urgent" => {
+  if (/\b(?:urgent|danger|dangerous|hostile|attack|attacking|fire|crash|blocked|failure|failed|security|risk)\b/i.test(value)) {
+    return "urgent";
+  }
+  if (/\b(?:warning|changed|change|new|unexpected|error|missing|stale|recovered|important|salient)\b/i.test(value)) {
+    return "high";
+  }
+  if (/\b(?:opened|closed|moved|selected|switched|visible|active|player|mob|document|browser|tab)\b/i.test(value)) {
+    return "medium";
+  }
+  return "low";
+};
+
+const watchTargetsFromText = (value: string): string[] => {
+  const targets = Array.from(new Set(
+    Array.from(value.matchAll(/\b(?:window|screen|tab|menu|button|icon|app|grid|player|mob|document|editor|browser|error|warning|scene|source|content|audio|transcript)\b/gi))
+      .map((match) => match[0].toLowerCase()),
+  ));
+  return targets.length > 0 ? targets.slice(0, 6) : ["next compact source summary"];
+};
+
+const resolvePredictionMailItems = (args: Record<string, unknown>, input: ExecuteLiveEnvironmentToolInput): StagePlayLiveSourceMailItemV1[] => {
+  const requestedMailIds = readStringArray(args.mail_ids ?? args.mailIds);
+  const explicitSourceId = readString(args.source_id) ?? readString(args.sourceId);
+  const roomId = readString(args.room_id) ?? readString(args.roomId);
+  const environmentId = readString(args.environment_id) ?? readString(args.environmentId) ?? input.environment_id ?? null;
+  const limit = Math.max(1, Math.min(readNumber(args.limit, 3), 8));
+  const byId = requestedMailIds
+    .map((mailId) => getStagePlayLiveSourceMailItem(mailId))
+    .filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item))
+    .filter((item) => item.threadId === input.thread_id);
+  if (byId.length > 0) return byId.slice(-limit);
+  return listStagePlayLiveSourceMailItems({
+    threadId: input.thread_id,
+    roomId,
+    environmentId,
+    sourceId: explicitSourceId,
+    limit,
+  });
+};
+
+const resolveLatestNarrativeState = (args: Record<string, unknown>, input: ExecuteLiveEnvironmentToolInput) => {
+  const narrativeStateId = readString(args.narrative_state_id) ?? readString(args.narrativeStateId);
+  if (narrativeStateId) return getStagePlayLiveSourceNarrativeState(narrativeStateId);
+  return getLatestStagePlayLiveSourceNarrativeState({
+    threadId: input.thread_id,
+    roomId: readString(args.room_id) ?? readString(args.roomId),
+    environmentId: readString(args.environment_id) ?? readString(args.environmentId) ?? input.environment_id ?? null,
+    sourceId: readString(args.source_id) ?? readString(args.sourceId),
+  });
+};
+
+const buildImmediateLiveSourcePrediction = (input: {
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  narrativeState: ReturnType<typeof getStagePlayLiveSourceNarrativeState>;
+  policy?: StagePlayLiveSourceWatchJobPolicyV1 | null;
+}) => {
+  const latestSummary = clipText(input.mailItems.at(-1)?.summary.text ?? input.narrativeState?.currentSceneSummary ?? "", 360);
+  const watchTargets = watchTargetsFromText([
+    latestSummary,
+    input.narrativeState?.watchNext.targets.join(" ") ?? "",
+    input.policy?.importanceCriteria.join(" ") ?? "",
+  ].join(" "));
+  const salienceHint = salienceHintFromText([
+    latestSummary,
+    input.narrativeState?.meaningfulChanges.join(" ") ?? "",
+    input.policy?.importanceCriteria.join(" ") ?? "",
+  ].join(" "));
+  const expectedChanges = [
+    latestSummary
+      ? `Next mail may confirm whether this remains stable: ${latestSummary}`
+      : "Next mail may establish the first compact live-source state.",
+    "A changed active window, visible warning, or new source content would invalidate the current projection.",
+  ];
+  const validationSignals = [
+    "next mail summary repeats the same key objects",
+    "next mail summary reports a changed active scene, warning, or new content",
+    ...watchTargets.slice(0, 3).map((target) => `watch target changed: ${target}`),
+  ];
+  return {
+    predictionHorizon: "next_mail" as const,
+    expectedChanges,
+    watchTargets,
+    validationSignals,
+    salienceHint,
+  };
+};
+
+const compareLiveSourcePrediction = (input: {
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  narrativeState: ReturnType<typeof getStagePlayLiveSourceNarrativeState>;
+}) => {
+  const latestSummary = input.mailItems.at(-1)?.summary.text ?? "";
+  const priorText = input.narrativeState?.prediction?.text ?? input.narrativeState?.watchNext.reason ?? "";
+  if (!priorText) {
+    return {
+      result: "no_prior_prediction" as const,
+      meaningfulDifferences: latestSummary ? [`No prior prediction was available; latest mail says: ${clipText(latestSummary)}`] : [],
+    };
+  }
+  const latestWords = new Set(wordsFromText(latestSummary));
+  const priorWords = wordsFromText(priorText);
+  const overlap = priorWords.filter((word) => latestWords.has(word));
+  const meaningfulDifferences = wordsFromText(latestSummary)
+    .filter((word) => !new Set(priorWords).has(word))
+    .slice(0, 8)
+    .map((word) => `new signal: ${word}`);
+  const result = overlap.length >= Math.min(2, Math.max(1, priorWords.length))
+    ? "supported"
+    : meaningfulDifferences.length >= 3
+      ? "contradicted"
+      : "unresolved";
+  return { result, meaningfulDifferences };
+};
 
 const evidenceRefsFrom = (value: unknown): string[] => {
   if (!value || typeof value !== "object") return [];
@@ -1397,6 +1532,245 @@ export function executeLiveEnvironmentTool(
         ...readResult.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.predict_live_source_immediate" ||
+    input.tool_name === "live_env.compare_live_source_prediction" ||
+    input.tool_name === "live_env.project_live_source_narrative"
+  ) {
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId) ??
+        readString(args.thread_id) ??
+        readString(args.threadId),
+      mailIds: readStringArray(args.mail_ids ?? args.mailIds),
+    });
+    const scopedInput: ExecuteLiveEnvironmentToolInput = {
+      ...input,
+      thread_id: mailboxThreadResolution.mailboxThreadId,
+      environment_id: environment?.environment_id ?? input.environment_id ?? null,
+    };
+    const mailItems = resolvePredictionMailItems(args, scopedInput);
+    const narrativeState = resolveLatestNarrativeState(args, scopedInput);
+    const policy =
+      readString(args.policy_id) || readString(args.policyId)
+        ? listStagePlayLiveSourceWatchJobPolicies({
+            threadId: scopedInput.thread_id,
+            roomId,
+            environmentId: scopedInput.environment_id ?? null,
+            limit: 50,
+          }).find((entry) => entry.policyId === (readString(args.policy_id) ?? readString(args.policyId))) ?? null
+        : listStagePlayLiveSourceWatchJobPolicies({
+            threadId: scopedInput.thread_id,
+            roomId,
+            environmentId: scopedInput.environment_id ?? null,
+            limit: 1,
+          }).at(-1) ?? null;
+    const prediction = buildImmediateLiveSourcePrediction({
+      mailItems,
+      narrativeState,
+      policy,
+    });
+    const evidenceRefs = Array.from(new Set([
+      ...mailItems.map((item) => item.mailId),
+      ...mailItems.flatMap((item) => item.evidenceRefs),
+      narrativeState?.narrativeStateId,
+      ...(narrativeState?.evidenceRefs ?? []),
+      policy?.policyId,
+      ...(policy?.evidenceRefs ?? []),
+      mailboxThreadResolution.mailboxThreadId,
+    ].filter((entry): entry is string => Boolean(entry))));
+
+    if (input.tool_name === "live_env.predict_live_source_immediate") {
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: scopedInput.environment_id,
+        toolName: input.tool_name,
+        ok: mailItems.length > 0 || Boolean(narrativeState),
+        summary: mailItems.length > 0 || narrativeState
+          ? `Prepared next-mail live-source prediction with ${prediction.salienceHint} salience.`
+          : "No live-source mail or narrative state was available for immediate prediction.",
+        observation: {
+          schema: "helix.live_source_immediate_prediction.v1",
+          predictionHorizon: prediction.predictionHorizon,
+          prediction_horizon: prediction.predictionHorizon,
+          expectedChanges: prediction.expectedChanges,
+          expected_changes: prediction.expectedChanges,
+          watchTargets: prediction.watchTargets,
+          watch_targets: prediction.watchTargets,
+          validationSignals: prediction.validationSignals,
+          validation_signals: prediction.validationSignals,
+          salienceHint: prediction.salienceHint,
+          salience_hint: prediction.salienceHint,
+          evidenceRefs,
+          evidence_refs: evidenceRefs,
+          mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+          mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs,
+      });
+    }
+
+    if (input.tool_name === "live_env.compare_live_source_prediction") {
+      const comparison = compareLiveSourcePrediction({
+        mailItems,
+        narrativeState,
+      });
+      const salienceHint = salienceHintFromText([
+        mailItems.at(-1)?.summary.text ?? "",
+        comparison.meaningfulDifferences.join(" "),
+      ].join(" "));
+      const wakeRecommendation =
+        comparison.result === "no_prior_prediction"
+          ? "record_interpretation"
+          : salienceHint === "urgent"
+            ? "request_voice_callout"
+            : comparison.result === "contradicted"
+              ? "record_interpretation"
+              : comparison.result === "supported"
+                ? "wait"
+                : "record_interpretation";
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: scopedInput.environment_id,
+        toolName: input.tool_name,
+        ok: true,
+        summary: `Compared live-source mail against prior prediction: ${comparison.result}; recommendation ${wakeRecommendation}.`,
+        observation: {
+          schema: "helix.live_source_prediction_comparison.v1",
+          result: comparison.result,
+          meaningfulDifferences: comparison.meaningfulDifferences,
+          meaningful_differences: comparison.meaningfulDifferences,
+          salienceHint,
+          salience_hint: salienceHint,
+          wakeRecommendation,
+          wake_recommendation: wakeRecommendation,
+          evidenceRefs,
+          evidence_refs: evidenceRefs,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs,
+      });
+    }
+
+    const latestSummary =
+      readString(args.current_scene_summary) ??
+      readString(args.currentSceneSummary) ??
+      mailItems.at(-1)?.summary.text ??
+      narrativeState?.currentSceneSummary ??
+      "No compact live-source mail summary was available.";
+    const projected = recordStagePlayLiveSourceNarrativeState({
+      threadId: scopedInput.thread_id,
+      roomId,
+      environmentId: scopedInput.environment_id ?? null,
+      jobId:
+        readString(args.job_id) ??
+        readString(args.jobId) ??
+        narrativeState?.jobId ??
+        policy?.jobId ??
+        listStagePlayMailDecisions({
+          threadId: scopedInput.thread_id,
+          roomId,
+          environmentId: scopedInput.environment_id ?? null,
+          limit: 1,
+        }).at(-1)?.activeJobId ??
+        `stage_play_live_source_job:${hashShort([scopedInput.thread_id, mailItems.at(-1)?.sourceId ?? "source"])}`,
+      policyId: readString(args.policy_id) ?? readString(args.policyId) ?? policy?.policyId ?? narrativeState?.policyId ?? null,
+      sourceIds: mailItems.length > 0 ? mailItems.map((item) => item.sourceId) : narrativeState?.sourceIds ?? [],
+      mailBatchRefs: mailItems.map((item) => item.mailId),
+      sourceEvidenceRefs: mailItems.flatMap((item) => item.evidenceRefs),
+      currentSceneSummary: clipText(latestSummary, 520),
+      runningStorySummary:
+        readString(args.running_story_summary) ??
+        readString(args.runningStorySummary) ??
+        narrativeState?.runningStorySummary ??
+        `Latest live-source projection: ${clipText(latestSummary, 420)}`,
+      interpretedSituation: {
+        userRelevantMeaning:
+          readString(args.user_relevant_meaning) ??
+          readString(args.userRelevantMeaning) ??
+          `The live-source projection expects the next update to validate or revise: ${clipText(latestSummary, 360)}`,
+        objects: prediction.watchTargets,
+        activities: ["live-source narrative projection"],
+      },
+      meaningfulChanges:
+        readStringArray(args.meaningful_changes ?? args.meaningfulChanges).length > 0
+          ? readStringArray(args.meaningful_changes ?? args.meaningfulChanges)
+          : [`Projection updated from latest mail: ${clipText(latestSummary, 220)}`],
+      uncertainties:
+        readStringArray(args.uncertainties).length > 0
+          ? readStringArray(args.uncertainties)
+          : ["Projection is based on compact live-source mail and should be checked against the next mail batch."],
+      watchNext: {
+        targets: readStringArray(args.watch_next_targets ?? args.watchNextTargets).length > 0
+          ? readStringArray(args.watch_next_targets ?? args.watchNextTargets)
+          : prediction.watchTargets,
+        reason:
+          readString(args.watch_next_reason) ??
+          readString(args.watchNextReason) ??
+          "Watch the next compact source update for prediction support, contradiction, or urgent salience.",
+      },
+      prediction: {
+        text:
+          readString(args.prediction_text) ??
+          readString(args.predictionText) ??
+          prediction.expectedChanges[0],
+        horizon:
+          readString(args.prediction_horizon) === "next_2_to_5_mail_batches" ||
+          readString(args.prediction_horizon) === "until_source_changes" ||
+          readString(args.prediction_horizon) === "unknown"
+            ? readString(args.prediction_horizon) as "next_2_to_5_mail_batches" | "until_source_changes" | "unknown"
+            : "next_mail",
+        confidence: Math.max(0, Math.min(readNumber(args.prediction_confidence ?? args.predictionConfidence, 0.45), 1)),
+        validationSignals: prediction.validationSignals,
+      },
+      evidenceRefs,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: scopedInput.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Projected live-source narrative state ${projected.narrativeStateId}.`,
+      observation: {
+        schema: "helix.live_source_narrative_projection.v1",
+        narrativeStateId: projected.narrativeStateId,
+        narrative_state_id: projected.narrativeStateId,
+        runningStorySummary: projected.runningStorySummary,
+        running_story_summary: projected.runningStorySummary,
+        userRelevantMeaning: projected.interpretedSituation.userRelevantMeaning,
+        user_relevant_meaning: projected.interpretedSituation.userRelevantMeaning,
+        meaningfulChanges: projected.meaningfulChanges,
+        meaningful_changes: projected.meaningfulChanges,
+        uncertainties: projected.uncertainties,
+        watchNext: projected.watchNext,
+        watch_next: projected.watchNext,
+        prediction: projected.prediction,
+        evidenceRefs: projected.evidenceRefs,
+        evidence_refs: projected.evidenceRefs,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: projected.evidenceRefs,
     });
   }
 

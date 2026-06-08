@@ -4,6 +4,13 @@ import {
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceVoiceDeliveryReceiptV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import {
+  getStagePlayHeldCallout,
+  markStagePlayHeldCalloutStatus,
+  recordStagePlayHeldCallout,
+  recheckStagePlayHeldCallout,
+} from "./stage-play-held-callout-store";
+import { recordInterimVoiceCalloutRequest } from "../helix-ask/interim-voice-callout-store";
 
 export type StagePlayLiveSourceVoiceDeliveryRunner = (input: {
   decisionId: string;
@@ -39,7 +46,26 @@ const clipText = (value: string | null | undefined, limit = 420): string => {
 export const isStagePlayLiveSourceVoiceRequestedTool = (
   tool: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null | undefined,
 ): tool is NonNullable<StagePlayLiveSourceMailDecisionV1["requestedTool"]> =>
-  Boolean(tool?.toolName && /\b(?:voice(?:_delivery|\.speak)?|confirm_speak|speak)\b/i.test(tool.toolName));
+  Boolean(
+    tool?.toolName &&
+    (
+      tool.toolName === "live_env.request_interim_voice_callout" ||
+      /\b(?:voice(?:_delivery|\.speak)?|confirm_speak|speak)\b/i.test(tool.toolName)
+    ),
+  );
+
+const isInterimVoiceCalloutTool = (
+  tool: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null | undefined,
+): tool is NonNullable<StagePlayLiveSourceMailDecisionV1["requestedTool"]> =>
+  tool?.toolName === "live_env.request_interim_voice_callout";
+
+const readStringArg = (record: Record<string, unknown> | null | undefined, ...keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+};
 
 const defaultVoicePolicy = (
   decision: StagePlayLiveSourceMailDecisionV1,
@@ -107,6 +133,13 @@ export async function maybeRunStagePlayLiveSourceVoiceDelivery(input: {
   decision: StagePlayLiveSourceMailDecisionV1;
   runner?: StagePlayLiveSourceVoiceDeliveryRunner | null;
   now?: string;
+  userSpeaking?: boolean;
+  manualPromptActive?: boolean;
+  heldCalloutId?: string | null;
+  userPromptText?: string | null;
+  userPromptRef?: string | null;
+  newMailIds?: string[];
+  answerRef?: string | null;
 }): Promise<StagePlayLiveSourceVoiceDeliveryReceiptV1 | null> {
   if (input.decision.decision !== "request_voice_callout") return null;
   const now = input.now ?? new Date().toISOString();
@@ -152,7 +185,154 @@ export async function maybeRunStagePlayLiveSourceVoiceDelivery(input: {
       now,
     });
   }
+  const jobId = input.decision.activeJobId ?? input.decision.threadId;
+  if (input.userSpeaking || input.manualPromptActive) {
+    const status = input.userSpeaking ? "held_user_speaking" : "held_manual_prompt_active";
+    const held = recordStagePlayHeldCallout({
+      threadId: input.decision.threadId,
+      roomId: input.decision.roomId ?? null,
+      environmentId: input.decision.environmentId ?? null,
+      jobId,
+      decisionId: input.decision.decisionId,
+      mailIds: input.decision.mailIds,
+      text: draftText,
+      status,
+      evidenceRefs: input.decision.evidenceRefs,
+      statusReason: input.userSpeaking
+        ? "User speech is active; holding the callout to avoid talking over the user."
+        : "Manual prompt input is active; holding the callout until the prompt boundary.",
+      now,
+    });
+    return buildReceipt({
+      decision: input.decision,
+      status,
+      delivery: {
+        provider: "stage_play_voice_bridge",
+        artifactRef: held.calloutId,
+        message: held.statusReason,
+      },
+      now,
+    });
+  }
+  if (input.heldCalloutId) {
+    const recheck = recheckStagePlayHeldCallout({
+      calloutId: input.heldCalloutId,
+      userPromptText: input.userPromptText ?? null,
+      userPromptRef: input.userPromptRef ?? null,
+      newMailIds: input.newMailIds ?? [],
+      answerRef: input.answerRef ?? null,
+      now,
+    });
+    if (recheck?.result === "merge_into_answer") {
+      return buildReceipt({
+        decision: input.decision,
+        status: "merged_into_answer",
+        delivery: {
+          provider: "stage_play_voice_bridge",
+          artifactRef: recheck.recheckId,
+          message: recheck.reason,
+        },
+        now,
+      });
+    }
+    if (recheck?.result === "stale_after_new_mail") {
+      return buildReceipt({
+        decision: input.decision,
+        status: "stale_after_new_mail",
+        delivery: {
+          provider: "stage_play_voice_bridge",
+          artifactRef: recheck.recheckId,
+          message: recheck.reason,
+        },
+        now,
+      });
+    }
+    if (recheck?.result === "drop" || recheck?.result === "superseded_by_user_prompt") {
+      return buildReceipt({
+        decision: input.decision,
+        status: "dropped",
+        delivery: {
+          provider: "stage_play_voice_bridge",
+          artifactRef: recheck.recheckId,
+          message: recheck.reason,
+        },
+        now,
+      });
+    }
+  }
   if (!input.runner) {
+    if (isInterimVoiceCalloutTool(input.decision.requestedTool)) {
+      const toolArgs = input.decision.requestedTool.args ?? {};
+      const result = recordInterimVoiceCalloutRequest({
+        turnId:
+          readStringArg(toolArgs, "turn_id", "turnId") ??
+          `stage_play_live_source_voice:${hashShort([input.decision.threadId, input.decision.decisionId])}`,
+        threadId: input.decision.threadId,
+        source: "live_source_mail_loop",
+        kind: readStringArg(toolArgs, "kind") ?? "tool_result",
+        text:
+          readStringArg(toolArgs, "text", "message", "callout_text", "calloutText") ??
+          draftText,
+        maxChars:
+          typeof toolArgs.max_chars === "number"
+            ? toolArgs.max_chars
+            : typeof toolArgs.maxChars === "number"
+              ? toolArgs.maxChars
+              : 160,
+        timingHintMs:
+          typeof toolArgs.timing_hint_ms === "number"
+            ? toolArgs.timing_hint_ms
+            : typeof toolArgs.timingHintMs === "number"
+              ? toolArgs.timingHintMs
+              : 1200,
+        voicePlaybackKind:
+          readStringArg(toolArgs, "voice_playback_kind", "voicePlaybackKind") ??
+          "tool_receipt",
+        requiresConfirmation: false,
+        evidenceRefs: uniqueStrings([
+          input.decision.decisionId,
+          ...input.decision.mailIds,
+          ...input.decision.evidenceRefs,
+        ]),
+        reasonCodes: uniqueStrings([
+          "live_source_model_decision_request_voice_callout",
+          "live_source_voice_policy_allowed",
+          ...(
+            Array.isArray(toolArgs.reason_codes)
+              ? toolArgs.reason_codes.map((entry) => String(entry ?? ""))
+              : Array.isArray(toolArgs.reasonCodes)
+                ? toolArgs.reasonCodes.map((entry) => String(entry ?? ""))
+                : []
+          ),
+        ]),
+      });
+      const status: StagePlayLiveSourceVoiceDeliveryReceiptV1["status"] =
+        result.receipt.status === "delivered"
+          ? "delivered"
+          : result.receipt.status === "awaiting_client_playback" ||
+            result.receipt.status === "queued" ||
+            result.receipt.status === "queued_for_retry"
+            ? "queued"
+            : result.receipt.status === "blocked_policy"
+              ? "blocked_voice_not_allowed"
+              : result.receipt.status === "blocked_missing_text"
+                ? "blocked_missing_callout_draft"
+                : result.receipt.status === "blocked_capacity"
+                  ? "queued"
+                  : result.receipt.status === "expired" || result.receipt.status === "superseded"
+                    ? "dropped"
+                    : "failed";
+      return buildReceipt({
+        decision: input.decision,
+        status,
+        delivery: {
+          provider: "helix_interim_voice_callout",
+          artifactRef: result.receipt.receiptId,
+          message: result.receipt.delivery?.message ?? result.receipt.status,
+        },
+        now,
+      });
+    }
     return buildReceipt({
       decision: input.decision,
       status: "queued",
@@ -170,6 +350,17 @@ export async function maybeRunStagePlayLiveSourceVoiceDelivery(input: {
       requestedTool: input.decision.requestedTool,
       evidenceRefs: input.decision.evidenceRefs,
     });
+    if (result.ok && input.heldCalloutId && getStagePlayHeldCallout(input.heldCalloutId)) {
+      markStagePlayHeldCalloutStatus({
+        calloutId: input.heldCalloutId,
+        status: result.status === "queued" ? "ready_for_recheck" : "delivered",
+        reason: result.status === "queued"
+          ? "Held callout passed recheck and is queued for voice delivery."
+          : "Held callout passed recheck and was delivered.",
+        evidenceRefs: [result.artifactRef],
+        now,
+      });
+    }
     return buildReceipt({
       decision: input.decision,
       status: result.ok ? result.status ?? "delivered" : "failed",

@@ -2710,6 +2710,183 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("docs-viewer.open");
   }, 60000);
 
+  it("routes natural voice-lane say commands to the live-env voice tool", async () => {
+    const app = createApp();
+    for (const { question, expectedText, reasonCode } of [
+      {
+        question: 'Use the voice lane to say "checking now", then give me three practical rules for when Helix Ask should speak during reasoning.',
+        expectedText: "checking now",
+        reasonCode: "quoted_callout_text",
+      },
+      {
+        question: 'Say "I will check the boundary" out loud, then explain why a playback receipt can support an answer but cannot authorize one.',
+        expectedText: "I will check the boundary",
+        reasonCode: "quoted_callout_text",
+      },
+      {
+        question: "Use the voice lane to say browser voice ok then explain voice receipts are evidence only.",
+        expectedText: "browser voice ok",
+        reasonCode: "unquoted_callout_text",
+      },
+      {
+        question: "Say browser boundary ok out loud, then explain why a playback receipt can support an answer but cannot authorize one.",
+        expectedText: "browser boundary ok",
+        reasonCode: "unquoted_callout_text",
+      },
+    ]) {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question,
+          mode: "read",
+          debug: true,
+          sessionId: `e52-natural-voice-callout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        })
+        .expect(200);
+
+      expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_environment_review");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("voice_output_tool_arbitration");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("voice_output_interim_callout_intent");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain(reasonCode);
+      expect(response.body?.available_capabilities?.recommended_capability_key).toBe("live_env.request_interim_voice_callout");
+      expect(response.body?.available_capabilities?.model_visible_capability_keys).toContain("live_env.request_interim_voice_callout");
+      expect(response.body?.agent_step_decision?.candidate_capabilities ?? []).toContain("live_env.request_interim_voice_callout");
+      expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("repo-code.search_concept");
+      const ledger = Array.isArray(response.body?.current_turn_artifact_ledger)
+        ? response.body.current_turn_artifact_ledger
+        : [];
+      const runtimeVoiceCall = ledger.find((artifact: any) =>
+        artifact?.kind === "runtime_tool_call" &&
+        artifact?.payload?.capability_key === "live_env.request_interim_voice_callout"
+      );
+      const voiceObservation = ledger.find((artifact: any) =>
+        artifact?.kind === "live_environment_tool_observation" &&
+        artifact?.payload?.tool_name === "live_env.request_interim_voice_callout"
+      );
+      const voiceReceipt = voiceObservation?.payload?.observation?.receipt;
+      expect(runtimeVoiceCall).toBeTruthy();
+      expect(runtimeVoiceCall?.payload?.args?.text).toBe(expectedText);
+      expect(voiceObservation).toBeTruthy();
+      expect(voiceObservation?.payload?.assistant_answer).toBe(false);
+      expect(voiceObservation?.payload?.observation?.assistant_answer).toBe(false);
+      expect(voiceObservation?.payload?.observation?.terminal_eligible).toBe(false);
+      expect(voiceReceipt?.assistant_answer).toBe(false);
+      expect(voiceReceipt?.terminal_eligible).toBe(false);
+      expect(response.body?.final_answer_source).toBe("final_answer_draft");
+      expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+      expect(response.body?.terminal_error_code ?? null).not.toBe("terminal_consistency_violation");
+      expect(response.body?.final_answer_draft?.llm_error_code ?? null).not.toBe("interim_voice_callout_status_observed");
+      const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+      expect(finalAnswer).toMatch(/evidence-only|receipt|voice|speak|reasoning|authority|observation/i);
+    }
+  }, 60000);
+
+  it("keeps voice-lane callouts as side effects while answering the separate content goal", async () => {
+    const previousRuntimeFinalAnswer = process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = [
+      "Resistance is steady opposition to current in a DC or low-frequency circuit and it dissipates energy as heat.",
+      "Impedance is the broader AC quantity: it includes resistance plus frequency-dependent reactance from capacitance and inductance, so it affects both magnitude and phase.",
+      "Superconductivity is different again because below its critical conditions a material can carry current with effectively zero DC resistance, though practical circuits still have limits from magnetic fields, current density, geometry, and AC losses.",
+    ].join(" ");
+    const app = createApp();
+    try {
+      for (const { question, expectedText } of [
+        {
+          question:
+            "Use the voice lane to say checking the comparison then explain the difference between resistance impedance and superconductivity in practical circuit terms. The final answer should focus on the circuit concepts.",
+          expectedText: "checking the comparison",
+        },
+        {
+          question:
+            "Use the voice lane to say checking now. Do not make the final answer about the voice tool. Explain impedance in practical circuit terms.",
+          expectedText: "checking now",
+        },
+      ]) {
+        const response = await request(app)
+          .post("/api/agi/ask/turn")
+          .send({
+            question,
+            mode: "read",
+            debug: true,
+            sessionId: `e52-voice-side-effect-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          })
+          .expect(200);
+
+        expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_environment_review");
+        expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toEqual(expect.arrayContaining([
+          "voice_output_tool_arbitration",
+          "voice_output_interim_callout_intent",
+          "compound_voice_side_effect",
+          "content_goal_preserved",
+        ]));
+        const ledger = Array.isArray(response.body?.current_turn_artifact_ledger)
+          ? response.body.current_turn_artifact_ledger
+          : [];
+        const runtimeVoiceCall = ledger.find((artifact: any) =>
+          artifact?.kind === "runtime_tool_call" &&
+          artifact?.payload?.capability_key === "live_env.request_interim_voice_callout"
+        );
+        const voiceObservation = ledger.find((artifact: any) =>
+          artifact?.kind === "live_environment_tool_observation" &&
+          artifact?.payload?.tool_name === "live_env.request_interim_voice_callout"
+        );
+        expect(runtimeVoiceCall).toBeTruthy();
+        expect(runtimeVoiceCall?.payload?.args?.text).toBe(expectedText);
+        expect(voiceObservation?.payload?.assistant_answer).toBe(false);
+        expect(voiceObservation?.payload?.observation?.terminal_eligible).toBe(false);
+        expect(response.body?.final_answer_source).toBe("final_answer_draft");
+        expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+        expect(response.body?.final_answer_draft?.llm_error_code ?? null).toBeNull();
+        const finalAnswer = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+        expect(finalAnswer).toMatch(/resistance|impedance|superconductivity|circuit/i);
+        expect(finalAnswer).not.toMatch(/^The interim voice callout\b/i);
+        expect(finalAnswer).not.toMatch(/accepted for client playback handoff/i);
+      }
+    } finally {
+      if (previousRuntimeFinalAnswer === undefined) delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previousRuntimeFinalAnswer;
+    }
+  }, 60000);
+
+  it("recognizes speak and read-aloud variants as direct interim voice commands", async () => {
+    const app = createApp();
+    for (const question of [
+      'With the voice lane active, speak "I am checking the live-source voice boundary" through the voice lane.',
+      'With the voice lane active, read "the live-source callout is policy-gated" aloud.',
+    ]) {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question,
+          mode: "read",
+          debug: true,
+          sessionId: `e52-natural-voice-variant-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        })
+        .expect(200);
+
+      expect(response.body?.canonical_goal_frame?.goal_kind).toBe("live_environment_review");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("voice_output_tool_arbitration");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toContain("voice_output_interim_callout_intent");
+      expect(response.body?.available_capabilities?.recommended_capability_key).toBe("live_env.request_interim_voice_callout");
+      const ledger = Array.isArray(response.body?.current_turn_artifact_ledger)
+        ? response.body.current_turn_artifact_ledger
+        : [];
+      const runtimeVoiceCall = ledger.find((artifact: any) =>
+        artifact?.kind === "runtime_tool_call" &&
+        artifact?.payload?.capability_key === "live_env.request_interim_voice_callout"
+      );
+      const voiceObservation = ledger.find((artifact: any) =>
+        artifact?.kind === "live_environment_tool_observation" &&
+        artifact?.payload?.tool_name === "live_env.request_interim_voice_callout"
+      );
+      expect(runtimeVoiceCall).toBeTruthy();
+      expect(voiceObservation).toBeTruthy();
+      expect(voiceObservation?.payload?.assistant_answer).toBe(false);
+      expect(voiceObservation?.payload?.observation?.assistant_answer).toBe(false);
+      expect(voiceObservation?.payload?.observation?.terminal_eligible).toBe(false);
+    }
+  }, 60000);
+
   it("builds blocked interim voice capacity as a final observed status fallback", () => {
     const text = __testHelixRuntimeInterimVoiceCalloutFallback.buildHelixRuntimeInterimVoiceCalloutFallbackText([
       {
@@ -2845,20 +3022,30 @@ describe("helix ask E52 panel control terminal contract", () => {
 
   it("keeps contextual interim voice tool policy mentions non-executable", async () => {
     const app = createApp();
-    const response = await request(app)
-      .post("/api/agi/ask/turn")
-      .send({
-        question: "What does the phrase \"use the interim voice callout tool\" mean in the previous debug, and what is the policy?",
-        mode: "read",
-        debug: true,
-        sessionId: `e52-interim-voice-policy-${Date.now()}`,
-      })
-      .expect(200);
+    for (const question of [
+      "What does the phrase \"use the interim voice callout tool\" mean in the previous debug, and what is the policy?",
+      "Do not speak. Just explain when a voice callout would be appropriate during a long tool-using answer.",
+      "Earlier we tested a voice callout saying \"I am checking this now\". Explain what happened, but do not make a new voice callout.",
+      "Do not use the voice lane to say browser voice ok; explain why that would normally be a voice command.",
+      "Do not use the voice lane to say checking now then explain impedance in practical circuit terms.",
+      "Earlier we said browser voice ok out loud. Explain what happened without making a new callout.",
+      "Write the sentence: use the voice lane to say browser voice ok.",
+    ]) {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question,
+          mode: "read",
+          debug: true,
+          sessionId: `e52-interim-voice-policy-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        })
+        .expect(200);
 
-    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).not.toContain("voice_output_tool_arbitration");
-    expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("live_env.request_interim_voice_callout");
-    expect(response.body?.agent_step_decision?.chosen_capability).not.toBe("live_env.request_interim_voice_callout");
-    expect(findAction(response.body, "docs-viewer")).toBeFalsy();
+      expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).not.toContain("voice_output_tool_arbitration");
+      expect(response.body?.available_capabilities?.recommended_capability_key).not.toBe("live_env.request_interim_voice_callout");
+      expect(response.body?.agent_step_decision?.chosen_capability).not.toBe("live_env.request_interim_voice_callout");
+      expect(findAction(response.body, "docs-viewer")).toBeFalsy();
+    }
   }, 60000);
 
   it("keeps contextual Dottie run analysis out of workstation action routing", async () => {
