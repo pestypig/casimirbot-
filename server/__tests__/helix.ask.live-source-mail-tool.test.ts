@@ -10,6 +10,7 @@ import {
 import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
+import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -19,6 +20,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceNarrativeStoreForTest();
+  resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -117,6 +119,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.configure_interpreter_profile",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.record_live_source_mail_decision",
         family: "live_env",
         creates_assistant_answer: false,
@@ -145,6 +154,146 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
     ]));
+  });
+
+  it("configures an interpreter profile without reading mail or answering", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_interpreter_profile",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        job_id: "stage_play_live_source_job:profile-test",
+        policy_id: "stage_play_live_source_watch_job_policy:profile-test",
+        domain: "minecraft",
+        objective_text: "Watch Minecraft and compare observations against a survival coach profile.",
+        interpretation_guidelines: "Treat visible hazards as observed facts and route likely intent as inference.",
+        lenses: ["hazards", "resources", "navigation"],
+        salience_criteria: ["hostile mob appears"],
+        suppress_criteria: ["unchanged camera angle"],
+        risk_criteria: ["lava", "hostile mob"],
+        opportunity_criteria: ["visible ore"],
+        voice_callout_criteria: ["immediate hazard"],
+        text_answer_style: "brief_explanation",
+        voice_style: "short_callout",
+        ask_when_uncertain: true,
+        create_linked_note: true,
+        evidence_refs: ["stage_play_live_source_mail:profile-test"],
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.configure_interpreter_profile",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toContain("Configured interpreter profile");
+    expect(observation.summary).toContain("no live-source mail was read");
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_interpreter_profile_config_result",
+      schema: "stage_play_interpreter_profile_config_result/v1",
+      schemaVersion: "stage_play_interpreter_profile_config_result/v1",
+      profile: {
+        artifactId: "stage_play_live_source_interpreter_profile",
+        schemaVersion: "stage_play_live_source_interpreter_profile/v1",
+        title: "Minecraft Survival Coach",
+        threadId,
+        roomId,
+        jobId: "stage_play_live_source_job:profile-test",
+        policyId: "stage_play_live_source_watch_job_policy:profile-test",
+        sourceKinds: ["visual_frame"],
+        domain: "minecraft",
+        objectiveText: "Watch Minecraft and compare observations against a survival coach profile.",
+        interpretationGuidelines: "Treat visible hazards as observed facts and route likely intent as inference.",
+        lenses: ["hazards", "resources", "navigation"],
+        salienceCriteria: ["hostile mob appears"],
+        suppressCriteria: ["unchanged camera angle"],
+        riskCriteria: ["lava", "hostile mob"],
+        opportunityCriteria: ["visible ore"],
+        voiceCalloutCriteria: ["immediate hazard"],
+        evidenceRules: {
+          preserveRawObservation: true,
+          distinguishObservedVsInferred: true,
+          requireEvidenceRefs: true,
+          askWhenUncertain: true,
+        },
+        outputStyle: {
+          textAnswerStyle: "brief_explanation",
+          voiceStyle: "short_callout",
+        },
+        status: "active",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      },
+      linkedNote: {
+        noteId: expect.stringMatching(/^note:interpreter_profile:/),
+        title: "Minecraft Survival Coach Guidelines",
+      },
+      transcriptRows: [
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Interpreter profile configured",
+          terminalEligible: false,
+          assistantAnswer: false,
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Objective",
+          body: "Objective: Watch Minecraft and compare observations against a survival coach profile.",
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Guidelines",
+          body: expect.stringContaining("Treat visible hazards as observed facts"),
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Scope",
+          body: "Domain: minecraft; source kinds: visual_frame; status: active.",
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Criteria",
+          body: expect.stringContaining("hostile mob appears"),
+        }),
+        expect.objectContaining({
+          rowKind: "loop_state",
+          title: "Linked note",
+          body: expect.stringContaining("Minecraft Survival Coach Guidelines"),
+        }),
+      ],
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+    });
+    expect(payload.profile.profileId).toMatch(/^stage_play_live_source_interpreter_profile:/);
+    expect(payload.interpreterProfileRef).toBe(payload.profile.profileId);
+    expect(payload.profile.evidenceRefs).toEqual(expect.arrayContaining([
+      sourceId,
+      "stage_play_live_source_job:profile-test",
+      "stage_play_live_source_watch_job_policy:profile-test",
+      "stage_play_live_source_mail:profile-test",
+      payload.linkedNote.noteId,
+    ]));
+    expect(payload.artifactId).not.toBe("stage_play_live_source_mail_read_result");
+    expect(observation.transcriptRows?.map((row: any) => row.title)).toEqual([
+      "Interpreter profile configured",
+      "Objective",
+      "Guidelines",
+      "Scope",
+      "Criteria",
+      "Linked note",
+    ]);
   });
 
   it("configures a live-source watch job policy without reading mail or answering", () => {

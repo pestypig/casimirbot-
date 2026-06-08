@@ -23,6 +23,13 @@ import type {
 import {
   STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import {
+  buildStagePlayLiveSourceInterpreterProfileV1,
+  type StagePlayLiveSourceInterpreterProfileDomainV1,
+  type StagePlayLiveSourceInterpreterProfileTextStyleV1,
+  type StagePlayLiveSourceInterpreterProfileV1,
+  type StagePlayLiveSourceInterpreterProfileVoiceStyleV1,
+} from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type {
   HelixLiveEnvironmentCommentaryKind,
   HelixLiveEnvironmentCommentaryStatus,
@@ -77,6 +84,13 @@ import {
   getStagePlayLiveSourceNarrativeState,
   recordStagePlayLiveSourceNarrativeState,
 } from "../stage-play/stage-play-live-source-narrative-store";
+import {
+  listStagePlayLiveSourceInterpreterProfiles,
+  recordStagePlayLiveSourceInterpreterProfile,
+} from "../stage-play/stage-play-live-source-interpreter-profile-store";
+import {
+  createInterpreterProfileNote,
+} from "../stage-play/stage-play-live-source-interpreter-profile-notes";
 import {
   buildStagePlayLiveSourceWatchJobPolicyDefaults,
   inferStagePlayLiveSourceInterpretationMode,
@@ -362,6 +376,144 @@ const buildWatchJobConfiguredTranscriptRows = (input: {
       ...rowBase,
     },
   ];
+};
+
+const readInterpreterProfileDomain = (
+  value: unknown,
+  fallbackText = "",
+): StagePlayLiveSourceInterpreterProfileDomainV1 => {
+  const raw = readString(value);
+  if (
+    raw === "minecraft" ||
+    raw === "browser" ||
+    raw === "video" ||
+    raw === "code_logs" ||
+    raw === "desktop_app" ||
+    raw === "custom"
+  ) {
+    return raw;
+  }
+  if (/\bminecraft|creeper|zombie|craft|inventory|biome|mob\b/i.test(fallbackText)) return "minecraft";
+  if (/\bbrowser|tab|webpage|website|chrome|url\b/i.test(fallbackText)) return "browser";
+  if (/\bvideo|scene|frame|clip|youtube\b/i.test(fallbackText)) return "video";
+  if (/\blog|stack trace|exception|test failure|server\b/i.test(fallbackText)) return "code_logs";
+  if (/\bdesktop|window|app|launcher|screen\b/i.test(fallbackText)) return "desktop_app";
+  return "custom";
+};
+
+const readInterpreterProfileTextStyle = (
+  value: unknown,
+): StagePlayLiveSourceInterpreterProfileTextStyleV1 => {
+  const raw = readString(value);
+  return raw === "one_sentence" || raw === "brief_explanation" || raw === "structured"
+    ? raw
+    : "brief_explanation";
+};
+
+const readInterpreterProfileVoiceStyle = (
+  value: unknown,
+): StagePlayLiveSourceInterpreterProfileVoiceStyleV1 => {
+  const raw = readString(value);
+  return raw === "short_callout" || raw === "coach" || raw === "warning_only"
+    ? raw
+    : "short_callout";
+};
+
+const titleCaseWords = (value: string, limit = 4): string =>
+  value
+    .replace(/[^\w\s-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, limit)
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+
+const inferInterpreterProfileTitle = (input: {
+  title?: string | null;
+  domain: StagePlayLiveSourceInterpreterProfileDomainV1;
+  objectiveText: string;
+}): string => {
+  const explicit = readString(input.title);
+  if (explicit) return clipText(explicit, 80);
+  const objective = input.objectiveText;
+  if (input.domain === "minecraft") {
+    if (/\bsurvival|hazard|risk|mob|creeper|zombie\b/i.test(objective)) return "Minecraft Survival Coach";
+    return "Minecraft Scene Interpreter";
+  }
+  if (input.domain === "browser") return "Browser Workflow Watcher";
+  if (input.domain === "video") return "Video Scene Interpreter";
+  if (input.domain === "code_logs") return "Code Log Failure Watcher";
+  if (input.domain === "desktop_app") return "Desktop App Watcher";
+  const titled = titleCaseWords(objective);
+  return titled ? `${titled} Interpreter` : "Live Source Interpreter";
+};
+
+const buildInterpreterProfileConfiguredTranscriptRows = (input: {
+  profile: StagePlayLiveSourceInterpreterProfileV1;
+  linkedNote?: { noteId: string; title: string } | null;
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? input.profile.updatedAt;
+  const rowBase = {
+    source: {
+      toolName: "live_env.configure_interpreter_profile",
+      artifactId: input.profile.profileId,
+      artifactKind: input.profile.artifactId,
+    },
+    evidenceRefs: input.profile.evidenceRefs,
+    authority: "tool_evidence" as const,
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  };
+  const rows: AskTurnTranscriptRowDraftV1[] = [
+    {
+      rowId: `ask_turn_interpreter_profile_configured:${hashShort(input.profile.profileId)}`,
+      rowKind: "loop_state",
+      title: "Interpreter profile configured",
+      body: `${input.profile.title}: ${input.profile.profileId}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_objective:${hashShort(input.profile.profileId)}`,
+      rowKind: "loop_state",
+      title: "Objective",
+      body: `Objective: ${input.profile.objectiveText}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_guidelines:${hashShort(input.profile.profileId)}`,
+      rowKind: "loop_state",
+      title: "Guidelines",
+      body: `Guidelines: ${clipText(input.profile.interpretationGuidelines, 420)}`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_scope:${hashShort(input.profile.profileId)}`,
+      rowKind: "loop_state",
+      title: "Scope",
+      body: `Domain: ${input.profile.domain}; source kinds: ${input.profile.sourceKinds.join(", ")}; status: ${input.profile.status}.`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_criteria:${hashShort(input.profile.profileId)}`,
+      rowKind: "loop_state",
+      title: "Criteria",
+      body: `Salience: ${input.profile.salienceCriteria.join(" | ") || "none"}; suppress: ${input.profile.suppressCriteria.join(" | ") || "none"}.`,
+      ...rowBase,
+    },
+  ];
+  if (input.linkedNote) {
+    rows.push({
+      rowId: `ask_turn_interpreter_profile_note:${hashShort([input.profile.profileId, input.linkedNote.noteId])}`,
+      rowKind: "loop_state",
+      title: "Linked note",
+      body: `Linked note: ${input.linkedNote.title} (${input.linkedNote.noteId}).`,
+      ...rowBase,
+      evidenceRefs: uniqueStrings([...input.profile.evidenceRefs, input.linkedNote.noteId]),
+    });
+  }
+  return rows;
 };
 
 const rowKindForVoiceSteeringQueueDecision = (
@@ -1873,6 +2025,188 @@ export function executeLiveEnvironmentTool(
         mailboxThreadResolution.mailboxThreadId,
         ...configured.policy.evidenceRefs,
       ],
+    });
+  }
+
+  if (input.tool_name === "live_env.configure_interpreter_profile") {
+    const objectiveText =
+      readString(args.objective_text) ??
+      readString(args.objectiveText) ??
+      readString(args.objective) ??
+      "Interpret live-source observations according to this profile.";
+    const interpretationGuidelines =
+      readString(args.interpretation_guidelines) ??
+      readString(args.interpretationGuidelines) ??
+      readString(args.guidelines) ??
+      "Preserve observed facts, separate inference from observation, and cite evidence refs.";
+    const domain = readInterpreterProfileDomain(
+      args.domain,
+      `${objectiveText}\n${interpretationGuidelines}`,
+    );
+    const sourceIds = uniqueStrings([
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ]);
+    const sourceKinds = readStringArray(args.source_kinds ?? args.sourceKinds);
+    const normalizedSourceKinds = sourceKinds.length > 0
+      ? sourceKinds
+      : domain === "code_logs"
+        ? ["screen_summary", "custom"]
+        : ["visual_frame"];
+    const jobId =
+      readString(args.job_id) ??
+      readString(args.jobId) ??
+      null;
+    const policyId =
+      readString(args.policy_id) ??
+      readString(args.policyId) ??
+      null;
+    const now = new Date().toISOString();
+    const title = inferInterpreterProfileTitle({
+      title: readString(args.title),
+      domain,
+      objectiveText,
+    });
+    const requestedLinkedNoteId =
+      readString(args.linked_note_id) ??
+      readString(args.linkedNoteId);
+    const createLinkedNote =
+      readBooleanArg(args, "create_linked_note", "createLinkedNote") === true ||
+      Boolean(requestedLinkedNoteId);
+    const requestedLinkedNoteTitle =
+      readString(args.linked_note_title) ??
+      readString(args.linkedNoteTitle);
+    const evidenceRefs = uniqueStrings([
+      ...readStringArray(args.evidence_refs ?? args.evidenceRefs),
+      ...sourceIds,
+      jobId,
+      policyId,
+      requestedLinkedNoteId,
+    ]);
+    let profile = recordStagePlayLiveSourceInterpreterProfile(
+      buildStagePlayLiveSourceInterpreterProfileV1({
+        profileId: `stage_play_live_source_interpreter_profile:${hashShort([
+          input.thread_id,
+          roomId,
+          environment?.environment_id ?? input.environment_id ?? null,
+          jobId,
+          policyId,
+          domain,
+          title,
+          objectiveText,
+          interpretationGuidelines,
+          now,
+        ])}`,
+        title,
+        threadId: input.thread_id,
+        roomId,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        jobId,
+        policyId,
+        sourceKinds: normalizedSourceKinds,
+        domain,
+        objectiveText,
+        interpretationGuidelines,
+        lenses: readStringArray(args.lenses),
+        salienceCriteria: readStringArray(args.salience_criteria ?? args.salienceCriteria),
+        suppressCriteria: readStringArray(args.suppress_criteria ?? args.suppressCriteria),
+        riskCriteria: readStringArray(args.risk_criteria ?? args.riskCriteria),
+        opportunityCriteria: readStringArray(args.opportunity_criteria ?? args.opportunityCriteria),
+        voiceCalloutCriteria: readStringArray(args.voice_callout_criteria ?? args.voiceCalloutCriteria),
+        evidenceRules: {
+          preserveRawObservation: true,
+          distinguishObservedVsInferred: true,
+          requireEvidenceRefs: true,
+          askWhenUncertain:
+            readBooleanArg(args, "ask_when_uncertain", "askWhenUncertain") ?? true,
+        },
+        outputStyle: {
+          textAnswerStyle: readInterpreterProfileTextStyle(
+            args.text_answer_style ?? args.textAnswerStyle,
+          ),
+          voiceStyle: readInterpreterProfileVoiceStyle(
+            args.voice_style ?? args.voiceStyle,
+          ),
+        },
+        linkedNoteId: requestedLinkedNoteId ?? null,
+        linkedNoteTitle: requestedLinkedNoteTitle ?? null,
+        status: "active",
+        evidenceRefs,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const note = createLinkedNote
+      ? createInterpreterProfileNote({
+          profileId: profile.profileId,
+          noteId: requestedLinkedNoteId,
+          title: requestedLinkedNoteTitle,
+          now,
+        })
+      : null;
+    if (note) {
+      profile = {
+        ...profile,
+        linkedNoteId: note.noteId,
+        linkedNoteTitle: note.title,
+        evidenceRefs: uniqueStrings([...profile.evidenceRefs, note.noteId]),
+      };
+      profile = recordStagePlayLiveSourceInterpreterProfile(profile);
+    }
+    const linkedNote = note
+      ? {
+          noteId: note.noteId,
+          title: note.title,
+        }
+      : null;
+    const profileCount = listStagePlayLiveSourceInterpreterProfiles({
+      threadId: input.thread_id,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      jobId,
+      domain,
+      includeArchived: true,
+      limit: 250,
+    }).length;
+    const transcriptRows = buildInterpreterProfileConfiguredTranscriptRows({
+      profile,
+      linkedNote,
+      createdAt: now,
+    });
+    const result = {
+      schema: "stage_play_interpreter_profile_config_result/v1",
+      schemaVersion: "stage_play_interpreter_profile_config_result/v1",
+      artifactId: "stage_play_interpreter_profile_config_result",
+      profile,
+      linkedNote,
+      linked_note: linkedNote,
+      transcriptRows,
+      profileCount,
+      profile_count: profileCount,
+      interpreterProfileRef: profile.profileId,
+      interpreter_profile_ref: profile.profileId,
+      sourceIds,
+      source_ids: sourceIds,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: profile.environmentId ?? environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Configured interpreter profile ${profile.profileId}; no live-source mail was read.`,
+      observation: result,
+      transcriptRows,
+      evidenceRefs: uniqueStrings([
+        profile.profileId,
+        linkedNote?.noteId,
+        ...profile.evidenceRefs,
+      ]),
     });
   }
 
