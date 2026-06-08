@@ -1450,6 +1450,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(scrollport.getAttribute("data-stage-play-graph-mode")).toBe("observer_mail_loop_v1");
     expect(screen.getByTestId("stage-play-observer-mail-loop-toggle")).toBeTruthy();
     expect(screen.getByTestId("stage-play-full-graph-toggle")).toBeTruthy();
+    expect(screen.queryByText("observer_mail_loop_v1")).toBeNull();
+    expect(screen.queryByText(/Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run armed mail wake" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy observer mail loop refs" })).toBeNull();
     expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(7);
     expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mailbox").length).toBeGreaterThan(0);
@@ -1459,22 +1463,40 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
+    expect(screen.queryByTestId("stage-play-mail-loop-header")).toBeNull();
+    expect(screen.queryByTestId("stage-play-mail-loop-activity")).toBeNull();
+    expect(screen.getAllByTestId("stage-play-mail-loop-node-payload").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-mail-loop-edge")).toHaveLength(6);
+    expect(screen.getByText("Objective")).toBeTruthy();
+    expect(screen.getByText("Source")).toBeTruthy();
+    expect(screen.getByText("Latest")).toBeTruthy();
+    expect(screen.getByText("Contract")).toBeTruthy();
+    expect(screen.getByText("Observed")).toBeTruthy();
+    expect(screen.getByText("Tool")).toBeTruthy();
+    expect(screen.getByText("Reason")).toBeTruthy();
+    expect(screen.getAllByText("Output").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Watch the active visual source/i)).toBeTruthy();
+    expect(screen.getByText(/source:visual-tab \| active \| fresh/i)).toBeTruthy();
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
     expect(screen.getByText("auto pressure")).toBeTruthy();
     expect(screen.getByText("retrying")).toBeTruthy();
-    expect(screen.getByText(/Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeTruthy();
     expect(screen.queryByText("14 badges")).toBeNull();
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getAllByText(/queued 0 \/ running 0/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/failed_retryable: mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("record_interpretation")).toBeTruthy();
+    expect(screen.getAllByText("record_interpretation").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Minecraft Survival Coach/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Matched: low light, cave exploration/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Recommended: record_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/watch next: Watch for a new actor, opened UI, or scene transition/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("summary mail")).toBeTruthy();
+    expect(screen.getByText("profile lens")).toBeTruthy();
+    expect(screen.getByText("comparison")).toBeTruthy();
+    expect(screen.getByText("wake queued")).toBeTruthy();
+    expect(screen.getByText("output state")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Open Interpreter Profile inspector" }));
     expect(screen.getByTestId("stage-play-interpreter-profile-inspector")).toBeTruthy();
     expect(screen.getByText(/Preserve observations and compare them to survival priorities/i)).toBeTruthy();
@@ -1484,24 +1506,13 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(7);
   });
 
-  it("shows manual mail wake admission without auto-running from the panel", async () => {
+  it("keeps mail wake execution out of the graph controls", async () => {
     renderPanel();
 
     await screen.findByTestId("stage-play-badge-graph-scrollport");
+    expect(screen.queryByRole("button", { name: "Run armed mail wake" })).toBeNull();
     expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/run"))).toBe(false);
     expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/cycle"))).toBe(false);
-
-    fireEvent.click(screen.getByRole("button", { name: "Run armed mail wake" }));
-
-    await waitFor(() => {
-      expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/cycle"))).toBe(true);
-    });
-    expect(fetchJsonBodies("/api/helix/stage-play/live-source-mail/wake/cycle").at(-1)).toEqual(expect.objectContaining({
-      threadId: "helix-ask:desktop",
-      roomId: null,
-      environmentId: null,
-    }));
-    expect(await screen.findByText(/queued: no_runnable_wake/i)).toBeTruthy();
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {
@@ -2059,6 +2070,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Stage Play console" }));
 
     expect(screen.getByTestId("stage-play-binding-overlay")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("stage-play-observer-mail-loop-toggle"));
+
+    expect(screen.queryByTestId("stage-play-binding-overlay")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open Stage Play console" })).toBeNull();
   });
 
   it("requests the transient graph with live thread, room, and environment identifiers", async () => {

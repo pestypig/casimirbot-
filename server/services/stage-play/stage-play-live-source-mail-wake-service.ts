@@ -29,6 +29,16 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
   result: StagePlayLiveSourceMailWakeResultV1 | null;
   status: "idle" | "queued" | "running" | "completed" | "deferred_for_pressure" | "failed_retryable" | "failed_terminal" | "failed";
   reason: string;
+  continuation: {
+    scheduled: boolean;
+    reason:
+      | "runnable_wake_remaining"
+      | "manual_cycle_no_auto_continuation"
+      | "no_runnable_wake_remaining"
+      | "wake_result_not_continuable"
+      | "wake_runner_disabled";
+    runnableWakeIds: string[];
+  };
   runtimeAdmission?: {
     admitted: boolean;
     action: RuntimeAdmissionDecision["action"];
@@ -103,6 +113,7 @@ const summarizeWakeState = (input: {
   result: StagePlayLiveSourceMailWakeResultV1 | null;
   runtimeAdmission: RuntimeAdmissionDecision | null;
   reason?: string;
+  continuation?: StagePlayLiveSourceMailWakeAdmissionCycleResultV1["continuation"] | null;
 }): StagePlayLiveSourceMailWakeAdmissionCycleResultV1 => {
   const wakes = listStagePlayLiveSourceMailWakeRequests({ limit: 250 });
   const runnable = listRunnableStagePlayLiveSourceMailWakeRequests({ now: input.now, limit: 250 });
@@ -125,6 +136,11 @@ const summarizeWakeState = (input: {
     result: input.result,
     status,
     reason: input.reason ?? (input.result ? "wake_result_recorded" : "no_runnable_wake"),
+    continuation: input.continuation ?? {
+      scheduled: false,
+      reason: "no_runnable_wake_remaining",
+      runnableWakeIds: [],
+    },
     runtimeAdmission: input.runtimeAdmission ? {
       admitted: input.runtimeAdmission.admitted,
       action: input.runtimeAdmission.action,
@@ -135,6 +151,56 @@ const summarizeWakeState = (input: {
     terminal_eligible: false,
     context_role: "tool_evidence",
     raw_content_included: false,
+  };
+};
+
+const maybeScheduleContinuation = (input: {
+  now: string;
+  result: StagePlayLiveSourceMailWakeResultV1 | null;
+  manualRun?: boolean;
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+}): StagePlayLiveSourceMailWakeAdmissionCycleResultV1["continuation"] => {
+  const continuable =
+    input.result?.status === "completed" ||
+    input.result?.status === "failed_retryable";
+  if (!continuable) {
+    return {
+      scheduled: false,
+      reason: input.result ? "wake_result_not_continuable" : "no_runnable_wake_remaining",
+      runnableWakeIds: [],
+    };
+  }
+  const runnable = listRunnableStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now: input.now,
+    limit: 250,
+  });
+  const runnableWakeIds = runnable.map((wake) => wake.wakeRequestId);
+  if (runnableWakeIds.length === 0) {
+    return {
+      scheduled: false,
+      reason: "no_runnable_wake_remaining",
+      runnableWakeIds,
+    };
+  }
+  if (input.manualRun) {
+    return {
+      scheduled: false,
+      reason: "manual_cycle_no_auto_continuation",
+      runnableWakeIds,
+    };
+  }
+  const scheduled = requestStagePlayLiveSourceMailWakeRun();
+  return {
+    scheduled,
+    reason: scheduled ? "runnable_wake_remaining" : "wake_runner_disabled",
+    runnableWakeIds,
   };
 };
 
@@ -195,11 +261,21 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       manualRun: input.manualRun,
       now,
     });
+    const continuation = maybeScheduleContinuation({
+      now,
+      result,
+      manualRun: input.manualRun,
+      threadId: input.threadId ?? null,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+    });
     return summarizeWakeState({
       now,
       result,
       runtimeAdmission,
       reason: result ? "wake_admitted" : "no_runnable_wake",
+      continuation,
     });
   } finally {
     cycleRunning = false;

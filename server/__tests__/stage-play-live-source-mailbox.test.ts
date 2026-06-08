@@ -2733,6 +2733,80 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("reports immediate continuation when a bounded wake leaves runnable retained mail", async () => {
+    const previousBatchLimit = process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT;
+    process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT = "1";
+    try {
+      const first = enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId,
+        sourceId,
+        sourceKind: "visual_frame",
+        frameRef: "visual_frame:cycle-retained-first",
+        evidenceRef: "visual_evidence:cycle-retained-first",
+        summaryText: "First retained-cycle summary.",
+        createdAt: "2026-06-04T12:02:50.000Z",
+      });
+      const second = enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId,
+        sourceId,
+        sourceKind: "visual_frame",
+        frameRef: "visual_frame:cycle-retained-second",
+        evidenceRef: "visual_evidence:cycle-retained-second",
+        summaryText: "Second retained-cycle summary.",
+        createdAt: "2026-06-04T12:02:51.000Z",
+      });
+
+      const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:02:52.000Z",
+        pressureCheck: () => ({ deferred: false }),
+        askTurnRunner: async ({ wakeRequest }) => ({
+          turn_id: "ask:wake-cycle-retained",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-cycle-retained",
+                  mailIds: wakeRequest.mailIds,
+                },
+              },
+            },
+          ],
+        }),
+      });
+
+      const wakes = listStagePlayLiveSourceMailWakeRequests({ threadId });
+      const completedWake = wakes.find((wake) => wake.status === "completed");
+      const retainedWake = wakes.find((wake) => wake.status === "queued");
+
+      expect(completedWake).toMatchObject({
+        mailIds: [first.mailId],
+        askTurnId: "ask:wake-cycle-retained",
+      });
+      expect(retainedWake).toMatchObject({
+        mailIds: [second.mailId],
+        status: "queued",
+      });
+      expect(cycle.continuation).toMatchObject({
+        scheduled: false,
+        reason: "wake_runner_disabled",
+        runnableWakeIds: [retainedWake?.wakeRequestId],
+      });
+    } finally {
+      if (previousBatchLimit === undefined) {
+        delete process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT;
+      } else {
+        process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT = previousBatchLimit;
+      }
+    }
+  });
+
   it("recovers a stale running wake into retryable state", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];

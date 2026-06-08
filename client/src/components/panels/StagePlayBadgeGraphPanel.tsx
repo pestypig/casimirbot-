@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, Play, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -48,10 +48,6 @@ import {
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
-import {
-  STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
-  type StagePlayLiveSourceMailWakeTranscriptEventDetail,
-} from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 
@@ -225,6 +221,15 @@ type StagePlayMailLoopNode = {
   status: string;
   preview: string;
   statusChips?: string[];
+  payloadRows?: Array<{
+    label: string;
+    value: string;
+    tone?: "default" | "good" | "warn" | "blocked";
+  }>;
+  edgeToNext?: {
+    label: string;
+    tone: "connected" | "pending" | "blocked";
+  } | null;
   inputLabel: string;
   inputRefs: string[];
   inputPreview: string;
@@ -424,60 +429,6 @@ async function fetchStagePlayLiveSourceMail(input: {
     throw new Error(`Stage Play live-source mail request failed: ${response.status}`);
   }
   return await response.json() as StagePlayLiveSourceMailListResponse;
-}
-
-async function runStagePlayLiveSourceMailWake(input: {
-  threadId: string;
-  roomId?: string | null;
-  environmentId?: string | null;
-  trigger?: "manual" | "auto";
-}): Promise<{
-  ok: boolean;
-  cycle: {
-    result: StagePlayLiveSourceMailWakeResultV1 | null;
-    status: string;
-    reason: string;
-  };
-  assistant_answer: false;
-  terminal_eligible: false;
-  context_role: "tool_evidence";
-  raw_content_included: false;
-}> {
-  const response = await fetch("/api/helix/stage-play/live-source-mail/wake/cycle", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      threadId: input.threadId,
-      roomId: input.roomId ?? null,
-      environmentId: input.environmentId ?? null,
-      trigger: input.trigger ?? "manual",
-      manualRun: input.trigger !== "auto",
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`Stage Play live-source mail wake run failed: ${response.status}`);
-  }
-  return await response.json();
-}
-
-async function fetchHelixAskTurnDebugPayload(turnId: string): Promise<Record<string, unknown> | null> {
-  const response = await fetch(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) return null;
-  const body = await response.json() as Record<string, unknown>;
-  const payload = body.payload;
-  return payload && typeof payload === "object" && !Array.isArray(payload)
-    ? payload as Record<string, unknown>
-    : body;
-}
-
-function dispatchStagePlayMailWakeTranscript(detail: StagePlayLiveSourceMailWakeTranscriptEventDetail): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT, { detail }));
 }
 
 async function fetchStagePlayBuilderContext(input: {
@@ -1350,6 +1301,22 @@ function buildObserverMailLoopNodes(input: {
         graph.sourceWindow.freshness,
         unreadCount > 0 ? `${unreadCount} unread` : "mail ready",
       ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Source",
+          value: `${visualSource?.sourceId ?? visualMail?.sourceId ?? "visual source pending"} | ${visualSource?.status ?? "unknown"} | ${graph.sourceWindow.freshness}`,
+          tone: graph.sourceWindow.freshness === "fresh" ? "good" : "warn",
+        },
+        {
+          label: "Objective",
+          value: latestPolicy?.objectiveText ?? activeJob?.objective ?? visualMail?.objective?.text ?? "No watch objective armed yet.",
+          tone: latestPolicy || activeJob ? "good" : "warn",
+        },
+      ],
+      edgeToNext: {
+        label: visualMail ? "summary mail" : visualSource ? "waiting for summary" : "source missing",
+        tone: visualMail ? "connected" : visualSource ? "pending" : "blocked",
+      },
       inputLabel: "Input",
       inputRefs: ["source registry"],
       inputPreview: "source registry",
@@ -1370,6 +1337,22 @@ function buildObserverMailLoopNodes(input: {
         unreadCount > 0 ? `${unreadCount} unread` : "no unread",
         queuedRunningText,
       ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Latest",
+          value: visualMail?.summary.preview ?? "No compact summary yet.",
+          tone: visualMail ? "good" : "warn",
+        },
+        {
+          label: "Mail",
+          value: `${unreadCount} unread | ${deliveredCount} delivered | ${queuedWakeMailCount} queued`,
+          tone: unreadCount > 0 ? "warn" : "default",
+        },
+      ],
+      edgeToNext: {
+        label: activeInterpreterProfile ? "profile lens" : latestPolicy ? "watch policy" : "no policy",
+        tone: activeInterpreterProfile ? "connected" : latestPolicy ? "pending" : "blocked",
+      },
       inputLabel: "Input",
       inputRefs: mailInputRefs,
       inputPreview: mailInputRefs.length > 0 ? mailInputRefs.slice(0, 2).join(", ") : "visual_frame / visual_evidence pending",
@@ -1394,6 +1377,26 @@ function buildObserverMailLoopNodes(input: {
             activeInterpreterProfile.outputStyle.voiceStyle,
           ]
         : ["watch policy only"],
+      payloadRows: [
+        {
+          label: "Contract",
+          value: activeInterpreterProfile?.title ?? latestPolicy?.objectiveText ?? "No active interpreter profile.",
+          tone: activeInterpreterProfile ? "good" : latestPolicy ? "warn" : "blocked",
+        },
+        {
+          label: "Watch",
+          value: activeInterpreterProfile?.salienceCriteria.slice(0, 3).join(", ") || latestPolicy?.importanceCriteria.slice(0, 3).join(", ") || "criteria pending",
+          tone: activeInterpreterProfile || latestPolicy ? "good" : "warn",
+        },
+        {
+          label: "Suppress",
+          value: activeInterpreterProfile?.suppressCriteria.slice(0, 2).join(", ") || latestPolicy?.suppressCriteria.slice(0, 2).join(", ") || "none",
+        },
+      ],
+      edgeToNext: {
+        label: latestProfileComparison ? "comparison" : activeInterpreterProfile ? "needs comparison" : "profile missing",
+        tone: latestProfileComparison ? "connected" : activeInterpreterProfile ? "pending" : "blocked",
+      },
       inputLabel: "Input",
       inputRefs: profileInputRefs,
       inputPreview: profileInputRefs.length > 0 ? profileInputRefs.join(", ") : "watch job / policy",
@@ -1444,6 +1447,26 @@ function buildObserverMailLoopNodes(input: {
             latestProfileComparison.suppressedCriteria.length ? `${latestProfileComparison.suppressedCriteria.length} suppressed` : null,
           ].filter((entry): entry is string => Boolean(entry))
         : ["evidence only"],
+      payloadRows: [
+        {
+          label: "Observed",
+          value: latestProfileComparison?.observedFacts.slice(0, 2).join("; ") || visualMail?.summary.preview || "No comparison input yet.",
+          tone: latestProfileComparison ? "good" : visualMail ? "warn" : "blocked",
+        },
+        {
+          label: "Matched",
+          value: latestProfileComparison?.matchedCriteria.join(", ") || "none",
+        },
+        {
+          label: "Recommended",
+          value: latestProfileComparison?.recommendedDecision ?? "pending",
+          tone: latestProfileComparison ? "good" : "warn",
+        },
+      ],
+      edgeToNext: {
+        label: displayWake ? "wake queued" : visualMail ? "needs wake" : "mail missing",
+        tone: displayWake ? "connected" : visualMail ? "pending" : "blocked",
+      },
       inputLabel: "Input",
       inputRefs: comparisonInputRefs,
       inputPreview: comparisonInputRefs.length > 0 ? comparisonInputRefs.join(", ") : "mail + profile + narrative",
@@ -1474,6 +1497,26 @@ function buildObserverMailLoopNodes(input: {
         pressureWakeCount > 0 ? (pressureIsSecondary ? "auto pressure" : "pressure") : null,
         retryWakeCount > 0 ? "retrying" : null,
       ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Tool",
+          value: `live_env.read_live_source_mail${latestWakeAskTurnId ? ` -> ${latestWakeAskTurnId}` : ""}`,
+          tone: latestWakeAskTurnId ? "good" : displayWake ? "warn" : "default",
+        },
+        {
+          label: "Wake",
+          value: latestWakeStatus
+            ? `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}`
+            : unreadCount > 0 ? "unread mail waiting" : "no wake request",
+          tone: latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
+            ? "blocked"
+            : latestWakeStatus ? "good" : unreadCount > 0 ? "warn" : "default",
+        },
+      ],
+      edgeToNext: {
+        label: latestDecision ? "decision" : latestWakeStatus === "deferred_for_pressure" ? "deferred" : displayWake ? "running/pending" : "wake missing",
+        tone: latestDecision ? "connected" : latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_terminal" ? "blocked" : displayWake ? "pending" : "blocked",
+      },
       inputLabel: "Input",
       inputRefs: wakeInputRefs,
       inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "unread mail ids pending",
@@ -1505,6 +1548,25 @@ function buildObserverMailLoopNodes(input: {
         latestDecision?.modelReviewed ? "model reviewed" : null,
         latestDecision?.mailIds.length ? `${latestDecision.mailIds.length} mail` : null,
       ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Decision",
+          value: latestDecision?.decision ?? "No model decision yet.",
+          tone: latestDecision ? "good" : "warn",
+        },
+        {
+          label: "Reason",
+          value: latestDecision?.rationalePreview || "Waiting for Ask to record a decision.",
+        },
+        {
+          label: "Refs",
+          value: latestDecision?.decisionId ?? "decision ref pending",
+        },
+      ],
+      edgeToNext: {
+        label: latestDecision ? "output state" : "decision missing",
+        tone: latestDecision ? "connected" : "pending",
+      },
       inputLabel: "Input",
       inputRefs: decisionInputRefs,
       inputPreview: decisionInputRefs.length > 0 ? decisionInputRefs.join(", ") : "mail item ids pending",
@@ -1523,6 +1585,19 @@ function buildObserverMailLoopNodes(input: {
         latestDecision?.voicePolicy?.voiceEnabled ? "voice enabled" : "voice off",
         activeJob?.status ? `job ${activeJob.status}` : null,
       ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Output",
+          value: outputPreview,
+          tone: latestDecision ? "good" : "default",
+        },
+        {
+          label: "Watch next",
+          value: latestNarrativeState?.watchNext?.reason ?? latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed for next summary",
+          tone: latestNarrativeState?.watchNext?.reason ? "good" : "default",
+        },
+      ],
+      edgeToNext: null,
       inputLabel: "Input",
       inputRefs: latestDecision ? [latestDecision.decisionId] : [],
       inputPreview: latestDecision?.decisionId ?? "decision id pending",
@@ -1547,13 +1622,9 @@ function buildObserverMailLoopNodes(input: {
 function StagePlayObserverMailLoopCanvas({
   graph,
   mailbox,
-  wakeRunStatus,
-  onRunWake,
 }: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
-  wakeRunStatus?: string | null;
-  onRunWake?: () => void;
 }) {
   const nodes = useMemo(() => buildObserverMailLoopNodes({ graph, mailbox }), [graph, mailbox]);
   const [selectedInspectorNodeId, setSelectedInspectorNodeId] = useState<string | null>(null);
@@ -1561,41 +1632,12 @@ function StagePlayObserverMailLoopCanvas({
     nodes.find((node) => node.id === selectedInspectorNodeId && node.inspector) ??
     nodes.find((node) => node.inspector) ??
     null;
-  const refs = uniqueSorted(nodes.flatMap((node) => [...node.inputRefs, ...node.outputRefs]));
   return (
     <div
       className="relative min-h-0 flex-1 overflow-auto rounded-md border border-slate-800 bg-slate-950/95 p-6"
       data-testid="stage-play-badge-graph-scrollport"
       data-stage-play-graph-mode="observer_mail_loop_v1"
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="font-mono text-[11px] uppercase tracking-wide text-cyan-200">observer_mail_loop_v1</div>
-          <div className="mt-1 text-sm text-slate-400">
-            {"Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output / Wait."}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {wakeRunStatus ? (
-            <span className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[10px] text-slate-300">
-              {wakeRunStatus}
-            </span>
-          ) : null}
-          {onRunWake ? (
-            <button
-              type="button"
-              onClick={onRunWake}
-              className="inline-flex items-center gap-1 rounded border border-cyan-800 bg-cyan-950/40 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:border-cyan-400"
-              data-testid="stage-play-run-armed-mail-wake"
-              aria-label="Run armed mail wake"
-            >
-              <Play className="h-3 w-3" aria-hidden="true" />
-              Run armed mail wake
-            </button>
-          ) : null}
-          <CopyStagePlayRefsButton refs={refs} label="Copy observer mail loop refs" />
-        </div>
-      </div>
       <div className="grid min-w-[1700px] grid-cols-[repeat(7,220px)] items-start gap-6">
         {nodes.map((node) => (
           <div
@@ -1607,7 +1649,7 @@ function StagePlayObserverMailLoopCanvas({
             <button
               type="button"
               onClick={() => node.inspector ? setSelectedInspectorNodeId(node.id) : undefined}
-              className={`flex min-h-[132px] w-full flex-col justify-between rounded-md border px-3 py-3 text-center shadow-[0_12px_30px_rgba(2,6,23,0.3)] ${
+              className={`flex min-h-[218px] w-full flex-col justify-between rounded-md border px-3 py-3 text-center shadow-[0_12px_30px_rgba(2,6,23,0.3)] ${
                 node.inspector && selectedInspectorNode?.id === node.id
                   ? "border-cyan-400 bg-cyan-950/40"
                   : "border-slate-700 bg-slate-900/80"
@@ -1620,6 +1662,27 @@ function StagePlayObserverMailLoopCanvas({
                 <span className="mt-1 block text-[10px] text-slate-500">{node.subtitle}</span>
               </div>
               <div className="mt-2 line-clamp-2 text-[11px] text-slate-200">{node.preview}</div>
+              {node.payloadRows?.length ? (
+                <div className="mt-2 space-y-1 text-left" data-testid="stage-play-mail-loop-node-payload">
+                  {node.payloadRows.slice(0, 3).map((row) => (
+                    <div
+                      key={`${node.id}:${row.label}`}
+                      className={`rounded border px-2 py-1 ${
+                        row.tone === "good"
+                          ? "border-emerald-900 bg-emerald-950/25"
+                          : row.tone === "warn"
+                            ? "border-amber-900 bg-amber-950/25"
+                            : row.tone === "blocked"
+                              ? "border-rose-900 bg-rose-950/25"
+                              : "border-slate-800 bg-slate-950/45"
+                      }`}
+                    >
+                      <div className="font-mono text-[8px] uppercase tracking-wide text-slate-500">{row.label}</div>
+                      <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-slate-200">{row.value}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {node.statusChips?.length ? (
                 <span className="mt-1 flex max-w-full flex-wrap justify-center gap-1">
                   {node.statusChips.slice(0, 2).map((chip) => (
@@ -1634,9 +1697,8 @@ function StagePlayObserverMailLoopCanvas({
               className="mt-2 rounded-md border border-slate-800 bg-black/25 p-2 text-[10px] text-slate-300"
               data-testid="stage-play-mail-loop-node-tray"
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-200">
-                <span>Details</span>
-                <CopyStagePlayRefsButton refs={uniqueSorted([...node.inputRefs, ...node.outputRefs])} label={`Copy refs for ${node.title}`} />
+              <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-200">
+                Details
               </summary>
               <div className="mt-2 space-y-2 text-left">
                 <div>
@@ -1664,7 +1726,40 @@ function StagePlayObserverMailLoopCanvas({
       <div className="mt-4 grid min-w-[1700px] grid-cols-[repeat(7,220px)] gap-6 font-mono text-[10px] text-slate-500">
         {nodes.map((node, index) => (
           <div key={`${node.id}:edge`} className="flex items-center justify-center">
-            {index < nodes.length - 1 ? <span>--&gt;</span> : <span>end</span>}
+            {index < nodes.length - 1 ? (
+              <div
+                className={`flex w-full items-center gap-2 ${
+                  node.edgeToNext?.tone === "connected"
+                    ? "text-emerald-200"
+                    : node.edgeToNext?.tone === "pending"
+                      ? "text-amber-200"
+                      : "text-rose-200"
+                }`}
+                data-testid="stage-play-mail-loop-edge"
+              >
+                <span
+                  className={`h-px flex-1 ${
+                    node.edgeToNext?.tone === "connected"
+                      ? "bg-emerald-500"
+                      : node.edgeToNext?.tone === "pending"
+                        ? "bg-amber-500"
+                        : "bg-rose-500"
+                  }`}
+                />
+                <span className="max-w-[126px] truncate rounded border border-current/40 px-1.5 py-0.5">
+                  {node.edgeToNext?.label ?? "not connected"}
+                </span>
+                <span
+                  className={`h-px flex-1 ${
+                    node.edgeToNext?.tone === "connected"
+                      ? "bg-emerald-500"
+                      : node.edgeToNext?.tone === "pending"
+                        ? "bg-amber-500"
+                        : "bg-rose-500"
+                  }`}
+                />
+              </div>
+            ) : <span>end</span>}
           </div>
         ))}
       </div>
@@ -1679,7 +1774,6 @@ function StagePlayObserverMailLoopCanvas({
               <div className="mt-1 text-base font-semibold text-slate-50">{selectedInspectorNode.inspector.title}</div>
               <div className="mt-1 font-mono text-[11px] text-slate-400">{selectedInspectorNode.inspector.profileId}</div>
             </div>
-            <CopyStagePlayRefsButton refs={selectedInspectorNode.outputRefs} label="Copy interpreter profile refs" />
           </div>
           <pre className="mt-3 whitespace-pre-wrap rounded border border-slate-800 bg-black/30 p-3 text-[11px] leading-relaxed text-slate-300">
             {selectedInspectorNode.inspector.body}
@@ -4300,7 +4394,6 @@ function Inspector({
 }
 
 export default function StagePlayBadgeGraphPanel() {
-  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [bindingOverlayOpen, setBindingOverlayOpen] = useState(false);
   const [draftNodes, setDraftNodes] = useState<DraftStagePlayNode[]>([]);
@@ -4317,7 +4410,6 @@ export default function StagePlayBadgeGraphPanel() {
   const [graphDiff, setGraphDiff] = useState<StagePlayGraphDiff | null>(null);
   const [removedBadgeGhosts, setRemovedBadgeGhosts] = useState<StagePlayRemovedBadgeGhost[]>([]);
   const [graphDisplayMode, setGraphDisplayMode] = useState<StagePlayGraphDisplayMode>("observer_mail_loop_v1");
-  const [wakeRunStatus, setWakeRunStatus] = useState<string | null>(null);
   const graphScrollportRef = useRef<HTMLDivElement>(null);
   const previousGraphRef = useRef<StagePlayBadgeGraphV1 | null>(null);
   const graphDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4822,35 +4914,6 @@ export default function StagePlayBadgeGraphPanel() {
     }
   }
 
-  async function handleRunArmedMailWake() {
-    setWakeRunStatus("running wake admission...");
-    try {
-      const response = await runStagePlayLiveSourceMailWake({
-        threadId,
-        roomId,
-        environmentId,
-        trigger: "manual",
-      });
-      const result = response.cycle?.result ?? null;
-      setWakeRunStatus(`${response.cycle?.status ?? "idle"}: ${response.cycle?.reason ?? "no status"}`);
-      if (result?.askTurnId) {
-        const debugPayload = await fetchHelixAskTurnDebugPayload(result.askTurnId).catch(() => null);
-        dispatchStagePlayMailWakeTranscript({
-          askTurnId: result.askTurnId,
-          wakeResult: result,
-          debugPayload,
-          createdAt: result.createdAt,
-        });
-      }
-    } catch (error) {
-      console.warn("[StagePlayBadgeGraphPanel] live-source mail wake cycle failed", error);
-      setWakeRunStatus("wake cycle failed");
-    } finally {
-      void queryClient.invalidateQueries({ queryKey: ["/api/helix/stage-play/live-source-mail"] });
-      void queryClient.invalidateQueries({ queryKey: ["/api/helix/stage-play/graph"] });
-    }
-  }
-
   async function postJson(path: string, body?: Record<string, unknown>): Promise<any> {
     const response = await fetch(path, {
       method: "POST",
@@ -5168,7 +5231,7 @@ export default function StagePlayBadgeGraphPanel() {
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-slate-950 text-slate-100">
       <div className="relative min-h-0 flex-1">
-        {!bindingOverlayOpen ? (
+        {graphDisplayMode === "full_graph" && !bindingOverlayOpen ? (
           <button
             type="button"
             onClick={() => setBindingOverlayOpen(true)}
@@ -5183,7 +5246,10 @@ export default function StagePlayBadgeGraphPanel() {
         <div className="absolute right-3 top-3 z-30 flex rounded-md border border-slate-800 bg-slate-950/90 p-1 text-[10px] font-semibold uppercase tracking-wide shadow-xl">
           <button
             type="button"
-            onClick={() => setGraphDisplayMode("observer_mail_loop_v1")}
+            onClick={() => {
+              setGraphDisplayMode("observer_mail_loop_v1");
+              setBindingOverlayOpen(false);
+            }}
             className={`rounded px-2.5 py-1.5 ${
               graphDisplayMode === "observer_mail_loop_v1"
                 ? "bg-cyan-950 text-cyan-100"
@@ -5209,7 +5275,7 @@ export default function StagePlayBadgeGraphPanel() {
           </button>
         </div>
 
-        {bindingOverlayOpen ? (
+        {graphDisplayMode === "full_graph" && bindingOverlayOpen ? (
           <StagePlayBindingOverlay
             graph={graph}
             builderContext={builderContext}
@@ -5298,8 +5364,6 @@ export default function StagePlayBadgeGraphPanel() {
             <StagePlayObserverMailLoopCanvas
               graph={graph}
               mailbox={mailbox}
-              wakeRunStatus={wakeRunStatus}
-              onRunWake={handleRunArmedMailWake}
             />
           ) : (
             <StagePlayGraphCanvas
