@@ -685,6 +685,26 @@ export function buildMailLoopTranscriptRows(input: {
       terminalEligible: false,
       createdAt,
     });
+    rows.push({
+      rowId: `ask_turn_mail_continuation_state:${hashShort(input.decision.decisionId)}`,
+      rowKind: "loop_state",
+      title: "Continuation state",
+      body: [
+        "Manual checkpoint completed.",
+        "Standing watch job continues only if a watch policy is armed.",
+        `Loop state: ${input.decision.nextLoopState}.`,
+      ].join("\n"),
+      source: {
+        artifactId: input.decision.decisionId,
+        artifactKind: input.decision.artifactId,
+      },
+      evidenceRefs: input.decision.evidenceRefs,
+      causalTrace: input.decision.causalTrace,
+      authority: "tool_evidence",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt,
+    });
   }
   return rows;
 }

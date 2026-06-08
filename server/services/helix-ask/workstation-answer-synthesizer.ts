@@ -457,6 +457,9 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
 }
 
 function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  const hasScenarioFrameStep = input.plan.steps.some(
+    (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.build_civilization_scenario_frame",
+  );
   const hasBridgeStep = input.plan.steps.some(
     (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.bridge_theory_ideology_context",
   );
@@ -471,6 +474,9 @@ function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerIn
     "Civilization Bounds Roadmap produced evidence-only system bounds, capability/dependency badges, collaboration constraints, and missing-evidence hooks.";
   return [
     "I treated the roadmap as a situational bounds receipt, not as a policy decision.",
+    hasScenarioFrameStep
+      ? "Scenario frame: the prompt was first parameterized as a bounded system frame before roadmap badges were emitted."
+      : "Scenario frame: no prompt-derived frame step was required, so the declared roadmap scenario stayed in force.",
     summary,
     hasTheoryStep
       ? "Theory binding: physical badges bound what can be claimed about energy, materials, observation, entropy, and conservation."

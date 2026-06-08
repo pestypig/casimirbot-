@@ -69,6 +69,7 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
     );
     expect(plan.intent).toBe("civilization_bounds_reflection");
     expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("reflect_civilization_bounds");
+    expect(plan.tool_plan?.steps.map((step) => step.step_id)).toContain("build_civilization_scenario_frame");
     expect(plan.tool_plan?.steps.some((step) => step.tool_id === HELIX_ASK_CIVILIZATION_BOUNDS_TOOL_NAME)).toBe(true);
   });
 
@@ -81,6 +82,7 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
       expect.arrayContaining([
         "reflect_theory_context",
         "reflect_zen_graph_context",
+        "build_civilization_scenario_frame",
         "reflect_civilization_bounds",
         "bridge_theory_ideology_context",
       ]),

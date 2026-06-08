@@ -534,6 +534,10 @@ describe("Stage Play live-source mailbox", () => {
       "loop_state",
     ]));
     expect(rows.find((row) => row.rowKind === "voice_callout_request")?.terminalEligible).toBe(false);
+    const continuationRow = rows.find((row) => row.title === "Continuation state");
+    expect(continuationRow?.body).toContain("Manual checkpoint completed.");
+    expect(continuationRow?.body).toContain("Standing watch job continues only if a watch policy is armed.");
+    expect(continuationRow?.body).toContain("Loop state: armed_for_next_summary.");
   });
 
   it("records interpreter profile comparison refs on mailbox decisions", () => {
@@ -2444,6 +2448,240 @@ describe("Stage Play live-source mailbox", () => {
     expect(wakeRequests[1].mailIds).toEqual(mailIds.slice(4));
   });
 
+  it("uses small batches for latest-scene watch policies before calling Ask", async () => {
+    const previousGenericLimit = process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+    const previousLatestLimit = process.env.STAGE_PLAY_MAIL_WAKE_LATEST_SCENE_BATCH_LIMIT;
+    process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = "8";
+    process.env.STAGE_PLAY_MAIL_WAKE_LATEST_SCENE_BATCH_LIMIT = "1";
+    try {
+      configureStagePlayLiveSourceWatchJobPolicy({
+        threadId,
+        roomId,
+        sourceIds: [sourceId],
+        objectiveText: "Watch the active visual source and describe each new mail batch in one sentence.",
+        interpretationMode: "latest_scene_answer",
+        mailProcessingMode: "latest_only",
+        outputCadence: "every_batch",
+        now: "2026-06-04T12:02:30.000Z",
+      });
+      const mailIds = Array.from({ length: 4 }, (_unused, index) =>
+        enqueueStagePlayLiveSourceMailItem({
+          threadId,
+          roomId,
+          sourceId,
+          sourceKind: "visual_frame",
+          frameRef: `visual_frame:latest-policy-${index}`,
+          evidenceRef: `visual_evidence:latest-policy-${index}`,
+          summaryText: `Latest-scene compact summary ${index}.`,
+          createdAt: `2026-06-04T12:02:3${index}.000Z`,
+        }).mailId
+      );
+
+      let prompt = "";
+      let askMailIds: string[] = [];
+      await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:02:40.000Z",
+        askTurnRunner: async ({ prompt: wakePrompt, wakeRequest }) => {
+          prompt = wakePrompt;
+          askMailIds = wakeRequest.mailIds;
+          return {
+            turn_id: "ask:latest-scene-policy-batch",
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: {
+                    artifactId: "stage_play_live_source_mail_decision",
+                    decisionId: "stage_play_live_source_mail_decision:latest-scene-policy-batch",
+                    mailIds: wakeRequest.mailIds,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      });
+
+      expect(askMailIds).toEqual(mailIds.slice(0, 1));
+      expect(prompt).toContain("Interpretation mode: latest_scene_answer");
+      expect(prompt).toContain("Mail processing mode: latest_only");
+      expect(prompt).toContain("Wake batch size for this policy: 1");
+      expect(prompt).toContain("Retained unread mail outside this Ask batch: 3");
+      const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+      expect(wakeRequests.map((wake) => wake.mailIds)).toEqual([
+        mailIds.slice(0, 1),
+        mailIds.slice(1),
+      ]);
+    } finally {
+      if (previousGenericLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+      else process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = previousGenericLimit;
+      if (previousLatestLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_LATEST_SCENE_BATCH_LIMIT;
+      else process.env.STAGE_PLAY_MAIL_WAKE_LATEST_SCENE_BATCH_LIMIT = previousLatestLimit;
+    }
+  });
+
+  it("uses chronological micro-batches for prediction watch policies before calling Ask", async () => {
+    const previousGenericLimit = process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+    const previousPredictionLimit = process.env.STAGE_PLAY_MAIL_WAKE_PREDICTION_MICRO_BATCH_LIMIT;
+    process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = "9";
+    process.env.STAGE_PLAY_MAIL_WAKE_PREDICTION_MICRO_BATCH_LIMIT = "3";
+    try {
+      configureStagePlayLiveSourceWatchJobPolicy({
+        threadId,
+        roomId,
+        sourceIds: [sourceId],
+        objectiveText: "Interpret the Minecraft video mail, predict what might happen next, and say what should be watched next.",
+        interpretationMode: "prediction_watch",
+        mailProcessingMode: "chronological_batch",
+        outputCadence: "only_salient",
+        now: "2026-06-04T12:02:50.000Z",
+      });
+      const mailIds = Array.from({ length: 7 }, (_unused, index) =>
+        enqueueStagePlayLiveSourceMailItem({
+          threadId,
+          roomId,
+          sourceId,
+          sourceKind: "visual_frame",
+          frameRef: `visual_frame:prediction-policy-${index}`,
+          evidenceRef: `visual_evidence:prediction-policy-${index}`,
+          summaryText: `Prediction compact summary ${index}.`,
+          createdAt: `2026-06-04T12:02:5${index}.000Z`,
+        }).mailId
+      );
+
+      let prompt = "";
+      let askMailIds: string[] = [];
+      await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:03:00.000Z",
+        askTurnRunner: async ({ prompt: wakePrompt, wakeRequest }) => {
+          prompt = wakePrompt;
+          askMailIds = wakeRequest.mailIds;
+          return {
+            turn_id: "ask:prediction-policy-batch",
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: {
+                    artifactId: "stage_play_live_source_mail_decision",
+                    decisionId: "stage_play_live_source_mail_decision:prediction-policy-batch",
+                    mailIds: wakeRequest.mailIds,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      });
+
+      expect(askMailIds).toEqual(mailIds.slice(0, 3));
+      expect(prompt).toContain("Interpretation mode: prediction_watch");
+      expect(prompt).toContain("Mail processing mode: chronological_batch");
+      expect(prompt).toContain("Wake batch size for this policy: 3");
+      expect(prompt).toContain("Retained unread mail outside this Ask batch: 4");
+      expect(prompt).toContain("- prediction_watch: produce record_interpretation with prediction and validation signals.");
+      const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+      expect(wakeRequests.map((wake) => wake.mailIds)).toEqual([
+        mailIds.slice(0, 3),
+        mailIds.slice(3),
+      ]);
+    } finally {
+      if (previousGenericLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+      else process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = previousGenericLimit;
+      if (previousPredictionLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_PREDICTION_MICRO_BATCH_LIMIT;
+      else process.env.STAGE_PLAY_MAIL_WAKE_PREDICTION_MICRO_BATCH_LIMIT = previousPredictionLimit;
+    }
+  });
+
+  it("uses salience windows for voice commentary policies before calling Ask", async () => {
+    const previousGenericLimit = process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+    const previousVoiceLimit = process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT;
+    process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = "9";
+    process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT = "5";
+    try {
+      configureStagePlayLiveSourceWatchJobPolicy({
+        threadId,
+        roomId,
+        sourceIds: [sourceId],
+        objectiveText: "Commentate while I play and speak only when something important changes.",
+        interpretationMode: "voice_commentary_watch",
+        mailProcessingMode: "salience_window",
+        outputCadence: "voice_only_salient",
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: true,
+          voiceRequiresUrgency: true,
+          confirmationRequired: false,
+        },
+        now: "2026-06-04T12:03:10.000Z",
+      });
+      const mailIds = Array.from({ length: 8 }, (_unused, index) =>
+        enqueueStagePlayLiveSourceMailItem({
+          threadId,
+          roomId,
+          sourceId,
+          sourceKind: "visual_frame",
+          frameRef: `visual_frame:voice-policy-${index}`,
+          evidenceRef: `visual_evidence:voice-policy-${index}`,
+          summaryText: `Voice commentary compact summary ${index}.`,
+          createdAt: `2026-06-04T12:03:1${index}.000Z`,
+        }).mailId
+      );
+
+      let prompt = "";
+      let askMailIds: string[] = [];
+      await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:03:20.000Z",
+        askTurnRunner: async ({ prompt: wakePrompt, wakeRequest }) => {
+          prompt = wakePrompt;
+          askMailIds = wakeRequest.mailIds;
+          return {
+            turn_id: "ask:voice-commentary-policy-batch",
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: {
+                    artifactId: "stage_play_live_source_mail_decision",
+                    decisionId: "stage_play_live_source_mail_decision:voice-commentary-policy-batch",
+                    mailIds: wakeRequest.mailIds,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      });
+
+      expect(askMailIds).toEqual(mailIds.slice(0, 5));
+      expect(prompt).toContain("Interpretation mode: voice_commentary_watch");
+      expect(prompt).toContain("Mail processing mode: salience_window");
+      expect(prompt).toContain("Output cadence: voice_only_salient");
+      expect(prompt).toContain("Wake batch size for this policy: 5");
+      expect(prompt).toContain("Retained unread mail outside this Ask batch: 3");
+      expect(prompt).toContain("- salience_window: scan the batch for policy-relevant changes and suppress routine updates.");
+      const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
+      expect(wakeRequests.map((wake) => wake.mailIds)).toEqual([
+        mailIds.slice(0, 5),
+        mailIds.slice(5),
+      ]);
+    } finally {
+      if (previousGenericLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH;
+      else process.env.STAGE_PLAY_MAIL_WAKE_MAX_BATCH = previousGenericLimit;
+      if (previousVoiceLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT;
+      else process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT = previousVoiceLimit;
+    }
+  });
+
   it("records a typed preflight failure instead of calling Ask when the wake prompt is too large", async () => {
     const previousMaxChars = process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS;
     process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = "200";
@@ -2806,7 +3044,7 @@ describe("Stage Play live-source mailbox", () => {
       const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
       const continuationRows = transcriptEntries.filter((entry) => entry.row.title === "Continuation state");
       expect(continuationRows).toHaveLength(1);
-      expect(continuationRows[0].row.body).toContain("Batch completed.");
+      expect(continuationRows[0].row.body).toContain("Batch checkpoint completed.");
       expect(continuationRows[0].row.body).toContain("Continuation: deferred; wake runner disabled.");
       expect(continuationRows[0].row.body).toContain("Loop state: armed_for_next_summary.");
       expect(continuationRows[0].row.body).toContain("Unread retained: 1.");

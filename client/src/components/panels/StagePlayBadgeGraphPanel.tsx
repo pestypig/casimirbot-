@@ -1461,7 +1461,7 @@ function buildObserverMailLoopNodes(input: {
     ? {
         title: "Continuation",
         lines: [
-          latestWakeStatus === "completed" ? "Batch completed." : latestDecision ? "Checkpoint completed." : "Watch job active.",
+          latestWakeStatus === "completed" ? "Batch checkpoint completed." : latestDecision ? "Manual checkpoint completed." : "Watch job active.",
           `Continuation: ${continuationStateText}`,
           `Loop state: ${latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary"}`,
           continuationRetainedMailCount > 0

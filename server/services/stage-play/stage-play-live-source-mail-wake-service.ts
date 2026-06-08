@@ -220,8 +220,15 @@ const continuationBody = (
           ? "armed for next summary"
           : "deferred";
   return [
-    status === "completed" ? "Batch completed." : `Batch ${status}.`,
+    status === "completed" ? "Batch checkpoint completed." : `Batch ${status}.`,
     `Continuation: ${continuationText}.`,
+    continuation.scheduled
+      ? "Backend wake loop remains armed."
+      : continuation.reason === "manual_cycle_no_auto_continuation"
+        ? "Manual checkpoint completed. Standing watch job continues only if a watch policy is armed."
+        : status === "deferred_for_pressure"
+          ? "Wake deferred for pressure; unread mail retained."
+          : null,
     `Loop state: armed_for_next_summary.`,
     retainedMailCount > 0 ? `Unread retained: ${retainedMailCount}.` : null,
     continuation.runnableWakeIds.length > 0

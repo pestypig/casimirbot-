@@ -1757,7 +1757,7 @@ export function executeLiveEnvironmentTool(
       mailIds: readStringArray(args.mail_ids ?? args.mailIds),
       limit: readNumber(args.limit, input.tool_name === "live_env.read_live_source_mail" ? 12 : 3),
       sameSourceBatch: input.tool_name === "live_env.read_live_source_mail",
-      batchCap: 12,
+      batchCap: readNumber(args.batch_cap ?? args.batchCap, 12),
       includeRead: args.include_read === true || args.includeRead === true,
       voicePolicy: {
         voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,

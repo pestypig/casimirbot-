@@ -136,6 +136,45 @@ const wakeAskBatchLimit = (): number =>
     readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT", 4),
   );
 
+const latestSceneWakeBatchLimit = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_LATEST_SCENE_BATCH_LIMIT", 1);
+
+const predictionWakeMicroBatchLimit = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_PREDICTION_MICRO_BATCH_LIMIT", wakeAskBatchLimit());
+
+const voiceSalienceWakeBatchLimit = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT", wakeAskBatchLimit());
+
+const policyAwareWakeAskBatchLimit = (
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null,
+): number => {
+  if (!policy) return wakeAskBatchLimit();
+  const interpretationMode = policy.interpretationMode ?? "latest_scene_answer";
+  const mailProcessingMode = policy.mailProcessingMode ?? "latest_only";
+  const outputCadence = policy.outputCadence ?? "every_batch";
+
+  if (interpretationMode === "latest_scene_answer" || mailProcessingMode === "latest_only") {
+    return latestSceneWakeBatchLimit();
+  }
+  if (
+    interpretationMode === "voice_commentary_watch" ||
+    interpretationMode === "voice_callout_watch" ||
+    mailProcessingMode === "salience_window" ||
+    outputCadence === "voice_only_salient"
+  ) {
+    return voiceSalienceWakeBatchLimit();
+  }
+  if (
+    interpretationMode === "prediction_watch" ||
+    interpretationMode === "batch_interpretation" ||
+    mailProcessingMode === "micro_batch" ||
+    mailProcessingMode === "chronological_batch"
+  ) {
+    return predictionWakeMicroBatchLimit();
+  }
+  return wakeAskBatchLimit();
+};
+
 const wakeAskPromptMaxChars = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS", 18_000);
 
@@ -1143,6 +1182,7 @@ const buildWakePrompt = (input: {
     `Interpretation mode: ${interpretationMode}`,
     `Mail processing mode: ${mailProcessingMode}`,
     `Output cadence: ${outputCadence}`,
+    `Wake batch size for this policy: ${policyAwareWakeAskBatchLimit(input.policy)}`,
     `Current task: ${activeTaskKind ?? "mail_batch_interpretation"}`,
     `Active user prompt context: ${activeUserPrompt}`,
     "",
@@ -1477,9 +1517,12 @@ export async function runNextMailWakeRequest(input: {
   ).at(0) ?? null;
   if (!selectedWake) return null;
 
+  const selectedMailBatch = mailBatchForWake(selectedWake);
+  const selectedPolicy = resolveActiveWatchPolicy({ wake: selectedWake, mailBatch: selectedMailBatch });
+  const selectedBatchLimit = policyAwareWakeAskBatchLimit(selectedPolicy);
   const splitWake = splitStagePlayLiveSourceMailWakeRequestForAsk({
     wakeRequestId: selectedWake.wakeRequestId,
-    maxMailIds: wakeAskBatchLimit(),
+    maxMailIds: selectedBatchLimit,
     now,
   });
   const running = splitWake?.wake ?? selectedWake;
@@ -1546,7 +1589,7 @@ export async function runNextMailWakeRequest(input: {
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
-  const batchLimit = wakeAskBatchLimit();
+  const batchLimit = policyAwareWakeAskBatchLimit(policy);
   if (running.mailIds.length > batchLimit) {
     const failedAt = now;
     const failedReason = `wake_preflight_blocked:batch_too_large:${running.mailIds.length}>${batchLimit}`;

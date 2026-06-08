@@ -131,6 +131,12 @@ const artifactKindMatchesCapability = (
   if (capability === "helix_ask.bridge_theory_ideology_context") {
     return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge|bridge_theory_ideology_context|workstation_tool_evaluation/i.test(joined);
   }
+  if (capability === "helix_ask.build_civilization_scenario_frame") {
+    return /helix_civilization_scenario_frame_tool_result|civilization_scenario_frame|build_civilization_scenario_frame|workstation_tool_evaluation/i.test(joined);
+  }
+  if (capability === "helix_ask.reflect_civilization_bounds") {
+    return /helix_civilization_bounds_tool_result|civilization_bounds_roadmap|reflect_civilization_bounds|workstation_tool_evaluation/i.test(joined);
+  }
   if (capability === "helix_ask.reflect_stage_play_context") {
     return /stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph|live_env\.reflect_stage_play_context|live_env\.plan_stage_play_job|live_env\.request_stage_play_checkpoint/i.test(joined);
   }

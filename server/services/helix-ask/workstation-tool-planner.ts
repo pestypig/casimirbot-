@@ -985,6 +985,29 @@ function makeTheoryIdeologyBridgeAskToolStep(prompt: string): HelixWorkstationTo
   };
 }
 
+function makeCivilizationScenarioFrameAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "build_civilization_scenario_frame",
+    kind: "run_ask_tool",
+    tool_id: "helix_ask.build_civilization_scenario_frame",
+    args: {
+      prompt,
+      refs: ["helix-ask:current-turn"],
+      options: {
+        allowFictional: true,
+        allowHistorical: true,
+        includeNeedleScenarioFallback: true,
+      },
+    },
+    expected_receipt_kind: "helix_civilization_scenario_frame_tool_result",
+    expected_state_change: {
+      store: "civilization-scenario-frame",
+      proof_key: "frame",
+    },
+    required: true,
+  };
+}
+
 function makeCivilizationBoundsAskToolStep(
   prompt: string,
   depends_on: string[] = [],
@@ -995,7 +1018,7 @@ function makeCivilizationBoundsAskToolStep(
     tool_id: "helix_ask.reflect_civilization_bounds",
     args: {
       prompt,
-      scenarioId: "needle_hull_ideal_global_construction",
+      scenarioFrameRef: "step:build_civilization_scenario_frame",
       refs: ["helix-ask:current-turn"],
       options: {
         includeBridgeContext: true,
@@ -1574,9 +1597,11 @@ export function planWorkstationToolUse(
       hasZenGraphPromptCue(normalized) ||
       /\b(?:fairness|due\s+process|review|non[-\s]?harm|governance|procedural)\b/i.test(normalized);
     const steps: HelixWorkstationToolPlanStep[] = [
+      makeCivilizationScenarioFrameAskToolStep(normalized),
       ...(wantsTheory ? [makeTheoryReflectionAskToolStep(normalized)] : []),
       ...(wantsZen ? [makeZenGraphReflectionAskToolStep(normalized)] : []),
       makeCivilizationBoundsAskToolStep(normalized, [
+        "build_civilization_scenario_frame",
         ...(wantsTheory ? ["reflect_theory_context"] : []),
         ...(wantsZen ? ["reflect_zen_graph_context"] : []),
       ]),

@@ -9,6 +9,7 @@ import { validateZenBadgeLocatorV1 } from "../../../shared/zen-badge-locator";
 import { validateFruitionProcedureExpressionV1 } from "../../../shared/fruition-procedure-expression";
 import { validateTheoryIdeologyBridgeV1 } from "../../../shared/theory-ideology-bridge";
 import { validateCivilizationBoundsRoadmapV1 } from "../../../shared/civilization-bounds-roadmap";
+import { validateCivilizationScenarioFrameV1 } from "../../../shared/civilization-scenario-frame";
 
 export type EvaluateWorkstationToolReceiptInput = {
   thread_id: string;
@@ -157,6 +158,19 @@ function isTheoryIdeologyBridgeToolKind(kind: string | null, artifact: Record<st
   );
 }
 
+function isCivilizationScenarioFrameToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  const frame = asRecord(artifact?.frame);
+  return (
+    kind === "helix_civilization_scenario_frame_tool_result" ||
+    kind === "civilization_scenario_frame" ||
+    artifact?.tool_id === "helix_ask.build_civilization_scenario_frame" ||
+    frame?.artifactId === "civilization_scenario_frame" ||
+    frame?.schemaVersion === "civilization_scenario_frame/v1" ||
+    artifact?.artifactId === "civilization_scenario_frame" ||
+    artifact?.schemaVersion === "civilization_scenario_frame/v1"
+  );
+}
+
 function isCivilizationBoundsToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
   const roadmap = asRecord(artifact?.roadmap);
   return (
@@ -200,6 +214,25 @@ function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>)
 function validateTheoryIdeologyBridgeToolResult(artifact: Record<string, unknown>): string[] {
   const bridge = asRecord(artifact.bridge) ?? artifact;
   return validateTheoryIdeologyBridgeV1(bridge);
+}
+
+function validateCivilizationScenarioFrameToolResult(artifact: Record<string, unknown>): string[] {
+  const frame = asRecord(artifact.frame) ?? artifact;
+  const issues = validateCivilizationScenarioFrameV1(frame);
+  const authority = asRecord(frame.authority);
+  if (authority) {
+    for (const field of [
+      "terminal_eligible",
+      "agent_executable",
+      "scenario_finality",
+      "prediction_finality",
+      "policy_finality",
+      "moral_finality",
+    ] as const) {
+      if (authority[field] !== false) issues.push(`authority.${field}_not_false`);
+    }
+  }
+  return issues;
 }
 
 function validateCivilizationBoundsToolResult(artifact: Record<string, unknown>): string[] {
@@ -312,6 +345,20 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       result = "supports_subgoal";
       summary =
         "Theory/Zen bridge produced evidence-only procedural constraints, analogy boundaries, missing checks, and overclaim guards.";
+    }
+  } else if (isCivilizationScenarioFrameToolKind(topLevelKind, artifact ?? receipt)) {
+    const frameArtifact = artifact ?? receipt;
+    const issues = validateCivilizationScenarioFrameToolResult(frameArtifact);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Civilization Scenario Frame did not produce a usable receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `Civilization Scenario Frame rejected as scenario/prediction evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary =
+        "Civilization Scenario Frame produced evidence-only bounded-system grammar, claim tier, missing-evidence hooks, and roadmap inputs.";
     }
   } else if (isCivilizationBoundsToolKind(topLevelKind, artifact ?? receipt)) {
     const civilizationArtifact = artifact ?? receipt;

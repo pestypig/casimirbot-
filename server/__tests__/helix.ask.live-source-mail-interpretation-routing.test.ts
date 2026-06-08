@@ -121,6 +121,10 @@ const askMailbox = async (question: string) => {
     artifact?.kind === "live_environment_tool_observation" &&
     artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
   );
+  const readArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+    artifact?.kind === "live_environment_tool_observation" &&
+    artifact?.payload?.tool_name === "live_env.read_live_source_mail"
+  );
   const liveEnvironmentToolNames = (response.body?.current_turn_artifact_ledger ?? [])
     .filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
     .map((artifact: any) => artifact?.payload?.tool_name)
@@ -128,6 +132,7 @@ const askMailbox = async (question: string) => {
   return {
     response,
     decision: decisionArtifact?.payload?.observation,
+    readObservation: readArtifact?.payload?.observation,
     liveEnvironmentToolNames,
     debug: JSON.stringify(response.body, null, 2),
   };
@@ -196,6 +201,36 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       }),
     });
     expect(response.body?.answer, debug).toMatch(/Interpreter profile configured|Minecraft Video Predictor/i);
+  }, 60_000);
+
+  it("routes standing Minecraft predictor watch prompts to configure a watch job before mailbox reads", async () => {
+    seedVisualMail("A Minecraft YouTube video frame is visible, but this turn is arming a standing watch job.");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Watch the active visual source as a Minecraft video predictor. Interpret chronological micro-batches, make cautious predictions, and say what should be watched next. Do not narrate every frame; only use short text checkpoints unless danger or a major scene transition appears.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.configure_live_source_watch_job");
+    expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_live_source_mail");
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.source_target_intent?.requested_outputs, debug).toContain(
+      "stage_play_live_source_watch_job_policy",
+    );
+    const policyArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_live_source_watch_job"
+    );
+    expect(policyArtifact?.payload?.observation, debug).toMatchObject({
+      policy: expect.objectContaining({
+        interpretationMode: "prediction_watch",
+        mailProcessingMode: "chronological_batch",
+        outputCadence: "only_salient",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+      watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+    });
+    expect(response.body?.answer, debug).toMatch(/Watch job configured|armed/i);
   }, 60_000);
 
   it("routes active-profile interpretation prompts through read, compare, then decision", async () => {
@@ -322,6 +357,14 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       cycleId: expect.stringMatching(/^live_source_cycle:/),
       askTurnId: response.body?.turn_id,
     });
+    expect(response.body?.stage_play_live_source_mailbox_debug?.wake_continuation, debug).toMatchObject({
+      checkpoint_state: "manual_checkpoint_completed",
+      continuation: expect.stringContaining("Manual checkpoint completed."),
+      loop_state: "armed_for_next_summary",
+      unread_retained: 0,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 60_000);
 
@@ -378,7 +421,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       "Mail 20 shows a return toward base or inventory interaction with valuable items visible.",
     ].forEach(seedVisualMail);
 
-    const { response, decision, debug } = await askMailbox(
+    const { response, decision, readObservation, debug } = await askMailbox(
       "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Use the Minecraft video predictor contract, predict what happens next, and say what should be watched next.",
     );
 
@@ -387,15 +430,20 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
       narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
       mailCoverage: {
-        mode: "micro_batch",
+        mode: "chronological_batch",
         readMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
         interpretedMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
       },
     });
-    expect(decision?.mailCoverage?.readMailIds, debug).toHaveLength(6);
-    expect(decision?.mailCoverage?.interpretedMailIds, debug).toHaveLength(6);
+    expect(decision?.mailCoverage?.readMailIds, debug).toHaveLength(4);
+    expect(decision?.mailCoverage?.interpretedMailIds, debug).toHaveLength(4);
+    expect(readObservation?.readWindow, debug).toMatchObject({
+      unreadBeforeRead: 6,
+      effectiveLimit: 4,
+      remainingUnreadCount: 2,
+    });
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
-    expect(response.body?.answer, debug).toMatch(/current micro batch mail batch/i);
+    expect(response.body?.answer, debug).toMatch(/current chronological batch mail batch/i);
     expect(response.body?.answer, debug).toMatch(/Prediction:/i);
     expect(response.body?.answer, debug).toMatch(/Watch next for/i);
     expect(response.body?.answer, debug).toMatch(/inventory|forest|sword|fire|valuable/i);
