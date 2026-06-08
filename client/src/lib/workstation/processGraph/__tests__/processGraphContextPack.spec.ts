@@ -94,7 +94,10 @@ describe("workstation process graph context pack", () => {
     expect(shouldUseProcessGraphContextPack("Explain what I'm looking at in the visual capture.")).toBe(false);
     expect(shouldUseProcessGraphContextPack("What is happening in the live source?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Read the live-source mailbox and interpret what is happening across the unread visual summaries.")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Read the visual mail and interpret what is happening. Say what should be watched next.")).toBe(false);
     expect(shouldUseProcessGraphContextPack("What is happening across the live source mail?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("What changed in the latest visual update?")).toBe(false);
+    expect(shouldUseProcessGraphContextPack("Review the new source mail and say what changed.")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Okay, can you describe what changed since last scene?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("What changed since the previous scene?")).toBe(false);
     expect(shouldUseProcessGraphContextPack("Compare this scene to the last scene.")).toBe(false);

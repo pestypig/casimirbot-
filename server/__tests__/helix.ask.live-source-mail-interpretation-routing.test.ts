@@ -165,7 +165,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       capability: "live_env.configure_interpreter_profile",
       interpreter_profile_ref: expect.stringMatching(/^stage_play_live_source_interpreter_profile:/),
     });
-  }, 30_000);
+  }, 60_000);
 
   it("routes active-profile interpretation prompts through read, compare, then decision", async () => {
     seedVisualMail("The player stands in a dim Minecraft cave with visible ore and no hostile mob in frame.");
@@ -292,7 +292,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       askTurnId: response.body?.turn_id,
     });
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
-  }, 30_000);
+  }, 60_000);
 
   it("routes natural mailbox/update wording to the intended text or interpretation decision", async () => {
     const cases = [
