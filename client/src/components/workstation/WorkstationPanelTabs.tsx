@@ -152,7 +152,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
           +
         </button>
         {pickerOpen ? (
-          <div className="absolute right-0 top-8 z-30 w-72 rounded-lg border border-white/20 bg-slate-950/95 p-2 shadow-xl">
+          <div className="absolute right-0 top-8 z-[90] w-72 rounded-lg border border-white/20 bg-slate-950/95 p-2 shadow-xl">
             <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">Launch panel</div>
             <button
               type="button"
