@@ -36,6 +36,7 @@ import {
   getStagePlayLiveSourceNarrativeState,
   recordStagePlayLiveSourceNarrativeState,
 } from "./stage-play-live-source-narrative-store";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -422,6 +423,7 @@ export function buildMailLoopTranscriptRows(input: {
         artifactKind: item.artifactId,
       },
       evidenceRefs: item.evidenceRefs,
+      causalTrace: item.causalTrace,
       authority: "tool_evidence",
       assistantAnswer: false,
       terminalEligible: false,
@@ -440,6 +442,7 @@ export function buildMailLoopTranscriptRows(input: {
         artifactKind: input.readResult.artifactId,
       },
       evidenceRefs: input.readResult.evidenceRefs,
+      causalTrace: input.readResult.causalTrace,
       authority: "tool_evidence",
       assistantAnswer: false,
       terminalEligible: false,
@@ -458,6 +461,7 @@ export function buildMailLoopTranscriptRows(input: {
         artifactKind: input.readResult.artifactId,
       },
       evidenceRefs: input.readResult.evidenceRefs,
+      causalTrace: input.readResult.causalTrace,
       authority: "tool_evidence",
       assistantAnswer: false,
       terminalEligible: false,
@@ -487,6 +491,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: input.decision.artifactId,
         },
         evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: false,
@@ -504,6 +509,7 @@ export function buildMailLoopTranscriptRows(input: {
         artifactKind: input.decision.artifactId,
       },
       evidenceRefs: input.decision.evidenceRefs,
+      causalTrace: input.decision.causalTrace,
       authority: "model_decision_receipt",
       assistantAnswer: false,
       terminalEligible: false,
@@ -522,6 +528,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: input.decision.artifactId,
         },
         evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: false,
@@ -542,6 +549,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: narrativeState.artifactId,
         },
         evidenceRefs: narrativeState.evidenceRefs,
+        causalTrace: narrativeState.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: false,
@@ -562,6 +570,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: narrativeState.artifactId,
         },
         evidenceRefs: narrativeState.evidenceRefs,
+        causalTrace: narrativeState.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: false,
@@ -584,6 +593,7 @@ export function buildMailLoopTranscriptRows(input: {
             artifactKind: narrativeState.artifactId,
           },
           evidenceRefs: narrativeState.evidenceRefs,
+          causalTrace: narrativeState.causalTrace,
           authority: "model_decision_receipt",
           assistantAnswer: false,
           terminalEligible: false,
@@ -600,6 +610,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: narrativeState.artifactId,
         },
         evidenceRefs: narrativeState.evidenceRefs,
+        causalTrace: narrativeState.causalTrace,
         authority: "tool_evidence",
         assistantAnswer: false,
         terminalEligible: false,
@@ -622,6 +633,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: input.decision.artifactId,
         },
         evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: false,
@@ -639,6 +651,7 @@ export function buildMailLoopTranscriptRows(input: {
           artifactKind: input.decision.artifactId,
         },
         evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
         authority: "model_decision_receipt",
         assistantAnswer: false,
         terminalEligible: input.decision.textAnswerDraft.terminalEligible,
@@ -657,6 +670,7 @@ export function buildMailLoopTranscriptRows(input: {
         artifactKind: input.decision.artifactId,
       },
       evidenceRefs: input.decision.evidenceRefs,
+      causalTrace: input.decision.causalTrace,
       authority: "tool_evidence",
       assistantAnswer: false,
       terminalEligible: false,
@@ -674,6 +688,8 @@ export function readLiveSourceMailForAsk(input: {
   sourceKind?: string | null;
   mailIds?: string[];
   limit?: number;
+  sameSourceBatch?: boolean;
+  batchCap?: number;
   includeRead?: boolean;
   voicePolicy?: Partial<StagePlayLiveSourceVoicePolicyV1> | null;
   now?: string;
@@ -683,8 +699,22 @@ export function readLiveSourceMailForAsk(input: {
     getActiveLiveAnswerEnvironmentForThread(input.threadId);
   const roomId = input.roomId ?? environment?.room_id ?? null;
   const objective = environment?.objective ?? null;
-  const limit = Math.max(1, Math.min(input.limit ?? DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT, DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT));
-  const requestedMailIds = uniqueStrings(input.mailIds ?? []).slice(0, limit);
+  const requestedLimit = Math.max(1, Math.min(input.limit ?? DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT, DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT));
+  const sameSourceBatch = input.sameSourceBatch === true;
+  const effectiveLimit = sameSourceBatch
+    ? Math.max(1, Math.min(input.batchCap ?? DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT, DEFAULT_STAGE_PLAY_LIVE_SOURCE_MAIL_READ_LIMIT))
+    : requestedLimit;
+  const requestedMailIds = uniqueStrings(input.mailIds ?? []).slice(0, effectiveLimit);
+  let readWindow: StagePlayLiveSourceMailReadResultV1["readWindow"] = {
+    sourceId: input.sourceId ?? null,
+    sourceKind: input.sourceKind ?? null,
+    requestedLimit,
+    effectiveLimit,
+    sameSourceBatch,
+    unreadBeforeRead: 0,
+    remainingUnreadCount: 0,
+    retainedUnreadMailIds: [],
+  };
   let items = requestedMailIds.length > 0
     ? requestedMailIds
         .map((mailId) => getStagePlayLiveSourceMailItem(mailId))
@@ -702,15 +732,41 @@ export function readLiveSourceMailForAsk(input: {
           const rightIndex = requestedMailIds.indexOf(right.mailId);
           return leftIndex - rightIndex || left.createdAt.localeCompare(right.createdAt);
         })
-    : listUnreadStagePlayLiveSourceMailItems({
+    : (() => {
+      const candidates = listUnreadStagePlayLiveSourceMailItems({
         threadId: input.threadId,
         roomId,
         environmentId: input.environmentId ?? environment?.environment_id ?? null,
         sourceId: input.sourceId ?? null,
         sourceKind: input.sourceKind ?? null,
         includeDelivered: input.includeRead === true,
-        limit,
+        limit: sameSourceBatch ? 250 : effectiveLimit,
       });
+      if (!sameSourceBatch) {
+        readWindow = {
+          ...readWindow,
+          unreadBeforeRead: candidates.length,
+          remainingUnreadCount: Math.max(0, candidates.length - effectiveLimit),
+          retainedUnreadMailIds: candidates.slice(effectiveLimit).map((item) => item.mailId),
+        };
+        return candidates.slice(0, effectiveLimit);
+      }
+      const selectedSourceId = input.sourceId ?? candidates[0]?.sourceId ?? null;
+      const selectedSourceKind = input.sourceKind ?? candidates.find((item) => !selectedSourceId || item.sourceId === selectedSourceId)?.sourceKind ?? null;
+      const sameSourceCandidates = candidates.filter((item) =>
+        (!selectedSourceId || item.sourceId === selectedSourceId) &&
+        (!selectedSourceKind || item.sourceKind === selectedSourceKind)
+      );
+      readWindow = {
+        ...readWindow,
+        sourceId: selectedSourceId,
+        sourceKind: selectedSourceKind,
+        unreadBeforeRead: sameSourceCandidates.length,
+        remainingUnreadCount: Math.max(0, sameSourceCandidates.length - effectiveLimit),
+        retainedUnreadMailIds: sameSourceCandidates.slice(effectiveLimit).map((item) => item.mailId),
+      };
+      return sameSourceCandidates.slice(0, effectiveLimit);
+    })();
   if (items.length === 0) {
     const latest = enqueueLatestVisualSummaryMailIfNeeded({
       threadId: input.threadId,
@@ -722,6 +778,14 @@ export function readLiveSourceMailForAsk(input: {
     });
     if (requestedMailIds.length === 0 && latest && mailItemCanBeDeliveredToAsk(latest, { includeDelivered: input.includeRead === true })) {
       items = [latest];
+      readWindow = {
+        ...readWindow,
+        sourceId: latest.sourceId,
+        sourceKind: latest.sourceKind,
+        unreadBeforeRead: Math.max(readWindow?.unreadBeforeRead ?? 0, 1),
+        remainingUnreadCount: 0,
+        retainedUnreadMailIds: [],
+      };
     }
   }
   const now = input.now ?? new Date().toISOString();
@@ -807,7 +871,17 @@ export function readLiveSourceMailForAsk(input: {
     priorAnswerObservationRefs: activeWatch.policy?.priorAnswerRefs ?? [],
     voicePolicy: defaultVoicePolicy(input.voicePolicy),
     suggestedDecisionOptions,
+    readWindow,
     evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces(delivered.map((item) => item.causalTrace), {
+      parentRefs: delivered.map((item) => item.mailId),
+      causedBy: delivered.map((item) => item.mailId),
+      producedRefs: [readId],
+      sourceIds: delivered.map((item) => item.sourceId),
+      jobId: activeWatch.policy?.jobId ?? activeWatch.jobState?.jobId ?? null,
+      policyId: activeWatch.policy?.policyId ?? activeWatch.jobState?.watchJobPolicyRef ?? null,
+      evidenceRefs,
+    }),
     assistant_answer: false,
     terminal_eligible: false,
     context_role: "tool_evidence",
@@ -939,6 +1013,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     ...interpretation,
     lastDecisionRef: decision.decisionId,
     evidenceRefs: decision.evidenceRefs,
+    causalTrace: decision.causalTrace,
     createdAt: input.now,
   });
   return attachStagePlayNarrativeStateToDecision({

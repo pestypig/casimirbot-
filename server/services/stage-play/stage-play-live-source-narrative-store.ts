@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import {
   STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA,
+  type LiveSourceCausalTraceV1,
   type StagePlayLiveSourceNarrativeStateV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 const narrativeStatesById = new Map<string, StagePlayLiveSourceNarrativeStateV1>();
 
@@ -70,6 +72,7 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
   prediction?: StagePlayLiveSourceNarrativeStateV1["prediction"];
   lastDecisionRef?: string | null;
   evidenceRefs?: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt?: string;
 }): StagePlayLiveSourceNarrativeStateV1 {
   const createdAt = input.createdAt ?? new Date().toISOString();
@@ -96,16 +99,17 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
     prior?.narrativeStateId,
     ...(input.evidenceRefs ?? []),
   ]);
+  const narrativeStateId = `stage_play_live_source_narrative_state:${hashShort([
+    input.threadId,
+    input.jobId,
+    input.mailBatchRefs,
+    currentSceneSummary,
+    createdAt,
+  ])}`;
   const narrative: StagePlayLiveSourceNarrativeStateV1 = {
     artifactId: "stage_play_live_source_narrative_state",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA,
-    narrativeStateId: `stage_play_live_source_narrative_state:${hashShort([
-      input.threadId,
-      input.jobId,
-      input.mailBatchRefs,
-      currentSceneSummary,
-      createdAt,
-    ])}`,
+    narrativeStateId,
     jobId: input.jobId,
     policyId: input.policyId ?? null,
     threadId: input.threadId,
@@ -148,6 +152,15 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
     },
     lastDecisionRef: input.lastDecisionRef ?? null,
     evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces([input.causalTrace, prior?.causalTrace], {
+      parentRefs: uniqueStrings([input.lastDecisionRef, prior?.narrativeStateId, ...input.mailBatchRefs]),
+      causedBy: uniqueStrings([input.lastDecisionRef, ...input.mailBatchRefs]),
+      producedRefs: [narrativeStateId],
+      sourceIds: input.sourceIds,
+      jobId: input.jobId,
+      policyId: input.policyId ?? null,
+      evidenceRefs,
+    }),
     createdAt,
     assistant_answer: false,
     terminal_eligible: false,

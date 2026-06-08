@@ -18,7 +18,9 @@ import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-
 import { runNextMailWakeRequest } from "../services/stage-play/stage-play-live-source-mail-wake-runner";
 import {
   getActiveInterpreterProfileForJob,
+  getStagePlayLiveSourceInterpreterProfileCriterionLedger,
   getStagePlayLiveSourceInterpreterProfile,
+  listStagePlayLiveSourceInterpreterProfileCriterionLedger,
   listStagePlayLiveSourceInterpreterProfiles,
   recordStagePlayLiveSourceInterpreterProfile,
   resetStagePlayLiveSourceInterpreterProfileStoreForTest,
@@ -230,6 +232,102 @@ describe("stage-play interpreter profile", () => {
     expect(comparison.suppressedCriteria).toEqual(expect.arrayContaining(expectedSuppressed));
     expect(comparison.riskMatches).toEqual(expect.arrayContaining(expectedRisk));
     expect(comparison.voiceCalloutMatches).toEqual(expect.arrayContaining(expectedVoice));
+  });
+
+  it("maintains criterion ledger state across repeated, resolved, contradicted, and uncertain comparisons", () => {
+    const profile = recordMinecraftProfile();
+    const caveMail = enqueueMail("The player approaches a cave entrance with low light and no visible torch cues.", "21");
+    const firstComparison = compareMailToInterpreterProfile({
+      profile,
+      mailItems: [caveMail],
+      jobId,
+      policyId,
+      createdAt: "2026-06-08T00:06:00.000Z",
+    });
+    const lowLightLedgerRef = firstComparison.criterionLedgerStatuses
+      ?.find((entry) => entry.criterionText === "low light" && entry.criterionKind === "risk")
+      ?.ledgerId;
+    expect(lowLightLedgerRef).toBeTruthy();
+    expect(getStagePlayLiveSourceInterpreterProfileCriterionLedger(lowLightLedgerRef!)).toMatchObject({
+      artifactId: "stage_play_live_source_interpreter_profile_criterion_ledger",
+      schemaVersion: "stage_play_live_source_interpreter_profile_criterion_ledger/v1",
+      profileId: profile.profileId,
+      criterionText: "low light",
+      criterionKind: "risk",
+      status: "matched",
+      previousStatus: null,
+      matchCount: 1,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+
+    const secondCaveMail = enqueueMail("The cave remains dim with low light near the player.", "22");
+    const secondComparison = compareMailToInterpreterProfile({
+      profile,
+      mailItems: [secondCaveMail],
+      jobId,
+      policyId,
+      createdAt: "2026-06-08T00:06:10.000Z",
+    });
+    expect(secondComparison.criterionLedgerStatuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ledgerId: lowLightLedgerRef,
+        criterionText: "low light",
+        criterionKind: "risk",
+        status: "still_matched",
+        previousStatus: "matched",
+      }),
+    ]));
+    expect(getStagePlayLiveSourceInterpreterProfileCriterionLedger(lowLightLedgerRef!)?.matchCount).toBe(2);
+
+    const daylightMail = enqueueMail("The player is walking through a daylight forest with no visible threat.", "23");
+    const resolvedComparison = compareMailToInterpreterProfile({
+      profile,
+      mailItems: [daylightMail],
+      jobId,
+      policyId,
+      createdAt: "2026-06-08T00:06:20.000Z",
+    });
+    expect(resolvedComparison.criterionLedgerStatuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ledgerId: lowLightLedgerRef,
+        criterionText: "low light",
+        criterionKind: "risk",
+        status: "resolved",
+        previousStatus: "still_matched",
+      }),
+    ]));
+
+    const mixedMail = enqueueMail("The player is routine walking while a hostile mob appears nearby.", "24");
+    const contradictedComparison = compareMailToInterpreterProfile({
+      profile,
+      mailItems: [mixedMail],
+      jobId,
+      policyId,
+      createdAt: "2026-06-08T00:06:30.000Z",
+    });
+    expect(contradictedComparison.criterionLedgerStatuses).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        criterionKind: "contradiction",
+        status: "contradicted",
+      }),
+      expect.objectContaining({
+        criterionKind: "uncertainty",
+        status: "uncertain",
+      }),
+    ]));
+    expect(listStagePlayLiveSourceInterpreterProfileCriterionLedger({
+      profileId: profile.profileId,
+      jobId,
+      policyId,
+      limit: 50,
+    }).map((ledger) => ledger.status)).toEqual(expect.arrayContaining([
+      "resolved",
+      "contradicted",
+      "uncertain",
+    ]));
   });
 
   it("injects active profile guidance and observed-vs-inferred rules into wake prompts", async () => {

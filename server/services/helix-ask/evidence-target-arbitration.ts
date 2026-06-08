@@ -45,6 +45,10 @@ const hasStagePlayNegativeCue = (prompt: string): boolean =>
   /\b(?:do\s+not|don't|dont|without|no)\b[\s\S]{0,80}\b(?:stage\s*play|stage_play|badge\s+graph|reflect_stage_play_context)\b/i.test(prompt) ||
   /\b(?:stage\s*play|stage_play|badge\s+graph|reflect_stage_play_context)\b[\s\S]{0,80}\b(?:do\s+not|don't|dont|without|no)\b/i.test(prompt);
 
+const hasLiveSourceCurrentStateCue = (prompt: string): boolean =>
+  /\b(?:what\s+do\s+you\s+know\s+right\s+now|what\s+is\s+the\s+current\s+(?:live\s+source|source|mailbox|watch|observation)\s+state|current\s+live\s+source\s+state|summari[sz]e\s+(?:the\s+)?(?:current\s+)?live\s+source\s+state|source\s+quality|live\s+source\s+quality|is\s+(?:the\s+)?(?:source|visual\s+source|mailbox)\s+(?:fresh|stale|degraded|under\s+pressure)|how\s+fresh\s+is\s+(?:the\s+)?(?:source|visual\s+source)|cadence|backlog|under\s+pressure)\b/i.test(prompt) &&
+  /\b(?:live\s+source|visual\s+source|mailbox|mail|summary|summaries|observation|source|watch|quality|fresh|stale|cadence|backlog|pressure)\b/i.test(prompt);
+
 const makeCandidate = (input: {
   candidateId: string;
   targetSource: HelixAskSourceTarget;
@@ -227,6 +231,34 @@ export function buildAskEvidenceTargetArbitration(input: {
         "stage_play_live_source_mail_read_result",
         "stage_play_live_source_mail_decision",
         "stage_play_live_source_narrative_state",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    }));
+  }
+
+  if (!contextualSuppression && hasLiveSourceCurrentStateCue(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+    promptIntentCandidates.push("live_source_current_state");
+    candidates.push(makeCandidate({
+      candidateId: "live_source_mailbox.current_state_or_quality",
+      targetSource: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
+      strength: "hard",
+      score: 0.93,
+      reasonCodes: ["live_source_current_state_intent", "requires_live_source_state_tool_observation"],
+      requestedOutputs: [
+        "stage_play_live_source_current_state",
+        "stage_play_live_source_quality",
+        "typed_failure",
+      ],
+      capabilityKeys: [
+        "live_env.summarize_live_source_current_state",
+        "live_env.query_live_source_quality",
+      ],
+      terminalProductConstraints: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_current_state",
+        "stage_play_live_source_quality",
         "model_synthesized_answer",
         "typed_failure",
       ],

@@ -11,6 +11,7 @@ import {
   recheckStagePlayHeldCallout,
 } from "./stage-play-held-callout-store";
 import { recordInterimVoiceCalloutRequest } from "../helix-ask/interim-voice-callout-store";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 export type StagePlayLiveSourceVoiceDeliveryRunner = (input: {
   decisionId: string;
@@ -95,15 +96,16 @@ const buildReceipt = (input: {
     input.decision.requestedTool?.toolName,
     input.delivery?.artifactRef,
   ]);
+  const receiptId = `stage_play_live_source_voice_delivery_receipt:${hashShort([
+    input.decision.decisionId,
+    input.status,
+    input.delivery?.artifactRef ?? null,
+    input.now,
+  ])}`;
   return {
     artifactId: "stage_play_live_source_voice_delivery_receipt",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA,
-    receiptId: `stage_play_live_source_voice_delivery_receipt:${hashShort([
-      input.decision.decisionId,
-      input.status,
-      input.delivery?.artifactRef ?? null,
-      input.now,
-    ])}`,
+    receiptId,
     decisionId: input.decision.decisionId,
     mailIds: input.decision.mailIds,
     threadId: input.decision.threadId,
@@ -121,6 +123,15 @@ const buildReceipt = (input: {
     requestedTool: input.decision.requestedTool ?? null,
     delivery: input.delivery ?? null,
     evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces([input.decision.causalTrace], {
+      parentRefs: [input.decision.decisionId],
+      causedBy: [input.decision.decisionId],
+      producedRefs: [receiptId],
+      sourceIds: input.decision.causalTrace?.sourceIds ?? [],
+      jobId: input.decision.activeJobId ?? input.decision.causalTrace?.jobId ?? null,
+      profileId: input.decision.interpreterProfileRef ?? input.decision.causalTrace?.profileId ?? null,
+      evidenceRefs,
+    }),
     createdAt: input.now,
     assistant_answer: false,
     terminal_eligible: false,

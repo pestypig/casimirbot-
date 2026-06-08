@@ -5,11 +5,15 @@ import type {
   StagePlayLiveSourceMailWakeResultV1,
   StagePlayLiveSourceMailWakeStatusV1,
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
-import type { StagePlayLiveSourceMailDecisionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  LiveSourceCausalTraceV1,
+  StagePlayLiveSourceMailDecisionV1,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_RESULT_SCHEMA,
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 const wakeById = new Map<string, StagePlayLiveSourceMailWakeRequestV1>();
 const resultById = new Map<string, StagePlayLiveSourceMailWakeResultV1>();
@@ -53,6 +57,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   sourceIds: string[];
   reason?: StagePlayLiveSourceMailWakeReasonV1;
   evidenceRefs?: string[];
+  causalTraces?: Array<LiveSourceCausalTraceV1 | null | undefined>;
   now?: string;
 }): StagePlayLiveSourceMailWakeRequestV1 | null {
   const mailIds = uniqueStrings(input.mailIds);
@@ -94,6 +99,18 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
           ...sourceIds,
           ...(input.evidenceRefs ?? []),
         ]),
+        causalTrace: mergeLiveSourceCausalTraces([queuedSameSource.causalTrace, ...(input.causalTraces ?? [])], {
+          parentRefs: appendMailIds,
+          causedBy: appendMailIds,
+          producedRefs: [queuedSameSource.wakeRequestId],
+          sourceIds,
+          jobId: input.jobId ?? null,
+          evidenceRefs: [
+            ...appendMailIds,
+            ...sourceIds,
+            ...(input.evidenceRefs ?? []),
+          ],
+        }),
         nextRetryAt: queuedSameSource.status === "deferred_for_pressure" ? queuedSameSource.nextRetryAt : null,
         updatedAt: now,
       };
@@ -104,17 +121,18 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   }
   const now = input.now ?? new Date().toISOString();
   const boundedMailIds = mailIds.slice(0, MAX_MAIL_IDS_PER_WAKE_BATCH);
+  const wakeRequestId = `stage_play_live_source_mail_wake:${hashShort([
+    input.threadId,
+    input.roomId ?? null,
+    input.environmentId ?? null,
+    input.jobId ?? null,
+    boundedMailIds,
+    now,
+  ])}`;
   const wake: StagePlayLiveSourceMailWakeRequestV1 = {
     artifactId: "stage_play_live_source_mail_wake_request",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA,
-    wakeRequestId: `stage_play_live_source_mail_wake:${hashShort([
-      input.threadId,
-      input.roomId ?? null,
-      input.environmentId ?? null,
-      input.jobId ?? null,
-      boundedMailIds,
-      now,
-    ])}`,
+    wakeRequestId,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
@@ -130,6 +148,14 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     nextRetryAt: null,
     failureReason: null,
     evidenceRefs: uniqueStrings([...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
+    causalTrace: mergeLiveSourceCausalTraces(input.causalTraces ?? [], {
+      parentRefs: boundedMailIds,
+      causedBy: boundedMailIds,
+      producedRefs: [wakeRequestId],
+      sourceIds,
+      jobId: input.jobId ?? null,
+      evidenceRefs: [...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])],
+    }),
     queuedAt: now,
     updatedAt: now,
     assistant_answer: false,
@@ -201,6 +227,11 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
       ...existing.sourceIds,
       ...existing.evidenceRefs.filter((ref) => boundedMailIds.includes(ref)),
     ]),
+    causalTrace: mergeLiveSourceCausalTraces([existing.causalTrace], {
+      parentRefs: [existing.wakeRequestId, ...boundedMailIds],
+      producedRefs: [existing.wakeRequestId],
+      evidenceRefs: boundedMailIds,
+    }),
     updatedAt: now,
   };
   wakeById.set(boundedWake.wakeRequestId, boundedWake);
@@ -229,6 +260,19 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
       ...existing.sourceIds,
       ...existing.evidenceRefs.filter((ref) => retainedMailIds.includes(ref)),
     ]),
+    causalTrace: mergeLiveSourceCausalTraces([existing.causalTrace], {
+      parentRefs: [existing.wakeRequestId, ...retainedMailIds],
+      producedRefs: [`stage_play_live_source_mail_wake:${hashShort([
+        existing.threadId,
+        existing.roomId ?? null,
+        existing.environmentId ?? null,
+        existing.jobId ?? null,
+        retainedMailIds,
+        "retained_after_bounded_ask",
+        now,
+      ])}`],
+      evidenceRefs: retainedMailIds,
+    }),
     queuedAt: now,
     updatedAt: now,
   };
@@ -367,25 +411,39 @@ export function recordStagePlayMailWakeResult(input: {
   createdAt?: string;
 }): StagePlayLiveSourceMailWakeResultV1 {
   const createdAt = input.createdAt ?? new Date().toISOString();
+  const wake = wakeById.get(input.wakeRequestId) ?? null;
+  const decisionIds = uniqueStrings(input.decisionIds ?? []);
+  const evidenceRefs = uniqueStrings([input.wakeRequestId, input.askTurnId, ...decisionIds, ...(input.evidenceRefs ?? [])]);
+  const wakeResultId = `stage_play_live_source_mail_wake_result:${hashShort([
+    input.wakeRequestId,
+    input.status,
+    input.askTurnId ?? null,
+    createdAt,
+  ])}`;
   const result: StagePlayLiveSourceMailWakeResultV1 = {
     artifactId: "stage_play_live_source_mail_wake_result",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_RESULT_SCHEMA,
-    wakeResultId: `stage_play_live_source_mail_wake_result:${hashShort([
-      input.wakeRequestId,
-      input.status,
-      input.askTurnId ?? null,
-      createdAt,
-    ])}`,
+    wakeResultId,
     wakeRequestId: input.wakeRequestId,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
     status: input.status,
     askTurnId: input.askTurnId ?? null,
-    decisionIds: uniqueStrings(input.decisionIds ?? []),
+    decisionIds,
+    budgetStateRef: null,
     skippedReason: input.skippedReason ?? null,
     failedReason: input.failedReason ?? null,
-    evidenceRefs: uniqueStrings([input.wakeRequestId, input.askTurnId, ...(input.decisionIds ?? []), ...(input.evidenceRefs ?? [])]),
+    evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces([wake?.causalTrace], {
+      parentRefs: [input.wakeRequestId],
+      causedBy: [input.wakeRequestId],
+      producedRefs: [wakeResultId],
+      sourceIds: wake?.sourceIds ?? [],
+      jobId: wake?.jobId ?? null,
+      askTurnId: input.askTurnId ?? null,
+      evidenceRefs,
+    }),
     createdAt,
     assistant_answer: false,
     terminal_eligible: false,
@@ -394,6 +452,26 @@ export function recordStagePlayMailWakeResult(input: {
   };
   resultById.set(result.wakeResultId, result);
   return result;
+}
+
+export function attachLiveSourceBudgetStateToWakeResult(input: {
+  wakeResultId: string;
+  budgetStateId: string;
+}): StagePlayLiveSourceMailWakeResultV1 | null {
+  const existing = resultById.get(input.wakeResultId);
+  if (!existing) return null;
+  const updated: StagePlayLiveSourceMailWakeResultV1 = {
+    ...existing,
+    budgetStateRef: input.budgetStateId,
+    evidenceRefs: uniqueStrings([...existing.evidenceRefs, input.budgetStateId]),
+    causalTrace: mergeLiveSourceCausalTraces([existing.causalTrace], {
+      parentRefs: [existing.wakeResultId],
+      producedRefs: [input.budgetStateId],
+      evidenceRefs: [input.budgetStateId],
+    }),
+  };
+  resultById.set(updated.wakeResultId, updated);
+  return updated;
 }
 
 export function listStagePlayLiveSourceMailWakeResults(input: {

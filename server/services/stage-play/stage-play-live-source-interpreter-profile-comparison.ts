@@ -7,6 +7,7 @@ import {
 } from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type { StagePlayLiveSourceMailItemV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { recordStagePlayLiveSourceInterpreterProfileComparison } from "./stage-play-live-source-interpreter-profile-store";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -245,13 +246,20 @@ export function compareMailToInterpreterProfile(input: {
     ...opportunityMatches,
     ...voiceCalloutMatches,
   ]).slice(0, 8);
+  const comparisonId = `stage_play_live_source_interpreter_profile_comparison:${hashShort([
+    input.profile.profileId,
+    input.mailItems.map((item) => item.mailId),
+    input.narrativeStateRef ?? null,
+    createdAt,
+  ])}`;
+  const evidenceRefs = uniqueStrings([
+    input.profile.profileId,
+    input.narrativeStateRef,
+    ...input.profile.evidenceRefs,
+    ...input.mailItems.flatMap((item) => [item.mailId, ...item.evidenceRefs]),
+  ]);
   const comparison = buildStagePlayLiveSourceInterpreterProfileComparisonV1({
-    comparisonId: `stage_play_live_source_interpreter_profile_comparison:${hashShort([
-      input.profile.profileId,
-      input.mailItems.map((item) => item.mailId),
-      input.narrativeStateRef ?? null,
-      createdAt,
-    ])}`,
+    comparisonId,
     profileId: input.profile.profileId,
     jobId: input.jobId ?? input.profile.jobId ?? null,
     policyId: input.policyId ?? input.profile.policyId ?? null,
@@ -277,12 +285,17 @@ export function compareMailToInterpreterProfile(input: {
       hasMail: input.mailItems.length > 0,
     }),
     recommendedNextWatch: recommendedNextWatch.length > 0 ? recommendedNextWatch : ["next compact source summary"],
-    evidenceRefs: uniqueStrings([
-      input.profile.profileId,
-      input.narrativeStateRef,
-      ...input.profile.evidenceRefs,
-      ...input.mailItems.flatMap((item) => [item.mailId, ...item.evidenceRefs]),
-    ]),
+    evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces(input.mailItems.map((item) => item.causalTrace), {
+      parentRefs: uniqueStrings([input.profile.profileId, input.narrativeStateRef, ...input.mailItems.map((item) => item.mailId)]),
+      causedBy: input.mailItems.map((item) => item.mailId),
+      producedRefs: [comparisonId],
+      sourceIds: input.mailItems.map((item) => item.sourceId),
+      jobId: input.jobId ?? input.profile.jobId ?? null,
+      policyId: input.policyId ?? input.profile.policyId ?? null,
+      profileId: input.profile.profileId,
+      evidenceRefs,
+    }),
     createdAt,
   });
   return recordStagePlayLiveSourceInterpreterProfileComparison(comparison);

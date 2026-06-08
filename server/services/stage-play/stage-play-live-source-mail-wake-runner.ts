@@ -8,6 +8,7 @@ import type {
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type {
+  StagePlayLiveSourceInterpreterProfileCriterionLedgerV1,
   StagePlayLiveSourceInterpreterProfileV1,
 } from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type { StagePlayHeldCalloutV1 } from "@shared/contracts/stage-play-held-callout.v1";
@@ -43,6 +44,7 @@ import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-liv
 import {
   getActiveInterpreterProfileForJob,
   getStagePlayLiveSourceInterpreterProfile,
+  listStagePlayLiveSourceInterpreterProfileCriterionLedger,
   listStagePlayLiveSourceInterpreterProfileComparisons,
 } from "./stage-play-live-source-interpreter-profile-store";
 import {
@@ -61,7 +63,13 @@ import {
   recordStagePlayMailWakeResult,
   latestStagePlayLiveSourceMailWakeResult,
   splitStagePlayLiveSourceMailWakeRequestForAsk,
+  attachLiveSourceBudgetStateToWakeResult,
 } from "./stage-play-live-source-mail-wake-store";
+import type {
+  LiveSourceBudgetActionV1,
+  LiveSourceBudgetStateV1,
+} from "@shared/contracts/stage-play-live-source-current-state.v1";
+import { recordLiveSourceBudgetState } from "./stage-play-live-source-budget-store";
 
 type AskWakeTurnResponse = Record<string, unknown>;
 
@@ -176,6 +184,24 @@ const formatActiveInterpreterProfile = (
     formatBooleanRule("require evidence refs", profile.evidenceRules.requireEvidenceRefs),
     formatBooleanRule("ask when uncertain", profile.evidenceRules.askWhenUncertain),
   ].join("\n");
+};
+
+const formatActiveCriterionLedger = (
+  ledgers: StagePlayLiveSourceInterpreterProfileCriterionLedgerV1[],
+): string => {
+  if (ledgers.length === 0) return "No active criterion ledger entries yet.";
+  return ledgers
+    .slice(-12)
+    .map((ledger) => [
+      `- ${ledger.criterionText}`,
+      `kind=${ledger.criterionKind}`,
+      `status=${ledger.status}`,
+      ledger.previousStatus ? `previous=${ledger.previousStatus}` : null,
+      `confidence=${ledger.currentConfidence.toFixed(2)}`,
+      ledger.lastMatchedMailId ? `lastMail=${ledger.lastMatchedMailId}` : null,
+      ledger.lastComparisonId ? `comparison=${ledger.lastComparisonId}` : null,
+    ].filter(Boolean).join("; "))
+    .join("\n");
 };
 
 const formatVoicePolicy = (policy: StagePlayLiveSourceVoicePolicyV1): string =>
@@ -529,12 +555,99 @@ const makeWakeTranscriptRow = (input: {
   createdAt: input.createdAt,
 });
 
+const budgetActionForWakeResult = (input: {
+  wakeResult: StagePlayLiveSourceMailWakeResultV1;
+  retainedMailCount?: number;
+}): LiveSourceBudgetActionV1 => {
+  if (input.wakeResult.status === "completed") {
+    return (input.retainedMailCount ?? 0) > 0 ? "batched" : "processed";
+  }
+  if (input.wakeResult.status === "deferred_for_pressure") return "pressure_blocked";
+  if (/paused/i.test(input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "")) return "paused";
+  return "deferred";
+};
+
+const recordWakeBudgetReceipt = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  wakeResult: StagePlayLiveSourceMailWakeResultV1;
+  action?: LiveSourceBudgetActionV1;
+  reason?: string | null;
+  processedMailCount?: number | null;
+  retainedMailCount?: number | null;
+  evidenceRefs: string[];
+  pressureReason?: string | null;
+  createdAt: string;
+}): {
+  wakeResult: StagePlayLiveSourceMailWakeResultV1;
+  budgetState: LiveSourceBudgetStateV1;
+} => {
+  const action = input.action ?? budgetActionForWakeResult({
+    wakeResult: input.wakeResult,
+    retainedMailCount: input.retainedMailCount ?? 0,
+  });
+  const budgetState = recordLiveSourceBudgetState({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    jobId: input.wake.jobId ?? null,
+    wakeRequest: input.wake,
+    wakeResult: input.wakeResult,
+    action,
+    reason:
+      input.reason ??
+      input.wakeResult.failedReason ??
+      input.wakeResult.skippedReason ??
+      (action === "batched" ? "wake_batch_split" : `wake_${action}`),
+    processedMailCount: input.processedMailCount ?? input.wake.mailIds.length,
+    retainedMailCount: input.retainedMailCount ?? 0,
+    pressureReason: input.pressureReason ?? (
+      action === "pressure_blocked"
+        ? input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "runtime_pressure"
+        : null
+    ),
+    evidenceRefs: input.evidenceRefs,
+    causalTraces: [input.wake.causalTrace, input.wakeResult.causalTrace],
+    now: input.createdAt,
+  });
+  const attached = attachLiveSourceBudgetStateToWakeResult({
+    wakeResultId: input.wakeResult.wakeResultId,
+    budgetStateId: budgetState.budgetStateId,
+  });
+  return {
+    wakeResult: attached ?? {
+      ...input.wakeResult,
+      budgetStateRef: budgetState.budgetStateId,
+      evidenceRefs: uniqueStrings([...input.wakeResult.evidenceRefs, budgetState.budgetStateId]),
+    },
+    budgetState,
+  };
+};
+
+const buildBudgetTranscriptRow = (budgetState: LiveSourceBudgetStateV1, createdAt: string): DurableWakeTranscriptRow =>
+  makeWakeTranscriptRow({
+    rowId: `wake_budget_state:${hashShort(budgetState.budgetStateId)}`,
+    rowKind: "budget_state",
+    title: "Budget state",
+    body: [
+      `${budgetState.action}: ${budgetState.reason}`,
+      `Processed ${budgetState.mailCounts.processedMailCount}/${budgetState.mailCounts.wakeMailCount} mail item(s); retained ${budgetState.mailCounts.retainedMailCount}; unread backlog ${budgetState.mailCounts.unreadBacklogCount}.`,
+      `Wake counts: queued ${budgetState.wakeCounts.queuedWakeCount}, running ${budgetState.wakeCounts.runningWakeCount}, deferred ${budgetState.wakeCounts.deferredWakeCount}, failed ${budgetState.wakeCounts.failedWakeCount}.`,
+      `Next: ${budgetState.allowedNextAction}.`,
+    ].join("\n"),
+    artifactId: budgetState.budgetStateId,
+    artifactKind: budgetState.artifactId,
+    evidenceRefs: budgetState.evidenceRefs,
+    authority: "tool_evidence",
+    createdAt,
+  });
+
 const buildDurableWakeTranscriptRows = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorNarrativeState?: StagePlayLiveSourceNarrativeStateV1 | null;
   decisionIds: string[];
+  budgetState?: LiveSourceBudgetStateV1 | null;
   voiceReceipts?: StagePlayLiveSourceVoiceDeliveryReceiptV1[];
   evidenceRefs: string[];
   createdAt: string;
@@ -612,6 +725,9 @@ const buildDurableWakeTranscriptRows = (input: {
     evidenceRefs: input.evidenceRefs,
     createdAt: input.createdAt,
   }));
+  if (input.budgetState) {
+    rows.push(buildBudgetTranscriptRow(input.budgetState, input.createdAt));
+  }
   const decisions = input.decisionIds
     .map((decisionId) => getStagePlayMailDecision(decisionId))
     .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
@@ -651,6 +767,9 @@ const buildDurableWakeTranscriptRows = (input: {
             ? [
                 comparison.matchedCriteria.length ? `Matched: ${comparison.matchedCriteria.join(", ")}.` : "Matched: none.",
                 comparison.suppressedCriteria.length ? `Suppressed: ${comparison.suppressedCriteria.join(", ")}.` : "Suppressed: none.",
+                comparison.criterionLedgerStatuses?.length
+                  ? `Ledger: ${comparison.criterionLedgerStatuses.map((entry) => `${entry.criterionText} -> ${entry.status}`).join("; ")}.`
+                  : "Ledger: no criterion state changes.",
                 `Recommended: ${comparison.recommendedDecision}.`,
               ].join("\n")
             : [
@@ -851,6 +970,7 @@ const buildNonTerminalWakeTranscriptRows = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
+  budgetState?: LiveSourceBudgetStateV1 | null;
   evidenceRefs: string[];
   createdAt: string;
 }): DurableWakeTranscriptRow[] => {
@@ -892,6 +1012,9 @@ const buildNonTerminalWakeTranscriptRows = (input: {
     evidenceRefs: input.evidenceRefs,
     createdAt: input.createdAt,
   }));
+  if (input.budgetState) {
+    rows.push(buildBudgetTranscriptRow(input.budgetState, input.createdAt));
+  }
   if (input.wakeResult.status === "deferred_for_pressure") {
     rows.push(makeWakeTranscriptRow({
       rowId: `wake_deferred:${hashShort(input.wakeResult.wakeResultId)}`,
@@ -944,27 +1067,45 @@ const recordNonTerminalWakeTranscript = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
+  action?: LiveSourceBudgetActionV1;
+  retainedMailCount?: number | null;
   evidenceRefs: string[];
   createdAt: string;
 }): StagePlayLiveSourceMailWakeResultV1 => {
+  const budgetReceipt = recordWakeBudgetReceipt({
+    wake: input.wake,
+    wakeResult: input.wakeResult,
+    action: input.action,
+    retainedMailCount: input.retainedMailCount ?? 0,
+    evidenceRefs: input.evidenceRefs,
+    pressureReason: input.wakeResult.status === "deferred_for_pressure" ? input.wakeResult.failedReason ?? null : null,
+    createdAt: input.createdAt,
+  });
   const transcriptEntries = recordStagePlayLiveSourceMailTranscriptEntries({
     threadId: input.wake.threadId,
     roomId: input.wake.roomId ?? null,
     environmentId: input.wake.environmentId ?? null,
     wakeRequestId: input.wake.wakeRequestId,
-    wakeResultId: input.wakeResult.wakeResultId,
-    askTurnId: input.wakeResult.askTurnId ?? null,
-    decisionIds: input.wakeResult.decisionIds,
+    wakeResultId: budgetReceipt.wakeResult.wakeResultId,
+    askTurnId: budgetReceipt.wakeResult.askTurnId ?? null,
+    decisionIds: budgetReceipt.wakeResult.decisionIds,
     mailIds: input.wake.mailIds,
     sourceIds: input.wake.sourceIds,
-    rows: buildNonTerminalWakeTranscriptRows(input),
-    evidenceRefs: input.wakeResult.evidenceRefs,
+    rows: buildNonTerminalWakeTranscriptRows({
+      ...input,
+      wakeResult: budgetReceipt.wakeResult,
+      budgetState: budgetReceipt.budgetState,
+      evidenceRefs: uniqueStrings([...input.evidenceRefs, budgetReceipt.budgetState.budgetStateId]),
+    }),
+    evidenceRefs: budgetReceipt.wakeResult.evidenceRefs,
+    causalTrace: budgetReceipt.wakeResult.causalTrace ?? budgetReceipt.budgetState.causalTrace ?? input.wake.causalTrace,
     createdAt: input.createdAt,
   });
   return {
-    ...input.wakeResult,
+    ...budgetReceipt.wakeResult,
     evidenceRefs: uniqueStrings([
-      ...input.wakeResult.evidenceRefs,
+      ...budgetReceipt.wakeResult.evidenceRefs,
+      budgetReceipt.budgetState.budgetStateId,
       ...transcriptEntries.map((entry) => entry.entryId),
     ]),
   };
@@ -974,6 +1115,7 @@ const buildWakePrompt = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
   activeInterpreterProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
+  activeCriterionLedger: StagePlayLiveSourceInterpreterProfileCriterionLedgerV1[];
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
@@ -1003,13 +1145,17 @@ const buildWakePrompt = (input: {
     "Active interpreter profile:",
     formatActiveInterpreterProfile(input.activeInterpreterProfile),
     "",
+    "Active criterion ledger:",
+    formatActiveCriterionLedger(input.activeCriterionLedger),
+    "",
     "Interpreter profile instructions:",
     "1. Preserve observed facts from the mail summaries.",
     "2. Compare observed facts against the active interpreter profile when one exists.",
     "3. Do not overwrite observations with profile assumptions.",
     "4. State matched and suppressed criteria when a profile is active.",
-    "5. If uncertain, record uncertainty or request more evidence.",
-    "6. Use profile comparison to choose wait, interpretation, text, voice, or checkpoint.",
+    "5. Use the criterion ledger to distinguish newly matched, still matched, resolved, contradicted, and uncertain profile criteria.",
+    "6. If uncertain, record uncertainty or request more evidence.",
+    "7. Use profile comparison to choose wait, interpretation, text, voice, or checkpoint.",
     "",
     "The mail is perturbation evidence for this continuing job.",
     "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
@@ -1238,6 +1384,7 @@ export function queueMailWakeForUnreadItems(input: {
     sourceIds: batch.map((item) => item.sourceId),
     reason: "unread_mail",
     evidenceRefs: batch.flatMap((item: StagePlayLiveSourceMailItemV1) => item.evidenceRefs),
+    causalTraces: batch.map((item) => item.causalTrace),
     now: input.now,
   });
 }
@@ -1337,6 +1484,14 @@ export async function runNextMailWakeRequest(input: {
     policyId: policy?.policyId ?? null,
     sourceKind: mailBatch[0]?.sourceKind ?? null,
   });
+  const activeCriterionLedger = activeInterpreterProfile
+    ? listStagePlayLiveSourceInterpreterProfileCriterionLedger({
+        profileId: activeInterpreterProfile.profileId,
+        jobId: policy?.jobId ?? running.jobId ?? null,
+        policyId: policy?.policyId ?? null,
+        limit: 24,
+      })
+    : [];
   const taskQueueSnapshot = getStagePlayLiveSourceTaskQueueSnapshot({
     threadId: running.threadId,
     roomId: running.roomId ?? null,
@@ -1363,6 +1518,7 @@ export async function runNextMailWakeRequest(input: {
     ...(policy ? [policy.policyId, policy.jobId, ...policy.evidenceRefs, ...policy.priorAnswerRefs, ...policy.priorDecisionRefs] : []),
     activeInterpreterProfile?.profileId,
     ...(activeInterpreterProfile?.evidenceRefs ?? []),
+    ...activeCriterionLedger.map((ledger) => ledger.ledgerId),
     latestNarrativeState?.narrativeStateId,
     ...taskQueueSnapshot.evidenceRefs,
     conversationContextPack.contextPackId,
@@ -1395,6 +1551,8 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      action: "deferred",
+      retainedMailCount,
       evidenceRefs,
       createdAt: wakeResult.createdAt,
     });
@@ -1403,6 +1561,7 @@ export async function runNextMailWakeRequest(input: {
     wake: running,
     policy,
     activeInterpreterProfile,
+    activeCriterionLedger,
     mailBatch,
     priorDecisions,
     latestNarrativeState,
@@ -1436,6 +1595,8 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      action: "deferred",
+      retainedMailCount,
       evidenceRefs,
       createdAt: wakeResult.createdAt,
     });
@@ -1485,6 +1646,8 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      action: "pressure_blocked",
+      retainedMailCount,
       evidenceRefs,
       createdAt: wakeResult.createdAt,
     });
@@ -1521,6 +1684,8 @@ export async function runNextMailWakeRequest(input: {
         wake: running,
         wakeResult,
         mailBatch,
+        action: "deferred",
+        retainedMailCount,
         evidenceRefs: wakeResult.evidenceRefs,
         createdAt: wakeResult.createdAt,
       });
@@ -1543,6 +1708,16 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: completed?.evidenceRefs ?? evidenceRefs,
       createdAt: new Date().toISOString(),
     });
+    const budgetReceipt = recordWakeBudgetReceipt({
+      wake: completed ?? running,
+      wakeResult,
+      action: retainedMailCount > 0 ? "batched" : "processed",
+      reason: retainedMailCount > 0 ? "wake_batch_split" : "wake_processed",
+      processedMailCount: running.mailIds.length,
+      retainedMailCount,
+      evidenceRefs: wakeResult.evidenceRefs,
+      createdAt: wakeResult.createdAt,
+    });
     const storedDecisions = (completed?.decisionIds ?? decisionIds)
       .map((decisionId) => getStagePlayMailDecision(decisionId))
       .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
@@ -1551,39 +1726,43 @@ export async function runNextMailWakeRequest(input: {
       const receipt = await maybeRunStagePlayLiveSourceVoiceDelivery({
         decision,
         runner: input.voiceDeliveryRunner ?? null,
-        now: wakeResult.createdAt,
+        now: budgetReceipt.wakeResult.createdAt,
       });
       if (receipt) voiceReceipts.push(receipt);
     }
     const transcriptRows = buildDurableWakeTranscriptRows({
       wake: completed ?? running,
-      wakeResult,
+      wakeResult: budgetReceipt.wakeResult,
       mailBatch,
       priorNarrativeState: latestNarrativeState,
       decisionIds: completed?.decisionIds ?? decisionIds,
+      budgetState: budgetReceipt.budgetState,
       voiceReceipts,
       evidenceRefs: uniqueStrings([
-        ...(completed?.evidenceRefs ?? evidenceRefs),
+        ...(budgetReceipt.wakeResult.evidenceRefs ?? completed?.evidenceRefs ?? evidenceRefs),
+        budgetReceipt.budgetState.budgetStateId,
         ...voiceReceipts.flatMap((receipt) => receipt.evidenceRefs),
       ]),
-      createdAt: wakeResult.createdAt,
+      createdAt: budgetReceipt.wakeResult.createdAt,
     });
     const transcriptEntries = recordStagePlayLiveSourceMailTranscriptEntries({
       threadId: running.threadId,
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
       wakeRequestId: running.wakeRequestId,
-      wakeResultId: wakeResult.wakeResultId,
-      askTurnId: wakeResult.askTurnId ?? askTurnId,
-      decisionIds: wakeResult.decisionIds,
+      wakeResultId: budgetReceipt.wakeResult.wakeResultId,
+      askTurnId: budgetReceipt.wakeResult.askTurnId ?? askTurnId,
+      decisionIds: budgetReceipt.wakeResult.decisionIds,
       mailIds: running.mailIds,
       sourceIds: running.sourceIds,
       rows: transcriptRows,
       evidenceRefs: uniqueStrings([
-        ...wakeResult.evidenceRefs,
+        ...budgetReceipt.wakeResult.evidenceRefs,
+        budgetReceipt.budgetState.budgetStateId,
         ...voiceReceipts.flatMap((receipt) => [receipt.receiptId, ...receipt.evidenceRefs]),
       ]),
-      createdAt: wakeResult.createdAt,
+      causalTrace: budgetReceipt.wakeResult.causalTrace ?? budgetReceipt.budgetState.causalTrace ?? completed?.causalTrace ?? running.causalTrace,
+      createdAt: budgetReceipt.wakeResult.createdAt,
     });
     const consolidation = maybeQueueStagePlayLiveSourceMemoryConsolidation({
       threadId: running.threadId,
@@ -1592,12 +1771,13 @@ export async function runNextMailWakeRequest(input: {
       jobId: policy?.jobId ?? running.jobId ?? null,
       policyId: policy?.policyId ?? null,
       sourceIds: running.sourceIds,
-      now: wakeResult.createdAt,
+      now: budgetReceipt.wakeResult.createdAt,
     });
     return {
-      ...wakeResult,
+      ...budgetReceipt.wakeResult,
       evidenceRefs: uniqueStrings([
-        ...wakeResult.evidenceRefs,
+        ...budgetReceipt.wakeResult.evidenceRefs,
+        budgetReceipt.budgetState.budgetStateId,
         ...transcriptEntries.map((entry) => entry.entryId),
         consolidation.task?.taskId,
       ]),
@@ -1628,6 +1808,8 @@ export async function runNextMailWakeRequest(input: {
         wake: runningAttempt,
         wakeResult,
         mailBatch,
+        action: "pressure_blocked",
+        retainedMailCount,
         evidenceRefs,
         createdAt: wakeResult.createdAt,
       });
@@ -1652,6 +1834,8 @@ export async function runNextMailWakeRequest(input: {
       wake: runningAttempt,
       wakeResult,
       mailBatch,
+      action: "deferred",
+      retainedMailCount,
       evidenceRefs,
       createdAt: wakeResult.createdAt,
     });

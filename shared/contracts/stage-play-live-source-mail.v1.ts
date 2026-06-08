@@ -7,6 +7,7 @@ export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_l
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA = "stage_play_live_source_voice_delivery_receipt/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA = "stage_play_live_source_narrative_state/v1" as const;
+export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
   "stage_play_live_source_watch_job_policy_config_result/v1" as const;
 
@@ -51,6 +52,21 @@ export type StagePlayNextLoopStateV1 =
   | "blocked_tool_error"
   | "ended";
 
+export type LiveSourceCausalTraceV1 = {
+  schemaVersion: typeof LIVE_SOURCE_CAUSAL_TRACE_SCHEMA;
+  traceId: string;
+  cycleId: string;
+  parentRefs: string[];
+  causedBy: string[];
+  producedRefs: string[];
+  sourceIds: string[];
+  jobId?: string | null;
+  policyId?: string | null;
+  profileId?: string | null;
+  askTurnId?: string | null;
+  evidenceRefs: string[];
+};
+
 export type StagePlayLiveSourceMailItemV1 = {
   artifactId: "stage_play_live_source_mail_item";
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA;
@@ -94,6 +110,7 @@ export type StagePlayLiveSourceMailItemV1 = {
   };
   status: StagePlayLiveSourceMailStatusV1;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   updatedAt: string;
   assistant_answer: false;
@@ -125,7 +142,18 @@ export type StagePlayLiveSourceMailReadResultV1 = {
   priorAnswerObservationRefs: string[];
   voicePolicy: StagePlayLiveSourceVoicePolicyV1;
   suggestedDecisionOptions: StagePlayMailDecisionV1[];
+  readWindow?: {
+    sourceId?: string | null;
+    sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
+    requestedLimit: number;
+    effectiveLimit: number;
+    sameSourceBatch: boolean;
+    unreadBeforeRead: number;
+    remainingUnreadCount: number;
+    retainedUnreadMailIds: string[];
+  };
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
@@ -170,6 +198,7 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   inferredMeaning?: string[];
   rearmReason?: string | null;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   modelReviewed: boolean;
   createdAt: string;
   assistant_answer: false;
@@ -224,6 +253,7 @@ export type StagePlayLiveSourceNarrativeStateV1 = {
   };
   lastDecisionRef?: string | null;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;
@@ -289,6 +319,7 @@ export type StagePlayLiveSourceVoiceDeliveryReceiptV1 = {
     message?: string | null;
   } | null;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;
@@ -391,6 +422,7 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "task_deferred"
     | "task_running"
     | "task_completed"
+    | "budget_state"
     | "prediction_check"
     | "narrative_projection"
     | "agent_decision"
@@ -426,6 +458,7 @@ export type AskTurnTranscriptRowDraftV1 = {
     artifactKind?: string | null;
   };
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   authority: "tool_evidence" | "model_decision_receipt" | "generated_prompt" | "model_synthesized_answer" | "blocked";
   assistantAnswer: boolean;
   terminalEligible: boolean;
@@ -448,6 +481,7 @@ export type StagePlayLiveSourceMailTranscriptEntryV1 = {
   sequence: number;
   row: AskTurnTranscriptRowDraftV1;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;

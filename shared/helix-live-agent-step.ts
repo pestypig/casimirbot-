@@ -33,6 +33,8 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.record_voice_steering"
   | "live_env.request_interim_voice_callout"
   | "live_env.query_source_health"
+  | "live_env.query_live_source_quality"
+  | "live_env.summarize_live_source_current_state"
   | "live_env.query_constructs"
   | "live_env.query_job_evidence"
   | "live_env.request_probe"

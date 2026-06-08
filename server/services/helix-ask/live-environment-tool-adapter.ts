@@ -104,8 +104,13 @@ import {
   inferStagePlayLiveSourceInterpretationMode,
 } from "../stage-play/stage-play-live-source-watch-policy-defaults";
 import {
+  queryStagePlayLiveSourceQuality,
+  summarizeStagePlayLiveSourceCurrentState,
+} from "../stage-play/stage-play-live-source-current-state";
+import {
   recordInterimVoiceCalloutRequest,
 } from "./interim-voice-callout-store";
+import { mergeLiveSourceCausalTraces } from "../stage-play/stage-play-live-source-causal-trace";
 import {
   recordVoiceSteeringEvent,
 } from "./voice-steering-event-store";
@@ -536,6 +541,7 @@ const buildInterpreterProfileComparisonTranscriptRows = (input: {
       artifactKind: input.comparison.artifactId,
     },
     evidenceRefs: input.comparison.evidenceRefs,
+    causalTrace: input.comparison.causalTrace,
     authority: "tool_evidence" as const,
     assistantAnswer: false,
     terminalEligible: false,
@@ -1699,6 +1705,8 @@ export function executeLiveEnvironmentTool(
       sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
       mailIds: readStringArray(args.mail_ids ?? args.mailIds),
       limit: readNumber(args.limit, input.tool_name === "live_env.read_live_source_mail" ? 12 : 3),
+      sameSourceBatch: input.tool_name === "live_env.read_live_source_mail",
+      batchCap: 12,
       includeRead: args.include_read === true || args.includeRead === true,
       voicePolicy: {
         voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
@@ -1717,7 +1725,9 @@ export function executeLiveEnvironmentTool(
       toolName: input.tool_name,
       ok: true,
       summary: readResult.items.length > 0
-        ? `Read ${readResult.items.length} unread live-source mail item(s); decision required.`
+        ? readResult.readWindow && readResult.readWindow.remainingUnreadCount > 0
+          ? `Read ${readResult.items.length} unread live-source mail item(s); ${readResult.readWindow.remainingUnreadCount} same-source unread item(s) remain queued; decision required.`
+          : `Read ${readResult.items.length} unread live-source mail item(s); decision required.`
         : "No unread live-source updates yet; loop is armed for the next source update.",
       observation: {
         ...readResult,
@@ -1727,6 +1737,8 @@ export function executeLiveEnvironmentTool(
         mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
         mailboxThreadResolution,
         mailbox_thread_resolution: mailboxThreadResolution,
+        causalTrace: readResult.causalTrace,
+        causal_trace: readResult.causalTrace,
         transcriptRows,
         loopState: readResult.items.length > 0 ? "continue_with_unread_mail" : "armed_for_next_summary",
         post_tool_model_step_required: true,
@@ -1883,23 +1895,30 @@ export function executeLiveEnvironmentTool(
       mailItems.at(-1)?.summary.text ??
       narrativeState?.currentSceneSummary ??
       "No compact live-source mail summary was available.";
+    const projectionJobId =
+      readString(args.job_id) ??
+      readString(args.jobId) ??
+      narrativeState?.jobId ??
+      policy?.jobId ??
+      listStagePlayMailDecisions({
+        threadId: scopedInput.thread_id,
+        roomId,
+        environmentId: scopedInput.environment_id ?? null,
+        limit: 1,
+      }).at(-1)?.activeJobId ??
+      `stage_play_live_source_job:${hashShort([scopedInput.thread_id, mailItems.at(-1)?.sourceId ?? "source"])}`;
+    const projectionPolicyId =
+      readString(args.policy_id) ??
+      readString(args.policyId) ??
+      policy?.policyId ??
+      narrativeState?.policyId ??
+      null;
     const projected = recordStagePlayLiveSourceNarrativeState({
       threadId: scopedInput.thread_id,
       roomId,
       environmentId: scopedInput.environment_id ?? null,
-      jobId:
-        readString(args.job_id) ??
-        readString(args.jobId) ??
-        narrativeState?.jobId ??
-        policy?.jobId ??
-        listStagePlayMailDecisions({
-          threadId: scopedInput.thread_id,
-          roomId,
-          environmentId: scopedInput.environment_id ?? null,
-          limit: 1,
-        }).at(-1)?.activeJobId ??
-        `stage_play_live_source_job:${hashShort([scopedInput.thread_id, mailItems.at(-1)?.sourceId ?? "source"])}`,
-      policyId: readString(args.policy_id) ?? readString(args.policyId) ?? policy?.policyId ?? narrativeState?.policyId ?? null,
+      jobId: projectionJobId,
+      policyId: projectionPolicyId,
       sourceIds: mailItems.length > 0 ? mailItems.map((item) => item.sourceId) : narrativeState?.sourceIds ?? [],
       mailBatchRefs: mailItems.map((item) => item.mailId),
       sourceEvidenceRefs: mailItems.flatMap((item) => item.evidenceRefs),
@@ -1949,6 +1968,20 @@ export function executeLiveEnvironmentTool(
         validationSignals: prediction.validationSignals,
       },
       evidenceRefs,
+      causalTrace: mergeLiveSourceCausalTraces([
+        ...mailItems.map((item) => item.causalTrace),
+        narrativeState?.causalTrace,
+      ], {
+        parentRefs: uniqueStrings([
+          narrativeState?.narrativeStateId,
+          ...mailItems.map((item) => item.mailId),
+        ]),
+        causedBy: mailItems.map((item) => item.mailId),
+        sourceIds: mailItems.map((item) => item.sourceId),
+        jobId: projectionJobId,
+        policyId: projectionPolicyId,
+        evidenceRefs,
+      }),
     });
     return makeObservation({
       threadId: input.thread_id,
@@ -1972,6 +2005,8 @@ export function executeLiveEnvironmentTool(
         prediction: projected.prediction,
         evidenceRefs: projected.evidenceRefs,
         evidence_refs: projected.evidenceRefs,
+        causalTrace: projected.causalTrace,
+        causal_trace: projected.causalTrace,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
@@ -2583,6 +2618,7 @@ export function executeLiveEnvironmentTool(
       summary: `Compared ${comparison.mailIds.length} live-source mail item(s) to interpreter profile ${comparison.profileId}; recommended ${comparison.recommendedDecision}.`,
       observation: {
         ...comparison,
+        causal_trace: comparison.causalTrace,
         transcriptRows,
         post_tool_model_step_required: true,
         ask_context_policy: "evidence_only",
@@ -2692,6 +2728,8 @@ export function executeLiveEnvironmentTool(
         mailbox_thread_resolution: mailboxThreadResolution,
         narrativeState,
         narrative_state: narrativeState,
+        causalTrace: recordedDecision.causalTrace,
+        causal_trace: recordedDecision.causalTrace,
         transcriptRows,
         liveSourceMailOutputIntent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,
         live_source_mail_output_intent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,
@@ -2872,6 +2910,110 @@ export function executeLiveEnvironmentTool(
       summary: `Read ${result.capabilities.length} source capability state(s).`,
       observation: result,
       evidenceRefs: result.capabilities.map((capability) => capability.source_id),
+    });
+  }
+
+  if (input.tool_name === "live_env.query_live_source_quality") {
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId) ??
+        readString(args.thread_id) ??
+        readString(args.threadId),
+      mailIds: readStringArray(args.mail_ids ?? args.mailIds),
+    });
+    const quality = queryStagePlayLiveSourceQuality({
+      threadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId: explicitSourceId,
+      sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
+      expectedCadenceMs: readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, 0) || null,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Live source quality is ${quality.quality}; freshness is ${quality.freshness}.`,
+      observation: {
+        ...quality,
+        askThreadId: input.thread_id,
+        ask_thread_id: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution,
+        mailbox_thread_resolution: mailboxThreadResolution,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: [
+        quality.qualityId,
+        ...quality.evidenceRefs,
+        mailboxThreadResolution.mailboxThreadId,
+      ],
+    });
+  }
+
+  if (input.tool_name === "live_env.summarize_live_source_current_state") {
+    const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+      askThreadId: input.thread_id,
+      requestedThreadId: effectiveThreadId,
+      uiThreadId: readString(args.ui_thread_id) ?? readString(args.uiThreadId),
+      environmentThreadId: environment?.thread_id ?? null,
+      explicitMailboxThreadId:
+        readString(args.mailbox_thread_id) ??
+        readString(args.mailboxThreadId) ??
+        readString(args.thread_id) ??
+        readString(args.threadId),
+      mailIds: readStringArray(args.mail_ids ?? args.mailIds),
+    });
+    const currentState = summarizeStagePlayLiveSourceCurrentState({
+      threadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      sourceId: explicitSourceId,
+      sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
+      expectedCadenceMs: readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, 0) || null,
+      limit: readNumber(args.limit, 6),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary:
+        currentState.latestMailItems.length > 0
+          ? `Summarized current live-source state from ${currentState.latestMailItems.length} compact mail item(s); quality ${currentState.quality.quality}.`
+          : `Summarized current live-source state; no compact mail is available and quality is ${currentState.quality.quality}.`,
+      observation: {
+        ...currentState,
+        askThreadId: input.thread_id,
+        ask_thread_id: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution,
+        mailbox_thread_resolution: mailboxThreadResolution,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: [
+        currentState.currentStateId,
+        ...currentState.evidenceRefs,
+        mailboxThreadResolution.mailboxThreadId,
+      ],
     });
   }
 

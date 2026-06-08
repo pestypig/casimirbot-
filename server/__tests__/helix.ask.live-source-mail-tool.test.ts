@@ -907,6 +907,73 @@ describe("live-source mail live environment tools", () => {
     ]);
   });
 
+  it("reads the same-source unread batch through live_env.read_live_source_mail even when model args supply a small limit", () => {
+    seedVisualSummaries(6);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+        limit: 3,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.summary).toBe("Read 6 unread live-source mail item(s); decision required.");
+    expect(payload.items).toHaveLength(6);
+    expect(payload.readWindow).toMatchObject({
+      sourceId,
+      sourceKind: "visual_frame",
+      requestedLimit: 3,
+      effectiveLimit: 12,
+      sameSourceBatch: true,
+      unreadBeforeRead: 6,
+      remainingUnreadCount: 0,
+      retainedUnreadMailIds: [],
+    });
+    expect(payload.items.map((item: any) => item.summary.text)).toEqual([
+      expect.stringContaining("Live frame 1"),
+      expect.stringContaining("Live frame 2"),
+      expect.stringContaining("Live frame 3"),
+      expect.stringContaining("Live frame 4"),
+      expect.stringContaining("Live frame 5"),
+      expect.stringContaining("Live frame 6"),
+    ]);
+  });
+
+  it("reports retained same-source unread backlog when read_live_source_mail reaches the batch cap", () => {
+    seedVisualSummaries(14);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.summary).toBe("Read 12 unread live-source mail item(s); 2 same-source unread item(s) remain queued; decision required.");
+    expect(payload.items).toHaveLength(12);
+    expect(payload.readWindow).toMatchObject({
+      sourceId,
+      sourceKind: "visual_frame",
+      requestedLimit: 12,
+      effectiveLimit: 12,
+      sameSourceBatch: true,
+      unreadBeforeRead: 14,
+      remainingUnreadCount: 2,
+    });
+    expect(payload.readWindow.retainedUnreadMailIds).toHaveLength(2);
+    expect(payload.items.at(0).summary.text).toContain("Live frame 1");
+    expect(payload.items.at(-1).summary.text).toContain("Live frame 12");
+  });
+
   it("keeps live_env.check_live_source_mail as a lightweight three-item status check", () => {
     seedVisualSummaries(5);
 

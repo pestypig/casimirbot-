@@ -2,8 +2,10 @@ import crypto from "node:crypto";
 import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA,
   type AskTurnTranscriptRowDraftV1,
+  type LiveSourceCausalTraceV1,
   type StagePlayLiveSourceMailTranscriptEntryV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-trace";
 
 const transcriptEntryById = new Map<string, StagePlayLiveSourceMailTranscriptEntryV1>();
 const MAX_TRANSCRIPT_ENTRIES_PER_THREAD = 500;
@@ -43,6 +45,7 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
   sourceIds?: string[];
   rows: AskTurnTranscriptRowDraftV1[];
   evidenceRefs?: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt?: string;
 }): StagePlayLiveSourceMailTranscriptEntryV1[] {
   const createdAt = input.createdAt ?? new Date().toISOString();
@@ -60,18 +63,34 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
   ]);
   const entries = input.rows.map((row, index): StagePlayLiveSourceMailTranscriptEntryV1 => {
     const evidenceRefs = uniqueStrings([...baseEvidenceRefs, ...row.evidenceRefs]);
+    const entryId = `stage_play_live_source_mail_transcript_entry:${hashShort([
+      input.threadId,
+      input.wakeRequestId ?? null,
+      input.wakeResultId ?? null,
+      input.askTurnId ?? null,
+      row.rowId,
+      row.rowKind,
+      index,
+    ])}`;
+    const causalTrace = mergeLiveSourceCausalTraces([input.causalTrace, row.causalTrace], {
+      parentRefs: uniqueStrings([
+        input.wakeRequestId,
+        input.wakeResultId,
+        input.askTurnId,
+        ...decisionIds,
+        ...mailIds,
+        row.source.artifactId,
+      ]),
+      causedBy: uniqueStrings([row.source.artifactId, ...mailIds]),
+      producedRefs: [entryId, row.rowId],
+      sourceIds,
+      askTurnId: input.askTurnId ?? row.causalTrace?.askTurnId ?? null,
+      evidenceRefs,
+    });
     return {
       artifactId: "stage_play_live_source_mail_transcript_entry",
       schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA,
-      entryId: `stage_play_live_source_mail_transcript_entry:${hashShort([
-        input.threadId,
-        input.wakeRequestId ?? null,
-        input.wakeResultId ?? null,
-        input.askTurnId ?? null,
-        row.rowId,
-        row.rowKind,
-        index,
-      ])}`,
+      entryId,
       threadId: input.threadId,
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
@@ -85,10 +104,12 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
       row: {
         ...row,
         evidenceRefs,
+        causalTrace,
         assistantAnswer: false,
         terminalEligible: row.terminalEligible === true,
       },
       evidenceRefs,
+      causalTrace,
       createdAt: row.createdAt || createdAt,
       assistant_answer: false,
       terminal_eligible: false,

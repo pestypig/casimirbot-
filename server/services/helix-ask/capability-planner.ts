@@ -129,6 +129,12 @@ const requestedActionFor = (
   }
   if (family === "live_environment") {
     if (sourceTarget === "live_source_mailbox") {
+      if (/\b(?:source\s+quality|live\s+source\s+quality|fresh|stale|degraded|cadence|backlog|under\s+pressure)\b/.test(prompt)) {
+        return "query_live_source_quality";
+      }
+      if (/\b(?:what\s+do\s+you\s+know\s+right\s+now|current\s+(?:live\s+source|source|mailbox|watch|observation)\s+state|summari[sz]e\s+(?:the\s+)?(?:current\s+)?live\s+source\s+state)\b/.test(prompt)) {
+        return "summarize_live_source_current_state";
+      }
       return "read_live_source_mail";
     }
     if (/\b(?:live\s*source\s*mailbox|live\s*source\s*mail|source\s*mail|mailbox|visual\s*summary\s*mail|read_live_source_mail)\b/.test(prompt)) {

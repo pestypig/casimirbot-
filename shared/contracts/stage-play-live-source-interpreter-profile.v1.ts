@@ -1,14 +1,22 @@
+import type { LiveSourceCausalTraceV1 } from "./stage-play-live-source-mail.v1";
+
 export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_SCHEMA =
   "stage_play_live_source_interpreter_profile/v1" as const;
 
 export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_COMPARISON_SCHEMA =
   "stage_play_live_source_interpreter_profile_comparison/v1" as const;
 
+export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_SCHEMA =
+  "stage_play_live_source_interpreter_profile_criterion_ledger/v1" as const;
+
 export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_ARTIFACT_ID =
   "stage_play_live_source_interpreter_profile" as const;
 
 export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_COMPARISON_ARTIFACT_ID =
   "stage_play_live_source_interpreter_profile_comparison" as const;
+
+export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_ARTIFACT_ID =
+  "stage_play_live_source_interpreter_profile_criterion_ledger" as const;
 
 export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_SOURCE_KINDS = [
   "visual_frame",
@@ -56,6 +64,25 @@ export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_DECISIONS = [
   "fail_closed",
 ] as const;
 
+export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_KINDS = [
+  "salience",
+  "suppress",
+  "risk",
+  "opportunity",
+  "voice_callout",
+  "contradiction",
+  "uncertainty",
+  "generic",
+] as const;
+
+export const STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES = [
+  "matched",
+  "still_matched",
+  "resolved",
+  "contradicted",
+  "uncertain",
+] as const;
+
 export type StagePlayLiveSourceInterpreterProfileSourceKindV1 =
   | (typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_SOURCE_KINDS)[number]
   | string;
@@ -74,6 +101,21 @@ export type StagePlayLiveSourceInterpreterProfileVoiceStyleV1 =
 
 export type StagePlayLiveSourceInterpreterProfileDecisionV1 =
   (typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_DECISIONS)[number];
+
+export type StagePlayLiveSourceInterpreterProfileCriterionKindV1 =
+  (typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_KINDS)[number];
+
+export type StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusV1 =
+  (typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES)[number];
+
+export type StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusSummaryV1 = {
+  ledgerId: string;
+  criterionId: string;
+  criterionText: string;
+  criterionKind: StagePlayLiveSourceInterpreterProfileCriterionKindV1;
+  status: StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusV1;
+  previousStatus?: StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusV1 | null;
+};
 
 export type StagePlayLiveSourceInterpreterProfileV1 = {
   artifactId: typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_ARTIFACT_ID;
@@ -156,8 +198,51 @@ export type StagePlayLiveSourceInterpreterProfileComparisonV1 = {
   recommendedDecision: StagePlayLiveSourceInterpreterProfileDecisionV1;
   recommendedNextWatch: string[];
 
+  criterionLedgerRefs?: string[];
+  criterionLedgerStatuses?: StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusSummaryV1[];
+
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
+
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+export type StagePlayLiveSourceInterpreterProfileCriterionLedgerV1 = {
+  artifactId: typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_ARTIFACT_ID;
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_SCHEMA;
+
+  ledgerId: string;
+  profileId: string;
+  jobId?: string | null;
+  policyId?: string | null;
+
+  criterionId: string;
+  criterionText: string;
+  criterionKind: StagePlayLiveSourceInterpreterProfileCriterionKindV1;
+  status: StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusV1;
+  previousStatus?: StagePlayLiveSourceInterpreterProfileCriterionLedgerStatusV1 | null;
+
+  firstMatchedMailId?: string | null;
+  lastMatchedMailId?: string | null;
+  lastComparisonId?: string | null;
+
+  firstMatchedAt?: string | null;
+  lastUpdatedAt: string;
+  resolvedAt?: string | null;
+  contradictedAt?: string | null;
+  uncertainAt?: string | null;
+
+  matchCount: number;
+  supportingEvidenceRefs: string[];
+  contradictingEvidenceRefs: string[];
+  currentConfidence: number;
+
+  evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
 
   assistant_answer: false;
   terminal_eligible: false;
@@ -177,6 +262,16 @@ export type BuildStagePlayLiveSourceInterpreterProfileV1Input = Omit<
 
 export type BuildStagePlayLiveSourceInterpreterProfileComparisonV1Input = Omit<
   StagePlayLiveSourceInterpreterProfileComparisonV1,
+  | "artifactId"
+  | "schemaVersion"
+  | "assistant_answer"
+  | "terminal_eligible"
+  | "context_role"
+  | "raw_content_included"
+>;
+
+export type BuildStagePlayLiveSourceInterpreterProfileCriterionLedgerV1Input = Omit<
+  StagePlayLiveSourceInterpreterProfileCriterionLedgerV1,
   | "artifactId"
   | "schemaVersion"
   | "assistant_answer"
@@ -246,8 +341,24 @@ export function buildStagePlayLiveSourceInterpreterProfileComparisonV1(
 ): StagePlayLiveSourceInterpreterProfileComparisonV1 {
   return {
     ...input,
+    criterionLedgerRefs: input.criterionLedgerRefs ?? [],
+    criterionLedgerStatuses: input.criterionLedgerStatuses ?? [],
     artifactId: STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_COMPARISON_ARTIFACT_ID,
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_COMPARISON_SCHEMA,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+}
+
+export function buildStagePlayLiveSourceInterpreterProfileCriterionLedgerV1(
+  input: BuildStagePlayLiveSourceInterpreterProfileCriterionLedgerV1Input,
+): StagePlayLiveSourceInterpreterProfileCriterionLedgerV1 {
+  return {
+    ...input,
+    artifactId: STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_ARTIFACT_ID,
+    schemaVersion: STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_SCHEMA,
     assistant_answer: false,
     terminal_eligible: false,
     context_role: "tool_evidence",
@@ -338,9 +449,86 @@ export function validateStagePlayLiveSourceInterpreterProfileComparisonV1(value:
     "recommendedNextWatch",
     "evidenceRefs",
   ], issues);
+  if (value.criterionLedgerRefs !== undefined && !isStringArray(value.criterionLedgerRefs)) {
+    issues.push("criterionLedgerRefs must be strings when present");
+  }
+  if (value.criterionLedgerStatuses !== undefined) {
+    if (!Array.isArray(value.criterionLedgerStatuses)) {
+      issues.push("criterionLedgerStatuses must be an array when present");
+    } else {
+      for (const [index, status] of value.criterionLedgerStatuses.entries()) {
+        if (!isRecord(status)) {
+          issues.push(`criterionLedgerStatuses[${index}] must be an object`);
+          continue;
+        }
+        for (const field of ["ledgerId", "criterionId", "criterionText"] as const) {
+          if (!isNonEmptyString(status[field])) issues.push(`criterionLedgerStatuses[${index}].${field} must be a non-empty string`);
+        }
+        if (!includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_KINDS, status.criterionKind)) {
+          issues.push(`criterionLedgerStatuses[${index}].criterionKind is invalid`);
+        }
+        if (!includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES, status.status)) {
+          issues.push(`criterionLedgerStatuses[${index}].status is invalid`);
+        }
+        if (status.previousStatus != null && !includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES, status.previousStatus)) {
+          issues.push(`criterionLedgerStatuses[${index}].previousStatus is invalid`);
+        }
+      }
+    }
+  }
   if (!includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_DECISIONS, value.recommendedDecision)) {
     issues.push("recommendedDecision is invalid");
   }
+  validateEvidenceAuthority(value, issues);
+
+  return issues;
+}
+
+export function validateStagePlayLiveSourceInterpreterProfileCriterionLedgerV1(value: unknown): string[] {
+  const issues: string[] = [];
+  if (!isRecord(value)) return ["interpreter profile criterion ledger must be an object"];
+
+  if (value.artifactId !== STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_ARTIFACT_ID) {
+    issues.push(`artifactId must be ${STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_ARTIFACT_ID}`);
+  }
+  if (value.schemaVersion !== STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_SCHEMA) {
+    issues.push(`schemaVersion must be ${STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_SCHEMA}`);
+  }
+  for (const field of ["ledgerId", "profileId", "criterionId", "criterionText", "lastUpdatedAt"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${field} must be a non-empty string`);
+  }
+  validateOptionalRefs(value, [
+    "jobId",
+    "policyId",
+    "previousStatus",
+    "firstMatchedMailId",
+    "lastMatchedMailId",
+    "lastComparisonId",
+    "firstMatchedAt",
+    "resolvedAt",
+    "contradictedAt",
+    "uncertainAt",
+  ], issues);
+  if (value.previousStatus != null && !includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES, value.previousStatus)) {
+    issues.push("previousStatus is invalid");
+  }
+  if (!includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_KINDS, value.criterionKind)) {
+    issues.push("criterionKind is invalid");
+  }
+  if (!includes(STAGE_PLAY_LIVE_SOURCE_INTERPRETER_PROFILE_CRITERION_LEDGER_STATUSES, value.status)) {
+    issues.push("status is invalid");
+  }
+  if (typeof value.matchCount !== "number" || !Number.isFinite(value.matchCount) || value.matchCount < 0) {
+    issues.push("matchCount must be a non-negative number");
+  }
+  if (typeof value.currentConfidence !== "number" || !Number.isFinite(value.currentConfidence) || value.currentConfidence < 0 || value.currentConfidence > 1) {
+    issues.push("currentConfidence must be between 0 and 1");
+  }
+  validateStringArrayFields(value, [
+    "supportingEvidenceRefs",
+    "contradictingEvidenceRefs",
+    "evidenceRefs",
+  ], issues);
   validateEvidenceAuthority(value, issues);
 
   return issues;
@@ -356,4 +544,10 @@ export function isStagePlayLiveSourceInterpreterProfileComparisonV1(
   value: unknown,
 ): value is StagePlayLiveSourceInterpreterProfileComparisonV1 {
   return validateStagePlayLiveSourceInterpreterProfileComparisonV1(value).length === 0;
+}
+
+export function isStagePlayLiveSourceInterpreterProfileCriterionLedgerV1(
+  value: unknown,
+): value is StagePlayLiveSourceInterpreterProfileCriterionLedgerV1 {
+  return validateStagePlayLiveSourceInterpreterProfileCriterionLedgerV1(value).length === 0;
 }

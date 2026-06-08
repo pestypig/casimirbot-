@@ -20,6 +20,10 @@ import {
   resetStagePlayLiveSourceNarrativeStoreForTest,
 } from "./stage-play-live-source-narrative-store";
 import { inferStagePlayLiveSourceInterpretationMode } from "./stage-play-live-source-watch-policy-defaults";
+import {
+  buildLiveSourceCausalTraceV1,
+  mergeLiveSourceCausalTraces,
+} from "./stage-play-live-source-causal-trace";
 
 export {
   getLatestStagePlayLiveSourceNarrativeState,
@@ -169,17 +173,18 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       ? Math.max(0, createdMs - previousCreatedMs)
       : null;
   const preview = previewText(input.summaryPreview ?? input.summaryText);
+  const mailId = `stage_play_live_source_mail:${hashShort([
+    input.threadId,
+    input.sourceId,
+    input.frameRef ?? null,
+    input.evidenceRef ?? null,
+    input.summaryText,
+    createdAt,
+  ])}`;
   const mail: StagePlayLiveSourceMailItemV1 = {
     artifactId: "stage_play_live_source_mail_item",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_ITEM_SCHEMA,
-    mailId: `stage_play_live_source_mail:${hashShort([
-      input.threadId,
-      input.sourceId,
-      input.frameRef ?? null,
-      input.evidenceRef ?? null,
-      input.summaryText,
-      createdAt,
-    ])}`,
+    mailId,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
@@ -215,6 +220,13 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     },
     status: "unread",
     evidenceRefs,
+    causalTrace: buildLiveSourceCausalTraceV1({
+      parentRefs: uniqueStrings([previous?.mailId, previous?.sourceRefs.evidenceRef]),
+      causedBy: uniqueStrings([input.sourceId, input.frameRef, input.evidenceRef, input.observationRef]),
+      producedRefs: [mailId],
+      sourceIds: [input.sourceId],
+      evidenceRefs,
+    }),
     createdAt,
     updatedAt: createdAt,
     assistant_answer: false,
@@ -256,6 +268,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
       sourceIds: [input.sourceId],
       reason: "unread_mail",
       evidenceRefs,
+      causalTraces: [mail.causalTrace],
       now: createdAt,
     });
     wakeRequestId = wake.wakeRequestId;
@@ -380,16 +393,17 @@ export function recordStagePlayMailDecision(input: {
     environmentId: input.environmentId ?? null,
     sourceId: mailItems[0]?.sourceId ?? null,
   });
+  const decisionId = `stage_play_live_source_mail_decision:${hashShort([
+    input.threadId,
+    input.mailIds,
+    input.decision,
+    input.rationalePreview,
+    createdAt,
+  ])}`;
   const decision: StagePlayLiveSourceMailDecisionV1 = {
     artifactId: "stage_play_live_source_mail_decision",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA,
-    decisionId: `stage_play_live_source_mail_decision:${hashShort([
-      input.threadId,
-      input.mailIds,
-      input.decision,
-      input.rationalePreview,
-      createdAt,
-    ])}`,
+    decisionId,
     mailIds: uniqueStrings(input.mailIds),
     threadId: input.threadId,
     roomId: input.roomId ?? null,
@@ -425,6 +439,15 @@ export function recordStagePlayMailDecision(input: {
     inferredMeaning: uniqueStrings(input.inferredMeaning ?? []),
     rearmReason: input.rearmReason ?? (nextLoopState === "armed_for_next_summary" ? "decision_recorded_rearm" : null),
     evidenceRefs,
+    causalTrace: mergeLiveSourceCausalTraces(mailItems.map((item) => item.causalTrace), {
+      parentRefs: input.mailIds,
+      causedBy: input.mailIds,
+      producedRefs: [decisionId],
+      sourceIds: mailItems.map((item) => item.sourceId),
+      jobId,
+      profileId: input.interpreterProfileRef ?? null,
+      evidenceRefs,
+    }),
     modelReviewed: input.modelReviewed !== false,
     createdAt,
     assistant_answer: false,
@@ -495,6 +518,11 @@ export function attachStagePlayNarrativeStateToDecision(input: {
     ...decision,
     narrativeStateRef: input.narrativeStateId,
     evidenceRefs: uniqueStrings([...decision.evidenceRefs, input.narrativeStateId]),
+    causalTrace: mergeLiveSourceCausalTraces([decision.causalTrace], {
+      parentRefs: [decision.decisionId],
+      producedRefs: [input.narrativeStateId],
+      evidenceRefs: [input.narrativeStateId],
+    }),
   };
   decisionsById.set(input.decisionId, updated);
   return updated;

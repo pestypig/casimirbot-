@@ -1,3 +1,5 @@
+import type { LiveSourceCausalTraceV1 } from "./stage-play-live-source-mail.v1";
+
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA = "stage_play_live_source_mail_wake_request/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_RESULT_SCHEMA = "stage_play_live_source_mail_wake_result/v1" as const;
 
@@ -35,6 +37,7 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   nextRetryAt?: string | null;
   failureReason?: string | null;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   queuedAt: string;
   updatedAt: string;
   assistant_answer: false;
@@ -54,9 +57,11 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   status: "completed" | "skipped" | "failed" | "failed_retryable" | "failed_terminal" | "deferred_for_pressure";
   askTurnId?: string | null;
   decisionIds: string[];
+  budgetStateRef?: string | null;
   skippedReason?: string | null;
   failedReason?: string | null;
   evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;
