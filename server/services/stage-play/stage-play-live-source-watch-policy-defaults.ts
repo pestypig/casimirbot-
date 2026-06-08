@@ -14,8 +14,14 @@ export type StagePlayLiveSourceWatchJobPolicyDefaults = {
 const normalizeSpace = (value: string): string =>
   value.replace(/\s+/g, " ").trim();
 
+const stripNegatedVoiceCues = (value: string): string =>
+  value.replace(
+    /\b(?:do\s+not|don'?t|without|not)\s+(?:auto[-\s]?)?(?:narrate|narration|commentate|commentary|announce|notify|speak|call\s*out|callout|voice)(?:\s+every\s+frame|\s+continuously|\s+unless\b[\s\S]{0,80})?/gi,
+    " ",
+  );
+
 const hasVoiceCue = (objectiveText: string): boolean =>
-  /\b(?:announce|voice|headphones|callout|call\s*out|speak|tell\s+me\s+aloud|commentate|commentary|narrate|narration)\b/i.test(objectiveText);
+  /\b(?:announce|voice|headphones|callout|call\s*out|speak|tell\s+me\s+aloud|commentate|commentary|narrate|narration)\b/i.test(stripNegatedVoiceCues(objectiveText));
 
 const isDescribeEachVisualSummaryBatchObjective = (objectiveText: string): boolean =>
   /\b(?:describe|summari[sz]e|report|tell\s+me)\b[\s\S]{0,120}\b(?:each|every|new)\b[\s\S]{0,120}\b(?:mail\s+batch|mail|summary|summaries|observation|update)s?\b/i.test(objectiveText) ||
@@ -33,8 +39,8 @@ const isInterpretEachVisualSummaryBatchObjective = (objectiveText: string): bool
   /\b(?:mail|summary|summaries|observation|update|live\s+source|visual\s+source|screen\s+summary|source)\b[\s\S]{0,180}\b(?:interpret|compare|what\s+changed|what\s+is\s+happening|what's\s+happening|what\s+should\s+(?:be\s+)?watched\s+next|watch\s+next|story\s+so\s+far|observations?\s+mean|predict|might\s+happen\s+next|record\s+an?\s+interpretation|summari[sz]e\s+the\s+story)\b/i.test(objectiveText);
 
 const isVoiceCommentaryObjective = (objectiveText: string): boolean =>
-  /\b(?:commentate|commentary|narrate|narration|talk\s+me\s+through|while\s+i\s+play|as\s+i\s+play)\b/i.test(objectiveText) ||
-  /\b(?:voice|announce|speak|call\s*out)\b[\s\S]{0,120}\b(?:while\s+i\s+play|as\s+i\s+play|commentary|narrat(?:e|ion))\b/i.test(objectiveText);
+  /\b(?:commentate|commentary|narrate|narration|talk\s+me\s+through|while\s+i\s+play|as\s+i\s+play)\b/i.test(stripNegatedVoiceCues(objectiveText)) ||
+  /\b(?:voice|announce|speak|call\s*out)\b[\s\S]{0,120}\b(?:while\s+i\s+play|as\s+i\s+play|commentary|narrat(?:e|ion))\b/i.test(stripNegatedVoiceCues(objectiveText));
 
 export const inferStagePlayLiveSourceInterpretationMode = (
   input: {
