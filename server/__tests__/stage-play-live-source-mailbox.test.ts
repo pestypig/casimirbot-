@@ -59,6 +59,7 @@ import {
   resetStagePlayLiveSourceInterpreterProfileStoreForTest,
 } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
+import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../services/stage-play/stage-play-live-source-watch-policy-defaults";
 import {
   analyzeVisualFrame,
   recordVisualFrame,
@@ -1771,6 +1772,22 @@ describe("Stage Play live-source mailbox", () => {
         body: "Loop state: armed for next summary.",
       }),
     ]));
+  });
+
+  it("does not treat negated narration wording as a voice commentary watch policy", () => {
+    const defaults = buildStagePlayLiveSourceWatchJobPolicyDefaults(
+      "Watch the active visual source as a Minecraft video predictor. Interpret chronological micro-batches, make cautious predictions, and say what should be watched next. Do not narrate every frame; only use short text checkpoints unless danger or a major scene transition appears.",
+    );
+
+    expect(defaults).toMatchObject({
+      interpretationMode: "prediction_watch",
+      mailProcessingMode: "chronological_batch",
+      outputCadence: "only_salient",
+      outputPolicy: expect.objectContaining({
+        allowTextAnswer: true,
+        allowVoiceCallout: false,
+      }),
+    });
   });
 
   it("includes latest narrative state in wake prompts before interpreting new mail", async () => {

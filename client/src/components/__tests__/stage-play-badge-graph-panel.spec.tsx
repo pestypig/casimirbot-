@@ -1593,6 +1593,119 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(7);
   });
 
+  it("renders an active unscoped interpreter profile returned by the mailbox namespace", async () => {
+    renderPanel({
+      mailboxResponse: {
+        ok: true,
+        schema: "stage_play_live_source_mail_list_response/v1",
+        requestedThreadId: "helix-ask:desktop",
+        mailboxThreadId: "helix-ask:desktop",
+        mailItems: [{
+          artifactId: "stage_play_live_source_mail_item",
+          schemaVersion: "stage_play_live_source_mail_item/v1",
+          mailId: "stage_play_live_source_mail:unscoped-profile-ui",
+          threadId: "helix-ask:desktop",
+          roomId: null,
+          environmentId: null,
+          sourceId: "source:visual-tab",
+          sourceKind: "visual_frame",
+          sourceRefs: {
+            sourceId: "source:visual-tab",
+            frameRef: "visual_frame:unscoped-profile-ui",
+            evidenceRef: "visual_evidence:unscoped-profile-ui",
+            observationRef: null,
+          },
+          summary: {
+            text: "Minecraft video frame with a player moving near a dark cave opening.",
+            preview: "Minecraft video frame near a dark cave opening.",
+            confidence: 0.72,
+            analysisState: "analysis_ready",
+          },
+          priorContext: {
+            previousMailId: null,
+            previousEvidenceRef: null,
+            previousSummaryPreview: null,
+          },
+          objective: {
+            objectiveId: null,
+            text: "Watch the active visual source.",
+          },
+          hints: {
+            deterministicChangeHint: "first_summary",
+            elapsedMsSincePrevious: null,
+            sourceFreshness: "fresh",
+          },
+          status: "unread",
+          evidenceRefs: ["visual_frame:unscoped-profile-ui", "visual_evidence:unscoped-profile-ui"],
+          createdAt: "2026-06-02T00:02:01.000Z",
+          updatedAt: "2026-06-02T00:02:01.000Z",
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_evidence",
+          raw_content_included: false,
+        }],
+        jobStates: [],
+        watchJobPolicies: [],
+        interpreterProfiles: [{
+          artifactId: "stage_play_live_source_interpreter_profile",
+          schemaVersion: "stage_play_live_source_interpreter_profile/v1",
+          profileId: "stage_play_live_source_interpreter_profile:unscoped-ui",
+          title: "Minecraft Video Predictor",
+          threadId: "helix-ask:desktop",
+          roomId: null,
+          environmentId: null,
+          jobId: null,
+          policyId: null,
+          sourceKinds: ["visual_frame"],
+          domain: "minecraft",
+          objectiveText: "Interpret chronological visual-summary mail for a Minecraft video.",
+          interpretationGuidelines: "Separate observed facts from cautious inferences and predict the next scene beat.",
+          lenses: ["prediction", "scene beat", "risk"],
+          salienceCriteria: ["hostile mobs", "fire", "damage", "major scene transition"],
+          suppressCriteria: ["routine walking", "repeated stable frames"],
+          riskCriteria: ["low light", "hostile mob"],
+          opportunityCriteria: ["rare resources"],
+          voiceCalloutCriteria: ["danger"],
+          evidenceRules: {
+            preserveRawObservation: true,
+            distinguishObservedVsInferred: true,
+            requireEvidenceRefs: true,
+            askWhenUncertain: true,
+          },
+          outputStyle: {
+            textAnswerStyle: "brief_explanation",
+            voiceStyle: "warning_only",
+          },
+          linkedNoteId: null,
+          linkedNoteTitle: null,
+          status: "active",
+          evidenceRefs: ["stage_play_live_source_interpreter_profile:unscoped-ui"],
+          createdAt: "2026-06-02T00:02:00.000Z",
+          updatedAt: "2026-06-02T00:02:00.000Z",
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_evidence",
+          raw_content_included: false,
+        }],
+        interpreterProfileComparisons: [],
+        decisions: [],
+        narrativeStates: [],
+        wakeRequests: [],
+        wakeResults: [],
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      },
+    });
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+
+    expect(screen.getAllByText(/Minecraft Video Predictor/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText("no active interpreter profile")).toBeNull();
+    expect(screen.queryByText("No active interpreter profile or watch policy.")).toBeNull();
+  });
+
   it("renders completed wake continuation as backend-owned loop state", async () => {
     renderPanel({
       mailboxResponse: {
@@ -1866,7 +1979,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Loop state: armed_for_next_summary/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Unread retained: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Runnable wakes: 1/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Watch policy: batch_interpretation; continuation scheduled/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Watch policy: batch_interpretation; mail latest_only; cadence every_batch; continuation scheduled/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("No watch policy.")).toBeNull();
     expect(screen.getAllByText(/job armed/i).length).toBeGreaterThan(0);
   });

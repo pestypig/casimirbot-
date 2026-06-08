@@ -1258,6 +1258,63 @@ function resolveActiveWatchPolicy(input: {
   };
 }
 
+function resolveActiveInterpreterProfile(input: {
+  profiles: StagePlayLiveSourceInterpreterProfileV1[];
+  activeJob?: StagePlayLiveSourceJobStateV1 | null;
+  activePolicy?: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  sourceKind?: string | null;
+}): {
+  activeProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
+  reason:
+    | "direct_job_ref"
+    | "direct_policy_ref"
+    | "source_kind_match"
+    | "unscoped_active_profile"
+    | "latest_active_profile"
+    | "latest_profile"
+    | "no_profile";
+} {
+  const activeProfiles = input.profiles.filter((profile) => profile.status === "active");
+  const directJobProfile = input.activeJob
+    ? [...activeProfiles].reverse().find((profile) => profile.jobId === input.activeJob?.jobId) ?? null
+    : null;
+  if (directJobProfile) {
+    return { activeProfile: directJobProfile, reason: "direct_job_ref" };
+  }
+
+  const directPolicyProfile = input.activePolicy
+    ? [...activeProfiles].reverse().find((profile) => profile.policyId === input.activePolicy?.policyId) ?? null
+    : null;
+  if (directPolicyProfile) {
+    return { activeProfile: directPolicyProfile, reason: "direct_policy_ref" };
+  }
+
+  const sourceKindProfile = input.sourceKind
+    ? [...activeProfiles].reverse().find((profile) => profile.sourceKinds.includes(input.sourceKind as string)) ?? null
+    : null;
+  if (sourceKindProfile) {
+    return { activeProfile: sourceKindProfile, reason: "source_kind_match" };
+  }
+
+  const unscopedActiveProfile =
+    [...activeProfiles].reverse().find((profile) => !profile.jobId && !profile.policyId) ?? null;
+  if (unscopedActiveProfile) {
+    return { activeProfile: unscopedActiveProfile, reason: "unscoped_active_profile" };
+  }
+
+  const latestActiveProfile = activeProfiles.at(-1) ?? null;
+  if (latestActiveProfile) {
+    return { activeProfile: latestActiveProfile, reason: "latest_active_profile" };
+  }
+
+  const latestProfile = input.profiles.at(-1) ?? null;
+  if (latestProfile) {
+    return { activeProfile: latestProfile, reason: "latest_profile" };
+  }
+
+  return { activeProfile: null, reason: "no_profile" };
+}
+
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
@@ -1337,17 +1394,13 @@ function buildObserverMailLoopNodes(input: {
     latestDecision.nextLoopState === "armed_for_next_summary" &&
     !hasWatchPolicy
   );
-  const activeInterpreterProfile =
-    interpreterProfiles
-      .filter((profile) => profile.status === "active")
-      .filter((profile) =>
-        (!activeJob || !profile.jobId || profile.jobId === activeJob.jobId) &&
-        (!latestPolicy || !profile.policyId || profile.policyId === latestPolicy.policyId)
-      )
-      .at(-1) ??
-    interpreterProfiles.filter((profile) => profile.status === "active").at(-1) ??
-    interpreterProfiles.at(-1) ??
-    null;
+  const interpreterProfileResolution = resolveActiveInterpreterProfile({
+    profiles: interpreterProfiles,
+    activeJob,
+    activePolicy: latestPolicy,
+    sourceKind: visualMail?.sourceKind ?? visualSource?.modality ?? null,
+  });
+  const activeInterpreterProfile = interpreterProfileResolution.activeProfile;
   const latestProfileComparison =
     interpreterProfileComparisons
       .filter((comparison) =>
@@ -1461,7 +1514,7 @@ function buildObserverMailLoopNodes(input: {
     ? {
         title: "Continuation",
         lines: [
-          latestWakeStatus === "completed" ? "Batch checkpoint completed." : latestDecision ? "Manual checkpoint completed." : "Watch job active.",
+          latestWakeStatus === "completed" ? "Batch completed." : latestDecision ? "Manual checkpoint completed." : "Watch job active.",
           `Continuation: ${continuationStateText}`,
           `Loop state: ${latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary"}`,
           continuationRetainedMailCount > 0
@@ -1601,6 +1654,7 @@ function buildObserverMailLoopNodes(input: {
         ? [
             activeInterpreterProfile.domain,
             activeInterpreterProfile.outputStyle.voiceStyle,
+            interpreterProfileResolution.reason,
           ]
         : [hasWatchPolicy ? "watch policy only" : "policy missing"],
       payloadRows: [
@@ -1631,6 +1685,11 @@ function buildObserverMailLoopNodes(input: {
             ? `${latestPolicy.interpretationMode ?? "latest_scene_answer"} / ${latestPolicy.mailProcessingMode ?? "latest_only"} / ${latestPolicy.outputCadence ?? "every_batch"}`
             : "no active watch policy",
           tone: latestPolicy ? "good" : "blocked",
+        },
+        {
+          label: "Profile resolution",
+          value: interpreterProfileResolution.reason,
+          tone: activeInterpreterProfile ? "good" : "blocked",
         },
       ],
       edgeToNext: {
