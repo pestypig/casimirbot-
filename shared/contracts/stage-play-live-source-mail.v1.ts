@@ -7,6 +7,9 @@ export const STAGE_PLAY_LIVE_SOURCE_MAIL_TRANSCRIPT_ENTRY_SCHEMA = "stage_play_l
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_CONTEXT_PACK_SCHEMA = "stage_play_live_source_mail_context_pack/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_VOICE_DELIVERY_RECEIPT_SCHEMA = "stage_play_live_source_voice_delivery_receipt/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA = "stage_play_live_source_narrative_state/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_IMMERSION_STATE_SCHEMA = "stage_play_live_source_immersion_state/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA =
+  "stage_play_live_source_prediction_validation/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
   "stage_play_live_source_watch_job_policy_config_result/v1" as const;
@@ -229,6 +232,113 @@ export type StagePlayLiveSourceMailCoverageV1 = {
   skippedMailIds: string[];
   mode: StagePlayLiveSourceMailProcessingModeV1;
   reason: string;
+};
+
+export type StagePlayLiveSourceImmersionActivityV1 =
+  | "unknown"
+  | "interior_base"
+  | "inventory_management"
+  | "outdoor_exploration"
+  | "combat_or_damage"
+  | "mining_or_cave"
+  | "building_or_crafting"
+  | "scene_transition";
+
+export type StagePlayLiveSourceImmersionSalienceLevelV1 =
+  | "low"
+  | "medium"
+  | "high"
+  | "urgent";
+
+export type StagePlayLiveSourceImmersionPredictionValidationResultV1 =
+  | "supported"
+  | "partially_supported"
+  | "contradicted"
+  | "unresolved"
+  | "no_prior_prediction";
+
+export type StagePlayLiveSourcePredictionValidationRecommendedNextV1 =
+  | "wait_for_next_summary"
+  | "record_interpretation"
+  | "draft_text_answer"
+  | "request_voice_callout"
+  | "request_more_evidence"
+  | "request_stage_play_checkpoint";
+
+export type StagePlayLiveSourcePredictionValidationV1 = {
+  artifactId: "stage_play_live_source_prediction_validation";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA;
+  validationId: string;
+  jobId: string;
+  priorPredictionId?: string | null;
+  newMailIds: string[];
+  result: StagePlayLiveSourceImmersionPredictionValidationResultV1;
+  supportedSignals: string[];
+  contradictedSignals: string[];
+  newSignals: string[];
+  salienceHint: StagePlayLiveSourceImmersionSalienceLevelV1;
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+};
+
+export type StagePlayLiveSourceImmersionStateV1 = {
+  artifactId: "stage_play_live_source_immersion_state";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_IMMERSION_STATE_SCHEMA;
+  immersionStateId: string;
+  jobId: string;
+  policyId?: string | null;
+  profileId?: string | null;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds: string[];
+  latestMailIds: string[];
+  latestEvidenceRefs: string[];
+  sourceIdentity: {
+    label: string;
+    confidence: number;
+    stable: boolean;
+  };
+  stableFacts: string[];
+  currentSceneFacts: string[];
+  changedFacts: string[];
+  uncertainties: string[];
+  currentActivity: StagePlayLiveSourceImmersionActivityV1;
+  salience: {
+    level: StagePlayLiveSourceImmersionSalienceLevelV1;
+    reasons: string[];
+    voiceCandidate: boolean;
+  };
+  prediction: {
+    predictionId: string;
+    text: string;
+    horizonMs: number;
+    watchTargets: string[];
+    validationSignals: string[];
+    confidence: number;
+  } | null;
+  lastValidation?: {
+    validationId: string;
+    priorPredictionId: string;
+    result: StagePlayLiveSourceImmersionPredictionValidationResultV1;
+    evidenceSummary: string;
+  } | null;
+  staleness: {
+    state: "current" | "stale_after_new_mail" | "superseded";
+    staleAfterMailId?: string | null;
+    supersededByStateId?: string | null;
+  };
+  evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
 };
 
 export type StagePlayLiveSourceNarrativeStateV1 = {

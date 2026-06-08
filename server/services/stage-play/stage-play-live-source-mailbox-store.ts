@@ -22,6 +22,10 @@ import {
   resetStagePlayLiveSourceNarrativeStoreForTest,
 } from "./stage-play-live-source-narrative-store";
 import {
+  markImmersionStateStaleAfterMail,
+  resetStagePlayLiveSourceImmersionStateStoreForTest,
+} from "./stage-play-live-source-immersion-state-store";
+import {
   inferStagePlayLiveSourceInterpretationMode,
   inferStagePlayLiveSourceMailProcessingMode,
   inferStagePlayLiveSourceOutputCadence,
@@ -30,6 +34,16 @@ import {
   buildLiveSourceCausalTraceV1,
   mergeLiveSourceCausalTraces,
 } from "./stage-play-live-source-causal-trace";
+
+export {
+  getLatestStagePlayLiveSourceImmersionState,
+  getStagePlayLiveSourceImmersionState,
+  listStagePlayLiveSourceImmersionStates,
+  markImmersionStateStaleAfterMail,
+  markImmersionStateSuperseded,
+  recordStagePlayLiveSourceImmersionState,
+  resetStagePlayLiveSourceImmersionStateStoreForTest,
+} from "./stage-play-live-source-immersion-state-store";
 
 export {
   getLatestStagePlayLiveSourceNarrativeState,
@@ -256,6 +270,14 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     updatedAt: createdAt,
   });
   markNarrativeStateStaleAfterMail({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: jobState.jobId,
+    sourceId: input.sourceId,
+    mailId: mail.mailId,
+  });
+  markImmersionStateStaleAfterMail({
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
@@ -771,6 +793,7 @@ export function listStagePlayLiveSourceJobStates(input: {
 export function resetStagePlayLiveSourceMailboxForTest(): void {
   mailById.clear();
   decisionsById.clear();
+  resetStagePlayLiveSourceImmersionStateStoreForTest();
   resetStagePlayLiveSourceNarrativeStoreForTest();
   jobStateById.clear();
   watchJobPolicyById.clear();
