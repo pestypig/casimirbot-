@@ -8,8 +8,10 @@ import {
   type StagePlayLiveSourceInterpretationModeV1,
   type StagePlayLiveSourceMailDecisionV1,
   type StagePlayLiveSourceMailItemV1,
+  type StagePlayLiveSourceMailProcessingModeV1,
   type StagePlayLiveSourceMailSourceKindV1,
   type StagePlayLiveSourceMailStatusV1,
+  type StagePlayLiveSourceOutputCadenceV1,
   type StagePlayLiveSourceWatchJobPolicyV1,
   type StagePlayMailDecisionV1,
   type StagePlayNextLoopStateV1,
@@ -19,7 +21,11 @@ import {
   markNarrativeStateStaleAfterMail,
   resetStagePlayLiveSourceNarrativeStoreForTest,
 } from "./stage-play-live-source-narrative-store";
-import { inferStagePlayLiveSourceInterpretationMode } from "./stage-play-live-source-watch-policy-defaults";
+import {
+  inferStagePlayLiveSourceInterpretationMode,
+  inferStagePlayLiveSourceMailProcessingMode,
+  inferStagePlayLiveSourceOutputCadence,
+} from "./stage-play-live-source-watch-policy-defaults";
 import {
   buildLiveSourceCausalTraceV1,
   mergeLiveSourceCausalTraces,
@@ -612,6 +618,8 @@ export function configureStagePlayLiveSourceWatchJobPolicy(input: {
   objectiveText: string;
   decisionPolicyPrompt?: string | null;
   interpretationMode?: StagePlayLiveSourceInterpretationModeV1 | null;
+  mailProcessingMode?: StagePlayLiveSourceMailProcessingModeV1 | null;
+  outputCadence?: StagePlayLiveSourceOutputCadenceV1 | null;
   outputPolicy?: Partial<StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"]> | null;
   importanceCriteria?: string[];
   suppressCriteria?: string[];
@@ -647,6 +655,31 @@ export function configureStagePlayLiveSourceWatchJobPolicy(input: {
     voiceRequiresUrgency: input.outputPolicy?.voiceRequiresUrgency ?? existing?.outputPolicy.voiceRequiresUrgency ?? true,
     confirmationRequired: input.outputPolicy?.confirmationRequired ?? existing?.outputPolicy.confirmationRequired ?? true,
   };
+  const interpretationMode =
+    input.interpretationMode ??
+    existing?.interpretationMode ??
+    inferStagePlayLiveSourceInterpretationMode({
+      objectiveText: input.objectiveText,
+      decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+      outputPolicy,
+    });
+  const mailProcessingMode =
+    input.mailProcessingMode ??
+    existing?.mailProcessingMode ??
+    inferStagePlayLiveSourceMailProcessingMode({
+      objectiveText: input.objectiveText,
+      decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+      interpretationMode,
+    });
+  const outputCadence =
+    input.outputCadence ??
+    existing?.outputCadence ??
+    inferStagePlayLiveSourceOutputCadence({
+      objectiveText: input.objectiveText,
+      decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
+      interpretationMode,
+      mailProcessingMode,
+    });
   const policy: StagePlayLiveSourceWatchJobPolicyV1 = {
     artifactId: "stage_play_live_source_watch_job_policy",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_SCHEMA,
@@ -658,14 +691,9 @@ export function configureStagePlayLiveSourceWatchJobPolicy(input: {
     sourceIds,
     objectiveText: input.objectiveText,
     decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
-    interpretationMode:
-      input.interpretationMode ??
-      existing?.interpretationMode ??
-      inferStagePlayLiveSourceInterpretationMode({
-        objectiveText: input.objectiveText,
-        decisionPolicyPrompt: input.decisionPolicyPrompt ?? input.objectiveText,
-        outputPolicy,
-      }),
+    interpretationMode,
+    mailProcessingMode,
+    outputCadence,
     outputPolicy,
     importanceCriteria: uniqueStrings(input.importanceCriteria ?? existing?.importanceCriteria ?? []),
     suppressCriteria: uniqueStrings(input.suppressCriteria ?? existing?.suppressCriteria ?? []),

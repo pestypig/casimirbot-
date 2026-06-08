@@ -12,6 +12,7 @@ import { buildRouteProductContract } from "../services/helix-ask/route-product-c
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
 import {
+  isInternetSearchProviderConfigurationMissing,
   runInternetSearch,
   type InternetSearchFetch,
 } from "../services/helix-ask/retrieval/internet-search";
@@ -29,6 +30,45 @@ const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null)
   confidence: "high",
   classifier_reasons: ["test"],
 });
+
+const internetSearchEnvKeys = [
+  "TAVILY_API_KEY",
+  "EXA_API_KEY",
+  "GOOGLE_CUSTOM_SEARCH_API_KEY",
+  "GOOGLE_CSE_API_KEY",
+  "GOOGLE_API_KEY",
+  "GOOGLE_CUSTOM_SEARCH_ENGINE_ID",
+  "GOOGLE_CUSTOM_SEARCH_CX",
+  "GOOGLE_CSE_CX",
+  "GOOGLE_CSE_ID",
+  "GOOGLE_SEARCH_ENGINE_ID",
+] as const;
+
+const withInternetSearchEnv = async <T>(
+  env: Partial<Record<(typeof internetSearchEnvKeys)[number], string | undefined>>,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  const previous = new Map<string, string | undefined>();
+  for (const key of internetSearchEnvKeys) {
+    previous.set(key, process.env[key]);
+    if (Object.prototype.hasOwnProperty.call(env, key)) {
+      const value = env[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    } else {
+      delete process.env[key];
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const key of internetSearchEnvKeys) {
+      const value = previous.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+};
 
 describe("Helix internet search tool admission", () => {
   it("routes explicit web search prompts to the internet search evidence path", () => {
@@ -193,14 +233,12 @@ describe("Helix internet search tool admission", () => {
     expect(validSearch.validation.valid).toBe(true);
   });
 
-  it("normalizes Google Custom Search results into a nonterminal internet observation", async () => {
-    const previousKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
-    const previousEngine = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
-    process.env.GOOGLE_CUSTOM_SEARCH_API_KEY = "test-key";
-    process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID = "test-engine";
+  it("normalizes Google Custom Search results from alias env names into a nonterminal internet observation", async () => {
     const fetchImpl: InternetSearchFetch = async (url) => {
       const parsed = new URL(url);
       expect(parsed.hostname).toBe("www.googleapis.com");
+      expect(parsed.searchParams.get("key")).toBe("alias-key");
+      expect(parsed.searchParams.get("cx")).toBe("alias-engine");
       expect(parsed.searchParams.get("q")).toContain("latest NASA Artemis news");
       expect(parsed.searchParams.get("q")).toContain("site:nasa.gov");
       return {
@@ -217,7 +255,10 @@ describe("Helix internet search tool admission", () => {
       };
     };
 
-    try {
+    await withInternetSearchEnv({
+      GOOGLE_API_KEY: "alias-key",
+      GOOGLE_CSE_CX: "alias-engine",
+    }, async () => {
       const observation = await runInternetSearch({
         turnId: "ask:google-search",
         callId: "call:google-search",
@@ -245,12 +286,37 @@ describe("Helix internet search tool admission", () => {
           evidence_refs: [expect.stringContaining("google_custom_search:")],
         }),
       ]);
-    } finally {
-      if (previousKey === undefined) delete process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
-      else process.env.GOOGLE_CUSTOM_SEARCH_API_KEY = previousKey;
-      if (previousEngine === undefined) delete process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
-      else process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID = previousEngine;
-    }
+    });
+  });
+
+  it("marks missing provider configuration as nonretryable search evidence", async () => {
+    await withInternetSearchEnv({}, async () => {
+      const observation = await runInternetSearch({
+        turnId: "ask:internet-config-missing",
+        callId: "call:internet-config-missing",
+        query: "latest NASA Artemis news",
+        providers: ["google_custom_search"],
+        limit: 3,
+        fetchImpl: async () => {
+          throw new Error("fetch should not run without provider keys");
+        },
+      });
+
+      expect(observation).toMatchObject({
+        schema: HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
+        selected_for_answer: false,
+        provider_configuration_missing: true,
+        providers_called: [],
+        results: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      });
+      expect(observation.missing_requirements).toEqual(expect.arrayContaining([
+        "google_custom_search_requires_google_custom_search_key_and_engine_id",
+        "no_internet_search_results_returned",
+      ]));
+      expect(isInternetSearchProviderConfigurationMissing(observation)).toBe(true);
+    });
   });
 
   it("materializes model-authored internet answers only after web observations and support refs", () => {

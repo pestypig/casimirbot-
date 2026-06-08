@@ -837,6 +837,18 @@ helixStagePlayRouter.post("/live-source-mail/job", (req: Request, res: Response)
         readQueryString(body.decisionPolicyPrompt) ??
         readQueryString(body.decision_policy_prompt) ??
         policyDefaults.decisionPolicyPrompt,
+      interpretationMode:
+        readQueryString(body.interpretationMode) ??
+        readQueryString(body.interpretation_mode) ??
+        policyDefaults.interpretationMode,
+      mailProcessingMode:
+        readQueryString(body.mailProcessingMode) ??
+        readQueryString(body.mail_processing_mode) ??
+        policyDefaults.mailProcessingMode,
+      outputCadence:
+        readQueryString(body.outputCadence) ??
+        readQueryString(body.output_cadence) ??
+        policyDefaults.outputCadence,
       outputPolicy: {
         allowTextAnswer: readOptionalBoolean(body.allowTextAnswer ?? body.allow_text_answer) ?? policyDefaults.outputPolicy.allowTextAnswer,
         allowVoiceCallout: readOptionalBoolean(body.allowVoiceCallout ?? body.allow_voice_callout) ?? policyDefaults.outputPolicy.allowVoiceCallout,

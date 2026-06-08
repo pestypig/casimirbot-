@@ -45,6 +45,7 @@ export type HelixInternetSearchObservation = {
   domains?: string[];
   recency_days?: number;
   missing_requirements: string[];
+  provider_configuration_missing?: boolean;
   selected_for_answer: boolean;
   assistant_answer: false;
   raw_content_included: false;

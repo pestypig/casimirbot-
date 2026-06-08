@@ -1524,6 +1524,13 @@ function buildObserverMailLoopNodes(input: {
           value: mailboxThreadId,
           tone: mailboxThreadId === STAGE_PLAY_PANEL_THREAD_ID ? "good" : "warn",
         },
+        {
+          label: "Processing",
+          value: latestPolicy
+            ? `${latestPolicy.interpretationMode ?? "latest_scene_answer"} | ${latestPolicy.mailProcessingMode ?? "latest_only"} | ${latestPolicy.outputCadence ?? "every_batch"}`
+            : "No processing policy yet.",
+          tone: latestPolicy ? "good" : "warn",
+        },
       ],
       edgeToNext: {
         label: visualMail ? "summary mail" : visualSource ? "waiting for summary" : "source missing",
@@ -1616,6 +1623,13 @@ function buildObserverMailLoopNodes(input: {
         {
           label: "Policy resolution",
           value: watchPolicyResolution.reason,
+          tone: latestPolicy ? "good" : "blocked",
+        },
+        {
+          label: "Mode",
+          value: latestPolicy
+            ? `${latestPolicy.interpretationMode ?? "latest_scene_answer"} / ${latestPolicy.mailProcessingMode ?? "latest_only"} / ${latestPolicy.outputCadence ?? "every_batch"}`
+            : "no active watch policy",
           tone: latestPolicy ? "good" : "blocked",
         },
       ],
@@ -1855,7 +1869,7 @@ function buildObserverMailLoopNodes(input: {
           value: manualCheckpointWithoutPolicy
             ? "Missing inner loop: configure a live-source watch job so new mail re-enters Ask under a stored objective."
             : latestPolicy
-              ? `Watch policy: ${latestPolicy.interpretationMode ?? "armed"}; continuation ${continuationStateText}`
+              ? `Watch policy: ${latestPolicy.interpretationMode ?? "armed"}; mail ${latestPolicy.mailProcessingMode ?? "latest_only"}; cadence ${latestPolicy.outputCadence ?? "every_batch"}; continuation ${continuationStateText}`
               : "No watch policy.",
           tone: manualCheckpointWithoutPolicy ? "blocked" : latestPolicy ? "good" : "warn",
         },

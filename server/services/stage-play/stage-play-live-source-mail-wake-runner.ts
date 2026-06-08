@@ -1131,6 +1131,8 @@ const buildWakePrompt = (input: {
   const objective = input.policy?.objectiveText ?? "Read the live-source mailbox and decide what to do with this unread source update batch.";
   const decisionPolicy = input.policy?.decisionPolicyPrompt ?? "If there is no user-facing change, record wait_for_next_summary. If there is a meaningful user-facing change, draft a concise text answer.";
   const interpretationMode = input.policy?.interpretationMode ?? "latest_scene_answer";
+  const mailProcessingMode = input.policy?.mailProcessingMode ?? "latest_only";
+  const outputCadence = input.policy?.outputCadence ?? "every_batch";
   const activeTaskKind = activeTaskKindFromSnapshot(input.taskQueueSnapshot);
   const activeUserPrompt = hasActiveUserPromptContext(input.conversationContextPack);
   return [
@@ -1139,6 +1141,8 @@ const buildWakePrompt = (input: {
     `Watch policy ref: ${input.policy?.policyId ?? "none"}`,
     `Watch job ref: ${input.policy?.jobId ?? input.wake.jobId ?? "none"}`,
     `Interpretation mode: ${interpretationMode}`,
+    `Mail processing mode: ${mailProcessingMode}`,
+    `Output cadence: ${outputCadence}`,
     `Current task: ${activeTaskKind ?? "mail_batch_interpretation"}`,
     `Active user prompt context: ${activeUserPrompt}`,
     "",
@@ -1171,6 +1175,18 @@ const buildWakePrompt = (input: {
     "- salience_watch: compare to prior state and wait unless the policy salience criteria are matched.",
     "- prediction_watch: produce record_interpretation with prediction and validation signals.",
     "- voice_callout_watch: request_voice_callout only if policy allows voice and salience criteria are matched.",
+    "- voice_commentary_watch: maintain interpretation over micro-batches, but only emit voice when output cadence and voice policy allow it.",
+    "Mail processing mode guidance:",
+    "- latest_only: treat the newest mail as the primary scene answer context.",
+    "- chronological_batch: preserve time order and describe how the batch evolves.",
+    "- micro_batch: group nearby mail into short chronological segments before synthesizing.",
+    "- per_mail: handle each mail item as its own observation, preserving chronology.",
+    "- salience_window: scan the batch for policy-relevant changes and suppress routine updates.",
+    "Output cadence guidance:",
+    "- every_batch: produce the configured output for each non-empty batch.",
+    "- only_salient: wait unless salience, risk, opportunity, or user-target criteria match.",
+    "- voice_only_salient: text/narrative may update internally, but voice callouts require salience and voice permission.",
+    "- manual_only: record state without user-facing output unless the user explicitly asks.",
     "- If current task is immediate_prediction_check: use live_env.compare_live_source_prediction when prior prediction exists; otherwise use live_env.predict_live_source_immediate.",
     "- If current task is prediction_error_review: use live_env.compare_live_source_prediction before deciding whether to wait, interpret, draft text, or request a callout.",
     "- If current task is mail_batch_interpretation: use live_env.project_live_source_narrative and record_interpretation.",

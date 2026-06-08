@@ -192,6 +192,8 @@ export function buildStagePlayLiveSourceMailContextPack(input: {
       objectiveText: clipText(policy.objectiveText, 420),
       decisionPolicyPrompt: clipText(policy.decisionPolicyPrompt, 420),
       interpretationMode: policy.interpretationMode ?? null,
+      mailProcessingMode: policy.mailProcessingMode ?? null,
+      outputCadence: policy.outputCadence ?? null,
       sourceIds: policy.sourceIds,
       outputPolicy: policy.outputPolicy,
       importanceCriteria: policy.importanceCriteria.map((entry: string) => clipText(entry, 120)).filter(Boolean),

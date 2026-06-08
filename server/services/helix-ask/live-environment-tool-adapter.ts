@@ -348,7 +348,39 @@ const readWatchJobInterpretationMode = (
     normalized === "batch_interpretation" ||
     normalized === "salience_watch" ||
     normalized === "prediction_watch" ||
+    normalized === "voice_commentary_watch" ||
     normalized === "voice_callout_watch"
+  )
+    ? normalized
+    : null;
+};
+
+const readWatchJobMailProcessingMode = (
+  value: unknown,
+): StagePlayLiveSourceWatchJobPolicyV1["mailProcessingMode"] | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return (
+    normalized === "latest_only" ||
+    normalized === "chronological_batch" ||
+    normalized === "micro_batch" ||
+    normalized === "per_mail" ||
+    normalized === "salience_window"
+  )
+    ? normalized
+    : null;
+};
+
+const readWatchJobOutputCadence = (
+  value: unknown,
+): StagePlayLiveSourceWatchJobPolicyV1["outputCadence"] | null => {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return (
+    normalized === "every_batch" ||
+    normalized === "only_salient" ||
+    normalized === "voice_only_salient" ||
+    normalized === "manual_only"
   )
     ? normalized
     : null;
@@ -397,7 +429,7 @@ const buildWatchJobConfiguredTranscriptRows = (input: {
       rowId: `ask_turn_watch_job_policy:${hashShort(input.policy.policyId)}`,
       rowKind: "loop_state",
       title: "Policy",
-      body: `Policy: ${input.policy.interpretationMode ?? "latest_scene_answer"}; ${formatWatchJobOutputPolicy(input.policy.outputPolicy)}`,
+      body: `Policy: ${input.policy.interpretationMode ?? "latest_scene_answer"}; mail ${input.policy.mailProcessingMode ?? "latest_only"}; cadence ${input.policy.outputCadence ?? "every_batch"}; ${formatWatchJobOutputPolicy(input.policy.outputPolicy)}`,
       ...rowBase,
     },
     {
@@ -2057,6 +2089,12 @@ export function executeLiveEnvironmentTool(
     const explicitInterpretationMode =
       readWatchJobInterpretationMode(args.interpretation_mode) ??
       readWatchJobInterpretationMode(args.interpretationMode);
+    const explicitMailProcessingMode =
+      readWatchJobMailProcessingMode(args.mail_processing_mode) ??
+      readWatchJobMailProcessingMode(args.mailProcessingMode);
+    const explicitOutputCadence =
+      readWatchJobOutputCadence(args.output_cadence) ??
+      readWatchJobOutputCadence(args.outputCadence);
     const sourceIds = [
       ...readStringArray(args.source_ids ?? args.sourceIds),
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
@@ -2079,6 +2117,12 @@ export function executeLiveEnvironmentTool(
           decisionPolicyPrompt: policyDefaults.decisionPolicyPrompt,
           outputPolicy: policyDefaults.outputPolicy,
         }),
+      mailProcessingMode:
+        explicitMailProcessingMode ??
+        policyDefaults.mailProcessingMode,
+      outputCadence:
+        explicitOutputCadence ??
+        policyDefaults.outputCadence,
       outputPolicy: readWatchJobOutputPolicy(args, policyDefaults.outputPolicy),
       importanceCriteria: readStringArray(args.importance_criteria ?? args.importanceCriteria).length > 0
         ? readStringArray(args.importance_criteria ?? args.importanceCriteria)

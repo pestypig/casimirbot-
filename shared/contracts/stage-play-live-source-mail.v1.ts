@@ -41,7 +41,21 @@ export type StagePlayLiveSourceInterpretationModeV1 =
   | "batch_interpretation"
   | "salience_watch"
   | "prediction_watch"
+  | "voice_commentary_watch"
   | "voice_callout_watch";
+
+export type StagePlayLiveSourceMailProcessingModeV1 =
+  | "latest_only"
+  | "chronological_batch"
+  | "micro_batch"
+  | "per_mail"
+  | "salience_window";
+
+export type StagePlayLiveSourceOutputCadenceV1 =
+  | "every_batch"
+  | "only_salient"
+  | "voice_only_salient"
+  | "manual_only";
 
 export type StagePlayNextLoopStateV1 =
   | "armed_for_next_summary"
@@ -213,12 +227,7 @@ export type StagePlayLiveSourceMailCoverageV1 = {
   interpretedMailIds: string[];
   compressedMailIds: string[];
   skippedMailIds: string[];
-  mode:
-    | "latest_only"
-    | "chronological_batch"
-    | "micro_batch"
-    | "per_mail"
-    | "salience_window";
+  mode: StagePlayLiveSourceMailProcessingModeV1;
   reason: string;
 };
 
@@ -383,6 +392,8 @@ export type StagePlayLiveSourceWatchJobPolicyV1 = {
   objectiveText: string;
   decisionPolicyPrompt: string;
   interpretationMode?: StagePlayLiveSourceInterpretationModeV1;
+  mailProcessingMode?: StagePlayLiveSourceMailProcessingModeV1;
+  outputCadence?: StagePlayLiveSourceOutputCadenceV1;
   outputPolicy: {
     allowTextAnswer: boolean;
     allowVoiceCallout: boolean;
@@ -526,6 +537,8 @@ export type StagePlayLiveSourceMailContextPackV1 = {
     objectiveText: string;
     decisionPolicyPrompt: string;
     interpretationMode?: StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"] | null;
+    mailProcessingMode?: StagePlayLiveSourceWatchJobPolicyV1["mailProcessingMode"] | null;
+    outputCadence?: StagePlayLiveSourceWatchJobPolicyV1["outputCadence"] | null;
     sourceIds: string[];
     outputPolicy: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"];
     importanceCriteria: string[];

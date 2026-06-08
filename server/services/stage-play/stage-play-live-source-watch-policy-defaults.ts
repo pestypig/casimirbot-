@@ -4,6 +4,8 @@ export type StagePlayLiveSourceWatchJobPolicyDefaults = {
   objectiveText: string;
   decisionPolicyPrompt: string;
   interpretationMode: NonNullable<StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"]>;
+  mailProcessingMode: NonNullable<StagePlayLiveSourceWatchJobPolicyV1["mailProcessingMode"]>;
+  outputCadence: NonNullable<StagePlayLiveSourceWatchJobPolicyV1["outputCadence"]>;
   outputPolicy: StagePlayLiveSourceWatchJobPolicyV1["outputPolicy"];
   importanceCriteria: string[];
   suppressCriteria: string[];
@@ -13,7 +15,7 @@ const normalizeSpace = (value: string): string =>
   value.replace(/\s+/g, " ").trim();
 
 const hasVoiceCue = (objectiveText: string): boolean =>
-  /\b(?:announce|voice|headphones|callout|call\s*out|speak|tell\s+me\s+aloud)\b/i.test(objectiveText);
+  /\b(?:announce|voice|headphones|callout|call\s*out|speak|tell\s+me\s+aloud|commentate|commentary|narrate|narration)\b/i.test(objectiveText);
 
 const isDescribeEachVisualSummaryBatchObjective = (objectiveText: string): boolean =>
   /\b(?:describe|summari[sz]e|report|tell\s+me)\b[\s\S]{0,120}\b(?:each|every|new)\b[\s\S]{0,120}\b(?:mail\s+batch|mail|summary|summaries|observation|update)s?\b/i.test(objectiveText) ||
@@ -30,6 +32,10 @@ const isInterpretEachVisualSummaryBatchObjective = (objectiveText: string): bool
   /\b(?:interpret|compare|what\s+changed|what\s+is\s+happening|what's\s+happening|what\s+should\s+(?:be\s+)?watched\s+next|watch\s+next|story\s+so\s+far|observations?\s+mean|predict|might\s+happen\s+next|record\s+an?\s+interpretation|summari[sz]e\s+the\s+story)\b[\s\S]{0,180}\b(?:mail|summary|summaries|observation|update|live\s+source|visual\s+source|screen\s+summary|source)\b/i.test(objectiveText) ||
   /\b(?:mail|summary|summaries|observation|update|live\s+source|visual\s+source|screen\s+summary|source)\b[\s\S]{0,180}\b(?:interpret|compare|what\s+changed|what\s+is\s+happening|what's\s+happening|what\s+should\s+(?:be\s+)?watched\s+next|watch\s+next|story\s+so\s+far|observations?\s+mean|predict|might\s+happen\s+next|record\s+an?\s+interpretation|summari[sz]e\s+the\s+story)\b/i.test(objectiveText);
 
+const isVoiceCommentaryObjective = (objectiveText: string): boolean =>
+  /\b(?:commentate|commentary|narrate|narration|talk\s+me\s+through|while\s+i\s+play|as\s+i\s+play)\b/i.test(objectiveText) ||
+  /\b(?:voice|announce|speak|call\s*out)\b[\s\S]{0,120}\b(?:while\s+i\s+play|as\s+i\s+play|commentary|narrat(?:e|ion))\b/i.test(objectiveText);
+
 export const inferStagePlayLiveSourceInterpretationMode = (
   input: {
     objectiveText?: string | null;
@@ -44,12 +50,20 @@ export const inferStagePlayLiveSourceInterpretationMode = (
   const voiceAllowed = input.outputPolicy?.allowVoiceCallout === true || hasVoiceCue(policyText);
   if (
     voiceAllowed &&
+    isVoiceCommentaryObjective(policyText)
+  ) {
+    return "voice_commentary_watch";
+  }
+  if (
+    voiceAllowed &&
     /\b(?:request_voice_callout|voice|announce|speak|call\s*out|callout|say\s+it\s+out\s+loud)\b/i.test(policyText)
   ) {
     return "voice_callout_watch";
   }
   if (isImportantOnlyObjective(policyText)) return "salience_watch";
-  if (/\b(?:predict|prediction|might\s+happen\s+next|validation\s+signals?|horizon)\b/i.test(policyText)) {
+  if (
+    /\b(?:predict|prediction|might\s+happen\s+next|validation\s+signals?|horizon|watch\s+next|what\s+should\s+(?:be\s+)?watched\s+next|what\s+changed|what\s+is\s+happening|what's\s+happening)\b/i.test(policyText)
+  ) {
     return "prediction_watch";
   }
   if (
@@ -61,6 +75,53 @@ export const inferStagePlayLiveSourceInterpretationMode = (
     return "latest_scene_answer";
   }
   return "latest_scene_answer";
+};
+
+export const inferStagePlayLiveSourceMailProcessingMode = (
+  input: {
+    objectiveText?: string | null;
+    decisionPolicyPrompt?: string | null;
+    interpretationMode?: StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"] | null;
+  },
+): NonNullable<StagePlayLiveSourceWatchJobPolicyV1["mailProcessingMode"]> => {
+  const policyText = normalizeSpace([
+    input.objectiveText ?? "",
+    input.decisionPolicyPrompt ?? "",
+    input.interpretationMode ?? "",
+  ].join("\n"));
+  if (/\bper[-\s]?mail|each\s+mail\s+item|each\s+observation\s+separately\b/i.test(policyText)) return "per_mail";
+  if (/\bsalience\s+window|only\s+salient|only\s+important|only\s+if\s+important|don'?t\s+bother\s+me\s+unless\b/i.test(policyText)) return "salience_window";
+  if (/\bmicro[-\s]?batch|commentary|commentate|while\s+i\s+play|as\s+i\s+play|one\s+fps|1\s*fps\b/i.test(policyText)) return "micro_batch";
+  if (/\bchronological|timeline|what\s+changed|interpret|prediction|predict|watch\s+next|batch_interpretation|prediction_watch\b/i.test(policyText)) return "chronological_batch";
+  if (/\blatest\s+only|latest\s+scene|one\s+sentence|latest_scene_answer|describe\s+each\s+new\s+mail\s+batch\b/i.test(policyText)) return "latest_only";
+  if (input.interpretationMode === "salience_watch" || input.interpretationMode === "voice_callout_watch") return "salience_window";
+  if (input.interpretationMode === "voice_commentary_watch") return "micro_batch";
+  if (input.interpretationMode === "batch_interpretation" || input.interpretationMode === "prediction_watch") return "chronological_batch";
+  return "latest_only";
+};
+
+export const inferStagePlayLiveSourceOutputCadence = (
+  input: {
+    objectiveText?: string | null;
+    decisionPolicyPrompt?: string | null;
+    interpretationMode?: StagePlayLiveSourceWatchJobPolicyV1["interpretationMode"] | null;
+    mailProcessingMode?: StagePlayLiveSourceWatchJobPolicyV1["mailProcessingMode"] | null;
+  },
+): NonNullable<StagePlayLiveSourceWatchJobPolicyV1["outputCadence"]> => {
+  const policyText = normalizeSpace([
+    input.objectiveText ?? "",
+    input.decisionPolicyPrompt ?? "",
+    input.interpretationMode ?? "",
+    input.mailProcessingMode ?? "",
+  ].join("\n"));
+  if (/\bmanual\s+only|only\s+when\s+i\s+ask|on\s+request\b/i.test(policyText)) return "manual_only";
+  if (/\bvoice\s+only\s+salient|voice_only_salient|announce\s+if|speak\s+if|call\s*out\s+if\b/i.test(policyText)) return "voice_only_salient";
+  if (/\bonly\s+salient|only\s+important|only\s+if\s+important|don'?t\s+bother\s+me\s+unless|salience_watch\b/i.test(policyText)) return "only_salient";
+  if (/\bevery\s+batch|each\s+new\s+mail\s+batch|each\s+batch|every\s+summary|every\s+update|latest_scene_answer\b/i.test(policyText)) return "every_batch";
+  if (input.interpretationMode === "latest_scene_answer") return "every_batch";
+  if (input.interpretationMode === "salience_watch") return "only_salient";
+  if (input.interpretationMode === "voice_callout_watch" || input.interpretationMode === "voice_commentary_watch") return "voice_only_salient";
+  return input.mailProcessingMode === "latest_only" ? "every_batch" : "only_salient";
 };
 
 const describeEachBatchObjectiveText = (objectiveText: string): string => {
@@ -86,6 +147,8 @@ export function buildStagePlayLiveSourceWatchJobPolicyDefaults(
         decisionPolicyPrompt: "record_interpretation with running story and watch-next targets",
         outputPolicy: { allowVoiceCallout: hasVoiceCue(objectiveText) },
       }),
+      mailProcessingMode: "chronological_batch",
+      outputCadence: "only_salient",
       decisionPolicyPrompt: [
         "For each unread mail batch, read the listed mail refs as the current observation window.",
         "If the mail batch contains any compact visual summary, record the decision record_interpretation.",
@@ -114,6 +177,8 @@ export function buildStagePlayLiveSourceWatchJobPolicyDefaults(
     return {
       objectiveText: describeEachBatchObjectiveText(objectiveText),
       interpretationMode: "latest_scene_answer",
+      mailProcessingMode: "latest_only",
+      outputCadence: "every_batch",
       decisionPolicyPrompt: [
         "For each unread mail batch, read the listed mail refs as the current observation window.",
         "If the mail batch contains any compact visual summary, record draft_text_answer.",
@@ -146,6 +211,8 @@ export function buildStagePlayLiveSourceWatchJobPolicyDefaults(
         decisionPolicyPrompt: "wait_for_next_summary unless salience criteria matched; request_voice_callout only when allowed",
         outputPolicy: { allowVoiceCallout },
       }),
+      mailProcessingMode: "salience_window",
+      outputCadence: allowVoiceCallout ? "voice_only_salient" : "only_salient",
       decisionPolicyPrompt: [
         "For each unread mail batch, read the listed mail refs as the current observation window.",
         "If there is no meaningful user-facing change, record wait_for_next_summary.",
@@ -176,6 +243,24 @@ export function buildStagePlayLiveSourceWatchJobPolicyDefaults(
       objectiveText,
       decisionPolicyPrompt: "record draft_text_answer for meaningful compact summaries",
       outputPolicy: { allowVoiceCallout },
+    }),
+    mailProcessingMode: inferStagePlayLiveSourceMailProcessingMode({
+      objectiveText,
+      decisionPolicyPrompt: "record draft_text_answer for meaningful compact summaries",
+      interpretationMode: inferStagePlayLiveSourceInterpretationMode({
+        objectiveText,
+        decisionPolicyPrompt: "record draft_text_answer for meaningful compact summaries",
+        outputPolicy: { allowVoiceCallout },
+      }),
+    }),
+    outputCadence: inferStagePlayLiveSourceOutputCadence({
+      objectiveText,
+      decisionPolicyPrompt: "record draft_text_answer for meaningful compact summaries",
+      interpretationMode: inferStagePlayLiveSourceInterpretationMode({
+        objectiveText,
+        decisionPolicyPrompt: "record draft_text_answer for meaningful compact summaries",
+        outputPolicy: { allowVoiceCallout },
+      }),
     }),
     decisionPolicyPrompt: [
       "For each unread mail batch, read the listed mail refs as the current observation window.",

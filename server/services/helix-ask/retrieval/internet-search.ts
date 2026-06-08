@@ -43,6 +43,12 @@ const DEFAULT_PROVIDERS: HelixInternetSearchProvider[] = [
   "google_custom_search",
 ];
 
+const PROVIDER_CONFIGURATION_REQUIREMENTS: Record<HelixInternetSearchProvider, string> = {
+  tavily: "tavily_requires_TAVILY_API_KEY",
+  exa: "exa_requires_EXA_API_KEY",
+  google_custom_search: "google_custom_search_requires_google_custom_search_key_and_engine_id",
+};
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
@@ -181,7 +187,7 @@ const lookupTavily = async (input: {
 }): Promise<HelixInternetSearchResult[]> => {
   const apiKey = readString(process.env.TAVILY_API_KEY);
   if (!apiKey) {
-    input.missingRequirements.push("tavily_requires_TAVILY_API_KEY");
+    input.missingRequirements.push(PROVIDER_CONFIGURATION_REQUIREMENTS.tavily);
     return [];
   }
   const json = await fetchJson({
@@ -242,7 +248,7 @@ const lookupExa = async (input: {
 }): Promise<HelixInternetSearchResult[]> => {
   const apiKey = readString(process.env.EXA_API_KEY);
   if (!apiKey) {
-    input.missingRequirements.push("exa_requires_EXA_API_KEY");
+    input.missingRequirements.push(PROVIDER_CONFIGURATION_REQUIREMENTS.exa);
     return [];
   }
   const json = await fetchJson({
@@ -302,10 +308,18 @@ const lookupGoogleCustomSearch = async (input: {
   missingRequirements: string[];
   evidenceRefs: HelixInternetSearchEvidenceRef[];
 }): Promise<HelixInternetSearchResult[]> => {
-  const apiKey = readString(process.env.GOOGLE_CUSTOM_SEARCH_API_KEY);
-  const engineId = readString(process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID) ?? readString(process.env.GOOGLE_CSE_ID);
+  const apiKey =
+    readString(process.env.GOOGLE_CUSTOM_SEARCH_API_KEY) ??
+    readString(process.env.GOOGLE_CSE_API_KEY) ??
+    readString(process.env.GOOGLE_API_KEY);
+  const engineId =
+    readString(process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID) ??
+    readString(process.env.GOOGLE_CUSTOM_SEARCH_CX) ??
+    readString(process.env.GOOGLE_CSE_CX) ??
+    readString(process.env.GOOGLE_CSE_ID) ??
+    readString(process.env.GOOGLE_SEARCH_ENGINE_ID);
   if (!apiKey || !engineId) {
-    input.missingRequirements.push("google_custom_search_requires_GOOGLE_CUSTOM_SEARCH_API_KEY_and_GOOGLE_CUSTOM_SEARCH_ENGINE_ID");
+    input.missingRequirements.push(PROVIDER_CONFIGURATION_REQUIREMENTS.google_custom_search);
     return [];
   }
   const domainClause = input.domains.length ? ` ${input.domains.map((domain) => `site:${domain}`).join(" OR ")}` : "";
@@ -348,6 +362,17 @@ const lookupGoogleCustomSearch = async (input: {
     .filter((entry): entry is HelixInternetSearchResult => Boolean(entry));
 };
 
+export const isInternetSearchProviderConfigurationMissing = (
+  observation: Pick<HelixInternetSearchObservation, "providers_considered" | "providers_called" | "results" | "missing_requirements" | "selected_for_answer">,
+): boolean => {
+  if (observation.selected_for_answer) return false;
+  if (observation.results.length > 0) return false;
+  if (observation.providers_called.length > 0) return false;
+  if (observation.providers_considered.length === 0) return false;
+  const missing = new Set(observation.missing_requirements);
+  return observation.providers_considered.every((provider) => missing.has(PROVIDER_CONFIGURATION_REQUIREMENTS[provider]));
+};
+
 export async function runInternetSearch(
   input: RunInternetSearchInput,
 ): Promise<HelixInternetSearchObservation> {
@@ -384,6 +409,14 @@ export async function runInternetSearch(
   if (!dedupedResults.length && query) {
     missingRequirements.push("no_internet_search_results_returned");
   }
+  const uniqueMissingRequirements = unique(missingRequirements);
+  const providerConfigurationMissing = isInternetSearchProviderConfigurationMissing({
+    providers_considered: providers,
+    providers_called: unique(providersCalled),
+    results: dedupedResults,
+    missing_requirements: uniqueMissingRequirements,
+    selected_for_answer: dedupedResults.length > 0,
+  });
 
   return {
     schema: HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
@@ -397,7 +430,8 @@ export async function runInternetSearch(
     results: dedupedResults,
     ...(domains.length ? { domains } : {}),
     ...(recencyDays ? { recency_days: recencyDays } : {}),
-    missing_requirements: unique(missingRequirements),
+    missing_requirements: uniqueMissingRequirements,
+    provider_configuration_missing: providerConfigurationMissing,
     selected_for_answer: dedupedResults.length > 0,
     assistant_answer: false,
     raw_content_included: false,
