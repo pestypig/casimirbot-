@@ -6,15 +6,15 @@ import { WorkstationResizeRail } from "@/components/workstation/WorkstationResiz
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixAskWorkspaceSessionStore } from "@/store/useHelixAskWorkspaceSessionStore";
+import {
+  listHelixAskChatSessions,
+  resolveActiveHelixAskSession,
+} from "@/lib/helix/helixAskChatSessions";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
 const HELIX_CONVERSATION_TRACE_PANEL_ID = "workstation-workflow-timeline";
 const HELIX_CHAT_CONTEXT_PREFIX = "helix-ask-chat:";
-
-function isHelixAskChatSession(session: ChatSession): boolean {
-  return Boolean(session.contextId?.startsWith("helix-ask"));
-}
 
 function formatSessionDate(value: string): string {
   const parsed = Date.parse(value);
@@ -57,28 +57,25 @@ export function HelixWorkstationShell({
     [onOpenPanel],
   );
 
-  const helixSessions = useMemo(
-    () =>
-      Object.values(sessions)
-        .filter(isHelixAskChatSession)
-        .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
-    [sessions],
+  const helixSessions = useMemo(() => listHelixAskChatSessions(sessions), [sessions]);
+  const activeSession = useMemo(
+    () => resolveActiveHelixAskSession(sessions, activeChatId),
+    [activeChatId, sessions],
   );
-  const activeSessionCandidate = activeChatId ? sessions[activeChatId] : undefined;
-  const activeSession =
-    activeSessionCandidate && isHelixAskChatSession(activeSessionCandidate)
-      ? activeSessionCandidate
-      : helixSessions[0];
   const activeContextId = activeSession?.contextId ?? HELIX_ASK_CONTEXT_ID.desktop;
   const activeTitle = titleFromSession(activeSession);
 
   useEffect(() => {
+    if (activeSession?.id && activeSession.id !== activeChatId) {
+      setActiveChat(activeSession.id);
+      return;
+    }
     if (activeSession?.contextId) return;
     const fallbackId = ensureContextSession(HELIX_ASK_CONTEXT_ID.desktop, "New chat");
     if (fallbackId) {
       setActiveChat(fallbackId);
     }
-  }, [activeSession?.contextId, ensureContextSession, setActiveChat]);
+  }, [activeChatId, activeSession?.contextId, activeSession?.id, ensureContextSession, setActiveChat]);
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {

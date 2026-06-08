@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveActiveHelixAskSession } from "@/lib/helix/helixAskChatSessions";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
 import { useHelixAskWorkspaceSessionStore } from "@/store/useHelixAskWorkspaceSessionStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
@@ -258,6 +259,28 @@ describe("workstation stores", () => {
     expect(useAgiChatStore.getState().sessions[sessionId]?.title).toBe(
       "Plan the next workstation research pass with notes",
     );
+  });
+
+  it("resolves Helix Ask resume from chat-session identity instead of global artifact recency", () => {
+    const chats = useAgiChatStore.getState();
+    const olderChatId = chats.newSession("Older chat", "helix-ask-chat:older");
+    chats.addMessage(olderChatId, {
+      role: "user",
+      content: "Older saved chat",
+    });
+    const newerChatId = chats.newSession("Newer chat", "helix-ask-chat:newer");
+    chats.addMessage(newerChatId, {
+      role: "user",
+      content: "Newer saved chat",
+    });
+    const nonHelixChatId = chats.newSession("Account chat", "account-panel");
+
+    const note = useWorkstationNotesStore.getState().createManualNote({ title: "Newest note artifact" });
+    useWorkstationNotesStore.getState().updateNoteBody(note.id, "This note can be newer without selecting a chat.");
+
+    const sessions = useAgiChatStore.getState().sessions;
+    expect(resolveActiveHelixAskSession(sessions, olderChatId)?.id).toBe(olderChatId);
+    expect(resolveActiveHelixAskSession(sessions, nonHelixChatId)?.id).toBe(newerChatId);
   });
 
   it("saves and restores workstation layout snapshots per Helix Ask chat", () => {

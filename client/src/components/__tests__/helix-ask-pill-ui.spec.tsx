@@ -849,6 +849,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("live question");
     expect(source).toContain("/^model decision:\\s*.+\\.?$/i");
     expect(source).not.toContain("askLiveStatusText");
+    expect(source).toContain("helixAskSessionContextRef.current === normalizedContextId");
+    expect(source).toContain("ensureContextSession(normalizedContextId, \"Helix Ask\")");
     expect(source).toContain("flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap");
     expect(source).toContain("min-w-0 truncate text-[10px] uppercase tracking-[0.16em] text-slate-300/90");
     expect(source).toContain("helix-ask-turn-enter");

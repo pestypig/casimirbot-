@@ -1220,6 +1220,12 @@ function buildObserverMailLoopNodes(input: {
   const latestPolicy = (mailbox?.watchJobPolicies ?? [])
     .filter((policy) => !activeJob || policy.jobId === activeJob.jobId || activeJob.watchJobPolicyRef === policy.policyId)
     .at(-1) ?? null;
+  const hasWatchPolicy = Boolean(latestPolicy);
+  const manualCheckpointWithoutPolicy = Boolean(
+    latestDecision &&
+    latestDecision.nextLoopState === "armed_for_next_summary" &&
+    !hasWatchPolicy
+  );
   const activeInterpreterProfile =
     interpreterProfiles
       .filter((profile) => profile.status === "active")
@@ -1277,7 +1283,11 @@ function buildObserverMailLoopNodes(input: {
   const latestDecisionText = latestDecision
     ? `${latestDecision.decision}: ${latestDecision.rationalePreview || latestDecision.decisionId}`
     : "no decision yet";
-  const outputPreview = latestDecision?.voiceCalloutDraft?.text
+  const outputPreview = manualCheckpointWithoutPolicy
+    ? latestNarrativeState
+      ? `manual interpretation checkpoint: ${latestNarrativeState.interpretedSituation.userRelevantMeaning || latestNarrativeState.currentSceneSummary}`
+      : "manual checkpoint complete; configure a watch job to continue automatically"
+    : latestDecision?.voiceCalloutDraft?.text
     ? `voice draft: ${latestDecision.voiceCalloutDraft.text}`
     : latestDecision?.textAnswerDraft?.text
       ? `text answer: ${latestDecision.textAnswerDraft.text}`
@@ -1309,8 +1319,11 @@ function buildObserverMailLoopNodes(input: {
         },
         {
           label: "Objective",
-          value: latestPolicy?.objectiveText ?? activeJob?.objective ?? visualMail?.objective?.text ?? "No watch objective armed yet.",
-          tone: latestPolicy || activeJob ? "good" : "warn",
+          value: latestPolicy?.objectiveText ??
+            (manualCheckpointWithoutPolicy
+              ? "Manual checkpoint only. Configure a watch job to keep interpreting new mail."
+              : activeJob?.objective ?? visualMail?.objective?.text ?? "No watch objective armed yet."),
+          tone: latestPolicy ? "good" : "warn",
         },
       ],
       edgeToNext: {
@@ -1376,11 +1389,13 @@ function buildObserverMailLoopNodes(input: {
             activeInterpreterProfile.domain,
             activeInterpreterProfile.outputStyle.voiceStyle,
           ]
-        : ["watch policy only"],
+        : [hasWatchPolicy ? "watch policy only" : "policy missing"],
       payloadRows: [
         {
           label: "Contract",
-          value: activeInterpreterProfile?.title ?? latestPolicy?.objectiveText ?? "No active interpreter profile.",
+          value: activeInterpreterProfile?.title ??
+            latestPolicy?.objectiveText ??
+            "No active interpreter profile or watch policy.",
           tone: activeInterpreterProfile ? "good" : latestPolicy ? "warn" : "blocked",
         },
         {
@@ -1486,12 +1501,15 @@ function buildObserverMailLoopNodes(input: {
       title: "Wake Ask",
       subtitle: "mail wake admission",
       status: latestWakeStatus ?? (unreadCount > 0 ? "queued pending" : "missing"),
-      preview: pressureText
+      preview: manualCheckpointWithoutPolicy && unreadCount > 0
+        ? `manual checkpoint completed; ${unreadCount} unread retained until a watch policy is configured`
+        : pressureText
         ? pressureText
         : latestWakeStatus
           ? `${latestWakeStatus}${latestWakeFailureReason ? `: ${latestWakeFailureReason}` : ""}; ${latestWakeAskText}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
+        manualCheckpointWithoutPolicy ? "policy missing" : null,
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
         runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
         pressureWakeCount > 0 ? (pressureIsSecondary ? "auto pressure" : "pressure") : null,
@@ -1505,17 +1523,24 @@ function buildObserverMailLoopNodes(input: {
         },
         {
           label: "Wake",
-          value: latestWakeStatus
+          value: manualCheckpointWithoutPolicy
+            ? "watch policy missing; configure a standing job before automatic interpretation"
+            : latestWakeStatus
             ? `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}`
             : unreadCount > 0 ? "unread mail waiting" : "no wake request",
-          tone: latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
+          tone: manualCheckpointWithoutPolicy ||
+            latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
             ? "blocked"
             : latestWakeStatus ? "good" : unreadCount > 0 ? "warn" : "default",
         },
       ],
       edgeToNext: {
-        label: latestDecision ? "decision" : latestWakeStatus === "deferred_for_pressure" ? "deferred" : displayWake ? "running/pending" : "wake missing",
-        tone: latestDecision ? "connected" : latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_terminal" ? "blocked" : displayWake ? "pending" : "blocked",
+        label: manualCheckpointWithoutPolicy
+          ? "policy missing"
+          : latestDecision ? "decision" : latestWakeStatus === "deferred_for_pressure" ? "deferred" : displayWake ? "running/pending" : "wake missing",
+        tone: manualCheckpointWithoutPolicy
+          ? "blocked"
+          : latestDecision ? "connected" : latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_terminal" ? "blocked" : displayWake ? "pending" : "blocked",
       },
       inputLabel: "Input",
       inputRefs: wakeInputRefs,
@@ -1531,7 +1556,9 @@ function buildObserverMailLoopNodes(input: {
         ...(latestWakeResult?.evidenceRefs ?? []),
       ].filter(Boolean)) : [],
       outputPreview: latestWakeStatus
-        ? latestWakeStatus === "deferred_for_pressure"
+        ? manualCheckpointWithoutPolicy
+          ? `manual checkpoint complete; ${unreadCount} unread retained; configure live_env.configure_live_source_watch_job for the continuing loop`
+          : latestWakeStatus === "deferred_for_pressure"
           ? `deferred_for_pressure; ${latestWakeFailureReason ?? "runtime pressure"}; ${unreadCount} unread retained${displayWake?.nextRetryAt ? `; retry ${displayWake.nextRetryAt}` : ""}`
           : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
@@ -1579,11 +1606,13 @@ function buildObserverMailLoopNodes(input: {
       id: "observer_mail_loop:output_wait",
       title: "Output / Wait",
       subtitle: "text answer / voice draft / wait",
-      status: latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary",
+      status: manualCheckpointWithoutPolicy
+        ? "policy missing"
+        : latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed_for_next_summary",
       preview: outputPreview,
       statusChips: [
         latestDecision?.voicePolicy?.voiceEnabled ? "voice enabled" : "voice off",
-        activeJob?.status ? `job ${activeJob.status}` : null,
+        manualCheckpointWithoutPolicy ? "configure watch job" : activeJob?.status ? `job ${activeJob.status}` : null,
       ].filter((entry): entry is string => Boolean(entry)),
       payloadRows: [
         {
@@ -1593,8 +1622,19 @@ function buildObserverMailLoopNodes(input: {
         },
         {
           label: "Watch next",
-          value: latestNarrativeState?.watchNext?.reason ?? latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed for next summary",
-          tone: latestNarrativeState?.watchNext?.reason ? "good" : "default",
+          value: manualCheckpointWithoutPolicy
+            ? "A watch-next target was produced for this checkpoint, but no standing watch policy is armed for future mail."
+            : latestNarrativeState?.watchNext?.reason ?? latestDecision?.nextLoopState ?? activeJob?.nextLoopState ?? "armed for next summary",
+          tone: manualCheckpointWithoutPolicy ? "warn" : latestNarrativeState?.watchNext?.reason ? "good" : "default",
+        },
+        {
+          label: "Loop",
+          value: manualCheckpointWithoutPolicy
+            ? "Missing inner loop: configure a live-source watch job so new mail re-enters Ask under a stored objective."
+            : latestPolicy
+              ? `Watch policy: ${latestPolicy.interpretationMode ?? "armed"}`
+              : "No watch policy.",
+          tone: manualCheckpointWithoutPolicy ? "blocked" : latestPolicy ? "good" : "warn",
         },
       ],
       edgeToNext: null,

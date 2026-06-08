@@ -368,6 +368,63 @@ describe("Helix Ask Stage Play routing", () => {
     expect(exportedObservation?.payload?.observation?.watch_job_policy_ref, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
   }, 30_000);
 
+  it("configures a batch-interpretation watch policy for natural visual mail loop wording", async () => {
+    const question = "Watch the active visual source and interpret each new visual mail batch. Say what changed and what should be watched next.";
+    process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
+      "Watch job configured and armed; no mail read yet.";
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question,
+        sessionId: threadId,
+        debug: true,
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      canonical: response.body?.canonical_goal_frame,
+      availableCapabilities: response.body?.available_capabilities,
+      runtimeLoop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+      currentTurnArtifacts: response.body?.current_turn_artifact_ledger,
+    }, null, 2);
+
+    expect(isLiveSourceMailLoopPrompt(question)).toBe(true);
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toEqual(expect.arrayContaining([
+      "live_source_mail_loop_intent",
+      "live_source_watch_job_setup_intent",
+      "prefer_configure_live_source_watch_job",
+    ]));
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? [], routeDebug).not.toContain("prefer_read_live_source_mail");
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.configure_live_source_watch_job");
+    const chosenCapabilities = response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    expect(chosenCapabilities, routeDebug).toContain("live_env.configure_live_source_watch_job");
+    expect(chosenCapabilities, routeDebug).not.toContain("live_env.read_live_source_mail");
+
+    const liveToolArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_live_source_watch_job"
+    );
+    expect(liveToolArtifact?.payload?.observation, routeDebug).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+      policy: {
+        objectiveText: question,
+        interpretationMode: "batch_interpretation",
+        decisionPolicyPrompt: expect.stringContaining("record the decision record_interpretation"),
+      },
+      jobState: {
+        objective: question,
+        watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
+        nextLoopState: "armed_for_next_summary",
+      },
+    });
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
+    expect(response.body?.answer, routeDebug).not.toContain("latest unread source update");
+  }, 30_000);
+
   it("forces policy configuration when the model tries to read mail during standing watch setup", async () => {
     process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
     process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([

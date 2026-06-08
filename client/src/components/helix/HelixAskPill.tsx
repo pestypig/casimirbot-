@@ -16690,6 +16690,7 @@ export function HelixAskPill({
   }, [userSettings.preferredResponseLanguage]);
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
   const helixAskSessionRef = useRef<string | null>(null);
+  const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [askBusy, setAskBusy] = useState(false);
@@ -17407,9 +17408,16 @@ export function HelixAskPill({
   useEffect(() => () => clearHeldTranscriptFlushTimer(), [clearHeldTranscriptFlushTimer]);
 
   const getHelixAskSessionId = useCallback(() => {
-    if (helixAskSessionRef.current) return helixAskSessionRef.current;
-    const sessionId = ensureContextSession(contextId, "Helix Ask");
+    const normalizedContextId = contextId.trim();
+    if (
+      helixAskSessionRef.current &&
+      helixAskSessionContextRef.current === normalizedContextId
+    ) {
+      return helixAskSessionRef.current;
+    }
+    const sessionId = ensureContextSession(normalizedContextId, "Helix Ask");
     helixAskSessionRef.current = sessionId || null;
+    helixAskSessionContextRef.current = normalizedContextId || null;
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
 
