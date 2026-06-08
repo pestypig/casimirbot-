@@ -30,12 +30,16 @@ const createApp = (): express.Express => {
   return app;
 };
 
-beforeEach(() => {
+const resetLiveSourceMailRoutingState = (): void => {
   resetVisualSnapshotStoreForTest();
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
+};
+
+beforeEach(() => {
+  resetLiveSourceMailRoutingState();
   process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
   process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
     {
@@ -258,9 +262,75 @@ describe("Helix Ask live-source mail interpretation routing", () => {
         }),
       }),
     });
+    expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
     expect(response.body?.answer, debug).toMatch(/document editor|Watch next/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
+
+  it("routes playbook visual-mail interpretation wording to record_interpretation", async () => {
+    seedVisualMail("The visual summary shows a dark icon grid with multiple productivity apps.");
+
+    const { response, decision, debug } = await askMailbox(
+      "Read the visual mail and interpret what is happening. Say what should be watched next.",
+    );
+
+    expect(decision, debug).toMatchObject({
+      decision: "record_interpretation",
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+    });
+    expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
+    expect(response.body?.answer, debug).toMatch(/icon grid|Watch next/i);
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 30_000);
+
+  it("routes natural mailbox/update wording to the intended text or interpretation decision", async () => {
+    const cases = [
+      {
+        question: "What does the latest visual update show?",
+        summary: "The latest visual update shows a desktop launcher with a calendar and browser icon.",
+        expectedDecision: "draft_text_answer",
+        answerPattern: /desktop launcher|calendar/i,
+      },
+      {
+        question: "Review the new source mail and say what changed.",
+        summary: "The new source mail shows the browser tab changed from a launcher to a document page.",
+        expectedDecision: "record_interpretation",
+        answerPattern: /document page|Watch next/i,
+      },
+      {
+        question: "Interpret these observations and say what should be watched next.",
+        summary: "These observations show a video timeline paused on a dark interface with a preview panel.",
+        expectedDecision: "record_interpretation",
+        answerPattern: /video timeline|Watch next/i,
+      },
+      {
+        question: "What changed in the latest visual update?",
+        summary: "The latest visual update shows a chat window replacing the previous app icon grid.",
+        expectedDecision: "record_interpretation",
+        answerPattern: /chat window|Watch next/i,
+      },
+    ];
+
+    for (const testCase of cases) {
+      resetLiveSourceMailRoutingState();
+      seedVisualMail(testCase.summary);
+
+      const { response, decision, debug } = await askMailbox(testCase.question);
+
+      expect(decision, debug).toMatchObject({
+        decision: testCase.expectedDecision,
+      });
+      if (testCase.expectedDecision === "record_interpretation") {
+        expect(decision?.narrativeStateRef, debug).toEqual(
+          expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+        );
+      }
+      expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
+      expect(response.body?.answer, debug).toMatch(testCase.answerPattern);
+      expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+    }
+  }, 180_000);
 
   it("routes change-across-summaries prompts to record_interpretation", async () => {
     seedVisualMail("The latest visual summary shows a new browser tab replacing the previous launcher grid.");

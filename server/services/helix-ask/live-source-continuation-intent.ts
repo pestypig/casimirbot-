@@ -59,15 +59,15 @@ const hasExplicitLiveSourceMailCue = (text: string): boolean =>
   /\b(?:use|apply|pause|archive|open|compile)\b[\s\S]{0,120}\b(?:interpreter\s+profile|profile\s+note|minecraft\s+survival\s+coach|browser\s+workflow\s+watcher)\b/i.test(text) ||
   /\b(?:interpret|compare)\b[\s\S]{0,120}\b(?:mail|mailbox|summaries|observations?)\b[\s\S]{0,120}\b(?:active\s+profile|interpreter\s+profile|profile)\b/i.test(text) ||
   /\b(?:why\s+did\s+you)\b[\s\S]{0,80}\b(?:call\s+this\s+out|suppress\s+this|suppress|callout)\b/i.test(text) ||
-  /\b(?:wake\s+request|mail\s+refs?|source\s+mail|live\s+source\s+mail|live-source\s+mail|observer\s+mailbox|active\s+visual\s+live-source\s+mailbox|latest\s+visual\s+summary\s+mail|stage\s+play\s+mail|visual\s+summary\s+mail|mailbox|wait\s+for\s+next\s+summary)\b/i.test(text) ||
-  /\b(?:read|check|watch|monitor|observe|use|process)\b[\s\S]{0,160}\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b/i.test(text) ||
-  /\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+summary\s+mail)\b[\s\S]{0,160}\b(?:read|check|watch|monitor|observe|process|decision|decide|record)\b/i.test(text);
+  /\b(?:wake\s+request|mail\s+refs?|source\s+mail|new\s+source\s+mail|live\s+source\s+mail|live-source\s+mail|observer\s+mailbox|active\s+visual\s+live-source\s+mailbox|latest\s+visual\s+summary\s+mail|stage\s+play\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|mailbox|wait\s+for\s+next\s+summary)\b/i.test(text) ||
+  /\b(?:read|check|watch|monitor|observe|use|process)\b[\s\S]{0,160}\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|new\s+source\s+mail)\b/i.test(text) ||
+  /\b(?:live-source\s+mailbox|live\s+source\s+mailbox|observer\s+mailbox|stage\s+play\s+mail|latest\s+visual\s+summary\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|new\s+source\s+mail)\b[\s\S]{0,160}\b(?:read|check|watch|monitor|observe|process|decision|decide|record|show|shows|showing|contains?|reports?|changed|interpret)\b/i.test(text);
 
 const hasLiveSourceMailInterpretationCue = (text: string): boolean => {
   const interpretationCue =
     /\b(?:interpret(?:ation)?|what\s+is\s+happening|what's\s+happening|what\s+happened|what\s+changed|changed|changes|compare|comparison|what\s+should\s+(?:be\s+)?watched\s+next|watch\s+next|what\s+to\s+watch\s+next|story\s+so\s+far|observations?\s+mean|predict(?:ion)?|might\s+happen\s+next|record\s+an?\s+interpretation|summari[sz]e\s+the\s+story)\b/i;
   const sourceCue =
-    /\b(?:mail|mailbox|summary|summaries|observation|observations|live\s+source|live-source|visual\s+source|visual\s+summary|screen\s+summary|source\s+update|watch\s+next|story\s+so\s+far)\b/i;
+    /\b(?:mail|mailbox|summary|summaries|observation|observations|live\s+source|live-source|visual\s+source|visual\s+summary|visual\s+update|latest\s+visual\s+update|screen\s+summary|source\s+update|watch\s+next|story\s+so\s+far)\b/i;
   return interpretationCue.test(text) && sourceCue.test(text);
 };
 

@@ -209,7 +209,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+  if (!contextualSuppression && !stagePlayOperational && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     promptIntentCandidates.push("live_source_mailbox");
     candidates.push(makeCandidate({
       candidateId: "live_source_mailbox.mail_loop",
@@ -237,7 +237,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && hasLiveSourceCurrentStateCue(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+  if (!contextualSuppression && !stagePlayOperational && hasLiveSourceCurrentStateCue(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     promptIntentCandidates.push("live_source_current_state");
     candidates.push(makeCandidate({
       candidateId: "live_source_mailbox.current_state_or_quality",
