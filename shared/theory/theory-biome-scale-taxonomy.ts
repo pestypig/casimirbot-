@@ -42,6 +42,7 @@ export const THEORY_BIOME_DOMAIN_ORDER = [
   "atomic_spectroscopy",
   "astrochemistry",
   "prebiotic_biophysics",
+  "evolutionary_biophysics",
   "solar",
   "stellar",
   "casimir",
@@ -94,7 +95,26 @@ function inferDomainKey(tokens: Set<string>, badge: TheoryBadgeV1): string {
   if (hasAny(tokens, ["casimir", "cavity", "tile"])) return "casimir";
   if (hasAny(tokens, ["tokamak", "plasma", "fusion_plasma"])) return "tokamak_plasma";
   if (hasAny(tokens, ["galactic", "rotation_curve", "dark_matter"])) return "galactic_dynamics";
-  if (hasAny(tokens, ["curvature", "collapse", "orch_or", "microtubule"])) return "curvature_collapse";
+  if (hasAny(tokens, ["curvature", "collapse", "orch_or"])) return "curvature_collapse";
+  if (
+    hasAny(tokens, [
+      "evolutionary_biophysics",
+      "common_descent",
+      "phylogeny",
+      "selection_fitness",
+      "kingdom",
+      "eukaryote",
+      "cytoskeleton",
+      "photosynthesis",
+      "light_harvesting",
+      "plant",
+      "animal",
+      "comparative_evidence",
+      "quantum_biology",
+    ])
+  ) {
+    return "evolutionary_biophysics";
+  }
   if (hasAny(tokens, ["astrochemistry", "fullerene", "pah", "aromatic_carbon"])) return "astrochemistry";
   if (hasAny(tokens, ["prebiotic", "biophysics", "membrane", "rna_world"])) return "prebiotic_biophysics";
   if (hasAny(tokens, ["solar", "helioseismology", "sunquake", "nanoflare"])) return "solar";
@@ -176,6 +196,16 @@ export function inferTheoryBiomeCoordinateSeed(badge: TheoryBadgeV1): {
     };
   }
 
+  if (hasAny(tokens, ["photosynthesis", "light_harvesting", "exciton", "pigment", "quantum_biology"])) {
+    return {
+      scaleLog10M: -8,
+      scaleBand: "molecular",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "photosynthetic molecular-biophysics metadata"],
+    };
+  }
+
   if (hasAny(tokens, ["microtubule", "cellular", "membrane", "biophysics"])) {
     return {
       scaleLog10M: -5,
@@ -183,6 +213,16 @@ export function inferTheoryBiomeCoordinateSeed(badge: TheoryBadgeV1): {
       domainKey,
       fidelity,
       reasons: [...reasons, "cellular/biophysical metadata"],
+    };
+  }
+
+  if (hasAny(tokens, ["common_descent", "phylogeny", "selection_fitness", "kingdom", "eukaryote", "plant", "animal"])) {
+    return {
+      scaleLog10M: -5,
+      scaleBand: "cellular_biophysical",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "evolutionary/cellular-biophysical metadata"],
     };
   }
 

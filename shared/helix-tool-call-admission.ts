@@ -8,6 +8,7 @@ export type HelixToolCallAdmissionFamily =
   | "docs_viewer"
   | "repo_code"
   | "scholarly_research"
+  | "internet_search"
   | "runtime_evidence"
   | "workspace_diagnostic"
   | "live_environment"

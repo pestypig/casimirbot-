@@ -17,6 +17,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "doc_location_result",
   "repo_code_evidence_answer",
   "scholarly_research_answer",
+  "internet_search_answer",
   "process_graph_overview",
   "audio_transcript_context_pack",
   "note_context_pack",
@@ -123,6 +124,7 @@ const normalizeSourceTarget = (
     sourceTarget === "calculator_stream" ||
     sourceTarget === "repo_code" ||
     sourceTarget === "scholarly_research" ||
+    sourceTarget === "internet_search" ||
     sourceTarget === "runtime_evidence" ||
     sourceTarget === "workspace_diagnostic" ||
     sourceTarget === "situation_epoch" ||
@@ -426,6 +428,39 @@ export function buildRouteProductContract(input: {
         "scholarly_pdf_page_image_observation",
         "scholarly_research_synthesis_attempt",
         "scholarly_research_claim_support",
+      ],
+    });
+  }
+
+  if (sourceTarget === "internet_search") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: ["internet_search_answer"],
+      allowedExtra: [],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "doc_location_result",
+        "repo_code_evidence_answer",
+        "repo_entity_definition",
+        "scholarly_research_answer",
+      ],
+      precedenceReason: "internet_search_source_target_allows_only_external_web_evidence_terminal_products",
+      sideArtifactKindsAllowed: [
+        "internet_search_observation",
+        "internet_search_synthesis_attempt",
+        "internet_search_claim_support",
       ],
     });
   }

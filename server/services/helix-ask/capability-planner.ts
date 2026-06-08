@@ -5,11 +5,15 @@ import {
   type HelixCapabilityPlan,
 } from "@shared/helix-capability-plan";
 import {
+  HELIX_INTERNET_SEARCH_CAPABILITY,
+} from "@shared/helix-internet-search-observation";
+import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -69,6 +73,13 @@ const classifySourceFamily = (input: {
     detectScholarlyResearchIntent(input.promptText).researchRequested
   ) {
     return "scholarly_research";
+  }
+  if (
+    input.sourceTarget === "internet_search" ||
+    input.admittedFamilies.includes("internet_search") ||
+    detectInternetSearchIntent(input.promptText).searchRequested
+  ) {
+    return "internet_search";
   }
   if (
     input.sourceTarget === "workstation_panel" ||
@@ -153,6 +164,7 @@ const requestedActionFor = (
       ? HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY
       : HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
   }
+  if (family === "internet_search") return HELIX_INTERNET_SEARCH_CAPABILITY;
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "workspace_diagnostic") return HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
@@ -186,6 +198,7 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "procedure_memory") return admittedFamilies.includes("procedure_memory") || admittedFamilies.includes("situation_run");
   if (family === "repo_evidence") return admittedFamilies.includes("repo_code");
   if (family === "scholarly_research") return admittedFamilies.includes("scholarly_research");
+  if (family === "internet_search") return admittedFamilies.includes("internet_search");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
   if (family === "workspace_diagnostic") return admittedFamilies.includes("workspace_diagnostic");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
@@ -234,6 +247,7 @@ const admissionFor = (input: {
     input.family === "workspace_diagnostic" ||
     input.family === "live_environment" ||
     input.family === "scholarly_research" ||
+    input.family === "internet_search" ||
     input.family === "repo_evidence" ||
     input.sourceTarget === "runtime_evidence"
   ) {

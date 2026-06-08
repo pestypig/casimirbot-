@@ -9,6 +9,7 @@ export type HelixCapabilityFamily =
   | "procedure_memory"
   | "repo_evidence"
   | "scholarly_research"
+  | "internet_search"
   | "process_graph"
   | "debug_export"
   | "workspace_diagnostic"

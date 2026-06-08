@@ -63,6 +63,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "repo_code_evidence_question",
   "repo_entity_definition",
   "scholarly_research_lookup",
+  "internet_search_lookup",
   "situation_context_question",
   "visual_capture_describe",
   "zen_graph_reflection",
@@ -120,6 +121,7 @@ const artifactKindMatchesCapability = (
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
+  if (capability === "internet-search.search_web") return /internet_search_observation|helix\.internet_search_observation\.v1|internet_search/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
   }
@@ -201,6 +203,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined)) {
     return "scholarly-research.lookup_papers";
   }
+  if (/internet_search_observation|helix\.internet_search_observation\.v1|internet_search/i.test(joined)) {
+    return "internet-search.search_web";
+  }
   if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
   }
@@ -252,7 +257,12 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
   capability: string,
   artifacts: Record<string, unknown>[],
 ): boolean => {
-  if (capability !== "repo-code.search_concept" && capability !== "scholarly-research.lookup_papers" && capability !== "scholarly-research.fetch_full_text") return false;
+  if (
+    capability !== "repo-code.search_concept" &&
+    capability !== "scholarly-research.lookup_papers" &&
+    capability !== "scholarly-research.fetch_full_text" &&
+    capability !== "internet-search.search_web"
+  ) return false;
   return artifacts.some((artifact) => {
     const sourceScope = readString(artifact.source_scope);
     if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;

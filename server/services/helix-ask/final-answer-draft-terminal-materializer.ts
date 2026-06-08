@@ -17,6 +17,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
     | "scholarly_research_answer"
+    | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
     | "request_user_input"
     | "typed_failure";
@@ -30,6 +31,8 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "repo_quality_gate_failed"
     | "scholarly_evidence_required_but_missing"
     | "scholarly_support_refs_missing"
+    | "internet_search_evidence_required_but_missing"
+    | "internet_search_support_refs_missing"
     | "draft_contradicts_observed_scholarly_full_text"
     | "live_job_contract_missing"
     | "deterministic_receipt_fallback_nonterminal"
@@ -92,6 +95,9 @@ const isRepoEvidenceObservation = (artifact: ArtifactLike): boolean =>
 
 const isScholarlyResearchObservation = (artifact: ArtifactLike): boolean =>
   /scholarly_research_observation|scholarly_full_text_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+
+const isInternetSearchObservation = (artifact: ArtifactLike): boolean =>
+  /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
 
 export const findLatestFinalAnswerDraftCandidate = (
   artifacts: ArtifactLike[],
@@ -185,6 +191,8 @@ export function materializeFinalAnswerDraftTerminal(input: {
         ? "repo_support_refs_missing"
         : qualityGate.violations.includes("missing_support_refs_for_scholarly_route")
           ? "scholarly_support_refs_missing"
+        : qualityGate.violations.includes("missing_support_refs_for_internet_search_route")
+          ? "internet_search_support_refs_missing"
           : "unsupported_route_terminal_kind";
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
@@ -350,6 +358,78 @@ export function materializeFinalAnswerDraftTerminal(input: {
       ok: true,
       materialized_terminal_artifact_ref: scholarlyAnswerRef,
       materialized_terminal_artifact_kind: "scholarly_research_answer",
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (routeFamily === "internet_search") {
+    if (!input.artifactLedger.some(isInternetSearchObservation)) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "internet_search_evidence_required_but_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const supportRefs = collectFinalAnswerDraftSupportRefs({
+      draftPayload,
+      artifactLedger: input.artifactLedger,
+    });
+    if (supportRefs.length === 0) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "internet_search_support_refs_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    if (!contractAllows(contract, "internet_search_answer")) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "route_contract_forbids_model_synthesized_answer",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const internetAnswerRef = materializedRef(input.turnId, "internet_search_answer");
+    input.payload.internet_search_answer = {
+      schema: "helix.internet_search_answer.v1",
+      artifact_id: internetAnswerRef,
+      turn_id: input.turnId,
+      text: draft.text,
+      answer_text: draft.text,
+      support_refs: supportRefs,
+      model_authored: true,
+      model_step_capability: "model.synthesize_from_internet_search",
+      final_answer_draft_ref: draft.ref,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: true,
+      materialized_terminal_artifact_ref: internetAnswerRef,
+      materialized_terminal_artifact_kind: "internet_search_answer",
       route_allowed_terminal_artifact_kinds: routeAllowed,
       final_answer_draft_quality_gate: qualityGate,
       assistant_answer: false,

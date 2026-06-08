@@ -106,6 +106,7 @@ export function formatHelixVisibleTerminalSourceLabel(
     live_environment_binding_diagnosis: "live environment diagnosis",
     situation_context_pack: "situation context",
     scholarly_research_answer: "scholarly research answer",
+    internet_search_answer: "internet search answer",
     repo_code_evidence_answer: "repo code evidence answer",
     typed_failure: "typed failure",
   };

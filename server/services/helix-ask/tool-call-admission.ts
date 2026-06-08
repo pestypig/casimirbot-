@@ -28,6 +28,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "visual_scene_memory",
   "repo_code",
   "scholarly_research",
+  "internet_search",
   "runtime_evidence",
   "workspace_diagnostic",
   "docs_viewer",
@@ -149,6 +150,35 @@ export function buildToolCallAdmissionDecision(input: {
       "no_tool_direct",
     ];
     reason = "scholarly_research_requires_external_paper_evidence_path";
+  } else if (sourceTarget === "internet_search") {
+    admittedToolFamilies = ["internet_search"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "no_tool_direct",
+      "model_only_concept",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "active_doc_identity",
+      "doc_open_receipt",
+      "doc_summary",
+      "doc_location_result",
+      "repo_code_evidence_answer",
+      "scholarly_research_answer",
+      "repo_entity_definition",
+    ];
+    extraForbiddenRoutes = [
+      "active_doc_identity",
+      "active_doc_summary",
+      "doc_open_best",
+      "repo_code_evidence_question",
+      "scholarly_research_lookup",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    reason = "internet_search_requires_external_web_evidence_path";
   } else if (
     sourceTarget === "unknown" &&
     /\b(?:open|show|pull\s+up|bring\s+up)\b[\s\S]{0,120}\b(?:docs?|docks|document|white\s*paper|whitepaper|paper)\b/i.test(promptText)

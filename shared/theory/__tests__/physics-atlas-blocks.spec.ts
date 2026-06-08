@@ -13,6 +13,7 @@ describe("physics atlas blocks", () => {
     expect(blocks.map((block: PhysicsAtlasBlockV1) => block.glyph)).toEqual([
       "★",
       "C",
+      "B",
       "z",
       "☀",
       "▣",
@@ -102,6 +103,25 @@ describe("physics atlas blocks", () => {
     );
     expect(byId.get("astrochemistry_prebiotic")?.claimBoundaryBadgeIds).toContain(
       "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
+    );
+    expect(byId.get("evolutionary_biophysics")?.status).toBe("seed");
+    expect(byId.get("evolutionary_biophysics")?.primaryBadgeIds).toContain(
+      "biology.evolution.common_descent_phylogeny_context",
+    );
+    expect(byId.get("evolutionary_biophysics")?.primaryBadgeIds).toContain(
+      "biology.kingdoms.eukaryotic_trait_matrix",
+    );
+    expect(byId.get("evolutionary_biophysics")?.primaryBadgeIds).toContain(
+      "eukaryote.cytoskeleton.microtubule_conserved_scaffold",
+    );
+    expect(byId.get("evolutionary_biophysics")?.primaryBadgeIds).toContain(
+      "plant.photosynthesis.light_harvesting_exciton_context",
+    );
+    expect(byId.get("evolutionary_biophysics")?.primaryBadgeIds).toContain(
+      "plant.photosynthesis.coherence_lifetime_gate",
+    );
+    expect(byId.get("evolutionary_biophysics")?.claimBoundaryBadgeIds).toContain(
+      "consciousness.claim_boundary.evolutionary_biology_context_only",
     );
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.tile.duty_budget");

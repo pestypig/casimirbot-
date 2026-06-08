@@ -834,6 +834,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildHelixContinuousTurnStreamRows");
     expect(source).toContain("buildHelixCausalTurnTraceRows");
     expect(source).toContain("sortHelixAskRepliesChronologically");
+    expect(source).toContain("chronologicalAskRepliesForState");
+    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain('aria-label="Turn stream"');
     expect(source).not.toContain(">Turn stream<");
@@ -969,6 +971,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("durableById.get(reply.id) ?? reply");
     expect(source).toContain("sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8)");
     expect(source).toContain("sortHelixAskRepliesChronologically");
+    expect(source).toContain("chronologicalAskRepliesForState");
+    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain("const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId");
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");

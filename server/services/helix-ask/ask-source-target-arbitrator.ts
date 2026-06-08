@@ -22,6 +22,7 @@ import {
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
 import { buildAskEvidenceTargetArbitration } from "./evidence-target-arbitration";
@@ -559,6 +560,35 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (selectedEvidenceCandidate?.target_source === "internet_search") {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "internet_search",
+      targetKind: "internet_search",
+      strength: selectedEvidenceCandidate.strength,
+      explicitCues: selectedEvidenceCandidate.reason_codes,
+      reasons: [
+        "evidence_target_arbitration_selected_internet_search",
+        ...selectedEvidenceCandidate.reason_codes,
+      ],
+      requestedOutputs: selectedEvidenceCandidate.requested_outputs,
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "docs_viewer_receipt",
+        "repo_code_evidence_question",
+        "scholarly_research_lookup",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "evidence_target_arbitration_selected_internet_search",
+      confidence: selectedEvidenceCandidate.score,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   const selectedEvidenceTargetSource = selectedEvidenceCandidate?.target_source ?? evidenceTargetArbitration.selected_target_source;
   const stagePlayLiveEnvironmentAdmitted = selectedEvidenceTargetSource === "live_environment";
   if (stagePlayLiveEnvironmentAdmitted && isStagePlayCheckpointRequestPrompt(prompt)) {
@@ -792,6 +822,33 @@ export function arbitrateAskSourceTarget(input: {
       ],
       precedenceReason: "external_scholarly_research_source_target",
       confidence: scholarlyResearchIntent.strength === "hard" ? 0.96 : 0.86,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  const internetSearchIntent = detectInternetSearchIntent(prompt);
+  if (internetSearchIntent.searchRequested) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "internet_search",
+      targetKind: "internet_search",
+      strength: internetSearchIntent.strength,
+      explicitCues: internetSearchIntent.explicitCues,
+      reasons: internetSearchIntent.reasons,
+      requestedOutputs: internetSearchIntent.requestedOutputs,
+      suppressedRoutes: [
+        "active_doc_identity",
+        "active_doc_summary",
+        "doc_open_best",
+        "docs_viewer_receipt",
+        "repo_code_evidence_question",
+        "scholarly_research_lookup",
+        "model_only_concept",
+        "no_tool_direct",
+      ],
+      precedenceReason: "external_internet_search_source_target",
+      confidence: internetSearchIntent.strength === "hard" ? 0.94 : 0.82,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

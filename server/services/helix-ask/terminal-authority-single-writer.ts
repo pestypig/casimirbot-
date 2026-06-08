@@ -70,6 +70,10 @@ const routeContractRequiresScholarlyResearchAnswer = (payload: Record<string, un
   readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) === "scholarly_research_answer" ||
   routeContractAllowedTerminalKinds(payload).includes("scholarly_research_answer");
 
+const routeContractRequiresInternetSearchAnswer = (payload: Record<string, unknown>): boolean =>
+  readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) === "internet_search_answer" ||
+  routeContractAllowedTerminalKinds(payload).includes("internet_search_answer");
+
 const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
@@ -585,6 +589,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const scholarlyAnswerSynthesisMissing =
     routeContractRequiresScholarlyResearchAnswer(input.payload) &&
     hasObservedScholarlyFullText(artifacts);
+  const internetSearchAnswerSynthesisMissing =
+    routeContractRequiresInternetSearchAnswer(input.payload) &&
+    artifacts.some((artifact) => /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
 
   if (selectedDraft && !routeAllowsModelSynthesizedAnswer && draftMaterialization?.ok !== true) {
     rejectedCandidates.push({
@@ -686,9 +693,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selectedArtifactKind === "scholarly_research_answer"
         ? readRecord(input.payload.scholarly_research_answer)
         : null;
+    const materializedInternetSearchAnswer =
+      selectedArtifactKind === "internet_search_answer"
+        ? readRecord(input.payload.internet_search_answer)
+        : null;
     const baseText =
       readString(materializedScholarlyAnswer?.answer_text) ??
       readString(materializedScholarlyAnswer?.text) ??
+      readString(materializedInternetSearchAnswer?.answer_text) ??
+      readString(materializedInternetSearchAnswer?.text) ??
       latestDraft?.text ??
       readString(input.payload.selected_final_answer) ??
       "I could not produce a terminal answer for this turn.";
@@ -702,6 +715,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materializedScholarlyAnswer.answer_text = text;
       materializedScholarlyAnswer.citations = citationFooter.citations;
       materializedScholarlyAnswer.citation_footer = citationFooter.footer;
+    }
+    if (materializedInternetSearchAnswer) {
+      materializedInternetSearchAnswer.text = text;
+      materializedInternetSearchAnswer.answer_text = text;
     }
     selectedSource = "final_answer_draft";
     input.payload.terminal_artifact_kind = selectedArtifactKind;
@@ -781,9 +798,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
   } else if (!solverContinuationPending && latestRequiredObservationSequence >= 0) {
     const terminalErrorCode = scholarlyAnswerSynthesisMissing
       ? "scholarly_answer_synthesis_failed_after_full_text_observed"
+      : internetSearchAnswerSynthesisMissing
+      ? "internet_search_answer_synthesis_failed_after_observation"
       : "post_tool_model_step_missing";
     const terminalErrorText = scholarlyAnswerSynthesisMissing
       ? "I could not complete this scholarly research turn because PDF/full-text evidence was observed, but no valid model-authored scholarly answer passed terminal authority."
+      : internetSearchAnswerSynthesisMissing
+      ? "I could not complete this internet search turn because web evidence was observed, but no valid model-authored internet search answer passed terminal authority."
       : "I could not complete this turn because a tool observation required a follow-up model answer step, but no later terminal answer artifact was available.";
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
@@ -820,6 +841,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const selectedMaterializedAnswerText =
     readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
+    readString(readRecord(input.payload.internet_search_answer)?.answer_text) ??
     readString(readRecord(input.payload.repo_code_evidence_answer)?.answer_text);
   const selectedArtifactTextForIntegrity = selectedMaterializedAnswerText ?? draftText;
   const receiptVisibleAsAnswer = artifacts.some((artifact) => {

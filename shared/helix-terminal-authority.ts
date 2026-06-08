@@ -1,6 +1,7 @@
 export type HelixTerminalCandidateSource =
   | "final_answer_draft"
   | "repo_code_evidence_answer"
+  | "internet_search_answer"
   | "situation_room_live_job_setup_answer"
   | "request_user_input"
   | "typed_failure"
@@ -59,6 +60,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
     | "scholarly_research_answer"
+    | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
     | "situation_context_pack"
     | "visual_context_pack"
@@ -74,6 +76,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "final_answer_draft"
     | "repo_code_evidence_answer"
     | "scholarly_research_answer"
+    | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
     | "situation_context_pack"
     | "visual_context_pack"

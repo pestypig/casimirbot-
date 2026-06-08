@@ -143,6 +143,8 @@ const inferSource = (record: Record<string, unknown>, kind?: string | null): Hel
   const panelId = readString(record.panel_id) ?? "";
   const searchable = `${schema} ${kind ?? ""} ${capability} ${panelId}`.toLowerCase();
   if (searchable.includes("repo_code")) return "repo_code";
+  if (searchable.includes("internet_search") || searchable.includes("internet-search")) return "internet_search";
+  if (searchable.includes("scholarly_research") || searchable.includes("scholarly-research")) return "scholarly_research";
   if (searchable.includes("docs-viewer") || searchable.includes("doc_")) return "docs";
   if (searchable.includes("active_doc")) return "active_doc";
   if (searchable.includes("visual") || searchable.includes("screen")) return "visual_capture";
@@ -404,6 +406,63 @@ export const compactScholarlyFullTextArtifactForModel = (input: {
   };
 };
 
+export const compactInternetSearchArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const cfg = config();
+  const results = readArray(payload.results).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const evidenceRefs = readArray(payload.evidence_refs).map((entry) => readRecord(entry)).filter(Boolean) as Record<string, unknown>[];
+  const supportRefs = unique([
+    readString(artifact?.artifact_id),
+    readString(payload.artifact_id),
+    ...evidenceRefs.map((entry) => readString(entry.ref)),
+    ...results.flatMap((entry) => [
+      readString(entry.result_id),
+      readString(entry.url),
+      ...readStringArray(entry.evidence_refs),
+    ]),
+  ], 96);
+  const found = results.length
+    ? results.slice(0, cfg.observationMaxFindings).map((result) => {
+        const title = readString(result.title) ?? "Untitled web result";
+        const url = readString(result.url);
+        const snippet = readString(result.snippet) ?? readString(result.content_excerpt);
+        return compactText([title, url, snippet].filter(Boolean).join(" - "), 420);
+      })
+    : [compactText(`No internet search results were returned for ${readString(payload.query) ?? "the requested query"}.`, 300)];
+  const proves = results.length
+    ? results.slice(0, cfg.observationMaxProves).map((result) => {
+        const title = readString(result.title) ?? "web result";
+        const url = readString(result.url) ?? "unknown URL";
+        return compactText(`${title} is an external web source at ${url}.`, 260);
+      })
+    : [];
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? `${input.turnId}:internet_search_observation`,
+    source: "internet_search",
+    source_target: "internet_search",
+    capability_key: "internet-search.search_web",
+    status: results.length > 0 ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? readString(payload.query) ?? "", 320),
+    found,
+    proves: proves.length ? proves : ["Internet search completed, but no web results were selected for synthesis."],
+    support_refs: supportRefs,
+    missing_or_uncertain: readStringArray(payload.missing_requirements),
+    suggested_next_steps: results.length ? ["answer", "repair"] : ["repair", "use_another_tool", "fail_closed"],
+    raw_debug_ref: `${readString(payload.artifact_id) ?? readString(artifact?.artifact_id) ?? input.turnId}:raw_internet_search_payload`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const compactRouteOrTerminalContractForModel = (
   value: unknown,
   options: { includeForbidden?: boolean; failedValidation?: boolean } = {},
@@ -533,6 +592,13 @@ export const buildHelixModelPromptContext = (input: {
       }
       if (/scholarly_full_text_observation/i.test(kind ?? "")) {
         return compactScholarlyFullTextArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+        });
+      }
+      if (/internet_search_observation/i.test(kind ?? "")) {
+        return compactInternetSearchArtifactForModel({
           turnId: input.turnId,
           artifact,
           userRequested: input.userGoal,

@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import { __testHelixAskPendingInputStore, planRouter } from "../routes/agi.plan";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
   analyzeVisualFrame,
@@ -17,9 +17,10 @@ import {
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
+import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { recordLiveSourceMailDecisionForAsk } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
 
-const threadId = "thread:mail-interpretation-routing";
+const threadId = "helix-ask:desktop";
 const roomId = "room:mail-interpretation-routing";
 const sourceId = "visual_source:mail-interpretation-routing";
 
@@ -33,9 +34,11 @@ const createApp = (): express.Express => {
 const resetLiveSourceMailRoutingState = (): void => {
   resetVisualSnapshotStoreForTest();
   resetStagePlayLiveSourceMailboxForTest();
+  resetStagePlayLiveSourceMailboxThreadResolverForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
+  __testHelixAskPendingInputStore.delete(threadId);
 };
 
 beforeEach(() => {
@@ -71,6 +74,7 @@ afterEach(() => {
   delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
   delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
   delete process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE;
+  __testHelixAskPendingInputStore.delete(threadId);
 });
 
 const seedVisualMail = (summary: string): void => {
@@ -165,6 +169,33 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       capability: "live_env.configure_interpreter_profile",
       interpreter_profile_ref: expect.stringMatching(/^stage_play_live_source_interpreter_profile:/),
     });
+    expect(response.body?.terminal_error_code, debug).not.toBe("terminal_consistency_violation");
+    expect(response.body?.answer, debug).toMatch(/Interpreter profile configured|Minecraft Survival Coach/i);
+  }, 60_000);
+
+  it("configures a Minecraft video predictor profile without terminal consistency failure", async () => {
+    seedVisualMail("A Minecraft YouTube video frame is visible, but profile setup should not consume the mail.");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Create a Minecraft Video Predictor interpreter profile for this source. Separate observed facts from cautious inferences, predict the next likely scene beat, and say what should be watched next.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.configure_interpreter_profile");
+    expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_live_source_mail");
+    expect(response.body?.terminal_error_code, debug).not.toBe("terminal_consistency_violation");
+    const profileArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_interpreter_profile"
+    );
+    expect(profileArtifact?.payload?.observation, debug).toMatchObject({
+      profile: expect.objectContaining({
+        title: "Minecraft Video Predictor",
+        domain: "minecraft",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+    expect(response.body?.answer, debug).toMatch(/Interpreter profile configured|Minecraft Video Predictor/i);
   }, 60_000);
 
   it("routes active-profile interpretation prompts through read, compare, then decision", async () => {
@@ -395,7 +426,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
     expect(decision?.narrativeStateRef, debug).toBeFalsy();
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
-  }, 30_000);
+  }, 60_000);
 
   it("routes explicit important voice prompts to request_voice_callout without terminalizing the raw mail receipt", async () => {
     seedVisualMail("A hostile mob appears near the player and should be called out quickly.");

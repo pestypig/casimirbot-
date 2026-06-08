@@ -5,6 +5,7 @@ export type FinalAnswerDraftQualityViolation =
   | "missing_required_prompt_parts"
   | "missing_support_refs_for_repo_route"
   | "missing_support_refs_for_scholarly_route"
+  | "missing_support_refs_for_internet_search_route"
   | "contradicts_observed_scholarly_full_text"
   | "unsupported_repo_claim"
   | "receipt_like_answer"
@@ -14,6 +15,7 @@ export type FinalAnswerDraftRouteFamily =
   | "model_only"
   | "repo_evidence"
   | "scholarly_research"
+  | "internet_search"
   | "docs_source"
   | "workstation_tool"
   | "calculator_tool"
@@ -77,6 +79,9 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "scholarly_research" || /scholarly_research|doi|citation|journal/i.test(routeText)) {
     return "scholarly_research";
   }
+  if (sourceTarget === "internet_search" || /internet_search|internet-search|web_search|google_custom_search|search_web/i.test(routeText)) {
+    return "internet_search";
+  }
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc" || /\bdoc|docs_viewer|active_doc/i.test(routeText)) {
     return "docs_source";
   }
@@ -97,15 +102,23 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     const kind = readString(artifact.kind);
     const payload = readRecord(artifact.payload);
     const schema = readString(payload?.schema);
-    return /repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation/i.test([kind, schema].join(" "));
+    return /repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation/i.test([kind, schema].join(" "));
   })) {
     return ledger.some((artifact: ArtifactLike) => {
       const kind = readString(artifact.kind);
       const payload = readRecord(artifact.payload);
       const schema = readString(payload?.schema);
+      if (/internet_search_observation/i.test([kind, schema].join(" "))) return true;
       return /scholarly_research_observation|scholarly_full_text_observation/i.test([kind, schema].join(" "));
     })
-      ? "scholarly_research"
+      ? ledger.some((artifact: ArtifactLike) => {
+          const kind = readString(artifact.kind);
+          const payload = readRecord(artifact.payload);
+          const schema = readString(payload?.schema);
+          return /internet_search_observation/i.test([kind, schema].join(" "));
+        })
+        ? "internet_search"
+        : "scholarly_research"
       : "repo_evidence";
   }
   return "unknown";
@@ -122,10 +135,17 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),
+      ...readArray(payload?.results)
+        .map(readRecord)
+        .flatMap((result: Record<string, unknown> | null) => [
+          readString(result?.result_id),
+          readString(result?.url),
+          ...readArray(result?.evidence_refs).map(readString),
+        ]),
       ...readArray(payload?.produced_artifact_refs).map(readString),
       ...readArray(payload?.support_refs).map(readString),
       ...readArray(payload?.page_text_refs)
@@ -220,14 +240,16 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
   if (routeFamily === "model_only" && isCompoundComparisonPrompt(prompt) && !compoundComparisonCovered(text)) {
     violations.push("missing_required_prompt_parts");
   }
-  if (routeFamily === "repo_evidence" || routeFamily === "scholarly_research") {
+  if (routeFamily === "repo_evidence" || routeFamily === "scholarly_research" || routeFamily === "internet_search") {
     if (collectFinalAnswerDraftSupportRefs({
       draftPayload: input.draftPayload,
       artifactLedger: input.artifactLedger,
     }).length === 0) {
       violations.push(routeFamily === "scholarly_research"
         ? "missing_support_refs_for_scholarly_route"
-        : "missing_support_refs_for_repo_route");
+        : routeFamily === "internet_search"
+          ? "missing_support_refs_for_internet_search_route"
+          : "missing_support_refs_for_repo_route");
     }
     if (routeFamily === "repo_evidence" && /\b(?:no|without|missing)\s+(?:current-turn\s+)?(?:repo|repository|code)\s+evidence/i.test(text)) {
       violations.push("unsupported_repo_claim");

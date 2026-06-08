@@ -174,6 +174,26 @@ const collectScholarlyResearchEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectInternetSearchEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesInternetSearch =
+    /internet_search_answer|internet_search_observation/i.test(input.terminalArtifactKind) ||
+    /internet_search_answer|internet_search_observation/i.test(input.finalAnswerSource);
+  if (!terminalUsesInternetSearch) return [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => readString(entry.kind) === "internet_search_observation")
+    .map((entry) => readString(entry.artifact_id))
+    .filter(Boolean);
+};
+
 const collectReceiptRefs = (input: {
   payload: RecordLike;
   loopTrace: RecordLike | null;
@@ -221,6 +241,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectScholarlyResearchEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectInternetSearchEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

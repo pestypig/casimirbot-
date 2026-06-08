@@ -5,6 +5,7 @@ export type HelixModelObservationSource =
   | "tool"
   | "repo_code"
   | "scholarly_research"
+  | "internet_search"
   | "docs"
   | "active_doc"
   | "visual_capture"

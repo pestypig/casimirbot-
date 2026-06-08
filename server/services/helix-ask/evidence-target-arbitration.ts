@@ -3,12 +3,14 @@ import type {
   HelixAskEvidenceTargetCandidate,
 } from "@shared/helix-ask-evidence-target-arbitration";
 import { HELIX_ASK_EVIDENCE_TARGET_ARBITRATION_SCHEMA } from "@shared/helix-ask-evidence-target-arbitration";
+import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
 import type {
   HelixAskSourceTarget,
   HelixAskSourceTargetRequestedOutput,
   HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
@@ -104,6 +106,7 @@ export function buildAskEvidenceTargetArbitration(input: {
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
   const scholarlyIntent = detectScholarlyResearchIntent(prompt);
+  const internetSearchIntent = detectInternetSearchIntent(prompt);
   const stagePlayNegative = hasStagePlayNegativeCue(prompt);
   const stagePlayLexical = hasStagePlayLexicalCue(prompt);
   const stagePlayOperational =
@@ -181,6 +184,21 @@ export function buildAskEvidenceTargetArbitration(input: {
       terminalProductConstraints: scholarlyIntent.fullTextRequested
         ? ["scholarly_research_observation", "scholarly_full_text_observation", "scholarly_research_answer"]
         : ["scholarly_research_observation", "scholarly_research_answer"],
+    }));
+  }
+
+  if (!contextualSuppression && internetSearchIntent.searchRequested) {
+    promptIntentCandidates.push("internet_search");
+    candidates.push(makeCandidate({
+      candidateId: "internet_search.external_web_sources",
+      targetSource: "internet_search",
+      targetKind: "internet_search",
+      strength: internetSearchIntent.strength,
+      score: internetSearchIntent.strength === "hard" ? 0.92 : 0.72,
+      reasonCodes: internetSearchIntent.reasons,
+      requestedOutputs: internetSearchIntent.requestedOutputs,
+      capabilityKeys: [HELIX_INTERNET_SEARCH_CAPABILITY],
+      terminalProductConstraints: ["internet_search_observation", "internet_search_answer"],
     }));
   }
 
