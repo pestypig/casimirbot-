@@ -1833,8 +1833,8 @@ function buildObserverMailLoopNodes(input: {
       preview: outputPreview,
       statusChips: [
         latestDecision?.voicePolicy?.voiceEnabled ? "voice enabled" : "voice off",
-        wakeContinuationActive ? "armed" : null,
         manualCheckpointWithoutPolicy ? "configure watch job" : activeJob?.status ? `job ${activeJob.status}` : null,
+        wakeContinuationActive ? "armed" : null,
       ].filter((entry): entry is string => Boolean(entry)),
       statusBand: wakePressureBand ?? wakeContinuationBand,
       payloadRows: [

@@ -294,6 +294,32 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 60_000);
 
+  it("lets current-turn predictor interpretation override a one-sentence standing watch policy", async () => {
+    executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the active visual source and describe each new mail batch in one sentence.",
+      },
+    });
+    seedVisualMail("The Minecraft video shows a player moving from a wooden cabin interior into a birch forest while holding a sword.");
+
+    const { response, decision, debug } = await askMailbox(
+      "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Use a Minecraft video predictor contract: separate observed facts from cautious inferences, predict the next likely scene beat, and say what should be watched next.",
+    );
+
+    expect(decision, debug).toMatchObject({
+      decision: "record_interpretation",
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+    });
+    expect(decision?.textAnswerDraft, debug).toBeFalsy();
+    expect(response.body?.answer, debug).toMatch(/Minecraft|birch forest|Watch next|Prediction/i);
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 60_000);
+
   it("routes natural mailbox/update wording to the intended text or interpretation decision", async () => {
     const cases = [
       {

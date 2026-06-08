@@ -16710,7 +16710,11 @@ export function HelixAskPill({
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
-  const latestAskReply = askReplies[0] ?? null;
+  const chronologicalAskRepliesForState = useMemo(
+    () => sortHelixAskRepliesChronologically(askReplies),
+    [askReplies],
+  );
+  const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
   const liveSourceMailWakeReplyIdsRef = useRef<Set<string>>(new Set());
   const [liveSourceMailTranscriptRefreshSeq, setLiveSourceMailTranscriptRefreshSeq] = useState(0);
@@ -24852,6 +24856,7 @@ export function HelixAskPill({
               [
                 {
                   id: replyId,
+                  createdAtMs: Date.now(),
                   content: outputText,
                   question: attempt.recordedText ?? attempt.prompt,
                   debug: responseDebugWithClientMode,
@@ -29966,6 +29971,7 @@ export function HelixAskPill({
             [
               {
                 id: replyId,
+                createdAtMs: Date.now(),
                 content: responseText,
                 question: questionText || "Previous request",
                 debug: responseDebug,
@@ -30498,6 +30504,7 @@ export function HelixAskPill({
               [
                 {
                   id: replyId,
+                  createdAtMs: Date.now(),
                   content: responseText,
                   question: trimmed,
                   mode: "act",
@@ -32199,6 +32206,7 @@ export function HelixAskPill({
               [
                 {
                   id: crypto.randomUUID(),
+                  createdAtMs: Date.now(),
                   content: prompt,
                   question: singleEntry,
                   mode: "observe",
@@ -32240,7 +32248,7 @@ export function HelixAskPill({
           const responseText = `Opened ${panelDef.title}.`;
           setAskReplies((prev) =>
             [
-              { id: replyId, content: responseText, question: normalizedEntries[0] ?? entries[0] },
+              { id: replyId, createdAtMs: Date.now(), content: responseText, question: normalizedEntries[0] ?? entries[0] },
               ...prev,
             ].slice(0, 3),
           );
@@ -32450,7 +32458,7 @@ export function HelixAskPill({
     (layoutVariant === "dock"
       ? "mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
       : "mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
-  const chronologicalAskReplies = sortHelixAskRepliesChronologically(askReplies);
+  const chronologicalAskReplies = chronologicalAskRepliesForState;
   const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
