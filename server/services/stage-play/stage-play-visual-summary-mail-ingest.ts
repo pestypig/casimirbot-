@@ -913,6 +913,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   suppressedCriteria?: string[];
   observedFacts?: string[];
   inferredMeaning?: string[];
+  mailCoverage?: StagePlayLiveSourceMailDecisionV1["mailCoverage"] | null;
   evidenceRefs?: string[];
   modelReviewed?: boolean;
   now?: string;
@@ -978,6 +979,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     suppressedCriteria: input.suppressedCriteria ?? [],
     observedFacts: input.observedFacts ?? [],
     inferredMeaning: input.inferredMeaning ?? [],
+    mailCoverage: input.mailCoverage ?? input.interpretation?.mailCoverage ?? null,
     evidenceRefs: input.evidenceRefs ?? [],
     modelReviewed: input.modelReviewed !== false,
     createdAt: input.now,
@@ -1009,6 +1011,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     policyId: policy?.policyId ?? jobState?.watchJobPolicyRef ?? null,
     sourceIds: mailItems.map((item) => item.sourceId),
     mailBatchRefs: decision.mailIds,
+    mailCoverage: decision.mailCoverage,
     sourceEvidenceRefs: mailItems.flatMap((item) => item.evidenceRefs),
     ...interpretation,
     lastDecisionRef: decision.decisionId,

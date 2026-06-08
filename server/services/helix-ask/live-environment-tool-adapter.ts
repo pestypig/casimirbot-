@@ -236,6 +236,24 @@ const readInterpretationPayload = (
 ): StagePlayLiveSourceMailInterpretationPayloadV1 | null => {
   const record = readRecord(value) ?? fallbackSource ?? null;
   if (!record) return null;
+  const coverageRecord = readRecord(record.mail_coverage ?? record.mailCoverage);
+  const coverageMode = readString(coverageRecord?.mode);
+  const mailCoverage = coverageRecord && (
+    coverageMode === "latest_only" ||
+    coverageMode === "chronological_batch" ||
+    coverageMode === "micro_batch" ||
+    coverageMode === "per_mail" ||
+    coverageMode === "salience_window"
+  )
+    ? {
+        readMailIds: readStringArray(coverageRecord.read_mail_ids ?? coverageRecord.readMailIds),
+        interpretedMailIds: readStringArray(coverageRecord.interpreted_mail_ids ?? coverageRecord.interpretedMailIds),
+        compressedMailIds: readStringArray(coverageRecord.compressed_mail_ids ?? coverageRecord.compressedMailIds),
+        skippedMailIds: readStringArray(coverageRecord.skipped_mail_ids ?? coverageRecord.skippedMailIds),
+        mode: coverageMode,
+        reason: readString(coverageRecord.reason) ?? "Interpretation payload supplied mail coverage.",
+      }
+    : undefined;
   const payload: StagePlayLiveSourceMailInterpretationPayloadV1 = {
     currentSceneSummary:
       readString(record.current_scene_summary) ??
@@ -273,6 +291,7 @@ const readInterpretationPayload = (
       readOptionalNumber(record.prediction_confidence) ??
       readOptionalNumber(record.predictionConfidence),
     validationSignals: readStringArray(record.validation_signals ?? record.validationSignals),
+    mailCoverage,
   };
   const hasPayload = Object.values(payload).some((entry) =>
     Array.isArray(entry) ? entry.length > 0 : entry !== undefined && entry !== null && entry !== ""
@@ -2666,6 +2685,22 @@ export function executeLiveEnvironmentTool(
     const nextLoopState = nextLoopStateRaw && allowedLoopStates.has(nextLoopStateRaw)
       ? nextLoopStateRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["nextLoopState"]
       : null;
+    const mailCoverageRaw =
+      args.mail_coverage && typeof args.mail_coverage === "object" && !Array.isArray(args.mail_coverage)
+        ? args.mail_coverage as Record<string, unknown>
+        : args.mailCoverage && typeof args.mailCoverage === "object" && !Array.isArray(args.mailCoverage)
+          ? args.mailCoverage as Record<string, unknown>
+          : null;
+    const mailCoverage = mailCoverageRaw
+      ? {
+          readMailIds: readStringArray(mailCoverageRaw.read_mail_ids ?? mailCoverageRaw.readMailIds),
+          interpretedMailIds: readStringArray(mailCoverageRaw.interpreted_mail_ids ?? mailCoverageRaw.interpretedMailIds),
+          compressedMailIds: readStringArray(mailCoverageRaw.compressed_mail_ids ?? mailCoverageRaw.compressedMailIds),
+          skippedMailIds: readStringArray(mailCoverageRaw.skipped_mail_ids ?? mailCoverageRaw.skippedMailIds),
+          mode: readString(mailCoverageRaw.mode) as NonNullable<Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["mailCoverage"]>["mode"] | undefined,
+          reason: readString(mailCoverageRaw.reason) ?? "Model supplied mail coverage for this decision.",
+        }
+      : null;
     const recordedDecision = recordLiveSourceMailDecisionForAsk({
       threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
@@ -2697,6 +2732,16 @@ export function executeLiveEnvironmentTool(
       suppressedCriteria: readStringArray(args.suppressed_criteria ?? args.suppressedCriteria),
       observedFacts: readStringArray(args.observed_facts ?? args.observedFacts),
       inferredMeaning: readStringArray(args.inferred_meaning ?? args.inferredMeaning),
+      mailCoverage: mailCoverage && mailCoverage.mode
+        ? {
+            readMailIds: mailCoverage.readMailIds,
+            interpretedMailIds: mailCoverage.interpretedMailIds,
+            compressedMailIds: mailCoverage.compressedMailIds,
+            skippedMailIds: mailCoverage.skippedMailIds,
+            mode: mailCoverage.mode,
+            reason: mailCoverage.reason,
+          }
+        : null,
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
     });

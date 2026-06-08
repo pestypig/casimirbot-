@@ -37,6 +37,7 @@ export type WorkstationToolIntent =
   | "physics_calculation_context"
   | "zen_graph_reflection"
   | "theory_ideology_bridge_reflection"
+  | "civilization_bounds_reflection"
   | "direct_answer";
 
 export type VoiceContextRequestKind =
@@ -984,6 +985,34 @@ function makeTheoryIdeologyBridgeAskToolStep(prompt: string): HelixWorkstationTo
   };
 }
 
+function makeCivilizationBoundsAskToolStep(
+  prompt: string,
+  depends_on: string[] = [],
+): HelixWorkstationToolPlanStep {
+  return {
+    step_id: "reflect_civilization_bounds",
+    kind: "run_ask_tool",
+    tool_id: "helix_ask.reflect_civilization_bounds",
+    args: {
+      prompt,
+      scenarioId: "needle_hull_ideal_global_construction",
+      refs: ["helix-ask:current-turn"],
+      options: {
+        includeBridgeContext: true,
+        includeCollaborationBounds: true,
+        includeFalsificationHooks: true,
+      },
+    },
+    depends_on,
+    expected_receipt_kind: "helix_civilization_bounds_tool_result",
+    expected_state_change: {
+      store: "civilization-bounds-roadmap",
+      proof_key: "roadmap",
+    },
+    required: true,
+  };
+}
+
 function makePanelReflectionStep(prompt: string, depends_on: string[] = []): HelixWorkstationToolPlanStep {
   return {
     step_id: "reflect_discussion_context",
@@ -1093,6 +1122,18 @@ function hasTheoryIdeologyBridgePromptCue(prompt: string): boolean {
     );
 
   return hasTheoryCue && hasZenJusticeCue;
+}
+
+function hasCivilizationBoundsCue(prompt: string): boolean {
+  return /\b(?:civilization\s+bounds|system\s+limits|collaboration\s+constraints|bounded\s+civilization|resource\s+bounds|ideal\s+vs\s+observed|feasibility\s+map|procedural\s+atlas|civilization\s+roadmap|phase\s+roadmap|material\s+inventory|energy\s+budget|manufacturing\s+resolution|governance\s+interface|situational\s+bounds|capacity\s+bounds|collaboration\s+bound|collaboration\s+value)\b/i.test(
+    prompt,
+  );
+}
+
+function isCivilizationBoundsReflectionPrompt(prompt: string): boolean {
+  if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
+  if (userExplicitlyDisallowsPanelsOrTools(prompt)) return false;
+  return hasCivilizationBoundsCue(prompt);
 }
 
 function isTheoryIdeologyBridgeReflectionPrompt(prompt: string): boolean {
@@ -1483,7 +1524,7 @@ export function planWorkstationToolUse(
     };
   }
 
-  if (isTheoryIdeologyBridgeReflectionPrompt(normalized)) {
+  if (isTheoryIdeologyBridgeReflectionPrompt(normalized) && !isCivilizationBoundsReflectionPrompt(normalized)) {
     const steps: HelixWorkstationToolPlanStep[] = [
       makeTheoryReflectionAskToolStep(normalized),
       makeZenGraphReflectionAskToolStep(normalized),
@@ -1521,6 +1562,71 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason:
         "Prompt asks to reflect theory/physics constraints against Zen/procedural justice lenses; produce bridge evidence before final answer.",
+      missing_required_args: [],
+    };
+  }
+
+  if (isCivilizationBoundsReflectionPrompt(normalized)) {
+    const wantsBridge = isTheoryIdeologyBridgeReflectionPrompt(normalized);
+    const wantsTheory = wantsBridge || hasTheoryReflectionDomain(normalized);
+    const wantsZen =
+      wantsBridge ||
+      hasZenGraphPromptCue(normalized) ||
+      /\b(?:fairness|due\s+process|review|non[-\s]?harm|governance|procedural)\b/i.test(normalized);
+    const steps: HelixWorkstationToolPlanStep[] = [
+      ...(wantsTheory ? [makeTheoryReflectionAskToolStep(normalized)] : []),
+      ...(wantsZen ? [makeZenGraphReflectionAskToolStep(normalized)] : []),
+      makeCivilizationBoundsAskToolStep(normalized, [
+        ...(wantsTheory ? ["reflect_theory_context"] : []),
+        ...(wantsZen ? ["reflect_zen_graph_context"] : []),
+      ]),
+      ...(wantsBridge
+        ? [
+            {
+              ...makeTheoryIdeologyBridgeAskToolStep(normalized),
+              depends_on: [
+                "reflect_theory_context",
+                "reflect_zen_graph_context",
+                "reflect_civilization_bounds",
+              ],
+            },
+          ]
+        : []),
+      {
+        step_id: wantsBridge
+          ? "evaluate_civilization_bounds_bridge"
+          : "evaluate_civilization_bounds",
+        kind: "evaluate_result",
+        depends_on: [wantsBridge ? "bridge_theory_ideology_context" : "reflect_civilization_bounds"],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      },
+    ];
+
+    pushScore({
+      affordance_id: "helix_ask.reflect_civilization_bounds",
+      panel_id: "helix_ask",
+      action_id: "reflect_civilization_bounds",
+      score: wantsBridge ? 0.92 : 0.88,
+      reason:
+        "Prompt asks for a read-only civilization bounds roadmap as situational evidence for capacities, dependencies, missing checks, and procedural gates",
+      required_args_missing: [],
+    });
+
+    return {
+      intent: "civilization_bounds_reflection",
+      action: null,
+      tool_plan: buildToolPlan({
+        prompt: normalized,
+        intent: "civilization_bounds_reflection",
+        missing: [],
+        options,
+        steps,
+      }),
+      scores,
+      should_use_tool: true,
+      reason:
+        "Prompt asks for civilization/system bounds; produce a diagnostic roadmap receipt before synthesis.",
       missing_required_args: [],
     };
   }

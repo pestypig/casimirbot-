@@ -456,6 +456,35 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
   ].join("\n");
 }
 
+function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  const hasBridgeStep = input.plan.steps.some(
+    (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.bridge_theory_ideology_context",
+  );
+  const hasTheoryStep = input.plan.steps.some(
+    (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.reflect_theory_context",
+  );
+  const hasZenStep = input.plan.steps.some(
+    (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.reflect_ideology_context",
+  );
+  const summary =
+    input.evaluation?.summary?.trim() ||
+    "Civilization Bounds Roadmap produced evidence-only system bounds, capability/dependency badges, collaboration constraints, and missing-evidence hooks.";
+  return [
+    "I treated the roadmap as a situational bounds receipt, not as a policy decision.",
+    summary,
+    hasTheoryStep
+      ? "Theory binding: physical badges bound what can be claimed about energy, materials, observation, entropy, and conservation."
+      : "Theory binding: no theory reflection step was required by the selected plan.",
+    hasZenStep
+      ? "ZenGraph binding: procedural lenses bound review, uncertainty, non-harm, contestability, and missing checks."
+      : "ZenGraph binding: no ZenGraph reflection step was required by the selected plan.",
+    hasBridgeStep
+      ? "Bridge continuity: civilization bounds supplied the situational layer between Theory and Zen evidence."
+      : "Bridge continuity: the roadmap is ready to export Theory/Zen bridge context, but the selected plan did not require the bridge step.",
+    "Boundary: the roadmap does not decide what should happen, certify predictions, authorize actions, or turn collaborationValue into moral value.",
+  ].join("\n");
+}
+
 export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnswerInput): string {
   if (hasTheoryReflectionAndCalculatorSolve(input.plan)) {
     return synthesizeTheoryReflectionCalculatorAnswer(input);
@@ -499,6 +528,9 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   }
   if (input.plan.intent === "theory_ideology_bridge_reflection") {
     return synthesizeTheoryIdeologyBridgeAnswer(input);
+  }
+  if (input.plan.intent === "civilization_bounds_reflection") {
+    return synthesizeCivilizationBoundsAnswer(input);
   }
   if (input.plan.intent === "zen_graph_reflection") {
     return synthesizeZenGraphReflectionAnswer(input);

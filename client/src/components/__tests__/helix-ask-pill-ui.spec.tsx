@@ -969,8 +969,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("setAskReplies((prev) =>");
     expect(source).toContain('question: ""');
     expect(source).toContain("durableById.get(reply.id) ?? reply");
-    expect(source).toContain("sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8)");
+    expect(source).toContain("limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], 8)");
     expect(source).toContain("sortHelixAskRepliesChronologically");
+    expect(source).toContain("appendHelixAskReplyChronologically");
     expect(source).toContain("chronologicalAskRepliesForState");
     expect(source).toContain("const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
@@ -978,7 +979,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");
     expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
     expect(source).toContain("left.sequence - right.sequence");
-    expect(source).toContain("return right.index - left.index");
+    expect(source).toContain("return left.index - right.index");
+    expect(source).toContain("const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now()");
   });
 
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {

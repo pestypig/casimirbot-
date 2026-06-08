@@ -8,6 +8,7 @@ import { validateIdeologyContextReflectionV1 } from "../../../shared/ideology-co
 import { validateZenBadgeLocatorV1 } from "../../../shared/zen-badge-locator";
 import { validateFruitionProcedureExpressionV1 } from "../../../shared/fruition-procedure-expression";
 import { validateTheoryIdeologyBridgeV1 } from "../../../shared/theory-ideology-bridge";
+import { validateCivilizationBoundsRoadmapV1 } from "../../../shared/civilization-bounds-roadmap";
 
 export type EvaluateWorkstationToolReceiptInput = {
   thread_id: string;
@@ -156,6 +157,23 @@ function isTheoryIdeologyBridgeToolKind(kind: string | null, artifact: Record<st
   );
 }
 
+function isCivilizationBoundsToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
+  const roadmap = asRecord(artifact?.roadmap);
+  return (
+    kind === "helix_civilization_bounds_tool_result" ||
+    kind === "civilization_bounds_roadmap" ||
+    kind === "civilization_bounds.locate_context" ||
+    kind === "civilization_bounds.reflect_system_bounds" ||
+    kind === "civilization_bounds.compare_collaboration_bounds" ||
+    kind === "civilization_bounds.export_bridge_context" ||
+    artifact?.tool_id === "helix_ask.reflect_civilization_bounds" ||
+    roadmap?.artifactId === "civilization_bounds_roadmap" ||
+    roadmap?.schemaVersion === "civilization_bounds_roadmap/v1" ||
+    artifact?.artifactId === "civilization_bounds_roadmap" ||
+    artifact?.schemaVersion === "civilization_bounds_roadmap/v1"
+  );
+}
+
 function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>): string[] {
   const issues: string[] = [];
   const reflection = asRecord(artifact.reflection) ?? artifact;
@@ -182,6 +200,24 @@ function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>)
 function validateTheoryIdeologyBridgeToolResult(artifact: Record<string, unknown>): string[] {
   const bridge = asRecord(artifact.bridge) ?? artifact;
   return validateTheoryIdeologyBridgeV1(bridge);
+}
+
+function validateCivilizationBoundsToolResult(artifact: Record<string, unknown>): string[] {
+  const roadmap = asRecord(artifact.roadmap) ?? artifact;
+  const issues = validateCivilizationBoundsRoadmapV1(roadmap);
+  const authority = asRecord(roadmap.authority);
+  if (authority) {
+    for (const field of [
+      "terminal_eligible",
+      "agent_executable",
+      "prediction_finality",
+      "policy_finality",
+      "moral_finality",
+    ] as const) {
+      if (authority[field] !== false) issues.push(`authority.${field}_not_false`);
+    }
+  }
+  return issues;
 }
 
 export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolReceiptInput): WorkstationToolEvaluation {
@@ -276,6 +312,20 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       result = "supports_subgoal";
       summary =
         "Theory/Zen bridge produced evidence-only procedural constraints, analogy boundaries, missing checks, and overclaim guards.";
+    }
+  } else if (isCivilizationBoundsToolKind(topLevelKind, artifact ?? receipt)) {
+    const civilizationArtifact = artifact ?? receipt;
+    const issues = validateCivilizationBoundsToolResult(civilizationArtifact);
+    if (!ok) {
+      result = "insufficient";
+      summary = getString(receipt.message) ?? "Civilization Bounds Roadmap did not produce a usable receipt.";
+    } else if (issues.length > 0) {
+      result = "insufficient";
+      summary = `Civilization Bounds Roadmap rejected as policy/prediction evidence: ${issues.join(", ")}.`;
+    } else {
+      result = "supports_subgoal";
+      summary =
+        "Civilization Bounds Roadmap produced evidence-only system bounds, capability/dependency badges, collaboration constraints, and missing-evidence hooks.";
     }
   } else if (panelId === "workstation-notes") {
     result = ok ? "stored_for_reference" : "insufficient";

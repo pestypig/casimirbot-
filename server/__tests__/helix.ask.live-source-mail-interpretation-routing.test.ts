@@ -345,11 +345,64 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       decision: "record_interpretation",
       decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
       narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      mailCoverage: {
+        mode: "latest_only",
+        interpretedMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
+      },
     });
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
-    expect(response.body?.answer, debug).toMatch(/Minecraft|birch forest|Watch next|Prediction/i);
+    expect(response.body?.answer, debug).toMatch(/Observed facts:/i);
+    expect(response.body?.answer, debug).toMatch(/Cautious inferences:/i);
+    expect(response.body?.answer, debug).toMatch(/Prediction:/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
+    expect(response.body?.answer, debug).toMatch(/Minecraft|birch forest/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 60_000);
+
+  it("records coverage semantics for multi-mail interpretation instead of flattening the batch", async () => {
+    executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Watch the active visual source and describe each new mail batch in one sentence.",
+      },
+    });
+    [
+      "Mail 15 shows the Minecraft player inside a base near inventory and chest UI.",
+      "Mail 16 shows the player still managing inventory near storage.",
+      "Mail 17 shows the scene moving outside into a forest path.",
+      "Mail 18 shows outdoor movement with the player holding a sword.",
+      "Mail 19 shows a brief combat-risk moment with the player on fire.",
+      "Mail 20 shows a return toward base or inventory interaction with valuable items visible.",
+    ].forEach(seedVisualMail);
+
+    const { response, decision, debug } = await askMailbox(
+      "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Use the Minecraft video predictor contract, predict what happens next, and say what should be watched next.",
+    );
+
+    expect(decision, debug).toMatchObject({
+      decision: "record_interpretation",
+      decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
+      narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      mailCoverage: {
+        mode: "micro_batch",
+        readMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
+        interpretedMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
+      },
+    });
+    expect(decision?.mailCoverage?.readMailIds, debug).toHaveLength(6);
+    expect(decision?.mailCoverage?.interpretedMailIds, debug).toHaveLength(6);
+    expect(decision?.textAnswerDraft, debug).toBeFalsy();
+    expect(response.body?.answer, debug).toMatch(/Coverage:\s*micro_batch/i);
+    expect(response.body?.answer, debug).toMatch(/Observed facts:/i);
+    expect(response.body?.answer, debug).toMatch(/Cautious inferences:/i);
+    expect(response.body?.answer, debug).toMatch(/Prediction:/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
+    expect(response.body?.answer, debug).toMatch(/inventory|forest|sword|fire|valuable/i);
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 90_000);
 
   it("routes natural mailbox/update wording to the intended text or interpretation decision", async () => {
     const cases = [

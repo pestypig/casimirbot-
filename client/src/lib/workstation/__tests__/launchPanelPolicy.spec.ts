@@ -38,6 +38,11 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("stage-play-badge-graph")).toBe(true);
   });
 
+  it("includes the Civilization Bounds Roadmap in launch panels", () => {
+    expect(isUserLaunchPanel("civilization-bounds-roadmap")).toBe(true);
+    expect(isUserLaunchPanel("needle-world-roadmap")).toBe(false);
+  });
+
   it("keeps Essence Console as a legacy/debug panel outside default launch", () => {
     expect(isUserLaunchPanel("agi-essence-console")).toBe(false);
     expect(isLegacyDebugPanel("agi-essence-console")).toBe(true);

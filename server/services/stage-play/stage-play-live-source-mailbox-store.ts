@@ -372,6 +372,7 @@ export function recordStagePlayMailDecision(input: {
   suppressedCriteria?: string[];
   observedFacts?: string[];
   inferredMeaning?: string[];
+  mailCoverage?: StagePlayLiveSourceMailDecisionV1["mailCoverage"] | null;
   rearmReason?: string | null;
   evidenceRefs?: string[];
   modelReviewed?: boolean;
@@ -387,6 +388,25 @@ export function recordStagePlayMailDecision(input: {
     ...(input.evidenceRefs ?? []),
   ]);
   const nextLoopState = input.nextLoopState ?? defaultNextLoopStateForDecision(input.decision);
+  const uniqueMailIds = uniqueStrings(input.mailIds);
+  const mailCoverage: StagePlayLiveSourceMailDecisionV1["mailCoverage"] = input.mailCoverage ?? {
+    readMailIds: uniqueMailIds,
+    interpretedMailIds: input.decision === "record_interpretation" ? uniqueMailIds : [],
+    compressedMailIds: input.decision === "record_interpretation" && uniqueMailIds.length > 1 ? uniqueMailIds : [],
+    skippedMailIds: [],
+    mode:
+      input.decision !== "record_interpretation"
+        ? "latest_only"
+        : uniqueMailIds.length <= 1
+          ? "latest_only"
+          : uniqueMailIds.length <= 5
+            ? "chronological_batch"
+            : "micro_batch",
+    reason:
+      input.decision === "record_interpretation"
+        ? "Read live-source mail was interpreted as a chronological observation batch."
+        : "Decision did not require narrative interpretation of the full mail batch.",
+  };
   const jobId = input.activeJobId ?? defaultJobId({
     threadId: input.threadId,
     roomId: input.roomId ?? null,
@@ -404,7 +424,7 @@ export function recordStagePlayMailDecision(input: {
     artifactId: "stage_play_live_source_mail_decision",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_DECISION_SCHEMA,
     decisionId,
-    mailIds: uniqueStrings(input.mailIds),
+    mailIds: uniqueMailIds,
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
@@ -437,6 +457,7 @@ export function recordStagePlayMailDecision(input: {
     suppressedCriteria: uniqueStrings(input.suppressedCriteria ?? []),
     observedFacts: uniqueStrings(input.observedFacts ?? []),
     inferredMeaning: uniqueStrings(input.inferredMeaning ?? []),
+    mailCoverage,
     rearmReason: input.rearmReason ?? (nextLoopState === "armed_for_next_summary" ? "decision_recorded_rearm" : null),
     evidenceRefs,
     causalTrace: mergeLiveSourceCausalTraces(mailItems.map((item) => item.causalTrace), {

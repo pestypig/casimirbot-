@@ -196,6 +196,7 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   suppressedCriteria?: string[];
   observedFacts?: string[];
   inferredMeaning?: string[];
+  mailCoverage: StagePlayLiveSourceMailCoverageV1;
   rearmReason?: string | null;
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
@@ -205,6 +206,20 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   terminal_eligible: false;
   context_role: "tool_evidence";
   raw_content_included: false;
+};
+
+export type StagePlayLiveSourceMailCoverageV1 = {
+  readMailIds: string[];
+  interpretedMailIds: string[];
+  compressedMailIds: string[];
+  skippedMailIds: string[];
+  mode:
+    | "latest_only"
+    | "chronological_batch"
+    | "micro_batch"
+    | "per_mail"
+    | "salience_window";
+  reason: string;
 };
 
 export type StagePlayLiveSourceNarrativeStateV1 = {
@@ -219,6 +234,7 @@ export type StagePlayLiveSourceNarrativeStateV1 = {
   sourceIds: string[];
   priorNarrativeStateRef?: string | null;
   mailBatchRefs: string[];
+  mailCoverage: StagePlayLiveSourceMailCoverageV1;
   sourceEvidenceRefs: string[];
   currentSceneSummary: string;
   runningStorySummary: string;
@@ -278,6 +294,7 @@ export type StagePlayLiveSourceMailInterpretationPayloadV1 = {
   predictionHorizon?: "next_mail" | "next_2_to_5_mail_batches" | "until_source_changes" | "unknown" | string | null;
   predictionConfidence?: number | null;
   validationSignals?: string[];
+  mailCoverage?: StagePlayLiveSourceMailCoverageV1;
 };
 
 export type StagePlayLiveSourceVoiceDeliveryReceiptV1 = {

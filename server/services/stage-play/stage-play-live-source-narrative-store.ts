@@ -62,6 +62,7 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
   policyId?: string | null;
   sourceIds: string[];
   mailBatchRefs: string[];
+  mailCoverage?: StagePlayLiveSourceNarrativeStateV1["mailCoverage"] | null;
   sourceEvidenceRefs?: string[];
   currentSceneSummary: string;
   runningStorySummary?: string | null;
@@ -82,6 +83,20 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
     before: createdAt,
   });
   const currentSceneSummary = previewText(input.currentSceneSummary, 520);
+  const uniqueMailBatchRefs = uniqueStrings(input.mailBatchRefs);
+  const mailCoverage: StagePlayLiveSourceNarrativeStateV1["mailCoverage"] = input.mailCoverage ?? {
+    readMailIds: uniqueMailBatchRefs,
+    interpretedMailIds: uniqueMailBatchRefs,
+    compressedMailIds: uniqueMailBatchRefs.length > 1 ? uniqueMailBatchRefs : [],
+    skippedMailIds: [],
+    mode:
+      uniqueMailBatchRefs.length <= 1
+        ? "latest_only"
+        : uniqueMailBatchRefs.length <= 5
+          ? "chronological_batch"
+          : "micro_batch",
+    reason: "Narrative state was projected from the read live-source mail batch.",
+  };
   const runningStorySummary = previewText(
     input.runningStorySummary ??
       (prior?.runningStorySummary
@@ -91,7 +106,7 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
   );
   const sourceEvidenceRefs = uniqueStrings(input.sourceEvidenceRefs ?? []);
   const evidenceRefs = uniqueStrings([
-    ...input.mailBatchRefs,
+    ...uniqueMailBatchRefs,
     ...sourceEvidenceRefs,
     input.policyId,
     input.jobId,
@@ -102,7 +117,7 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
   const narrativeStateId = `stage_play_live_source_narrative_state:${hashShort([
     input.threadId,
     input.jobId,
-    input.mailBatchRefs,
+    uniqueMailBatchRefs,
     currentSceneSummary,
     createdAt,
   ])}`;
@@ -117,7 +132,8 @@ export function recordStagePlayLiveSourceNarrativeState(input: {
     environmentId: input.environmentId ?? null,
     sourceIds: uniqueStrings(input.sourceIds),
     priorNarrativeStateRef: prior?.narrativeStateId ?? null,
-    mailBatchRefs: uniqueStrings(input.mailBatchRefs),
+    mailBatchRefs: uniqueMailBatchRefs,
+    mailCoverage,
     sourceEvidenceRefs,
     currentSceneSummary,
     runningStorySummary,

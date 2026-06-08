@@ -8610,7 +8610,7 @@ function groupStagePlayMailTranscriptEntries(
     .sort((left: StagePlayLiveSourceMailTranscriptEntryV1[], right: StagePlayLiveSourceMailTranscriptEntryV1[]) => {
       const leftAt = left[0]?.createdAt ?? "";
       const rightAt = right[0]?.createdAt ?? "";
-      return rightAt.localeCompare(leftAt);
+      return leftAt.localeCompare(rightAt);
     });
 }
 
@@ -8620,12 +8620,10 @@ function buildHelixAskReplyFromMailTranscriptEntries(
   const first = entries[0] ?? null;
   if (!first) return null;
   const groupId = first.wakeResultId ?? first.askTurnId ?? first.wakeRequestId ?? first.entryId;
-  const createdAtMs = Math.max(
-    ...entries
-      .map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => Date.parse(entry.createdAt))
-      .filter((value: number) => Number.isFinite(value)),
-    Date.now(),
-  );
+  const parsedEntryTimes = entries
+    .map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => Date.parse(entry.createdAt))
+    .filter((value: number) => Number.isFinite(value));
+  const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now();
   const transcriptRows = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row);
   const transcriptEntryIds = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId);
   const mailIds = uniqueTextValues(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.mailIds));
@@ -9040,9 +9038,24 @@ function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskR
       if (left.ts !== null && right.ts !== null && left.ts !== right.ts) return left.ts - right.ts;
       if (left.ts !== null && right.ts === null) return -1;
       if (left.ts === null && right.ts !== null) return 1;
-      return right.index - left.index;
+      return left.index - right.index;
     })
     .map((entry) => entry.reply);
+}
+
+function limitHelixAskRepliesChronologically(
+  replies: HelixAskReply[],
+  limit = 8,
+): HelixAskReply[] {
+  return sortHelixAskRepliesChronologically(replies).slice(-limit);
+}
+
+function appendHelixAskReplyChronologically(
+  replies: HelixAskReply[],
+  reply: HelixAskReply,
+  limit = 8,
+): HelixAskReply[] {
+  return limitHelixAskRepliesChronologically([...replies, reply], limit);
 }
 
 function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {
@@ -16802,7 +16815,7 @@ export function HelixAskPill({
             liveSourceMailWakeReplyIdsRef.current.add(reply.id);
           }
           if (nextDurableReplies.length === 0 && merged.every((reply, index) => reply === prev[index])) return prev;
-          return sortHelixAskRepliesChronologically([...merged, ...nextDurableReplies]).slice(-8);
+          return limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], 8);
         });
       } catch (error) {
         console.warn("[HelixAskPill] live-source mail transcript refresh failed", error);
@@ -24853,7 +24866,8 @@ export function HelixAskPill({
             });
             const replyId = crypto.randomUUID();
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: replyId,
                   createdAtMs: Date.now(),
@@ -24875,8 +24889,8 @@ export function HelixAskPill({
                   liveEvents: liveEventsSnapshot,
                   convergenceSnapshot,
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
             appendSyntheticLiveEvent(
               buildObserverFinalizationEvent({
@@ -29968,7 +29982,8 @@ export function HelixAskPill({
             debug: responseDebug,
           });
           setAskReplies((prev) =>
-            [
+            appendHelixAskReplyChronologically(
+              prev,
               {
                 id: replyId,
                 createdAtMs: Date.now(),
@@ -29987,8 +30002,8 @@ export function HelixAskPill({
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
               },
-              ...prev,
-            ].slice(0, 3),
+              3,
+            ),
           );
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: responseText });
@@ -30190,9 +30205,11 @@ export function HelixAskPill({
           },
         });
         setAskReplies((prev) =>
-          [
+          appendHelixAskReplyChronologically(
+            prev,
             {
               id: crypto.randomUUID(),
+              createdAtMs: Date.now(),
               content: overviewText,
               question: trimmed,
               mode: "observe",
@@ -30201,8 +30218,8 @@ export function HelixAskPill({
                 process_graph_execution_authority: "none",
               } as unknown as HelixAskReply["debug"],
             },
-            ...prev,
-          ].slice(0, 3),
+            3,
+          ),
         );
         return;
       }
@@ -30234,15 +30251,17 @@ export function HelixAskPill({
               "I still need one detail before I can run that workspace action.";
             setAskStatus("Waiting for required input...");
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: crypto.randomUUID(),
+                  createdAtMs: Date.now(),
                   content: prompt,
                   question: trimmed,
                   mode: "observe",
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
             return;
           }
@@ -30328,15 +30347,17 @@ export function HelixAskPill({
               "I need one detail before I can run that workspace action.";
             setAskStatus("Waiting for required input...");
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: crypto.randomUUID(),
+                  createdAtMs: Date.now(),
                   content: clarifyText,
                   question: trimmed,
                   mode: "observe",
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
             if (routerSessionId) {
               setActive(routerSessionId);
@@ -30413,15 +30434,17 @@ export function HelixAskPill({
             "I still need one detail before I can run that workspace action.";
           setAskStatus("Waiting for required input...");
           setAskReplies((prev) =>
-            [
+            appendHelixAskReplyChronologically(
+              prev,
               {
                 id: crypto.randomUUID(),
+                createdAtMs: Date.now(),
                 content: prompt,
                 question: trimmed,
                 mode: "observe",
               },
-              ...prev,
-            ].slice(0, 3),
+              3,
+            ),
           );
           return;
         }
@@ -30501,7 +30524,8 @@ export function HelixAskPill({
               trimmed,
             );
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: replyId,
                   createdAtMs: Date.now(),
@@ -30510,8 +30534,8 @@ export function HelixAskPill({
                   mode: "act",
                   liveEvents: [fastPathEvent],
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
             if (sessionId) {
               addMessage(sessionId, { role: "assistant", content: responseText });
@@ -31534,9 +31558,11 @@ export function HelixAskPill({
             const replyId = crypto.randomUUID();
             directReplyIdForAutoSpeak = replyId;
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: replyId,
+                  createdAtMs: Date.now(),
                   content: responseText,
                   question: trimmed,
                   debug: responseDebugForReply,
@@ -31555,8 +31581,8 @@ export function HelixAskPill({
                   liveEvents: liveEventsSnapshot,
                   convergenceSnapshot,
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
           }
           const responseEnvelopeRecord =
@@ -32203,7 +32229,8 @@ export function HelixAskPill({
               "I still need one detail before I can run that workspace action.";
             setAskStatus("Waiting for required input...");
             setAskReplies((prev) =>
-              [
+              appendHelixAskReplyChronologically(
+                prev,
                 {
                   id: crypto.randomUUID(),
                   createdAtMs: Date.now(),
@@ -32211,8 +32238,8 @@ export function HelixAskPill({
                   question: singleEntry,
                   mode: "observe",
                 },
-                ...prev,
-              ].slice(0, 3),
+                3,
+              ),
             );
             if (askInputRef.current) {
               askInputRef.current.value = "";
@@ -32247,10 +32274,11 @@ export function HelixAskPill({
           const replyId = crypto.randomUUID();
           const responseText = `Opened ${panelDef.title}.`;
           setAskReplies((prev) =>
-            [
+            appendHelixAskReplyChronologically(
+              prev,
               { id: replyId, createdAtMs: Date.now(), content: responseText, question: normalizedEntries[0] ?? entries[0] },
-              ...prev,
-            ].slice(0, 3),
+              3,
+            ),
           );
           if (sessionId) {
             addMessage(sessionId, { role: "assistant", content: responseText });

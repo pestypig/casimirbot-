@@ -384,7 +384,8 @@ const RAW_HELIX_PANELS: HelixPanelRef[] = [
     loader: lazyPanel(() => import("@/components/CivilizationBoundsRoadmap")),
     defaultSize: { w: 1100, h: 720 },
     defaultPosition: { x: 240, y: 200 },
-    startHidden: true,
+    mobileReady: true,
+    keywords: PANEL_KEYWORDS["civilization-bounds-roadmap"],
   },
   {
     id: "electron-orbital",
