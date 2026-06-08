@@ -35,6 +35,24 @@ const readStreamFinal = (text: string): Record<string, any> => {
   return JSON.parse(String(dataLine).replace(/^data:\s*/, ""));
 };
 
+const parseStreamEvents = (text: string): Array<{ event: string; data: any }> =>
+  text
+    .split(/\n\n+/)
+    .map((block) => {
+      const event = block
+        .split(/\n/)
+        .find((line) => line.startsWith("event:"))
+        ?.replace(/^event:\s*/, "")
+        .trim();
+      const dataLines = block
+        .split(/\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.replace(/^data:\s*/, ""));
+      if (!event || dataLines.length === 0) return null;
+      return { event, data: JSON.parse(dataLines.join("\n")) };
+    })
+    .filter((entry): entry is { event: string; data: any } => Boolean(entry));
+
 describe("helix ask E52 panel control terminal contract", () => {
   it("satisfies explicit docs-viewer panel opens with a workspace action receipt", async () => {
     const app = createApp();
@@ -2842,6 +2860,49 @@ describe("helix ask E52 panel control terminal contract", () => {
         expect(finalAnswer).not.toMatch(/^The interim voice callout\b/i);
         expect(finalAnswer).not.toMatch(/accepted for client playback handoff/i);
       }
+    } finally {
+      if (previousRuntimeFinalAnswer === undefined) delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previousRuntimeFinalAnswer;
+    }
+  }, 60000);
+
+  it("streams interim voice callout handoff before the final answer", async () => {
+    const previousRuntimeFinalAnswer = process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE =
+      "Energy-mass equivalence means mass and energy are interchangeable through E=mc^2, which matters practically in nuclear reactions, particle creation, and binding energy.";
+    const app = createApp();
+    try {
+      const response = await request(app)
+        .post("/api/agi/ask/turn/stream")
+        .send({
+          question:
+            "Use the voice lane to say checking energy mass equivalence then tell me about energy mass equivalence in practical physics terms. The final answer should focus on the physics.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-voice-stream-handoff-${Date.now()}`,
+        })
+        .expect(200);
+
+      const events = parseStreamEvents(response.text);
+      const handoffIndex = events.findIndex((event) => event.event === "interim_voice_callout_handoff");
+      const finalIndex = events.findIndex((event) => event.event === "turn_final");
+      expect(handoffIndex).toBeGreaterThanOrEqual(0);
+      expect(finalIndex).toBeGreaterThanOrEqual(0);
+      expect(handoffIndex).toBeLessThan(finalIndex);
+      const handoff = events[handoffIndex]?.data;
+      expect(handoff).toMatchObject({
+        schema: "helix.interim_voice_callout_stream_handoff.v1",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      expect(handoff?.artifact?.kind).toBe("live_environment_tool_observation");
+      expect(handoff?.artifact?.payload?.tool_name).toBe("live_env.request_interim_voice_callout");
+      expect(["awaiting_client_playback", "queued_for_retry"]).toContain(handoff?.artifact?.payload?.observation?.receipt?.status);
+      expect(handoff?.artifact?.payload?.observation?.request?.text).toBe("checking energy mass equivalence");
+      const final = events[finalIndex]?.data;
+      expect(String(final?.selected_final_answer ?? final?.answer ?? "")).toMatch(/mass|energy|E=mc/i);
+      expect(String(final?.selected_final_answer ?? final?.answer ?? "")).not.toMatch(/^The interim voice callout\b/i);
     } finally {
       if (previousRuntimeFinalAnswer === undefined) delete process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE;
       else process.env.HELIX_RUNTIME_FINAL_ANSWER_TEST_RESPONSE = previousRuntimeFinalAnswer;

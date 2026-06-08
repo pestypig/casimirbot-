@@ -8,7 +8,7 @@ This repository is research and simulation software. It is not a claim of a work
 
 | Area | Why it matters | Entry points |
 | --- | --- | --- |
-| Helix Ask agentic wrapper | Natural-language research/operator loop with audited tool calls, routing, regression packs, and prompt-quality probes. | `server/helix-core.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `npm run helix:ask:regression:light` |
+| Helix Ask bounded workstation loop | Natural-language research/operator loop with model-driven reasoning, deterministic tool receipts, terminal authority, routing, regression packs, and prompt-quality probes. | `server/helix-core.ts`, `docs/helix-ask-agentic-loop-current-overview.md`, `npm run helix:ask:regression:light` |
 | NHM2 full-solve lane | Selected-family warp solve campaigns, shift-lapse sweeps, transport packages, source closure, observer audits, and publication bundles. | `scripts/warp-full-solve-campaign-cli.ts`, `scripts/research/run-nhm2-lapse-alpha-sweep.ts`, `docs/nhm2-closed-loop.md`, `artifacts/research/full-solve/` |
 | Evidence tree + DAG | Root-to-leaf proof structure for math, citations, manifests, and auditability. | `AUDIT_TREE.json`, `MATH_GRAPH.json`, `docs/warp-tree-dag-inventory.md`, `scripts/warp-tree-dag-walk.ts` |
 | Physics simulation codes | Runnable checks for GR loops, physics QA, Casimir verification, shadow injections, and sector controls. | `npm run gr:loop`, `npm run physics:validate`, `npm run casimir:verify`, `npm run warp:shadow:inject` |
@@ -91,7 +91,7 @@ npm run hooks:install
 flowchart LR
   UI["Helix UI\nclient/"]
   API["Express API\nserver/"]
-  Ask["Helix Ask\nagentic wrapper"]
+  Ask["Helix Ask\nbounded workstation loop"]
   Physics["Physics modules\nmodules/ sim_core/"]
   Campaigns["Campaign scripts\nscripts/ cli/"]
   Evidence["Evidence DAG\nAUDIT_TREE.json MATH_GRAPH.json artifacts/"]
@@ -118,16 +118,45 @@ Useful docs:
 - `docs/helix-desktop-panels.md`
 - `docs/helix-panel-template.md`
 
-### Helix Ask Agentic Wrapper
+### Helix Ask Bounded Agentic Workstation Loop
 
-Helix Ask is the agentic layer around the cockpit. It supports routed prompts, audited reasoning packets, regression sweeps, math routing evidence, prompt-quality probes, and decision bundles.
+Helix Ask is the bounded agentic workstation loop around the cockpit. It is a
+model-driven reasoning layer equipped with deterministic, callable tools:
+calculator lanes, document and repo evidence, notes, live-source mail, Situation
+Room observations, voice callouts, and other workstation capabilities. Those
+tools produce receipts, proofs, observations, debug traces, and side effects.
+The model consumes those results, explains the work at public boundaries, and
+decides the next step.
+
+The core boundary is that tool output is evidence, not answer authority. A tool
+may prove that a calculation ran, a document opened, a note was updated, a voice
+callout was handed to playback, or a live-source observation arrived. The final
+answer still comes only after the solver loop re-enters that evidence and passes
+goal satisfaction, route authority, poison audit, and terminal authority.
+
+This makes Helix Ask a workstation loop rather than a deterministic answer
+shortcut:
+
+```text
+model interprets the prompt
+-> admitted tool produces deterministic evidence
+-> evidence re-enters the model-facing turn
+-> model commentary and synthesis explain what the evidence means
+-> terminal authority selects one eligible answer, request, or typed failure
+```
+
+Voice follows the same rule. The voice lane is a medium tool inside the loop,
+not a competing answer route. It can speak provisional callouts,
+acknowledgements, status updates, or read-aloud snippets while reasoning
+continues, but those utterances remain non-terminal tool receipts until the
+agent synthesizes the final response.
 
 #### Solver Shape Rule Of Thumb
 
 Helix Ask should preserve the Codex-style turn shape without becoming a private
-Codex runtime. The model-facing loop should keep the user's prompt and context
-alive, admit tools only when the route contract justifies them, feed tool
-results back as observations, and publish only a terminal artifact that passed
+Codex runtime. The loop is bounded: it keeps the user's prompt and context
+alive, admits tools only when the route contract justifies them, feeds tool
+results back as observations, and publishes only a terminal artifact that passed
 solver authority.
 
 The rule of thumb for every Ask route and every workstation panel is:

@@ -527,6 +527,10 @@ const VOICE_PLAYBACK_ERROR_RECOVER_DURATION_RATIO = 0.35;
 const VOICE_PLAYBACK_ERROR_RECOVER_DIRECT_FALLBACK_MIN_SECONDS = 0.3;
 const VOICE_PLAYBACK_GRAPH_FAILURE_STREAK_FOR_BYPASS = 2;
 const VOICE_PLAYBACK_GRAPH_BYPASS_MS = 90_000;
+const VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS = 3_500;
+const VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS = 15_000;
+const VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS = 4_000;
+const VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS = 60_000;
 const HELIX_VOICE_FORCE_DIRECT_MOBILE =
   String((import.meta as any)?.env?.VITE_HELIX_VOICE_FORCE_DIRECT_MOBILE ?? "").trim() === "1";
 const HELIX_VOICE_CONFIRM_V2_ENABLED = parseVoiceEnvBoolean("VITE_HELIX_VOICE_CONFIRM_V2_ENABLED", true);
@@ -13846,11 +13850,45 @@ function buildVoicePlaybackReconciliationDebug(input: {
     .flatMap((source) => (Array.isArray(source) ? source : []))
     .map((receipt) => readAgentLoopAuditRecord(receipt))
     .filter((receipt): receipt is Record<string, unknown> => Boolean(receipt));
+  const receiptKeyForReconciliation = (receipt: Record<string, unknown>): string => {
+    const candidates = [
+      receipt.receiptId,
+      receipt.sourceReceiptId,
+      receipt.sourceReceiptKey,
+      receipt.utteranceId,
+      receipt.requestId,
+    ].map((value) => coerceText(value).trim()).filter(Boolean);
+    return candidates.join("|") || JSON.stringify(receipt).slice(0, 120);
+  };
+  const receiptsByKey = new Map<string, Record<string, unknown>>();
+  for (const receipt of receipts) {
+    const key = receiptKeyForReconciliation(receipt);
+    const existing = receiptsByKey.get(key);
+    if (!existing || coerceText(existing.status).trim() !== "delivered") {
+      receiptsByKey.set(key, receipt);
+    }
+  }
+  const uniqueReceipts = Array.from(receiptsByKey.values());
   const voiceCallSources = [input.source.client_voice_calls, clientProjection?.voice_calls, clientVoice?.voiceCalls];
   const voiceCalls = voiceCallSources
     .flatMap((source) => (Array.isArray(source) ? source : []))
     .map((call) => readAgentLoopAuditRecord(call))
     .filter((call): call is Record<string, unknown> => Boolean(call));
+  const voiceCallKeyForReconciliation = (call: Record<string, unknown>): string => {
+    const candidates = [
+      call.id,
+      call.utteranceId,
+      call.eventId,
+      call.traceId,
+      call.textHash,
+    ].map((value) => coerceText(value).trim()).filter(Boolean);
+    return candidates.join("|") || JSON.stringify(call).slice(0, 120);
+  };
+  const voiceCallsByKey = new Map<string, Record<string, unknown>>();
+  for (const call of voiceCalls) {
+    voiceCallsByKey.set(voiceCallKeyForReconciliation(call), call);
+  }
+  const uniqueVoiceCalls = Array.from(voiceCallsByKey.values());
   const activeTurnId = input.activeTurnId?.trim() ?? "";
   const isActiveTurnReceipt = (receipt: Record<string, unknown>): boolean => {
     if (!activeTurnId) return true;
@@ -13862,13 +13900,13 @@ function buildVoicePlaybackReconciliationDebug(input: {
       receipt.requestId,
     ].some((value) => coerceText(value).includes(activeTurnId));
   };
-  const deliveredReceipts = receipts.filter(
+  const deliveredReceipts = uniqueReceipts.filter(
     (receipt) => coerceText(receipt.status).trim() === "delivered" && isActiveTurnReceipt(receipt),
   );
   const deliveredUtteranceIds = Array.from(
     new Set(deliveredReceipts.map((receipt) => coerceText(receipt.utteranceId).trim()).filter(Boolean)),
   );
-  const audioBytesObserved = voiceCalls
+  const audioBytesObserved = uniqueVoiceCalls
     .filter((call) => {
       const utteranceId = coerceText(call.utteranceId).trim();
       return deliveredUtteranceIds.length === 0 || deliveredUtteranceIds.includes(utteranceId);
@@ -17059,6 +17097,7 @@ export function HelixAskPill({
   const voicePlaybackFallbackCountRef = useRef(0);
   const voicePlaybackLastFallbackRef = useRef<{ reason: string; atMs: number } | null>(null);
   const voicePlaybackCurrentPathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
+  const voicePlaybackLastOutcomePathRef = useRef<"audio_graph" | "direct_element" | "direct_fallback" | null>(null);
   const voicePlaybackGraphFailureStreakRef = useRef(0);
   const voicePlaybackGraphBypassUntilMsRef = useRef<number | null>(null);
   const voicePlaybackLastUnlockFailureRef = useRef<{ reason: string; atMs: number } | null>(null);
@@ -19209,7 +19248,7 @@ export function HelixAskPill({
       cancelReason: input.metrics?.cancelReason ?? null,
       error: input.error ?? null,
       audioUnlocked: voiceAudioUnlockedRef.current,
-      playbackPath: voicePlaybackCurrentPathRef.current,
+      playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -19514,6 +19553,20 @@ export function HelixAskPill({
     audio.playsInline = true;
     audio.autoplay = true;
     audio.volume = 1;
+    if (typeof document !== "undefined") {
+      audio.dataset.helixVoicePlayback = "true";
+      audio.style.position = "fixed";
+      audio.style.left = "-9999px";
+      audio.style.top = "0";
+      audio.style.width = "1px";
+      audio.style.height = "1px";
+      audio.style.opacity = "0";
+      audio.style.pointerEvents = "none";
+      audio.setAttribute("aria-hidden", "true");
+      if (!audio.isConnected) {
+        document.body.appendChild(audio);
+      }
+    }
     return audio;
   }, []);
 
@@ -19703,12 +19756,69 @@ export function HelixAskPill({
         try {
           await new Promise<void>((resolve, reject) => {
             let settled = false;
+            let watchdogId: number | null = null;
+            let playResolvedAtMs: number | null = null;
+            let lastProgressAtMs = Date.now();
+            let lastCurrentTime = 0;
+            let playbackStopResolver: (() => void) | null = null;
+            const getDurationSeconds = () =>
+              Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
+            const cleanupPlaybackHandlers = () => {
+              audio.onended = null;
+              audio.onerror = null;
+              audio.onplaying = null;
+              audio.ontimeupdate = null;
+              audio.onloadedmetadata = null;
+              if (watchdogId !== null && typeof window !== "undefined") {
+                window.clearInterval(watchdogId);
+                watchdogId = null;
+              }
+            };
+            const failWithPlaybackTimeout = (reason: "no_progress" | "duration_exceeded") => {
+              if (settled) return;
+              settled = true;
+              cleanupPlaybackHandlers();
+              if (
+                playbackStopResolver &&
+                voiceAutoSpeakPendingPlaybackResolverRef.current === playbackStopResolver
+              ) {
+                voiceAutoSpeakPendingPlaybackResolverRef.current = null;
+              }
+              if (replyId) {
+                setReadAloudByReply((prev) => ({
+                  ...prev,
+                  [replyId]: transitionReadAloudState(prev[replyId] ?? "idle", "error"),
+                }));
+              }
+              if (playbackUrlRef.current === url) {
+                URL.revokeObjectURL(url);
+                playbackUrlRef.current = null;
+              }
+              if (playbackAudioRef.current === audio) {
+                playbackAudioRef.current = null;
+                voicePlaybackLastOutcomePathRef.current = voicePlaybackCurrentPathRef.current;
+                voicePlaybackCurrentPathRef.current = null;
+              }
+              if (playbackReplyIdRef.current === replyId) {
+                playbackReplyIdRef.current = null;
+              }
+              try {
+                audio.pause();
+              } catch {
+                // no-op
+              }
+              audio.src = "";
+              audio.load();
+              reject(new Error(`voice_audio_playback_timeout:${reason}`));
+            };
             const finalize = (event: "ended" | "error" | "stopped") => {
               if (settled) return;
               settled = true;
-              audio.onended = null;
-              audio.onerror = null;
-              if (voiceAutoSpeakPendingPlaybackResolverRef.current === resolver) {
+              cleanupPlaybackHandlers();
+              if (
+                playbackStopResolver &&
+                voiceAutoSpeakPendingPlaybackResolverRef.current === playbackStopResolver
+              ) {
                 voiceAutoSpeakPendingPlaybackResolverRef.current = null;
               }
               if (replyId) {
@@ -19726,6 +19836,7 @@ export function HelixAskPill({
               }
               if (playbackAudioRef.current === audio) {
                 playbackAudioRef.current = null;
+                voicePlaybackLastOutcomePathRef.current = voicePlaybackCurrentPathRef.current;
                 voicePlaybackCurrentPathRef.current = null;
               }
               if (playbackReplyIdRef.current === replyId) {
@@ -19753,12 +19864,64 @@ export function HelixAskPill({
               resolve();
             };
             const resolver = () => finalize("stopped");
+            playbackStopResolver = resolver;
             voiceAutoSpeakPendingPlaybackResolverRef.current = resolver;
             audio.onended = () => finalize("ended");
             audio.onerror = () => finalize("error");
+            audio.onplaying = () => {
+              lastProgressAtMs = Date.now();
+            };
+            audio.ontimeupdate = () => {
+              const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+              if (currentTime > lastCurrentTime + 0.02) {
+                lastCurrentTime = currentTime;
+                lastProgressAtMs = Date.now();
+              }
+            };
+            audio.onloadedmetadata = () => {
+              lastProgressAtMs = Date.now();
+            };
+            if (typeof window !== "undefined") {
+              watchdogId = window.setInterval(() => {
+                if (settled) return;
+                const now = Date.now();
+                const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+                const durationSeconds = getDurationSeconds();
+                if (audio.ended || (durationSeconds !== null && currentTime >= Math.max(0, durationSeconds - 0.15))) {
+                  finalize("ended");
+                  return;
+                }
+                if (currentTime > lastCurrentTime + 0.02) {
+                  lastCurrentTime = currentTime;
+                  lastProgressAtMs = now;
+                }
+                if (
+                  playResolvedAtMs !== null &&
+                  currentTime < 0.1 &&
+                  now - lastProgressAtMs > VOICE_PLAYBACK_NO_PROGRESS_TIMEOUT_MS
+                ) {
+                  failWithPlaybackTimeout("no_progress");
+                  return;
+                }
+                const durationTimeoutMs =
+                  durationSeconds !== null
+                    ? Math.min(
+                        VOICE_PLAYBACK_DURATION_TIMEOUT_MAX_MS,
+                        Math.max(8_000, durationSeconds * 1_000 + VOICE_PLAYBACK_DURATION_TIMEOUT_PAD_MS),
+                      )
+                    : VOICE_PLAYBACK_UNKNOWN_DURATION_TIMEOUT_MS;
+                if (playResolvedAtMs !== null && now - playResolvedAtMs > durationTimeoutMs) {
+                  failWithPlaybackTimeout("duration_exceeded");
+                }
+              }, 250);
+            }
             const attemptPlay = async () => {
               try {
                 await audio.play();
+                playResolvedAtMs = Date.now();
+                lastProgressAtMs = playResolvedAtMs;
+                voiceAudioUnlockedRef.current = true;
+                voicePlaybackLastUnlockFailureRef.current = null;
               } catch (error) {
                 if (
                   error instanceof DOMException &&
@@ -19767,6 +19930,10 @@ export function HelixAskPill({
                   const unlocked = await primeVoiceAudioPlayback();
                   if (unlocked) {
                     await audio.play();
+                    playResolvedAtMs = Date.now();
+                    lastProgressAtMs = playResolvedAtMs;
+                    voiceAudioUnlockedRef.current = true;
+                    voicePlaybackLastUnlockFailureRef.current = null;
                     return;
                   }
                 }
@@ -19822,6 +19989,9 @@ export function HelixAskPill({
             audio.src = "";
             audio.load();
             if (playbackElementRef.current === audio) {
+              if (audio.isConnected) {
+                audio.remove();
+              }
               playbackElementRef.current = null;
             }
             continue;
@@ -19853,6 +20023,9 @@ export function HelixAskPill({
             audio.src = "";
             audio.load();
             if (playbackElementRef.current === audio) {
+              if (audio.isConnected) {
+                audio.remove();
+              }
               playbackElementRef.current = null;
             }
             continue;
@@ -29026,12 +29199,16 @@ export function HelixAskPill({
       playbackElement.pause();
       playbackElement.src = "";
       playbackElement.load();
+      if (playbackElement.isConnected) {
+        playbackElement.remove();
+      }
     }
     playbackElementRef.current = null;
     voicePlaybackGraphAttemptCountRef.current = 0;
     voicePlaybackFallbackCountRef.current = 0;
     voicePlaybackLastFallbackRef.current = null;
     voicePlaybackCurrentPathRef.current = null;
+    voicePlaybackLastOutcomePathRef.current = null;
     voicePlaybackGraphFailureStreakRef.current = 0;
     voicePlaybackGraphBypassUntilMsRef.current = null;
     voicePlaybackLastUnlockFailureRef.current = null;
@@ -30633,6 +30810,18 @@ export function HelixAskPill({
             try {
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
                 const record = readAgentLoopAuditRecord(event.data);
+                if (event.event === "interim_voice_callout_handoff" && record) {
+                  const artifacts = [
+                    readAgentLoopAuditRecord(record.artifact),
+                    ...(Array.isArray(record.artifacts)
+                      ? record.artifacts.map((artifact) => readAgentLoopAuditRecord(artifact))
+                      : []),
+                  ].filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+                  if (artifacts.length > 0) {
+                    enqueueInterimVoiceCalloutsFromAskArtifacts(artifacts);
+                  }
+                  return;
+                }
                 if (event.event === "turn_transcript_event" && record) {
                   const sourceEventType =
                     coerceText(record.source_event_type).trim() ||
@@ -31583,6 +31772,7 @@ export function HelixAskPill({
       canEmitTurnTerminalOutcome,
       ensureReasoningTimelineEntry,
       ensureExplicitReasoningPlan,
+      enqueueInterimVoiceCalloutsFromAskArtifacts,
       enqueueVoicePlaybackIntent,
       enqueueReasoningAttempt,
       formatReasoningAttemptDetail,
