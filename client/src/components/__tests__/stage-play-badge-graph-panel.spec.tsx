@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import StagePlayBadgeGraphPanel from "../panels/StagePlayBadgeGraphPanel";
 import { useStagePlayBadgeGraphPanelStore } from "@/store/useStagePlayBadgeGraphPanelStore";
 import { useLiveAnswerEnvironmentStore } from "@/store/useLiveAnswerEnvironmentStore";
+import { STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT } from "@/lib/helix/liveSourceMailRefreshEvent";
 import {
   buildStagePlayBadgeGraphV1,
   type StagePlayBadgeGraphV1,
@@ -820,6 +821,35 @@ function renderPanel(options: {
           context_role: "tool_evidence",
           raw_content_included: false,
         },
+        wakeAdmissionCycle: {
+          schema: "stage_play_live_source_mail_wake_admission_cycle/v1",
+          now: "2026-06-02T00:00:05.000Z",
+          queuedWakeIds: [],
+          runnableWakeIds: [],
+          runningWakeIds: [],
+          deferredWakeIds: [
+            "stage_play_live_source_mail_wake:pressure-ui",
+            "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+          ],
+          result: null,
+          status: "deferred_for_pressure",
+          reason: "runtime_pressure",
+          continuation: {
+            scheduled: false,
+            reason: "wake_runner_disabled",
+            runnableWakeIds: [],
+          },
+          runtimeAdmission: {
+            admitted: false,
+            action: "defer",
+            reason: "runtime_memory_queue_deferrable",
+            pressureLevel: "soft_pressure",
+          },
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_evidence",
+          raw_content_included: false,
+        },
         mailItems: [
           {
             artifactId: "stage_play_live_source_mail_item",
@@ -1519,8 +1549,13 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/Watch the active visual source/i)).toBeTruthy();
     expect(screen.getByText(/source:visual-tab \| active \| fresh/i)).toBeTruthy();
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
-    expect(screen.getByText("auto pressure")).toBeTruthy();
-    expect(screen.getByText("retrying")).toBeTruthy();
+    expect(screen.getAllByText(/wake pressure/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Wake pressure").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Deferred for pressure").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 unread retained/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Next retry:/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Pressure: soft pressure/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Auto continuation: waiting for pressure release/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("14 badges")).toBeNull();
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
@@ -1532,6 +1567,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Policy resolution/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/direct_job_ref/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Watch policy: batch_interpretation/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText("No watch policy.")).toBeNull();
     expect(screen.getAllByText(/Matched: low light, cave exploration/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Recommended: record_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
@@ -1548,6 +1584,34 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByRole("button", { name: "Compile from note" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pause / archive" })).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(7);
+  });
+
+  it("refreshes mailbox state when Helix Ask completes a mailbox artifact turn", async () => {
+    renderPanel();
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+    await waitFor(() => {
+      expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail?"))).toBe(true);
+    });
+    const initialMailboxCalls = fetchCallUrls().filter((url) =>
+      url.includes("/api/helix/stage-play/live-source-mail?")
+    ).length;
+
+    window.dispatchEvent(new CustomEvent(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, {
+      detail: {
+        threadId: "helix-ask:desktop",
+        mailboxThreadId: "helix-ask:desktop",
+        askTurnId: "ask:policy-created",
+        artifactMarkers: ["stage_play_live_source_watch_job_policy"],
+      },
+    }));
+
+    await waitFor(() => {
+      const nextMailboxCalls = fetchCallUrls().filter((url) =>
+        url.includes("/api/helix/stage-play/live-source-mail?")
+      ).length;
+      expect(nextMailboxCalls).toBeGreaterThan(initialMailboxCalls);
+    });
   });
 
   it("keeps mail wake execution out of the graph controls", async () => {

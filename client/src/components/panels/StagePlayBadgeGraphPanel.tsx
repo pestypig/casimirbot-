@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
@@ -48,8 +48,17 @@ import {
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
+import {
+  STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT,
+  type StagePlayLiveSourceMailRefreshEventDetail,
+} from "@/lib/helix/liveSourceMailRefreshEvent";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
+const STAGE_PLAY_MAILBOX_QUERY_KEY = [
+  "/api/helix/stage-play/live-source-mail",
+  STAGE_PLAY_PANEL_THREAD_ID,
+  STAGE_PLAY_PANEL_THREAD_ID,
+] as const;
 
 const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
   routeTo: "narrative_stage_play",
@@ -200,6 +209,22 @@ type StagePlayLiveSourceMailListResponse = {
   requestedThreadId?: string;
   mailboxThreadId?: string;
   mailboxThreadResolution?: Record<string, unknown>;
+  wakeAdmissionCycle?: {
+    deferredWakeIds?: string[];
+    runtimeAdmission?: {
+      admitted?: boolean;
+      action?: string;
+      reason?: string;
+      pressureLevel?: string;
+    } | null;
+    continuation?: {
+      scheduled?: boolean;
+      reason?: string;
+      runnableWakeIds?: string[];
+    } | null;
+    status?: string;
+    reason?: string;
+  } | null;
   mailItems?: StagePlayLiveSourceMailItemV1[];
   jobStates?: StagePlayLiveSourceJobStateV1[];
   watchJobPolicies?: StagePlayLiveSourceWatchJobPolicyV1[];
@@ -224,6 +249,11 @@ type StagePlayMailLoopNode = {
   status: string;
   preview: string;
   statusChips?: string[];
+  statusBand?: {
+    title: string;
+    lines: string[];
+    tone: "pressure" | "blocked" | "good" | "pending";
+  } | null;
   payloadRows?: Array<{
     label: string;
     value: string;
@@ -1362,6 +1392,43 @@ function buildObserverMailLoopNodes(input: {
   const secondaryPressureText = pressureIsSecondary
     ? `auto pressure retained ${unreadCount} unread`
     : null;
+  const deferredWakeIds = uniqueSorted([
+    ...(mailbox?.wakeAdmissionCycle?.deferredWakeIds ?? []),
+    ...wakeRequests
+      .filter((wake) => wake.status === "deferred_for_pressure")
+      .map((wake) => wake.wakeRequestId),
+  ]);
+  const pressureDisplayWake = displayWake?.status === "deferred_for_pressure"
+    ? displayWake
+    : wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").at(-1) ?? null;
+  const pressureNextRetryAt = pressureDisplayWake?.nextRetryAt ?? null;
+  const runtimePressureReason =
+    mailbox?.wakeAdmissionCycle?.runtimeAdmission?.reason ??
+    latestWakeFailureReason ??
+    pressureDisplayWake?.failureReason ??
+    null;
+  const runtimePressureLevel = mailbox?.wakeAdmissionCycle?.runtimeAdmission?.pressureLevel ?? null;
+  const continuation = mailbox?.wakeAdmissionCycle?.continuation ?? null;
+  const pressureContinuationText = continuation
+    ? continuation.scheduled
+      ? `Auto continuation: scheduled (${labelize(continuation.reason ?? "runnable_wake_remaining")})`
+      : `Auto continuation: waiting for pressure release (${labelize(continuation.reason ?? "runtime_pressure")})`
+    : "Auto continuation: waiting for pressure release";
+  const wakePressureActive = latestWakeStatus === "deferred_for_pressure" || pressureWakeCount > 0 || deferredWakeIds.length > 0;
+  const wakePressureBand = wakePressureActive
+    ? {
+        title: "Wake pressure",
+        lines: [
+          "Deferred for pressure",
+          `${unreadCount} unread retained`,
+          pressureNextRetryAt ? `Next retry: ${formatStagePlayClock(pressureNextRetryAt)}` : null,
+          runtimePressureLevel ? `Pressure: ${labelize(runtimePressureLevel)}` : null,
+          runtimePressureReason ? `Reason: ${labelize(runtimePressureReason)}` : null,
+          pressureContinuationText,
+        ].filter((line): line is string => Boolean(line)),
+        tone: "pressure" as const,
+      }
+    : null;
   const latestDecisionText = latestDecision
     ? `${latestDecision.decision}: ${latestDecision.rationalePreview || latestDecision.decisionId}`
     : "no decision yet";
@@ -1611,9 +1678,11 @@ function buildObserverMailLoopNodes(input: {
         manualCheckpointWithoutPolicy ? "policy missing" : null,
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
         runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
-        pressureWakeCount > 0 ? (pressureIsSecondary ? "auto pressure" : "pressure") : null,
+        wakePressureActive ? "wake pressure" : null,
+        pressureWakeMailCount > 0 ? `${pressureWakeMailCount} retained mail` : null,
         retryWakeCount > 0 ? "retrying" : null,
       ].filter((entry): entry is string => Boolean(entry)),
+      statusBand: wakePressureBand,
       payloadRows: [
         {
           label: "Tool",
@@ -1628,9 +1697,16 @@ function buildObserverMailLoopNodes(input: {
             ? `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}`
             : unreadCount > 0 ? "unread mail waiting" : "no wake request",
           tone: manualCheckpointWithoutPolicy ||
-            latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
+            latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
             ? "blocked"
-            : latestWakeStatus ? "good" : unreadCount > 0 ? "warn" : "default",
+            : latestWakeStatus === "deferred_for_pressure" || unreadCount > 0 ? "warn" : latestWakeStatus ? "good" : "default",
+        },
+        {
+          label: "Pressure",
+          value: wakePressureActive
+            ? `deferred; ${unreadCount} unread retained${pressureNextRetryAt ? `; next retry ${formatStagePlayClock(pressureNextRetryAt)}` : ""}`
+            : "no pressure defer",
+          tone: wakePressureActive ? "warn" : "good",
         },
       ],
       edgeToNext: {
@@ -1639,7 +1715,7 @@ function buildObserverMailLoopNodes(input: {
           : latestDecision ? "decision" : latestWakeStatus === "deferred_for_pressure" ? "deferred" : displayWake ? "running/pending" : "wake missing",
         tone: manualCheckpointWithoutPolicy
           ? "blocked"
-          : latestDecision ? "connected" : latestWakeStatus === "deferred_for_pressure" || latestWakeStatus === "failed_terminal" ? "blocked" : displayWake ? "pending" : "blocked",
+          : latestDecision ? "connected" : latestWakeStatus === "deferred_for_pressure" ? "pending" : latestWakeStatus === "failed_terminal" ? "blocked" : displayWake ? "pending" : "blocked",
       },
       inputLabel: "Input",
       inputRefs: wakeInputRefs,
@@ -1658,7 +1734,7 @@ function buildObserverMailLoopNodes(input: {
         ? manualCheckpointWithoutPolicy
           ? `manual checkpoint complete; ${unreadCount} unread retained; configure live_env.configure_live_source_watch_job for the continuing loop`
           : latestWakeStatus === "deferred_for_pressure"
-          ? `deferred_for_pressure; ${latestWakeFailureReason ?? "runtime pressure"}; ${unreadCount} unread retained${displayWake?.nextRetryAt ? `; retry ${displayWake.nextRetryAt}` : ""}`
+          ? `deferred_for_pressure; ${runtimePressureReason ?? "runtime pressure"}; ${unreadCount} unread retained${pressureNextRetryAt ? `; next retry ${formatStagePlayClock(pressureNextRetryAt)}` : ""}; ${pressureContinuationText}`
           : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
@@ -1820,6 +1896,26 @@ function StagePlayObserverMailLoopCanvas({
                       <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-slate-200">{row.value}</div>
                     </div>
                   ))}
+                </div>
+              ) : null}
+              {node.statusBand ? (
+                <div
+                  className={`mt-2 rounded border px-2 py-1 text-left ${
+                    node.statusBand.tone === "pressure"
+                      ? "border-amber-700 bg-amber-950/35 text-amber-100"
+                      : node.statusBand.tone === "blocked"
+                        ? "border-rose-800 bg-rose-950/35 text-rose-100"
+                        : node.statusBand.tone === "good"
+                          ? "border-emerald-800 bg-emerald-950/25 text-emerald-100"
+                          : "border-slate-700 bg-slate-950/60 text-slate-200"
+                  }`}
+                >
+                  <div className="text-[8px] font-semibold uppercase tracking-wide">{node.statusBand.title}</div>
+                  <div className="mt-0.5 space-y-0.5">
+                    {node.statusBand.lines.slice(0, 6).map((line) => (
+                      <div key={line} className="line-clamp-1 text-[9px] leading-tight">{line}</div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
               {node.statusChips?.length ? (
@@ -4533,6 +4629,7 @@ function Inspector({
 }
 
 export default function StagePlayBadgeGraphPanel() {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [bindingOverlayOpen, setBindingOverlayOpen] = useState(false);
   const [draftNodes, setDraftNodes] = useState<DraftStagePlayNode[]>([]);
@@ -4581,16 +4678,12 @@ export default function StagePlayBadgeGraphPanel() {
   });
   const { data: graph, isLoading, error } = graphQuery;
   const mailboxQuery = useQuery<StagePlayLiveSourceMailListResponse>({
-    queryKey: [
-      "/api/helix/stage-play/live-source-mail",
-      STAGE_PLAY_PANEL_THREAD_ID,
-      STAGE_PLAY_PANEL_THREAD_ID,
-    ],
+    queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY,
     queryFn: () => fetchStagePlayLiveSourceMail({
       threadId: STAGE_PLAY_PANEL_THREAD_ID,
       mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
     }),
-    refetchInterval: 1000,
+    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
   });
   const mailbox = mailboxQuery.data ?? null;
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
@@ -4654,6 +4747,26 @@ export default function StagePlayBadgeGraphPanel() {
       if (removedGhostClearTimerRef.current) clearTimeout(removedGhostClearTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (graphDisplayMode !== "observer_mail_loop_v1") return;
+    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+    void mailboxQuery.refetch();
+  }, [graphDisplayMode, mailboxQuery.refetch, queryClient]);
+
+  useEffect(() => {
+    const handleMailboxRefresh = (event: Event) => {
+      const detail = (event as CustomEvent<StagePlayLiveSourceMailRefreshEventDetail>).detail;
+      const mailboxThreadId = detail?.mailboxThreadId ?? detail?.threadId ?? STAGE_PLAY_PANEL_THREAD_ID;
+      if (mailboxThreadId && mailboxThreadId !== STAGE_PLAY_PANEL_THREAD_ID) return;
+      void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+      void mailboxQuery.refetch();
+    };
+    window.addEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
+    return () => {
+      window.removeEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
+    };
+  }, [mailboxQuery.refetch, queryClient]);
 
   useEffect(() => {
     if (!graph) return;

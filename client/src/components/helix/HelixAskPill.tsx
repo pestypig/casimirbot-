@@ -67,6 +67,10 @@ import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_TRANSCRIPT_EVENT,
   type StagePlayLiveSourceMailWakeTranscriptEventDetail,
 } from "@/lib/helix/liveSourceMailWakeTranscriptEvent";
+import {
+  STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT,
+  listStagePlayLiveSourceMailRefreshArtifactMarkers,
+} from "@/lib/helix/liveSourceMailRefreshEvent";
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   formatHelixVisibleTerminalSourceLabel,
@@ -31488,6 +31492,24 @@ export function HelixAskPill({
             proof: responseProof,
             debug: responseDebugForReply,
           });
+          const liveSourceMailArtifactMarkers = listStagePlayLiveSourceMailRefreshArtifactMarkers([
+            localResponseForTerminal,
+            responseDebugPayload,
+            responseDebugForReply,
+            responseEnvelope,
+          ]);
+          if (liveSourceMailArtifactMarkers.length > 0) {
+            window.dispatchEvent(new CustomEvent(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, {
+              detail: {
+                threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+                mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+                askTurnId: traceId,
+                reason: "ask_turn_completed",
+                artifactMarkers: liveSourceMailArtifactMarkers,
+              },
+            }));
+            setLiveSourceMailTranscriptRefreshSeq((current) => current + 1);
+          }
           let directReplyIdForAutoSpeak: string | null = null;
           if (briefOnlyReply) {
             patchHelixTimelineEntry(manualBriefTimelineEntry.id, {
