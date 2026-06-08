@@ -878,6 +878,111 @@ function renderPanel(options: {
             raw_content_included: false,
           },
         ],
+        watchJobPolicies: [
+          {
+            artifactId: "stage_play_live_source_watch_job_policy",
+            schemaVersion: "stage_play_live_source_watch_job_policy/v1",
+            policyId: "stage_play_live_source_watch_job_policy:ui",
+            jobId: "stage_play_live_source_job:ui",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            sourceIds: ["source:visual-tab"],
+            objectiveText: "Watch the active visual source.",
+            decisionPolicyPrompt: "Interpret each compact visual-summary mail batch.",
+            outputPolicy: {
+              allowTextAnswer: true,
+              allowVoiceCallout: true,
+              voiceRequiresUrgency: true,
+              confirmationRequired: true,
+            },
+            importanceCriteria: ["danger", "rare resources", "strategic decisions"],
+            suppressCriteria: ["routine walking"],
+            interpretationMode: "batch_interpretation",
+            status: "armed",
+            priorDecisionRefs: [],
+            priorAnswerRefs: [],
+            evidenceRefs: ["stage_play_live_source_watch_job_policy:ui"],
+            createdAt: "2026-06-02T00:00:00.500Z",
+            updatedAt: "2026-06-02T00:00:00.500Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        interpreterProfiles: [
+          {
+            artifactId: "stage_play_live_source_interpreter_profile",
+            schemaVersion: "stage_play_live_source_interpreter_profile/v1",
+            profileId: "stage_play_live_source_interpreter_profile:ui",
+            title: "Minecraft Survival Coach",
+            threadId: "thread:stage-play-ui",
+            roomId: "room:minecraft",
+            environmentId: "live_env:minecraft",
+            jobId: "stage_play_live_source_job:ui",
+            policyId: "stage_play_live_source_watch_job_policy:ui",
+            sourceKinds: ["visual_frame"],
+            domain: "minecraft",
+            objectiveText: "Watch the Minecraft visual source like a survival coach.",
+            interpretationGuidelines: "Preserve observations and compare them to survival priorities.",
+            lenses: ["survival", "hazards", "resources"],
+            salienceCriteria: ["danger", "rare resources", "strategic decisions"],
+            suppressCriteria: ["routine walking"],
+            riskCriteria: ["low light", "hostile mob"],
+            opportunityCriteria: ["rare resources", "crafting station"],
+            voiceCalloutCriteria: ["danger"],
+            evidenceRules: {
+              preserveRawObservation: true,
+              distinguishObservedVsInferred: true,
+              requireEvidenceRefs: true,
+              askWhenUncertain: true,
+            },
+            outputStyle: {
+              textAnswerStyle: "brief_explanation",
+              voiceStyle: "warning_only",
+            },
+            linkedNoteId: "note:interpreter_profile:ui",
+            linkedNoteTitle: "Minecraft Survival Coach",
+            status: "active",
+            evidenceRefs: ["stage_play_live_source_interpreter_profile:ui", "stage_play_live_source_watch_job_policy:ui"],
+            createdAt: "2026-06-02T00:00:00.800Z",
+            updatedAt: "2026-06-02T00:00:00.800Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
+        interpreterProfileComparisons: [
+          {
+            artifactId: "stage_play_live_source_interpreter_profile_comparison",
+            schemaVersion: "stage_play_live_source_interpreter_profile_comparison/v1",
+            comparisonId: "stage_play_live_source_interpreter_profile_comparison:ui",
+            profileId: "stage_play_live_source_interpreter_profile:ui",
+            jobId: "stage_play_live_source_job:ui",
+            policyId: "stage_play_live_source_watch_job_policy:ui",
+            mailIds: ["stage_play_live_source_mail:ui"],
+            narrativeStateRef: "stage_play_live_source_narrative_state:ui",
+            observedFacts: ["Minecraft-like scene remains visible."],
+            inferredMeaning: ["Stable scene; continue watching for survival-relevant changes."],
+            matchedCriteria: ["low light", "cave exploration"],
+            suppressedCriteria: ["routine walking"],
+            riskMatches: ["low light"],
+            opportunityMatches: [],
+            voiceCalloutMatches: [],
+            contradictions: [],
+            uncertainties: ["Audio context is unavailable."],
+            recommendedDecision: "record_interpretation",
+            recommendedNextWatch: ["danger", "rare resources", "strategic decisions"],
+            evidenceRefs: ["stage_play_live_source_interpreter_profile_comparison:ui", "stage_play_live_source_mail:ui"],
+            createdAt: "2026-06-02T00:00:01.900Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+            raw_content_included: false,
+          },
+        ],
         wakeRequests: [
           {
             artifactId: "stage_play_live_source_mail_wake_request",
@@ -1046,6 +1151,12 @@ function renderPanel(options: {
             mailboxCursor: "stage_play_live_source_mail:ui",
             activeJobId: "stage_play_live_source_job:ui",
             narrativeStateRef: "stage_play_live_source_narrative_state:ui",
+            interpreterProfileRef: "stage_play_live_source_interpreter_profile:ui",
+            profileComparisonRefs: ["stage_play_live_source_interpreter_profile_comparison:ui"],
+            matchedCriteria: ["low light", "cave exploration"],
+            suppressedCriteria: ["routine walking"],
+            observedFacts: ["Minecraft-like scene remains visible."],
+            inferredMeaning: ["Stable scene; continue watching for survival-relevant changes."],
             rearmReason: "decision recorded",
             evidenceRefs: ["visual_evidence:ui", "stage_play_live_source_narrative_state:ui"],
             modelReviewed: true,
@@ -1339,9 +1450,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(scrollport.getAttribute("data-stage-play-graph-mode")).toBe("observer_mail_loop_v1");
     expect(screen.getByTestId("stage-play-observer-mail-loop-toggle")).toBeTruthy();
     expect(screen.getByTestId("stage-play-full-graph-toggle")).toBeTruthy();
-    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(5);
+    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(7);
     expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mailbox").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Interpreter Profile").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Profile Comparison").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Wake Ask").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
@@ -1349,7 +1462,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/unread 1/i)).toBeTruthy();
     expect(screen.getByText("auto pressure")).toBeTruthy();
     expect(screen.getByText("retrying")).toBeTruthy();
-    expect(screen.getByText(/Observer -> Mailbox -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeTruthy();
+    expect(screen.getByText(/Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeTruthy();
     expect(screen.queryByText("14 badges")).toBeNull();
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
@@ -1357,9 +1470,18 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/failed_retryable: mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
     expect(screen.getByText("record_interpretation")).toBeTruthy();
+    expect(screen.getAllByText(/Minecraft Survival Coach/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Matched: low light, cave exploration/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Recommended: record_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/watch next: Watch for a new actor, opened UI, or scene transition/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Open Interpreter Profile inspector" }));
+    expect(screen.getByTestId("stage-play-interpreter-profile-inspector")).toBeTruthy();
+    expect(screen.getByText(/Preserve observations and compare them to survival priorities/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open linked note" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Compile from note" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pause / archive" })).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(7);
   });
 
   it("shows manual mail wake admission without auto-running from the panel", async () => {

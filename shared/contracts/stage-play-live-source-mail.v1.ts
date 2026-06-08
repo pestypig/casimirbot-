@@ -162,6 +162,12 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   mailboxCursor?: string | null;
   activeJobId?: string | null;
   narrativeStateRef?: string | null;
+  interpreterProfileRef?: string | null;
+  profileComparisonRefs?: string[];
+  matchedCriteria?: string[];
+  suppressedCriteria?: string[];
+  observedFacts?: string[];
+  inferredMeaning?: string[];
   rearmReason?: string | null;
   evidenceRefs: string[];
   modelReviewed: boolean;
@@ -393,6 +399,10 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "watch_next"
     | "narrative_state"
     | "interpretation_state"
+    | "interpreter_profile"
+    | "profile_comparison"
+    | "profile_note_link"
+    | "profile_compiled"
     | "requested_tool"
     | "wait_for_next_summary"
     | "text_answer"

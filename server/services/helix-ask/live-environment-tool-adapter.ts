@@ -85,11 +85,19 @@ import {
   recordStagePlayLiveSourceNarrativeState,
 } from "../stage-play/stage-play-live-source-narrative-store";
 import {
+  getActiveInterpreterProfileForJob,
+  getStagePlayLiveSourceInterpreterProfile,
   listStagePlayLiveSourceInterpreterProfiles,
   recordStagePlayLiveSourceInterpreterProfile,
+  setInterpreterProfileStatus,
 } from "../stage-play/stage-play-live-source-interpreter-profile-store";
 import {
+  compareMailToInterpreterProfile,
+} from "../stage-play/stage-play-live-source-interpreter-profile-comparison";
+import {
+  compileInterpreterProfileFromNote,
   createInterpreterProfileNote,
+  openInterpreterProfileNote,
 } from "../stage-play/stage-play-live-source-interpreter-profile-notes";
 import {
   buildStagePlayLiveSourceWatchJobPolicyDefaults,
@@ -469,35 +477,35 @@ const buildInterpreterProfileConfiguredTranscriptRows = (input: {
   const rows: AskTurnTranscriptRowDraftV1[] = [
     {
       rowId: `ask_turn_interpreter_profile_configured:${hashShort(input.profile.profileId)}`,
-      rowKind: "loop_state",
+      rowKind: "interpreter_profile",
       title: "Interpreter profile configured",
       body: `${input.profile.title}: ${input.profile.profileId}`,
       ...rowBase,
     },
     {
       rowId: `ask_turn_interpreter_profile_objective:${hashShort(input.profile.profileId)}`,
-      rowKind: "loop_state",
+      rowKind: "interpreter_profile",
       title: "Objective",
       body: `Objective: ${input.profile.objectiveText}`,
       ...rowBase,
     },
     {
       rowId: `ask_turn_interpreter_profile_guidelines:${hashShort(input.profile.profileId)}`,
-      rowKind: "loop_state",
+      rowKind: "interpreter_profile",
       title: "Guidelines",
       body: `Guidelines: ${clipText(input.profile.interpretationGuidelines, 420)}`,
       ...rowBase,
     },
     {
       rowId: `ask_turn_interpreter_profile_scope:${hashShort(input.profile.profileId)}`,
-      rowKind: "loop_state",
+      rowKind: "interpreter_profile",
       title: "Scope",
       body: `Domain: ${input.profile.domain}; source kinds: ${input.profile.sourceKinds.join(", ")}; status: ${input.profile.status}.`,
       ...rowBase,
     },
     {
       rowId: `ask_turn_interpreter_profile_criteria:${hashShort(input.profile.profileId)}`,
-      rowKind: "loop_state",
+      rowKind: "interpreter_profile",
       title: "Criteria",
       body: `Salience: ${input.profile.salienceCriteria.join(" | ") || "none"}; suppress: ${input.profile.suppressCriteria.join(" | ") || "none"}.`,
       ...rowBase,
@@ -506,7 +514,7 @@ const buildInterpreterProfileConfiguredTranscriptRows = (input: {
   if (input.linkedNote) {
     rows.push({
       rowId: `ask_turn_interpreter_profile_note:${hashShort([input.profile.profileId, input.linkedNote.noteId])}`,
-      rowKind: "loop_state",
+      rowKind: "profile_note_link",
       title: "Linked note",
       body: `Linked note: ${input.linkedNote.title} (${input.linkedNote.noteId}).`,
       ...rowBase,
@@ -514,6 +522,54 @@ const buildInterpreterProfileConfiguredTranscriptRows = (input: {
     });
   }
   return rows;
+};
+
+const buildInterpreterProfileComparisonTranscriptRows = (input: {
+  comparison: ReturnType<typeof compareMailToInterpreterProfile>;
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? input.comparison.createdAt;
+  const rowBase = {
+    source: {
+      toolName: "live_env.compare_mail_to_interpreter_profile",
+      artifactId: input.comparison.comparisonId,
+      artifactKind: input.comparison.artifactId,
+    },
+    evidenceRefs: input.comparison.evidenceRefs,
+    authority: "tool_evidence" as const,
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  };
+  return [
+    {
+      rowId: `ask_turn_interpreter_profile_comparison:${hashShort(input.comparison.comparisonId)}`,
+      rowKind: "profile_comparison",
+      title: "Interpreter profile comparison",
+      body: `Profile ${input.comparison.profileId} compared ${input.comparison.mailIds.length} mail item(s). Recommended: ${input.comparison.recommendedDecision}.`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_decision:${hashShort(input.comparison.comparisonId)}`,
+      rowKind: "agent_decision",
+      title: "Recommended decision",
+      body: `Recommended decision: ${input.comparison.recommendedDecision}.`,
+      ...rowBase,
+    },
+    {
+      rowId: `ask_turn_interpreter_profile_matches:${hashShort(input.comparison.comparisonId)}`,
+      rowKind: "profile_comparison",
+      title: "Criteria matches",
+      body: [
+        input.comparison.matchedCriteria.length ? `salience=${input.comparison.matchedCriteria.join(", ")}` : null,
+        input.comparison.riskMatches.length ? `risk=${input.comparison.riskMatches.join(", ")}` : null,
+        input.comparison.opportunityMatches.length ? `opportunity=${input.comparison.opportunityMatches.join(", ")}` : null,
+        input.comparison.voiceCalloutMatches.length ? `voice=${input.comparison.voiceCalloutMatches.join(", ")}` : null,
+        input.comparison.suppressedCriteria.length ? `suppress=${input.comparison.suppressedCriteria.join(", ")}` : null,
+      ].filter(Boolean).join("; ") || "No profile criteria matched deterministically.",
+      ...rowBase,
+    },
+  ];
 };
 
 const rowKindForVoiceSteeringQueueDecision = (
@@ -2067,6 +2123,245 @@ export function executeLiveEnvironmentTool(
       domain,
       objectiveText,
     });
+    const profileActionRaw =
+      readString(args.profile_action) ??
+      readString(args.profileAction) ??
+      readString(args.action);
+    const profileAction = profileActionRaw && new Set([
+      "select",
+      "apply",
+      "activate",
+      "pause",
+      "archive",
+      "open_note",
+      "compile_note",
+    ]).has(profileActionRaw)
+      ? profileActionRaw
+      : null;
+    const requestedProfileId =
+      readString(args.profile_id) ??
+      readString(args.profileId);
+    if (profileAction) {
+      const profiles = listStagePlayLiveSourceInterpreterProfiles({
+        threadId: input.thread_id,
+        roomId,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        includeArchived: true,
+        limit: 250,
+      });
+      const requestedTitle =
+        readString(args.profile_title) ??
+        readString(args.profileTitle) ??
+        readString(args.title);
+      const profile =
+        (requestedProfileId ? getStagePlayLiveSourceInterpreterProfile(requestedProfileId) : null) ??
+        (requestedTitle
+          ? profiles.find((entry) => entry.title.toLowerCase() === requestedTitle.toLowerCase()) ??
+            profiles.find((entry) => requestedTitle.toLowerCase().includes(entry.title.toLowerCase()) || entry.title.toLowerCase().includes(requestedTitle.toLowerCase()))
+          : null) ??
+        getActiveInterpreterProfileForJob({
+          threadId: input.thread_id,
+          roomId,
+          environmentId: environment?.environment_id ?? input.environment_id ?? null,
+          jobId,
+          policyId,
+          domain,
+        }) ??
+        profiles.at(-1) ??
+        null;
+      const now = new Date().toISOString();
+      if (!profile) {
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: `Interpreter profile ${profileAction} could not run: no matching profile was found.`,
+          observation: {
+            schema: "stage_play_interpreter_profile_action_result/v1",
+            ok: false,
+            profileAction,
+            profile_action: profileAction,
+            requestedProfileId,
+            requested_profile_id: requestedProfileId,
+            requestedTitle,
+            requested_title: requestedTitle,
+            missingFields: ["profile_id or active interpreter profile"],
+            missing_fields: ["profile_id or active interpreter profile"],
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: uniqueStrings([requestedProfileId, requestedTitle]),
+        });
+      }
+      if (profileAction === "pause" || profileAction === "archive" || profileAction === "select" || profileAction === "apply" || profileAction === "activate") {
+        const status = profileAction === "pause"
+          ? "paused"
+          : profileAction === "archive"
+            ? "archived"
+            : "active";
+        const updated = setInterpreterProfileStatus({
+          profileId: profile.profileId,
+          status,
+          updatedAt: now,
+        }) ?? profile;
+        const transcriptRows: AskTurnTranscriptRowDraftV1[] = [{
+          rowId: `ask_turn_interpreter_profile_action:${hashShort([updated.profileId, profileAction, now])}`,
+          rowKind: "interpreter_profile",
+          title: profileAction === "pause"
+            ? "Interpreter profile paused"
+            : profileAction === "archive"
+              ? "Interpreter profile archived"
+              : "Interpreter profile applied",
+          body: `${updated.title}: ${updated.status}.`,
+          source: {
+            toolName: "live_env.configure_interpreter_profile",
+            artifactId: updated.profileId,
+            artifactKind: updated.artifactId,
+          },
+          evidenceRefs: updated.evidenceRefs,
+          authority: "tool_evidence",
+          assistantAnswer: false,
+          terminalEligible: false,
+          createdAt: now,
+        }];
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: updated.environmentId ?? environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: true,
+          summary: `Interpreter profile ${updated.profileId} ${profileAction === "pause" || profileAction === "archive" ? status : "applied"}; no live-source mail was read.`,
+          observation: {
+            schema: "stage_play_interpreter_profile_action_result/v1",
+            ok: true,
+            profileAction,
+            profile_action: profileAction,
+            profile: updated,
+            transcriptRows,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          transcriptRows,
+          evidenceRefs: uniqueStrings([updated.profileId, ...updated.evidenceRefs]),
+        });
+      }
+      if (profileAction === "open_note") {
+        const requestedNoteId =
+          readString(args.note_id) ??
+          readString(args.noteId) ??
+          readString(args.linked_note_id) ??
+          readString(args.linkedNoteId);
+        const note =
+          openInterpreterProfileNote({ noteId: requestedNoteId, profileId: profile.profileId }) ??
+          createInterpreterProfileNote({ profileId: profile.profileId, noteId: requestedNoteId, now });
+        const transcriptRows: AskTurnTranscriptRowDraftV1[] = [{
+          rowId: `ask_turn_interpreter_profile_note_opened:${hashShort([profile.profileId, note.noteId, now])}`,
+          rowKind: "profile_note_link",
+          title: "Profile note opened",
+          body: `Linked note: ${note.title} (${note.noteId}).`,
+          source: {
+            toolName: "live_env.configure_interpreter_profile",
+            artifactId: note.noteId,
+            artifactKind: note.artifactId,
+          },
+          evidenceRefs: uniqueStrings([profile.profileId, note.noteId]),
+          authority: "tool_evidence",
+          assistantAnswer: false,
+          terminalEligible: false,
+          createdAt: now,
+        }];
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: profile.environmentId ?? environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: true,
+          summary: `Opened interpreter profile note ${note.noteId} for ${profile.profileId}.`,
+          observation: {
+            schema: "stage_play_interpreter_profile_action_result/v1",
+            ok: true,
+            profileAction,
+            profile_action: profileAction,
+            profile,
+            note,
+            linkedNote: { noteId: note.noteId, title: note.title },
+            linked_note: { noteId: note.noteId, title: note.title },
+            transcriptRows,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          transcriptRows,
+          evidenceRefs: uniqueStrings([profile.profileId, note.noteId, ...profile.evidenceRefs]),
+        });
+      }
+      if (profileAction === "compile_note") {
+        const noteId =
+          readString(args.note_id) ??
+          readString(args.noteId) ??
+          readString(args.linked_note_id) ??
+          readString(args.linkedNoteId) ??
+          profile.linkedNoteId;
+        const result = noteId
+          ? compileInterpreterProfileFromNote({ noteId, updatedAt: now })
+          : null;
+        const compiledProfile = result?.profile ?? null;
+        const transcriptRows: AskTurnTranscriptRowDraftV1[] = [{
+          rowId: `ask_turn_interpreter_profile_note_compiled:${hashShort([profile.profileId, noteId ?? "missing", now])}`,
+          rowKind: result?.ok ? "profile_compiled" : "blocked",
+          title: result?.ok ? "Profile compiled" : "Profile compile blocked",
+          body: result?.ok && compiledProfile
+            ? `Compiled ${result.note.title} into ${compiledProfile.title}.`
+            : `Could not compile interpreter profile note: ${result?.issues.join("; ") || "missing linked note"}.`,
+          source: {
+            toolName: "live_env.configure_interpreter_profile",
+            artifactId: noteId ?? profile.profileId,
+            artifactKind: "stage_play_live_source_interpreter_profile_note",
+          },
+          evidenceRefs: uniqueStrings([profile.profileId, noteId]),
+          authority: "tool_evidence",
+          assistantAnswer: false,
+          terminalEligible: false,
+          createdAt: now,
+        }];
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: compiledProfile?.environmentId ?? profile.environmentId ?? environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: result?.ok === true,
+          summary: result?.ok && compiledProfile
+            ? `Compiled interpreter profile note ${result.note.noteId} into ${compiledProfile.profileId}.`
+            : `Interpreter profile note compile failed: ${result?.issues.join("; ") || "missing linked note"}.`,
+          observation: {
+            schema: "stage_play_interpreter_profile_action_result/v1",
+            ok: result?.ok === true,
+            profileAction,
+            profile_action: profileAction,
+            profile: compiledProfile ?? profile,
+            note: result?.note ?? null,
+            issues: result?.issues ?? ["missing linked note"],
+            transcriptRows,
+            post_tool_model_step_required: true,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          transcriptRows,
+          evidenceRefs: uniqueStrings([profile.profileId, compiledProfile?.profileId, noteId]),
+        });
+      }
+    }
     const requestedLinkedNoteId =
       readString(args.linked_note_id) ??
       readString(args.linkedNoteId);
@@ -2210,6 +2505,93 @@ export function executeLiveEnvironmentTool(
     });
   }
 
+  if (input.tool_name === "live_env.compare_mail_to_interpreter_profile") {
+    const profileId =
+      readString(args.profile_id) ??
+      readString(args.profileId);
+    const jobId =
+      readString(args.job_id) ??
+      readString(args.jobId) ??
+      null;
+    const policyId =
+      readString(args.policy_id) ??
+      readString(args.policyId) ??
+      null;
+    const profile =
+      (profileId ? getStagePlayLiveSourceInterpreterProfile(profileId) : null) ??
+      getActiveInterpreterProfileForJob({
+        threadId: input.thread_id,
+        roomId,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        jobId,
+        policyId,
+      });
+    const mailIds = readStringArray(args.mail_ids ?? args.mailIds);
+    const mailItems = mailIds
+      .map((mailId) => getStagePlayLiveSourceMailItem(mailId))
+      .filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item));
+    const missingFields = [
+      profile ? null : "profile_id or active interpreter profile",
+      mailIds.length > 0 ? null : "mail_ids",
+      mailIds.length === mailItems.length ? null : "one or more mail_ids could not be loaded",
+    ].filter((entry): entry is string => Boolean(entry));
+    if (!profile || missingFields.length > 0) {
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: false,
+        summary: `Interpreter profile comparison could not run: missing ${missingFields.join(", ")}.`,
+        observation: {
+          schema: "stage_play_interpreter_profile_comparison_result/v1",
+          ok: false,
+          missingFields,
+          missing_fields: missingFields,
+          requestedProfileId: profileId,
+          requested_profile_id: profileId,
+          mailIds,
+          mail_ids: mailIds,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([profileId, ...mailIds]),
+      });
+    }
+    const narrativeStateRef =
+      readString(args.narrative_state_ref) ??
+      readString(args.narrativeStateRef) ??
+      readString(args.narrative_state_id) ??
+      readString(args.narrativeStateId);
+    const comparison = compareMailToInterpreterProfile({
+      profile,
+      mailItems,
+      narrativeStateRef,
+      jobId,
+      policyId,
+    });
+    const transcriptRows = buildInterpreterProfileComparisonTranscriptRows({
+      comparison,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: profile.environmentId ?? environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Compared ${comparison.mailIds.length} live-source mail item(s) to interpreter profile ${comparison.profileId}; recommended ${comparison.recommendedDecision}.`,
+      observation: {
+        ...comparison,
+        transcriptRows,
+        post_tool_model_step_required: true,
+        ask_context_policy: "evidence_only",
+      },
+      transcriptRows,
+      evidenceRefs: comparison.evidenceRefs,
+    });
+  }
+
   if (input.tool_name === "live_env.record_live_source_mail_decision") {
     const decisionRaw = readString(args.decision) ?? "wait_for_next_summary";
     const allowedDecisions = new Set([
@@ -2269,6 +2651,16 @@ export function executeLiveEnvironmentTool(
       requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool),
       interpretation: readInterpretationPayload(args.interpretation, args),
       nextLoopState,
+      interpreterProfileRef:
+        readString(args.interpreter_profile_ref) ??
+        readString(args.interpreterProfileRef) ??
+        readString(args.profile_id) ??
+        readString(args.profileId),
+      profileComparisonRefs: readStringArray(args.profile_comparison_refs ?? args.profileComparisonRefs),
+      matchedCriteria: readStringArray(args.matched_criteria ?? args.matchedCriteria),
+      suppressedCriteria: readStringArray(args.suppressed_criteria ?? args.suppressedCriteria),
+      observedFacts: readStringArray(args.observed_facts ?? args.observedFacts),
+      inferredMeaning: readStringArray(args.inferred_meaning ?? args.inferredMeaning),
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
     });

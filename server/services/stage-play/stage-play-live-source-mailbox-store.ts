@@ -353,6 +353,12 @@ export function recordStagePlayMailDecision(input: {
   nextExpectedSourceKind?: StagePlayLiveSourceMailDecisionV1["nextExpectedSourceKind"];
   nextExpectedAfterMs?: number | null;
   activeJobId?: string | null;
+  interpreterProfileRef?: string | null;
+  profileComparisonRefs?: string[];
+  matchedCriteria?: string[];
+  suppressedCriteria?: string[];
+  observedFacts?: string[];
+  inferredMeaning?: string[];
   rearmReason?: string | null;
   evidenceRefs?: string[];
   modelReviewed?: boolean;
@@ -363,6 +369,8 @@ export function recordStagePlayMailDecision(input: {
   const evidenceRefs = uniqueStrings([
     ...input.mailIds,
     ...mailItems.flatMap((item) => item.evidenceRefs),
+    input.interpreterProfileRef,
+    ...(input.profileComparisonRefs ?? []),
     ...(input.evidenceRefs ?? []),
   ]);
   const nextLoopState = input.nextLoopState ?? defaultNextLoopStateForDecision(input.decision);
@@ -409,6 +417,12 @@ export function recordStagePlayMailDecision(input: {
     mailboxCursor: mailItems.at(-1)?.mailId ?? input.mailIds.at(-1) ?? null,
     activeJobId: jobId,
     narrativeStateRef: null,
+    interpreterProfileRef: input.interpreterProfileRef ?? null,
+    profileComparisonRefs: uniqueStrings(input.profileComparisonRefs ?? []),
+    matchedCriteria: uniqueStrings(input.matchedCriteria ?? []),
+    suppressedCriteria: uniqueStrings(input.suppressedCriteria ?? []),
+    observedFacts: uniqueStrings(input.observedFacts ?? []),
+    inferredMeaning: uniqueStrings(input.inferredMeaning ?? []),
     rearmReason: input.rearmReason ?? (nextLoopState === "armed_for_next_summary" ? "decision_recorded_rearm" : null),
     evidenceRefs,
     modelReviewed: input.modelReviewed !== false,

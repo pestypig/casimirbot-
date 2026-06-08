@@ -8482,6 +8482,10 @@ export type HelixMailLoopTranscriptRowKind =
   | "watch_next"
   | "narrative_state"
   | "interpretation_state"
+  | "interpreter_profile"
+  | "profile_comparison"
+  | "profile_note_link"
+  | "profile_compiled"
   | "text_answer"
   | "voice_callout_request"
   | "voice_tool_call"
@@ -8516,6 +8520,10 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "watch_next",
   "narrative_state",
   "interpretation_state",
+  "interpreter_profile",
+  "profile_comparison",
+  "profile_note_link",
+  "profile_compiled",
   "text_answer",
   "voice_callout_request",
   "voice_tool_call",
@@ -8754,6 +8762,10 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   if (row.rowKind === "prediction") return row.body || "Prediction recorded.";
   if (row.rowKind === "narrative_state") return row.body || "Narrative state recorded.";
   if (row.rowKind === "interpretation_state") return row.body || "Interpretation state recorded.";
+  if (row.rowKind === "interpreter_profile") return row.body || "Interpreter profile applied.";
+  if (row.rowKind === "profile_comparison") return row.body || "Profile comparison recorded.";
+  if (row.rowKind === "profile_note_link") return row.body || "Interpreter profile note linked.";
+  if (row.rowKind === "profile_compiled") return row.body || "Interpreter profile compiled from note.";
   if (row.rowKind === "wait_for_next_summary") return "No unread live-source updates.\nStanding by for the next source update.";
   if (row.rowKind === "mail_wake_requested") return row.body || "Wake requested for live-source mail.";
   if (row.rowKind === "mail_wake_deferred") return row.body || "Wake deferred; mailbox remains armed for the next summary.";
@@ -8786,6 +8798,10 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "prediction") return "Prediction";
   if (row.rowKind === "narrative_state") return "Narrative state";
   if (row.rowKind === "interpretation_state") return row.title || "Interpretation";
+  if (row.rowKind === "interpreter_profile") return row.title || "Interpreter profile";
+  if (row.rowKind === "profile_comparison") return row.title || "Profile comparison";
+  if (row.rowKind === "profile_note_link") return row.title || "Profile note";
+  if (row.rowKind === "profile_compiled") return row.title || "Profile compiled";
   if (row.rowKind === "text_answer") return "Text draft";
   if (row.rowKind === "voice_callout_request") return "Voice callout request";
   if (row.rowKind === "voice_tool_call") return "Voice tool call";
@@ -8808,7 +8824,7 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
 function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
   if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
   if (row.rowKind === "prediction_check") return "observation";
-  if (row.rowKind === "interpretation" || row.rowKind === "watch_next" || row.rowKind === "prediction" || row.rowKind === "narrative_state" || row.rowKind === "interpretation_state" || row.rowKind === "narrative_projection") return "checkpoint";
+  if (row.rowKind === "interpretation" || row.rowKind === "watch_next" || row.rowKind === "prediction" || row.rowKind === "narrative_state" || row.rowKind === "interpretation_state" || row.rowKind === "interpreter_profile" || row.rowKind === "profile_comparison" || row.rowKind === "profile_note_link" || row.rowKind === "profile_compiled" || row.rowKind === "narrative_projection") return "checkpoint";
   if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
   if (row.rowKind === "task_queued" || row.rowKind === "task_running") return "working";
   if (row.rowKind === "task_deferred") return "warning";

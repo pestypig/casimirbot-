@@ -7,6 +7,9 @@ import type {
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  StagePlayLiveSourceInterpreterProfileV1,
+} from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type { StagePlayHeldCalloutV1 } from "@shared/contracts/stage-play-held-callout.v1";
 import type {
   StagePlayLiveSourceConversationContextPackV1,
@@ -37,6 +40,11 @@ import { buildStagePlayLiveSourceConversationContextPack } from "./stage-play-li
 import { listStagePlayHeldCallouts } from "./stage-play-held-callout-store";
 import { maybeQueueStagePlayLiveSourceMemoryConsolidation } from "./stage-play-live-source-memory-consolidation";
 import { recordStagePlayLiveSourceMailTranscriptEntries } from "./stage-play-live-source-mail-transcript-store";
+import {
+  getActiveInterpreterProfileForJob,
+  getStagePlayLiveSourceInterpreterProfile,
+  listStagePlayLiveSourceInterpreterProfileComparisons,
+} from "./stage-play-live-source-interpreter-profile-store";
 import {
   maybeRunStagePlayLiveSourceVoiceDelivery,
   type StagePlayLiveSourceVoiceDeliveryRunner,
@@ -137,6 +145,38 @@ const clipPromptText = (value: string | null | undefined, max = 420): string => 
 
 const formatCriteria = (values: string[]): string =>
   values.length > 0 ? values.map((value) => `- ${value}`).join("\n") : "- none recorded";
+
+const formatBooleanRule = (label: string, value: boolean): string =>
+  `- ${label}: ${value}`;
+
+const formatActiveInterpreterProfile = (
+  profile: StagePlayLiveSourceInterpreterProfileV1 | null,
+): string => {
+  if (!profile) return "No active interpreter profile. Use watch policy only.";
+  return [
+    `Profile ref: ${profile.profileId}`,
+    `Title: ${profile.title}`,
+    `Domain: ${profile.domain}`,
+    `Objective: ${profile.objectiveText}`,
+    "Guidelines:",
+    profile.interpretationGuidelines,
+    "Salience criteria:",
+    formatCriteria(profile.salienceCriteria),
+    "Suppress criteria:",
+    formatCriteria(profile.suppressCriteria),
+    "Risk criteria:",
+    formatCriteria(profile.riskCriteria),
+    "Opportunity criteria:",
+    formatCriteria(profile.opportunityCriteria),
+    "Voice callout criteria:",
+    formatCriteria(profile.voiceCalloutCriteria),
+    "Evidence rules:",
+    formatBooleanRule("preserve raw observation", profile.evidenceRules.preserveRawObservation),
+    formatBooleanRule("distinguish observed vs inferred", profile.evidenceRules.distinguishObservedVsInferred),
+    formatBooleanRule("require evidence refs", profile.evidenceRules.requireEvidenceRefs),
+    formatBooleanRule("ask when uncertain", profile.evidenceRules.askWhenUncertain),
+  ].join("\n");
+};
 
 const formatVoicePolicy = (policy: StagePlayLiveSourceVoicePolicyV1): string =>
   [
@@ -581,6 +621,51 @@ const buildDurableWakeTranscriptRows = (input: {
   if (decisions.length > 0) {
     for (const decision of decisions) {
       const voiceReceipt = voiceReceiptByDecisionId.get(decision.decisionId) ?? null;
+      const decisionProfile = decision.interpreterProfileRef
+        ? getStagePlayLiveSourceInterpreterProfile(decision.interpreterProfileRef)
+        : null;
+      if (decision.interpreterProfileRef) {
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_interpreter_profile:${hashShort([decision.decisionId, decision.interpreterProfileRef])}`,
+          rowKind: "interpreter_profile",
+          title: "Interpreter profile",
+          body: decisionProfile
+            ? `${decisionProfile.title} applied.\nDomain: ${decisionProfile.domain}. Voice: ${decisionProfile.outputStyle.voiceStyle}.\nSuppressed: ${decisionProfile.suppressCriteria.join(", ") || "none"}.\nWatch: ${decisionProfile.salienceCriteria.join(", ") || "profile criteria"}.`
+            : `${decision.interpreterProfileRef} applied.`,
+          toolName: "live_env.record_live_source_mail_decision",
+          artifactId: decision.interpreterProfileRef,
+          artifactKind: "stage_play_live_source_interpreter_profile",
+          evidenceRefs: uniqueStrings([decision.interpreterProfileRef, ...decision.evidenceRefs]),
+          authority: "tool_evidence",
+          createdAt: input.createdAt,
+        }));
+      }
+      for (const comparisonRef of decision.profileComparisonRefs ?? []) {
+        const comparison = listStagePlayLiveSourceInterpreterProfileComparisons({ limit: 250 })
+          .find((entry) => entry.comparisonId === comparisonRef) ?? null;
+        rows.push(makeWakeTranscriptRow({
+          rowId: `wake_profile_comparison:${hashShort([decision.decisionId, comparisonRef])}`,
+          rowKind: "profile_comparison",
+          title: "Profile comparison",
+          body: comparison
+            ? [
+                comparison.matchedCriteria.length ? `Matched: ${comparison.matchedCriteria.join(", ")}.` : "Matched: none.",
+                comparison.suppressedCriteria.length ? `Suppressed: ${comparison.suppressedCriteria.join(", ")}.` : "Suppressed: none.",
+                `Recommended: ${comparison.recommendedDecision}.`,
+              ].join("\n")
+            : [
+                decision.matchedCriteria?.length ? `Matched: ${decision.matchedCriteria.join(", ")}.` : "Matched: none recorded.",
+                decision.suppressedCriteria?.length ? `Suppressed: ${decision.suppressedCriteria.join(", ")}.` : "Suppressed: none recorded.",
+                `Comparison: ${comparisonRef}.`,
+              ].join("\n"),
+          toolName: "live_env.record_live_source_mail_decision",
+          artifactId: comparisonRef,
+          artifactKind: "stage_play_live_source_interpreter_profile_comparison",
+          evidenceRefs: uniqueStrings([comparisonRef, ...decision.evidenceRefs]),
+          authority: "tool_evidence",
+          createdAt: input.createdAt,
+        }));
+      }
       rows.push(makeWakeTranscriptRow({
         rowId: `wake_agent_decision:${hashShort(decision.decisionId)}`,
         rowKind: "agent_decision",
@@ -888,6 +973,7 @@ const recordNonTerminalWakeTranscript = (input: {
 const buildWakePrompt = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  activeInterpreterProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
@@ -913,6 +999,17 @@ const buildWakePrompt = (input: {
     "",
     "Decision policy:",
     decisionPolicy,
+    "",
+    "Active interpreter profile:",
+    formatActiveInterpreterProfile(input.activeInterpreterProfile),
+    "",
+    "Interpreter profile instructions:",
+    "1. Preserve observed facts from the mail summaries.",
+    "2. Compare observed facts against the active interpreter profile when one exists.",
+    "3. Do not overwrite observations with profile assumptions.",
+    "4. State matched and suppressed criteria when a profile is active.",
+    "5. If uncertain, record uncertainty or request more evidence.",
+    "6. Use profile comparison to choose wait, interpretation, text, voice, or checkpoint.",
     "",
     "The mail is perturbation evidence for this continuing job.",
     "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
@@ -1232,6 +1329,14 @@ export async function runNextMailWakeRequest(input: {
     jobId: policy?.jobId ?? running.jobId ?? null,
     sourceId: mailBatch[0]?.sourceId ?? running.sourceIds[0] ?? null,
   });
+  const activeInterpreterProfile = getActiveInterpreterProfileForJob({
+    threadId: running.threadId,
+    roomId: running.roomId ?? null,
+    environmentId: running.environmentId ?? null,
+    jobId: policy?.jobId ?? running.jobId ?? null,
+    policyId: policy?.policyId ?? null,
+    sourceKind: mailBatch[0]?.sourceKind ?? null,
+  });
   const taskQueueSnapshot = getStagePlayLiveSourceTaskQueueSnapshot({
     threadId: running.threadId,
     roomId: running.roomId ?? null,
@@ -1256,6 +1361,8 @@ export async function runNextMailWakeRequest(input: {
     ...running.mailIds,
     ...running.sourceIds,
     ...(policy ? [policy.policyId, policy.jobId, ...policy.evidenceRefs, ...policy.priorAnswerRefs, ...policy.priorDecisionRefs] : []),
+    activeInterpreterProfile?.profileId,
+    ...(activeInterpreterProfile?.evidenceRefs ?? []),
     latestNarrativeState?.narrativeStateId,
     ...taskQueueSnapshot.evidenceRefs,
     conversationContextPack.contextPackId,
@@ -1295,6 +1402,7 @@ export async function runNextMailWakeRequest(input: {
   const prompt = buildWakePrompt({
     wake: running,
     policy,
+    activeInterpreterProfile,
     mailBatch,
     priorDecisions,
     latestNarrativeState,

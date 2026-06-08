@@ -918,6 +918,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"watch_next"');
     expect(source).toContain('"prediction"');
     expect(source).toContain('"narrative_state"');
+    expect(source).toContain('"interpreter_profile"');
+    expect(source).toContain('"profile_comparison"');
+    expect(source).toContain('"profile_note_link"');
+    expect(source).toContain('"profile_compiled"');
     expect(source).toContain('"text_answer"');
     expect(source).toContain('"voice_callout_request"');
     expect(source).toContain('"voice_tool_call"');
@@ -935,6 +939,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Prediction check");
     expect(source).toContain("Narrative projection");
     expect(source).toContain("Narrative state");
+    expect(source).toContain("Interpreter profile");
+    expect(source).toContain("Profile comparison");
     expect(source).toContain("Text draft");
     expect(source).toContain("Voice callout request");
     expect(source).toContain("Voice tool call");

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { buildStagePlayLiveSourceInterpreterProfileV1 } from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import {
   buildMailLoopTranscriptRows,
   enqueueLatestVisualSummaryMailIfNeeded,
@@ -53,6 +54,10 @@ import {
   recordStagePlayHeldCallout,
   resetStagePlayHeldCalloutStoreForTest,
 } from "../services/stage-play/stage-play-held-callout-store";
+import {
+  recordStagePlayLiveSourceInterpreterProfile,
+  resetStagePlayLiveSourceInterpreterProfileStoreForTest,
+} from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
 import {
   analyzeVisualFrame,
@@ -76,6 +81,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceTaskQueueForTest();
   resetStagePlayLiveSourceConversationStoreForTest();
   resetStagePlayHeldCalloutStoreForTest();
+  resetStagePlayLiveSourceInterpreterProfileStoreForTest();
 });
 
 const seedVisualEvidence = () => {
@@ -528,6 +534,59 @@ describe("Stage Play live-source mailbox", () => {
       "loop_state",
     ]));
     expect(rows.find((row) => row.rowKind === "voice_callout_request")?.terminalEligible).toBe(false);
+  });
+
+  it("records interpreter profile comparison refs on mailbox decisions", () => {
+    seedVisualEvidence();
+    const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
+    const mailId = readResult.items[0].mailId;
+    const profileRef = "stage_play_live_source_interpreter_profile:mailbox-decision";
+    const comparisonRef = "stage_play_live_source_interpreter_profile_comparison:mailbox-decision";
+
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId,
+      roomId,
+      mailIds: [mailId],
+      decision: "wait_for_next_summary",
+      rationalePreview: "Routine walking matched the suppress criteria.",
+      interpreterProfileRef: profileRef,
+      profileComparisonRefs: [comparisonRef],
+      matchedCriteria: ["routine walking"],
+      suppressedCriteria: ["stable daylight scenery"],
+      observedFacts: ["The compact summary shows stable daylight scenery."],
+      inferredMeaning: ["The Minecraft Survival Coach profile recommends waiting."],
+      evidenceRefs: readResult.evidenceRefs.concat(comparisonRef),
+      now: "2026-06-04T12:00:02.000Z",
+    });
+
+    expect(decision).toMatchObject({
+      decision: "wait_for_next_summary",
+      interpreterProfileRef: profileRef,
+      profileComparisonRefs: [comparisonRef],
+      matchedCriteria: ["routine walking"],
+      suppressedCriteria: ["stable daylight scenery"],
+      observedFacts: ["The compact summary shows stable daylight scenery."],
+      inferredMeaning: ["The Minecraft Survival Coach profile recommends waiting."],
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(decision.evidenceRefs).toEqual(expect.arrayContaining([
+      profileRef,
+      comparisonRef,
+      mailId,
+    ]));
+    const rows = buildMailLoopTranscriptRows({ decision });
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "profile_comparison",
+        title: "Interpreter profile context",
+        body: expect.stringContaining(`Profile: ${profileRef}.`),
+      }),
+      expect.objectContaining({
+        rowKind: "agent_decision",
+        title: "Agent decision",
+      }),
+    ]));
   });
 
   it("includes voice policy in mail reads and suppresses voice options when disabled", () => {
@@ -1542,6 +1601,132 @@ describe("Stage Play live-source mailbox", () => {
     expect(prompt).toContain("Suppress only if no unread mail items exist or mail lacks compact summary text.");
     expect(prompt).toContain(mail.mailId);
     expect(prompt).toContain("Minecraft-like scene with a player near a book stand");
+  });
+
+  it("injects the active interpreter profile into wake prompts", async () => {
+    const { policy } = configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft visual source and interpret each mail batch like a survival coach.",
+      decisionPolicyPrompt: "Interpret each non-empty visual-summary mail batch against the active survival-coach profile.",
+      importanceCriteria: ["hostile mobs", "low light", "strategic resources"],
+      suppressCriteria: ["routine walking"],
+      interpretationMode: "batch_interpretation",
+    });
+    const profile = recordStagePlayLiveSourceInterpreterProfile(
+      buildStagePlayLiveSourceInterpreterProfileV1({
+        profileId: "stage_play_live_source_interpreter_profile:minecraft-survival-coach",
+        title: "Minecraft Survival Coach",
+        threadId,
+        roomId,
+        environmentId: null,
+        jobId: policy.jobId,
+        policyId: policy.policyId,
+        sourceKinds: ["visual_frame"],
+        domain: "minecraft",
+        objectiveText: "Coach the user through Minecraft survival decisions from compact visual summaries.",
+        interpretationGuidelines: "Preserve visible observations, separate them from inferred danger, and compare updates to survival priorities.",
+        lenses: ["survival", "hazards", "resources"],
+        salienceCriteria: ["hostile mob", "cave exploration", "low health"],
+        suppressCriteria: ["routine walking", "unchanged menu"],
+        riskCriteria: ["low light", "lava", "hostile mob nearby"],
+        opportunityCriteria: ["rare resource", "shelter", "crafting table"],
+        voiceCalloutCriteria: ["urgent danger", "hostile mob nearby"],
+        evidenceRules: {
+          preserveRawObservation: true,
+          distinguishObservedVsInferred: true,
+          requireEvidenceRefs: true,
+          askWhenUncertain: true,
+        },
+        outputStyle: {
+          textAnswerStyle: "brief_explanation",
+          voiceStyle: "short_callout",
+        },
+        linkedNoteId: null,
+        linkedNoteTitle: null,
+        status: "active",
+        evidenceRefs: [policy.policyId],
+        createdAt: "2026-06-04T12:00:50.000Z",
+        updatedAt: "2026-06-04T12:00:50.000Z",
+      }),
+    );
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:profile-wake",
+      evidenceRef: "visual_evidence:profile-wake",
+      summaryText: "Minecraft-like scene in a dim cave corridor with a visible crafting table and no confirmed hostile mob.",
+      createdAt: "2026-06-04T12:00:55.000Z",
+    });
+
+    let prompt = "";
+    let evidenceRefs: string[] = [];
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      askTurnRunner: async (input) => {
+        prompt = input.prompt;
+        evidenceRefs = input.evidenceRefs;
+        return {
+          turn_id: "ask:wake-with-active-interpreter-profile",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-with-active-interpreter-profile",
+                  decision: "record_interpretation",
+                  mailIds: input.wakeRequest.mailIds,
+                  interpreterProfileRef: profile.profileId,
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-with-active-interpreter-profile",
+      decisionIds: ["stage_play_live_source_mail_decision:wake-with-active-interpreter-profile"],
+    });
+    expect(evidenceRefs).toEqual(expect.arrayContaining([profile.profileId, policy.policyId, mail.mailId]));
+    expect(prompt).toContain("Active interpreter profile:");
+    expect(prompt).toContain(`Profile ref: ${profile.profileId}`);
+    expect(prompt).toContain("Title: Minecraft Survival Coach");
+    expect(prompt).toContain("Domain: minecraft");
+    expect(prompt).toContain("Objective: Coach the user through Minecraft survival decisions from compact visual summaries.");
+    expect(prompt).toContain("Guidelines:");
+    expect(prompt).toContain("Preserve visible observations, separate them from inferred danger");
+    expect(prompt).toContain("Salience criteria:");
+    expect(prompt).toContain("- cave exploration");
+    expect(prompt).toContain("Suppress criteria:");
+    expect(prompt).toContain("- routine walking");
+    expect(prompt).toContain("Risk criteria:");
+    expect(prompt).toContain("- low light");
+    expect(prompt).toContain("Opportunity criteria:");
+    expect(prompt).toContain("- crafting table");
+    expect(prompt).toContain("Voice callout criteria:");
+    expect(prompt).toContain("- hostile mob nearby");
+    expect(prompt).toContain("Evidence rules:");
+    expect(prompt).toContain("- preserve raw observation: true");
+    expect(prompt).toContain("- distinguish observed vs inferred: true");
+    expect(prompt).toContain("- require evidence refs: true");
+    expect(prompt).toContain("- ask when uncertain: true");
+    expect(prompt).toContain("Interpreter profile instructions:");
+    expect(prompt).toContain("Preserve observed facts from the mail summaries.");
+    expect(prompt).toContain("Compare observed facts against the active interpreter profile when one exists.");
+    expect(prompt).toContain("Do not overwrite observations with profile assumptions.");
+    expect(prompt).toContain("State matched and suppressed criteria when a profile is active.");
+    expect(prompt).toContain("Use profile comparison to choose wait, interpretation, text, voice, or checkpoint.");
+    expect(prompt).toContain(mail.mailId);
+    expect(prompt).toContain("dim cave corridor");
   });
 
   it("binds generated interpretation policy into future wake prompts", () => {

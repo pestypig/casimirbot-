@@ -12,7 +12,12 @@ import type {
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
   StagePlayLiveSourceNarrativeStateV1,
+  StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  StagePlayLiveSourceInterpreterProfileComparisonV1,
+  StagePlayLiveSourceInterpreterProfileV1,
+} from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type {
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
@@ -198,6 +203,9 @@ type StagePlayLiveSourceMailListResponse = {
   schema: "stage_play_live_source_mail_list_response/v1";
   mailItems?: StagePlayLiveSourceMailItemV1[];
   jobStates?: StagePlayLiveSourceJobStateV1[];
+  watchJobPolicies?: StagePlayLiveSourceWatchJobPolicyV1[];
+  interpreterProfiles?: StagePlayLiveSourceInterpreterProfileV1[];
+  interpreterProfileComparisons?: StagePlayLiveSourceInterpreterProfileComparisonV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
   narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
@@ -225,6 +233,14 @@ type StagePlayMailLoopNode = {
   outputRefs: string[];
   outputPreview: string;
   blockedUntil?: string | null;
+  inspector?: {
+    kind: "interpreter_profile";
+    title: string;
+    profileId: string;
+    linkedNoteId?: string | null;
+    linkedNoteTitle?: string | null;
+    body: string;
+  } | null;
 };
 
 const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
@@ -1196,6 +1212,8 @@ function buildObserverMailLoopNodes(input: {
   const narrativeStates = mailbox?.narrativeStates ?? [];
   const wakeRequests = mailbox?.wakeRequests ?? [];
   const wakeResults = mailbox?.wakeResults ?? [];
+  const interpreterProfiles = mailbox?.interpreterProfiles ?? [];
+  const interpreterProfileComparisons = mailbox?.interpreterProfileComparisons ?? [];
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
@@ -1248,6 +1266,30 @@ function buildObserverMailLoopNodes(input: {
   const latestWakeAskTurnId = latestWakeResult?.askTurnId ?? displayWake?.askTurnId ?? null;
   const latestWakeDecisionIds = latestWakeResult?.decisionIds ?? displayWake?.decisionIds ?? [];
   const activeJob = jobStates.at(-1) ?? null;
+  const latestPolicy = (mailbox?.watchJobPolicies ?? [])
+    .filter((policy) => !activeJob || policy.jobId === activeJob.jobId || activeJob.watchJobPolicyRef === policy.policyId)
+    .at(-1) ?? null;
+  const activeInterpreterProfile =
+    interpreterProfiles
+      .filter((profile) => profile.status === "active")
+      .filter((profile) =>
+        (!activeJob || !profile.jobId || profile.jobId === activeJob.jobId) &&
+        (!latestPolicy || !profile.policyId || profile.policyId === latestPolicy.policyId)
+      )
+      .at(-1) ??
+    interpreterProfiles.filter((profile) => profile.status === "active").at(-1) ??
+    interpreterProfiles.at(-1) ??
+    null;
+  const latestProfileComparison =
+    interpreterProfileComparisons
+      .filter((comparison) =>
+        (latestDecision?.profileComparisonRefs ?? []).includes(comparison.comparisonId) ||
+        (visualMail?.mailId ? comparison.mailIds.includes(visualMail.mailId) : false) ||
+        (latestNarrativeState?.narrativeStateId ? comparison.narrativeStateRef === latestNarrativeState.narrativeStateId : false)
+      )
+      .at(-1) ??
+    interpreterProfileComparisons.at(-1) ??
+    null;
   const observerOutputRefs = uniqueSorted([
     visualSource?.sourceId ?? "",
     activeJob?.jobId ?? "",
@@ -1264,6 +1306,15 @@ function buildObserverMailLoopNodes(input: {
   const wakeInputRefs = uniqueSorted([
     ...(displayWake?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : [])),
   ]);
+  const profileInputRefs = uniqueSorted([
+    activeInterpreterProfile?.policyId ?? "",
+    activeInterpreterProfile?.jobId ?? activeJob?.jobId ?? "",
+  ].filter(Boolean));
+  const comparisonInputRefs = uniqueSorted([
+    activeInterpreterProfile?.profileId ?? "",
+    visualMail?.mailId ?? "",
+    latestNarrativeState?.narrativeStateId ?? "",
+  ].filter(Boolean));
   const queuedRunningText = `queued ${queuedWakeMailCount} / running ${runningWakeMailCount}`;
   const latestWakeAskText = latestWakeAskTurnId ? `latest ask ${latestWakeAskTurnId}` : "no Ask turn yet";
   const pressureText = latestWakeStatus === "deferred_for_pressure"
@@ -1328,6 +1379,84 @@ function buildObserverMailLoopNodes(input: {
       outputPreview: visualMail
         ? `summary preview: ${visualMail.summary.preview}; status ${visualMail.status}`
         : "summary preview: none yet; status missing",
+    },
+    {
+      id: "observer_mail_loop:interpreter_profile",
+      title: "Interpreter Profile",
+      subtitle: "interpretation contract",
+      status: activeInterpreterProfile?.status ?? "missing",
+      preview: activeInterpreterProfile
+        ? `${activeInterpreterProfile.title} | Domain: ${activeInterpreterProfile.domain} | Voice: ${activeInterpreterProfile.outputStyle.voiceStyle}`
+        : "no active interpreter profile",
+      statusChips: activeInterpreterProfile
+        ? [
+            activeInterpreterProfile.domain,
+            activeInterpreterProfile.outputStyle.voiceStyle,
+          ]
+        : ["watch policy only"],
+      inputLabel: "Input",
+      inputRefs: profileInputRefs,
+      inputPreview: profileInputRefs.length > 0 ? profileInputRefs.join(", ") : "watch job / policy",
+      transformLabel: "profile contract -> comparison lens",
+      outputLabel: "Output",
+      outputRefs: activeInterpreterProfile ? [activeInterpreterProfile.profileId, ...activeInterpreterProfile.evidenceRefs] : [],
+      outputPreview: activeInterpreterProfile
+        ? [
+            activeInterpreterProfile.title,
+            "Active",
+            `Domain: ${activeInterpreterProfile.domain}`,
+            `Voice: ${activeInterpreterProfile.outputStyle.voiceStyle}`,
+            `Suppressed: ${activeInterpreterProfile.suppressCriteria.slice(0, 2).join(", ") || "none"}`,
+            `Watch: ${activeInterpreterProfile.salienceCriteria.slice(0, 3).join(", ") || "profile criteria"}`,
+          ].join(" | ")
+        : "Use watch policy only.",
+      inspector: activeInterpreterProfile ? {
+        kind: "interpreter_profile",
+        title: activeInterpreterProfile.title,
+        profileId: activeInterpreterProfile.profileId,
+        linkedNoteId: activeInterpreterProfile.linkedNoteId,
+        linkedNoteTitle: activeInterpreterProfile.linkedNoteTitle,
+        body: [
+          `Status: ${activeInterpreterProfile.status}`,
+          `Domain: ${activeInterpreterProfile.domain}`,
+          `Voice: ${activeInterpreterProfile.outputStyle.voiceStyle}`,
+          `Guidelines: ${activeInterpreterProfile.interpretationGuidelines}`,
+          `Salience: ${activeInterpreterProfile.salienceCriteria.join(", ") || "none"}`,
+          `Suppress: ${activeInterpreterProfile.suppressCriteria.join(", ") || "none"}`,
+          `Risk: ${activeInterpreterProfile.riskCriteria.join(", ") || "none"}`,
+          `Opportunity: ${activeInterpreterProfile.opportunityCriteria.join(", ") || "none"}`,
+        ].join("\n"),
+      } : null,
+    },
+    {
+      id: "observer_mail_loop:profile_comparison",
+      title: "Profile Comparison",
+      subtitle: "profile lens over mail",
+      status: latestProfileComparison?.recommendedDecision ?? "pending",
+      preview: latestProfileComparison
+        ? `Matched: ${latestProfileComparison.matchedCriteria.slice(0, 2).join(", ") || "none"}; Recommended: ${latestProfileComparison.recommendedDecision}`
+        : activeInterpreterProfile
+          ? "waiting for comparison receipt"
+          : "no profile comparison",
+      statusChips: latestProfileComparison
+        ? [
+            latestProfileComparison.matchedCriteria.length ? `${latestProfileComparison.matchedCriteria.length} matched` : "no matches",
+            latestProfileComparison.suppressedCriteria.length ? `${latestProfileComparison.suppressedCriteria.length} suppressed` : null,
+          ].filter((entry): entry is string => Boolean(entry))
+        : ["evidence only"],
+      inputLabel: "Input",
+      inputRefs: comparisonInputRefs,
+      inputPreview: comparisonInputRefs.length > 0 ? comparisonInputRefs.join(", ") : "mail + profile + narrative",
+      transformLabel: "profile + mail + narrative -> comparison receipt",
+      outputLabel: "Output",
+      outputRefs: latestProfileComparison ? [latestProfileComparison.comparisonId, ...latestProfileComparison.evidenceRefs] : [],
+      outputPreview: latestProfileComparison
+        ? [
+            `Matched: ${latestProfileComparison.matchedCriteria.join(", ") || "none"}.`,
+            `Suppressed: ${latestProfileComparison.suppressedCriteria.join(", ") || "none"}.`,
+            `Recommended: ${latestProfileComparison.recommendedDecision}.`,
+          ].join(" ")
+        : "No profile comparison receipt yet.",
     },
     {
       id: "observer_mail_loop:ask_wake",
@@ -1427,6 +1556,11 @@ function StagePlayObserverMailLoopCanvas({
   onRunWake?: () => void;
 }) {
   const nodes = useMemo(() => buildObserverMailLoopNodes({ graph, mailbox }), [graph, mailbox]);
+  const [selectedInspectorNodeId, setSelectedInspectorNodeId] = useState<string | null>(null);
+  const selectedInspectorNode =
+    nodes.find((node) => node.id === selectedInspectorNodeId && node.inspector) ??
+    nodes.find((node) => node.inspector) ??
+    null;
   const refs = uniqueSorted(nodes.flatMap((node) => [...node.inputRefs, ...node.outputRefs]));
   return (
     <div
@@ -1438,7 +1572,7 @@ function StagePlayObserverMailLoopCanvas({
         <div>
           <div className="font-mono text-[11px] uppercase tracking-wide text-cyan-200">observer_mail_loop_v1</div>
           <div className="mt-1 text-sm text-slate-400">
-            {"Observer -> Mailbox -> Wake Ask -> Decision -> Output / Wait."}
+            {"Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output / Wait."}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1462,7 +1596,7 @@ function StagePlayObserverMailLoopCanvas({
           <CopyStagePlayRefsButton refs={refs} label="Copy observer mail loop refs" />
         </div>
       </div>
-      <div className="grid min-w-[1220px] grid-cols-[repeat(5,220px)] items-start gap-6">
+      <div className="grid min-w-[1700px] grid-cols-[repeat(7,220px)] items-start gap-6">
         {nodes.map((node) => (
           <div
             key={node.id}
@@ -1470,7 +1604,16 @@ function StagePlayObserverMailLoopCanvas({
             data-testid="stage-play-observer-mail-loop-node"
             title={`Refs: ${uniqueSorted([...node.inputRefs, ...node.outputRefs]).join(", ") || "none"}`}
           >
-            <div className="flex min-h-[132px] flex-col justify-between rounded-md border border-slate-700 bg-slate-900/80 px-3 py-3 text-center shadow-[0_12px_30px_rgba(2,6,23,0.3)]">
+            <button
+              type="button"
+              onClick={() => node.inspector ? setSelectedInspectorNodeId(node.id) : undefined}
+              className={`flex min-h-[132px] w-full flex-col justify-between rounded-md border px-3 py-3 text-center shadow-[0_12px_30px_rgba(2,6,23,0.3)] ${
+                node.inspector && selectedInspectorNode?.id === node.id
+                  ? "border-cyan-400 bg-cyan-950/40"
+                  : "border-slate-700 bg-slate-900/80"
+              } ${node.inspector ? "cursor-pointer hover:border-cyan-500" : "cursor-default"}`}
+              aria-label={node.inspector ? `Open ${node.title} inspector` : node.title}
+            >
               <div>
                 <span className="text-xs font-semibold text-slate-100">{node.title}</span>
                 <span className="mt-1 block font-mono text-[10px] text-cyan-200">{labelize(node.status)}</span>
@@ -1486,7 +1629,7 @@ function StagePlayObserverMailLoopCanvas({
                   ))}
                 </span>
               ) : null}
-            </div>
+            </button>
             <details
               className="mt-2 rounded-md border border-slate-800 bg-black/25 p-2 text-[10px] text-slate-300"
               data-testid="stage-play-mail-loop-node-tray"
@@ -1518,13 +1661,57 @@ function StagePlayObserverMailLoopCanvas({
           </div>
         ))}
       </div>
-      <div className="mt-4 grid min-w-[1220px] grid-cols-[repeat(5,220px)] gap-6 font-mono text-[10px] text-slate-500">
+      <div className="mt-4 grid min-w-[1700px] grid-cols-[repeat(7,220px)] gap-6 font-mono text-[10px] text-slate-500">
         {nodes.map((node, index) => (
           <div key={`${node.id}:edge`} className="flex items-center justify-center">
             {index < nodes.length - 1 ? <span>--&gt;</span> : <span>end</span>}
           </div>
         ))}
       </div>
+      {selectedInspectorNode?.inspector ? (
+        <div
+          className="mt-5 max-w-3xl rounded-md border border-cyan-900 bg-slate-950/85 p-4 text-sm text-slate-200"
+          data-testid="stage-play-interpreter-profile-inspector"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">Profile inspector</div>
+              <div className="mt-1 text-base font-semibold text-slate-50">{selectedInspectorNode.inspector.title}</div>
+              <div className="mt-1 font-mono text-[11px] text-slate-400">{selectedInspectorNode.inspector.profileId}</div>
+            </div>
+            <CopyStagePlayRefsButton refs={selectedInspectorNode.outputRefs} label="Copy interpreter profile refs" />
+          </div>
+          <pre className="mt-3 whitespace-pre-wrap rounded border border-slate-800 bg-black/30 p-3 text-[11px] leading-relaxed text-slate-300">
+            {selectedInspectorNode.inspector.body}
+          </pre>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!selectedInspectorNode.inspector.linkedNoteId}
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 disabled:cursor-not-allowed disabled:opacity-45"
+              title={selectedInspectorNode.inspector.linkedNoteId ?? "No linked note yet"}
+            >
+              Open linked note
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 opacity-45"
+              title="Profile note compile route is not exposed in this panel yet."
+            >
+              Compile from note
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 opacity-45"
+              title="Profile status route is not exposed in this panel yet."
+            >
+              Pause / archive
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

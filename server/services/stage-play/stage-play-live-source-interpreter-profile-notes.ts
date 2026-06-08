@@ -269,8 +269,14 @@ export function compileInterpreterProfileFromNote(input: {
   const issues: string[] = [];
   if (!currentProfile) issues.push(`Interpreter profile not found: ${note.profileId}`);
   const parsed = parseSections(note.body);
-  const objectiveText = parsed.sections.objective || currentProfile?.objectiveText || "";
-  const interpretationGuidelines = parsed.sections["interpretation guidelines"] || currentProfile?.interpretationGuidelines || "";
+  const hasObjectiveSection = Object.prototype.hasOwnProperty.call(parsed.sections, "objective");
+  const hasGuidelinesSection = Object.prototype.hasOwnProperty.call(parsed.sections, "interpretation guidelines");
+  const objectiveText = hasObjectiveSection
+    ? parsed.sections.objective ?? ""
+    : currentProfile?.objectiveText ?? "";
+  const interpretationGuidelines = hasGuidelinesSection
+    ? parsed.sections["interpretation guidelines"] ?? ""
+    : currentProfile?.interpretationGuidelines ?? "";
   if (!objectiveText) issues.push("Objective section is required");
   if (!interpretationGuidelines) issues.push("Interpretation Guidelines section is required");
   if (!currentProfile || issues.length > 0) {

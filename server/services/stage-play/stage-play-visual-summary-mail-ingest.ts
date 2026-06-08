@@ -465,6 +465,34 @@ export function buildMailLoopTranscriptRows(input: {
     });
   }
   if (input.decision) {
+    if (
+      input.decision.interpreterProfileRef ||
+      (input.decision.profileComparisonRefs?.length ?? 0) > 0 ||
+      (input.decision.matchedCriteria?.length ?? 0) > 0 ||
+      (input.decision.suppressedCriteria?.length ?? 0) > 0
+    ) {
+      rows.push({
+        rowId: `ask_turn_mail_profile_context:${hashShort(input.decision.decisionId)}`,
+        rowKind: input.decision.profileComparisonRefs?.length ? "profile_comparison" : "interpreter_profile",
+        title: "Interpreter profile context",
+        body: [
+          input.decision.interpreterProfileRef ? `Profile: ${input.decision.interpreterProfileRef}.` : null,
+          input.decision.profileComparisonRefs?.length ? `Comparisons: ${input.decision.profileComparisonRefs.join(", ")}.` : null,
+          input.decision.matchedCriteria?.length ? `Matched: ${input.decision.matchedCriteria.join(", ")}.` : null,
+          input.decision.suppressedCriteria?.length ? `Suppressed: ${input.decision.suppressedCriteria.join(", ")}.` : null,
+        ].filter(Boolean).join("\n"),
+        source: {
+          toolName: "live_env.record_live_source_mail_decision",
+          artifactId: input.decision.decisionId,
+          artifactKind: input.decision.artifactId,
+        },
+        evidenceRefs: input.decision.evidenceRefs,
+        authority: "model_decision_receipt",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt,
+      });
+    }
     rows.push({
       rowId: `ask_turn_mail_decision:${hashShort(input.decision.decisionId)}`,
       rowKind: "agent_decision",
@@ -805,6 +833,12 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   requestedTool?: StagePlayLiveSourceMailDecisionV1["requestedTool"] | null;
   interpretation?: StagePlayLiveSourceMailInterpretationPayloadV1 | null;
   nextLoopState?: StagePlayLiveSourceMailDecisionV1["nextLoopState"] | null;
+  interpreterProfileRef?: string | null;
+  profileComparisonRefs?: string[];
+  matchedCriteria?: string[];
+  suppressedCriteria?: string[];
+  observedFacts?: string[];
+  inferredMeaning?: string[];
   evidenceRefs?: string[];
   modelReviewed?: boolean;
   now?: string;
@@ -864,6 +898,12 @@ export function recordLiveSourceMailDecisionForAsk(input: {
     voicePolicy,
     requestedTool,
     nextLoopState: input.nextLoopState ?? (normalizedDecision === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary"),
+    interpreterProfileRef: input.interpreterProfileRef ?? null,
+    profileComparisonRefs: input.profileComparisonRefs ?? [],
+    matchedCriteria: input.matchedCriteria ?? [],
+    suppressedCriteria: input.suppressedCriteria ?? [],
+    observedFacts: input.observedFacts ?? [],
+    inferredMeaning: input.inferredMeaning ?? [],
     evidenceRefs: input.evidenceRefs ?? [],
     modelReviewed: input.modelReviewed !== false,
     createdAt: input.now,
@@ -907,6 +947,12 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   }) ?? {
     ...decision,
     narrativeStateRef: narrative.narrativeStateId,
+    interpreterProfileRef: decision.interpreterProfileRef ?? null,
+    profileComparisonRefs: decision.profileComparisonRefs ?? [],
+    matchedCriteria: decision.matchedCriteria ?? [],
+    suppressedCriteria: decision.suppressedCriteria ?? [],
+    observedFacts: decision.observedFacts ?? [],
+    inferredMeaning: decision.inferredMeaning ?? [],
     evidenceRefs: uniqueStrings([...decision.evidenceRefs, narrative.narrativeStateId]),
   };
 }

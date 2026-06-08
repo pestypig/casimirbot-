@@ -49,6 +49,10 @@ import {
 } from "../../services/stage-play/stage-play-live-source-mail-wake-store";
 import { listStagePlayLiveSourceMailTranscriptEntries } from "../../services/stage-play/stage-play-live-source-mail-transcript-store";
 import {
+  listStagePlayLiveSourceInterpreterProfileComparisons,
+  listStagePlayLiveSourceInterpreterProfiles,
+} from "../../services/stage-play/stage-play-live-source-interpreter-profile-store";
+import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
@@ -726,20 +730,21 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       environmentId,
       decisions,
     });
+    const mailItems = listStagePlayLiveSourceMailItems({
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+      status,
+      limit,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
       requestedThreadId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
-      mailItems: listStagePlayLiveSourceMailItems({
-        threadId,
-        roomId,
-        environmentId,
-        sourceId,
-        status,
-        limit,
-      }),
+      mailItems,
       jobStates: listStagePlayLiveSourceJobStates({
         threadId,
         roomId,
@@ -752,6 +757,20 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
         environmentId,
         limit: 10,
       }),
+      interpreterProfiles: listStagePlayLiveSourceInterpreterProfiles({
+        threadId,
+        roomId,
+        environmentId,
+        includeArchived: true,
+        limit: 20,
+      }),
+      interpreterProfileComparisons: listStagePlayLiveSourceInterpreterProfileComparisons({
+        limit: 50,
+      }).filter((comparison) =>
+        comparison.mailIds.some((mailId) =>
+          mailItems.some((item) => item.mailId === mailId)
+        )
+      ),
       decisions,
       narrativeStates: listStagePlayLiveSourceNarrativeStates({
         threadId,

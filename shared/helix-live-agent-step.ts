@@ -25,6 +25,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.read_live_source_mail"
   | "live_env.configure_live_source_watch_job"
   | "live_env.configure_interpreter_profile"
+  | "live_env.compare_mail_to_interpreter_profile"
   | "live_env.record_live_source_mail_decision"
   | "live_env.predict_live_source_immediate"
   | "live_env.compare_live_source_prediction"

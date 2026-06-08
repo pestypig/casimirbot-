@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
   analyzeVisualFrame,
   recordVisualFrame,
@@ -15,6 +16,7 @@ import {
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
+import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { recordLiveSourceMailDecisionForAsk } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
 
 const threadId = "thread:mail-interpretation-routing";
@@ -33,6 +35,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
+  resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
   process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
     {
@@ -110,9 +113,14 @@ const askMailbox = async (question: string) => {
     artifact?.kind === "live_environment_tool_observation" &&
     artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
   );
+  const liveEnvironmentToolNames = (response.body?.current_turn_artifact_ledger ?? [])
+    .filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
+    .map((artifact: any) => artifact?.payload?.tool_name)
+    .filter(Boolean);
   return {
     response,
     decision: decisionArtifact?.payload?.observation,
+    liveEnvironmentToolNames,
     debug: JSON.stringify(response.body, null, 2),
   };
 };
@@ -124,6 +132,99 @@ const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void =>
 };
 
 describe("Helix Ask live-source mail interpretation routing", () => {
+  it("routes interpreter profile setup prompts to configure_interpreter_profile before mailbox reads", async () => {
+    seedVisualMail("A Minecraft menu is visible, but this turn is only configuring interpretation policy.");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Create an interpreter profile for this live source. Act like a Minecraft survival coach.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.configure_interpreter_profile");
+    expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_live_source_mail");
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.source_target_intent?.requested_outputs, debug).toContain(
+      "stage_play_live_source_interpreter_profile",
+    );
+    const profileArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+      artifact?.kind === "live_environment_tool_observation" &&
+      artifact?.payload?.tool_name === "live_env.configure_interpreter_profile"
+    );
+    expect(profileArtifact?.payload?.observation, debug).toMatchObject({
+      profile: expect.objectContaining({
+        title: "Minecraft Survival Coach",
+        domain: "minecraft",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    });
+    expect(response.body?.stage_play_live_source_mailbox_debug, debug).toMatchObject({
+      capability: "live_env.configure_interpreter_profile",
+      interpreter_profile_ref: expect.stringMatching(/^stage_play_live_source_interpreter_profile:/),
+    });
+  }, 30_000);
+
+  it("routes active-profile interpretation prompts through read, compare, then decision", async () => {
+    seedVisualMail("The player stands in a dim Minecraft cave with visible ore and no hostile mob in frame.");
+    const profileObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_interpreter_profile",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        domain: "minecraft",
+        objective_text: "Watch Minecraft as a survival coach.",
+        interpretation_guidelines: "Compare visual mail against hazards, resources, and navigation opportunities.",
+        salience_criteria: ["cave", "ore"],
+        suppress_criteria: ["unchanged menu"],
+        risk_criteria: ["hostile mob", "lava"],
+        opportunity_criteria: ["ore"],
+        voice_callout_criteria: ["hostile mob"],
+      },
+    });
+    expect(profileObservation.ok).toBe(true);
+
+    const { response, decision, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Interpret the active visual live-source mailbox using the active profile.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toEqual(expect.arrayContaining([
+      "live_env.read_live_source_mail",
+      "live_env.compare_mail_to_interpreter_profile",
+      "live_env.record_live_source_mail_decision",
+    ]));
+    expect(liveEnvironmentToolNames.indexOf("live_env.compare_mail_to_interpreter_profile"), debug).toBeGreaterThan(
+      liveEnvironmentToolNames.indexOf("live_env.read_live_source_mail"),
+    );
+    expect(liveEnvironmentToolNames.indexOf("live_env.record_live_source_mail_decision"), debug).toBeGreaterThan(
+      liveEnvironmentToolNames.indexOf("live_env.compare_mail_to_interpreter_profile"),
+    );
+    expect(decision, debug).toMatchObject({
+      decision: "record_interpretation",
+      interpreterProfileRef: expect.stringMatching(/^stage_play_live_source_interpreter_profile:/),
+      profileComparisonRefs: [expect.stringMatching(/^stage_play_live_source_interpreter_profile_comparison:/)],
+      matchedCriteria: expect.arrayContaining(["cave", "ore"]),
+    });
+    expect(response.body?.source_target_intent?.requested_outputs, debug).toContain(
+      "stage_play_live_source_interpreter_profile_comparison",
+    );
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 30_000);
+
+  it("does not execute profile tools for future, quoted, or negated profile-control wording", async () => {
+    const prompts = [
+      "In the future, create an interpreter profile for the live source, but for now just explain what that would mean.",
+      "The screen says \"open the profile note\"; explain that label without using the profile tool.",
+      "Do not use the Minecraft Survival Coach profile right now; just explain the profile idea.",
+    ];
+
+    for (const prompt of prompts) {
+      const { liveEnvironmentToolNames, debug } = await askMailbox(prompt);
+      expect(liveEnvironmentToolNames, debug).not.toContain("live_env.configure_interpreter_profile");
+      expect(liveEnvironmentToolNames, debug).not.toContain("live_env.compare_mail_to_interpreter_profile");
+      expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_live_source_mail");
+    }
+  }, 30_000);
+
   it("routes latest-mail visibility prompts to draft_text_answer", async () => {
     seedVisualMail("A dark app launcher shows Docs, Gmail, Drive, YouTube, and Instagram icons.");
 

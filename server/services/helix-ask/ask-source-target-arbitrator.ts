@@ -671,6 +671,8 @@ export function arbitrateAskSourceTarget(input: {
         "stage_play_live_source_mail_read_result",
         "stage_play_live_source_mail_decision",
         "stage_play_live_source_narrative_state",
+        "stage_play_live_source_interpreter_profile",
+        "stage_play_live_source_interpreter_profile_comparison",
         "typed_failure",
       ],
       suppressedRoutes: [

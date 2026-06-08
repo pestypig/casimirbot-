@@ -32,6 +32,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.read_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.configure_live_source_watch_job", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.configure_interpreter_profile", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.compare_mail_to_interpreter_profile", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.record_live_source_mail_decision", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.predict_live_source_immediate", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.compare_live_source_prediction", requires_user_confirmation: false, can_run_automatically: true },
