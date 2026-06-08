@@ -40,6 +40,16 @@ type ScenarioResult = {
   decisionEvidenceHasTurnId: boolean | null;
   narrativeStateRef: string | null;
   watchPolicyRef: string | null;
+  trajectory: {
+    route: string | null;
+    capability: string | null;
+    mailIds: string[];
+    decisionId: string | null;
+    narrativeStateId: string | null;
+    traceId: string | null;
+    cycleId: string | null;
+    askTurnId: string | null;
+  };
   mailboxBefore: MailboxCounts;
   mailboxAfter: MailboxCounts;
   artifacts: {
@@ -257,6 +267,66 @@ const terminalKind = (ask: RecordLike, debugPayload: RecordLike | null): string 
   return readString(resolved?.terminal_artifact_kind) ?? readString(debugPayload?.terminal_artifact_kind);
 };
 
+const mailboxDebug = (ask: RecordLike, debugPayload: RecordLike | null): RecordLike | null =>
+  readRecord(debugPayload?.stage_play_live_source_mailbox_debug) ??
+  readRecord(ask.stage_play_live_source_mailbox_debug);
+
+const extractTrajectory = (input: {
+  ask: RecordLike;
+  debugPayload: RecordLike | null;
+  turnId: string | null;
+  tools: string[];
+  target: string | null;
+  decisionId: string | null;
+  narrativeStateRef: string | null;
+}): ScenarioResult["trajectory"] => {
+  const debug = mailboxDebug(input.ask, input.debugPayload);
+  const trajectory = readRecord(debug?.trajectory);
+  const readWindow = readRecord(debug?.read_window);
+  const mailIds = uniqueStrings([
+    ...readArray(trajectory?.mailIds),
+    ...readArray(trajectory?.mail_ids),
+    ...readArray(debug?.mail_ids),
+    ...readArray(readWindow?.mailIds),
+    ...readArray(readWindow?.mail_ids),
+  ]);
+  return {
+    route:
+      readString(trajectory?.route) ??
+      readString(debug?.route) ??
+      input.target,
+    capability:
+      readString(trajectory?.capability) ??
+      readString(debug?.capability) ??
+      input.tools.find((tool) => tool.startsWith("live_env.")) ??
+      null,
+    mailIds,
+    decisionId:
+      readString(trajectory?.decisionId) ??
+      readString(trajectory?.decision_id) ??
+      readString(debug?.decision_id) ??
+      input.decisionId,
+    narrativeStateId:
+      readString(trajectory?.narrativeStateId) ??
+      readString(trajectory?.narrative_state_id) ??
+      readString(debug?.narrative_state_id) ??
+      input.narrativeStateRef,
+    traceId:
+      readString(trajectory?.traceId) ??
+      readString(trajectory?.trace_id) ??
+      readString(debug?.trace_id),
+    cycleId:
+      readString(trajectory?.cycleId) ??
+      readString(trajectory?.cycle_id) ??
+      readString(debug?.cycle_id),
+    askTurnId:
+      readString(trajectory?.askTurnId) ??
+      readString(trajectory?.ask_turn_id) ??
+      readString(debug?.ask_turn_id) ??
+      input.turnId,
+  };
+};
+
 const askTurn = async (scenario: Scenario, scenarioDir: string): Promise<{
   ask: RecordLike;
   debug: RecordLike | null;
@@ -317,9 +387,25 @@ const evaluateScenario = (input: {
   const sourceTarget = readString(readRecord(ask.source_target_intent)?.target_source);
   const terminal = terminalKind(ask, debugPayload);
   const answer = readString(ask.answer) ?? readString(debugPayload?.selected_final_answer);
+  const trajectory = extractTrajectory({
+    ask,
+    debugPayload,
+    turnId,
+    tools,
+    target,
+    decisionId,
+    narrativeStateRef,
+  });
 
   if (scenario.expectation.targetSource && target !== scenario.expectation.targetSource && sourceTarget !== scenario.expectation.targetSource) {
     failures.push(`expected target ${scenario.expectation.targetSource}, got ${target ?? sourceTarget ?? "none"}`);
+  }
+  if (scenario.expectation.targetSource === "live_source_mailbox") {
+    if (trajectory.route !== "live_source_mailbox") failures.push(`trajectory route missing or wrong: ${trajectory.route ?? "none"}`);
+    if (!trajectory.capability) failures.push("trajectory capability missing");
+    if (!trajectory.askTurnId) failures.push("trajectory askTurnId missing");
+    if (!trajectory.traceId) failures.push("trajectory traceId missing");
+    if (!trajectory.cycleId) failures.push("trajectory cycleId missing");
   }
   for (const tool of scenario.expectation.requiredTools ?? []) {
     if (!tools.includes(tool)) failures.push(`missing tool ${tool}`);
@@ -335,6 +421,15 @@ const evaluateScenario = (input: {
   }
   if (scenario.expectation.requiresNarrative && !narrativeStateRef) {
     failures.push("expected narrative state ref");
+  }
+  if (scenario.expectation.requiresNarrative && !trajectory.narrativeStateId) {
+    failures.push("trajectory narrativeStateId missing");
+  }
+  if (scenario.expectation.decision && !trajectory.decisionId) {
+    failures.push("trajectory decisionId missing");
+  }
+  if (scenario.expectation.requiredTools?.includes("live_env.read_live_source_mail") && trajectory.mailIds.length === 0) {
+    failures.push("trajectory mailIds missing");
   }
   if (scenario.expectation.requiresDecisionTurnRef && decisionKind && decisionEvidenceHasTurnId !== true) {
     failures.push("decision evidence refs do not include owning Ask turn id");
@@ -367,6 +462,7 @@ const evaluateScenario = (input: {
     decisionEvidenceHasTurnId,
     narrativeStateRef,
     watchPolicyRef: policyRef ?? input.mailboxAfter.latestPolicyRef,
+    trajectory,
     mailboxBefore: input.mailboxBefore,
     mailboxAfter: input.mailboxAfter,
     artifacts: {
@@ -435,6 +531,14 @@ const renderMarkdown = (input: {
       `- decision_turn_ref: ${String(result.decisionEvidenceHasTurnId)}`,
       `- narrative: ${result.narrativeStateRef ?? "none"}`,
       `- policy: ${result.watchPolicyRef ?? "none"}`,
+      `- trajectory.route: ${result.trajectory.route ?? "none"}`,
+      `- trajectory.capability: ${result.trajectory.capability ?? "none"}`,
+      `- trajectory.mailIds: ${result.trajectory.mailIds.join(", ") || "none"}`,
+      `- trajectory.decisionId: ${result.trajectory.decisionId ?? "none"}`,
+      `- trajectory.narrativeStateId: ${result.trajectory.narrativeStateId ?? "none"}`,
+      `- trajectory.traceId: ${result.trajectory.traceId ?? "none"}`,
+      `- trajectory.cycleId: ${result.trajectory.cycleId ?? "none"}`,
+      `- trajectory.askTurnId: ${result.trajectory.askTurnId ?? "none"}`,
       `- mailbox_before: ${JSON.stringify(result.mailboxBefore.byStatus)}`,
       `- mailbox_after: ${JSON.stringify(result.mailboxAfter.byStatus)}`,
       `- failures: ${result.failures.length ? result.failures.join("; ") : "none"}`,
@@ -481,6 +585,16 @@ const main = async (): Promise<void> => {
         decisionEvidenceHasTurnId: null,
         narrativeStateRef: null,
         watchPolicyRef: null,
+        trajectory: {
+          route: null,
+          capability: null,
+          mailIds: [],
+          decisionId: null,
+          narrativeStateId: null,
+          traceId: null,
+          cycleId: null,
+          askTurnId: null,
+        },
         mailboxBefore: { total: 0, byStatus: {}, latestMailId: null, latestPreview: null, policyCount: 0, latestPolicyRef: null, latestDecisionRef: null, unreadCount: 0 },
         mailboxAfter: { total: 0, byStatus: {}, latestMailId: null, latestPreview: null, policyCount: 0, latestPolicyRef: null, latestDecisionRef: null, unreadCount: 0 },
         artifacts: {

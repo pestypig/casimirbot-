@@ -281,6 +281,16 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     });
     expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
     expect(response.body?.answer, debug).toMatch(/icon grid|Watch next/i);
+    expect(response.body?.stage_play_live_source_mailbox_debug?.trajectory, debug).toMatchObject({
+      route: "live_source_mailbox",
+      capability: "live_env.read_live_source_mail",
+      mailIds: [expect.stringMatching(/^stage_play_live_source_mail:/)],
+      decisionId: expect.stringMatching(/^stage_play_live_source_mail_decision:/),
+      narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      traceId: expect.stringMatching(/^live_source_trace:/),
+      cycleId: expect.stringMatching(/^live_source_cycle:/),
+      askTurnId: response.body?.turn_id,
+    });
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
 
