@@ -996,24 +996,45 @@ describe("live-source mail live environment tools", () => {
     {
       objective: "Watch the active visual source and describe each new mail batch in one sentence.",
       expectedMode: "latest_scene_answer",
+      expectedMailProcessingMode: "latest_only",
+      expectedOutputCadence: "every_batch",
     },
     {
       objective: "Watch the active visual source and interpret what is happening across the summaries.",
-      expectedMode: "batch_interpretation",
+      expectedMode: "prediction_watch",
+      expectedMailProcessingMode: "chronological_batch",
+      expectedOutputCadence: "only_salient",
     },
     {
       objective: "Watch the active visual source and do not bother me unless something important changes.",
       expectedMode: "salience_watch",
+      expectedMailProcessingMode: "salience_window",
+      expectedOutputCadence: "only_salient",
     },
     {
       objective: "Watch the active visual source, interpret the summaries, and predict what might happen next.",
       expectedMode: "prediction_watch",
+      expectedMailProcessingMode: "chronological_batch",
+      expectedOutputCadence: "only_salient",
     },
     {
       objective: "Watch the active visual source and announce if anything important happens.",
-      expectedMode: "voice_callout_watch",
+      expectedMode: "salience_watch",
+      expectedMailProcessingMode: "salience_window",
+      expectedOutputCadence: "voice_only_salient",
     },
-  ])("classifies watch-job policy mode: $expectedMode", ({ objective, expectedMode }) => {
+    {
+      objective: "Commentate while I play from the active visual source.",
+      expectedMode: "voice_commentary_watch",
+      expectedMailProcessingMode: "micro_batch",
+      expectedOutputCadence: "voice_only_salient",
+    },
+  ])("classifies watch-job policy modes: $expectedMode", ({
+    objective,
+    expectedMode,
+    expectedMailProcessingMode,
+    expectedOutputCadence,
+  }) => {
     const observation = executeLiveEnvironmentTool({
       tool_name: "live_env.configure_live_source_watch_job",
       thread_id: threadId,
@@ -1029,6 +1050,8 @@ describe("live-source mail live environment tools", () => {
       artifactId: "stage_play_live_source_watch_job_policy_config_result",
       policy: {
         interpretationMode: expectedMode,
+        mailProcessingMode: expectedMailProcessingMode,
+        outputCadence: expectedOutputCadence,
       },
     });
     expect(payload.transcriptRows).toEqual(expect.arrayContaining([
@@ -1036,6 +1059,20 @@ describe("live-source mail live environment tools", () => {
         rowKind: "loop_state",
         title: "Policy",
         body: expect.stringContaining(expectedMode),
+      }),
+    ]));
+    expect(payload.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining(expectedMailProcessingMode),
+      }),
+    ]));
+    expect(payload.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "loop_state",
+        title: "Policy",
+        body: expect.stringContaining(expectedOutputCadence),
       }),
     ]));
   });

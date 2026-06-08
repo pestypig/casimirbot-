@@ -48,6 +48,7 @@ export const inferStagePlayLiveSourceInterpretationMode = (
     input.decisionPolicyPrompt ?? "",
   ].join("\n"));
   const voiceAllowed = input.outputPolicy?.allowVoiceCallout === true || hasVoiceCue(policyText);
+  if (isImportantOnlyObjective(policyText)) return "salience_watch";
   if (
     voiceAllowed &&
     isVoiceCommentaryObjective(policyText)
@@ -60,7 +61,6 @@ export const inferStagePlayLiveSourceInterpretationMode = (
   ) {
     return "voice_callout_watch";
   }
-  if (isImportantOnlyObjective(policyText)) return "salience_watch";
   if (
     /\b(?:predict|prediction|might\s+happen\s+next|validation\s+signals?|horizon|watch\s+next|what\s+should\s+(?:be\s+)?watched\s+next|what\s+changed|what\s+is\s+happening|what's\s+happening)\b/i.test(policyText)
   ) {
