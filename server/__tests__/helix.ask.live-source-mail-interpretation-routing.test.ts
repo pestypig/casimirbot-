@@ -351,11 +351,11 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       },
     });
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
-    expect(response.body?.answer, debug).toMatch(/Observed facts:/i);
-    expect(response.body?.answer, debug).toMatch(/Cautious inferences:/i);
+    expect(response.body?.answer, debug).toMatch(/I interpreted the current live-source mail checkpoint/i);
     expect(response.body?.answer, debug).toMatch(/Prediction:/i);
-    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next for/i);
     expect(response.body?.answer, debug).toMatch(/Minecraft|birch forest/i);
+    expect(response.body?.answer, debug).not.toMatch(/Observed facts:|Cautious inferences:/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 60_000);
 
@@ -395,12 +395,11 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     expect(decision?.mailCoverage?.readMailIds, debug).toHaveLength(6);
     expect(decision?.mailCoverage?.interpretedMailIds, debug).toHaveLength(6);
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
-    expect(response.body?.answer, debug).toMatch(/Coverage:\s*micro_batch/i);
-    expect(response.body?.answer, debug).toMatch(/Observed facts:/i);
-    expect(response.body?.answer, debug).toMatch(/Cautious inferences:/i);
+    expect(response.body?.answer, debug).toMatch(/current micro batch mail batch/i);
     expect(response.body?.answer, debug).toMatch(/Prediction:/i);
-    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next for/i);
     expect(response.body?.answer, debug).toMatch(/inventory|forest|sword|fire|valuable/i);
+    expect(response.body?.answer, debug).not.toMatch(/Observed facts:|Cautious inferences:|Coverage:/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 90_000);
 
@@ -492,15 +491,56 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       decision: "request_voice_callout",
       decision_validation_result: "forced_request_voice_callout_for_read_mail_voice_intent",
       voiceCalloutDraft: {
-        text: expect.stringContaining("hostile mob"),
+        text: expect.stringMatching(/hostile mob/i),
         voiceEligible: true,
       },
       assistant_answer: false,
       terminal_eligible: false,
     });
-    expect(response.body?.answer, debug).toContain("hostile mob");
+    expect(response.body?.answer, debug).toMatch(/hostile mob/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 30_000);
+
+  it("promotes salient Minecraft commentary mail to a decision-backed interim voice callout", async () => {
+    executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        objective: "Commentate while I play from the active Minecraft visual source. Call out danger, rare resources, major scene transitions, or damage cues.",
+        allow_voice_callout: true,
+        confirmation_required: false,
+      },
+    });
+    seedVisualMail("Mail 20 shows the Minecraft player outdoors with the character visibly on fire while holding a sword.");
+
+    const { response, decision, debug } = await askMailbox(
+      "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Predict what happens next and say what should be watched next.",
+    );
+
+    expect(decision, debug).toMatchObject({
+      decision: "request_voice_callout",
+      decision_validation_result: "forced_request_voice_callout_for_read_mail_voice_intent",
+      voiceCalloutDraft: {
+        text: expect.stringMatching(/fire|damage/i),
+        voiceEligible: true,
+        requiresConfirmation: false,
+      },
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: {
+          text: expect.stringMatching(/fire|damage/i),
+          reason_codes: expect.arrayContaining(["minecraft_fire_or_damage_cue"]),
+        },
+      },
+      nextLoopState: "armed_for_next_summary",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(response.body?.answer, debug).toMatch(/fire|damage/i);
+    expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 60_000);
 
   it("records voice callouts only when voice policy allows the decision", () => {
     const mail = enqueueStagePlayLiveSourceMailItem({
@@ -526,11 +566,15 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       nextLoopState: "armed_for_next_summary",
     });
     expect(disabled).toMatchObject({
-      decision: "draft_text_answer",
-      voiceCalloutDraft: null,
+      decision: "request_voice_callout",
+      voiceCalloutDraft: {
+        text: "Hostile mob appeared near the player.",
+        voiceEligible: false,
+      },
       textAnswerDraft: {
         text: "Hostile mob appeared near the player.",
       },
+      requestedTool: null,
     });
 
     const allowed = recordLiveSourceMailDecisionForAsk({

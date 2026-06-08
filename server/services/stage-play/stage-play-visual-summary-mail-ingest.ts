@@ -621,13 +621,22 @@ export function buildMailLoopTranscriptRows(input: {
       const requiresConfirmation =
         input.decision.voicePolicy?.requiresConfirmation === true ||
         input.decision.voiceCalloutDraft.requiresConfirmation === true;
+      const blockedByPolicy =
+        input.decision.voicePolicy?.voiceEnabled === false ||
+        (!requiresConfirmation && input.decision.voicePolicy?.allowedNow === false) ||
+        (!requiresConfirmation && input.decision.voiceCalloutDraft.voiceEligible === false);
+      const policyReason = input.decision.voicePolicy?.reason
+        ? ` Reason: ${input.decision.voicePolicy.reason}.`
+        : "";
       rows.push({
         rowId: `ask_turn_mail_voice:${hashShort(input.decision.decisionId)}`,
         rowKind: "voice_callout_request",
         title: "Voice callout draft",
-        body: requiresConfirmation
-          ? `${input.decision.voiceCalloutDraft.text}\nAwaiting confirmation before voice delivery.`
-          : input.decision.voiceCalloutDraft.text,
+        body: blockedByPolicy
+          ? `${input.decision.voiceCalloutDraft.text}\nVoice callout held by policy.${policyReason}`
+          : requiresConfirmation
+            ? `${input.decision.voiceCalloutDraft.text}\nAwaiting confirmation before voice delivery.`
+            : input.decision.voiceCalloutDraft.text,
         source: {
           artifactId: input.decision.decisionId,
           artifactKind: input.decision.artifactId,
@@ -929,7 +938,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   let normalizedDecision = input.decision;
   let rationalePreview = input.rationalePreview;
   let requestedTool = input.requestedTool ?? null;
-  let voiceCalloutDraft = voicePolicy.voiceEnabled ? rawVoiceDraft || null : null;
+  let voiceCalloutDraft = rawVoiceDraft || null;
   let textAnswerDraft = input.textAnswerDraft ?? null;
 
   if (normalizedDecision === "request_voice_callout") {
@@ -939,10 +948,8 @@ export function recordLiveSourceMailDecisionForAsk(input: {
       requestedTool = null;
       voiceCalloutDraft = null;
     } else if (!voicePolicy.voiceEnabled) {
-      normalizedDecision = "draft_text_answer";
-      rationalePreview = `${rationalePreview} Voice is disabled, so the callout draft was retained as text only.`;
+      rationalePreview = `${rationalePreview} Voice is disabled, so the callout draft was held as a blocked voice request.`;
       requestedTool = null;
-      voiceCalloutDraft = null;
       textAnswerDraft = textAnswerDraft ?? rawVoiceDraft;
     } else if (voicePolicy.requiresConfirmation) {
       requestedTool = null;

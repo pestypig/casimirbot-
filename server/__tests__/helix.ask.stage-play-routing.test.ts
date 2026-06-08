@@ -368,7 +368,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(exportedObservation?.payload?.observation?.watch_job_policy_ref, routeDebug).toMatch(/^stage_play_live_source_watch_job_policy:/);
   }, 30_000);
 
-  it("configures a batch-interpretation watch policy for natural visual mail loop wording", async () => {
+  it("configures a prediction-watch policy for natural interpret/watch-next mail loop wording", async () => {
     const question = "Watch the active visual source and interpret each new visual mail batch. Say what changed and what should be watched next.";
     process.env.HELIX_POST_OBSERVATION_COMPOSER_TEST_RESPONSE =
       "Watch job configured and armed; no mail read yet.";
@@ -411,7 +411,9 @@ describe("Helix Ask Stage Play routing", () => {
       watchJobPolicyRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy:/),
       policy: {
         objectiveText: question,
-        interpretationMode: "batch_interpretation",
+        interpretationMode: "prediction_watch",
+        mailProcessingMode: "chronological_batch",
+        outputCadence: "only_salient",
         decisionPolicyPrompt: expect.stringContaining("record the decision record_interpretation"),
       },
       jobState: {

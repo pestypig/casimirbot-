@@ -613,7 +613,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(readResult.suggestedDecisionOptions).not.toContain("request_voice_callout");
   });
 
-  it("downgrades disabled voice callout requests to text drafts and blocks voice tools", () => {
+  it("keeps disabled voice callout requests visible and blocks voice tools", () => {
     seedVisualEvidence();
     const readResult = readLiveSourceMailForAsk({ threadId, roomId, sourceId, limit: 1 });
     const mailId = readResult.items[0].mailId;
@@ -642,7 +642,11 @@ describe("Stage Play live-source mailbox", () => {
       allowedNow: false,
       reason: "voice_disabled",
     });
-    expect(decision.voiceCalloutDraft).toBeNull();
+    expect(decision.decision).toBe("request_voice_callout");
+    expect(decision.voiceCalloutDraft).toMatchObject({
+      text: "Hostile mob appeared near the player.",
+      voiceEligible: false,
+    });
     expect(decision.textAnswerDraft).toMatchObject({
       text: "Hostile mob appeared near the player.",
       terminalEligible: false,
@@ -650,8 +654,9 @@ describe("Stage Play live-source mailbox", () => {
     expect(decision.requestedTool).toBeNull();
     const rows = buildMailLoopTranscriptRows({ decision });
     expect(rows.map((row) => row.rowKind)).toContain("text_answer");
-    expect(rows.map((row) => row.rowKind)).not.toContain("voice_callout_request");
+    expect(rows.map((row) => row.rowKind)).toContain("voice_callout_request");
     expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
+    expect(rows.find((row) => row.rowKind === "voice_callout_request")?.body).toContain("Voice callout held by policy");
   });
 
   it("keeps confirmation-required voice callouts as drafts and blocks voice tools", () => {
@@ -2947,7 +2952,9 @@ describe("Stage Play live-source mailbox", () => {
       policyId: policy.policyId,
       objectiveText: "Watch the visual source and only announce if a hostile mob appears.",
       decisionPolicyPrompt: "Wait on harmless scene changes. Draft a callout only for hostile mobs.",
-      interpretationMode: "voice_callout_watch",
+      interpretationMode: "salience_watch",
+      mailProcessingMode: "salience_window",
+      outputCadence: "voice_only_salient",
       sourceIds: [sourceId],
       status: "armed",
     });
@@ -3021,12 +3028,16 @@ describe("Stage Play live-source mailbox", () => {
       now: "2026-06-04T12:07:01.000Z",
     });
 
-    expect(decision.decision).toBe("draft_text_answer");
+    expect(decision.decision).toBe("request_voice_callout");
     expect(decision.textAnswerDraft?.text).toBe("Important update near the player.");
-    expect(decision.voiceCalloutDraft).toBeNull();
+    expect(decision.voiceCalloutDraft).toMatchObject({
+      text: "Important update near the player.",
+      voiceEligible: false,
+    });
     expect(decision.requestedTool).toBeNull();
     const rows = buildMailLoopTranscriptRows({ decision });
     expect(rows.map((row) => row.rowKind)).toContain("text_answer");
+    expect(rows.map((row) => row.rowKind)).toContain("voice_callout_request");
     expect(rows.map((row) => row.rowKind)).not.toContain("voice_tool_call");
   });
 
