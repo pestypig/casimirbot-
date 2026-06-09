@@ -285,13 +285,13 @@ const CONSTRAINT_EVIDENCE: Record<CivilizationConstraintProfileV1, string[]> = {
 };
 
 const FAMILY_PATTERNS: Array<[CivilizationScenarioFamilyV1, RegExp]> = [
-  ["machine_or_digital_civilization", /\b(?:machine|digital|compute|computational|ai|model|memory|cooling|hardware|signal latency)\b/i],
+  ["resource_reconstruction", /\b(?:reconstruction|rebuild|restore|repair capacity|damaged infrastructure|critical supply|civilian harm|ceasefire|conflict|war|battlefield|air defense|long[-\s]?range strike|infrastructure stability|resource reserves?|buildout rate|decision makers?)\b/i],
+  ["collapse_repair_and_resilience", /\b(?:collapse|resilience|brittle|failure mode|trust loss|what failed|repair path|grinding machine|marginal gains?|attrition)\b/i],
+  ["planetary_trade", /\b(?:trade|supply chain|supplier|import|export|market|treaty|sanction|dependency edge|transport corridor|reserve estimates?|infrastructure development)\b/i],
+  ["industrial_capacity", /\b(?:industrial|manufactur|material inventory|grid capacity|throughput|thermal ceiling|labor skill|needle hull|economic max capacity|production rate|capacity margin)\b/i],
+  ["machine_or_digital_civilization", /\b(?:machine|digital|compute|computational|ai|ai model|model execution|model\/action authority|memory|cooling|hardware|signal latency)\b/i],
   ["exploration_and_colonization", /\b(?:mars|base|coloni[sz]ation|exploration|life support|terraform|mission|extraplanetary|interplanetary)\b/i],
-  ["planetary_trade", /\b(?:trade|supply chain|supplier|import|export|market|treaty|sanction|dependency edge|transport corridor)\b/i],
-  ["resource_reconstruction", /\b(?:reconstruction|rebuild|restore|repair capacity|damaged infrastructure|critical supply|civilian harm)\b/i],
-  ["collapse_repair_and_resilience", /\b(?:collapse|resilience|brittle|failure mode|trust loss|what failed|repair path)\b/i],
   ["ecological_civilization", /\b(?:ecolog|species|biodiversity|carrying capacity|regeneration|waste sink|sink overloaded)\b/i],
-  ["industrial_capacity", /\b(?:industrial|manufactur|material inventory|grid capacity|throughput|thermal ceiling|labor skill|needle hull)\b/i],
   ["settlement_and_city", /\b(?:city|settlement|infrastructure|housing|water|public review|local manufacturing)\b/i],
   ["social_coordination", /\b(?:tribe|tribal|social coordination|norm|trust|role specialization|consent interface|conflict resolution)\b/i],
   ["agent_survival", /\b(?:creature|agent survival|shelter|threat|mobility|tool use|survival)\b/i],
@@ -310,6 +310,11 @@ const stableFrameId = (prompt: string): string =>
   `civilization-frame:${crypto.createHash("sha256").update(prompt).digest("hex").slice(0, 16)}`;
 
 function selectFamily(prompt: string): CivilizationScenarioFamilyV1 {
+  const conflictCue = /\b(?:ceasefire|war|conflict|battlefield|frontline|air defense|long[-\s]?range strike|military|marginal gains?|attrition)\b/i;
+  const resourceCapacityCue = /\b(?:resource|reserve|infrastructure|supply|capacity|buildout|development rate|economic max|material|manufactur)\b/i;
+  if (conflictCue.test(prompt) && resourceCapacityCue.test(prompt)) {
+    return "resource_reconstruction";
+  }
   for (const [family, pattern] of FAMILY_PATTERNS) {
     if (pattern.test(prompt)) return family;
   }
@@ -366,14 +371,18 @@ function overlayPromptConstraints(
 function selectPreset(prompt: string): FramePreset {
   const family = selectFamily(prompt);
   const preset = FAMILY_PRESETS[family];
-  if (/\b(?:planetary civilization|global|world|earth|needle hull)\b/i.test(prompt)) {
+  if (/\b(?:planetary civilization|global|world|earth|countries|china|europe|u\.s\.|u\.s|usa|united states|needle hull)\b/i.test(prompt)) {
     return {
       ...preset,
       boundaryKind: "planetary_civilization",
       developmentalStage: preset.developmentalStage === "industrial_system" ? "planetary_coordination" : preset.developmentalStage,
       substrateKind: preset.substrateKind === "industrial_material" ? "planetary_infrastructure" : preset.substrateKind,
       agencyModel: preset.agencyModel === "hierarchical_institution" ? "mixed_agency" : preset.agencyModel,
-      coordinationMode: /\bopen source\b/i.test(prompt) ? "open_source" : preset.coordinationMode,
+      coordinationMode: /\bopen source\b/i.test(prompt)
+        ? "open_source"
+        : /\b(?:ceasefire|treaty|agreement|diplomacy|countries|china|europe|u\.s\.|u\.s|usa|united states)\b/i.test(prompt)
+          ? "treaty"
+          : preset.coordinationMode,
     };
   }
   if (/\b(?:supply chain)\b/i.test(prompt)) return { ...preset, boundaryKind: "supply_chain", agencyModel: "market_network" };

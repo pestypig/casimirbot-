@@ -48,8 +48,8 @@ describe("Helix Ask Civilization Bounds route", () => {
 
     expect(body?.route_reason_code).toBe("civilization_bounds_reflection");
     expect(body?.route).toBe("civilization_bounds_reflection");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
     expect(body?.workstation_tool_plan?.intent).toBe("civilization_bounds_reflection");
     expect(body?.civilization_scenario_frame_tool_result?.frame?.schemaVersion).toBe("civilization_scenario_frame/v1");
     expect(body?.civilization_scenario_frame_tool_result?.frame?.evidenceMode).toBe("user_hypothesis");
@@ -68,8 +68,8 @@ describe("Helix Ask Civilization Bounds route", () => {
     expect(body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
     expect(body?.ask_turn_solver_trace?.evidence_reentry_gate?.evidence_reentered).toBe(true);
     expect(body?.terminal_answer_authority).toMatchObject({
-      final_answer_source: "workstation_tool_evaluation",
-      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
       route: "civilization_bounds_reflection",
     });
     expect(body?.current_turn_artifact_ledger?.map((artifact: any) => artifact.kind)).toEqual(
@@ -77,6 +77,7 @@ describe("Helix Ask Civilization Bounds route", () => {
         "helix_civilization_scenario_frame_tool_result",
         "helix_civilization_bounds_tool_result",
         "workstation_tool_evaluation",
+        "final_answer_draft",
       ]),
     );
     expect(answer).toContain("situational bounds receipt");
@@ -105,11 +106,11 @@ describe("Helix Ask Civilization Bounds route", () => {
     const finalEvent = events.find((entry) => entry.event === "turn_final");
     const body = finalEvent?.data;
 
-    expect(terminalEvent?.data?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(terminalEvent?.data?.final_answer_source).toBe("final_answer_draft");
     expect(body?.route_reason_code).toBe("civilization_bounds_reflection");
     expect(body?.route).toBe("civilization_bounds_reflection");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
     expect(body?.civilization_scenario_frame_tool_result?.frame?.schemaVersion).toBe("civilization_scenario_frame/v1");
     expect(body?.civilization_bounds_roadmap_tool_result?.roadmap?.schemaVersion).toBe("civilization_bounds_roadmap/v1");
     expect(body?.ask_turn_solver_trace?.evidence_reentry_gate?.evidence_reentered).toBe(true);
@@ -155,6 +156,7 @@ describe("Helix Ask Civilization Bounds route", () => {
         "helix_civilization_bounds_tool_result",
         "helix_theory_ideology_bridge_tool_result",
         "workstation_tool_evaluation",
+        "final_answer_draft",
       ]),
     );
   }, 60_000);

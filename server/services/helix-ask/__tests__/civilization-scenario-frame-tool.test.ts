@@ -53,6 +53,21 @@ describe("Helix Ask Civilization Scenario Frame tool", () => {
     );
   });
 
+  it("keeps conflict resource-capacity prompts out of the machine civilization preset", async () => {
+    const output = await runHelixAskCivilizationScenarioFrameTool({
+      prompt:
+        "Frame a regional conflict recovery scenario where marginal battlefield cost, defensive denial capacity, infrastructure stability, resource reserves, and buildout rates constrain decision maker claims across countries.",
+    });
+
+    expect(output.frame.family).toBe("resource_reconstruction");
+    expect(output.frame.family).not.toBe("machine_or_digital_civilization");
+    expect(output.frame.boundaryKind).toBe("planetary_civilization");
+    expect(output.frame.coordinationMode).toBe("treaty");
+    expect(output.frame.constraintProfiles).toEqual(
+      expect.arrayContaining(["material_limited", "transport_limited", "governance_limited"]),
+    );
+  });
+
   it("evaluates scenario frames as evidence-only receipts", async () => {
     const output = await runHelixAskCivilizationScenarioFrameTool({
       prompt: "Build a machine civilization frame with compute, cooling, signal latency, and audit review.",

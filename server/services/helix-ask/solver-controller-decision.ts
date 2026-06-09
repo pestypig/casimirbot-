@@ -191,6 +191,44 @@ const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
     ].includes(receiptStatus));
   });
 
+const hasLiveSourceSetupReceipt = (payload: RecordLike): boolean => {
+  const phase = readRecord(payload.live_source_turn_phase_resolution);
+  const phaseName = readString(phase?.phase);
+  const canonicalGoal = readString(phase?.canonicalGoal);
+  const phaseLocked = readBoolean(readRecord(phase?.phaseLock)?.locked) === true;
+  if (!phaseLocked) return false;
+  const expectedTool =
+    canonicalGoal === "configure_interpreter_profile" || phaseName === "configure_interpreter_profile"
+      ? "live_env.configure_interpreter_profile"
+      : canonicalGoal === "configure_watch_job" || phaseName === "configure_watch_job"
+        ? "live_env.configure_live_source_watch_job"
+        : canonicalGoal === "apply_visual_observer_profile" || phaseName === "apply_visual_observer_profile"
+          ? null
+          : null;
+  if (!expectedTool && canonicalGoal !== "apply_visual_observer_profile" && phaseName !== "apply_visual_observer_profile") {
+    return false;
+  }
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "live_environment_tool_observation") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    const toolName = readString(artifactPayload?.tool_name);
+    const observation = readRecord(artifactPayload?.observation);
+    if (expectedTool) {
+      return toolName === expectedTool;
+    }
+    return (
+      toolName === "live_env.configure_visual_observer_profile" ||
+      toolName === "live_env.apply_visual_observer_profile" ||
+      toolName === "live_env.query_visual_observer_profiles" ||
+      toolName === "live_env.test_visual_observer_profile" ||
+      toolName === "live_env.compare_visual_observer_profiles" ||
+      readString(observation?.artifactId) === "stage_play_visual_observer_profile" ||
+      readString(observation?.schemaVersion) === "stage_play_visual_observer_profile/v1"
+    );
+  });
+};
+
 const hasIncompletePromptRequirementCoverage = (payload: RecordLike): boolean => {
   const coverage = readRecord(payload.prompt_requirement_coverage);
   const coverageState = readString(coverage?.coverage);
@@ -454,8 +492,16 @@ export function buildSolverControllerDecision(input: {
     readString(payload.final_answer_source) === "final_answer_draft" &&
     readBoolean(readRecord(payload.terminal_consistency_check)?.consistent) === true &&
     hasFinalInterimVoiceCalloutReceipt(payload);
+  const liveSourceSetupReceiptTerminal =
+    canonicalGoalKind === "live_environment_review" &&
+    terminalArtifactKind === "model_synthesized_answer" &&
+    goalSatisfactionState === "satisfied" &&
+    goalNextDecision === "allow_terminal" &&
+    readString(payload.final_answer_source) === "final_answer_draft" &&
+    hasLiveSourceSetupReceipt(payload);
   const capabilityGuardRequired =
     !modelDirectAnswerTerminal &&
+    !liveSourceSetupReceiptTerminal &&
     (
       capabilityTerminal ||
       Boolean(
@@ -493,7 +539,7 @@ export function buildSolverControllerDecision(input: {
   if (!nonAnswerTerminal) {
     if (!goalSatisfaction) {
       pushUnique(blockingReasons, "goal_satisfaction_missing");
-    } else if (!interimVoiceCalloutStatusTerminal && (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal")) {
+    } else if (!interimVoiceCalloutStatusTerminal && !liveSourceSetupReceiptTerminal && (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal")) {
       pushUnique(blockingReasons, "goal_not_satisfied");
     }
     if (disciplineGuardRequired && !hasRequiredArtifactContract(terminalContract)) {
@@ -512,7 +558,7 @@ export function buildSolverControllerDecision(input: {
     }
     if (!terminalEquivalence) {
       pushUnique(blockingReasons, "terminal_equivalence_missing");
-    } else if (!interimVoiceCalloutStatusTerminal && readBoolean(terminalEquivalence.ok) !== true) {
+    } else if (!interimVoiceCalloutStatusTerminal && !liveSourceSetupReceiptTerminal && readBoolean(terminalEquivalence.ok) !== true) {
       pushUnique(blockingReasons, "terminal_equivalence_failed");
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
@@ -562,7 +608,7 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!turnIdIntegrityAudit.ok) pushUnique(blockingReasons, "turn_id_integrity_failed");
-  if (!finalRouteReconciliation.ok && !noteMutationTerminal && !modelDirectAnswerTerminal) {
+  if (!finalRouteReconciliation.ok && !noteMutationTerminal && !modelDirectAnswerTerminal && !liveSourceSetupReceiptTerminal) {
     pushUnique(blockingReasons, "terminal_route_mismatch");
     if (finalRouteReconciliation.violations.some((entry) => entry.code === "terminal_artifact_forbidden_by_final_route")) {
       pushUnique(blockingReasons, "route_product_contract_rejected_terminal");
@@ -574,9 +620,9 @@ export function buildSolverControllerDecision(input: {
     canonicalTerminal &&
     poisonViolations.length > 0 &&
     poisonViolations.every((kind) => kind === "terminal_artifact_forbidden_by_route_contract");
-  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) pushUnique(blockingReasons, "poison_audit_failed");
-  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal) {
+  if (!nonAnswerTerminal && readBoolean(poisonAudit?.ok) !== true && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal && !liveSourceSetupReceiptTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (poisonFailed && !staleRouteOnlyPoisonFailure && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal && !liveSourceSetupReceiptTerminal) pushUnique(blockingReasons, "poison_audit_failed");
+  if (!nonAnswerTerminal && readBoolean(routeAuthority?.route_authority_ok) !== true && !noteMutationTerminal && !liveMaintenanceTerminal && !modelDirectAnswerTerminal && !liveSourceSetupReceiptTerminal) {
     pushUnique(blockingReasons, "route_authority_failed");
   }
   if (
@@ -584,6 +630,7 @@ export function buildSolverControllerDecision(input: {
     !noteMutationTerminal &&
     !liveMaintenanceTerminal &&
     !modelDirectAnswerTerminal &&
+    !liveSourceSetupReceiptTerminal &&
     (
       (poisonFailed && !staleRouteOnlyPoisonFailure) ||
       readString(routeAuthority?.primary_violation_code) === "terminal_artifact_forbidden_by_route_contract" ||
@@ -689,6 +736,7 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (
+    !liveSourceSetupReceiptTerminal &&
     readBoolean(solverTrace?.completed_solver_path) === false &&
     blockingReasons.some((reason) =>
       reason === "poison_audit_failed" ||

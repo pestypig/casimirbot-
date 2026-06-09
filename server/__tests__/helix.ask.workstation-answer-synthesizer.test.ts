@@ -194,4 +194,40 @@ describe("Helix Ask workstation answer synthesizer", () => {
     );
     expect(answer).toContain("Procedural posture: use the bridge to ask better questions");
   });
+
+  it("turns civilization bounds receipts into conflict-capacity reflection instead of receipt prose", () => {
+    const prompt =
+      "Use civilization bounds to assess a conflict recovery claim about marginal battlefield cost, defensive denial capacity, infrastructure stability, resource reserves, and buildout rates.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    expect(plan?.intent).toBe("civilization_bounds_reflection");
+
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      civilizationScenarioFrameToolOutput: {
+        frame: {
+          family: "resource_reconstruction",
+          boundaryKind: "planetary_civilization",
+          developmentalStage: "collapse_or_repair",
+          evidenceMode: "user_hypothesis",
+          constraintProfiles: ["material_limited", "transport_limited", "governance_limited"],
+          missingEvidence: ["material_inventory_receipts", "transport_route_and_latency_evidence"],
+        },
+      },
+      civilizationBoundsToolOutput: {
+        roadmap: {
+          collaborationBound: { collaborationValue: 0.12 },
+        },
+      },
+    });
+
+    expect(answer).toContain("The procedural frame should inform the reflection, not replace it.");
+    expect(answer).toContain("Frame hypothesis: resource_reconstruction / planetary_civilization");
+    expect(answer).toContain("plausible constraint model, not an ultimatum or proof");
+    expect(answer).toContain("You need the decision-relevant reserve, extraction, refining, manufacturing, transport");
+    expect(answer).toContain("Boundary: the roadmap can organize what must be measured");
+    expect(answer).not.toContain("Civilization Bounds Roadmap produced evidence-only system bounds");
+  });
 });

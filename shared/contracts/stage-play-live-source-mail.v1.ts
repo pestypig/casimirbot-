@@ -14,6 +14,7 @@ export const STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA = "stage_play_micro_reasone
 export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
 export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
+export const LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA = "live_source_turn_phase_resolution/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
   "stage_play_live_source_watch_job_policy_config_result/v1" as const;
 
@@ -71,6 +72,49 @@ export type StagePlayNextLoopStateV1 =
   | "blocked_voice_policy"
   | "blocked_tool_error"
   | "ended";
+
+export type LiveSourceTurnPhaseV1 =
+  | "configure_interpreter_profile"
+  | "configure_watch_job"
+  | "apply_visual_observer_profile"
+  | "read_processed_mail"
+  | "process_mail_fallback"
+  | "record_decision"
+  | "request_voice_after_decision"
+  | "terminal_checkpoint"
+  | "queue_continuation"
+  | "blocked_or_missing_args";
+
+export type LiveSourceTurnCanonicalGoalV1 =
+  | "configure_interpreter_profile"
+  | "configure_watch_job"
+  | "apply_visual_observer_profile"
+  | "processed_mail_interpretation"
+  | "processed_mail_voice_decision"
+  | "processed_mail_checkpoint"
+  | "live_source_status";
+
+export type LiveSourceTurnPhaseResolutionV1 = {
+  artifactId: "live_source_turn_phase_resolution";
+  schemaVersion: typeof LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA;
+  phase: LiveSourceTurnPhaseV1;
+  reason: string;
+  canonicalGoal: LiveSourceTurnCanonicalGoalV1;
+  allowedTools: string[];
+  fallbackTools: string[];
+  forbiddenTools: string[];
+  requiredEvidence: string[];
+  completionEvidence: string[];
+  nextPhase: LiveSourceTurnPhaseV1 | null;
+  phaseLock: {
+    locked: boolean;
+    reason?: string | null;
+  };
+  evidenceRefs: string[];
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_policy";
+};
 
 export type LiveSourceCausalTraceV1 = {
   schemaVersion: typeof LIVE_SOURCE_CAUSAL_TRACE_SCHEMA;

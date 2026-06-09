@@ -12,6 +12,8 @@ export type SynthesizeWorkstationAnswerInput = {
   postToolSynthesisPlan?: HelixPostToolSynthesisPlanV1 | null;
   zenGraphReflectionToolOutput?: unknown;
   theoryIdeologyBridgeToolOutput?: unknown;
+  civilizationScenarioFrameToolOutput?: unknown;
+  civilizationBoundsToolOutput?: unknown;
 };
 
 export type CalculatorObservation = {
@@ -456,7 +458,64 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
   ].join("\n");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function readText(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readTextArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+}
+
+function extractCivilizationFrame(input: SynthesizeWorkstationAnswerInput): Record<string, unknown> | null {
+  const output = asRecord(input.civilizationScenarioFrameToolOutput);
+  return asRecord(output?.frame);
+}
+
+function extractCivilizationRoadmap(input: SynthesizeWorkstationAnswerInput): Record<string, unknown> | null {
+  const output = asRecord(input.civilizationBoundsToolOutput);
+  return asRecord(output?.roadmap);
+}
+
+function formatFrameLabel(frame: Record<string, unknown> | null): string {
+  if (!frame) return "frame unavailable";
+  const family = readText(frame.family) ?? "unknown_family";
+  const boundary = readText(frame.boundaryKind) ?? "unknown_boundary";
+  const stage = readText(frame.developmentalStage) ?? "unknown_stage";
+  const evidenceMode = readText(frame.evidenceMode) ?? "unknown_evidence";
+  return `${family} / ${boundary} / ${stage} / ${evidenceMode}`;
+}
+
+function synthesizeConflictCapacityFallback(input: SynthesizeWorkstationAnswerInput): string {
+  const frame = extractCivilizationFrame(input);
+  const roadmap = extractCivilizationRoadmap(input);
+  const constraints = readTextArray(frame?.constraintProfiles).slice(0, 6);
+  const missingEvidence = readTextArray(frame?.missingEvidence).slice(0, 6);
+  const collaborationValue = asRecord(roadmap?.collaborationBound)?.collaborationValue;
+  const collaborationText =
+    typeof collaborationValue === "number" && Number.isFinite(collaborationValue)
+      ? ` Roadmap collaborationValue=${collaborationValue}; treat it as a diagnostic placeholder until sourced factors replace defaults.`
+      : "";
+  return [
+    "The procedural frame should inform the reflection, not replace it.",
+    `Frame hypothesis: ${formatFrameLabel(frame)}. Classifiers are hypotheses, so this frame can be revised if the prompt evidence points elsewhere.`,
+    "Assessment: the proposed triangle is a plausible constraint model, not an ultimatum or proof. It says a ceasefire becomes more likely when battlefield marginal cost, denial capacity, and outside infrastructure-stability incentives all bind at once; it does not certify that those conditions are present.",
+    "What would support it: source-backed marginal-cost trends for continued gains, air-defense and long-range-strike capacity plus production/replacement rates, and evidence that China, Europe, and the U.S. value infrastructure stability more than continued battlefield leverage.",
+    "What would weaken or falsify it: cheap continued gains, exhausted denial capacity, external actors still preferring leverage, or resource/manufacturing/transport bottlenecks that make the stability path slower than the conflict path.",
+    "Resource proof boundary: you do not need every resource estimate on Earth. You need the decision-relevant reserve, extraction, refining, manufacturing, transport, substitution, and infrastructure buildout rates with timestamps and uncertainty bounds.",
+    `Roadmap constraints: ${constraints.length ? constraints.join(", ") : "not exposed in compact receipt"}.${collaborationText}`,
+    `Missing evidence to upgrade the claim tier: ${missingEvidence.length ? missingEvidence.join(", ") : "source-backed capacity measurements and claim-tier receipts"}.`,
+    "Boundary: the roadmap can organize what must be measured and where the Theory/Zen bridge should look; it cannot decide policy, prove prediction finality, or convert physical feasibility into moral permission.",
+  ].join("\n");
+}
+
 function synthesizeCivilizationBoundsAnswer(input: SynthesizeWorkstationAnswerInput): string {
+  if (/\b(?:ceasefire|war|conflict|battlefield|air defense|long[-\s]?range strike|resource reserves?|infrastructure stability|decision makers?)\b/i.test(input.prompt)) {
+    return synthesizeConflictCapacityFallback(input);
+  }
   const hasScenarioFrameStep = input.plan.steps.some(
     (step) => step.kind === "run_ask_tool" && step.tool_id === "helix_ask.build_civilization_scenario_frame",
   );

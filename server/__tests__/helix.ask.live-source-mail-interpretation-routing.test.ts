@@ -161,6 +161,67 @@ const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void =>
 };
 
 describe.sequential("Helix Ask live-source mail interpretation routing", () => {
+  it("resolves interpreter profile setup as a locked configure phase", () => {
+    const phase = __testHelixGoalSatisfaction.liveSourceTurnPhaseResolution({
+      transcript:
+        "Create a Minecraft Survival Coach interpreter profile for this source. Call out danger and ignore routine walking.",
+      canonicalGoalKind: "live_environment_review",
+      classifierReasons: ["prefer_configure_interpreter_profile"],
+      currentTurnArtifacts: [],
+    });
+
+    expect(phase?.phase).toBe("configure_interpreter_profile");
+    expect(phase?.phaseLock.locked).toBe(true);
+    expect(phase?.allowedTools).toContain("live_env.configure_interpreter_profile");
+    expect(phase?.forbiddenTools).toContain("live_env.read_processed_live_source_mail");
+  });
+
+  it("resolves processed voice candidates as decision-before-voice phase", () => {
+    const phase = __testHelixGoalSatisfaction.liveSourceTurnPhaseResolution({
+      transcript:
+        "Read the processed visual mail and call out if danger appears in the Minecraft video predictor.",
+      canonicalGoalKind: "live_source_processed_mail_interpretation",
+      classifierReasons: ["live_source_mail_loop_intent"],
+      currentTurnArtifacts: [
+        {
+          artifact_id: "artifact:packet",
+          turn_id: "turn:phase",
+          producer_item_id: "test",
+          kind: "live_environment_tool_observation",
+          created_at_ms: Date.now(),
+          source_scope: "current_turn",
+          goal_hash: "hash",
+          payload: {
+            tool_name: "live_env.read_processed_live_source_mail",
+            ok: true,
+            packets: [
+              {
+                artifactId: "stage_play_processed_mail_packet",
+                schemaVersion: "stage_play_processed_mail_packet/v1",
+                packetId: "stage_play_processed_mail_packet:phase",
+                mailIds: ["stage_play_live_source_mail:1"],
+                observedFacts: ["player appears to be on fire"],
+                changedFacts: ["fire/damage cue appeared"],
+                recommendedNext: "request_voice_callout",
+                salience: {
+                  level: "urgent",
+                  reasons: ["fire/damage cue"],
+                  voiceCandidate: true,
+                  calloutDraft: "The player appears to be on fire.",
+                },
+              },
+            ],
+          },
+        },
+      ] as any,
+    });
+
+    expect(phase?.phase).toBe("record_decision");
+    expect(phase?.canonicalGoal).toBe("processed_mail_voice_decision");
+    expect(phase?.allowedTools).toEqual(["live_env.record_live_source_mail_decision"]);
+    expect(phase?.forbiddenTools).toContain("live_env.request_interim_voice_callout");
+  });
+
   it("classifies new processed mail refs as tool progress", () => {
     const receipt = __testHelixGoalSatisfaction.buildMailLoopToolProgressReceipt({
       turnId: "ask:mail-loop-progress",
@@ -290,6 +351,7 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
         watchNext: ["health", "fire recovery"],
       },
       decision: {
+        decisionId: "stage_play_live_source_mail_decision:voice-terminal",
         decision: "request_voice_callout",
         voiceCalloutDraft: {
           text: "The player appears to be on fire; watch for recovery or danger.",
@@ -297,13 +359,68 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
           requiresConfirmation: false,
         },
       },
+      artifacts: [{
+        artifact_id: "ask:voice-terminal:voice",
+        turn_id: "ask:voice-terminal",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "live_environment_tool_observation",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: "hash",
+        payload: {
+          tool_name: "live_env.request_interim_voice_callout",
+          observation: {
+            schema: "helix.interim_voice_callout_tool_result.v1",
+            receipt: {
+              status: "queued",
+              receiptId: "voice_receipt:queued",
+              evidenceRefs: ["stage_play_live_source_mail_decision:voice-terminal"],
+            },
+          },
+        },
+      } as any],
     });
 
     expect(text).toContain("Processed mail identified a high-salience voice candidate:");
     expect(text).toContain("The player appears to be on fire");
+    expect(text).toContain("Decision: stage_play_live_source_mail_decision:voice-terminal");
     expect(text).toContain("Voice status:");
-    expect(text).toContain("requested");
+    expect(text).toContain("voice requested");
     expect(text).toContain("Loop:");
+    expect(text).toContain("Armed for next update.");
+  });
+
+  it("builds held voice terminal text when confirmation blocks the voice tool", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeProcessedMailTerminalText({
+      packet: {
+        artifactId: "stage_play_processed_mail_packet",
+        schemaVersion: "stage_play_processed_mail_packet/v1",
+        packetId: "stage_play_processed_mail_packet:terminal-voice-held",
+        observedFacts: ["A hostile mob appears near the player."],
+        salience: {
+          level: "urgent",
+          reasons: ["hostile mob nearby"],
+          voiceCandidate: true,
+          calloutDraft: "Hostile mob nearby.",
+        },
+        recommendedNext: "request_voice_callout",
+        watchNext: ["health", "mob distance"],
+      },
+      decision: {
+        decisionId: "stage_play_live_source_mail_decision:voice-held",
+        decision: "request_voice_callout",
+        voicePolicyReason: "confirmation_required",
+        voiceCalloutDraft: {
+          text: "Hostile mob nearby.",
+          voiceEligible: true,
+          requiresConfirmation: true,
+        },
+      },
+    });
+
+    expect(text).toContain("Decision: stage_play_live_source_mail_decision:voice-held");
+    expect(text).toContain("voice held: confirmation required");
+    expect(text).toContain("Policy: confirmation_required.");
     expect(text).toContain("Armed for next update.");
   });
 
@@ -332,10 +449,88 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     });
 
     expect(text).toContain("Processed mail did not require a user-facing update.");
+    expect(text).toContain("Packet: stage_play_processed_mail_packet:terminal-wait");
     expect(text).toContain("Reason: stable scene.");
     expect(text).toContain("Loop remains armed.");
     expect(text).toContain("Armed for next update.");
     expect(text).not.toMatch(/visual evidence (?:is|was) unavailable/i);
+  });
+
+  it("builds configure_interpreter_profile terminal text from profile setup evidence only", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeLiveSourceMailFallbackText({
+      prompt: "Create a Minecraft Survival Coach interpreter profile for this source.",
+      artifacts: [{
+        artifact_id: "ask:profile-terminal:profile",
+        turn_id: "ask:profile-terminal",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "live_environment_tool_observation",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: "hash",
+        payload: {
+          tool_name: "live_env.configure_interpreter_profile",
+          observation: {
+            schema: "stage_play_interpreter_profile_config_result/v1",
+            profile: {
+              profileId: "stage_play_live_source_interpreter_profile:terminal",
+              title: "Minecraft Survival Coach",
+              status: "active",
+              objectiveText: "Watch Minecraft as a survival coach.",
+              salienceCriteria: ["danger", "rare resources"],
+              suppressCriteria: ["routine walking"],
+              voiceCalloutCriteria: ["hostile mob"],
+            },
+            interpreterProfileRef: "stage_play_live_source_interpreter_profile:terminal",
+          },
+        },
+      } as any],
+    });
+
+    expect(text).toContain("Profile configured: Minecraft Survival Coach.");
+    expect(text).toContain("Profile: stage_play_live_source_interpreter_profile:terminal");
+    expect(text).toContain("Status: active.");
+    expect(text).toContain("Criteria:");
+    expect(text).toContain("Salience: danger; rare resources");
+    expect(text).toContain("Suppress: routine walking");
+    expect(text).toContain("No live-source mail was interpreted in this setup turn.");
+    expect(text).not.toContain("Observed:");
+  });
+
+  it("builds configure_watch_job terminal text from policy setup evidence only", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeLiveSourceMailFallbackText({
+      prompt: "Watch the active visual source and describe each new mail batch.",
+      artifacts: [{
+        artifact_id: "ask:watch-terminal:policy",
+        turn_id: "ask:watch-terminal",
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "live_environment_tool_observation",
+        created_at_ms: Date.now(),
+        source_scope: "current_turn",
+        goal_hash: "hash",
+        payload: {
+          tool_name: "live_env.configure_live_source_watch_job",
+          observation: {
+            schema: "stage_play_live_source_watch_job_policy_config_result/v1",
+            watchJobPolicyRef: "stage_play_live_source_watch_job_policy:terminal",
+            policy: {
+              policyId: "stage_play_live_source_watch_job_policy:terminal",
+              objectiveText: "Watch the active visual source and describe each new mail batch.",
+              status: "armed",
+            },
+            jobState: {
+              nextLoopState: "armed_for_next_summary",
+            },
+          },
+        },
+      } as any],
+    });
+
+    expect(text).toContain("Watch job configured and armed.");
+    expect(text).toContain("Policy: stage_play_live_source_watch_job_policy:terminal");
+    expect(text).toContain("Objective: Watch the active visual source");
+    expect(text).toContain("Loop state: armed for next summary.");
+    expect(text).toContain("No live-source mail was interpreted in this setup turn.");
+    expect(text).not.toContain("Observed:");
   });
 
   it("queues a backend continuation wake after a processed-mail checkpoint without reusing the current batch", () => {
@@ -772,6 +967,43 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     expect(response.body?.answer, debug).toMatch(/Interpreter profile configured|Minecraft Survival Coach/i);
   }, 60_000);
 
+  it("repairs forbidden mailbox reads during interpreter profile setup before tool budget is spent", async () => {
+    seedVisualMail("A Minecraft frame exists, but the current turn is profile setup only.");
+    setAgentStepResponses([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_processed_live_source_mail",
+        reason: "Wrongly tried to read mail during profile setup.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.8,
+      },
+    ]);
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Create a Minecraft Survival Coach interpreter profile for this source. Call out danger, rare resources, and strategic decision points. Ignore routine walking.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.configure_interpreter_profile");
+    expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_processed_live_source_mail");
+    if (response.body?.live_source_phase_repair) {
+      expect(response.body.live_source_phase_repair, debug).toMatchObject({
+        phase: "configure_interpreter_profile",
+        repaired_to: "live_env.configure_interpreter_profile",
+      });
+    } else {
+      expect(response.body?.live_source_turn_phase_resolution, debug).toMatchObject({
+        canonicalGoal: "configure_interpreter_profile",
+        phaseLock: expect.objectContaining({ locked: true }),
+      });
+      expect(["configure_interpreter_profile", "terminal_checkpoint"], debug).toContain(
+        response.body?.live_source_turn_phase_resolution?.phase,
+      );
+    }
+    expect(response.body?.terminal_error_code, debug).not.toBe("agent_loop_budget_exhausted");
+    expect(response.body?.terminal_error_code, debug).not.toBe("live_source_phase_violation");
+  }, 60_000);
+
   it("configures a Minecraft video predictor profile without terminal consistency failure", async () => {
     seedVisualMail("A Minecraft YouTube video frame is visible, but profile setup should not consume the mail.");
     setAgentStepResponses([
@@ -1087,6 +1319,61 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     expect(response.body?.answer, debug).toMatch(/Observed:/i);
     expect(response.body?.answer, debug).toMatch(/Cautious interpretation:/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
+  }, 60_000);
+
+  it("repairs premature final answers in record_decision phase to record_live_source_mail_decision", async () => {
+    setAgentStepResponses([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_processed_live_source_mail",
+        reason: "Read processed mail first.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.process_live_source_mail",
+        reason: "Process raw visual mail into packet evidence.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_processed_live_source_mail",
+        reason: "Read canonical processed packet after fallback processing.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "Wrongly tried to answer before recording the packet decision.",
+        args: {},
+        expected_artifacts: ["model_synthesized_answer"],
+        confidence: 0.7,
+      },
+    ]);
+    seedVisualMail("The Minecraft player leaves an interior base and moves outdoors with a sword; watch for combat or exploration.");
+
+    const { response, decision, liveEnvironmentToolNames, debug } = await askMailbox(
+      "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Predict what should be watched next.",
+    );
+
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.record_live_source_mail_decision");
+    expect(decision, debug).toMatchObject({
+      decision: "record_interpretation",
+      nextLoopState: "armed_for_next_summary",
+    });
+    expect(response.body?.live_source_phase_repair, debug).toMatchObject({
+      phase: "record_decision",
+      repaired_to: "live_env.record_live_source_mail_decision",
+    });
+    expect(response.body?.live_source_phase_repair?.selected_operation, debug).not.toBe("live_env.record_live_source_mail_decision");
+    expect(response.body?.terminal_error_code, debug).not.toBe("agent_loop_budget_exhausted");
+    expect(response.body?.answer, debug).toMatch(/Observed:|Watch next:/i);
   }, 60_000);
 
   it("records coverage semantics for multi-mail interpretation instead of flattening the batch", async () => {
