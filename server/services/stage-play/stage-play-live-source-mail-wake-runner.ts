@@ -5,6 +5,7 @@ import type {
   StagePlayLiveSourceMailItemV1,
   StagePlayLiveSourceNarrativeStateV1,
   StagePlayLiveSourcePredictionValidationV1,
+  StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceVoiceDeliveryReceiptV1,
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -76,6 +77,7 @@ import type {
 import { recordLiveSourceBudgetState } from "./stage-play-live-source-budget-store";
 import { extractStagePlayLiveSourceDelta } from "./stage-play-live-source-delta-extractor";
 import { validateStagePlayLiveSourcePredictionFromMail } from "./stage-play-live-source-prediction-validator";
+import { buildStagePlayProcessedMailPacket } from "./stage-play-processed-mail-packet";
 import { recordLiveSourceMailDecisionForAsk } from "./stage-play-visual-summary-mail-ingest";
 
 type AskWakeTurnResponse = Record<string, unknown>;
@@ -493,10 +495,41 @@ const formatTaskQueueSnapshot = (
 
 const activeTaskKindFromSnapshot = (
   snapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null,
-): string | null =>
+): StagePlayLiveSourceTaskV1["taskKind"] | null =>
   snapshot?.runningTask?.taskKind ??
   snapshot?.queuedTasks[0]?.taskKind ??
   null;
+
+const inferredTaskKindFromLiveReceipts = (input: {
+  immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+}): StagePlayLiveSourceTaskV1["taskKind"] => {
+  const voiceCandidate =
+    (
+      input.processedPacket?.salience.voiceCandidate === true &&
+      (input.processedPacket.salience.level === "high" || input.processedPacket.salience.level === "urgent")
+    ) ||
+    (
+      input.immersionState?.salience.voiceCandidate === true &&
+      (input.immersionState.salience.level === "high" || input.immersionState.salience.level === "urgent")
+    );
+  if (
+    voiceCandidate ||
+    input.processedPacket?.recommendedNext === "request_voice_callout" ||
+    input.predictionValidation?.recommendedNext === "request_voice_callout"
+  ) {
+    return "voice_callout_candidate";
+  }
+  if (
+    input.predictionValidation?.result === "contradicted" ||
+    input.predictionValidation?.result === "partially_supported"
+  ) {
+    return "prediction_error_review";
+  }
+  if (input.predictionValidation?.result === "supported") return "immediate_prediction_check";
+  return "mail_batch_interpretation";
+};
 
 const formatConversationContextPack = (
   pack: StagePlayLiveSourceConversationContextPackV1 | null,
@@ -586,6 +619,55 @@ const formatPredictionValidation = (
   ].filter(Boolean).join("\n");
 };
 
+const formatProcessedMailPacket = (
+  packet: StagePlayProcessedMailPacketV1 | null,
+): string => {
+  if (!packet) return "- none recorded";
+  return [
+    `- packet_id: ${packet.packetId}`,
+    `  source: ${packet.sourceId}`,
+    `  mail_refs: ${packet.mailIds.slice(0, 12).join(", ")}`,
+    `  resolution: ${packet.resolutionState}`,
+    `  recommended_next: ${packet.recommendedNext}`,
+    `  salience: ${packet.salience.level}${packet.salience.voiceCandidate ? " (voice candidate)" : ""}`,
+    packet.observedFacts.length > 0 ? `  observed: ${packet.observedFacts.slice(0, 6).map((fact) => clipPromptText(fact, 160)).join(" | ")}` : null,
+    packet.inferredFacts.length > 0 ? `  inferred: ${packet.inferredFacts.slice(0, 6).map((fact) => clipPromptText(fact, 160)).join(" | ")}` : null,
+    packet.changedFacts.length > 0 ? `  changed: ${packet.changedFacts.slice(0, 6).join(" | ")}` : null,
+    packet.uncertainties.length > 0 ? `  uncertain: ${packet.uncertainties.slice(0, 4).join(" | ")}` : null,
+    packet.watchNext.length > 0 ? `  watch_next: ${packet.watchNext.slice(0, 8).join(" | ")}` : null,
+    packet.voiceCalloutMatches.length > 0 ? `  voice_matches: ${packet.voiceCalloutMatches.slice(0, 6).join(" | ")}` : null,
+    packet.salience.calloutDraft ? `  callout_candidate: ${clipPromptText(packet.salience.calloutDraft, 180)}` : null,
+    packet.microReasonerRunRefs.length > 0 ? `  micro_reasoners: ${packet.microReasonerRunRefs.slice(0, 8).join(", ")}` : null,
+  ].filter(Boolean).join("\n");
+};
+
+const formatVoiceCandidateReceipt = (input: {
+  immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+}): string => {
+  const state = input.immersionState ?? null;
+  const validation = input.predictionValidation ?? null;
+  const packet = input.processedPacket ?? null;
+  const isCandidate =
+    state?.salience.voiceCandidate === true &&
+    (state.salience.level === "high" || state.salience.level === "urgent");
+  if (!isCandidate && validation?.recommendedNext !== "request_voice_callout" && packet?.recommendedNext !== "request_voice_callout") {
+    return "- none";
+  }
+  return [
+    `- candidate: ${isCandidate || validation?.recommendedNext === "request_voice_callout" || packet?.recommendedNext === "request_voice_callout"}`,
+    `  salience: ${packet?.salience.level ?? state?.salience.level ?? validation?.salienceHint ?? "unknown"}`,
+    `  voice_candidate: ${packet?.salience.voiceCandidate === true || state?.salience.voiceCandidate === true}`,
+    `  recommended_next: ${packet?.recommendedNext ?? validation?.recommendedNext ?? "model_decides"}`,
+    state?.salience.reasons.length ? `  reasons: ${state.salience.reasons.slice(0, 6).join(" | ")}` : null,
+    packet?.voiceCalloutMatches.length ? `  voice_matches: ${packet.voiceCalloutMatches.slice(0, 6).join(" | ")}` : null,
+    packet?.salience.calloutDraft ? `  callout_candidate: ${clipPromptText(packet.salience.calloutDraft, 180)}` : null,
+    validation?.newSignals.length ? `  signals: ${validation.newSignals.slice(0, 8).join(" | ")}` : null,
+    "  decision_required: choose request_voice_callout, draft_text_answer, or wait_for_next_summary after checking voice policy and suppression criteria.",
+  ].filter(Boolean).join("\n");
+};
+
 const buildImmersionPredictionForWake = (input: {
   jobId: string;
   mailBatch: StagePlayLiveSourceMailItemV1[];
@@ -660,6 +742,7 @@ const buildWakeFastLayer = (input: {
   priorImmersionState: StagePlayLiveSourceImmersionStateV1 | null;
   immersionState: StagePlayLiveSourceImmersionStateV1;
   predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+  processedPacket: StagePlayProcessedMailPacketV1;
   shouldRunSlowAsk: boolean;
   slowAskReason: string;
 } => {
@@ -747,11 +830,23 @@ const buildWakeFastLayer = (input: {
     causalTrace: input.wake.causalTrace,
     createdAt: input.now,
   });
+  const { packet: processedPacket } = buildStagePlayProcessedMailPacket({
+    jobId,
+    sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "unknown_source",
+    mailItems: input.mailBatch,
+    priorImmersionState,
+    immersionState,
+    predictionValidation,
+    activeProfile: input.activeInterpreterProfile ?? null,
+    causalTrace: input.wake.causalTrace,
+    now: input.now,
+  });
   const shouldRunSlowAsk =
     input.manualRun === true ||
     !input.policy ||
     policyWantsEveryBatch(input.policy) ||
     salienceNeedsSlowAsk(immersionState.salience) ||
+    processedPacket.recommendedNext === "request_voice_callout" ||
     policyCriteriaNeedsSlowAsk({
       policy: input.policy,
       mailBatch: input.mailBatch,
@@ -765,6 +860,8 @@ const buildWakeFastLayer = (input: {
         ? "policy_output_cadence_every_batch"
         : salienceNeedsSlowAsk(immersionState.salience)
           ? `salience_${immersionState.salience.level}`
+          : processedPacket.recommendedNext === "request_voice_callout"
+            ? "processed_packet_voice_candidate"
           : policyCriteriaNeedsSlowAsk({ policy: input.policy, mailBatch: input.mailBatch })
             ? "policy_criteria_matched"
           : validationNeedsSlowAsk(predictionValidation)
@@ -774,6 +871,7 @@ const buildWakeFastLayer = (input: {
     priorImmersionState,
     immersionState,
     predictionValidation,
+    processedPacket,
     shouldRunSlowAsk,
     slowAskReason,
   };
@@ -932,6 +1030,7 @@ const buildDurableWakeTranscriptRows = (input: {
   priorNarrativeState?: StagePlayLiveSourceNarrativeStateV1 | null;
   immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
   predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
   slowAskRan?: boolean;
   decisionIds: string[];
   budgetState?: LiveSourceBudgetStateV1 | null;
@@ -995,6 +1094,31 @@ const buildDurableWakeTranscriptRows = (input: {
       artifactId: input.predictionValidation.validationId,
       artifactKind: input.predictionValidation.artifactId,
       evidenceRefs: input.predictionValidation.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  if (input.processedPacket) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_processed_packet:${hashShort(input.processedPacket.packetId)}`,
+      rowKind: "processed_mail_packet",
+      title: "Processed mail packet",
+      body: [
+        `${input.processedPacket.resolutionState}; recommended ${input.processedPacket.recommendedNext}.`,
+        `Salience: ${input.processedPacket.salience.level}${input.processedPacket.salience.voiceCandidate ? " (voice candidate)" : ""}.`,
+        input.processedPacket.observedFacts.length > 0
+          ? `Observed: ${input.processedPacket.observedFacts.slice(0, 3).map((fact) => clipPromptText(fact, 120)).join("; ")}.`
+          : null,
+        input.processedPacket.changedFacts.length > 0
+          ? `Changed: ${input.processedPacket.changedFacts.slice(0, 4).join("; ")}.`
+          : null,
+        input.processedPacket.watchNext.length > 0
+          ? `Watch next: ${input.processedPacket.watchNext.slice(0, 5).join("; ")}.`
+          : null,
+      ].filter(Boolean).join("\n"),
+      toolName: "live_env.process_live_source_mail_packet",
+      artifactId: input.processedPacket.packetId,
+      artifactKind: input.processedPacket.artifactId,
+      evidenceRefs: input.processedPacket.evidenceRefs,
       createdAt: input.createdAt,
     }));
   }
@@ -1456,6 +1580,7 @@ const buildWakePrompt = (input: {
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
   latestImmersionState?: StagePlayLiveSourceImmersionStateV1 | null;
   predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
   taskQueueSnapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null;
   conversationContextPack: StagePlayLiveSourceConversationContextPackV1 | null;
   heldCallouts: StagePlayHeldCalloutV1[];
@@ -1467,7 +1592,11 @@ const buildWakePrompt = (input: {
   const interpretationMode = input.policy?.interpretationMode ?? "latest_scene_answer";
   const mailProcessingMode = input.policy?.mailProcessingMode ?? "latest_only";
   const outputCadence = input.policy?.outputCadence ?? "every_batch";
-  const activeTaskKind = activeTaskKindFromSnapshot(input.taskQueueSnapshot);
+  const activeTaskKind = activeTaskKindFromSnapshot(input.taskQueueSnapshot) ?? inferredTaskKindFromLiveReceipts({
+    immersionState: input.latestImmersionState ?? null,
+    predictionValidation: input.predictionValidation ?? null,
+    processedPacket: input.processedPacket ?? null,
+  });
   const activeUserPrompt = hasActiveUserPromptContext(input.conversationContextPack);
   return [
     "Continuing live-source watch job:",
@@ -1500,7 +1629,8 @@ const buildWakePrompt = (input: {
     "7. Use profile comparison to choose wait, interpretation, text, voice, or checkpoint.",
     "",
     "The mail is perturbation evidence for this continuing job.",
-    "Use live_env.read_live_source_mail first, then record the decision with live_env.record_live_source_mail_decision.",
+    "Use the processed mail packet as the primary compact evidence packet. Use raw mail summaries below only to audit or clarify the packet.",
+    "Use live_env.read_processed_live_source_mail first. Fall back to live_env.read_live_source_mail only if no processed packet exists, then record the decision with live_env.record_live_source_mail_decision.",
     "Read only the mail refs listed below for this wake request; do not widen to newer mailbox items in this turn.",
     "Treat the listed mail refs as one chronological observation window from the same live source.",
     "Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.",
@@ -1526,6 +1656,7 @@ const buildWakePrompt = (input: {
     "- If current task is prediction_error_review: use live_env.compare_live_source_prediction before deciding whether to wait, interpret, draft text, or request a callout.",
     "- If current task is mail_batch_interpretation: use live_env.project_live_source_narrative and record_interpretation.",
     "- If current task is voice_callout_candidate: confirm salience and voice policy before requesting voice callout; if confirmationRequired is true, draft only.",
+    "- If current task is voice_callout_candidate: the trigger is live-source salience, not final-answer timing. Decide between request_voice_callout, draft_text_answer, and wait_for_next_summary.",
     "- If current task is long_horizon_projection: use live_env.project_live_source_narrative unless an active user prompt or urgent voice candidate has priority.",
     "- If active user prompt context is true: answer the user first, and merge or recheck held callouts instead of speaking an older warning separately.",
     "- Use draft_text_answer when the standing policy or current prompt asks what the latest mail shows or asks for a one-sentence scene answer.",
@@ -1550,6 +1681,18 @@ const buildWakePrompt = (input: {
     "- If requiresConfirmation is true, produce the callout draft and wait for confirmation; do not request a voice tool.",
     "- If allowedNow is true and speech is appropriate, record the decision first and request the separate voice delivery tool from that decision.",
     "- Live-source voice must come from a model-reviewed mail decision. Visual capture, prediction receipts, narrative projection receipts, and task queue receipts do not speak automatically.",
+    "- Minecraft voice candidates include player on fire, hostile mob, lava, fall, low health, and optionally rare resources if the active profile says to call out opportunities.",
+    "- Suppress voice for stable chest/inventory frames, repeated interior/base frames, routine walking, and low-salience summaries unless the user explicitly requested narration/commentary.",
+    "",
+    "Voice candidate receipt:",
+    formatVoiceCandidateReceipt({
+      immersionState: input.latestImmersionState ?? null,
+      predictionValidation: input.predictionValidation ?? null,
+      processedPacket: input.processedPacket ?? null,
+    }),
+    "",
+    "Processed mail packet:",
+    formatProcessedMailPacket(input.processedPacket ?? null),
     "",
     "Task queue state:",
     formatTaskQueueSnapshot(input.taskQueueSnapshot),
@@ -1902,10 +2045,13 @@ export async function runNextMailWakeRequest(input: {
     ...evidenceRefs,
     fastLayer.immersionState.immersionStateId,
     fastLayer.predictionValidation.validationId,
+    fastLayer.processedPacket.packetId,
     ...(fastLayer.immersionState.evidenceRefs ?? []),
     ...(fastLayer.predictionValidation.evidenceRefs ?? []),
+    ...(fastLayer.processedPacket.evidenceRefs ?? []),
   ]);
-  if (!fastLayer.shouldRunSlowAsk) {
+  const taskNeedsSlowAsk = Boolean(activeTaskKindFromSnapshot(taskQueueSnapshot));
+  if (!fastLayer.shouldRunSlowAsk && !taskNeedsSlowAsk) {
     const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
     const decision = recordLiveSourceMailDecisionForAsk({
       threadId: running.threadId,
@@ -1916,6 +2062,7 @@ export async function runNextMailWakeRequest(input: {
       rationalePreview: [
         "Fast live-source layer updated immersion state and validated the prior prediction.",
         `Slow Ask was skipped because ${fastLayer.slowAskReason}.`,
+        `Processed packet: ${fastLayer.processedPacket.packetId}.`,
         `Prediction validation: ${fastLayer.predictionValidation.result}; salience: ${fastLayer.immersionState.salience.level}.`,
       ].join(" "),
       nextLoopState: "armed_for_next_summary",
@@ -1934,6 +2081,7 @@ export async function runNextMailWakeRequest(input: {
         ...evidenceRefs,
         fastLayer.immersionState.immersionStateId,
         fastLayer.predictionValidation.validationId,
+        fastLayer.processedPacket.packetId,
       ]),
       modelReviewed: false,
       now,
@@ -1958,6 +2106,7 @@ export async function runNextMailWakeRequest(input: {
         decision.decisionId,
         fastLayer.immersionState.immersionStateId,
         fastLayer.predictionValidation.validationId,
+        fastLayer.processedPacket.packetId,
       ]),
       skippedReason: "fast_layer_wait_for_next_summary",
       createdAt: now,
@@ -1979,6 +2128,7 @@ export async function runNextMailWakeRequest(input: {
       priorNarrativeState: latestNarrativeState,
       immersionState: fastLayer.immersionState,
       predictionValidation: fastLayer.predictionValidation,
+      processedPacket: fastLayer.processedPacket,
       slowAskRan: false,
       decisionIds: [decision.decisionId],
       budgetState: budgetReceipt.budgetState,
@@ -2055,6 +2205,7 @@ export async function runNextMailWakeRequest(input: {
     latestNarrativeState,
     latestImmersionState: fastLayer.immersionState,
     predictionValidation: fastLayer.predictionValidation,
+    processedPacket: fastLayer.processedPacket,
     taskQueueSnapshot,
     conversationContextPack,
     heldCallouts,
@@ -2227,6 +2378,7 @@ export async function runNextMailWakeRequest(input: {
       priorNarrativeState: latestNarrativeState,
       immersionState: fastLayer.immersionState,
       predictionValidation: fastLayer.predictionValidation,
+      processedPacket: fastLayer.processedPacket,
       slowAskRan: true,
       decisionIds: completed?.decisionIds ?? decisionIds,
       budgetState: budgetReceipt.budgetState,
@@ -2234,6 +2386,7 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: uniqueStrings([
         ...(budgetReceipt.wakeResult.evidenceRefs ?? completed?.evidenceRefs ?? evidenceRefs),
         budgetReceipt.budgetState.budgetStateId,
+        fastLayer.processedPacket.packetId,
         ...voiceReceipts.flatMap((receipt) => receipt.evidenceRefs),
       ]),
       createdAt: budgetReceipt.wakeResult.createdAt,
@@ -2271,6 +2424,7 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: uniqueStrings([
         ...budgetReceipt.wakeResult.evidenceRefs,
         budgetReceipt.budgetState.budgetStateId,
+        fastLayer.processedPacket.packetId,
         ...transcriptEntries.map((entry) => entry.entryId),
         consolidation.task?.taskId,
       ]),

@@ -187,6 +187,8 @@ export type StagePlayLiveSourceCurrentStateV1 = {
   whatAskCanSafelySay: string[];
   limitations: string[];
   nextUsefulTool?:
+    | "live_env.process_live_source_mail"
+    | "live_env.read_processed_live_source_mail"
     | "live_env.read_live_source_mail"
     | "live_env.record_live_source_mail_decision"
     | "live_env.query_live_source_quality"

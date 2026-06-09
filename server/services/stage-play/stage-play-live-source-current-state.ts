@@ -440,7 +440,7 @@ export function summarizeStagePlayLiveSourceCurrentState(input: {
   ]);
   const nextUsefulTool =
     quality.backlog.unreadMailCount > 0
-      ? "live_env.read_live_source_mail"
+      ? "live_env.read_processed_live_source_mail"
       : activeWatchJobs.length === 0
         ? "live_env.configure_live_source_watch_job"
         : quality.quality === "stale" || quality.quality === "degraded"

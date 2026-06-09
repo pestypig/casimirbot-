@@ -19,6 +19,7 @@ import type {
   StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
@@ -119,6 +120,16 @@ import {
 import {
   validateStagePlayLiveSourcePredictionFromMail,
 } from "../stage-play/stage-play-live-source-prediction-validator";
+import {
+  buildStagePlayProcessedMailPacket,
+} from "../stage-play/stage-play-processed-mail-packet";
+import {
+  getActiveStagePlayMicroReasonerPromptForRole,
+  listStagePlayMicroReasonerPrompts,
+  listStagePlayMicroReasonerRuns,
+  listStagePlayProcessedMailPackets,
+  recordStagePlayMicroReasonerPrompt,
+} from "../stage-play/stage-play-processed-mail-packet-store";
 import {
   listStagePlayLiveSourceMailWakeRequests,
 } from "../stage-play/stage-play-live-source-mail-wake-store";
@@ -1127,6 +1138,148 @@ const readCheckpointRequestReason = (value: unknown): StagePlayCheckpointRequest
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
 
+const processLiveSourceMailItemsForTool = (input: {
+  args: Record<string, unknown>;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  sourceKind?: string | null;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+}): {
+  activePolicy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  activeProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
+  priorImmersionState: StagePlayLiveSourceImmersionStateV1 | null;
+  immersionState: StagePlayLiveSourceImmersionStateV1;
+  predictionValidation: ReturnType<typeof validateStagePlayLiveSourcePredictionFromMail>;
+  processedPacket: StagePlayProcessedMailPacketV1;
+} | null => {
+  if (input.mailItems.length === 0) return null;
+  const { activeJob, activePolicy, jobId } = resolveActiveWatchJobAndPolicy({
+    args: input.args,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId ?? input.mailItems[0]?.sourceId ?? null,
+  });
+  const priorImmersionState = getLatestStagePlayLiveSourceImmersionState({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId,
+    policyId: activePolicy?.policyId ?? null,
+    sourceId: input.sourceId ?? input.mailItems[0]?.sourceId ?? null,
+  }) ?? null;
+  const activeProfile = resolveActiveInterpreterProfile({
+    args: input.args,
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId,
+    policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+    sourceKind: input.sourceKind ?? input.mailItems[0]?.sourceKind ?? null,
+  });
+  const delta = extractStagePlayLiveSourceDelta({
+    latestMailItems: input.mailItems,
+    priorImmersionState,
+    activeProfile,
+  });
+  const predictionValidation = validateStagePlayLiveSourcePredictionFromMail({
+    jobId,
+    priorImmersionState,
+    latestMailItems: input.mailItems,
+    delta,
+  });
+  const prediction = buildImmersionPrediction({
+    args: input.args,
+    jobId,
+    mailItems: input.mailItems,
+    delta,
+  });
+  const evidenceRefs = uniqueStrings([
+    activeJob?.jobId,
+    activePolicy?.policyId,
+    activeProfile?.profileId,
+    priorImmersionState?.immersionStateId,
+    predictionValidation.validationId,
+    ...input.mailItems.map((item) => item.mailId),
+    ...input.mailItems.flatMap((item) => item.evidenceRefs),
+    ...input.mailItems.flatMap((item) => [item.sourceRefs.frameRef, item.sourceRefs.evidenceRef, item.sourceRefs.observationRef]),
+  ]);
+  const causalTrace = mergeLiveSourceCausalTraces([
+    priorImmersionState?.causalTrace,
+    ...input.mailItems.map((item) => item.causalTrace),
+    activeProfile?.causalTrace,
+  ], {
+    parentRefs: uniqueStrings([
+      priorImmersionState?.immersionStateId,
+      ...input.mailItems.map((item) => item.mailId),
+      activePolicy?.policyId,
+      activeProfile?.profileId,
+    ]),
+    causedBy: input.mailItems.map((item) => item.mailId),
+    sourceIds: input.mailItems.map((item) => item.sourceId),
+    jobId,
+    policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+    profileId: activeProfile?.profileId ?? priorImmersionState?.profileId ?? null,
+    evidenceRefs,
+  });
+  const immersionState = recordStagePlayLiveSourceImmersionState({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId,
+    policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+    profileId: activeProfile?.profileId ?? priorImmersionState?.profileId ?? null,
+    sourceIds: uniqueStrings([
+      input.sourceId,
+      ...input.mailItems.map((item) => item.sourceId),
+      ...(activeJob?.sourceIds ?? []),
+      ...(activePolicy?.sourceIds ?? []),
+      ...(priorImmersionState?.sourceIds ?? []),
+    ]),
+    latestMailIds: input.mailItems.map((item) => item.mailId),
+    latestEvidenceRefs: uniqueStrings([
+      ...input.mailItems.flatMap((item) => item.evidenceRefs),
+      ...input.mailItems.flatMap((item) => [item.sourceRefs.frameRef, item.sourceRefs.evidenceRef, item.sourceRefs.observationRef]),
+    ]),
+    sourceIdentity: delta.sourceIdentity,
+    stableFacts: delta.stableFacts,
+    currentSceneFacts: delta.currentSceneFacts,
+    changedFacts: delta.changedFacts,
+    uncertainties: delta.uncertainties,
+    currentActivity: delta.currentActivity,
+    salience: delta.salience,
+    prediction,
+    lastValidation: {
+      validationId: predictionValidation.validationId,
+      priorPredictionId: predictionValidation.priorPredictionId,
+      result: predictionValidation.result,
+      evidenceSummary: predictionValidation.newSignals.slice(0, 6).join("; ") || "No validation signals were available.",
+    },
+    evidenceRefs,
+    causalTrace,
+  });
+  const { packet } = buildStagePlayProcessedMailPacket({
+    jobId,
+    sourceId: input.sourceId ?? input.mailItems[0]?.sourceId ?? "unknown_source",
+    mailItems: input.mailItems,
+    priorImmersionState,
+    immersionState,
+    predictionValidation,
+    activeProfile,
+    causalTrace,
+  });
+  return {
+    activePolicy,
+    activeProfile,
+    priorImmersionState,
+    immersionState,
+    predictionValidation,
+    processedPacket: packet,
+  };
+};
+
 const collectStagePlayGraphSourceRefs = (graph: StagePlayBadgeGraphV1): string[] =>
   uniqueStrings([
     ...(graph.sourceWindow.latestSourceDescriptorRefs ?? []),
@@ -1951,6 +2104,254 @@ export function executeLiveEnvironmentTool(
             ]
           : []),
       ],
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.query_micro_reasoner_prompts" ||
+    input.tool_name === "live_env.update_micro_reasoner_prompt" ||
+    input.tool_name === "live_env.test_micro_reasoner_prompt"
+  ) {
+    const role = readString(args.role) as any;
+    const prompts = listStagePlayMicroReasonerPrompts({
+      active: input.tool_name === "live_env.query_micro_reasoner_prompts" ? true : undefined,
+      role,
+      limit: readNumber(args.limit, 20),
+    });
+    if (input.tool_name === "live_env.update_micro_reasoner_prompt") {
+      const existingPrompt = (readString(args.prompt_id) ?? readString(args.promptId))
+        ? prompts.find((prompt) => prompt.promptId === (readString(args.prompt_id) ?? readString(args.promptId))) ?? null
+        : role
+          ? getActiveStagePlayMicroReasonerPromptForRole(role)
+          : null;
+      const template = readString(args.template);
+      if (!existingPrompt || !template) {
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: "Micro-reasoner prompt update requires an existing prompt role/id and a replacement template.",
+          observation: {
+            schema: "stage_play_micro_reasoner_prompt_update_result/v1",
+            updated: false,
+            reason: !existingPrompt ? "prompt_not_found" : "missing_template",
+            prompts,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: prompts.map((prompt) => prompt.promptId),
+        });
+      }
+      const now = new Date().toISOString();
+      const forked = args.activate === false || args.active === false
+        ? null
+        : recordStagePlayMicroReasonerPrompt({
+            ...existingPrompt,
+            promptId: `stage_play_micro_reasoner_prompt:${existingPrompt.role}:v${existingPrompt.version + 1}:${hashShort([template, now])}`,
+            version: existingPrompt.version + 1,
+            template,
+            title: readString(args.title) ?? existingPrompt.title,
+            active: true,
+            updatedAt: now,
+            createdAt: now,
+          });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: Boolean(forked),
+        summary: forked
+          ? `Activated micro-reasoner prompt ${forked.title} v${forked.version}.`
+          : "Prompt update was not activated.",
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_update_result/v1",
+          updated: Boolean(forked),
+          prompt: forked,
+          previousPrompt: existingPrompt,
+          previous_prompt: existingPrompt,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([forked?.promptId, existingPrompt.promptId]),
+      });
+    }
+    if (input.tool_name === "live_env.test_micro_reasoner_prompt") {
+      const scope = resolveLiveSourceToolScope({
+        args,
+        threadId: input.thread_id,
+        effectiveThreadId,
+        roomId,
+        environmentThreadId: environment?.thread_id ?? null,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        explicitSourceId,
+      });
+      const mailItems = resolveImmersionMailItems({
+        args,
+        scopedInput: scope.scopedInput,
+        roomId,
+        environmentId: environment?.environment_id ?? input.environment_id ?? null,
+        sourceId: scope.sourceId,
+        sourceKind: scope.sourceKind,
+        defaultLimit: readNumber(args.limit, 5),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: true,
+        summary: `Prepared prompt test context for ${mailItems.length} recent mail item(s); no prompt was activated.`,
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_test_result/v1",
+          prompt: role ? getActiveStagePlayMicroReasonerPromptForRole(role) : prompts.at(-1) ?? null,
+          mailItems,
+          mail_items: mailItems,
+          activated: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([
+          ...(role ? [getActiveStagePlayMicroReasonerPromptForRole(role)?.promptId] : prompts.map((prompt) => prompt.promptId)),
+          ...mailItems.map((item) => item.mailId),
+          ...mailItems.flatMap((item) => item.evidenceRefs),
+        ]),
+      });
+    }
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Found ${prompts.length} active micro-reasoner prompt(s).`,
+      observation: {
+        schema: "stage_play_micro_reasoner_prompt_query_result/v1",
+        prompts,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: prompts.map((prompt) => prompt.promptId),
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.process_live_source_mail" ||
+    input.tool_name === "live_env.read_processed_live_source_mail"
+  ) {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const mailItems = resolveImmersionMailItems({
+      args,
+      scopedInput: {
+        ...scope.scopedInput,
+        environment_id: environmentId,
+      },
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      defaultLimit: 12,
+    });
+    const existingPackets = listStagePlayProcessedMailPackets({
+      sourceId: scope.sourceId,
+      limit: 50,
+    }).filter((packet) =>
+      packet.mailIds.some((mailId) => mailItems.some((item) => item.mailId === mailId))
+    );
+    const coveredMailIds = new Set(existingPackets.flatMap((packet) => packet.mailIds));
+    const missingRawMailItems = mailItems.filter((item) => !coveredMailIds.has(item.mailId));
+    const shouldProcess =
+      input.tool_name === "live_env.process_live_source_mail" ||
+      missingRawMailItems.length > 0;
+    const generated = shouldProcess
+      ? processLiveSourceMailItemsForTool({
+          args,
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          environmentId,
+          sourceId: scope.sourceId ?? mailItems[0]?.sourceId ?? null,
+          sourceKind: scope.sourceKind ?? mailItems[0]?.sourceKind ?? null,
+          mailItems,
+        })
+      : null;
+    const packets = uniqueStrings([
+      ...existingPackets.map((packet) => packet.packetId),
+      generated?.processedPacket.packetId,
+    ])
+      .map((packetId) =>
+        [generated?.processedPacket, ...existingPackets].find((packet) => packet?.packetId === packetId) ?? null
+      )
+      .filter((packet): packet is StagePlayProcessedMailPacketV1 => Boolean(packet));
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId: scope.sourceId,
+      limit: 100,
+    }).filter((run) =>
+      packets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
+    const missingRawMailIds = mailItems
+      .filter((item) => !packets.some((packet) => packet.mailIds.includes(item.mailId)))
+      .map((item) => item.mailId);
+    const resolutionStateSummary = packets.length > 0
+      ? packets.map((packet) => `${packet.packetId}: ${packet.resolutionState}; ${packet.recommendedNext}; ${packet.salience.level}`).join(" | ")
+      : "No processed packets are available yet.";
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: packets.length > 0,
+      summary: packets.length > 0
+        ? `Read ${packets.length} processed live-source packet(s); ${missingRawMailIds.length} raw mail item(s) still missing packet coverage.`
+        : "No processed live-source packets were available; raw mail fallback may be required.",
+      observation: {
+        schema: "stage_play_processed_live_source_mail_read_result/v1",
+        packets,
+        missingRawMailIds,
+        missing_raw_mail_ids: missingRawMailIds,
+        resolutionStateSummary,
+        resolution_state_summary: resolutionStateSummary,
+        microReasonerRuns,
+        micro_reasoner_runs: microReasonerRuns,
+        microReasonerRunRefs: uniqueStrings(microReasonerRuns.map((run) => run.runId)),
+        micro_reasoner_run_refs: uniqueStrings(microReasonerRuns.map((run) => run.runId)),
+        processedPacketRefs: packets.map((packet) => packet.packetId),
+        processed_packet_refs: packets.map((packet) => packet.packetId),
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution: scope.mailboxThreadResolution,
+        mailbox_thread_resolution: scope.mailboxThreadResolution,
+        fallbackTool: missingRawMailIds.length > 0 ? "live_env.read_live_source_mail" : null,
+        fallback_tool: missingRawMailIds.length > 0 ? "live_env.read_live_source_mail" : null,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([
+        scope.mailboxThreadResolution.mailboxThreadId,
+        ...packets.flatMap((packet) => packet.evidenceRefs),
+        ...microReasonerRuns.map((run) => run.runId),
+        ...mailItems.map((item) => item.mailId),
+      ]),
     });
   }
 

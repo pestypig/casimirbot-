@@ -53,6 +53,11 @@ import {
   listStagePlayLiveSourceInterpreterProfiles,
 } from "../../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import {
+  listStagePlayMicroReasonerPrompts,
+  listStagePlayMicroReasonerRuns,
+  listStagePlayProcessedMailPackets,
+} from "../../services/stage-play/stage-play-processed-mail-packet-store";
+import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
@@ -738,6 +743,20 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       status,
       limit,
     });
+    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const processedMailPackets = listStagePlayProcessedMailPackets({
+      sourceId,
+      limit: 50,
+    }).filter((packet) =>
+      packet.mailIds.some((mailId) => mailIds.has(mailId))
+    );
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId,
+      limit: 100,
+    }).filter((run) =>
+      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
+      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -767,10 +786,14 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       interpreterProfileComparisons: listStagePlayLiveSourceInterpreterProfileComparisons({
         limit: 50,
       }).filter((comparison) =>
-        comparison.mailIds.some((mailId) =>
-          mailItems.some((item) => item.mailId === mailId)
-        )
+        comparison.mailIds.some((mailId) => mailIds.has(mailId))
       ),
+      microReasonerPrompts: listStagePlayMicroReasonerPrompts({
+        active: true,
+        limit: 20,
+      }),
+      microReasonerRuns,
+      processedMailPackets,
       decisions,
       narrativeStates: listStagePlayLiveSourceNarrativeStates({
         threadId,

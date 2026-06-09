@@ -243,7 +243,12 @@ export function buildAskEvidenceTargetArbitration(input: {
         "stage_play_live_source_narrative_state",
         "typed_failure",
       ],
-      capabilityKeys: ["live_env.read_live_source_mail", "live_env.record_live_source_mail_decision"],
+      capabilityKeys: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ],
       terminalProductConstraints: [
         "live_environment_tool_observation",
         "stage_play_live_source_mail_read_result",

@@ -146,7 +146,16 @@ const requestedActionFor = (
       if (/\b(?:what\s+do\s+you\s+know\s+right\s+now|current\s+(?:live\s+source|source|mailbox|watch|observation)\s+state|summari[sz]e\s+(?:the\s+)?(?:current\s+)?live\s+source\s+state)\b/.test(prompt)) {
         return "summarize_live_source_current_state";
       }
+      if (/\b(?:raw\s+mail|read\s+raw|unprocessed|debug\s+mail|read_live_source_mail)\b/.test(prompt)) {
+        return "read_live_source_mail";
+      }
+      if (/\b(?:process(?:ed)?\s+(?:live\s+source\s+)?mail|packet|interpret|predict|watch\s+next|what\s+changed|what\s+is\s+happening|voice\s+candidate|callout)\b/.test(prompt)) {
+        return "read_processed_live_source_mail";
+      }
       return "read_live_source_mail";
+    }
+    if (/\b(?:processed\s+(?:live\s+source\s+)?mail|read_processed_live_source_mail|process_live_source_mail)\b/.test(prompt)) {
+      return "read_processed_live_source_mail";
     }
     if (/\b(?:live\s*source\s*mailbox|live\s*source\s*mail|source\s*mail|mailbox|visual\s*summary\s*mail|read_live_source_mail)\b/.test(prompt)) {
       return "read_live_source_mail";

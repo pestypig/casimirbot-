@@ -258,7 +258,7 @@ describe("live-source current state and source quality", () => {
     expect(currentState.latestMailItems[0].preview).toMatch(/Minecraft-like scene/);
     expect(currentState.quality.freshness).toBe("fresh");
     expect(currentState.whatAskCanSafelySay.join(" ")).toMatch(/Latest compact live-source summary is fresh/);
-    expect(currentState.nextUsefulTool).toBe("live_env.read_live_source_mail");
+    expect(currentState.nextUsefulTool).toBe("live_env.read_processed_live_source_mail");
     expect(currentState.causalTrace?.producedRefs).toContain(currentState.currentStateId);
   });
 

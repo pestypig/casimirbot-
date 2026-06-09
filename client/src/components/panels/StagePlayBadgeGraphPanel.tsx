@@ -11,6 +11,10 @@ import type {
   StagePlayLiveSourceJobStateV1,
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayMicroReasonerPromptV1,
+  StagePlayMicroReasonerRoleV1,
+  StagePlayMicroReasonerRunV1,
+  StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceNarrativeStateV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -230,6 +234,9 @@ type StagePlayLiveSourceMailListResponse = {
   watchJobPolicies?: StagePlayLiveSourceWatchJobPolicyV1[];
   interpreterProfiles?: StagePlayLiveSourceInterpreterProfileV1[];
   interpreterProfileComparisons?: StagePlayLiveSourceInterpreterProfileComparisonV1[];
+  microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
+  processedMailPackets?: StagePlayProcessedMailPacketV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
   narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
@@ -272,9 +279,10 @@ type StagePlayMailLoopNode = {
   outputPreview: string;
   blockedUntil?: string | null;
   inspector?: {
-    kind: "interpreter_profile";
+    kind: "interpreter_profile" | "micro_reasoner_prompt";
     title: string;
-    profileId: string;
+    profileId?: string;
+    promptId?: string;
     linkedNoteId?: string | null;
     linkedNoteTitle?: string | null;
     body: string;
@@ -1315,6 +1323,149 @@ function resolveActiveInterpreterProfile(input: {
   return { activeProfile: null, reason: "no_profile" };
 }
 
+const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
+  title: string;
+  subtitle: string;
+  missingPreview: string;
+}> = {
+  claim_extractor: {
+    title: "Claim Extractor",
+    subtitle: "summary -> claimlets",
+    missingPreview: "waiting for claim extraction",
+  },
+  observation_classifier: {
+    title: "Observed / Inferred Classifier",
+    subtitle: "stable vs changed facts",
+    missingPreview: "waiting for classified observations",
+  },
+  profile_comparator: {
+    title: "Interpreter Profile Comparator",
+    subtitle: "profile lens over facts",
+    missingPreview: "waiting for profile comparison",
+  },
+  delta_extractor: {
+    title: "Delta Extractor",
+    subtitle: "prior state -> current delta",
+    missingPreview: "waiting for delta extraction",
+  },
+  prediction_validator: {
+    title: "Prediction Validator",
+    subtitle: "prior prediction check",
+    missingPreview: "waiting for prediction validation",
+  },
+  salience_scorer: {
+    title: "Salience / Voice Candidate",
+    subtitle: "wake + voice scoring",
+    missingPreview: "waiting for salience score",
+  },
+  packet_composer: {
+    title: "Processed Packet",
+    subtitle: "structured packet composer",
+    missingPreview: "waiting for processed packet",
+  },
+};
+
+const latestMicroReasonerRunForRole = (
+  runs: StagePlayMicroReasonerRunV1[],
+  role: StagePlayMicroReasonerRoleV1,
+  mailIds: string[],
+): StagePlayMicroReasonerRunV1 | null => {
+  const mailIdSet = new Set(mailIds);
+  return runs
+    .filter((run) => run.role === role)
+    .filter((run) => mailIdSet.size === 0 || run.mailIds.some((mailId) => mailIdSet.has(mailId)))
+    .at(-1) ?? null;
+};
+
+const activeMicroReasonerPromptForRole = (
+  prompts: StagePlayMicroReasonerPromptV1[],
+  role: StagePlayMicroReasonerRoleV1,
+): StagePlayMicroReasonerPromptV1 | null =>
+  prompts.filter((prompt) => prompt.active && prompt.role === role).at(-1) ??
+  prompts.filter((prompt) => prompt.role === role).at(-1) ??
+  null;
+
+const makeMicroReasonerNode = (input: {
+  role: StagePlayMicroReasonerRoleV1;
+  run: StagePlayMicroReasonerRunV1 | null;
+  prompt: StagePlayMicroReasonerPromptV1 | null;
+  packet: StagePlayProcessedMailPacketV1 | null;
+  fallbackInputRefs: string[];
+  fallbackInputPreview: string;
+  fallbackOutputPreview?: string | null;
+  edgeLabel: string;
+  edgeTone: "connected" | "pending" | "blocked";
+}): StagePlayMailLoopNode => {
+  const display = MICRO_REASONER_DISPLAY[input.role];
+  const modelLabel = input.run?.modelUsed ?? input.prompt?.modelPreference ?? "not run";
+  const latencyLabel = input.run?.latencyMs == null ? "pending" : `${input.run.latencyMs}ms`;
+  const promptLabel = input.prompt
+    ? `${input.prompt.title} v${input.prompt.version}`
+    : "prompt missing";
+  const status = input.run?.status ?? (input.prompt ? "ready" : "missing");
+  return {
+    id: `observer_mail_loop:micro_reasoner:${input.role}`,
+    title: display.title,
+    subtitle: display.subtitle,
+    status,
+    preview: input.run?.outputPreview ?? input.fallbackOutputPreview ?? display.missingPreview,
+    statusChips: [
+      input.prompt?.modelPreference ?? null,
+      input.run?.latencyMs != null ? latencyLabel : null,
+    ].filter((entry): entry is string => Boolean(entry)),
+    payloadRows: [
+      {
+        label: "Prompt used",
+        value: promptLabel,
+        tone: input.prompt ? "good" : "blocked",
+      },
+      {
+        label: "Latest input",
+        value: input.run?.inputPreview ?? input.fallbackInputPreview,
+        tone: input.run ? "good" : "warn",
+      },
+      {
+        label: "Latest output",
+        value: input.run?.outputPreview ?? input.fallbackOutputPreview ?? "No run output yet.",
+        tone: input.run ? "good" : "warn",
+      },
+      {
+        label: "Model/tool",
+        value: `${modelLabel} | ${latencyLabel}`,
+      },
+    ],
+    edgeToNext: {
+      label: input.edgeLabel,
+      tone: input.edgeTone,
+    },
+    inputLabel: "Input",
+    inputRefs: input.run?.inputRefs ?? input.fallbackInputRefs,
+    inputPreview: input.run?.inputPreview ?? input.fallbackInputPreview,
+    transformLabel: input.prompt
+      ? `${input.prompt.title} v${input.prompt.version} -> ${input.prompt.outputSchemaName}`
+      : `${display.title} prompt missing`,
+    outputLabel: "Output",
+    outputRefs: input.run?.outputRefs ?? (input.role === "packet_composer" && input.packet ? [input.packet.packetId] : []),
+    outputPreview: input.run?.outputPreview ?? input.fallbackOutputPreview ?? display.missingPreview,
+    inspector: input.prompt ? {
+      kind: "micro_reasoner_prompt",
+      title: input.prompt.title,
+      promptId: input.prompt.promptId,
+      linkedNoteId: input.prompt.linkedNoteId,
+      body: [
+        `Role: ${input.prompt.role}`,
+        `Version: ${input.prompt.version}`,
+        `Active: ${input.prompt.active}`,
+        `Model preference: ${input.prompt.modelPreference}`,
+        `Input schema: ${input.prompt.inputSchemaName}`,
+        `Output schema: ${input.prompt.outputSchemaName}`,
+        "",
+        input.prompt.template,
+      ].join("\n"),
+    } : null,
+  };
+};
+
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
@@ -1328,6 +1479,9 @@ function buildObserverMailLoopNodes(input: {
   const wakeResults = mailbox?.wakeResults ?? [];
   const interpreterProfiles = mailbox?.interpreterProfiles ?? [];
   const interpreterProfileComparisons = mailbox?.interpreterProfileComparisons ?? [];
+  const microReasonerPrompts = mailbox?.microReasonerPrompts ?? [];
+  const microReasonerRuns = mailbox?.microReasonerRuns ?? [];
+  const processedMailPackets = mailbox?.processedMailPackets ?? [];
   const mailboxThreadId = mailbox?.mailboxThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
   const requestedThreadId = mailbox?.requestedThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
@@ -1411,6 +1565,19 @@ function buildObserverMailLoopNodes(input: {
       .at(-1) ??
     interpreterProfileComparisons.at(-1) ??
     null;
+  const latestProcessedPacket =
+    processedMailPackets
+      .filter((packet) =>
+        visualMail?.mailId ? packet.mailIds.includes(visualMail.mailId) : true
+      )
+      .at(-1) ??
+    processedMailPackets.at(-1) ??
+    null;
+  const processedPacketMailIds = latestProcessedPacket?.mailIds ?? (visualMail?.mailId ? [visualMail.mailId] : []);
+  const microRun = (role: StagePlayMicroReasonerRoleV1) =>
+    latestMicroReasonerRunForRole(microReasonerRuns, role, processedPacketMailIds);
+  const microPrompt = (role: StagePlayMicroReasonerRoleV1) =>
+    activeMicroReasonerPromptForRole(microReasonerPrompts, role);
   const observerOutputRefs = uniqueSorted([
     mailboxThreadId,
     visualSource?.sourceId ?? "",
@@ -1548,7 +1715,7 @@ function buildObserverMailLoopNodes(input: {
   return [
     {
       id: "observer_mail_loop:observer",
-      title: "Observer",
+      title: "Visual Source",
       subtitle: "source registry",
       status: visualSource?.status ?? "waiting",
       preview: visualSource
@@ -1599,7 +1766,7 @@ function buildObserverMailLoopNodes(input: {
     },
     {
       id: "observer_mail_loop:visual_mail",
-      title: "Mailbox",
+      title: "Raw Mail",
       subtitle: "compact observation delivery",
       status: visualMail?.status ?? "missing",
       preview: visualMail
@@ -1642,6 +1809,30 @@ function buildObserverMailLoopNodes(input: {
         ? `summary preview: ${visualMail.summary.preview}; status ${visualMail.status}`
         : "summary preview: none yet; status missing",
     },
+    makeMicroReasonerNode({
+      role: "claim_extractor",
+      run: microRun("claim_extractor"),
+      prompt: microPrompt("claim_extractor"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: visualMail ? [visualMail.mailId, ...visualMail.evidenceRefs] : [],
+      fallbackInputPreview: visualMail?.summary.preview ?? "compact visual-summary mail pending",
+      fallbackOutputPreview: latestProcessedPacket?.observedFacts.slice(0, 3).join(" | ") ?? null,
+      edgeLabel: microRun("observation_classifier") ? "classified" : "needs classifier",
+      edgeTone: microRun("observation_classifier") ? "connected" : visualMail ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "observation_classifier",
+      run: microRun("observation_classifier"),
+      prompt: microPrompt("observation_classifier"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: microRun("claim_extractor")?.outputRefs ?? [],
+      fallbackInputPreview: microRun("claim_extractor")?.outputPreview ?? "claimlets pending",
+      fallbackOutputPreview: latestProcessedPacket
+        ? `stable ${latestProcessedPacket.stableFactsUsed.slice(0, 2).join(" | ") || "none"}; changed ${latestProcessedPacket.changedFacts.slice(0, 2).join(" | ") || "none"}`
+        : null,
+      edgeLabel: activeInterpreterProfile ? "profile lens" : "profile optional",
+      edgeTone: activeInterpreterProfile ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
     {
       id: "observer_mail_loop:interpreter_profile",
       title: "Interpreter Profile",
@@ -1732,7 +1923,7 @@ function buildObserverMailLoopNodes(input: {
     },
     {
       id: "observer_mail_loop:profile_comparison",
-      title: "Profile Comparison",
+      title: "Interpreter Profile Comparator",
       subtitle: "profile lens over mail",
       status: latestProfileComparison?.recommendedDecision ?? "pending",
       preview: latestProfileComparison
@@ -1748,17 +1939,31 @@ function buildObserverMailLoopNodes(input: {
         : ["evidence only"],
       payloadRows: [
         {
+          label: "Prompt used",
+          value: microPrompt("profile_comparator")
+            ? `${microPrompt("profile_comparator")?.title} v${microPrompt("profile_comparator")?.version}`
+            : "prompt missing",
+          tone: microPrompt("profile_comparator") ? "good" : "blocked",
+        },
+        {
           label: "Observed",
-          value: latestProfileComparison?.observedFacts.slice(0, 2).join("; ") || visualMail?.summary.preview || "No comparison input yet.",
+          value: microRun("profile_comparator")?.inputPreview ||
+            latestProfileComparison?.observedFacts.slice(0, 2).join("; ") ||
+            visualMail?.summary.preview ||
+            "No comparison input yet.",
           tone: latestProfileComparison ? "good" : visualMail ? "warn" : "blocked",
         },
         {
-          label: "Matched",
-          value: latestProfileComparison?.matchedCriteria.join(", ") || "none",
+          label: "Latest output",
+          value: microRun("profile_comparator")?.outputPreview ||
+            latestProfileComparison?.matchedCriteria.join(", ") ||
+            "none",
         },
         {
-          label: "Recommended",
-          value: latestProfileComparison?.recommendedDecision ?? "pending",
+          label: "Model/tool",
+          value: `${microRun("profile_comparator")?.modelUsed ?? microPrompt("profile_comparator")?.modelPreference ?? "not run"} | ${
+            microRun("profile_comparator")?.latencyMs == null ? "pending" : `${microRun("profile_comparator")?.latencyMs}ms`
+          } | ${latestProfileComparison?.recommendedDecision ?? "pending"}`,
           tone: latestProfileComparison ? "good" : "warn",
         },
       ],
@@ -1780,6 +1985,70 @@ function buildObserverMailLoopNodes(input: {
           ].join(" ")
         : "No profile comparison receipt yet.",
     },
+    makeMicroReasonerNode({
+      role: "delta_extractor",
+      run: microRun("delta_extractor"),
+      prompt: microPrompt("delta_extractor"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: uniqueSorted([
+        latestNarrativeState?.narrativeStateId ?? "",
+        ...(visualMail ? [visualMail.mailId] : []),
+      ].filter(Boolean)),
+      fallbackInputPreview: latestNarrativeState?.runningStorySummary ?? visualMail?.summary.preview ?? "prior state + mail pending",
+      fallbackOutputPreview: latestProcessedPacket?.changedFacts.join(" | ") ?? null,
+      edgeLabel: microRun("prediction_validator") ? "prediction checked" : "needs prediction check",
+      edgeTone: microRun("prediction_validator") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "prediction_validator",
+      run: microRun("prediction_validator"),
+      prompt: microPrompt("prediction_validator"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: uniqueSorted([
+        latestProcessedPacket?.priorPredictionRef ?? "",
+        ...(latestProcessedPacket?.mailIds ?? []),
+      ].filter(Boolean)),
+      fallbackInputPreview: latestProcessedPacket?.priorPredictionRef ?? "prior prediction pending",
+      fallbackOutputPreview: latestProcessedPacket?.predictionValidation
+        ? `${latestProcessedPacket.predictionValidation.result}; new ${latestProcessedPacket.predictionValidation.newSignals.join(", ") || "none"}`
+        : null,
+      edgeLabel: microRun("salience_scorer") ? "salience scored" : "needs salience",
+      edgeTone: microRun("salience_scorer") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "salience_scorer",
+      run: microRun("salience_scorer"),
+      prompt: microPrompt("salience_scorer"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: latestProcessedPacket ? [
+        ...latestProcessedPacket.changedFacts,
+        ...latestProcessedPacket.riskMatches,
+        ...latestProcessedPacket.voiceCalloutMatches,
+      ] : [],
+      fallbackInputPreview: latestProcessedPacket
+        ? `changed ${latestProcessedPacket.changedFacts.length}; voice matches ${latestProcessedPacket.voiceCalloutMatches.length}`
+        : "salience inputs pending",
+      fallbackOutputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.salience.level}; voice ${latestProcessedPacket.salience.voiceCandidate ? "candidate" : "no"}; recommended ${latestProcessedPacket.recommendedNext}`
+        : null,
+      edgeLabel: microRun("packet_composer") ? "packet ready" : "needs packet",
+      edgeTone: microRun("packet_composer") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "packet_composer",
+      run: microRun("packet_composer"),
+      prompt: microPrompt("packet_composer"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: latestProcessedPacket?.microReasonerRunRefs ?? [],
+      fallbackInputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.mailIds.length} mail; ${latestProcessedPacket.resolutionState}`
+        : "processed packet pending",
+      fallbackOutputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.recommendedNext}; ${latestProcessedPacket.resolutionState}; ${latestProcessedPacket.observedFacts.slice(0, 2).join(" | ")}`
+        : null,
+      edgeLabel: displayWake ? "Ask wake" : "decision needed",
+      edgeTone: displayWake ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
     {
       id: "observer_mail_loop:ask_wake",
       title: "Wake Ask",
@@ -1979,7 +2248,7 @@ function StagePlayObserverMailLoopCanvas({
       data-testid="stage-play-badge-graph-scrollport"
       data-stage-play-graph-mode="observer_mail_loop_v1"
     >
-      <div className="grid min-w-[1700px] grid-cols-[repeat(7,220px)] items-start gap-6">
+      <div className="grid min-w-[3120px] grid-cols-[repeat(13,220px)] items-start gap-6">
         {nodes.map((node) => (
           <div
             key={node.id}
@@ -2084,7 +2353,7 @@ function StagePlayObserverMailLoopCanvas({
           </div>
         ))}
       </div>
-      <div className="mt-4 grid min-w-[1700px] grid-cols-[repeat(7,220px)] gap-6 font-mono text-[10px] text-slate-500">
+      <div className="mt-4 grid min-w-[3120px] grid-cols-[repeat(13,220px)] gap-6 font-mono text-[10px] text-slate-500">
         {nodes.map((node, index) => (
           <div key={`${node.id}:edge`} className="flex items-center justify-center">
             {index < nodes.length - 1 ? (
@@ -2131,9 +2400,15 @@ function StagePlayObserverMailLoopCanvas({
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">Profile inspector</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-cyan-200">
+                {selectedInspectorNode.inspector.kind === "micro_reasoner_prompt"
+                  ? "Prompt inspector"
+                  : "Profile inspector"}
+              </div>
               <div className="mt-1 text-base font-semibold text-slate-50">{selectedInspectorNode.inspector.title}</div>
-              <div className="mt-1 font-mono text-[11px] text-slate-400">{selectedInspectorNode.inspector.profileId}</div>
+              <div className="mt-1 font-mono text-[11px] text-slate-400">
+                {selectedInspectorNode.inspector.promptId ?? selectedInspectorNode.inspector.profileId}
+              </div>
             </div>
           </div>
           <pre className="mt-3 whitespace-pre-wrap rounded border border-slate-800 bg-black/30 p-3 text-[11px] leading-relaxed text-slate-300">
@@ -2152,17 +2427,21 @@ function StagePlayObserverMailLoopCanvas({
               type="button"
               disabled
               className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 opacity-45"
-              title="Profile note compile route is not exposed in this panel yet."
+              title={selectedInspectorNode.inspector.kind === "micro_reasoner_prompt"
+                ? "Prompt edit/fork route is not exposed in this panel yet."
+                : "Profile note compile route is not exposed in this panel yet."}
             >
-              Compile from note
+              {selectedInspectorNode.inspector.kind === "micro_reasoner_prompt" ? "Edit / fork prompt" : "Compile from note"}
             </button>
             <button
               type="button"
               disabled
               className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-300 opacity-45"
-              title="Profile status route is not exposed in this panel yet."
+              title={selectedInspectorNode.inspector.kind === "micro_reasoner_prompt"
+                ? "Prompt test route is not exposed in this panel yet."
+                : "Profile status route is not exposed in this panel yet."}
             >
-              Pause / archive
+              {selectedInspectorNode.inspector.kind === "micro_reasoner_prompt" ? "Test latest mail" : "Pause / archive"}
             </button>
           </div>
         </div>
@@ -5638,7 +5917,7 @@ export default function StagePlayBadgeGraphPanel() {
             aria-label="Show observer mail loop"
             data-testid="stage-play-observer-mail-loop-toggle"
           >
-            Mail Loop
+            Processed Mail Loop
           </button>
           <button
             type="button"

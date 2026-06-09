@@ -58,6 +58,12 @@ import {
   recordStagePlayLiveSourceInterpreterProfile,
   resetStagePlayLiveSourceInterpreterProfileStoreForTest,
 } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
+import {
+  listStagePlayMicroReasonerPrompts,
+  listStagePlayMicroReasonerRuns,
+  getLatestStagePlayProcessedMailPacket,
+  resetStagePlayProcessedMailPacketStoreForTest,
+} from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
 import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../services/stage-play/stage-play-live-source-watch-policy-defaults";
 import {
@@ -83,6 +89,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceConversationStoreForTest();
   resetStagePlayHeldCalloutStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
+  resetStagePlayProcessedMailPacketStoreForTest();
 });
 
 const seedVisualEvidence = () => {
@@ -1259,11 +1266,13 @@ describe("Stage Play live-source mailbox", () => {
       createdAt: "2026-06-04T12:20:01.000Z",
     });
 
+    let daylightAskCalls = 0;
     await runNextMailWakeRequest({
       threadId,
       roomId,
       now: "2026-06-04T12:20:02.000Z",
       askTurnRunner: async ({ wakeRequest }) => {
+        daylightAskCalls += 1;
         const decision = recordLiveSourceMailDecisionForAsk({
           threadId,
           roomId,
@@ -1287,17 +1296,64 @@ describe("Stage Play live-source mailbox", () => {
         };
       },
     });
+    expect(daylightAskCalls).toBe(0);
 
-    const daylightRows = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:minecraft-daylight" })
+    const daylightRows = listStagePlayLiveSourceMailTranscriptEntries({ threadId })
+      .filter((entry) => entry.mailIds.includes(daylightMail.mailId))
       .map((entry) => entry.row);
     expect(daylightRows.map((row) => row.title)).toEqual(expect.arrayContaining([
       "Observation mail",
+      "Immersion state",
+      "Prediction validation",
+      "Processed mail packet",
       "Prediction check",
       "Immediate prediction",
       "Agent decision",
       "Loop state",
     ]));
+    const daylightPacket = getLatestStagePlayProcessedMailPacket({
+      jobId: policy.jobId,
+      sourceId,
+      mailId: daylightMail.mailId,
+    });
+    expect(daylightPacket).toMatchObject({
+      artifactId: "stage_play_processed_mail_packet",
+      context_role: "tool_evidence",
+      assistant_answer: false,
+      terminal_eligible: false,
+      recommendedNext: "record_interpretation",
+      salience: expect.objectContaining({
+        level: "low",
+        voiceCandidate: false,
+      }),
+    });
+    expect(daylightPacket?.microReasonerRunRefs.length).toBeGreaterThanOrEqual(6);
+    const defaultPrompts = listStagePlayMicroReasonerPrompts({ active: true });
+    expect(defaultPrompts.map((prompt) => prompt.role)).toEqual(expect.arrayContaining([
+      "claim_extractor",
+      "observation_classifier",
+      "profile_comparator",
+      "delta_extractor",
+      "prediction_validator",
+      "salience_scorer",
+      "packet_composer",
+    ]));
+    const daylightRuns = listStagePlayMicroReasonerRuns({
+      jobId: policy.jobId,
+      sourceId,
+      mailId: daylightMail.mailId,
+    });
+    expect(daylightRuns.map((run) => run.role)).toEqual(expect.arrayContaining([
+      "claim_extractor",
+      "observation_classifier",
+      "delta_extractor",
+      "prediction_validator",
+      "salience_scorer",
+      "packet_composer",
+    ]));
+    expect(daylightRuns.every((run) => run.promptId)).toBe(true);
     expect(daylightRows.find((row) => row.title === "Observation mail")?.body).toBe("Forest daylight scene; player visible.");
+    expect(daylightRows.find((row) => row.title === "Processed mail packet")?.body).toContain("processed_packet_ready");
     expect(daylightRows.find((row) => row.title === "Prediction check")?.body).toBe("No prior prediction.");
     expect(daylightRows.find((row) => row.title === "Immediate prediction")?.body).toContain("Likely next: gathering wood or scanning resources.");
     expect(daylightRows.find((row) => row.title === "Agent decision")?.body).toContain("wait_for_next_summary");
@@ -3372,11 +3428,13 @@ describe("Stage Play live-source mailbox", () => {
     });
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId }).find((entry) => entry.mailIds.includes(mail.mailId));
     expect(wake).toBeTruthy();
+    let wakePrompt = "";
     const result = await runNextMailWakeRequest({
       threadId,
       roomId,
       now: "2026-06-04T12:09:02.000Z",
-      askTurnRunner: async ({ wakeRequest }) => {
+      askTurnRunner: async ({ wakeRequest, prompt }) => {
+        wakePrompt = prompt;
         const decision = recordLiveSourceMailDecisionForAsk({
           threadId,
           roomId,
@@ -3420,6 +3478,29 @@ describe("Stage Play live-source mailbox", () => {
       status: "completed",
       askTurnId: "ask:wake-voice-allowed",
     });
+    expect(wakePrompt).toContain("Current task: voice_callout_candidate");
+    expect(wakePrompt).toContain("Voice candidate receipt:");
+    expect(wakePrompt).toContain("Processed mail packet:");
+    expect(wakePrompt).toContain("Use the processed mail packet as the primary compact evidence packet");
+    expect(wakePrompt).toContain("decision_required: choose request_voice_callout, draft_text_answer, or wait_for_next_summary");
+    expect(wakePrompt).toContain("Minecraft voice candidates include player on fire, hostile mob, lava, fall, low health");
+    expect(wakePrompt).toContain("Suppress voice for stable chest/inventory frames");
+    const packet = getLatestStagePlayProcessedMailPacket({
+      sourceId,
+      mailId: mail.mailId,
+    });
+    expect(packet).toMatchObject({
+      artifactId: "stage_play_processed_mail_packet",
+      context_role: "tool_evidence",
+      assistant_answer: false,
+      terminal_eligible: false,
+      recommendedNext: "request_voice_callout",
+      salience: expect.objectContaining({
+        voiceCandidate: true,
+      }),
+      resolutionState: "voice_candidate_prepared",
+    });
+    expect(packet?.observedFacts.join("\n")).toMatch(/hostile mob/i);
     const entries = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:wake-voice-allowed" });
     const rowKinds = entries.map((entry) => entry.row.rowKind);
     const decisionIndex = rowKinds.indexOf("agent_decision");
@@ -3431,5 +3512,6 @@ describe("Stage Play live-source mailbox", () => {
     expect(entries.find((entry) => entry.row.rowKind === "voice_tool_call")?.row.body).toMatch(/live_env\.request_interim_voice_callout/);
     expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/Interim voice callout accepted|queued for retry/i);
     expect(entries.find((entry) => entry.row.rowKind === "voice_receipt")?.row.body).toMatch(/helix_interim_voice_callout_receipt:/);
+    expect(entries.find((entry) => entry.row.rowKind === "processed_mail_packet")?.row.body).toContain("voice_candidate_prepared");
   });
 });

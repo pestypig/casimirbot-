@@ -10,6 +10,9 @@ export const STAGE_PLAY_LIVE_SOURCE_NARRATIVE_STATE_SCHEMA = "stage_play_live_so
 export const STAGE_PLAY_LIVE_SOURCE_IMMERSION_STATE_SCHEMA = "stage_play_live_source_immersion_state/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA =
   "stage_play_live_source_prediction_validation/v1" as const;
+export const STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA = "stage_play_micro_reasoner_prompt/v1" as const;
+export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
+export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
   "stage_play_live_source_watch_job_policy_config_result/v1" as const;
@@ -279,6 +282,126 @@ export type StagePlayLiveSourcePredictionValidationV1 = {
   salienceHint: StagePlayLiveSourceImmersionSalienceLevelV1;
   recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
   evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+};
+
+export type StagePlayMicroReasonerRoleV1 =
+  | "claim_extractor"
+  | "observation_classifier"
+  | "profile_comparator"
+  | "delta_extractor"
+  | "prediction_validator"
+  | "salience_scorer"
+  | "packet_composer";
+
+export type StagePlayMicroReasonerPromptV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt";
+  schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA;
+  promptId: string;
+  title: string;
+  role: StagePlayMicroReasonerRoleV1;
+  version: number;
+  active: boolean;
+  template: string;
+  inputSchemaName: string;
+  outputSchemaName: string;
+  modelPreference: "deterministic" | "small_fast_llm" | "main_llm" | "auto";
+  maxInputItems: number;
+  maxOutputTokens?: number | null;
+  linkedNoteId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_policy";
+};
+
+export type StagePlayMicroReasonerRunV1 = {
+  artifactId: "stage_play_micro_reasoner_run";
+  schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA;
+  runId: string;
+  promptId?: string | null;
+  role: StagePlayMicroReasonerRoleV1;
+  jobId: string;
+  sourceId: string;
+  mailIds: string[];
+  inputRefs: string[];
+  outputRefs: string[];
+  inputPreview: string;
+  outputPreview: string;
+  status: "queued" | "running" | "completed" | "failed" | "skipped";
+  modelUsed?: string | null;
+  latencyMs?: number | null;
+  tokenEstimateIn?: number | null;
+  tokenEstimateOut?: number | null;
+  error?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+  causalTrace?: LiveSourceCausalTraceV1;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+};
+
+export type StagePlayProcessedMailPacketResolutionStateV1 =
+  | "mail_received"
+  | "summary_split"
+  | "claims_extracted"
+  | "profile_compared"
+  | "immersion_state_updated"
+  | "prediction_validated"
+  | "processed_packet_ready"
+  | "ask_decision_needed"
+  | "ask_decision_recorded"
+  | "voice_candidate_prepared"
+  | "waiting_for_next_mail"
+  | "deferred_for_pressure"
+  | "compacted";
+
+export type StagePlayProcessedMailPacketV1 = {
+  artifactId: "stage_play_processed_mail_packet";
+  schemaVersion: typeof STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA;
+  packetId: string;
+  jobId: string;
+  sourceId: string;
+  mailIds: string[];
+  visualEvidenceRefs: string[];
+  observedFacts: string[];
+  inferredFacts: string[];
+  uncertainties: string[];
+  stableFactsUsed: string[];
+  changedFacts: string[];
+  sceneTags: string[];
+  activityTags: string[];
+  objectTags: string[];
+  profileRef?: string | null;
+  matchedCriteria: string[];
+  suppressedCriteria: string[];
+  riskMatches: string[];
+  opportunityMatches: string[];
+  voiceCalloutMatches: string[];
+  priorPredictionRef?: string | null;
+  predictionValidation?: {
+    result: StagePlayLiveSourceImmersionPredictionValidationResultV1;
+    supportedSignals: string[];
+    contradictedSignals: string[];
+    newSignals: string[];
+  } | null;
+  salience: {
+    level: StagePlayLiveSourceImmersionSalienceLevelV1;
+    reasons: string[];
+    voiceCandidate: boolean;
+    calloutDraft?: string | null;
+  };
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  watchNext: string[];
+  resolutionState: StagePlayProcessedMailPacketResolutionStateV1;
+  microReasonerRunRefs: string[];
+  evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;
   assistant_answer: false;
   terminal_eligible: false;
@@ -563,6 +686,8 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "budget_state"
     | "prediction_check"
     | "narrative_projection"
+    | "micro_reasoner_run"
+    | "processed_mail_packet"
     | "agent_decision"
     | "interpretation"
     | "prediction"
