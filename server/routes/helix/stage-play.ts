@@ -58,6 +58,14 @@ import {
   listStagePlayProcessedMailPackets,
 } from "../../services/stage-play/stage-play-processed-mail-packet-store";
 import {
+  applyStagePlayVisualObserverProfile,
+  ensureDefaultStagePlayVisualObserverProfiles,
+  getActiveStagePlayVisualObserverProfileForSource,
+  getStagePlayVisualObserverProfile,
+  listStagePlayVisualObserverProfiles,
+  recordStagePlayVisualObserverProfile,
+} from "../../services/stage-play/stage-play-visual-observer-profile-store";
+import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
@@ -281,6 +289,21 @@ helixStagePlayRouter.options("/live-source-mail/wake/cycle", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/live-source-mail/job", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/visual-observer-profile", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/visual-observer-profile/apply", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/visual-observer-profile/test", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -1074,6 +1097,196 @@ helixStagePlayRouter.post("/live-source-mail/job", (req: Request, res: Response)
       error: "stage-play-live-source-watch-job-policy-failed",
       err,
       schema: "stage_play_live_source_watch_job_policy_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/visual-observer-profile", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    ensureDefaultStagePlayVisualObserverProfiles();
+    const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const domain = readQueryString(req.query.domain);
+    const profiles = listStagePlayVisualObserverProfiles({
+      sourceId,
+      domain,
+      status: readQueryString(req.query.status),
+      includePresets: req.query.includePresets !== "false",
+      limit: 100,
+    });
+    const activeProfile = getActiveStagePlayVisualObserverProfileForSource({ sourceId, domain });
+    return res.json({
+      ok: true,
+      schema: "stage_play_visual_observer_profile_list_response/v1",
+      profiles,
+      activeProfile,
+      active_profile: activeProfile,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-visual-observer-profile-list-failed",
+      err,
+      schema: "stage_play_visual_observer_profile_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/visual-observer-profile", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const prompt = readQueryString(body.prompt);
+    if (!prompt) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_visual_observer_profile_config_result/v1",
+        error: "missing_prompt",
+        message: "prompt is required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const profile = recordStagePlayVisualObserverProfile({
+      title: readQueryString(body.title),
+      domain: readQueryString(body.domain),
+      sourceIds: readStringArray(body.sourceIds ?? body.source_ids),
+      prompt,
+      outputMode: readQueryString(body.outputMode) ?? readQueryString(body.output_mode),
+      cadenceHintMs: typeof body.cadenceHintMs === "number"
+        ? body.cadenceHintMs
+        : typeof body.cadence_hint_ms === "number"
+          ? body.cadence_hint_ms
+          : null,
+      linkedInterpreterProfileId: readQueryString(body.linkedInterpreterProfileId) ?? readQueryString(body.linked_interpreter_profile_id),
+      linkedWatchJobPolicyId: readQueryString(body.linkedWatchJobPolicyId) ?? readQueryString(body.linked_watch_job_policy_id),
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_visual_observer_profile_config_result/v1",
+      profile,
+      profileCount: listStagePlayVisualObserverProfiles({ includePresets: true, limit: 250 }).length,
+      activeForSourceIds: profile.sourceIds,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-visual-observer-profile-create-failed",
+      err,
+      schema: "stage_play_visual_observer_profile_config_result/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/visual-observer-profile/apply", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const profileId = readQueryString(body.profileId) ?? readQueryString(body.profile_id);
+    const sourceIds = readStringArray(body.sourceIds ?? body.source_ids);
+    if (!profileId || sourceIds.length === 0) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_visual_observer_profile_apply_response/v1",
+        error: "missing_profile_or_source",
+        message: "profileId/profile_id and at least one source id are required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const profile = applyStagePlayVisualObserverProfile({ profileId, sourceIds });
+    if (!profile) {
+      return stagePlayJsonError(res, 404, {
+        schema: "stage_play_visual_observer_profile_apply_response/v1",
+        error: "visual_observer_profile_not_found",
+        message: `Visual observer profile was not found: ${profileId}`,
+        contextRole: "tool_evidence",
+      });
+    }
+    return res.json({
+      ok: true,
+      schema: "stage_play_visual_observer_profile_apply_response/v1",
+      profile,
+      sourceIds,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-visual-observer-profile-apply-failed",
+      err,
+      schema: "stage_play_visual_observer_profile_apply_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/visual-observer-profile/test", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const profileId = readQueryString(body.profileId) ?? readQueryString(body.profile_id);
+    const profile = profileId ? getStagePlayVisualObserverProfile(profileId) : null;
+    if (!profile) {
+      return stagePlayJsonError(res, 404, {
+        schema: "stage_play_visual_observer_profile_test_result/v1",
+        error: "visual_observer_profile_not_found",
+        message: "profileId/profile_id is required for visual observer profile tests.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const profileSummary = readQueryString(body.summary) ?? readQueryString(body.profileSummary) ?? "";
+    const start = profileSummary.indexOf("{");
+    const end = profileSummary.lastIndexOf("}");
+    let parsedProfileOutput: Record<string, unknown> | null = null;
+    if (start >= 0 && end > start) {
+      try {
+        const parsed = JSON.parse(profileSummary.slice(start, end + 1));
+        parsedProfileOutput = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : null;
+      } catch {
+        parsedProfileOutput = null;
+      }
+    }
+    return res.json({
+      ok: true,
+      schema: "stage_play_visual_observer_profile_test_result/v1",
+      profile,
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id),
+      genericSummary: readQueryString(body.genericSummary) ?? readQueryString(body.generic_summary),
+      profileSummary: profileSummary || null,
+      parsedProfileOutput,
+      parseOk: Boolean(parsedProfileOutput),
+      enqueuedAsMail: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-visual-observer-profile-test-failed",
+      err,
+      schema: "stage_play_visual_observer_profile_test_result/v1",
       contextRole: "tool_evidence",
     });
   }

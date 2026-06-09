@@ -12,6 +12,7 @@ import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
+import { resetStagePlayVisualObserverProfileStoreForTest } from "../services/stage-play/stage-play-visual-observer-profile-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -23,6 +24,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceNarrativeStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
+  resetStagePlayVisualObserverProfileStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -174,6 +176,34 @@ describe("live-source mail live environment tools", () => {
       }),
       expect.objectContaining({
         tool_id: "live_env.test_micro_reasoner_prompt",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.configure_visual_observer_profile",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.apply_visual_observer_profile",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_visual_observer_profiles",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.test_visual_observer_profile",
         family: "live_env",
         creates_assistant_answer: false,
         requires_user_confirmation: false,
@@ -987,6 +1017,84 @@ describe("live-source mail live environment tools", () => {
     expect(readPayload.fallbackTool).toBeNull();
     expect(readPayload.assistant_answer).toBe(false);
     expect(readPayload.terminal_eligible).toBe(false);
+  });
+
+  it("configures visual observer profiles and maps structured Minecraft observer output into processed packets", () => {
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_visual_observer_profiles",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+      },
+    });
+    const queryPayload = queryObservation.observation as any;
+    const minecraftProfile = queryPayload.profiles.find((profile: any) => profile.title === "Minecraft Gameplay Observer");
+    expect(minecraftProfile).toBeTruthy();
+    expect(queryPayload.assistant_answer).toBe(false);
+    expect(queryPayload.terminal_eligible).toBe(false);
+
+    const applyObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.apply_visual_observer_profile",
+      thread_id: threadId,
+      args: {
+        profile_id: minecraftProfile.profileId,
+        source_ids: [sourceId],
+      },
+    });
+    const applyPayload = applyObservation.observation as any;
+    expect(applyPayload.applied).toBe(true);
+    expect(applyPayload.profile.sourceIds).toContain(sourceId);
+
+    const structuredSummary = JSON.stringify({
+      scene: "underground Minecraft cave",
+      hud: "fire overlay visible; health uncertain",
+      hotbar: "pickaxe and sword visible",
+      selected_item: "pickaxe",
+      visible_entities: [],
+      current_action: "moving through a dark cave",
+      changed_since_last_frame: ["fire or damage cue appeared"],
+      risk_cues: ["fire", "low light"],
+      opportunity_cues: ["ore may be nearby"],
+      next_10s_prediction: "watch for recovery from fire or nearby hostile mobs",
+      confidence: 0.82,
+    });
+    seedVisualSummaryText(structuredSummary, "minecraft-observer-json");
+
+    const testObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.test_visual_observer_profile",
+      thread_id: threadId,
+      args: {
+        profile_id: minecraftProfile.profileId,
+        source_id: sourceId,
+        summary: structuredSummary,
+      },
+    });
+    const testPayload = testObservation.observation as any;
+    expect(testPayload.parseOk).toBe(true);
+    expect(testPayload.enqueuedAsMail).toBe(false);
+    expect(testPayload.parsedProfileOutput.scene).toBe("underground Minecraft cave");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const packet = (processObservation.observation as any).packets[0];
+    expect(packet.observedFacts).toEqual(expect.arrayContaining([
+      expect.stringContaining("scene: underground Minecraft cave"),
+      expect.stringContaining("selected_item: pickaxe"),
+    ]));
+    expect(packet.changedFacts).toEqual(expect.arrayContaining([expect.stringContaining("fire or damage cue appeared")]));
+    expect(packet.riskMatches).toEqual(expect.arrayContaining(["fire", "low light"]));
+    expect(packet.opportunityMatches).toEqual(expect.arrayContaining(["ore may be nearby"]));
+    expect(packet.watchNext).toEqual(expect.arrayContaining(["watch for recovery from fire or nearby hostile mobs"]));
+    expect(packet.recommendedNext).toBe("request_voice_callout");
+    expect(packet.assistant_answer).toBe(false);
+    expect(packet.terminal_eligible).toBe(false);
   });
 
   it("records a processed-mail interpretation with recovered mail ids and narrative aliases", () => {

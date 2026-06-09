@@ -131,6 +131,14 @@ import {
   recordStagePlayMicroReasonerPrompt,
 } from "../stage-play/stage-play-processed-mail-packet-store";
 import {
+  applyStagePlayVisualObserverProfile,
+  ensureDefaultStagePlayVisualObserverProfiles,
+  getActiveStagePlayVisualObserverProfileForSource,
+  getStagePlayVisualObserverProfile,
+  listStagePlayVisualObserverProfiles,
+  recordStagePlayVisualObserverProfile,
+} from "../stage-play/stage-play-visual-observer-profile-store";
+import {
   listStagePlayLiveSourceMailWakeRequests,
 } from "../stage-play/stage-play-live-source-mail-wake-store";
 import {
@@ -2242,6 +2250,206 @@ export function executeLiveEnvironmentTool(
         ask_context_policy: "evidence_only",
       },
       evidenceRefs: prompts.map((prompt) => prompt.promptId),
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.configure_visual_observer_profile" ||
+    input.tool_name === "live_env.apply_visual_observer_profile" ||
+    input.tool_name === "live_env.query_visual_observer_profiles" ||
+    input.tool_name === "live_env.test_visual_observer_profile" ||
+    input.tool_name === "live_env.compare_visual_observer_profiles"
+  ) {
+    ensureDefaultStagePlayVisualObserverProfiles();
+    const sourceIds = uniqueStrings([
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ]);
+    const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
+    const profileId = readString(args.profile_id) ?? readString(args.profileId);
+    const domain = readString(args.domain);
+    const parseSummary = (value: unknown): Record<string, unknown> | null => {
+      const record = readRecord(value);
+      if (record) return record;
+      const text = readString(value);
+      if (!text) return null;
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end <= start) return null;
+      try {
+        return readRecord(JSON.parse(text.slice(start, end + 1)));
+      } catch {
+        return null;
+      }
+    };
+
+    if (input.tool_name === "live_env.configure_visual_observer_profile") {
+      const prompt = readString(args.prompt) ?? readString(args.interpretation_guidelines ?? args.interpretationGuidelines);
+      if (!prompt) {
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: "Visual observer profile configuration requires a prompt.",
+          observation: {
+            schema: "stage_play_visual_observer_profile_config_result/v1",
+            configured: false,
+            reason: "missing_prompt",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: sourceIds,
+        });
+      }
+      const profile = recordStagePlayVisualObserverProfile({
+        title: readString(args.title),
+        domain,
+        sourceIds,
+        prompt,
+        outputMode: readString(args.output_mode) ?? readString(args.outputMode),
+        cadenceHintMs: readOptionalNumber(args.cadence_hint_ms ?? args.cadenceHintMs),
+        linkedInterpreterProfileId:
+          readString(args.linked_interpreter_profile_id) ?? readString(args.linkedInterpreterProfileId),
+        linkedWatchJobPolicyId:
+          readString(args.linked_watch_job_policy_id) ?? readString(args.linkedWatchJobPolicyId),
+        linkedNoteId: readString(args.linked_note_id) ?? readString(args.linkedNoteId),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: true,
+        summary: `Configured visual observer profile ${profile.title}.`,
+        observation: {
+          schema: "stage_play_visual_observer_profile_config_result/v1",
+          profile,
+          policy: profile,
+          profileCount: listStagePlayVisualObserverProfiles({ includePresets: true, limit: 250 }).length,
+          profile_count: listStagePlayVisualObserverProfiles({ includePresets: true, limit: 250 }).length,
+          watchJobPolicyRef: profile.linkedWatchJobPolicyId ?? null,
+          visualObserverProfileRef: profile.profileId,
+          visual_observer_profile_ref: profile.profileId,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([profile.profileId, ...profile.sourceIds]),
+      });
+    }
+
+    if (input.tool_name === "live_env.apply_visual_observer_profile") {
+      const profile = profileId ? applyStagePlayVisualObserverProfile({ profileId, sourceIds }) : null;
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: Boolean(profile),
+        summary: profile
+          ? `Applied visual observer profile ${profile.title} to ${sourceIds.length} source(s).`
+          : "Visual observer profile apply failed: profile id and source ids are required.",
+        observation: {
+          schema: "stage_play_visual_observer_profile_apply_response/v1",
+          profile,
+          sourceIds,
+          source_ids: sourceIds,
+          applied: Boolean(profile),
+          reason: profile ? "applied" : "missing_or_unknown_profile",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([profile?.profileId, ...sourceIds]),
+      });
+    }
+
+    if (input.tool_name === "live_env.test_visual_observer_profile" || input.tool_name === "live_env.compare_visual_observer_profiles") {
+      const selectedProfile =
+        (profileId ? getStagePlayVisualObserverProfile(profileId) : null) ??
+        getActiveStagePlayVisualObserverProfileForSource({ sourceId, domain }) ??
+        null;
+      const genericSummary = readString(args.generic_summary) ?? readString(args.genericSummary);
+      const profileSummary =
+        readString(args.profile_summary) ??
+        readString(args.profileSummary) ??
+        readString(args.summary);
+      const parsedProfileOutput = parseSummary(args.profile_output ?? args.profileOutput ?? profileSummary);
+      const parsedGenericOutput = parseSummary(args.generic_output ?? args.genericOutput ?? genericSummary);
+      const ok = Boolean(selectedProfile);
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok,
+        summary: ok
+          ? `${input.tool_name === "live_env.compare_visual_observer_profiles" ? "Compared" : "Prepared test for"} visual observer profile ${selectedProfile.title}; no mail was enqueued.`
+          : "No visual observer profile was available for the requested test.",
+        observation: {
+          schema: "stage_play_visual_observer_profile_test_result/v1",
+          profile: selectedProfile,
+          sourceId,
+          source_id: sourceId,
+          genericSummary: genericSummary ?? null,
+          generic_summary: genericSummary ?? null,
+          profileSummary: profileSummary ?? null,
+          profile_summary: profileSummary ?? null,
+          parsedGenericOutput,
+          parsed_generic_output: parsedGenericOutput,
+          parsedProfileOutput,
+          parsed_profile_output: parsedProfileOutput,
+          parseOk: Boolean(parsedProfileOutput),
+          parse_ok: Boolean(parsedProfileOutput),
+          enqueuedAsMail: false,
+          enqueued_as_mail: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([selectedProfile?.profileId, sourceId]),
+      });
+    }
+
+    const profiles = listStagePlayVisualObserverProfiles({
+      sourceId,
+      domain,
+      status: readString(args.status),
+      includePresets: args.include_presets !== false && args.includePresets !== false,
+      limit: readNumber(args.limit, 100),
+    });
+    const activeProfile = getActiveStagePlayVisualObserverProfileForSource({ sourceId, domain });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Found ${profiles.length} visual observer profile(s).`,
+      observation: {
+        schema: "stage_play_visual_observer_profile_list_response/v1",
+        profiles,
+        activeProfile,
+        active_profile: activeProfile,
+        sourceId,
+        source_id: sourceId,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([
+        activeProfile?.profileId,
+        ...profiles.map((profile) => profile.profileId),
+        sourceId,
+      ]),
     });
   }
 

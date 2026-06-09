@@ -44,6 +44,24 @@ const readNumber = (value: unknown): number | null =>
 const uniqueStrings = (value: unknown): string[] =>
   Array.isArray(value) ? Array.from(new Set(value.map((entry) => String(entry ?? "").trim()).filter(Boolean))) : [];
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const parseStructuredVisualObserverOutput = (value: unknown): Record<string, unknown> | null => {
+  const direct = readRecord(value);
+  if (direct) return direct;
+  const text = readString(value);
+  if (!text) return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return readRecord(JSON.parse(text.slice(start, end + 1)));
+  } catch {
+    return null;
+  }
+};
+
 const normalizeCaptureMode = (value: unknown): HelixVisualCaptureMode =>
   value === "interval" || value === "salience_triggered" ? value : "manual";
 
@@ -296,6 +314,14 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
     detected_scene_relations: uniqueStrings(input.detected_scene_relations),
     uncertainty: uniqueStrings(input.uncertainty),
     supports_claims: supportClaims,
+    visual_observer_profile_id: readString(input.visual_observer_profile_id) ?? readString(input.visualObserverProfileId),
+    visual_observer_profile_title: readString(input.visual_observer_profile_title) ?? readString(input.visualObserverProfileTitle),
+    visual_prompt_hash: readString(input.visual_prompt_hash) ?? readString(input.visualPromptHash),
+    visual_output_mode: readString(input.visual_output_mode) ?? readString(input.visualOutputMode),
+    visual_observer_structured_output:
+      parseStructuredVisualObserverOutput(input.visual_observer_structured_output) ??
+      parseStructuredVisualObserverOutput(input.visualObserverStructuredOutput) ??
+      parseStructuredVisualObserverOutput(input.summary),
     raw_image_included: false,
     assistant_answer: false,
     context_policy: "compact_context_pack_only",
@@ -313,7 +339,13 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
     summaryText: evidence.summary,
     confidence: evidence.supports_claims[0]?.confidence ?? null,
     analysisState: "analysis_ready",
-    evidenceRefs: [evidence.source_id, evidence.frame_id, evidence.evidence_id],
+    evidenceRefs: [
+      evidence.source_id,
+      evidence.frame_id,
+      evidence.evidence_id,
+      evidence.visual_observer_profile_id,
+      evidence.visual_prompt_hash ? `visual_prompt_hash:${evidence.visual_prompt_hash}` : null,
+    ].filter((ref): ref is string => Boolean(ref)),
     createdAt: evidence.ts,
   });
   return evidence;

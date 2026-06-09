@@ -78,14 +78,144 @@ const objectTagsFor = (mailItems: StagePlayLiveSourceMailItemV1[], facts: string
     "tree",
   ]);
 
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const parseStructuredObserverOutput = (value: unknown): Record<string, unknown> | null => {
+  const direct = readRecord(value);
+  if (direct) return direct;
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return readRecord(JSON.parse(text.slice(start, end + 1)));
+  } catch {
+    return null;
+  }
+};
+
+const readStructuredString = (record: Record<string, unknown>, key: string): string | null => {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const readStructuredStringArray = (record: Record<string, unknown>, key: string): string[] => {
+  const value = record[key];
+  if (!Array.isArray(value)) return [];
+  return uniqueStrings(value.map((entry) => {
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object") return JSON.stringify(entry);
+    return String(entry ?? "");
+  }));
+};
+
+const structuredObserverFactsFor = (input: {
+  mailItems: StagePlayLiveSourceMailItemV1[];
+}): {
+  observedFacts: string[];
+  inferredFacts: string[];
+  changedFacts: string[];
+  uncertainties: string[];
+  sceneTags: string[];
+  activityTags: string[];
+  objectTags: string[];
+  riskMatches: string[];
+  opportunityMatches: string[];
+  voiceCalloutMatches: string[];
+  watchNext: string[];
+} => {
+  const records = input.mailItems
+    .map((item) => ({
+      mailId: item.mailId,
+      record: parseStructuredObserverOutput(item.summary.text) ?? parseStructuredObserverOutput(item.summary.preview),
+    }))
+    .filter((entry): entry is { mailId: string; record: Record<string, unknown> } => Boolean(entry.record));
+  const observedFacts: string[] = [];
+  const inferredFacts: string[] = [];
+  const changedFacts: string[] = [];
+  const uncertainties: string[] = [];
+  const sceneTags: string[] = [];
+  const activityTags: string[] = [];
+  const objectTags: string[] = [];
+  const riskMatches: string[] = [];
+  const opportunityMatches: string[] = [];
+  const watchNext: string[] = [];
+
+  for (const { mailId, record } of records) {
+    for (const key of ["scene", "hud", "hotbar", "selected_item", "crosshair_target", "current_action"]) {
+      const value = readStructuredString(record, key);
+      if (value) observedFacts.push(`${mailId} ${key}: ${value}`);
+    }
+    for (const entity of readStructuredStringArray(record, "visible_entities")) {
+      observedFacts.push(`${mailId} visible_entity: ${entity}`);
+      objectTags.push(entity);
+    }
+    for (const change of readStructuredStringArray(record, "changed_since_last_frame")) {
+      changedFacts.push(`${mailId}: ${change}`);
+    }
+    for (const risk of readStructuredStringArray(record, "risk_cues")) {
+      riskMatches.push(risk);
+    }
+    for (const opportunity of readStructuredStringArray(record, "opportunity_cues")) {
+      opportunityMatches.push(opportunity);
+    }
+    const prediction = readStructuredString(record, "next_10s_prediction");
+    if (prediction) {
+      inferredFacts.push(`${mailId} next_10s_prediction: ${prediction}`);
+      watchNext.push(prediction);
+    }
+    const scene = readStructuredString(record, "scene");
+    if (scene) sceneTags.push(...sceneTagsFor([scene]));
+    const action = readStructuredString(record, "current_action");
+    if (action) activityTags.push(action);
+    for (const key of ["hud", "hotbar", "selected_item", "crosshair_target"]) {
+      const value = readStructuredString(record, key);
+      if (value && /\b(?:uncertain|not clear|unclear|not visible|unknown)\b/i.test(value)) {
+        uncertainties.push(`${mailId} ${key}: ${value}`);
+      }
+    }
+  }
+
+  const voiceCalloutMatches = tokenTags(riskMatches, [
+    "fire",
+    "damage",
+    "hostile",
+    "mob",
+    "creeper",
+    "zombie",
+    "skeleton",
+    "lava",
+    "low health",
+    "danger",
+  ]);
+  return {
+    observedFacts: uniqueStrings(observedFacts),
+    inferredFacts: uniqueStrings(inferredFacts),
+    changedFacts: uniqueStrings(changedFacts),
+    uncertainties: uniqueStrings(uncertainties),
+    sceneTags: uniqueStrings(sceneTags),
+    activityTags: uniqueStrings(activityTags),
+    objectTags: uniqueStrings(objectTags),
+    riskMatches: uniqueStrings(riskMatches),
+    opportunityMatches: uniqueStrings(opportunityMatches),
+    voiceCalloutMatches,
+    watchNext: uniqueStrings(watchNext),
+  };
+};
+
 const recommendedNextFor = (input: {
   comparison?: StagePlayLiveSourceInterpreterProfileComparisonV1 | null;
   validation: StagePlayLiveSourcePredictionValidationV1;
   immersionState: StagePlayLiveSourceImmersionStateV1;
+  structuredRiskMatches?: string[];
+  structuredVoiceCalloutMatches?: string[];
 }): StagePlayLiveSourcePredictionValidationRecommendedNextV1 => {
   if (input.comparison?.recommendedDecision === "request_voice_callout") return "request_voice_callout";
   if (input.comparison?.recommendedDecision === "request_more_evidence") return "request_more_evidence";
   if (input.comparison?.recommendedDecision === "request_stage_play_checkpoint") return "request_stage_play_checkpoint";
+  if ((input.structuredVoiceCalloutMatches?.length ?? 0) > 0) return "request_voice_callout";
   if (
     input.immersionState.salience.voiceCandidate &&
     (input.immersionState.salience.level === "high" || input.immersionState.salience.level === "urgent")
@@ -182,11 +312,14 @@ export function buildStagePlayProcessedMailPacket(input: {
         createdAt: now,
       })
     : null;
+  const structured = structuredObserverFactsFor({ mailItems: input.mailItems });
   const observedFacts = uniqueStrings([
+    ...structured.observedFacts,
     ...input.mailItems.map((item) => `${item.mailId}: ${clipText(item.summary.text || item.summary.preview, 240)}`),
     ...input.immersionState.currentSceneFacts,
   ]);
   const inferredFacts = uniqueStrings([
+    ...structured.inferredFacts,
     ...input.immersionState.changedFacts.map((fact) => `Changed: ${fact}`),
     ...input.immersionState.salience.reasons.map((reason) => `Salience: ${reason}`),
     ...(comparison?.inferredMeaning ?? []),
@@ -195,9 +328,13 @@ export function buildStagePlayProcessedMailPacket(input: {
     comparison,
     validation: input.predictionValidation,
     immersionState: input.immersionState,
+    structuredRiskMatches: structured.riskMatches,
+    structuredVoiceCalloutMatches: structured.voiceCalloutMatches,
   });
   const calloutDraft = recommendedNext === "request_voice_callout"
     ? input.immersionState.salience.reasons[0] ??
+      structured.voiceCalloutMatches[0] ??
+      structured.riskMatches[0] ??
       comparison?.voiceCalloutMatches[0] ??
       "High-salience live-source update detected."
     : null;
@@ -224,9 +361,11 @@ export function buildStagePlayProcessedMailPacket(input: {
         ...input.immersionState.stableFacts,
         ...input.immersionState.changedFacts,
         ...input.immersionState.uncertainties,
+        ...structured.changedFacts,
+        ...structured.uncertainties,
       ]),
       inputPreview: `observed ${observedFacts.length}; inferred ${inferredFacts.length}; prior stable ${input.immersionState.stableFacts.length}`,
-      outputPreview: `stable ${input.immersionState.stableFacts.slice(0, 2).join(" | ") || "none"}; changed ${input.immersionState.changedFacts.slice(0, 2).join(" | ") || "none"}`,
+      outputPreview: `stable ${input.immersionState.stableFacts.slice(0, 2).join(" | ") || "none"}; changed ${uniqueStrings([...input.immersionState.changedFacts, ...structured.changedFacts]).slice(0, 2).join(" | ") || "none"}`,
       now,
       causalTrace: input.causalTrace,
     }),
@@ -273,6 +412,10 @@ export function buildStagePlayProcessedMailPacket(input: {
       mailIds,
       inputRefs: uniqueStrings([
         ...input.immersionState.changedFacts,
+        ...structured.changedFacts,
+        ...structured.riskMatches,
+        ...structured.opportunityMatches,
+        ...structured.voiceCalloutMatches,
         ...(comparison?.riskMatches ?? []),
         ...(comparison?.opportunityMatches ?? []),
         ...(comparison?.voiceCalloutMatches ?? []),
@@ -281,10 +424,12 @@ export function buildStagePlayProcessedMailPacket(input: {
       outputRefs: uniqueStrings([
         input.immersionState.salience.level,
         ...input.immersionState.salience.reasons,
+        ...structured.riskMatches,
+        ...structured.voiceCalloutMatches,
         recommendedNext,
         calloutDraft,
       ]),
-      inputPreview: `changed ${input.immersionState.changedFacts.length}; risks ${comparison?.riskMatches.length ?? 0}; validation ${input.predictionValidation.result}`,
+      inputPreview: `changed ${uniqueStrings([...input.immersionState.changedFacts, ...structured.changedFacts]).length}; risks ${uniqueStrings([...(comparison?.riskMatches ?? []), ...structured.riskMatches]).length}; validation ${input.predictionValidation.result}`,
       outputPreview: `${input.immersionState.salience.level}; voice ${input.immersionState.salience.voiceCandidate ? "candidate" : "no"}; recommended ${recommendedNext}${calloutDraft ? `; ${calloutDraft}` : ""}`,
       now,
       causalTrace: input.causalTrace,
@@ -309,18 +454,18 @@ export function buildStagePlayProcessedMailPacket(input: {
     visualEvidenceRefs,
     observedFacts,
     inferredFacts,
-    uncertainties: uniqueStrings(input.immersionState.uncertainties),
+    uncertainties: uniqueStrings([...input.immersionState.uncertainties, ...structured.uncertainties]),
     stableFactsUsed: input.immersionState.stableFacts,
-    changedFacts: input.immersionState.changedFacts,
-    sceneTags: sceneTagsFor(input.immersionState.currentSceneFacts),
-    activityTags: uniqueStrings([input.immersionState.currentActivity]),
-    objectTags: objectTagsFor(input.mailItems, input.immersionState.currentSceneFacts),
+    changedFacts: uniqueStrings([...input.immersionState.changedFacts, ...structured.changedFacts]),
+    sceneTags: uniqueStrings([...sceneTagsFor(input.immersionState.currentSceneFacts), ...structured.sceneTags]),
+    activityTags: uniqueStrings([input.immersionState.currentActivity, ...structured.activityTags]),
+    objectTags: uniqueStrings([...objectTagsFor(input.mailItems, input.immersionState.currentSceneFacts), ...structured.objectTags]),
     profileRef: input.activeProfile?.profileId ?? null,
     matchedCriteria: comparison?.matchedCriteria ?? [],
     suppressedCriteria: comparison?.suppressedCriteria ?? [],
-    riskMatches: comparison?.riskMatches ?? [],
-    opportunityMatches: comparison?.opportunityMatches ?? [],
-    voiceCalloutMatches: comparison?.voiceCalloutMatches ?? [],
+    riskMatches: uniqueStrings([...(comparison?.riskMatches ?? []), ...structured.riskMatches]),
+    opportunityMatches: uniqueStrings([...(comparison?.opportunityMatches ?? []), ...structured.opportunityMatches]),
+    voiceCalloutMatches: uniqueStrings([...(comparison?.voiceCalloutMatches ?? []), ...structured.voiceCalloutMatches]),
     priorPredictionRef: input.priorImmersionState?.prediction?.predictionId ?? null,
     predictionValidation: {
       result: input.predictionValidation.result,
@@ -335,7 +480,7 @@ export function buildStagePlayProcessedMailPacket(input: {
       calloutDraft,
     },
     recommendedNext,
-    watchNext: delta.watchTargets,
+    watchNext: uniqueStrings([...delta.watchTargets, ...structured.watchNext]),
     resolutionState: recommendedNext === "request_voice_callout"
       ? "voice_candidate_prepared"
       : "processed_packet_ready",

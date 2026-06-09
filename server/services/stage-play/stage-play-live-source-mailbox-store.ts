@@ -479,6 +479,7 @@ export function recordStagePlayMailDecision(input: {
     mailboxCursor: mailItems.at(-1)?.mailId ?? input.mailIds.at(-1) ?? null,
     activeJobId: jobId,
     narrativeStateRef: null,
+    narrativeStateId: null,
     interpreterProfileRef: input.interpreterProfileRef ?? null,
     profileComparisonRefs: uniqueStrings(input.profileComparisonRefs ?? []),
     matchedCriteria: uniqueStrings(input.matchedCriteria ?? []),
@@ -566,6 +567,7 @@ export function attachStagePlayNarrativeStateToDecision(input: {
   const updated: StagePlayLiveSourceMailDecisionV1 = {
     ...decision,
     narrativeStateRef: input.narrativeStateId,
+    narrativeStateId: input.narrativeStateId,
     evidenceRefs: uniqueStrings([...decision.evidenceRefs, input.narrativeStateId]),
     causalTrace: mergeLiveSourceCausalTraces([decision.causalTrace], {
       parentRefs: [decision.decisionId],

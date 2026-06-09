@@ -210,6 +210,7 @@ export type StagePlayLiveSourceMailDecisionV1 = {
   mailboxCursor?: string | null;
   activeJobId?: string | null;
   narrativeStateRef?: string | null;
+  narrativeStateId?: string | null;
   interpreterProfileRef?: string | null;
   profileComparisonRefs?: string[];
   matchedCriteria?: string[];

@@ -52,6 +52,11 @@ export type HelixVisualFrameEvidence = {
   detected_scene_relations: string[];
   uncertainty: string[];
   supports_claims: HelixVisualFrameSupportClaim[];
+  visual_observer_profile_id?: string | null;
+  visual_observer_profile_title?: string | null;
+  visual_prompt_hash?: string | null;
+  visual_output_mode?: string | null;
+  visual_observer_structured_output?: Record<string, unknown> | null;
   raw_image_included: false;
   assistant_answer: false;
   context_policy: "compact_context_pack_only";

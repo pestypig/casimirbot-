@@ -1052,6 +1052,7 @@ export function recordLiveSourceMailDecisionForAsk(input: {
   }) ?? {
     ...decision,
     narrativeStateRef: narrative.narrativeStateId,
+    narrativeStateId: narrative.narrativeStateId,
     interpreterProfileRef: decision.interpreterProfileRef ?? null,
     profileComparisonRefs: decision.profileComparisonRefs ?? [],
     matchedCriteria: decision.matchedCriteria ?? [],
