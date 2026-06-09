@@ -3767,6 +3767,17 @@ export function executeLiveEnvironmentTool(
           reason: readString(mailCoverageRaw.reason) ?? "Model supplied mail coverage for this decision.",
         }
       : null;
+    const defaultDecisionMailCoverage: Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["mailCoverage"] | null =
+      decision === "record_interpretation" && mailIds.length > 0
+        ? {
+            readMailIds: mailIds,
+            interpretedMailIds: mailIds,
+            compressedMailIds: mailIds.length > 1 ? mailIds : [],
+            skippedMailIds: [],
+            mode: mailIds.length > 8 ? "micro_batch" : "chronological_batch",
+            reason: "Interpretation decision preserves mail as a time-aware observation batch.",
+          }
+        : null;
     const recordedDecision = recordLiveSourceMailDecisionForAsk({
       threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
@@ -3807,7 +3818,7 @@ export function executeLiveEnvironmentTool(
             mode: mailCoverage.mode,
             reason: mailCoverage.reason,
           }
-        : null,
+        : defaultDecisionMailCoverage,
       evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
     });

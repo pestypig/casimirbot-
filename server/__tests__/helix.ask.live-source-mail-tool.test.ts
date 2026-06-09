@@ -11,6 +11,7 @@ import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/s
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
+import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -21,6 +22,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceNarrativeStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
+  resetStagePlayProcessedMailPacketStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -137,6 +139,41 @@ describe("live-source mail live environment tools", () => {
       }),
       expect.objectContaining({
         tool_id: "live_env.read_live_source_mail",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.process_live_source_mail",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.read_processed_live_source_mail",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_micro_reasoner_prompts",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.update_micro_reasoner_prompt",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.test_micro_reasoner_prompt",
         family: "live_env",
         creates_assistant_answer: false,
         requires_user_confirmation: false,
@@ -905,6 +942,51 @@ describe("live-source mail live environment tools", () => {
       expect.stringContaining("Live frame 4"),
       expect.stringContaining("Live frame 5"),
     ]);
+  });
+
+  it("processes and reads processed live-source mail packets as evidence-only receipts", () => {
+    seedVisualSummaryText("Minecraft cave scene with low light and the player near fire damage.", "processed");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const processPayload = processObservation.observation as any;
+    expect(processPayload.schema).toBe("stage_play_processed_live_source_mail_read_result/v1");
+    expect(processPayload.processedPacketRefs).toHaveLength(1);
+    expect(processPayload.packets[0]).toMatchObject({
+      artifactId: "stage_play_processed_mail_packet",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+    });
+    expect(processPayload.packets[0].salience.voiceCandidate).toBe(true);
+    expect(processPayload.microReasonerRunRefs.length).toBeGreaterThanOrEqual(6);
+    expect(processPayload.microReasonerRuns.every((run: any) => run.promptId)).toBe(true);
+
+    const readObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_processed_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const readPayload = readObservation.observation as any;
+    expect(readObservation.summary).toContain("processed live-source packet");
+    expect(readPayload.packets.map((packet: any) => packet.packetId)).toContain(processPayload.packets[0].packetId);
+    expect(readPayload.missingRawMailIds).toEqual([]);
+    expect(readPayload.fallbackTool).toBeNull();
+    expect(readPayload.assistant_answer).toBe(false);
+    expect(readPayload.terminal_eligible).toBe(false);
   });
 
   it("reads the same-source unread batch through live_env.read_live_source_mail even when model args supply a small limit", () => {

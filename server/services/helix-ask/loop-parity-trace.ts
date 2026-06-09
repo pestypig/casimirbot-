@@ -78,6 +78,7 @@ const readStringArray = (value: unknown): string[] =>
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const inferToolFamily = (toolId: string): string => {
+  if (/^live_env\./i.test(toolId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
   if (/situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding)/i.test(toolId)) return "situation_run";
