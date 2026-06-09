@@ -515,6 +515,28 @@ export function buildMailLoopTranscriptRows(input: {
       terminalEligible: false,
       createdAt,
     });
+    rows.push({
+      rowId: `ask_turn_mail_decision_recorded:${hashShort(input.decision.decisionId)}`,
+      rowKind: "decision_recorded",
+      title: "Decision recorded",
+      body: [
+        `Decision: ${input.decision.decision}.`,
+        `Loop state: ${input.decision.nextLoopState}.`,
+        input.decision.narrativeStateRef ? `Narrative: ${input.decision.narrativeStateRef}.` : null,
+        input.decision.voiceCalloutDraft ? "Voice candidate: yes." : null,
+      ].filter(Boolean).join("\n"),
+      source: {
+        toolName: "live_env.record_live_source_mail_decision",
+        artifactId: input.decision.decisionId,
+        artifactKind: input.decision.artifactId,
+      },
+      evidenceRefs: input.decision.evidenceRefs,
+      causalTrace: input.decision.causalTrace,
+      authority: "model_decision_receipt",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt,
+    });
     if (input.decision.requestedTool) {
       const voiceTool = isVoiceRequestedTool(input.decision.requestedTool);
       rows.push({
@@ -627,7 +649,51 @@ export function buildMailLoopTranscriptRows(input: {
         (!requiresConfirmation && input.decision.voiceCalloutDraft.voiceEligible === false);
       const policyReason = input.decision.voicePolicy?.reason
         ? ` Reason: ${input.decision.voicePolicy.reason}.`
-        : "";
+          : "";
+      rows.push({
+        rowId: `ask_turn_mail_voice_candidate:${hashShort(input.decision.decisionId)}`,
+        rowKind: "voice_candidate",
+        title: "Voice candidate",
+        body: [
+          input.decision.voiceCalloutDraft.text,
+          `Eligible: ${String(input.decision.voiceCalloutDraft.voiceEligible)}.`,
+          `Requires confirmation: ${String(requiresConfirmation)}.`,
+        ].join("\n"),
+        source: {
+          artifactId: input.decision.decisionId,
+          artifactKind: input.decision.artifactId,
+        },
+        evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
+        authority: "model_decision_receipt",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt,
+      });
+      rows.push({
+        rowId: `ask_turn_mail_voice_${blockedByPolicy || requiresConfirmation ? "blocked" : "requested"}:${hashShort(input.decision.decisionId)}`,
+        rowKind: blockedByPolicy || requiresConfirmation ? "voice_blocked" : "voice_requested",
+        title: blockedByPolicy
+          ? "Voice blocked"
+          : requiresConfirmation
+            ? "Voice blocked"
+            : "Voice requested",
+        body: blockedByPolicy
+          ? `Voice blocked by policy.${policyReason}`
+          : requiresConfirmation
+            ? "Voice requires confirmation before delivery."
+            : "Voice callout requested after model decision.",
+        source: {
+          artifactId: input.decision.decisionId,
+          artifactKind: input.decision.artifactId,
+        },
+        evidenceRefs: input.decision.evidenceRefs,
+        causalTrace: input.decision.causalTrace,
+        authority: blockedByPolicy || requiresConfirmation ? "blocked" : "model_decision_receipt",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt,
+      });
       rows.push({
         rowId: `ask_turn_mail_voice:${hashShort(input.decision.decisionId)}`,
         rowKind: "voice_callout_request",

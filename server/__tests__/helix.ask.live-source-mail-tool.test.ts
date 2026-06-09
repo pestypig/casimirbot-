@@ -7,7 +7,10 @@ import {
   resetVisualSnapshotStoreForTest,
   startVisualSnapshotSource,
 } from "../services/situation-room/visual-snapshot-store";
-import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  listStagePlayLiveSourceMailItems,
+  resetStagePlayLiveSourceMailboxForTest,
+} from "../services/stage-play/stage-play-live-source-mailbox-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
@@ -1056,7 +1059,48 @@ describe("live-source mail live environment tools", () => {
       next_10s_prediction: "watch for recovery from fire or nearby hostile mobs",
       confidence: 0.82,
     });
-    seedVisualSummaryText(structuredSummary, "minecraft-observer-json");
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const frame = recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:helix-ask-live-source-mail-tool:minecraft-observer-json",
+      ts: "2026-06-04T12:10:00.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: frame.frame_id,
+      evidence_id: "visual_evidence:helix-ask-live-source-mail-tool:minecraft-observer-json",
+      summary: structuredSummary,
+      visual_observer_profile_id: minecraftProfile.profileId,
+      visual_observer_profile_title: minecraftProfile.title,
+      visual_prompt_hash: minecraftProfile.promptHash,
+      visual_output_mode: minecraftProfile.outputMode,
+      visual_observer_structured_output: structuredSummary,
+      supports_claims: [
+        {
+          claim: "The Minecraft observer profile produced compact structured visual evidence.",
+          support_status: "supports",
+          confidence: 0.82,
+        },
+      ],
+    });
+    const stampedMail = listStagePlayLiveSourceMailItems({ threadId, sourceId }).at(-1);
+    expect(stampedMail?.sourceRefs).toMatchObject({
+      frameRef: frame.frame_id,
+      evidenceRef: "visual_evidence:helix-ask-live-source-mail-tool:minecraft-observer-json",
+    });
+    expect(stampedMail?.evidenceRefs).toEqual(expect.arrayContaining([
+      minecraftProfile.profileId,
+      `visual_prompt_hash:${minecraftProfile.promptHash}`,
+    ]));
 
     const testObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.test_visual_observer_profile",
@@ -1090,6 +1134,14 @@ describe("live-source mail live environment tools", () => {
     expect(packet.riskMatches).toEqual(expect.arrayContaining(["fire", "low light"]));
     expect(packet.opportunityMatches).toEqual(expect.arrayContaining(["ore may be nearby"]));
     expect(packet.watchNext).toEqual(expect.arrayContaining(["watch for recovery from fire or nearby hostile mobs"]));
+    expect(packet.mailIds).toContain(stampedMail?.mailId);
+    expect(packet.visualEvidenceRefs).toEqual(expect.arrayContaining([
+      "visual_evidence:helix-ask-live-source-mail-tool:minecraft-observer-json",
+    ]));
+    expect(packet.evidenceRefs).toEqual(expect.arrayContaining([
+      minecraftProfile.profileId,
+      `visual_prompt_hash:${minecraftProfile.promptHash}`,
+    ]));
     expect(packet.recommendedNext).toBe("request_voice_callout");
     expect(packet.assistant_answer).toBe(false);
     expect(packet.terminal_eligible).toBe(false);

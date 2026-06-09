@@ -8478,6 +8478,19 @@ export type HelixMailLoopTranscriptRowKind =
   | "task_deferred"
   | "task_running"
   | "task_completed"
+  | "budget_state"
+  | "processed_mail_read"
+  | "processed_mail_packet"
+  | "processed_mail_goal_satisfied"
+  | "decision_recorded"
+  | "voice_candidate"
+  | "voice_requested"
+  | "voice_blocked"
+  | "checkpoint_summary"
+  | "continuation_scheduled"
+  | "continuation_deferred"
+  | "tool_budget_no_progress"
+  | "micro_reasoner_run"
   | "prediction_check"
   | "narrative_projection"
   | "agent_decision"
@@ -8516,6 +8529,19 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "task_deferred",
   "task_running",
   "task_completed",
+  "budget_state",
+  "processed_mail_read",
+  "processed_mail_packet",
+  "processed_mail_goal_satisfied",
+  "decision_recorded",
+  "voice_candidate",
+  "voice_requested",
+  "voice_blocked",
+  "checkpoint_summary",
+  "continuation_scheduled",
+  "continuation_deferred",
+  "tool_budget_no_progress",
+  "micro_reasoner_run",
   "prediction_check",
   "narrative_projection",
   "agent_decision",
@@ -8752,6 +8778,19 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   }
   if (row.rowKind === "prediction_check") return row.body || "No prior prediction.";
   if (row.rowKind === "narrative_projection") return row.body || "Narrative projection recorded.";
+  if (row.rowKind === "budget_state") return row.body || "Mail-loop budget state recorded.";
+  if (row.rowKind === "processed_mail_read") return row.body || "Processed live-source mail packet read.";
+  if (row.rowKind === "processed_mail_packet") return row.body || "Processed mail packet available.";
+  if (row.rowKind === "processed_mail_goal_satisfied") return row.body || "Goal satisfied by processed mail.";
+  if (row.rowKind === "decision_recorded") return row.body || "Decision recorded.";
+  if (row.rowKind === "voice_candidate") return row.body || "Voice candidate prepared.";
+  if (row.rowKind === "voice_requested") return row.body || "Voice callout requested.";
+  if (row.rowKind === "voice_blocked") return row.body || "Voice callout blocked or held by policy.";
+  if (row.rowKind === "checkpoint_summary") return row.body || "Checkpoint summary recorded.";
+  if (row.rowKind === "continuation_scheduled") return row.body || "Continuation scheduled; backend wake loop remains armed.";
+  if (row.rowKind === "continuation_deferred") return row.body || "Continuation deferred for pressure; unread mail retained.";
+  if (row.rowKind === "tool_budget_no_progress") return row.body || "Tool budget stopped because the latest tool call made no progress.";
+  if (row.rowKind === "micro_reasoner_run") return row.body || "Micro-reasoner run recorded.";
   if (row.rowKind === "task_queued" || row.rowKind === "task_deferred" || row.rowKind === "task_running" || row.rowKind === "task_completed") return row.body;
   if (row.rowKind === "mail_read_tool_call") return "live_env.read_live_source_mail";
   if (row.rowKind === "mail_read_receipt") {
@@ -8793,6 +8832,19 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "mail_received") return "Observation mail";
   if (row.rowKind === "prediction_check") return "Prediction check";
   if (row.rowKind === "narrative_projection") return "Narrative projection";
+  if (row.rowKind === "budget_state") return row.title || "Budget state";
+  if (row.rowKind === "processed_mail_read") return row.title || "Processed mail read";
+  if (row.rowKind === "processed_mail_packet") return row.title || "Processed packet";
+  if (row.rowKind === "processed_mail_goal_satisfied") return row.title || "Goal satisfied";
+  if (row.rowKind === "decision_recorded") return row.title || "Decision recorded";
+  if (row.rowKind === "voice_candidate") return row.title || "Voice candidate";
+  if (row.rowKind === "voice_requested") return row.title || "Voice requested";
+  if (row.rowKind === "voice_blocked") return row.title || "Voice blocked";
+  if (row.rowKind === "checkpoint_summary") return row.title || "Checkpoint summary";
+  if (row.rowKind === "continuation_scheduled") return row.title || "Continuation scheduled";
+  if (row.rowKind === "continuation_deferred") return row.title || "Continuation deferred";
+  if (row.rowKind === "tool_budget_no_progress") return row.title || "Tool budget stopped";
+  if (row.rowKind === "micro_reasoner_run") return row.title || "Micro-reasoner run";
   if (row.rowKind === "task_queued") return "Task queued";
   if (row.rowKind === "task_deferred") return "Task deferred";
   if (row.rowKind === "task_running") return "Task running";
@@ -8831,6 +8883,11 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
 function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): HelixContinuousTurnStreamTone {
   if (row.rowKind === "mail_received" || row.rowKind === "mail_read_receipt") return "observation";
   if (row.rowKind === "prediction_check") return "observation";
+  if (row.rowKind === "processed_mail_read" || row.rowKind === "processed_mail_packet" || row.rowKind === "micro_reasoner_run") return "observation";
+  if (row.rowKind === "processed_mail_goal_satisfied" || row.rowKind === "decision_recorded" || row.rowKind === "checkpoint_summary" || row.rowKind === "continuation_scheduled") return "checkpoint";
+  if (row.rowKind === "voice_candidate" || row.rowKind === "voice_requested") return "checkpoint";
+  if (row.rowKind === "voice_blocked" || row.rowKind === "continuation_deferred" || row.rowKind === "tool_budget_no_progress") return "warning";
+  if (row.rowKind === "budget_state") return /\b(?:deferred|pressure|exhausted|no progress|stopped)\b/i.test(row.body) ? "warning" : "checkpoint";
   if (row.rowKind === "interpretation" || row.rowKind === "watch_next" || row.rowKind === "prediction" || row.rowKind === "narrative_state" || row.rowKind === "interpretation_state" || row.rowKind === "interpreter_profile" || row.rowKind === "profile_comparison" || row.rowKind === "profile_note_link" || row.rowKind === "profile_compiled" || row.rowKind === "narrative_projection") return "checkpoint";
   if (row.rowKind === "agent_decision" || row.rowKind === "voice_callout_request" || row.rowKind === "wait_for_next_summary" || row.rowKind === "loop_state") return "checkpoint";
   if (row.rowKind === "task_queued" || row.rowKind === "task_running") return "working";
@@ -8853,6 +8910,9 @@ export function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: Heli
     key: `${replyId}-mail-loop-${row.rowId}-${row.rowKind}`,
     source: row.rowKind === "voice_tool_call" ||
       row.rowKind === "voice_receipt" ||
+      row.rowKind === "voice_candidate" ||
+      row.rowKind === "voice_requested" ||
+      row.rowKind === "voice_blocked" ||
       row.rowKind.startsWith("voice_steering_") ||
       row.rowKind === "steering_ack_receipt"
       ? "voice"

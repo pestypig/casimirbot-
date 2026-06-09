@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { __testHelixAskPendingInputStore, planRouter } from "../routes/agi.plan";
+import { __testHelixAskPendingInputStore, __testHelixGoalSatisfaction, planRouter } from "../routes/agi.plan";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
   analyzeVisualFrame,
@@ -11,11 +11,18 @@ import {
   startVisualSnapshotSource,
 } from "../services/situation-room/visual-snapshot-store";
 import {
+  configureStagePlayLiveSourceWatchJobPolicy,
   enqueueStagePlayLiveSourceMailItem,
   resetStagePlayLiveSourceMailboxForTest,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
-import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
-import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
+import {
+  listStagePlayLiveSourceMailWakeRequests,
+  resetStagePlayLiveSourceMailWakeStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
+  listStagePlayLiveSourceMailTranscriptEntries,
+  resetStagePlayLiveSourceMailTranscriptStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
@@ -43,10 +50,14 @@ const resetLiveSourceMailRoutingState = (): void => {
   __testHelixAskPendingInputStore.delete(threadId);
 };
 
+const setAgentStepResponses = (responses: Array<Record<string, unknown>>): void => {
+  process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+  process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify(responses);
+};
+
 beforeEach(() => {
   resetLiveSourceMailRoutingState();
-  process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
-  process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+  setAgentStepResponses([
     {
       next_step: "next_action",
       chosen_capability: "live_env.read_processed_live_source_mail",
@@ -150,8 +161,586 @@ const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void =>
 };
 
 describe.sequential("Helix Ask live-source mail interpretation routing", () => {
+  it("classifies new processed mail refs as tool progress", () => {
+    const receipt = __testHelixGoalSatisfaction.buildMailLoopToolProgressReceipt({
+      turnId: "ask:mail-loop-progress",
+      iteration: 1,
+      toolName: "live_env.read_processed_live_source_mail",
+      previousRefs: new Set(),
+      observation: {
+        schema: "stage_play_processed_live_source_mail_read_result/v1",
+        packets: [
+          {
+            artifactId: "stage_play_processed_mail_packet",
+            schemaVersion: "stage_play_processed_mail_packet/v1",
+            packetId: "stage_play_processed_mail_packet:progress-new",
+            observedFacts: ["Minecraft gameplay is visible."],
+            recommendedNext: "draft_text_answer",
+          },
+        ],
+      },
+    });
+
+    expect(receipt).toMatchObject({
+      toolName: "live_env.read_processed_live_source_mail",
+      producedRefs: ["stage_play_processed_mail_packet:progress-new"],
+      newRefs: ["stage_play_processed_mail_packet:progress-new"],
+      progressKind: "processed_packet",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("classifies repeated live-source refs as no_progress", () => {
+    const previousRefs = new Set(["stage_play_processed_mail_packet:progress-repeat"]);
+    const receipt = __testHelixGoalSatisfaction.buildMailLoopToolProgressReceipt({
+      turnId: "ask:mail-loop-progress-repeat",
+      iteration: 2,
+      toolName: "live_env.read_processed_live_source_mail",
+      previousRefs,
+      observation: {
+        schema: "stage_play_processed_live_source_mail_read_result/v1",
+        packets: [
+          {
+            artifactId: "stage_play_processed_mail_packet",
+            schemaVersion: "stage_play_processed_mail_packet/v1",
+            packetId: "stage_play_processed_mail_packet:progress-repeat",
+            observedFacts: ["Minecraft gameplay is still visible."],
+            recommendedNext: "draft_text_answer",
+          },
+        ],
+      },
+    });
+
+    expect(receipt).toMatchObject({
+      toolName: "live_env.read_processed_live_source_mail",
+      producedRefs: ["stage_play_processed_mail_packet:progress-repeat"],
+      newRefs: [],
+      progressKind: "no_progress",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("builds record_interpretation final answer from processed-mail packet fields", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeProcessedMailTerminalText({
+      packet: {
+        artifactId: "stage_play_processed_mail_packet",
+        schemaVersion: "stage_play_processed_mail_packet/v1",
+        packetId: "stage_play_processed_mail_packet:terminal-interpretation",
+        observedFacts: [
+          "Minecraft player is in a cave-like area.",
+          "A pickaxe is visible.",
+        ],
+        inferredFacts: ["The player may be mining or exploring underground."],
+        changedFacts: ["The scene moved from base inventory to cave exploration."],
+        predictionValidation: {
+          result: "partially_supported",
+          supportedSignals: ["cave setting remained visible"],
+          contradictedSignals: ["inventory view disappeared"],
+          newSignals: ["pickaxe visible"],
+        },
+        salience: {
+          level: "medium",
+          reasons: ["underground exploration may become risky"],
+          voiceCandidate: false,
+        },
+        recommendedNext: "record_interpretation",
+        watchNext: ["mob movement", "lava", "ore discovery"],
+      },
+      decision: {
+        decision: "record_interpretation",
+        rationalePreview: "The processed packet should be interpreted as the current checkpoint.",
+      },
+      narrativeState: {
+        interpretedSituation: {
+          userRelevantMeaning: "The clip is shifting from routine setup toward underground exploration.",
+        },
+      },
+    });
+
+    expect(text).toContain("Observed:");
+    expect(text).toContain("Minecraft player is in a cave-like area.");
+    expect(text).toContain("Cautious interpretation:");
+    expect(text).toContain("shifting from routine setup");
+    expect(text).toContain("Prediction:");
+    expect(text).toContain("partially supported");
+    expect(text).toContain("Watch next:");
+    expect(text).toContain("mob movement");
+    expect(text).toContain("Loop:");
+    expect(text).toContain("Armed for next update.");
+    expect(text).not.toMatch(/processed live-source packet\(s\) were read and require a recorded agent decision/i);
+  });
+
+  it("builds request_voice_callout final answer from processed-mail salience", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeProcessedMailTerminalText({
+      packet: {
+        artifactId: "stage_play_processed_mail_packet",
+        schemaVersion: "stage_play_processed_mail_packet/v1",
+        packetId: "stage_play_processed_mail_packet:terminal-voice",
+        observedFacts: ["The player appears to be on fire."],
+        changedFacts: ["Damage/fire cue appeared."],
+        salience: {
+          level: "urgent",
+          reasons: ["fire or damage cue"],
+          voiceCandidate: true,
+          calloutDraft: "The player appears to be on fire; watch for recovery or danger.",
+        },
+        recommendedNext: "request_voice_callout",
+        watchNext: ["health", "fire recovery"],
+      },
+      decision: {
+        decision: "request_voice_callout",
+        voiceCalloutDraft: {
+          text: "The player appears to be on fire; watch for recovery or danger.",
+          voiceEligible: true,
+          requiresConfirmation: false,
+        },
+      },
+    });
+
+    expect(text).toContain("Processed mail identified a high-salience voice candidate:");
+    expect(text).toContain("The player appears to be on fire");
+    expect(text).toContain("Voice status:");
+    expect(text).toContain("requested");
+    expect(text).toContain("Loop:");
+    expect(text).toContain("Armed for next update.");
+  });
+
+  it("builds wait_for_next_summary final answer from low-salience processed mail", () => {
+    const text = __testHelixGoalSatisfaction.buildHelixRuntimeProcessedMailTerminalText({
+      packet: {
+        artifactId: "stage_play_processed_mail_packet",
+        schemaVersion: "stage_play_processed_mail_packet/v1",
+        packetId: "stage_play_processed_mail_packet:terminal-wait",
+        observedFacts: ["The scene remains in a stable inventory view."],
+        changedFacts: [],
+        predictionValidation: {
+          result: "supported",
+          supportedSignals: ["inventory/base view remained stable"],
+          contradictedSignals: [],
+          newSignals: [],
+        },
+        salience: {
+          level: "low",
+          reasons: ["stable scene"],
+          voiceCandidate: false,
+        },
+        recommendedNext: "wait_for_next_summary",
+        watchNext: ["scene transition"],
+      },
+    });
+
+    expect(text).toContain("Processed mail did not require a user-facing update.");
+    expect(text).toContain("Reason: stable scene.");
+    expect(text).toContain("Loop remains armed.");
+    expect(text).toContain("Armed for next update.");
+    expect(text).not.toMatch(/visual evidence (?:is|was) unavailable/i);
+  });
+
+  it("queues a backend continuation wake after a processed-mail checkpoint without reusing the current batch", () => {
+    const firstMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:checkpoint-current",
+      evidenceRef: "visual_evidence:checkpoint-current",
+      summaryText: "Minecraft gameplay shows the current processed checkpoint batch.",
+      createdAt: "2026-06-04T12:00:00.000Z",
+    });
+    const secondMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:checkpoint-retained",
+      evidenceRef: "visual_evidence:checkpoint-retained",
+      summaryText: "Minecraft gameplay has a newer unread update retained after the checkpoint.",
+      createdAt: "2026-06-04T12:00:10.000Z",
+    });
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the active visual source and interpret retained mail.",
+      decisionPolicyPrompt: "Read retained mail as the next checkpoint.",
+      interpretationMode: "batch_interpretation",
+      mailProcessingMode: "micro_batch",
+      outputCadence: "every_batch",
+    });
+    resetStagePlayLiveSourceMailWakeStoreForTest();
+    const prompt = "Read the visual mail and interpret what is happening. Say what should be watched next.";
+    const canonicalGoalFrame = __testHelixGoalSatisfaction.buildAskTurnCanonicalGoalFrame({
+      turnId: "ask:checkpoint-continuation",
+      goalFrame: {
+        schema: "helix.ask.universal_goal_frame.v1",
+        turn_id: "ask:checkpoint-continuation",
+        user_goal: {
+          raw: prompt,
+          normalized: prompt,
+          goal_kind: "unknown",
+          goal_hash: "test-goal-hash",
+        },
+        requested_outputs: [],
+        evidence_requirements: [],
+        constraints: [],
+        risks: [],
+        confidence: "medium",
+        assistant_answer: false,
+        raw_content_included: false,
+      } as any,
+    });
+    const payload: Record<string, unknown> = {
+      thread_id: threadId,
+      debug: {},
+    };
+    const artifacts: any[] = [{
+      artifact_id: "ask:checkpoint-continuation:read_processed_mail",
+      kind: "live_environment_tool_observation",
+      turn_id: "ask:checkpoint-continuation",
+      producer_item_id: "live_env.read_processed_live_source_mail",
+      created_at_ms: Date.now(),
+      source_scope: "current_turn",
+      goal_hash: "checkpoint-continuation-test",
+      payload: {
+        schema: "helix.live_environment_tool_observation.v1",
+        ok: true,
+        tool_name: "live_env.read_processed_live_source_mail",
+        observation: {
+          schema: "stage_play_processed_live_source_mail_read_result/v1",
+          mailboxThreadId: threadId,
+          packets: [{
+            artifactId: "stage_play_processed_mail_packet",
+            schemaVersion: "stage_play_processed_mail_packet/v1",
+            packetId: "stage_play_processed_mail_packet:checkpoint-current",
+            jobId: "stage_play_live_source_job:checkpoint-continuation",
+            sourceId,
+            mailIds: [firstMail.mailId],
+            visualEvidenceRefs: ["visual_evidence:checkpoint-current"],
+            observedFacts: ["Minecraft gameplay is visible in the current checkpoint."],
+            inferredFacts: [],
+            uncertainties: [],
+            stableFactsUsed: [],
+            changedFacts: ["current checkpoint batch interpreted"],
+            sceneTags: ["minecraft"],
+            activityTags: ["gameplay"],
+            objectTags: [],
+            matchedCriteria: [],
+            suppressedCriteria: [],
+            riskMatches: [],
+            opportunityMatches: [],
+            voiceCalloutMatches: [],
+            salience: {
+              level: "medium",
+              reasons: ["checkpoint batch"],
+              voiceCandidate: false,
+            },
+            recommendedNext: "draft_text_answer",
+            watchNext: ["next retained visual update"],
+            resolutionState: "processed_packet_ready",
+            microReasonerRunRefs: [],
+            evidenceRefs: [firstMail.mailId, "visual_evidence:checkpoint-current"],
+            createdAt: "2026-06-04T12:00:11.000Z",
+            assistant_answer: false,
+            terminal_eligible: false,
+            context_role: "tool_evidence",
+          }],
+        },
+      },
+    }];
+
+    const result = __testHelixGoalSatisfaction.applyMailLoopCheckpointContinuationToPayload({
+      payload,
+      turnId: "ask:checkpoint-continuation",
+      transcript: prompt,
+      canonicalGoalFrame,
+      artifacts,
+    });
+
+    const continuation = payload.stage_play_mail_loop_checkpoint_continuation as any;
+    expect(result.artifact?.kind).toBe("stage_play_mail_loop_checkpoint_continuation");
+    expect(continuation).toMatchObject({
+      checkpoint_state: "checkpoint_completed",
+      continuation: "scheduled",
+      unread_retained: 1,
+      loop_state: "armed_for_next_summary",
+    });
+    expect(continuation.current_batch_mail_ids).toContain(firstMail.mailId);
+    expect(continuation.retained_mail_ids).toEqual([secondMail.mailId]);
+    expect(continuation.queued_wake_id).toMatch(/^stage_play_live_source_mail_wake:/);
+    const queuedWakes = listStagePlayLiveSourceMailWakeRequests({ threadId, limit: 10 });
+    expect(queuedWakes).toHaveLength(1);
+    expect(queuedWakes[0].mailIds).toEqual([secondMail.mailId]);
+    expect(queuedWakes[0].mailIds).not.toContain(firstMail.mailId);
+    const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId, limit: 10 });
+    const rowKinds = transcriptEntries.map((entry) => entry.row.rowKind);
+    expect(rowKinds).toEqual(expect.arrayContaining([
+      "checkpoint_summary",
+      "processed_mail_goal_satisfied",
+      "continuation_scheduled",
+      "loop_state",
+    ]));
+    const continuationRow = transcriptEntries.find((entry) => entry.row.rowKind === "continuation_scheduled")?.row;
+    expect(continuationRow?.body).toContain("Checkpoint complete.");
+    expect(continuationRow?.body).toContain("Continuation: scheduled.");
+    expect(continuationRow?.body).toContain("Unread retained: 1.");
+  });
+
+  it("classifies processed visual-mail interpretation as the canonical processed-mail checkpoint goal", () => {
+    const prompt =
+      "Read the visual mail from the active Minecraft video predictor and interpret what is happening. Predict what should be watched next.";
+    const canonicalGoalFrame = __testHelixGoalSatisfaction.buildAskTurnCanonicalGoalFrame({
+      turnId: "ask:processed-mail-canonical-goal",
+      goalFrame: {
+        schema: "helix.ask.universal_goal_frame.v1",
+        turn_id: "ask:processed-mail-canonical-goal",
+        user_goal: {
+          raw: prompt,
+          normalized: prompt,
+          goal_kind: "unknown",
+          goal_hash: "test-goal-hash",
+        },
+        requested_outputs: [],
+        evidence_requirements: [],
+        constraints: [],
+        risks: [],
+        confidence: "medium",
+        assistant_answer: false,
+        raw_content_included: false,
+      } as any,
+    });
+    expect(canonicalGoalFrame).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      answer_scope: "live_environment_state",
+      required_terminal_kind: "model_synthesized_answer",
+      classifier_reasons: expect.arrayContaining([
+        "processed_mail_interpretation_goal",
+        "forbid_visual_capture_describe_goal",
+      ]),
+    });
+
+    const evaluation = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId: "ask:processed-mail-canonical-goal",
+      transcript: prompt,
+      canonicalGoalFrame,
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:processed-mail-canonical-goal:read_processed_mail",
+          kind: "live_environment_tool_observation",
+          turn_id: "ask:processed-mail-canonical-goal",
+          producer_item_id: "live_env.read_processed_live_source_mail",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            ok: true,
+            tool_name: "live_env.read_processed_live_source_mail",
+            observation: {
+              schema: "stage_play_processed_live_source_mail_read_result/v1",
+              packets: [
+                {
+                  artifactId: "stage_play_processed_mail_packet",
+                  schemaVersion: "stage_play_processed_mail_packet/v1",
+                  packetId: "stage_play_processed_mail_packet:test",
+                  observedFacts: ["Minecraft gameplay is visible."],
+                  changedFacts: ["The scene moved outdoors."],
+                  salience: {
+                    level: "medium",
+                    reasons: ["scene transition"],
+                    voiceCandidate: false,
+                  },
+                  recommendedNext: "draft_text_answer",
+                },
+              ],
+            },
+          },
+        } as any,
+      ],
+      satisfactionReport: {
+        satisfied: true,
+        terminal_kind: "final_answer",
+        terminal_artifact_id: "ask:processed-mail-canonical-goal:model_synthesized_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        terminal_source: "artifact_synthesis",
+        missing_artifacts: [],
+        confidence: "high",
+      },
+      selectedAction: null,
+    });
+
+    expect(evaluation).toMatchObject({
+      canonical_goal_kind: "live_source_processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+      satisfaction: "satisfied",
+      terminal_contract: expect.objectContaining({
+        required_terminal_kinds: ["model_synthesized_answer"],
+        required_actions: ["live_env.read_processed_live_source_mail"],
+        required_evidence: [
+          "processed_mail_packet",
+          "live_source_decision_or_checkpoint_summary",
+          "loop_state",
+        ],
+        forbidden_terminal_kinds: expect.arrayContaining([
+          "visual_context_pack",
+          "situation_context_pack",
+          "focused_doc_answer",
+          "doc_summary",
+        ]),
+      }),
+      required_actions: [
+        expect.objectContaining({
+          action_key: "live_env.read_processed_live_source_mail",
+          satisfied: true,
+        }),
+      ],
+      required_evidence: [
+        expect.objectContaining({
+          kind: "processed_mail_packet",
+          satisfied: true,
+        }),
+        expect.objectContaining({
+          kind: "live_source_decision_or_checkpoint_summary",
+          satisfied: true,
+        }),
+        expect.objectContaining({
+          kind: "loop_state",
+          satisfied: true,
+        }),
+      ],
+    });
+  });
+
+  it("requires a decision receipt when processed mail recommends interpretation", () => {
+    const prompt =
+      "Read the visual mail and interpret what is happening. Predict what happens next and say what should be watched next.";
+    const canonicalGoalFrame = __testHelixGoalSatisfaction.buildAskTurnCanonicalGoalFrame({
+      turnId: "ask:processed-mail-decision-required",
+      goalFrame: {
+        schema: "helix.ask.universal_goal_frame.v1",
+        turn_id: "ask:processed-mail-decision-required",
+        user_goal: {
+          raw: prompt,
+          normalized: prompt,
+          goal_kind: "unknown",
+          goal_hash: "test-goal-hash",
+        },
+        requested_outputs: [],
+        evidence_requirements: [],
+        constraints: [],
+        risks: [],
+        confidence: "medium",
+        assistant_answer: false,
+        raw_content_included: false,
+      } as any,
+    });
+    const readArtifact = {
+      artifact_id: "ask:processed-mail-decision-required:read_processed_mail",
+      kind: "live_environment_tool_observation",
+      turn_id: "ask:processed-mail-decision-required",
+      producer_item_id: "live_env.read_processed_live_source_mail",
+      payload: {
+        schema: "helix.live_environment_tool_observation.v1",
+        ok: true,
+        tool_name: "live_env.read_processed_live_source_mail",
+        observation: {
+          schema: "stage_play_processed_live_source_mail_read_result/v1",
+          packets: [
+            {
+              artifactId: "stage_play_processed_mail_packet",
+              schemaVersion: "stage_play_processed_mail_packet/v1",
+              packetId: "stage_play_processed_mail_packet:interpretation-required",
+              observedFacts: ["Minecraft gameplay is visible."],
+              changedFacts: ["The player moved from an interior base to an outdoor area."],
+              salience: {
+                level: "medium",
+                reasons: ["scene transition"],
+                voiceCandidate: false,
+              },
+              recommendedNext: "record_interpretation",
+            },
+          ],
+        },
+      },
+    } as any;
+    const satisfiedTerminal = {
+      satisfied: true,
+      terminal_kind: "final_answer",
+      terminal_artifact_id: "ask:processed-mail-decision-required:model_synthesized_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_source: "artifact_synthesis",
+      missing_artifacts: [],
+      confidence: "high",
+    } as any;
+
+    const withoutDecision = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId: "ask:processed-mail-decision-required",
+      transcript: prompt,
+      canonicalGoalFrame,
+      currentTurnArtifacts: [readArtifact],
+      satisfactionReport: satisfiedTerminal,
+      selectedAction: null,
+    });
+
+    expect(withoutDecision).toMatchObject({
+      canonical_goal_kind: "live_source_processed_mail_interpretation",
+      satisfaction: "partially_satisfied",
+      required_evidence: [
+        expect.objectContaining({ kind: "processed_mail_packet", satisfied: true }),
+        expect.objectContaining({ kind: "live_source_decision_or_checkpoint_summary", satisfied: false }),
+        expect.objectContaining({ kind: "loop_state", satisfied: true }),
+      ],
+    });
+
+    const withDecision = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId: "ask:processed-mail-decision-required",
+      transcript: prompt,
+      canonicalGoalFrame,
+      currentTurnArtifacts: [
+        readArtifact,
+        {
+          artifact_id: "ask:processed-mail-decision-required:decision",
+          kind: "live_environment_tool_observation",
+          turn_id: "ask:processed-mail-decision-required",
+          producer_item_id: "live_env.record_live_source_mail_decision",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            ok: true,
+            tool_name: "live_env.record_live_source_mail_decision",
+            observation: {
+              artifactId: "stage_play_live_source_mail_decision",
+              schemaVersion: "stage_play_live_source_mail_decision/v1",
+              decisionId: "stage_play_live_source_mail_decision:interpretation-required",
+              decision: "record_interpretation",
+              nextLoopState: "armed_for_next_summary",
+            },
+          },
+        } as any,
+      ],
+      satisfactionReport: satisfiedTerminal,
+      selectedAction: null,
+    });
+
+    expect(withDecision).toMatchObject({
+      satisfaction: "satisfied",
+      required_evidence: [
+        expect.objectContaining({ kind: "processed_mail_packet", satisfied: true }),
+        expect.objectContaining({ kind: "live_source_decision_or_checkpoint_summary", satisfied: true }),
+        expect.objectContaining({ kind: "loop_state", satisfied: true }),
+      ],
+    });
+  });
+
   it("routes interpreter profile setup prompts to configure_interpreter_profile before mailbox reads", async () => {
     seedVisualMail("A Minecraft menu is visible, but this turn is only configuring interpretation policy.");
+    setAgentStepResponses([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.configure_interpreter_profile",
+        reason: "Configure the requested interpreter profile.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_interpreter_profile"],
+        confidence: 0.95,
+      },
+    ]);
 
     const { response, liveEnvironmentToolNames, debug } = await askMailbox(
       "Create a Minecraft Survival Coach interpreter profile for this source. Call out danger, rare resources, and strategic decisions; ignore routine walking.",
@@ -185,6 +774,16 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
 
   it("configures a Minecraft video predictor profile without terminal consistency failure", async () => {
     seedVisualMail("A Minecraft YouTube video frame is visible, but profile setup should not consume the mail.");
+    setAgentStepResponses([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.configure_interpreter_profile",
+        reason: "Configure the requested Minecraft video predictor profile.",
+        args: {},
+        expected_artifacts: ["stage_play_live_source_interpreter_profile"],
+        confidence: 0.95,
+      },
+    ]);
 
     const { response, liveEnvironmentToolNames, debug } = await askMailbox(
       "Create a Minecraft Video Predictor interpreter profile for this source. Separate observed facts from cautious inferences, predict the next likely scene beat, and say what should be watched next.",
@@ -341,7 +940,7 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
   it("routes playbook visual-mail interpretation wording to record_interpretation", async () => {
     seedVisualMail("The visual summary shows a dark icon grid with multiple productivity apps.");
 
-    const { response, decision, debug } = await askMailbox(
+    const { response, decision, liveEnvironmentToolNames, debug } = await askMailbox(
       "Read the visual mail and interpret what is happening. Say what should be watched next.",
     );
 
@@ -350,8 +949,52 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
       decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
       narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
     });
+    const firstProcessedReadIndex = liveEnvironmentToolNames.indexOf("live_env.read_processed_live_source_mail");
+    const processIndex = liveEnvironmentToolNames.indexOf("live_env.process_live_source_mail");
+    const secondProcessedReadIndex = liveEnvironmentToolNames.lastIndexOf("live_env.read_processed_live_source_mail");
+    const decisionIndex = liveEnvironmentToolNames.indexOf("live_env.record_live_source_mail_decision");
+    expect(firstProcessedReadIndex, debug).toBeGreaterThanOrEqual(0);
+    expect(processIndex, debug).toBeGreaterThan(firstProcessedReadIndex);
+    expect(secondProcessedReadIndex, debug).toBeGreaterThan(processIndex);
+    expect(decisionIndex, debug).toBeGreaterThan(secondProcessedReadIndex);
     expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
     expect(response.body?.answer, debug).toMatch(/icon grid|Watch next/i);
+    expect(response.body?.canonical_goal_frame, debug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(response.body?.goal_satisfaction_evaluation, debug).toMatchObject({
+      canonical_goal_kind: "live_source_processed_mail_interpretation",
+      terminal_contract: expect.objectContaining({
+        required_evidence: [
+          "processed_mail_packet",
+          "live_source_decision_or_checkpoint_summary",
+          "loop_state",
+        ],
+        forbidden_terminal_kinds: expect.arrayContaining([
+          "visual_context_pack",
+          "situation_context_pack",
+          "focused_doc_answer",
+          "doc_summary",
+        ]),
+      }),
+    });
+    expect(response.body?.goal_satisfaction_evaluation?.required_evidence, debug).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "processed_mail_packet",
+          satisfied: true,
+        }),
+        expect.objectContaining({
+          kind: "live_source_decision_or_checkpoint_summary",
+          satisfied: true,
+        }),
+        expect.objectContaining({
+          kind: "loop_state",
+          satisfied: true,
+        }),
+      ]),
+    );
     expect(response.body?.stage_play_live_source_mailbox_debug?.trajectory, debug).toMatchObject({
       route: "live_source_mailbox",
       capability: "live_env.read_processed_live_source_mail",
@@ -362,9 +1005,15 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
       cycleId: expect.stringMatching(/^live_source_cycle:/),
       askTurnId: response.body?.turn_id,
     });
+    expect(response.body?.stage_play_live_source_mailbox_debug, debug).toMatchObject({
+      canonical_goal: "live_source_processed_mail_interpretation",
+      evidence_requirement: "processed_mail_packet",
+      decision_requirement: "record_live_source_mail_decision",
+    });
     expect(response.body?.stage_play_live_source_mailbox_debug?.wake_continuation, debug).toMatchObject({
-      checkpoint_state: "manual_checkpoint_completed",
-      continuation: expect.stringContaining("Manual checkpoint completed."),
+      checkpoint_state: "checkpoint_completed",
+      continuation: expect.stringContaining("Backend wake loop remains armed"),
+      backend_wake_loop_armed: true,
       loop_state: "armed_for_next_summary",
       unread_retained: 0,
       assistant_answer: false,
@@ -385,7 +1034,7 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     });
     seedVisualMail("The Minecraft video shows a player moving from a wooden cabin interior into a birch forest while holding a sword.");
 
-    const { response, decision, debug } = await askMailbox(
+    const { response, decision, liveEnvironmentToolNames, debug } = await askMailbox(
       "Read the visual mail from the active Minecraft YouTube live source and interpret what is happening. Use a Minecraft video predictor contract: separate observed facts from cautious inferences, predict the next likely scene beat, and say what should be watched next.",
     );
 
@@ -394,16 +1043,49 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
       decision_validation_result: "forced_record_interpretation_for_read_mail_interpretation_intent",
       narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
       mailCoverage: {
-        mode: "latest_only",
+        mode: "chronological_batch",
         interpretedMailIds: expect.arrayContaining([expect.stringMatching(/^stage_play_live_source_mail:/)]),
       },
     });
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
-    expect(response.body?.answer, debug).toMatch(/I interpreted the current live-source mail checkpoint/i);
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.read_processed_live_source_mail");
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.record_live_source_mail_decision");
+    expect(liveEnvironmentToolNames, debug).not.toContain("live_env.read_live_source_mail");
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.stage_play_live_source_mailbox_debug, debug).toMatchObject({
+      route: "live_source_mailbox",
+      capability: "live_env.read_processed_live_source_mail",
+      canonical_goal: "live_source_processed_mail_interpretation",
+      evidence_requirement: "processed_mail_packet",
+      decision_requirement: "record_live_source_mail_decision",
+    });
+    expect(response.body?.answer, debug).toMatch(/Observed:/i);
+    expect(response.body?.canonical_goal_frame, debug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+      classifier_reasons: expect.arrayContaining([
+        "processed_mail_interpretation_goal",
+        "forbid_visual_capture_describe_goal",
+      ]),
+    });
+    expect(response.body?.canonical_goal_frame?.goal_kind, debug).not.toBe("visual_capture_describe");
+    expect(response.body?.canonical_goal_frame?.goal_kind, debug).not.toBe("situation_context_pack");
+    expect(response.body?.canonical_goal_frame?.goal_kind, debug).not.toBe("doc_summary");
+    expect(response.body?.goal_satisfaction_evaluation?.terminal_contract?.forbidden_terminal_kinds, debug).toEqual(
+      expect.arrayContaining([
+        "visual_context_pack",
+        "situation_context_pack",
+        "focused_doc_answer",
+        "doc_summary",
+      ]),
+    );
+    expect(response.body?.terminal_error_code, debug).not.toBe("missing_visual_observation");
+    expect(response.body?.terminal_error_code, debug).not.toBe("missing_doc_summary");
     expect(response.body?.answer, debug).toMatch(/Prediction:/i);
-    expect(response.body?.answer, debug).toMatch(/Watch next for/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
     expect(response.body?.answer, debug).toMatch(/Minecraft|birch forest/i);
-    expect(response.body?.answer, debug).not.toMatch(/Observed facts:|Cautious inferences:/i);
+    expect(response.body?.answer, debug).toMatch(/Observed:/i);
+    expect(response.body?.answer, debug).toMatch(/Cautious interpretation:/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
   }, 60_000);
 
@@ -450,7 +1132,7 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     expect(decision?.textAnswerDraft, debug).toBeFalsy();
     expect(response.body?.answer, debug).toMatch(/current chronological batch mail batch/i);
     expect(response.body?.answer, debug).toMatch(/Prediction:/i);
-    expect(response.body?.answer, debug).toMatch(/Watch next for/i);
+    expect(response.body?.answer, debug).toMatch(/Watch next:/i);
     expect(response.body?.answer, debug).toMatch(/inventory|forest|sword|fire|valuable/i);
     expect(response.body?.answer, debug).not.toMatch(/Observed facts:|Cautious inferences:|Coverage:/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
@@ -555,6 +1237,44 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
   }, 30_000);
 
   it("promotes salient Minecraft commentary mail to a decision-backed interim voice callout", async () => {
+    setAgentStepResponses([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_processed_live_source_mail",
+        reason: "Read processed mail first.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.process_live_source_mail",
+        reason: "Process raw mail into packet coverage.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.read_processed_live_source_mail",
+        reason: "Read the processed packet after processing.",
+        args: {},
+        expected_artifacts: ["stage_play_processed_mail_packet"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.record_live_source_mail_decision",
+        reason: "Record the voice callout decision.",
+        args: {
+          decision: "request_voice_callout",
+          rationale_preview: "Salient Minecraft damage/fire cue requires a callout decision.",
+          next_loop_state: "armed_for_next_summary",
+        },
+        expected_artifacts: ["stage_play_live_source_mail_decision"],
+        confidence: 0.9,
+      },
+    ]);
     executeLiveEnvironmentTool({
       tool_name: "live_env.configure_live_source_watch_job",
       thread_id: threadId,

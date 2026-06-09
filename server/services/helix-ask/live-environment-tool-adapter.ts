@@ -798,6 +798,89 @@ const clipText = (value: string | null | undefined, limit = 260): string => {
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
 };
 
+const buildProcessedMailTranscriptRows = (input: {
+  toolName: HelixLiveEnvironmentToolName;
+  packets: StagePlayProcessedMailPacketV1[];
+  missingRawMailIds: string[];
+  mailboxThreadId: string;
+  microReasonerRunRefs: string[];
+  resolutionStateSummary: string;
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const packetRefs = input.packets.map((packet) => packet.packetId);
+  const evidenceRefs = uniqueStrings([
+    input.mailboxThreadId,
+    ...packetRefs,
+    ...input.missingRawMailIds,
+    ...input.microReasonerRunRefs,
+    ...input.packets.flatMap((packet) => packet.evidenceRefs),
+  ]);
+  const rows: AskTurnTranscriptRowDraftV1[] = [{
+    rowId: `processed_mail_read:${hashShort([
+      input.toolName,
+      input.mailboxThreadId,
+      packetRefs,
+      input.missingRawMailIds,
+    ])}`,
+    rowKind: "processed_mail_read",
+    title: "Processed mail read",
+    body: input.packets.length > 0
+      ? [
+          `Read ${input.packets.length} processed live-source packet${input.packets.length === 1 ? "" : "s"}.`,
+          input.missingRawMailIds.length > 0
+            ? `${input.missingRawMailIds.length} raw mail item${input.missingRawMailIds.length === 1 ? "" : "s"} still need processing.`
+            : "All selected raw mail has processed packet coverage.",
+          input.resolutionStateSummary,
+        ].join("\n")
+      : [
+          "No processed live-source packets are available yet.",
+          input.missingRawMailIds.length > 0
+            ? `Fallback: run live_env.process_live_source_mail for ${input.missingRawMailIds.length} raw mail item${input.missingRawMailIds.length === 1 ? "" : "s"}.`
+            : "No raw mail fallback was identified.",
+        ].join("\n"),
+    source: {
+      toolName: input.toolName,
+      artifactKind: "stage_play_processed_live_source_mail_read_result",
+    },
+    evidenceRefs,
+    authority: "tool_evidence",
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  }];
+  for (const packet of input.packets.slice(0, 6)) {
+    const observedPreview = clipText([
+      ...packet.observedFacts,
+      ...packet.changedFacts.map((fact) => `Changed: ${fact}`),
+    ].join(" "), 260);
+    rows.push({
+      rowId: `processed_mail_packet:${hashShort(packet.packetId)}`,
+      rowKind: "processed_mail_packet",
+      title: "Processed packet",
+      body: [
+        `Recommended: ${packet.recommendedNext}.`,
+        `Salience: ${packet.salience.level}${packet.salience.voiceCandidate ? " / voice candidate" : ""}.`,
+        `Mail coverage: ${packet.mailIds.length} mail item${packet.mailIds.length === 1 ? "" : "s"}.`,
+        packet.salience.reasons.length > 0 ? `Reason: ${packet.salience.reasons.join("; ")}.` : null,
+        observedPreview ? `Preview: ${observedPreview}` : null,
+      ].filter(Boolean).join("\n"),
+      source: {
+        toolName: input.toolName,
+        artifactId: packet.packetId,
+        artifactKind: packet.artifactId,
+      },
+      evidenceRefs: uniqueStrings([packet.packetId, ...packet.mailIds, ...packet.evidenceRefs]),
+      causalTrace: packet.causalTrace,
+      authority: "tool_evidence",
+      assistantAnswer: false,
+      terminalEligible: false,
+      createdAt,
+    });
+  }
+  return rows;
+};
+
 const wordsFromText = (value: string): string[] =>
   Array.from(new Set(value.toLowerCase().match(/\b[a-z0-9][a-z0-9-]{2,}\b/g) ?? []))
     .filter((word) => !new Set([
@@ -2487,9 +2570,18 @@ export function executeLiveEnvironmentTool(
     );
     const coveredMailIds = new Set(existingPackets.flatMap((packet) => packet.mailIds));
     const missingRawMailItems = mailItems.filter((item) => !coveredMailIds.has(item.mailId));
+    const autoProcessMissing =
+      args.auto_process_missing === false ||
+      args.autoProcessMissing === false ||
+      args.process_missing === false ||
+      args.processMissing === false ||
+      args.read_only === true ||
+      args.readOnly === true
+        ? false
+        : true;
     const shouldProcess =
       input.tool_name === "live_env.process_live_source_mail" ||
-      missingRawMailItems.length > 0;
+      (autoProcessMissing && missingRawMailItems.length > 0);
     const generated = shouldProcess
       ? processLiveSourceMailItemsForTool({
           args,
@@ -2521,6 +2613,15 @@ export function executeLiveEnvironmentTool(
     const resolutionStateSummary = packets.length > 0
       ? packets.map((packet) => `${packet.packetId}: ${packet.resolutionState}; ${packet.recommendedNext}; ${packet.salience.level}`).join(" | ")
       : "No processed packets are available yet.";
+    const microReasonerRunRefs = uniqueStrings(microReasonerRuns.map((run) => run.runId));
+    const transcriptRows = buildProcessedMailTranscriptRows({
+      toolName: input.tool_name,
+      packets,
+      missingRawMailIds,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      microReasonerRunRefs,
+      resolutionStateSummary,
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
@@ -2538,16 +2639,24 @@ export function executeLiveEnvironmentTool(
         resolution_state_summary: resolutionStateSummary,
         microReasonerRuns,
         micro_reasoner_runs: microReasonerRuns,
-        microReasonerRunRefs: uniqueStrings(microReasonerRuns.map((run) => run.runId)),
-        micro_reasoner_run_refs: uniqueStrings(microReasonerRuns.map((run) => run.runId)),
+        microReasonerRunRefs,
+        micro_reasoner_run_refs: microReasonerRunRefs,
         processedPacketRefs: packets.map((packet) => packet.packetId),
         processed_packet_refs: packets.map((packet) => packet.packetId),
+        transcriptRows,
+        transcript_rows: transcriptRows,
+        autoProcessMissing,
+        auto_process_missing: autoProcessMissing,
         mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
         mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
         mailboxThreadResolution: scope.mailboxThreadResolution,
         mailbox_thread_resolution: scope.mailboxThreadResolution,
-        fallbackTool: missingRawMailIds.length > 0 ? "live_env.read_live_source_mail" : null,
-        fallback_tool: missingRawMailIds.length > 0 ? "live_env.read_live_source_mail" : null,
+        fallbackTool: missingRawMailIds.length > 0
+          ? "live_env.process_live_source_mail"
+          : null,
+        fallback_tool: missingRawMailIds.length > 0
+          ? "live_env.process_live_source_mail"
+          : null,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
@@ -2560,6 +2669,7 @@ export function executeLiveEnvironmentTool(
         ...microReasonerRuns.map((run) => run.runId),
         ...mailItems.map((item) => item.mailId),
       ]),
+      transcriptRows,
     });
   }
 
