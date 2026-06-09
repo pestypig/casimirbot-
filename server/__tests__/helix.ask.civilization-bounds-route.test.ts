@@ -118,6 +118,44 @@ describe("Helix Ask Civilization Bounds route", () => {
     expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toContain("situational bounds receipt");
   }, 60_000);
 
+  it("falls back when the composer falsely claims civilization observations are missing", async () => {
+    const previous = process.env.HELIX_CIVILIZATION_BOUNDS_FINAL_ANSWER_TEST_RESPONSE;
+    process.env.HELIX_CIVILIZATION_BOUNDS_FINAL_ANSWER_TEST_RESPONSE =
+      "No compact observations or excerpts were provided to support this analysis. The goal satisfaction evaluation indicates necessary information is missing. Please provide relevant data or observations.";
+    try {
+      const app = createApp();
+
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Use Civilization Bounds to assess whether a ceasefire claim based on marginal battlefield cost, defensive denial capacity, infrastructure stability, and resource buildout rates is an ultimatum or only a conditional decision model.",
+          mode: "read",
+          debug: true,
+          sessionId: `civilization-bounds-composer-guard-${Date.now()}`,
+        })
+        .expect(200);
+
+      const body = response.body;
+      const answer = String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "");
+
+      expect(body?.route).toBe("civilization_bounds_reflection");
+      expect(body?.terminal_artifact_kind).toBe("model_synthesized_answer");
+      expect(body?.final_answer_source).toBe("final_answer_draft");
+      expect(body?.final_answer_draft?.authority).toBe("deterministic_receipt_fallback");
+      expect(body?.final_answer_draft?.llm_error_code).toBe("civilization_bounds_composer_contradicted_receipts");
+      expect(answer).toContain("plausible constraint model, not an ultimatum or proof");
+      expect(answer).toContain("Resource proof boundary");
+      expect(answer).not.toContain("No compact observations");
+    } finally {
+      if (previous === undefined) {
+        delete process.env.HELIX_CIVILIZATION_BOUNDS_FINAL_ANSWER_TEST_RESPONSE;
+      } else {
+        process.env.HELIX_CIVILIZATION_BOUNDS_FINAL_ANSWER_TEST_RESPONSE = previous;
+      }
+    }
+  }, 60_000);
+
   it("keeps Theory/Zen bridge continuity from the desktop Ask endpoint", async () => {
     const app = createApp();
 

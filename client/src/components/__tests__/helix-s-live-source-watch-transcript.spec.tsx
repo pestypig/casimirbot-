@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 let buildHelixMailLoopTurnStreamRows: typeof import("../helix/HelixAskPill").buildHelixMailLoopTurnStreamRows;
+let buildHelixAskSteeringQueueItems: typeof import("../helix/HelixAskPill").buildHelixAskSteeringQueueItems;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ buildHelixMailLoopTurnStreamRows } = await import("../helix/HelixAskPill"));
+  ({ buildHelixMailLoopTurnStreamRows, buildHelixAskSteeringQueueItems } = await import("../helix/HelixAskPill"));
 });
 
 describe("Helix Ask live-source watch transcript rows", () => {
@@ -97,5 +98,85 @@ describe("Helix Ask live-source watch transcript rows", () => {
       detailLimit: 420,
     });
     expect(rows[0].evidenceRefs).toContain("stage_play_live_source_narrative_state:latest");
+  });
+
+  it("builds a visible steering queue with active steps first", () => {
+    const rows = buildHelixAskSteeringQueueItems({
+      activeTurnStreamRows: [
+        {
+          key: "active-read",
+          source: "agent_work",
+          label: "Read processed mail",
+          text: "live_env.read_processed_live_source_mail",
+          meta: "current turn",
+          status: "running",
+          tone: "working",
+          evidenceRefs: [],
+        },
+      ],
+      mailbox: {
+        ok: true,
+        mailboxThreadId: "helix-ask:desktop",
+        watchJobPolicies: [
+          {
+            policyId: "stage_play_live_source_watch_job_policy:test",
+            objectiveText: "Watch Minecraft mail.",
+            interpretationMode: "prediction_watch",
+            status: "armed",
+            createdAt: "2026-06-09T10:00:00.000Z",
+          },
+        ],
+      },
+      maxItems: 4,
+    });
+
+    expect(rows[0]).toMatchObject({
+      label: "Read processed mail",
+      status: "running",
+    });
+    expect(rows.some((row) => row.label === "Watch policy armed")).toBe(true);
+  });
+
+  it("surfaces unread mail and deferred wake continuation as queue items", () => {
+    const rows = buildHelixAskSteeringQueueItems({
+      mailbox: {
+        ok: true,
+        mailboxThreadId: "helix-ask:desktop",
+        mailItems: [
+          {
+            mailId: "stage_play_live_source_mail:one",
+            status: "unread",
+            summary: {
+              preview: "Minecraft player moves from a base toward a cave.",
+            },
+            evidenceRefs: ["visual_evidence:one"],
+            createdAt: "2026-06-09T10:01:00.000Z",
+          },
+        ],
+        wakeAdmissionCycle: {
+          deferredWakeIds: ["stage_play_live_source_mail_wake:pressure"],
+          runtimeAdmission: {
+            reason: "memory_pressure",
+            pressureLevel: "high",
+          },
+          continuation: {
+            scheduled: false,
+            reason: "pressure",
+            runnableWakeIds: [],
+          },
+        },
+      },
+      maxItems: 4,
+    });
+
+    expect(rows.map((row) => row.label)).toEqual([
+      "Unread mail waiting",
+      "Continuation deferred",
+    ]);
+    expect(rows[0].detail).toContain("Minecraft player moves");
+    expect(rows[1]).toMatchObject({
+      status: "deferred",
+      meta: "memory_pressure",
+    });
   });
 });
