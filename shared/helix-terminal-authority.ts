@@ -48,6 +48,9 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "lower_priority_than_selected_artifact"
   | "later_valid_final_answer_draft"
   | "route_requires_synthesis"
+  | "missing_required_observation"
+  | "missing_evidence_reentry"
+  | "route_contract_disallowed"
   | "deterministic_receipt_fallback_nonterminal"
   | "route_contract_forbids_model_synthesized_answer"
   | "coverage_valid_model_only_answer_exists"
@@ -62,9 +65,35 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "stale_solver_continuation_superseded_by_scholarly_terminal"
   | "stale_solver_continuation_superseded_by_stage_play_terminal";
 
+export type TerminalAuthoritySingleWriterAuditRejectionReason =
+  | "receipt_not_terminal_eligible"
+  | "stale_model_only_after_observation"
+  | "terminal_forbidden_by_phase_lock"
+  | "missing_required_observation"
+  | "missing_evidence_reentry"
+  | "route_contract_disallowed";
+
+export interface TerminalAuthoritySingleWriterAuditV1 {
+  artifactId: "terminal_authority_single_writer";
+  schemaVersion: "helix.terminal_authority_single_writer.v1";
+  selectedArtifactKind: string | null;
+  selectedArtifactRef: string | null;
+  rejectedCandidates: Array<{
+    artifactKind: string;
+    artifactRef?: string;
+    reason: TerminalAuthoritySingleWriterAuditRejectionReason;
+  }>;
+  wroteVisibleFields: string[];
+  forbiddenPreAuthorityVisibleFields?: string[];
+}
+
 export type HelixTerminalAuthoritySingleWriterResult = {
   schema: "helix.terminal_authority_single_writer_result.v1";
+  artifactId?: "terminal_authority_single_writer";
+  schemaVersion?: "helix.terminal_authority_single_writer.v1";
   turn_id: string;
+  selectedArtifactKind?: string | null;
+  selectedArtifactRef?: string | null;
   selected_terminal_artifact_ref: string | null;
   selected_terminal_artifact_kind:
     | "model_synthesized_answer"
@@ -110,6 +139,9 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     terminal_presentation_concise_text: string;
     debug_selected_final_answer: string;
   };
+  wroteVisibleFields?: string[];
+  forbiddenPreAuthorityVisibleFields?: string[];
+  audit?: TerminalAuthoritySingleWriterAuditV1;
   integrity: {
     single_writer_applied: true;
     visible_matches_selected_artifact: boolean;

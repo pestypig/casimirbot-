@@ -375,6 +375,15 @@ const conditionValueForFamily = (
   if (familyId === "eulerian") return toFinite(condition?.eulerianMin);
   const source = asText(condition?.worstCase?.source);
   if (source === familyId) return toFinite(condition?.robustMin);
+  if (
+    familyId === "boosted_timelike_grid" &&
+    (source === "capped_search" || source === "capped_timelike_search")
+  ) {
+    return toFinite(condition?.robustMin);
+  }
+  if (familyId === "null_direction_grid" && source === "capped_null_search") {
+    return toFinite(condition?.robustMin);
+  }
   return null;
 };
 
