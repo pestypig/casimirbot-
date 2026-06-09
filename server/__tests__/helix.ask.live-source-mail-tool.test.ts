@@ -1023,9 +1023,7 @@ describe("live-source mail live environment tools", () => {
     const queryObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.query_visual_observer_profiles",
       thread_id: threadId,
-      args: {
-        source_id: sourceId,
-      },
+      args: {},
     });
     const queryPayload = queryObservation.observation as any;
     const minecraftProfile = queryPayload.profiles.find((profile: any) => profile.title === "Minecraft Gameplay Observer");
