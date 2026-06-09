@@ -788,6 +788,15 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       run.mailIds.some((mailId) => mailIds.has(mailId)) ||
       processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
     );
+    ensureDefaultStagePlayVisualObserverProfiles();
+    const visualObserverProfiles = listStagePlayVisualObserverProfiles({
+      sourceId,
+      includePresets: true,
+      limit: 50,
+    });
+    const activeVisualObserverProfile = getActiveStagePlayVisualObserverProfileForSource({
+      sourceId: sourceId ?? mailItems.find((item) => item.sourceKind === "visual_frame")?.sourceId ?? null,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -823,6 +832,8 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
         active: true,
         limit: 20,
       }),
+      visualObserverProfiles,
+      activeVisualObserverProfile,
       microReasonerRuns,
       processedMailPackets,
       decisions,

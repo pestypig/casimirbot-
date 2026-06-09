@@ -22,6 +22,7 @@ import type {
   StagePlayLiveSourceInterpreterProfileComparisonV1,
   StagePlayLiveSourceInterpreterProfileV1,
 } from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
+import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
 import type {
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
@@ -234,6 +235,8 @@ type StagePlayLiveSourceMailListResponse = {
   watchJobPolicies?: StagePlayLiveSourceWatchJobPolicyV1[];
   interpreterProfiles?: StagePlayLiveSourceInterpreterProfileV1[];
   interpreterProfileComparisons?: StagePlayLiveSourceInterpreterProfileComparisonV1[];
+  visualObserverProfiles?: StagePlayVisualObserverProfileV1[];
+  activeVisualObserverProfile?: StagePlayVisualObserverProfileV1 | null;
   microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
   microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   processedMailPackets?: StagePlayProcessedMailPacketV1[];
@@ -279,7 +282,7 @@ type StagePlayMailLoopNode = {
   outputPreview: string;
   blockedUntil?: string | null;
   inspector?: {
-    kind: "interpreter_profile" | "micro_reasoner_prompt";
+    kind: "interpreter_profile" | "micro_reasoner_prompt" | "visual_observer_profile";
     title: string;
     profileId?: string;
     promptId?: string;
@@ -1479,6 +1482,7 @@ function buildObserverMailLoopNodes(input: {
   const wakeResults = mailbox?.wakeResults ?? [];
   const interpreterProfiles = mailbox?.interpreterProfiles ?? [];
   const interpreterProfileComparisons = mailbox?.interpreterProfileComparisons ?? [];
+  const visualObserverProfiles = mailbox?.visualObserverProfiles ?? [];
   const microReasonerPrompts = mailbox?.microReasonerPrompts ?? [];
   const microReasonerRuns = mailbox?.microReasonerRuns ?? [];
   const processedMailPackets = mailbox?.processedMailPackets ?? [];
@@ -1488,6 +1492,27 @@ function buildObserverMailLoopNodes(input: {
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const activeVisualObserverProfile = mailbox?.activeVisualObserverProfile ??
+    visualObserverProfiles.find((profile) =>
+      profile.status === "active" &&
+      (visualSource?.sourceId ? profile.sourceIds.includes(visualSource.sourceId) : false)
+    ) ??
+    null;
+  const latestVisualObserverProfileRef = visualMail?.evidenceRefs.find((ref) =>
+    ref.startsWith("stage_play_visual_observer_profile:")
+  ) ?? activeVisualObserverProfile?.profileId ?? null;
+  const latestVisualPromptHashRef = visualMail?.evidenceRefs.find((ref) =>
+    ref.startsWith("visual_prompt_hash:")
+  ) ?? (activeVisualObserverProfile?.promptHash ? `visual_prompt_hash:${activeVisualObserverProfile.promptHash}` : null);
+  const visualObserverTitle =
+    activeVisualObserverProfile?.title ??
+    (latestVisualObserverProfileRef ? "Profile-stamped evidence" : "Generic Visual Observer");
+  const visualObserverPromptPreview =
+    activeVisualObserverProfile?.prompt
+      ? activeVisualObserverProfile.prompt.replace(/\s+/g, " ").trim()
+      : latestVisualObserverProfileRef
+        ? "Latest evidence was produced with an observer profile."
+        : "Generic capture prompt is active until a source-bound shade is applied.";
   const watchPolicyResolution = resolveActiveWatchPolicy({
     jobStates,
     policies: mailbox?.watchJobPolicies ?? [],
@@ -1753,8 +1778,8 @@ function buildObserverMailLoopNodes(input: {
         },
       ],
       edgeToNext: {
-        label: visualMail ? "summary mail" : visualSource ? "waiting for summary" : "source missing",
-        tone: visualMail ? "connected" : visualSource ? "pending" : "blocked",
+        label: activeVisualObserverProfile ? "observer prompt" : visualSource ? "generic observer" : "source missing",
+        tone: visualSource ? (activeVisualObserverProfile || latestVisualObserverProfileRef ? "connected" : "pending") : "blocked",
       },
       inputLabel: "Input",
       inputRefs: ["source registry"],
@@ -1763,6 +1788,69 @@ function buildObserverMailLoopNodes(input: {
       outputLabel: "Output",
       outputRefs: observerOutputRefs,
       outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mailbox ${mailboxThreadId} | unread ${unreadCount} | delivered ${deliveredCount}`,
+    },
+    {
+      id: "observer_mail_loop:observer_shades",
+      title: "Observer Shades",
+      subtitle: "visual model prompt lens",
+      status: activeVisualObserverProfile || latestVisualObserverProfileRef ? "active" : "generic",
+      preview: `${visualObserverTitle}; ${latestVisualPromptHashRef ?? "no prompt hash yet"}`,
+      statusChips: [
+        activeVisualObserverProfile?.domain ?? "generic",
+        activeVisualObserverProfile?.outputMode ?? "prose",
+      ].filter((entry): entry is string => Boolean(entry)),
+      payloadRows: [
+        {
+          label: "Profile",
+          value: visualObserverTitle,
+          tone: activeVisualObserverProfile || latestVisualObserverProfileRef ? "good" : "warn",
+        },
+        {
+          label: "Output",
+          value: activeVisualObserverProfile?.outputMode ?? "generic prose fallback",
+        },
+        {
+          label: "Prompt",
+          value: visualObserverPromptPreview,
+          tone: activeVisualObserverProfile ? "good" : "warn",
+        },
+        {
+          label: "Hash",
+          value: latestVisualPromptHashRef ?? "No visual prompt hash stamped yet.",
+          tone: latestVisualPromptHashRef ? "good" : "warn",
+        },
+      ],
+      edgeToNext: {
+        label: visualMail ? "profiled mail" : visualSource ? "waiting for evidence" : "source missing",
+        tone: visualMail ? "connected" : visualSource ? "pending" : "blocked",
+      },
+      inputLabel: "Input",
+      inputRefs: uniqueSorted([visualSource?.sourceId ?? "", activeVisualObserverProfile?.profileId ?? ""].filter(Boolean)),
+      inputPreview: visualSource?.sourceId ?? "visual source missing",
+      transformLabel: activeVisualObserverProfile
+        ? `${activeVisualObserverProfile.title} -> visual-frame/analyze`
+        : "generic visual capture prompt -> visual-frame/analyze",
+      outputLabel: "Output",
+      outputRefs: uniqueSorted([
+        latestVisualObserverProfileRef ?? "",
+        latestVisualPromptHashRef ?? "",
+        visualMail?.sourceRefs.evidenceRef ?? "",
+      ].filter(Boolean)),
+      outputPreview: visualMail?.summary.preview ?? "No latest visual evidence yet.",
+      inspector: activeVisualObserverProfile ? {
+        kind: "visual_observer_profile",
+        title: activeVisualObserverProfile.title,
+        profileId: activeVisualObserverProfile.profileId,
+        linkedNoteId: activeVisualObserverProfile.linkedNoteId,
+        body: [
+          `Domain: ${activeVisualObserverProfile.domain}`,
+          `Output: ${activeVisualObserverProfile.outputMode}`,
+          `Prompt hash: ${activeVisualObserverProfile.promptHash}`,
+          `Sources: ${activeVisualObserverProfile.sourceIds.join(", ") || "not source-bound"}`,
+          "",
+          activeVisualObserverProfile.prompt,
+        ].join("\n"),
+      } : null,
     },
     {
       id: "observer_mail_loop:visual_mail",
