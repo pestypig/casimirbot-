@@ -2069,9 +2069,10 @@ describe("HelixAskPill mic helper behavior", () => {
   it("resolves open-doc plus summarize phrasing to docs summarize action", () => {
     const action = parseWorkstationActionCommand("okay open up a doc about the sun and summarize what it means");
     expect(action?.action).toBe("run_panel_action");
-    expect(action?.panel_id).toBe("docs-viewer");
-    expect(action?.action_id).toBe("summarize_doc");
-    expect((action as { args?: { path?: string } } | null)?.args?.path).toBeTruthy();
+    if (action?.action !== "run_panel_action") return;
+    expect(action.panel_id).toBe("docs-viewer");
+    expect(action.action_id).toBe("summarize_doc");
+    expect((action.args as { path?: string } | undefined)?.path).toBeTruthy();
   });
 
   it("resolves open-paper plus summarize phrasing to docs summarize action", () => {
@@ -2079,9 +2080,10 @@ describe("HelixAskPill mic helper behavior", () => {
       "okay open up a paper about the sun and summarize what it means",
     );
     expect(action?.action).toBe("run_panel_action");
-    expect(action?.panel_id).toBe("docs-viewer");
-    expect(action?.action_id).toBe("summarize_doc");
-    expect((action as { args?: { path?: string } } | null)?.args?.path).toBeTruthy();
+    if (action?.action !== "run_panel_action") return;
+    expect(action.panel_id).toBe("docs-viewer");
+    expect(action.action_id).toBe("summarize_doc");
+    expect((action.args as { path?: string } | undefined)?.path).toBeTruthy();
   });
 
   it("routes quoted open-doc title prompts through workstation docs actions", () => {

@@ -76,6 +76,7 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     assumptions: [
       "Idealized perfect-conductor, zero-temperature parallel-plate scalar row.",
       "Material and finite-temperature corrections require a separate runtime/receipt context.",
+      "Material receipts are required before this scalar row can be used as material source evidence.",
     ],
     calculatorPayloads: [
       payload({
@@ -88,13 +89,19 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     sourceRefs: [
       repoRef("modules/core/physics-constants.ts", "PHYSICS_CONSTANTS.HBAR_C", "Constants used by the static Casimir module."),
       repoRef("modules/sim_core/static-casimir.ts", "calculateCasimirEnergy", "Static Casimir calculation module."),
+      repoRef("shared/contracts/casimir-material-receipt.v1.ts", "CasimirMaterialReceiptV1", "Receipt contract that gates material-source interpretation."),
       docRef("docs/casimir-tile-mechanism.md", "per-tile-casimir-energy", "Mechanism note mapping the formula to pipeline fields."),
     ],
     hintKeys: {
       subjects: ["casimir", "cavity", "parallel_plate", "vacuum_energy"],
       symbols: ["E_area", "hbar_c", "a", "gap"],
       unitSignatures: ["M T^-2", "M L^3 T^-2", "L"],
-      repoPaths: ["modules/sim_core/static-casimir.ts", "modules/core/physics-constants.ts", "docs/casimir-tile-mechanism.md"],
+      repoPaths: [
+        "modules/sim_core/static-casimir.ts",
+        "modules/core/physics-constants.ts",
+        "shared/contracts/casimir-material-receipt.v1.ts",
+        "docs/casimir-tile-mechanism.md",
+      ],
       equationFamilies: ["casimir_energy", "parallel_plate_static"],
       simulationOwners: ["casimir", "NHM2"],
     },
@@ -616,6 +623,7 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
     ],
     calculatorPayloads: [],
     sourceRefs: [
+      repoRef("shared/contracts/casimir-material-receipt.v1.ts", "CasimirMaterialReceiptV1", "Runtime receipt contract for material and geometry evidence."),
       repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "boundary", "Geometry-freeze boundary statement."),
       repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "layout.witnessCoupons", "Nanogap and sign-control witness coupon layout."),
       repoRef("modules/sim_core/static-casimir.ts", "calculateCasimirEnergy", "Static idealized calculation that receipts must qualify."),
@@ -627,7 +635,106 @@ export const CASIMIR_CAVITY_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: [],
       repoPaths: [
         "configs/needle-hull-mark2-cavity-contract.v1.json",
+        "shared/contracts/casimir-material-receipt.v1.ts",
         "modules/sim_core/static-casimir.ts",
+        "docs/casimir-tile-mechanism.md",
+      ],
+      equationFamilies: ["casimir_material_receipts", "geometry_validity"],
+      simulationOwners: ["casimir", "NHM2"],
+    },
+  }),
+  casimirBadge({
+    id: "casimir.material.lifshitz_receipt",
+    title: "Casimir Lifshitz Material Receipt",
+    plainMeaning:
+      "Checks whether the runtime has a material receipt with dielectric response, finite conductivity, finite temperature, and roughness corrections.",
+    whyItMatters:
+      "It separates real-material Lifshitz context from the perfect-conductor scalar formula.",
+    subjects: ["casimir", "materials", "lifshitz", "dielectric_response", "receipt"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["casimir", "NHM2"],
+    equationFamilies: ["casimir_material_receipts", "lifshitz_material_model"],
+    tags: ["lifshitz", "material_receipt", "finite_conductivity", "finite_temperature", "roughness"],
+    equations: [
+      {
+        id: "casimir_lifshitz_receipt_gate",
+        role: "gate",
+        displayLatex:
+          "receipt_{Lifshitz}=\\epsilon(\\omega)\\land \\sigma_{finite}\\land T_{finite}\\land roughness",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["epsilon_omega", "finite_conductivity", "finite_temperature", "roughness"],
+        outputSymbols: ["material_receipt_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      "A Lifshitz label without dielectric-response provenance is blocked, not material-receipted.",
+      "Perfect-conductor rows remain diagnostic scalar rows until this receipt is present.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef("shared/contracts/casimir-material-receipt.v1.ts", "CasimirMaterialReceiptV1", "Lifshitz/material receipt contract."),
+      repoRef("modules/sim_core/static-casimir.ts", "calculateCasimirEnergy", "Static module whose material model is receipt-gated."),
+      docRef("docs/casimir-tile-mechanism.md", "caveats", "Mechanism caveats and verification checklist."),
+    ],
+    hintKeys: {
+      subjects: ["casimir", "materials", "lifshitz", "dielectric_response", "receipt"],
+      symbols: ["epsilon_omega", "material_receipt_status"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/casimir-material-receipt.v1.ts",
+        "modules/sim_core/static-casimir.ts",
+        "docs/casimir-tile-mechanism.md",
+      ],
+      equationFamilies: ["casimir_material_receipts", "lifshitz_material_model"],
+      simulationOwners: ["casimir", "NHM2"],
+    },
+  }),
+  casimirBadge({
+    id: "casimir.geometry.beyond_pfa_validity",
+    title: "Casimir Beyond-PFA Geometry Validity",
+    plainMeaning:
+      "Checks whether the tile geometry is valid beyond the simple proximity-force/parallel-plate approximation.",
+    whyItMatters:
+      "It prevents curved or rough nanogap geometry from inheriting the ideal plate scalar without geometry evidence.",
+    subjects: ["casimir", "geometry", "pfa", "roughness", "metrology"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["casimir", "NHM2"],
+    equationFamilies: ["casimir_material_receipts", "geometry_validity"],
+    tags: ["geometry", "beyond_pfa", "gap_metrology", "roughness", "blocked"],
+    equations: [
+      {
+        id: "casimir_beyond_pfa_validity_gate",
+        role: "gate",
+        displayLatex:
+          "geometry_{valid}=gap_{measured}\\land roughness\\land beyond\\ PFA",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["gap_metrology", "roughness", "beyond_pfa_validity"],
+        outputSymbols: ["geometry_receipt_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      "Parallel-plate and PFA-like geometry rows are not geometry receipts.",
+      "Beyond-PFA validity must be explicit before using geometry-corrected Casimir rows as source evidence.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef("shared/contracts/casimir-material-receipt.v1.ts", "geometry.beyondPfaValidity", "Geometry validity field in the material receipt."),
+      repoRef("configs/needle-hull-mark2-cavity-contract.v1.json", "layout.witnessCoupons", "Witness coupon context for nanogap and geometry checks."),
+      docRef("docs/casimir-tile-mechanism.md", "caveats", "Mechanism caveats and verification checklist."),
+    ],
+    hintKeys: {
+      subjects: ["casimir", "geometry", "pfa", "roughness", "metrology"],
+      symbols: ["gap_metrology", "roughness", "beyond_pfa_validity"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/casimir-material-receipt.v1.ts",
+        "configs/needle-hull-mark2-cavity-contract.v1.json",
         "docs/casimir-tile-mechanism.md",
       ],
       equationFamilies: ["casimir_material_receipts", "geometry_validity"],
@@ -786,9 +893,41 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     id: "casimir_material_receipts_document_boundary",
     from: "casimir.material_receipts",
     to: "casimir.claim_boundary.diagnostic_source_context",
-    relation: "blocks",
+    relation: "requires",
     label: "Material receipts must be present before Casimir source rows can be interpreted beyond diagnostics.",
     claimBoundaryNote: "Missing material and metrology receipts block physical mechanism language.",
+  },
+  {
+    id: "casimir_lifshitz_receipt_feeds_material_receipts",
+    from: "casimir.material.lifshitz_receipt",
+    to: "casimir.material_receipts",
+    relation: "requires",
+    label: "The material-receipt gate includes Lifshitz/dielectric-response provenance.",
+    claimBoundaryNote: "A material model label alone is not a material receipt.",
+  },
+  {
+    id: "casimir_beyond_pfa_feeds_material_receipts",
+    from: "casimir.geometry.beyond_pfa_validity",
+    to: "casimir.material_receipts",
+    relation: "requires",
+    label: "The material-receipt gate includes gap metrology and beyond-PFA geometry validity.",
+    claimBoundaryNote: "Ideal plate geometry does not certify shaped tile geometry.",
+  },
+  {
+    id: "casimir_ideal_scalar_requires_receipt_for_source_evidence",
+    from: "casimir.cavity.parallel_plate_energy_density",
+    to: "casimir.material.lifshitz_receipt",
+    relation: "requires",
+    label: "The ideal scalar row requires a material receipt before source-evidence interpretation.",
+    claimBoundaryNote: "The calculator payload remains available as a diagnostic scalar.",
+  },
+  {
+    id: "casimir_ideal_geometry_requires_beyond_pfa_for_source_evidence",
+    from: "casimir.cavity.parallel_plate_energy_density",
+    to: "casimir.geometry.beyond_pfa_validity",
+    relation: "blocks",
+    label: "The ideal plate row requires geometry validity before shaped tile source-evidence interpretation.",
+    claimBoundaryNote: "Parallel-plate validity is not a shaped-geometry receipt.",
   },
   {
     id: "casimir_mass_proxy_blocks_claim_promotion",

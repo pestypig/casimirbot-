@@ -29,6 +29,11 @@ import {
   WORKSTATION_DYNAMIC_TOOL_ACTIONS,
   type WorkspaceActionRegistryEntry,
 } from "@shared/workstation-dynamic-tools";
+import {
+  WORKSTATION_SHELL_CAPABILITIES,
+  WORKSTATION_SHELL_CAPABILITY_CONTRACT_VERSION,
+  type WorkstationShellCapabilityDefinition,
+} from "@shared/workstation-shell-capabilities";
 import { listClientCapabilityActions } from "../client-capabilities/client-action-queue";
 import { listClientCapabilityAdoptions } from "../client-capabilities/client-adoption-store";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -284,6 +289,10 @@ const buildWorkstationActionRecords = (): HelixWorkspaceOsCapabilityRecord[] => 
     },
   }));
 
+  for (const capability of WORKSTATION_SHELL_CAPABILITIES) {
+    records.push(makeWorkstationShellCapabilityRecord(capability));
+  }
+
   const byFamily = new Map<string, HelixWorkstationAffordance[]>();
   for (const affordance of WORKSTATION_AFFORDANCES) {
     byFamily.set(affordance.family, [...(byFamily.get(affordance.family) ?? []), affordance]);
@@ -310,6 +319,33 @@ const buildWorkstationActionRecords = (): HelixWorkspaceOsCapabilityRecord[] => 
   }
   return records;
 };
+
+const makeWorkstationShellCapabilityRecord = (
+  capability: WorkstationShellCapabilityDefinition,
+): HelixWorkspaceOsCapabilityRecord =>
+  makeRecord({
+    capability_id: capability.capability_id,
+    surface: "workstation_action",
+    mode: "diagnostic",
+    status: "available",
+    label: capability.label,
+    source: "workstation_shell_capability_contract",
+    fallbacks: capability.fallbacks,
+    evidence_refs: [
+      WORKSTATION_SHELL_CAPABILITY_CONTRACT_VERSION,
+      capability.evidence_ref,
+    ],
+    diagnostics: {
+      action_id: capability.action_id ?? null,
+      supported_query_params: capability.supported_query_params,
+      path_policy: capability.path_policy,
+      passive_restore_emits_receipt: capability.passive_restore_emits_receipt,
+      agent_triggered_emits_receipt: capability.agent_triggered_emits_receipt,
+      agent_receipt_kind: capability.agent_receipt_kind ?? null,
+      workspace_os_status_executes: capability.workspace_os_status_executes,
+      raw_local_paths_allowed: false,
+    },
+  });
 
 export type HelixWorkspaceOsStatusReaders = {
   listClientCapabilityActions: typeof listClientCapabilityActions;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  TOOL_FAMILY_CONTRACTS,
   TOOL_FAMILY_DEFAULT_CONTRACTS,
   resolveToolFamilyContract,
   type ToolFamily,
@@ -68,6 +69,105 @@ describe("Helix Ask tool-family contract registry", () => {
         defaultAssistantAnswer: false,
         defaultTerminalEligible: false,
         defaultRawContentIncluded: false,
+      });
+    }
+  });
+
+  it("resolves every registered tool to a contract with nonterminal receipt defaults", () => {
+    for (const entry of TOOL_FAMILY_CONTRACTS) {
+      expect(resolveToolFamilyContract({ toolName: entry.toolName })).toMatchObject({
+        toolName: entry.toolName,
+        toolFamily: entry.toolFamily,
+        authority: entry.authority,
+        defaultAssistantAnswer: false,
+        defaultTerminalEligible: false,
+        defaultRawContentIncluded: false,
+      });
+      expect(entry.requiredObservationKinds.length).toBeGreaterThan(0);
+      expect(entry.requiredReentry).toBe(true);
+      expect(entry.requiresGoalSatisfaction).toBe(true);
+    }
+  });
+
+  it("keeps default tool receipts nonterminal and non-answering", () => {
+    for (const entry of TOOL_FAMILY_CONTRACTS) {
+      const receiptKind = entry.requiredObservationKinds[0] ?? "tool_receipt";
+      const decision = evaluateToolFamilyTerminalPolicy({
+        toolName: entry.toolName,
+        terminalArtifactKind: receiptKind,
+        routeProductContract: routeContract([receiptKind, "model_synthesized_answer"]),
+        canonicalGoalFrame: {
+          goal_kind: "tool_result",
+          required_terminal_kind: receiptKind,
+        },
+        admitted: true,
+        goalSatisfied: true,
+        operatorCommandPresent: true,
+        mutating: entry.mutating,
+      });
+
+      expect(decision.assistant_answer).toBe(false);
+      expect(decision.terminal_eligible).toBe(false);
+      expect(decision.raw_content_included).toBe(false);
+    }
+  });
+
+  it("prevents read-only evidence tools from writing terminal answer fields", () => {
+    const evidenceTools = TOOL_FAMILY_CONTRACTS.filter((entry) => entry.authority === "evidence_only");
+
+    for (const entry of evidenceTools) {
+      const receiptKind = `${entry.toolFamily}_receipt`;
+      const decision = evaluateToolFamilyTerminalPolicy({
+        toolName: entry.toolName,
+        terminalArtifactKind: receiptKind,
+        routeProductContract: routeContract([receiptKind, "model_synthesized_answer"]),
+        canonicalGoalFrame: {
+          goal_kind: "evidence_tool_result",
+          required_terminal_kind: receiptKind,
+        },
+        admitted: true,
+        goalSatisfied: true,
+        operatorCommandPresent: true,
+        mutating: false,
+      });
+
+      expect(decision).toMatchObject({
+        allowed: false,
+        reason: "evidence_only_tool_cannot_terminalize_receipt",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
+  });
+
+  it("requires route product authorization before control receipts can terminalize", () => {
+    const controlTools = TOOL_FAMILY_CONTRACTS.filter((entry) => entry.authority === "control_receipt");
+
+    for (const entry of controlTools) {
+      const receiptKind = entry.allowedTerminalKinds.find((kind) => kind !== "model_synthesized_answer") ??
+        entry.requiredObservationKinds.at(-1) ??
+        "workspace_action_receipt";
+      const decision = evaluateToolFamilyTerminalPolicy({
+        toolName: entry.toolName,
+        terminalArtifactKind: receiptKind,
+        routeProductContract: routeContract(["model_synthesized_answer"], [receiptKind]),
+        canonicalGoalFrame: {
+          goal_kind: "control_receipt",
+          required_terminal_kind: receiptKind,
+        },
+        admitted: true,
+        goalSatisfied: true,
+        operatorCommandPresent: true,
+        mutating: entry.mutating,
+      });
+
+      expect(decision).toMatchObject({
+        allowed: false,
+        reason: "terminal_kind_forbidden_by_route_product_contract",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
       });
     }
   });

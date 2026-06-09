@@ -656,6 +656,7 @@ export const resolveLiveSourceTurnPhase = (
         "live_env.process_live_source_mail",
         "live_env.read_live_source_mail",
         "live_env.request_interim_voice_callout",
+        "final_answer",
       ],
       requiredEvidence: ["stage_play_processed_mail_packet"],
       completionEvidence: ["stage_play_live_source_mail_decision"],

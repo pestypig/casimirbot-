@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-09T21:43:23.302Z",
-  "registryCount": 127,
+  "generatedAt": "2026-06-09T22:54:16.000Z",
+  "registryCount": 129,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 63,
+      "count": 65,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -88,7 +88,9 @@
         "shared/contracts/nhm2-full-loop-audit.v1.ts",
         "shared/contracts/nhm2-same-chart-full-tensor.v1.ts",
         "shared/contracts/nhm2-wall-source-closure.v1.ts",
+        "shared/contracts/casimir-material-receipt.v1.ts",
         "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
+        "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
         "server/services/observability/training-trace-store.ts",
         "server/routes/training-trace.ts",
         "server/services/observability/gr-agent-loop-store.ts",
@@ -213,7 +215,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 127,
+    "entriesWithUnits": 129,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -227,8 +229,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 63,
-        "withUnits": 63,
+        "total": 65,
+        "withUnits": 65,
         "missing": []
       },
       "certified": {
@@ -249,8 +251,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1924,
-    "edgeCount": 4507
+    "nodeCount": 1926,
+    "edgeCount": 4509
   },
   "evidenceProfiles": [
     {

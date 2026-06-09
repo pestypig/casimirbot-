@@ -176,7 +176,12 @@ describe("Casimir runtime adapter", () => {
       "quick_runtime",
     ]);
     expect(casimirRuntimeAdapter.supportedBadgeIds).toEqual(
-      expect.arrayContaining(["casimir.tile.duty_budget", "casimir.material_receipts"]),
+      expect.arrayContaining([
+        "casimir.tile.duty_budget",
+        "casimir.material_receipts",
+        "casimir.material.lifshitz_receipt",
+        "casimir.geometry.beyond_pfa_validity",
+      ]),
     );
     expect(casimirRuntimeAdapter.runQuick).toBeDefined();
 

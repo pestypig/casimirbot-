@@ -1,0 +1,119 @@
+import { describe, expect, it } from "vitest";
+import { decodeLayout, encodeLayout } from "@/lib/desktop/shareState";
+import {
+  buildWorkstationPathRef,
+  buildWorkstationPanelPathRef,
+  coerceWorkstationViewStateFromPathInput,
+  coerceWorkstationViewState,
+  encodeWorkstationViewStateSearch,
+  normalizeWorkstationDocPath,
+  parseWorkstationViewStateFromUrl,
+} from "@/lib/workstation/workstationDeepLink";
+import { coerceHelixWorkstationActions } from "@/lib/workstation/workstationActionContract";
+
+describe("workstationDeepLink", () => {
+  it("parses canonical workstation view state from query params", () => {
+    const state = parseWorkstationViewStateFromUrl(
+      "/desktop?panels=docs-viewer,workstation-notes&focus=docs-viewer&doc=docs/papers.md&anchor=intro",
+    );
+
+    expect(state.panels).toEqual(["docs-viewer", "workstation-notes"]);
+    expect(state.focusPanel).toBe("docs-viewer");
+    expect(state.activeDocPath).toBe("docs/papers.md");
+    expect(state.anchor).toBe("intro");
+    expect(state.pathRef?.displaySegments).toEqual(["Workspace", "docs", "papers.md"]);
+  });
+
+  it("normalizes doc paths and rejects raw absolute local paths", () => {
+    expect(normalizeWorkstationDocPath("/docs/foo.md")).toBe("docs/foo.md");
+    expect(normalizeWorkstationDocPath("foo.md")).toBe("docs/foo.md");
+    expect(normalizeWorkstationDocPath("C:\\Users\\dan\\Desktop\\secret.md")).toBeNull();
+  });
+
+  it("keeps legacy hash layout compatibility through shareState", () => {
+    expect(decodeLayout("#panels=docs-viewer,noisegen&project=alpha")).toEqual({
+      projectSlug: "alpha",
+      panels: ["docs-viewer", "helix-noise-gens"],
+    });
+    expect(encodeLayout({ panels: ["docs-viewer", "helix-noise-gens"], projectSlug: "alpha" })).toBe(
+      "#project=alpha&panels=docs-viewer%2Cnoisegen",
+    );
+  });
+
+  it("drops unknown panel ids while preserving valid panels", () => {
+    const state = parseWorkstationViewStateFromUrl("/desktop?panels=docs-viewer,not-real&focus=not-real");
+    expect(state.panels).toEqual(["docs-viewer"]);
+    expect(state.focusPanel).toBeUndefined();
+  });
+
+  it("encodes canonical query state without legacy hash", () => {
+    expect(
+      encodeWorkstationViewStateSearch({
+        panels: ["docs-viewer"],
+        focusPanel: "docs-viewer",
+        activeDocPath: "/docs/foo.md",
+        anchor: "section-a",
+      }),
+    ).toBe("?panels=docs-viewer&focus=docs-viewer&doc=docs%2Ffoo.md&anchor=section-a");
+  });
+
+  it("builds workspace path refs for breadcrumbs and agent traces", () => {
+    expect(buildWorkstationPathRef("docs/a/b.md")).toEqual({
+      root: "workspace",
+      relativePath: "docs/a/b.md",
+      displaySegments: ["Workspace", "docs", "a", "b.md"],
+      virtualUri: "workspace://workspace/docs/a/b.md",
+    });
+  });
+
+  it("builds panel path refs for workstation breadcrumbs without local paths", () => {
+    expect(buildWorkstationPanelPathRef("stage-play-badge-graph")).toEqual({
+      root: "workspace",
+      relativePath: "panels/stage-play-badge-graph",
+      displaySegments: ["Workspace", "Panels", "Stage Play Badge Graph"],
+      virtualUri: "workspace://workspace/panels/stage-play-badge-graph",
+    });
+  });
+
+  it("coerces pasted workspace paths into safe view state", () => {
+    expect(coerceWorkstationViewStateFromPathInput("workspace://workspace/panels/stage-play-badge-graph")).toMatchObject({
+      panels: ["stage-play-badge-graph"],
+      focusPanel: "stage-play-badge-graph",
+    });
+    expect(coerceWorkstationViewStateFromPathInput("docs/a/b.md#intro")).toMatchObject({
+      panels: ["docs-viewer"],
+      focusPanel: "docs-viewer",
+      activeDocPath: "docs/a/b.md",
+      anchor: "intro",
+    });
+    expect(coerceWorkstationViewStateFromPathInput("C:\\Users\\dan\\secret.md")).toBeNull();
+  });
+
+  it("coerces typed restore view state actions for the workstation action loop", () => {
+    const actions = coerceHelixWorkstationActions({
+      action: "restore_view_state",
+      view_state: {
+        panels: ["docs-viewer"],
+        focusPanel: "docs-viewer",
+        activeDocPath: "/docs/papers.md",
+        anchor: "overview",
+      },
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({
+      action: "restore_view_state",
+      view_state: {
+        panels: ["docs-viewer"],
+        focusPanel: "docs-viewer",
+        activeDocPath: "docs/papers.md",
+        anchor: "overview",
+      },
+    });
+  });
+
+  it("returns null for empty or invalid view state payloads", () => {
+    expect(coerceWorkstationViewState({ panels: ["not-real"] })).toBeNull();
+    expect(coerceWorkstationViewState({ activeDocPath: "C:\\Users\\dan\\secret.md" })).toBeNull();
+  });
+});

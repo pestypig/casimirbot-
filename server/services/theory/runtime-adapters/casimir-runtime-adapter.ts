@@ -31,6 +31,8 @@ export const CASIMIR_SUPPORTED_BADGE_IDS = [
   "casimir.cavity.mode_photon_energy",
   "casimir.runtime.static_casimir_module",
   "casimir.material_receipts",
+  "casimir.material.lifshitz_receipt",
+  "casimir.geometry.beyond_pfa_validity",
   "casimir.claim_boundary.diagnostic_source_context",
 ] as const;
 

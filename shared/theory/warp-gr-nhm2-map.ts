@@ -93,6 +93,8 @@ export const WARP_GR_NHM2_GROUPS: WarpGrNhm2Group[] = [
       "nhm2.tensor.full_authority_gate",
       "casimir.tile.duty_budget",
       "casimir.material_receipts",
+      "casimir.material.lifshitz_receipt",
+      "casimir.geometry.beyond_pfa_validity",
       ...NHM2_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [
@@ -126,7 +128,7 @@ export const WARP_GR_NHM2_GROUPS: WarpGrNhm2Group[] = [
     id: "warp.nhm2.diagnostic_path",
     title: "Diagnostic Path",
     band: "diagnostic",
-    description: "Scalar path through geometry, source residual, QEI margin, gate context, and claim boundary.",
+    description: "Scalar path through geometry, source residual, QEI badge replay margin, gate context, and claim boundary.",
     theoryBadgeIds: [
       "physics.gr.einstein_field_equation",
       "physics.gr.3p1_decomposition",

@@ -134,6 +134,33 @@ describe("pipeline ts/qi autoscale integration", () => {
     }
   });
 
+  it("surfaces Casimir material receipt status in the solve state", async () => {
+    process.env.WARP_STRICT_CONGRUENCE = "1";
+    process.env.TS_AUTOSCALE_ENABLE = "false";
+    process.env.QI_AUTOSCALE_ENABLE = "false";
+
+    const { calculateEnergyPipeline, initializePipelineState } = await loadPipeline();
+    const snapshot = await calculateEnergyPipeline(initializePipelineState());
+
+    expect((snapshot as any).casimirMaterialReceipt?.contractVersion).toBe(
+      "casimir_material_receipt/v1",
+    );
+    expect((snapshot as any).casimirMaterialReceipt?.status).toBe(
+      "ideal_scalar_only",
+    );
+    expect((snapshot as any).natario?.casimirMaterialReceipt?.status).toBe(
+      "ideal_scalar_only",
+    );
+    const wallSourceClosure =
+      (snapshot as any).nhm2WallSourceClosure ??
+      (snapshot as any).natario?.nhm2WallSourceClosure;
+    if (wallSourceClosure) {
+      expect(wallSourceClosure.available?.sourceKind).not.toBe(
+        "material_receipted",
+      );
+    }
+  });
+
   it("marks TS as non-metric when hardware timing telemetry drives clocking", async () => {
     process.env.WARP_STRICT_CONGRUENCE = "1";
     process.env.TS_AUTOSCALE_ENABLE = "false";
@@ -258,6 +285,22 @@ describe("pipeline ts/qi autoscale integration", () => {
     expect(artifact.signals.qi.applicabilityStatus).toBe(
       (snapshot as any).qiGuardrail?.applicabilityStatus ?? null,
     );
+    const qeiDossier = (snapshot as any).nhm2QeiWorldlineDossier;
+    expect(qeiDossier).toBeTruthy();
+    expect((snapshot as any).natario?.nhm2QeiWorldlineDossier).toEqual(qeiDossier);
+    expect(qeiDossier.contractVersion).toBe("nhm2_qei_worldline_dossier/v1");
+    expect(qeiDossier.summary.hasWallWorldline).toBe(true);
+    expect(typeof qeiDossier.summary.dossierComplete).toBe("boolean");
+    const wallWorldline = qeiDossier.worldlines.find(
+      (worldline: any) => worldline.regionId === "wall",
+    );
+    expect(wallWorldline).toBeTruthy();
+    expect(wallWorldline.sampledRho.status).toMatch(/computed|proxy|missing/);
+    expect(wallWorldline.bound.status).toMatch(/computed|literature_bound|proxy|missing/);
+    expect(wallWorldline.sampledRho.valueSI).toBe(
+      (snapshot as any).qiGuardrail?.lhs_Jm3 ?? null,
+    );
+    expect(wallWorldline.claimBoundary).toBeUndefined();
   });
 
   it("labels NHM2 hardware-timed strict signals as proxy instead of metric-derived", async () => {

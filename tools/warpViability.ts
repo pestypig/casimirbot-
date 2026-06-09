@@ -45,6 +45,8 @@ import {
   isNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import { isNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { isCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
 import {
   isNhm2ShiftVsLapseDecompositionArtifact,
   type Nhm2ShiftVsLapseDecompositionArtifact,
@@ -723,9 +725,13 @@ const buildNhm2FullLoopPolicyLayer = (args: {
   nhm2ObserverAudit: unknown;
   nhm2SourceClosure: unknown;
   nhm2StrictSignalReadiness: unknown;
+  nhm2QeiWorldlineDossier: unknown;
 }): WarpNhm2FullLoopPolicyLayer | undefined => {
   const strictSignal = isNhm2StrictSignalReadinessArtifact(args.nhm2StrictSignalReadiness)
     ? args.nhm2StrictSignalReadiness
+    : null;
+  const qeiWorldlineDossier = isNhm2QeiWorldlineDossier(args.nhm2QeiWorldlineDossier)
+    ? args.nhm2QeiWorldlineDossier
     : null;
   const sourceClosure = isNhm2SourceClosureArtifactLike(args.nhm2SourceClosure)
     ? args.nhm2SourceClosure
@@ -1144,16 +1150,31 @@ const buildNhm2FullLoopPolicyLayer = (args: {
       sectionId: "strict_signal_readiness",
       state: strictSignalState,
       reasons: uniqueStrictSignalReasons,
-      artifactRefs: strictSignal
-        ? [
-            makeAuditRef(
-              strictSignal.artifactId,
-              "runtime://pipeline/nhm2StrictSignalReadiness",
-              strictSignal.schemaVersion,
-              strictSignal.status,
-            ),
+      artifactRefs:
+        strictSignal || qeiWorldlineDossier
+          ? [
+            ...(strictSignal
+              ? [
+                  makeAuditRef(
+                    strictSignal.artifactId,
+                    "runtime://pipeline/nhm2StrictSignalReadiness",
+                    strictSignal.schemaVersion,
+                    strictSignal.status,
+                  ),
+                ]
+              : []),
+            ...(qeiWorldlineDossier
+              ? [
+                  makeAuditRef(
+                    "nhm2_qei_worldline_dossier",
+                    "runtime://pipeline/nhm2QeiWorldlineDossier",
+                    qeiWorldlineDossier.contractVersion,
+                    qeiWorldlineDossier.summary.dossierComplete ? "pass" : "review",
+                  ),
+                ]
+              : []),
           ]
-        : [makeAuditRef("warp_viability", "tools/warpViability.ts")],
+          : [makeAuditRef("warp_viability", "tools/warpViability.ts")],
       strictModeEnabled: args.strictMode,
       thetaMetricDerived:
         strictSignal?.promotionInputs.thetaMetricDerived ?? args.thetaMetricDerived,
@@ -1163,6 +1184,7 @@ const buildNhm2FullLoopPolicyLayer = (args: {
         strictSignal?.promotionInputs.qiApplicabilityStatus ??
         asNonEmptyString(args.qiApplicabilityStatus),
       missingSignals,
+      qeiWorldlineDossier,
     },
     source_closure: {
       sectionId: "source_closure",
@@ -1969,6 +1991,17 @@ export async function evaluateWarpViability(
   const nhm2StrictSignalReadiness =
     (pipeline as any)?.nhm2StrictSignalReadiness ??
     (pipeline as any)?.natario?.nhm2StrictSignalReadiness;
+  const nhm2QeiWorldlineDossier =
+    (pipeline as any)?.nhm2QeiWorldlineDossier ??
+    (pipeline as any)?.natario?.nhm2QeiWorldlineDossier;
+  const casimirMaterialReceiptCandidate =
+    (pipeline as any)?.casimirMaterialReceipt ??
+    (pipeline as any)?.natario?.casimirMaterialReceipt;
+  const casimirMaterialReceipt = isCasimirMaterialReceipt(
+    casimirMaterialReceiptCandidate,
+  )
+    ? casimirMaterialReceiptCandidate
+    : undefined;
 
   const warpMechanicsProvenanceClass: ProvenanceClass =
     thetaProvenanceClass === "measured" &&
@@ -2001,6 +2034,14 @@ export async function evaluateWarpViability(
     dutyCycle: pipeline.dutyCycle,
     d_eff: dutyEffective,
     U_static: pipeline.U_static,
+    casimir_material_receipt: casimirMaterialReceipt,
+    casimir_material_receipt_status: casimirMaterialReceipt?.status,
+    casimir_material_receipt_model_kind:
+      casimirMaterialReceipt?.material.modelKind,
+    casimir_material_receipt_tile_batch_id:
+      casimirMaterialReceipt?.tileBatchId,
+    casimir_material_receipt_claim_boundary:
+      casimirMaterialReceipt?.claimBoundary,
     TS_ratio: Number.isFinite(TS) ? TS : pipeline.TS_ratio,
     gamma_geo_cubed: gammaGeoCubed,
     gamma_VdB: gammaVdB,
@@ -2460,6 +2501,19 @@ export async function evaluateWarpViability(
     nhm2_qi_applicability_reason_code:
       typeof nhm2StrictSignalReadiness?.signals?.qi?.applicabilityReasonCode === "string"
         ? String(nhm2StrictSignalReadiness.signals.qi.applicabilityReasonCode)
+        : undefined,
+    nhm2_qei_worldline_dossier: nhm2QeiWorldlineDossier,
+    nhm2_qei_worldline_dossier_complete:
+      typeof nhm2QeiWorldlineDossier?.summary?.dossierComplete === "boolean"
+        ? Boolean(nhm2QeiWorldlineDossier.summary.dossierComplete)
+        : undefined,
+    nhm2_qei_worldline_dossier_has_wall:
+      typeof nhm2QeiWorldlineDossier?.summary?.hasWallWorldline === "boolean"
+        ? Boolean(nhm2QeiWorldlineDossier.summary.hasWallWorldline)
+        : undefined,
+    nhm2_qei_worldline_dossier_any_proxy:
+      typeof nhm2QeiWorldlineDossier?.summary?.anyProxy === "boolean"
+        ? Boolean(nhm2QeiWorldlineDossier.summary.anyProxy)
         : undefined,
     nhm2_source_closure: nhm2SourceClosure,
     nhm2_source_closure_status:
@@ -2935,6 +2989,7 @@ export async function evaluateWarpViability(
     nhm2ObserverAudit,
     nhm2SourceClosure,
     nhm2StrictSignalReadiness,
+    nhm2QeiWorldlineDossier,
   });
   if (nhm2FullLoopPolicyLayer) {
     snapshot.nhm2_full_loop_policy_id = nhm2FullLoopPolicyLayer.policyId;

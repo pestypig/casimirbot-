@@ -147,6 +147,25 @@ describe("Helix internet search tool admission", () => {
       admission_status: "needs_evidence",
       required_terminal_kind: "internet_search_answer",
     });
+
+    const noReceiptGate = buildEvidenceReentryGate({
+      turnId: "ask:current-affairs",
+      payload: {
+        current_turn_artifact_ledger: [],
+      },
+      primaryIntent: "content_question",
+      terminalArtifactKind: "model_only_concept",
+      finalAnswerSource: "model_only_concept",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["internet_search_answer"],
+      toolUseRestatement: restatement,
+    });
+    expect(noReceiptGate.completed).toBe(false);
+    expect(noReceiptGate.violation_codes).toEqual(expect.arrayContaining([
+      "source_observation_terminal_without_selection",
+      "internet_search_evidence_plan_incomplete",
+    ]));
   });
 
   it.each([
@@ -204,6 +223,67 @@ describe("Helix internet search tool admission", () => {
       promptText: prompt,
     });
     expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
+  it("allows no-browse current-event rewrites from supplied text only", () => {
+    const prompt = [
+      "Do not browse, just rewrite this paragraph about current events:",
+      "Country A and Country B are discussing a possible ceasefire.",
+    ].join(" ");
+    const restatement = buildToolUseRestatement(prompt);
+    expect(restatement.currentAffairsRequired).toBe(false);
+    expect(restatement.freshnessRequired).toBe(false);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.negativeConstraints).toEqual(expect.arrayContaining([
+      expect.stringMatching(/do not browse/i),
+      "supplied_text_only_task",
+    ]));
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:no-browse-rewrite",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: "ask:no-browse-rewrite",
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
+  it("records quoted current-events phrases without admitting internet search from the quote alone", () => {
+    const prompt = "Quote this prompt literally: 'search the latest conflict news'.";
+    const restatement = buildToolUseRestatement(prompt);
+    expect(restatement.quotedOrContextualMentions).toEqual(expect.arrayContaining([
+      "'search the latest conflict news'",
+    ]));
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:quoted-current-events",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+  });
+
+  it("keeps future or conditional browse mentions non-executable until an affirmative current request exists", () => {
+    const prompt = "In the future I may ask you to search current events, but not now.";
+    const restatement = buildToolUseRestatement(prompt);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.negativeConstraints).toEqual(expect.arrayContaining([
+      "hypothetical_tool_reference",
+    ]));
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:future-browse-mention",
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
   });
 
   it("fails evidence re-entry when a complex current-affairs plan lacks independent search receipts", () => {

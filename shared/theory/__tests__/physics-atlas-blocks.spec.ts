@@ -126,6 +126,8 @@ describe("physics atlas blocks", () => {
     expect(byId.get("casimir_cavity_modes")?.repoPathHints).toContain("modules/sim_core/static-casimir.ts");
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.tile.duty_budget");
     expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.material_receipts");
+    expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.material.lifshitz_receipt");
+    expect(byId.get("casimir_cavity_modes")?.primaryBadgeIds).toContain("casimir.geometry.beyond_pfa_validity");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.source.wall_t00_trace");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.closure.wall_t00_source_residual");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.tensor.full_authority_gate");

@@ -21,6 +21,8 @@ describe("casimir cavity theory badges", () => {
     expect(badgeIds).toContain("casimir.cavity.static_tile_budget");
     expect(badgeIds).toContain("casimir.tile.duty_budget");
     expect(badgeIds).toContain("casimir.material_receipts");
+    expect(badgeIds).toContain("casimir.material.lifshitz_receipt");
+    expect(badgeIds).toContain("casimir.geometry.beyond_pfa_validity");
     expect(badgeIds).toContain("casimir.cavity.mode_frequency");
     expect(badgeIds).toContain("casimir.claim_boundary.diagnostic_source_context");
     expect(JSON.stringify(graph)).not.toMatch(/Casimir proves propulsion|validated propulsion|confirmed physical mechanism/i);
@@ -32,7 +34,7 @@ describe("casimir cavity theory badges", () => {
     const matches = locateTheoryBadges({
       graph,
       input: {
-        query: "Casimir parallel plate gap tile energy budget cavity mode duty sector",
+        query: "Casimir parallel plate gap tile energy budget cavity mode duty sector material lifshitz receipt",
         simulationOwners: ["casimir"],
         limit: 20,
       },
@@ -43,6 +45,7 @@ describe("casimir cavity theory badges", () => {
     );
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.cavity.per_tile_energy");
     expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.tile.duty_budget");
+    expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toContain("casimir.material.lifshitz_receipt");
   });
 
   it("builds a Casimir scalar loadout from selected badges", () => {

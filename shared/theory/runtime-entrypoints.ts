@@ -118,6 +118,8 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "casimir.cavity.mass_equivalent_proxy",
       "casimir.runtime.static_casimir_module",
       "casimir.material_receipts",
+      "casimir.material.lifshitz_receipt",
+      "casimir.geometry.beyond_pfa_validity",
       "casimir.claim_boundary.diagnostic_source_context",
     ],
     sourceRefs: [

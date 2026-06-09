@@ -23,7 +23,12 @@ describe("casimir cavity map", () => {
 
     const budget = CASIMIR_CAVITY_GROUPS.find((group) => group.id === "casimir.cavity.tile_budget");
     expect(budget?.theoryBadgeIds).toEqual(
-      expect.arrayContaining(["casimir.tile.duty_budget", "casimir.material_receipts"]),
+      expect.arrayContaining([
+        "casimir.tile.duty_budget",
+        "casimir.material_receipts",
+        "casimir.material.lifshitz_receipt",
+        "casimir.geometry.beyond_pfa_validity",
+      ]),
     );
     expect(budget?.calculatorPayloadRefs).toContainEqual({
       badgeId: "casimir.tile.duty_budget",

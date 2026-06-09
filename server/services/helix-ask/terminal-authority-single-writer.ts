@@ -483,6 +483,32 @@ const findGoalSatisfyingVisualSituationArtifact = (
   return null;
 };
 
+const findLiveEnvironmentBindingDiagnosisTerminal = (
+  payload: Record<string, unknown>,
+): { kind: "live_environment_binding_diagnosis"; text: string; ref: string | null } | null => {
+  if (readString(payload.terminal_artifact_kind) !== "live_environment_binding_diagnosis") return null;
+  if (readString(payload.final_answer_source) !== "live_environment_binding_diagnosis") return null;
+  if (!routeContractAllowsTerminalKind(payload, "live_environment_binding_diagnosis")) return null;
+  const goal = readRecord(payload.canonical_goal_frame);
+  const requiredTerminalKind = readString(goal?.required_terminal_kind);
+  if (readString(goal?.goal_kind) !== "live_environment_binding_diagnosis") return null;
+  if (requiredTerminalKind && requiredTerminalKind !== "live_environment_binding_diagnosis") return null;
+  const diagnosis = readRecord(payload.live_environment_binding_diagnosis);
+  if (!/^helix\.live_environment_binding_diagnosis\.v\d+$/i.test(readString(diagnosis?.schema) ?? "")) return null;
+  if (diagnosis?.assistant_answer !== false || diagnosis?.raw_content_included !== false) return null;
+  const text =
+    readString(payload.selected_final_answer) ??
+    readString(payload.answer) ??
+    readString(payload.text) ??
+    readString(readRecord(payload.terminal_presentation)?.concise_text);
+  if (!text || isStaleWorkspaceFailureText(text) || isStaleModelOnlyNoObservationText(text)) return null;
+  return {
+    kind: "live_environment_binding_diagnosis",
+    text,
+    ref: readString(payload.terminal_artifact_id) ?? readString(diagnosis?.diagnosis_id),
+  };
+};
+
 const quarantineStaleRequestUserInput = (payload: Record<string, unknown>): void => {
   const staleRequest =
     readRecord(payload.request_user_input) ??
@@ -710,6 +736,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
   const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
+  const selectedLiveEnvironmentBindingDiagnosis = findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);
   const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
@@ -800,7 +827,32 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (!solverContinuationPending && selectedGoalArtifact) {
+  if (!solverContinuationPending && selectedLiveEnvironmentBindingDiagnosis) {
+    selectedArtifactRef = selectedLiveEnvironmentBindingDiagnosis.ref;
+    selectedArtifactKind = selectedLiveEnvironmentBindingDiagnosis.kind;
+    selectedSource = "live_environment_binding_diagnosis";
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.terminal_artifact_kind = selectedLiveEnvironmentBindingDiagnosis.kind;
+    input.payload.final_answer_source = selectedLiveEnvironmentBindingDiagnosis.kind;
+    input.payload.selected_final_answer = selectedLiveEnvironmentBindingDiagnosis.text;
+    input.payload.answer = selectedLiveEnvironmentBindingDiagnosis.text;
+    input.payload.text = selectedLiveEnvironmentBindingDiagnosis.text;
+    input.payload.assistant_answer = selectedLiveEnvironmentBindingDiagnosis.text;
+    input.payload.terminal_artifact_id = selectedLiveEnvironmentBindingDiagnosis.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: selectedLiveEnvironmentBindingDiagnosis.kind,
+      concise_text: selectedLiveEnvironmentBindingDiagnosis.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+  } else if (!solverContinuationPending && selectedGoalArtifact) {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;
     selectedSource = selectedGoalArtifact.kind;

@@ -137,6 +137,24 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessProvenance,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1.ts";
+import {
+  buildNhm2QeiWorldlineDossierFromGuardrail,
+  type Nhm2QeiWorldlineDossierV1,
+} from "../shared/contracts/nhm2-qei-worldline-dossier.v1.ts";
+import {
+  buildNhm2NatarioInvariantAudit,
+  type Nhm2NatarioConvergenceStatus,
+  type Nhm2NatarioInvariantAuditV1,
+  type Nhm2NatarioThetaFlatnessStatus,
+} from "../shared/contracts/nhm2-natario-invariant-audit.v1.ts";
+import {
+  buildCasimirMaterialReceipt,
+  type CasimirBeyondPfaValidity,
+  type CasimirGapMetrologyStatus,
+  type CasimirMaterialModelKind,
+  type CasimirMaterialReceiptV1,
+  type CasimirVacuumSealEvidence,
+} from "../shared/contracts/casimir-material-receipt.v1.ts";
 import type { Nhm2PhaseTopologyArtifact } from "../shared/contracts/nhm2-phase-topology.v1.ts";
 import {
   buildStressEnergyBrick,
@@ -854,7 +872,10 @@ const buildNatarioRuntimePayload = (
   const nhm2SourceClosure = state.nhm2SourceClosure;
   const nhm2WallSourceClosure = state.nhm2WallSourceClosure;
   const nhm2StrictSignalReadiness = state.nhm2StrictSignalReadiness;
+  const nhm2QeiWorldlineDossier = state.nhm2QeiWorldlineDossier;
+  const nhm2NatarioInvariantAudit = state.nhm2NatarioInvariantAudit;
   const nhm2PhaseTopology = state.nhm2PhaseTopology;
+  const casimirMaterialReceipt = state.casimirMaterialReceipt;
 
   return {
     ...(fallback ?? {}),
@@ -890,9 +911,12 @@ const buildNatarioRuntimePayload = (
     ...(nhm2SameChartFullTensor ? { nhm2SameChartFullTensor } : {}),
     ...(nhm2SourceClosure ? { nhm2SourceClosure } : {}),
     ...(nhm2WallSourceClosure ? { nhm2WallSourceClosure } : {}),
+    ...(casimirMaterialReceipt ? { casimirMaterialReceipt } : {}),
     ...(nhm2StrictSignalReadiness
       ? { nhm2StrictSignalReadiness }
       : {}),
+    ...(nhm2QeiWorldlineDossier ? { nhm2QeiWorldlineDossier } : {}),
+    ...(nhm2NatarioInvariantAudit ? { nhm2NatarioInvariantAudit } : {}),
     ...(nhm2PhaseTopology ? { nhm2PhaseTopology } : {}),
     metricT00,
     metricT00Source: metricT00Source ?? undefined,
@@ -1652,6 +1676,7 @@ export interface EnergyPipelineState {
   U_static_uncoupled?: number;
   U_static_band?: { min: number; max: number };
   casimirRatio?: number;
+  casimirMaterialReceipt?: CasimirMaterialReceiptV1;
   lifshitzSweep?: Array<{ gap_nm: number; ratio: number }>;
   couplingChi?: number;
   couplingMethod?: string;
@@ -1870,6 +1895,8 @@ export interface EnergyPipelineState {
   nhm2SourceClosure?: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact;
   nhm2WallSourceClosure?: Nhm2WallSourceClosureArtifactV1;
   nhm2StrictSignalReadiness?: Nhm2StrictSignalReadinessArtifact;
+  nhm2QeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1;
+  nhm2NatarioInvariantAudit?: Nhm2NatarioInvariantAuditV1;
 }
 
 export const buildGrRequestPayload = (state: EnergyPipelineState): GrRequestPayload => {
@@ -4136,6 +4163,148 @@ const isCompleteNhm2SourceClosureTensor = (
 ): boolean =>
   NHM2_SOURCE_CLOSURE_COMPONENTS.every((component) => tensor[component] != null);
 
+const normalizeCasimirReceiptModelKind = (
+  value: unknown,
+): CasimirMaterialModelKind => {
+  const text = asText(value)?.toLowerCase() ?? "";
+  if (text === "measured_dielectric") return "measured_dielectric";
+  if (text.includes("lifshitz")) return "lifshitz";
+  if (
+    text.includes("ideal") ||
+    text.includes("retarded") ||
+    text === "pec" ||
+    text.includes("perfect")
+  ) {
+    return "perfect_conductor_ideal";
+  }
+  return "missing";
+};
+
+const normalizeCasimirGapMetrologyStatus = (
+  value: unknown,
+  fallback: CasimirGapMetrologyStatus,
+): CasimirGapMetrologyStatus => {
+  const text = asText(value);
+  return text === "measured" ||
+    text === "design" ||
+    text === "proxy" ||
+    text === "missing"
+    ? text
+    : fallback;
+};
+
+const normalizeCasimirBeyondPfaValidity = (
+  value: unknown,
+): CasimirBeyondPfaValidity => {
+  const text = asText(value);
+  return text === "pass" ||
+    text === "fail" ||
+    text === "unknown" ||
+    text === "not_evaluated"
+    ? text
+    : "not_evaluated";
+};
+
+const normalizeCasimirVacuumEvidence = (
+  value: unknown,
+): CasimirVacuumSealEvidence => {
+  const text = asText(value);
+  return text === "present" || text === "missing" || text === "proxy"
+    ? text
+    : "missing";
+};
+
+const refreshCasimirMaterialReceipt = (state: EnergyPipelineState): void => {
+  const root = state as Record<string, any>;
+  const materialProps = (state.materialProps ?? {}) as Record<string, unknown>;
+  const geometry = (root.geometry ?? {}) as Record<string, unknown>;
+  const environment = (root.environment ?? {}) as Record<string, unknown>;
+  const corrections = (root.casimirCorrectionFactors ??
+    root.correctionFactors ??
+    {}) as Record<string, unknown>;
+  const gapNm = firstFinite(
+    state.gap_nm,
+    root.tiles?.gap_nm,
+    geometry.gap_nm,
+  );
+  const gapMeters = gapNm != null ? gapNm * NM_TO_M : null;
+  const roughnessNm = firstFinite(
+    materialProps.roughness_nm as number | undefined,
+    root.roughness_nm,
+    geometry.roughness_nm,
+  );
+  const roughnessRmsMeters = roughnessNm != null ? roughnessNm * NM_TO_M : null;
+  const temperatureK =
+    firstFinite(
+      state.temperature_K,
+      materialProps.temperature_K as number | undefined,
+      root.temperatureK,
+      root.temperature,
+      environment.temperatureK,
+    ) ?? null;
+  const modelKind = normalizeCasimirReceiptModelKind(
+    state.casimirModel ?? root.materialModel ?? root.casimirMaterialModel,
+  );
+  const dielectricResponseRef =
+    asText(materialProps.dielectricResponseRef) ??
+    asText(materialProps.dielectric_response_ref) ??
+    asText(root.dielectricResponseRef) ??
+    asText(root.dielectric_response_ref);
+  const gapMetrologyStatus = normalizeCasimirGapMetrologyStatus(
+    root.gapMetrologyStatus ?? geometry.gapMetrologyStatus,
+    gapMeters == null ? "missing" : "design",
+  );
+  const finiteTemperatureIncluded =
+    root.finiteTemperatureIncluded === true ||
+    modelKind === "lifshitz" ||
+    modelKind === "measured_dielectric";
+  const roughnessCorrectionIncluded =
+    root.roughnessCorrectionIncluded === true ||
+    roughnessRmsMeters != null ||
+    toFiniteNumberOrNull(corrections.roughness) != null;
+  const finiteConductivityIncluded =
+    root.finiteConductivityIncluded === true ||
+    modelKind === "lifshitz" ||
+    modelKind === "measured_dielectric";
+
+  state.casimirMaterialReceipt = buildCasimirMaterialReceipt({
+    generatedAt: new Date().toISOString(),
+    tileBatchId: [
+      "tile_batch",
+      asText(root.tileBatchId) ?? asText(root.currentMode) ?? "runtime",
+      gapNm != null ? `gap_nm_${Number(gapNm).toPrecision(6)}` : "gap_unknown",
+      Number.isFinite(state.N_tiles) ? `tiles_${Math.round(state.N_tiles)}` : "tiles_unknown",
+    ].join(":"),
+    geometry: {
+      gapMeters,
+      gapMetrologyStatus,
+      roughnessRmsMeters,
+      beyondPfaValidity: normalizeCasimirBeyondPfaValidity(
+        root.beyondPfaValidity ?? geometry.beyondPfaValidity,
+      ),
+    },
+    material: {
+      modelKind,
+      ...(dielectricResponseRef != null ? { dielectricResponseRef } : {}),
+      finiteConductivityIncluded,
+      finiteTemperatureIncluded,
+      roughnessCorrectionIncluded,
+    },
+    environment: {
+      vacuumSealEvidence: normalizeCasimirVacuumEvidence(
+        root.vacuumSealEvidence ?? environment.vacuumSealEvidence,
+      ),
+      temperatureK,
+    },
+    correctionFactors: {
+      conductivity: toFiniteNumberOrNull(corrections.conductivity) ?? null,
+      temperature: toFiniteNumberOrNull(corrections.temperature) ?? null,
+      roughness: toFiniteNumberOrNull(corrections.roughness) ?? null,
+      geometry: toFiniteNumberOrNull(corrections.geometry) ?? null,
+    },
+  });
+};
+
 const resolveNhm2SourceClosureBrickBasis = (state: EnergyPipelineState) => {
   const hull = (state.hull ?? {}) as Record<string, unknown>;
   const Lx = Math.max(1e-6, toFiniteNumber(hull.Lx_m) ?? 1007);
@@ -4174,6 +4343,7 @@ const collectNhm2SourceClosureRegionComparisons = (
   const voxelIndex = (x: number, y: number, z: number) =>
     x + brickBasis.dims[0] * (y + brickBasis.dims[1] * z);
   const warpState = ((state as any).warp ?? null) as Record<string, unknown> | null;
+  const casimirMaterialReceipt = state.casimirMaterialReceipt ?? null;
   const stressBrick = buildStressEnergyBrick({
     metricT00: toFiniteNumber((warpState as Record<string, unknown> | null)?.metricT00) ?? undefined,
     metricT00Ref: asText(warpState?.metricT00Ref) ?? undefined,
@@ -4726,6 +4896,8 @@ const collectNhm2SourceClosureRegionComparisons = (
       metricT00Diagnostics,
       tileT00Diagnostics,
       tileProxyDiagnostics,
+      casimirMaterialReceipt:
+        regionId === "wall" ? casimirMaterialReceipt : null,
       note: noteParts.join(" "),
     };
   });
@@ -13286,6 +13458,268 @@ const resolveNhm2QiStrictSignalInput = (state: EnergyPipelineState) => {
   };
 };
 
+const refreshNhm2QeiWorldlineDossier = (state: EnergyPipelineState): void => {
+  const { warpState, adapter, nhm2Active } = resolveNhm2ArtifactContext(state);
+
+  if (!nhm2Active) {
+    delete state.nhm2QeiWorldlineDossier;
+    return;
+  }
+
+  const qiGuard =
+    ((state as any).qiGuardrail &&
+    typeof (state as any).qiGuardrail === "object"
+      ? (state as any).qiGuardrail
+      : null) as Record<string, unknown> | null;
+  state.nhm2QeiWorldlineDossier = buildNhm2QeiWorldlineDossierFromGuardrail({
+    generatedAt: new Date().toISOString(),
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId:
+      asText((adapter?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+      asText(warpState?.shiftLapseProfileId) ??
+      "runtime",
+    chartId: asText(adapter?.chart?.label) ?? "unknown",
+    qiGuardrail: qiGuard,
+  });
+};
+
+const asPlainRecord = (value: unknown): Record<string, unknown> | null =>
+  value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const pickFiniteScalar = (value: unknown): number | null => {
+  const direct = toFiniteNumber(value);
+  if (direct != null) return direct;
+  const record = asPlainRecord(value);
+  if (record == null) return null;
+  for (const key of ["value", "mean", "p98", "max", "maxAbs", "rms"] as const) {
+    const picked = toFiniteNumber(record[key]);
+    if (picked != null) return picked;
+  }
+  return null;
+};
+
+const firstFiniteRecordScalar = (
+  records: Array<Record<string, unknown> | null | undefined>,
+  keys: readonly string[],
+): number | null => {
+  for (const record of records) {
+    if (record == null) continue;
+    for (const key of keys) {
+      const value = pickFiniteScalar(record[key]);
+      if (value != null) return value;
+    }
+  }
+  return null;
+};
+
+const firstTextRecordValue = (
+  records: Array<Record<string, unknown> | null | undefined>,
+  keys: readonly string[],
+): string | null => {
+  for (const record of records) {
+    if (record == null) continue;
+    for (const key of keys) {
+      const value = asText(record[key]);
+      if (value != null) return value;
+    }
+  }
+  return null;
+};
+
+const normalizeNatarioThetaStatus = (
+  value: unknown,
+): Nhm2NatarioThetaFlatnessStatus | null => {
+  const normalized = asText(value)?.toLowerCase();
+  if (normalized === "pass" || normalized === "fail" || normalized === "missing") {
+    return normalized;
+  }
+  return null;
+};
+
+const normalizeNatarioConvergenceStatus = (
+  value: unknown,
+): Nhm2NatarioConvergenceStatus | null => {
+  const normalized = asText(value)?.toLowerCase();
+  if (
+    normalized === "pass" ||
+    normalized === "fail" ||
+    normalized === "missing" ||
+    normalized === "not_run"
+  ) {
+    return normalized;
+  }
+  return null;
+};
+
+const finiteSameChartAuditComponent = (
+  artifact: Nhm2SameChartFullTensorArtifactV1 | undefined,
+  componentId: Nhm2SameChartFullTensorComponentId,
+): number | null => {
+  const component = artifact?.components.find(
+    (entry) => entry.componentId === componentId,
+  );
+  if (component == null || !isNhm2SameChartCompleteStatus(component.status)) {
+    return null;
+  }
+  return toFiniteNumberOrNull(component.valueSI);
+};
+
+const refreshNhm2NatarioInvariantAudit = (state: EnergyPipelineState): void => {
+  const { warpState, adapter, metricFamily, nhm2Active } =
+    resolveNhm2ArtifactContext(state);
+
+  if (!nhm2Active) {
+    delete state.nhm2NatarioInvariantAudit;
+    return;
+  }
+
+  const betaDiagnostics = asPlainRecord(adapter?.betaDiagnostics);
+  const lowExpansionGate =
+    asPlainRecord((state as any).shiftLapseTransportPromotionGate) ??
+    asPlainRecord(warpState?.shiftLapseTransportPromotionGate);
+  const thetaMaxAbsRaw = firstFiniteRecordScalar(
+    [
+      betaDiagnostics,
+      lowExpansionGate,
+      asPlainRecord((state as any).thetaDiagnostics),
+      asPlainRecord((state as any).warp?.thetaDiagnostics),
+    ],
+    ["thetaMaxAbs", "thetaMax", "theta_max_abs", "theta_abs_max", "theta"],
+  );
+  const expansionLeakageBound = firstFiniteRecordScalar(
+    [
+      betaDiagnostics,
+      lowExpansionGate,
+      asPlainRecord((state as any).thetaDiagnostics),
+      asPlainRecord((state as any).warp?.thetaDiagnostics),
+    ],
+    ["expansionLeakageBound", "thetaTolerance", "divergenceTolerance", "tolerance"],
+  );
+  const thetaFlatnessStatus =
+    normalizeNatarioThetaStatus(lowExpansionGate?.authoritativeLowExpansionStatus) ??
+    normalizeNatarioThetaStatus(lowExpansionGate?.thetaKConsistencyStatus) ??
+    normalizeNatarioThetaStatus(betaDiagnostics?.thetaFlatnessStatus) ??
+    null;
+
+  const gr = asPlainRecord((state as any).gr);
+  const grStats = asPlainRecord(gr?.stats);
+  const grInvariants = asPlainRecord(gr?.invariants);
+  const extraChannels = asPlainRecord(gr?.extraChannels);
+  const invariantRecords = [
+    asPlainRecord((state as any).invariants),
+    asPlainRecord((state as any).grInvariantStats),
+    grInvariants,
+    grStats,
+    extraChannels,
+    asPlainRecord(warpState?.metricStressDiagnostics),
+    asPlainRecord(asPlainRecord(warpState?.metricStressDiagnostics)?.invariants),
+    asPlainRecord((adapter as Record<string, unknown> | null | undefined)?.invariants),
+  ];
+  const ricciScalar = firstFiniteRecordScalar(invariantRecords, [
+    "ricciScalar",
+    "ricci4",
+    "ricci4_mean",
+    "gr_ricci4_mean",
+    "R4_mean",
+    "ricciInvariant",
+  ]);
+  const kretschmannScalar = firstFiniteRecordScalar(invariantRecords, [
+    "kretschmannScalar",
+    "kretschmann",
+    "kretschmann_mean",
+    "gr_kretschmann_mean",
+    "K_mean",
+  ]);
+  const weylScalarProxy = firstFiniteRecordScalar(invariantRecords, [
+    "weylScalarProxy",
+    "weylScalar",
+    "weylI",
+    "weylI_mean",
+    "weyl_mean",
+  ]);
+  const petrovClass = firstTextRecordValue(invariantRecords, [
+    "petrovClass",
+    "petrov_class",
+  ]);
+
+  const metricStress =
+    asPlainRecord(warpState?.metricStressEnergy) ??
+    asPlainRecord(warpState?.stressEnergyTensor);
+  const Jx =
+    finiteSameChartAuditComponent(state.nhm2SameChartFullTensor, "T0x") ??
+    firstFiniteRecordScalar([metricStress], ["T0x", "T01", "T10"]);
+  const Jy =
+    finiteSameChartAuditComponent(state.nhm2SameChartFullTensor, "T0y") ??
+    firstFiniteRecordScalar([metricStress], ["T0y", "T02", "T20"]);
+  const Jz =
+    finiteSameChartAuditComponent(state.nhm2SameChartFullTensor, "T0z") ??
+    firstFiniteRecordScalar([metricStress], ["T0z", "T03", "T30"]);
+
+  const stabilityRecords = [
+    asPlainRecord((state as any).stability),
+    asPlainRecord((state as any).grStability),
+    asPlainRecord(gr?.stability),
+    asPlainRecord(gr?.meta),
+    asPlainRecord(warpState?.stability),
+  ];
+  const tidalMax = firstFiniteRecordScalar(stabilityRecords, [
+    "tidalMax",
+    "tidal_max",
+    "tidalMaxAbs",
+    "tidal_max_abs",
+  ]);
+  const blueshiftMax = firstFiniteRecordScalar(
+    [
+      ...stabilityRecords,
+      lowExpansionGate,
+      asPlainRecord((state as any).warpMechanics),
+    ],
+    ["blueshiftMax", "blueshift_max", "betaOverAlphaMax", "beta_over_alpha_max"],
+  );
+  const convergenceStatus =
+    normalizeNatarioConvergenceStatus(firstTextRecordValue(stabilityRecords, [
+      "convergenceStatus",
+      "meshConvergenceStatus",
+      "curvatureConvergenceStatus",
+    ])) ?? "not_run";
+
+  state.nhm2NatarioInvariantAudit = buildNhm2NatarioInvariantAudit({
+    generatedAt: new Date().toISOString(),
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId:
+      asText((adapter?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+      asText(warpState?.shiftLapseProfileId) ??
+      "runtime",
+    metricFamily:
+      metricFamily === "natario" || metricFamily === "natario_sdf"
+        ? "natario_zero_expansion"
+        : metricFamily,
+    expansion: {
+      thetaMaxAbs: thetaMaxAbsRaw == null ? null : Math.abs(thetaMaxAbsRaw),
+      thetaFlatnessStatus,
+      expansionLeakageBound,
+    },
+    invariants: {
+      ricciScalar,
+      kretschmannScalar,
+      weylScalarProxy,
+      petrovClass,
+    },
+    momentumDensity: {
+      Jx,
+      Jy,
+      Jz,
+    },
+    stability: {
+      tidalMax,
+      blueshiftMax,
+      convergenceStatus,
+    },
+  });
+};
+
 const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
   const { warpState, adapter, metricT00Ref, nhm2Active } =
     resolveNhm2ArtifactContext(state);
@@ -13328,6 +13762,7 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
     tileEffectiveTensor,
     requiredRegionIds: [...REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS],
     regionComparisons,
+    casimirMaterialReceipt: state.casimirMaterialReceipt ?? null,
     toleranceRelLInf: resolveNhm2SourceClosureTolerance(),
     scalarCl3RhoDeltaRel:
       Number.isFinite(state.rho_delta_metric_mean) ? Number(state.rho_delta_metric_mean) : null,
@@ -17518,6 +17953,7 @@ export async function calculateEnergyPipeline(
   await refreshWarpInHullProperAcceleration(state);
   refreshMetricConstraintAudit(state);
   refreshCl3Telemetry(state);
+  refreshCasimirMaterialReceipt(state);
   refreshNhm2SourceClosure(state);
   refreshThetaAuditFromMetricAdapter(state);
   refreshCongruenceMeta(state);
@@ -17619,8 +18055,10 @@ export async function calculateEnergyPipeline(
     state.curvatureLimit = state.fordRomanCompliance;
     state.overallStatus = qiStatusLate.overallStatus;
   }
+  refreshNhm2QeiWorldlineDossier(state);
   refreshNhm2StrictSignalReadiness(state);
   refreshNhm2ObserverAudit(state);
+  refreshNhm2NatarioInvariantAudit(state);
   applyNhm2PhaseTopologyGate(state as any);
   // Canonical Natario payload now mirrors solved warp metric output.
   // Legacy inverse/proxy Natario is retained under `natarioLegacy` for diagnostics.
@@ -20373,6 +20811,12 @@ export async function computeEnergySnapshot(sim: any) {
   nhm2StrictSignalReadiness:
     (result as any).natario?.nhm2StrictSignalReadiness ??
     (result as any).nhm2StrictSignalReadiness,
+  nhm2QeiWorldlineDossier:
+    (result as any).natario?.nhm2QeiWorldlineDossier ??
+    (result as any).nhm2QeiWorldlineDossier,
+  nhm2NatarioInvariantAudit:
+    (result as any).natario?.nhm2NatarioInvariantAudit ??
+    (result as any).nhm2NatarioInvariantAudit,
   };
 
   // --- Compatibility aliases: accept alternate server keys and provide both forms ---

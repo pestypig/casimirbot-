@@ -218,6 +218,55 @@ describe("Workspace OS status", () => {
     expect(serialized).not.toContain("SECRET_CLIPBOARD_TEXT_SHOULD_NOT_LEAK");
   });
 
+  it("represents workstation deep-link restore as diagnostic shell capability metadata", async () => {
+    const status = await getHelixWorkspaceOsStatus({ thread_id: threadId, room_id: roomId });
+    const serialized = JSON.stringify(status);
+
+    expect(status.capabilities.find((entry) => entry.capability_id === "workstation.deep_link_state")).toMatchObject({
+      surface: "workstation_action",
+      mode: "diagnostic",
+      status: "available",
+      source: "workstation_shell_capability_contract",
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      diagnostics: expect.objectContaining({
+        supported_query_params: ["panels", "focus", "doc", "anchor"],
+        path_policy: "workspace_relative_path_ref_only",
+        passive_restore_emits_receipt: false,
+        workspace_os_status_executes: false,
+        raw_local_paths_allowed: false,
+      }),
+    });
+
+    expect(status.capabilities.find((entry) => entry.capability_id === "workstation.restore_view_state")).toMatchObject({
+      surface: "workstation_action",
+      mode: "diagnostic",
+      status: "available",
+      source: "workstation_shell_capability_contract",
+      fallbacks: expect.arrayContaining(["workstation.panel_focus", "docs-viewer.open_doc_by_path"]),
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      diagnostics: expect.objectContaining({
+        action_id: "restore_view_state",
+        supported_query_params: ["panels", "focus", "doc", "anchor"],
+        path_policy: "workspace_relative_path_ref_only",
+        passive_restore_emits_receipt: false,
+        agent_triggered_emits_receipt: true,
+        agent_receipt_kind: "workstation_view_state_restore",
+        workspace_os_status_executes: false,
+        raw_local_paths_allowed: false,
+      }),
+    });
+
+    expect(serialized).not.toMatch(/[A-Za-z]:\\\\|C:\\Users/);
+  });
+
   it("maps source capability states into Workspace OS status language", async () => {
     registerSituationSourceCapability({
       source_id: "source-active",

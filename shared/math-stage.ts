@@ -1374,6 +1374,25 @@ export const mathStageRegistry: MathStageEntry[] = [
   },
   {
     tag: "WARP_AUDIT",
+    module: "shared/contracts/casimir-material-receipt.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Typed Casimir material receipt artifact for gap metrology, material response, correction factors, environment evidence, ideal-scalar boundaries, and material-source receipt status.",
+    checks: [
+      { type: "stability", path: "tests/casimir-material-receipt.spec.ts" },
+      { type: "stability", path: "tests/nhm2-source-closure.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      gapMeters: "L",
+      roughnessRmsMeters: "L",
+      temperatureK: "temperature",
+      correctionFactors: "1",
+      status: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
     module: "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
     stage: "diagnostic",
     notes:
@@ -1394,6 +1413,28 @@ export const mathStageRegistry: MathStageEntry[] = [
       missedViolationRisk: "1",
       worstCaseValue: "M L^-1 T^-2",
       sampleCount: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Typed NHM2 QEI worldline dossier for sampling functions, sampled density, bound provenance, tau consistency, wall-worldline coverage, regional margins, and scalar-margin claim boundaries.",
+    checks: [
+      { type: "stability", path: "tests/nhm2-qei-worldline-dossier.spec.ts" },
+      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      tauSeconds: "T",
+      sampledRho: "M L^-1 T^-2",
+      bound: "M L^-1 T^-2",
+      margin: "M L^-1 T^-2",
+      hasWallWorldline: "1",
+      allMarginsPass: "1",
+      anyProxy: "1",
+      dossierComplete: "1",
     },
   },
   {

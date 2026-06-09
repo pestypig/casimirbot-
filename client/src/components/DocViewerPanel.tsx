@@ -5,10 +5,18 @@ import "katex/dist/katex.min.css";
 import { ArrowLeft, Folder, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 import { speakVoice } from "@/lib/agi/api";
 import { DOC_MANIFEST, findDocEntry, type DocManifestEntry } from "@/lib/docs/docManifest";
-import { consumeDocViewerIntent, makeDocHref } from "@/lib/docs/docViewer";
+import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
+import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
   HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT,
   type HelixWorkstationProceduralStepPayload,
@@ -818,8 +826,9 @@ function PanelHeader({
       : "Docs & Papers Directory";
   const subtitle =
     mode === "doc" && entry
-      ? entry.relativePath + (anchor ? ` · #${anchor}` : "")
+      ? entry.relativePath + (anchor ? ` #${anchor}` : "")
       : "Browse every note, digest, and ethos memo from the repo.";
+  const pathRef = mode === "doc" && entry ? buildWorkstationPathRef(entry.relativePath) : null;
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -833,7 +842,46 @@ function PanelHeader({
         <ArrowLeft className="h-4 w-4" />
       </Button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
+        {pathRef ? (
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-nowrap gap-1 overflow-hidden text-[11px] uppercase tracking-wide text-slate-400 sm:gap-1.5">
+              {pathRef.displaySegments.map((segment, index) => {
+                const isLast = index === pathRef.displaySegments.length - 1;
+                return (
+                  <React.Fragment key={`${segment}:${index}`}>
+                    <BreadcrumbItem className="min-w-0">
+                      <BreadcrumbPage
+                        className={cn(
+                          "max-w-[12rem] truncate text-[11px] font-normal uppercase tracking-wide",
+                          isLast ? "text-slate-200" : "text-slate-500",
+                        )}
+                        title={segment}
+                      >
+                        {segment}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                    {!isLast ? <BreadcrumbSeparator className="text-slate-600" /> : null}
+                  </React.Fragment>
+                );
+              })}
+              {anchor ? (
+                <>
+                  <BreadcrumbSeparator className="text-slate-600" />
+                  <BreadcrumbItem className="min-w-0">
+                    <BreadcrumbPage
+                      className="max-w-[10rem] truncate text-[11px] font-normal uppercase tracking-wide text-cyan-200"
+                      title={`#${anchor}`}
+                    >
+                      #{anchor}
+                    </BreadcrumbPage>
+                  </BreadcrumbItem>
+                </>
+              ) : null}
+            </BreadcrumbList>
+          </Breadcrumb>
+        ) : (
+          <p className="truncate text-[11px] uppercase tracking-wide text-slate-400">{subtitle}</p>
+        )}
         <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
         {isAutoReading ? (
           <p className="mt-0.5 text-[11px] text-cyan-200">Reading aloud with Auntie Dottie...</p>

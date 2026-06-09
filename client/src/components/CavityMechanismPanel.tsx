@@ -221,6 +221,18 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
     ? ((pipeline as any).U_static_band.max as number)
     : undefined;
   const casimirModel = (pipeline as any)?.casimirModel ?? 'ideal_retarded';
+  const casimirMaterialReceipt =
+    (pipeline as any)?.casimirMaterialReceipt ??
+    (pipeline as any)?.natario?.casimirMaterialReceipt ??
+    null;
+  const casimirReceiptStatus =
+    typeof casimirMaterialReceipt?.status === 'string'
+      ? String(casimirMaterialReceipt.status)
+      : 'missing';
+  const casimirReceiptModel =
+    typeof casimirMaterialReceipt?.material?.modelKind === 'string'
+      ? String(casimirMaterialReceipt.material.modelKind)
+      : undefined;
   const casimirRatio = isFiniteNumber((pipeline as any)?.casimirRatio)
     ? ((pipeline as any).casimirRatio as number)
     : isFiniteNumber(staticEnergyNominal_J) && staticEnergyNominal_J !== 0 && isFiniteNumber(staticEnergyRealistic_J)
@@ -370,6 +382,11 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
               hint={isFiniteNumber(casimirRatio) ? `lifshitz/ret = ${casimirRatio.toFixed(2)}x` : undefined}
             />
             <Metric
+              label="Material receipt"
+              value={casimirReceiptStatus}
+              hint={casimirReceiptModel ? `model ${casimirReceiptModel}` : 'receipt unavailable'}
+            />
+            <Metric
               label="Realistic U band"
               value={
                 isFiniteNumber(bandMin_J) && isFiniteNumber(bandMax_J)
@@ -407,6 +424,18 @@ export function CavityMechanismPanel({ className }: { className?: string }) {
                   )}
                 >
                   {casimirModel ?? 'uniform'}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'border-slate-700 bg-slate-900/60 text-[11px] font-semibold text-slate-200',
+                    casimirReceiptStatus === 'material_receipted' && 'border-emerald-400/60 text-emerald-100',
+                    casimirReceiptStatus === 'ideal_scalar_only' && 'border-amber-400/60 text-amber-100',
+                    casimirReceiptStatus === 'blocked' && 'border-rose-400/60 text-rose-100',
+                  )}
+                  title="Casimir material receipt status for using tile rows as material source evidence"
+                >
+                  {casimirReceiptStatus}
                 </Badge>
                 {isFiniteNumber(casimirRatio) ? (
                   <Badge

@@ -1,4 +1,8 @@
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
+import {
+  coerceWorkstationViewState,
+  type WorkstationViewState,
+} from "@/lib/workstation/workstationDeepLink";
 
 export const HELIX_WORKSTATION_ACTION_SCHEMA_VERSION = "helix.workstation.action/v1";
 export const HELIX_WORKSTATION_ACTION_EVENT = "helix-workstation-action";
@@ -60,6 +64,11 @@ export type HelixWorkstationAction =
       action: "set_chat_dock";
       width_px?: number;
       collapsed?: boolean;
+    }
+  | {
+      schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
+      action: "restore_view_state";
+      view_state: WorkstationViewState;
     }
   | {
       schema_version?: typeof HELIX_WORKSTATION_ACTION_SCHEMA_VERSION;
@@ -157,6 +166,16 @@ function coerceAction(value: unknown): HelixWorkstationAction | null {
       action,
       collapsed,
       width_px: widthPx,
+    };
+  }
+
+  if (action === "restore_view_state") {
+    const viewState = coerceWorkstationViewState(record.view_state ?? record.viewState ?? record.args);
+    if (!viewState) return null;
+    return {
+      schema_version: HELIX_WORKSTATION_ACTION_SCHEMA_VERSION,
+      action,
+      view_state: viewState,
     };
   }
 

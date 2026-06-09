@@ -13,8 +13,9 @@ import {
   useHelixStartSettings,
 } from "@/hooks/useHelixStartSettings";
 import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
-import { decodeLayout, resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
+import { resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
+import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { fetchUiPreferences, type EssenceEnvironmentContext, type UiPreference } from "@/lib/agi/preferences";
 import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
@@ -38,6 +39,12 @@ import {
   emitWorkstationActionLiveEvent,
 } from "@/lib/workstation/workstationActionLiveEvents";
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
+import {
+  encodeWorkstationViewStateSearch,
+  normalizeWorkstationDocPath,
+  parseWorkstationViewStateFromUrl,
+  type WorkstationViewState,
+} from "@/lib/workstation/workstationDeepLink";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -127,6 +134,7 @@ export default function DesktopPage({
     exportActiveContext: state.exportActiveContext,
   }));
   const hashAppliedRef = useRef(false);
+  const urlSyncRestoringRef = useRef(false);
   const environmentAppliedRef = useRef(false);
   const autoOpenSuppressRef = useRef<Set<string> | null>(null);
   const { mood } = useLumaMoodTheme({ randomize: true, listenToBus: true });
@@ -161,6 +169,33 @@ export default function DesktopPage({
       open(panelId);
     },
     [open, workstationEnabled],
+  );
+
+  const applyWorkstationViewState = useCallback(
+    (viewState: WorkstationViewState) => {
+      const panels = [...viewState.panels];
+      if (viewState.activeDocPath && !panels.includes("docs-viewer")) {
+        panels.push("docs-viewer");
+      }
+      panels.forEach((panelId) => openPanelUniversal(panelId));
+      if (viewState.activeDocPath) {
+        useDocViewerStore.getState().viewDoc(viewState.activeDocPath, viewState.anchor);
+      }
+      const focusPanel = viewState.focusPanel ?? (viewState.activeDocPath ? "docs-viewer" : undefined);
+      if (focusPanel && workstationEnabled) {
+        const store = useWorkstationLayoutStore.getState();
+        const hit = Object.values(store.groups).find((group) => group.panelIds.includes(focusPanel));
+        if (hit) {
+          store.setActivePanel(hit.id, focusPanel);
+          store.focusGroup(hit.id);
+        } else {
+          store.openPanelInActiveGroup(focusPanel);
+        }
+      } else if (focusPanel) {
+        openPanelUniversal(focusPanel);
+      }
+    },
+    [openPanelUniversal, workstationEnabled],
   );
 
   useEffect(() => {
@@ -367,6 +402,21 @@ export default function DesktopPage({
               store.toggleChatDock();
             }
             publish({ ok: true });
+            return;
+          case "restore_view_state":
+            applyWorkstationViewState(action.view_state);
+            publish({
+              ok: true,
+              message: "Restored workstation view state.",
+              artifact: {
+                kind: "workstation_view_state_restore",
+                panels: action.view_state.panels,
+                focus_panel: action.view_state.focusPanel ?? null,
+                active_doc_path: action.view_state.activeDocPath ?? null,
+                anchor: action.view_state.anchor ?? null,
+                path_ref: action.view_state.pathRef ?? null,
+              },
+            });
             return;
           case "run_panel_action": {
             const actionId = action.action_id.trim().toLowerCase();
@@ -609,7 +659,7 @@ export default function DesktopPage({
       stopTimelineCapture();
       stopProcessGraphCapture();
     };
-  }, [openPanelUniversal, openSettings, workstationEnabled]);
+  }, [applyWorkstationViewState, openPanelUniversal, openSettings, workstationEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -664,19 +714,74 @@ export default function DesktopPage({
   useEffect(() => {
     if (hashAppliedRef.current) return;
     if (typeof window === "undefined") return;
-    const layout = decodeLayout(window.location.hash ?? "");
-    if (!layout.projectSlug && (!layout.panels || layout.panels.length === 0)) {
+    const viewState = parseWorkstationViewStateFromUrl(window.location.href);
+    if (
+      !viewState.projectSlug &&
+      viewState.panels.length === 0 &&
+      !viewState.focusPanel &&
+      !viewState.activeDocPath
+    ) {
       return;
     }
-    if (layout.projectSlug) {
-      const match = projects.find((project) => project.hashSlug === layout.projectSlug);
+    if (viewState.projectSlug) {
+      const match = projects.find((project) => project.hashSlug === viewState.projectSlug);
       if (!match) {
         return;
       }
+      selectProjects([match.id]);
     }
-    applyLayout(layout);
+    urlSyncRestoringRef.current = true;
+    applyWorkstationViewState(viewState);
+    window.setTimeout(() => {
+      urlSyncRestoringRef.current = false;
+    }, 0);
     hashAppliedRef.current = true;
-  }, [applyLayout, projects]);
+  }, [applyWorkstationViewState, projects, selectProjects]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !workstationEnabled) return;
+    const buildViewState = (): WorkstationViewState => {
+      const layout = useWorkstationLayoutStore.getState();
+      const panelSet = new Set<string>();
+      Object.values(layout.groups).forEach((group) => {
+        group.panelIds.forEach((panelId) => {
+          if (getPanelDef(panelId)) panelSet.add(panelId);
+        });
+      });
+      const activeGroup = layout.groups[layout.activeGroupId] ?? null;
+      const focusPanel = activeGroup?.activePanelId && getPanelDef(activeGroup.activePanelId)
+        ? activeGroup.activePanelId
+        : undefined;
+      const docState = useDocViewerStore.getState();
+      const activeDocPath =
+        docState.mode === "doc"
+          ? normalizeWorkstationDocPath(docState.currentPath)
+          : null;
+      return {
+        panels: [...panelSet].sort((a, b) => a.localeCompare(b)),
+        ...(focusPanel ? { focusPanel } : {}),
+        ...(activeDocPath ? { activeDocPath } : {}),
+        ...(activeDocPath && docState.anchor ? { anchor: docState.anchor } : {}),
+      };
+    };
+    const syncUrl = () => {
+      if (urlSyncRestoringRef.current) return;
+      const viewState = buildViewState();
+      const nextSearch = encodeWorkstationViewStateSearch(viewState, window.location.search);
+      const nextUrl = `${window.location.pathname}${nextSearch}`;
+      const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (nextUrl !== currentUrl) {
+        window.history.replaceState(window.history.state, "", nextUrl);
+      }
+    };
+    const unsubscribeLayout = useWorkstationLayoutStore.subscribe(syncUrl);
+    const unsubscribeDocs = useDocViewerStore.subscribe(syncUrl);
+    syncUrl();
+    return () => {
+      unsubscribeLayout();
+      unsubscribeDocs();
+    };
+  }, [workstationEnabled]);
 
   useEffect(() => {
     const handleApplyLayout = (event: Event) => {

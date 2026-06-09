@@ -10,6 +10,7 @@ import {
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
 import { buildNhm2WallSourceClosureArtifact } from "../shared/contracts/nhm2-wall-source-closure.v1";
 import { buildNhm2ObserverRobustEnergyConditionArtifact } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
+import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 
 const makeArtifactRef = (artifactId: string, path: string) => ({
   artifactId,
@@ -78,6 +79,47 @@ const makeObserverRobustEnergyConditions = () => ({
     "artifact://tile-effective",
   ),
 });
+
+const makeQeiWorldlineDossier = (args?: {
+  regionId?: "hull" | "wall" | "exterior_shell" | "centerline" | "custom";
+  marginPass?: boolean | null;
+}) =>
+  buildNhm2QeiWorldlineDossier({
+    generatedAt: "2026-04-07T12:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    worldlines: [
+      {
+        worldlineId: "qei:wall:guardrail",
+        regionId: args?.regionId ?? "wall",
+        chartId: "adm_eulerian",
+        samplingFunction: {
+          kind: "gaussian",
+          tauSeconds: 1e-9,
+          normalized: true,
+        },
+        sampledRho: {
+          valueSI: -1,
+          provenanceRef: "warp.metric.T00.natario.shift",
+          status: "computed",
+        },
+        bound: {
+          valueSI: args?.marginPass === false ? -2 : 0,
+          provenanceRef: "ford_roman_1996_quantum_inequality",
+          status: "literature_bound",
+        },
+        margin: {
+          valueSI: args?.marginPass === false ? -1 : 1,
+          pass: args?.marginPass ?? true,
+        },
+        consistency: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+        },
+      },
+    ],
+  });
 
 const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
   family_semantics: {
@@ -334,6 +376,7 @@ const makeReducedOrderReadySections = (): Nhm2FullLoopAuditSectionsInput => {
     qiMetricDerived: true,
     qiApplicabilityStatus: "PASS",
     missingSignals: [],
+    qeiWorldlineDossier: makeQeiWorldlineDossier(),
   };
   sections.source_closure = {
     ...sections.source_closure,
@@ -567,6 +610,70 @@ describe("nhm2 full-loop audit contract", () => {
     expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
   });
 
+  it("keeps strict-signal readiness in review when the QEI worldline dossier is missing", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.strict_signal_readiness = {
+      ...sections.strict_signal_readiness,
+      qeiWorldlineDossier: null,
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.strict_signal_readiness.state).toBe("review");
+    expect(contract?.sections.strict_signal_readiness.reasons).toContain(
+      "qei_worldline_dossier_missing",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("review");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
+  it("keeps strict-signal readiness in review when the QEI dossier has no wall worldline", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.strict_signal_readiness = {
+      ...sections.strict_signal_readiness,
+      qeiWorldlineDossier: makeQeiWorldlineDossier({ regionId: "hull" }),
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.strict_signal_readiness.qeiWorldlineDossier?.summary.hasWallWorldline).toBe(false);
+    expect(contract?.sections.strict_signal_readiness.state).toBe("review");
+    expect(contract?.sections.strict_signal_readiness.reasons).toContain(
+      "qei_worldline_dossier_incomplete",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("review");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
+  it("fails strict-signal readiness when a QEI worldline margin fails", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.strict_signal_readiness = {
+      ...sections.strict_signal_readiness,
+      qeiWorldlineDossier: makeQeiWorldlineDossier({ marginPass: false }),
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.strict_signal_readiness.state).toBe("fail");
+    expect(contract?.sections.strict_signal_readiness.reasons).toContain(
+      "qei_worldline_dossier_margin_failed",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("fail");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
   it("keeps full-loop readiness in review when observer-robust checks are missing", () => {
     const sections = makeReducedOrderReadySections();
     sections.observer_audit = {
@@ -654,6 +761,7 @@ describe("nhm2 full-loop audit contract", () => {
       qiMetricDerived: true,
       qiApplicabilityStatus: "PASS",
       missingSignals: [],
+      qeiWorldlineDossier: makeQeiWorldlineDossier(),
     };
     sections.source_closure = {
       ...sections.source_closure,

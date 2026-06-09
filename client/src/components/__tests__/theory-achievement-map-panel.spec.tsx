@@ -221,7 +221,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(await screen.findByTestId("theory-achievement-map-scrollport")).toBeTruthy();
     expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
     expect(screen.queryByText("Current discussion zone")).toBeNull();
-    expect(screen.getByRole("button", { name: "QEI sampling window" })).not.toHaveAttribute(
+    expect(screen.getByRole("button", { name: "QEI badge replay margin" })).not.toHaveAttribute(
       "data-discussion-match",
     );
     expect(screen.getByRole("button", { name: "Source residual" })).not.toHaveAttribute("data-discussion-match");
@@ -368,7 +368,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { altKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }), { altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }), { altKey: true });
 
     await waitFor(() => {
       expect(useTheoryBadgeGraphPanelStore.getState().selectedBadgeIds).toEqual([
@@ -389,7 +389,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { ctrlKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }), { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }), { ctrlKey: true });
 
     expect(screen.queryByText("Trace Selected Badges")).toBeNull();
     expect(screen.queryByRole("button", { name: /Run Selected Trace/i })).toBeNull();
@@ -399,7 +399,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
         "nhm2.qei.sampling_window",
       ]);
     });
-    expect(screen.getByRole("button", { name: "QEI sampling window" }).className).toContain("ring");
+    expect(screen.getByRole("button", { name: "QEI badge replay margin" }).className).toContain("ring");
   });
 
   it("uses the StarSim stellar evolution lens to light mapped badges and load scalar formulas", async () => {
@@ -594,11 +594,11 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     fireEvent.click(await screen.findByRole("button", { name: "QEI / Stress-Energy atlas lens" }));
 
     expect(await screen.findByText("Stress-Energy")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Select QEI Margin" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select QEI Badge Replay Margin" })).toBeTruthy();
     expect(screen.queryByText("Load Examples")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Select QEI Margin" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Use Sample QEI margin object binding" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select QEI Badge Replay Margin" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Sample QEI badge replay margin object binding" }));
 
     await waitFor(() => {
       expect(useTheoryBadgeGraphPanelStore.getState().activeAtlasLensId).toBe("qei_stress_energy");
@@ -735,7 +735,7 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     const firstRender = renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "Rest Energy" }), { ctrlKey: true });
-    fireEvent.click(await screen.findByRole("button", { name: "QEI sampling window" }), { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "QEI badge replay margin" }), { ctrlKey: true });
 
     const scrollport = screen.getByTestId("theory-achievement-map-scrollport");
     scrollport.scrollLeft = 240;

@@ -35,10 +35,13 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(debugExport.body?.payload?.active_turn_id).toBe(turnId);
     expect(debugExport.body?.payload?.active_prompt).toBe("Open Scientific Calculator");
     expect(debugExport.body?.payload?.selected_final_answer).toBe(turn.body?.selected_final_answer);
-    expect(debugExport.body?.payload?.resolved_turn_summary?.terminal_artifact_kind).toBe("workspace_action_receipt");
+    expect(debugExport.body?.payload?.resolved_turn_summary?.terminal_artifact_kind).toBe(turn.body?.terminal_artifact_kind);
     expect(debugExport.body?.payload?.payload_hash).toEqual(expect.any(String));
     expect(debugExport.body.payload.payload_hash.length).toBeGreaterThan(12);
     expect(Array.isArray(debugExport.body?.payload?.current_turn_artifact_ledger)).toBe(true);
+    expect(debugExport.body?.payload).toHaveProperty("terminal_candidate_rejections");
+    expect(debugExport.body?.payload).toHaveProperty("evidence_reentry_proof");
+    expect(debugExport.body?.payload).toHaveProperty("terminal_authority_single_writer");
   }, 60000);
 
   it("returns a typed debug failure for missing turn ids", async () => {

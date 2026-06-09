@@ -93,6 +93,98 @@ describe("Helix terminal authority single writer", () => {
     expect((payload.debug as Record<string, unknown>).selected_final_answer).toBe("docs-viewer has been successfully opened.");
   });
 
+  it("selects post-tool synthesized answers over stale typed failures after internal tool success", () => {
+    const turnId = "ask:test:internal-success-visible-failure";
+    const staleFailureText = "I am unable to provide context because no observations are available.";
+    const synthesizedText = "The tool succeeded, the observation was re-entered, and the answer was synthesized from that evidence.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:receipt`,
+        kind: "workspace_action_receipt",
+        payload: {
+          schema: "helix.workspace_action_receipt.v1",
+          status: "completed",
+          message: "Tool receipt succeeded.",
+          assistant_answer: false,
+          terminal_eligible: false,
+        },
+      },
+      makePostToolObservation(turnId),
+      {
+        artifact_id: `${turnId}:stale_typed_failure`,
+        kind: "typed_failure",
+        payload: {
+          schema: "helix.typed_failure.v1",
+          error_code: "stale_model_only_fallback",
+          text: staleFailureText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: synthesizedText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "post_tool_answer",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: staleFailureText,
+      answer: staleFailureText,
+      text: staleFailureText,
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.source).toBe("final_answer_draft");
+    expect(result.visible_text).toBe(synthesizedText);
+    expect(result.visible_text).not.toBe(staleFailureText);
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "typed_failure",
+        source: "typed_failure",
+        reason: "stale_model_only_after_observation",
+      }),
+      expect.objectContaining({
+        kind: "workspace_action_receipt",
+        reason: "receipt_or_projection",
+      }),
+    ]));
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.selected_final_answer).toBe(synthesizedText);
+    expect((payload.terminal_presentation as Record<string, unknown>).concise_text).toBe(synthesizedText);
+  });
+
   it("quarantines note receipts as side evidence and selects the synthesized note answer", () => {
     const turnId = "ask:test:note-receipt-quarantine";
     const artifacts = [

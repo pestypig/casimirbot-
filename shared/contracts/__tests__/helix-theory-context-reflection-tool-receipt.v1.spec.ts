@@ -32,7 +32,7 @@ function reflectionFixture(): TheoryContextReflectionV1 {
     exactMatches: [
       {
         badgeId: "nhm2.qei.sampling_window",
-        title: "QEI sampling window",
+        title: "QEI badge replay margin",
         score: 90,
         reasons: ["symbol match"],
         matchedSymbols: ["qei_margin"],

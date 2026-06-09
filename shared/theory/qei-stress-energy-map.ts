@@ -99,9 +99,9 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
   },
   {
     id: "qei.stress_energy.qei_margin",
-    title: "QEI Margin",
+    title: "QEI Badge Replay Margin",
     band: "qei",
-    description: "Computes a scalar margin between a QEI bound and sampled density.",
+    description: "Computes the scalar badge replay margin; the worldline dossier remains the runtime QEI evidence surface.",
     theoryBadgeIds: [
       "physics.energy.energy_density",
       "nhm2.source.energy_density_proxy",
@@ -116,11 +116,11 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     objectBindings: [
       {
         id: "sample-qei-margin",
-        label: "Sample QEI margin",
+        label: "Sample QEI badge replay margin",
         description: "Bound 1 minus sample 0.9 in energy-density units.",
         input: {
           objectId: "qei-stress:sample-qei-margin",
-          label: "QEI/stress sample QEI margin",
+          label: "QEI/stress sample badge replay margin",
           qei_bound: 1,
           qei_sample: 0.9,
         },
@@ -131,7 +131,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     id: "qei.stress_energy.energy_condition_gate",
     title: "Energy-Condition Gate",
     band: "gate",
-    description: "Shows source residual and QEI margin feeding a diagnostic gate context.",
+    description: "Shows source residual and QEI badge replay margin feeding a diagnostic gate context.",
     theoryBadgeIds: [
       "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",

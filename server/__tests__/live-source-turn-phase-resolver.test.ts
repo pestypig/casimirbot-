@@ -249,8 +249,17 @@ describe("resolveLiveSourceTurnPhase", () => {
       canonicalGoal: "processed_mail_voice_decision",
       allowedTools: ["live_env.record_live_source_mail_decision"],
       nextPhase: "request_voice_after_decision",
+      terminal_eligible: false,
     });
-    expect(phase.forbiddenTools).toContain("live_env.request_interim_voice_callout");
+    expect(phase.phaseLock.locked).toBe(true);
+    expect(phase.requiredEvidence).toEqual(["stage_play_processed_mail_packet"]);
+    expect(phase.completionEvidence).toEqual(["stage_play_live_source_mail_decision"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
   });
 
   it("treats high or urgent salience as a voice candidate requiring decision first", () => {
@@ -326,6 +335,7 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(phase.completionEvidence).toEqual(["live_source_interim_voice_callout_receipt", "voice_receipt"]);
     expect(phase.nextPhase).toBe("terminal_checkpoint");
     expect(phase.phaseLock.locked).toBe(true);
+    expect(phase.terminal_eligible).toBe(false);
   });
 
   it("routes processed-mail interpretation prompts to read processed mail with process fallback", () => {
@@ -368,6 +378,14 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(phase.requiredEvidence).toEqual(["stage_play_processed_mail_packet"]);
     expect(phase.completionEvidence).toEqual(["stage_play_live_source_mail_decision"]);
     expect(phase.nextPhase).toBe("terminal_checkpoint");
+    expect(phase.terminal_eligible).toBe(false);
+    expect(phase.phaseLock.locked).toBe(true);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
   });
 
   it("requires a canonical processed read after process fallback before decision", () => {

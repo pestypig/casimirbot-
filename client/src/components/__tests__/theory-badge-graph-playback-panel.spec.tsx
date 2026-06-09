@@ -33,7 +33,7 @@ describe("TheoryBadgeGraphPanel playback", () => {
   it("runs a badge path from the achievement map", async () => {
     renderPanel();
 
-    fireEvent.doubleClick(await screen.findByRole("button", { name: "QEI sampling window" }));
+    fireEvent.doubleClick(await screen.findByRole("button", { name: "QEI badge replay margin" }));
 
     await waitFor(
       () => {

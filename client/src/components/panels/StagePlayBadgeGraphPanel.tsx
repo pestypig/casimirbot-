@@ -11,10 +11,12 @@ import type {
   StagePlayLiveSourceJobStateV1,
   StagePlayLiveSourceMailDecisionV1,
   StagePlayLiveSourceMailItemV1,
+  AskTurnTranscriptRowDraftV1,
   StagePlayMicroReasonerPromptV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
+  StagePlayLiveSourceMailTranscriptEntryV1,
   StagePlayLiveSourceNarrativeStateV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -61,6 +63,11 @@ import {
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 const STAGE_PLAY_MAILBOX_QUERY_KEY = [
   "/api/helix/stage-play/live-source-mail",
+  STAGE_PLAY_PANEL_THREAD_ID,
+  STAGE_PLAY_PANEL_THREAD_ID,
+] as const;
+const STAGE_PLAY_TRANSCRIPT_QUERY_KEY = [
+  "/api/helix/stage-play/live-source-mail/transcript",
   STAGE_PLAY_PANEL_THREAD_ID,
   STAGE_PLAY_PANEL_THREAD_ID,
 ] as const;
@@ -244,6 +251,24 @@ type StagePlayLiveSourceMailListResponse = {
   narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
   wakeResults?: StagePlayLiveSourceMailWakeResultV1[];
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+type StagePlayLiveSourceMailTranscriptResponse = {
+  ok: boolean;
+  schema: "stage_play_live_source_mail_transcript_response/v1";
+  requestedThreadId?: string;
+  mailboxThreadId?: string;
+  threadId?: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  entries?: StagePlayLiveSourceMailTranscriptEntryV1[];
+  transcriptRows?: AskTurnTranscriptRowDraftV1[];
+  transcriptEntryIds?: string[];
+  evidenceRefs?: string[];
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
@@ -477,6 +502,27 @@ async function fetchStagePlayLiveSourceMail(input: {
   return await response.json() as StagePlayLiveSourceMailListResponse;
 }
 
+async function fetchStagePlayLiveSourceMailTranscript(input: {
+  threadId: string;
+  mailboxThreadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+}): Promise<StagePlayLiveSourceMailTranscriptResponse> {
+  const params = new URLSearchParams();
+  params.set("threadId", input.threadId);
+  if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
+  if (input.roomId) params.set("roomId", input.roomId);
+  if (input.environmentId) params.set("environmentId", input.environmentId);
+  params.set("limit", "80");
+  const response = await fetch(`/api/helix/stage-play/live-source-mail/transcript?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play live-source mail transcript request failed: ${response.status}`);
+  }
+  return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
+}
+
 async function fetchStagePlayBuilderContext(input: {
   threadId: string;
   environmentId?: string | null;
@@ -606,6 +652,36 @@ function formatStagePlayClock(value: string | null | undefined): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+const STAGE_PLAY_STEERING_ROW_KINDS = new Set<AskTurnTranscriptRowDraftV1["rowKind"]>([
+  "voice_steering_received",
+  "voice_steering_queued",
+  "voice_steering_applied",
+  "voice_steering_deferred",
+  "voice_steering_rejected",
+  "voice_steering_cancel_requested",
+  "steering_ack_receipt",
+]);
+
+function isStagePlaySteeringTranscriptRow(row: AskTurnTranscriptRowDraftV1): boolean {
+  return STAGE_PLAY_STEERING_ROW_KINDS.has(row.rowKind);
+}
+
+function stagePlaySteeringRowLabel(rowKind: AskTurnTranscriptRowDraftV1["rowKind"]): string {
+  if (rowKind === "voice_steering_received") return "Voice steering received";
+  if (rowKind === "voice_steering_queued") return "Voice steering queued";
+  if (rowKind === "voice_steering_applied") return "Voice steering applied";
+  if (rowKind === "voice_steering_deferred") return "Voice steering deferred";
+  if (rowKind === "voice_steering_rejected") return "Voice steering rejected";
+  if (rowKind === "voice_steering_cancel_requested") return "Voice steering cancel";
+  if (rowKind === "steering_ack_receipt") return "Steering ack receipt";
+  return labelize(rowKind);
+}
+
+function compactStagePlayText(value: string | null | undefined, fallback: string, max = 160): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
+  return text.length > max ? `${text.slice(0, Math.max(0, max - 1)).trimEnd()}...` : text;
 }
 
 function statusTone(status: string): string {
@@ -1472,8 +1548,9 @@ const makeMicroReasonerNode = (input: {
 function buildObserverMailLoopNodes(input: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+  transcript: StagePlayLiveSourceMailTranscriptResponse | null | undefined;
 }): StagePlayMailLoopNode[] {
-  const { graph, mailbox } = input;
+  const { graph, mailbox, transcript } = input;
   const mailItems = mailbox?.mailItems ?? [];
   const jobStates = mailbox?.jobStates ?? [];
   const decisions = mailbox?.decisions ?? [];
@@ -1486,6 +1563,42 @@ function buildObserverMailLoopNodes(input: {
   const microReasonerPrompts = mailbox?.microReasonerPrompts ?? [];
   const microReasonerRuns = mailbox?.microReasonerRuns ?? [];
   const processedMailPackets = mailbox?.processedMailPackets ?? [];
+  const transcriptRows = transcript?.transcriptRows ?? transcript?.entries?.map((entry) => entry.row) ?? [];
+  const steeringRows = transcriptRows.filter(isStagePlaySteeringTranscriptRow);
+  const latestSteeringRow = steeringRows.at(-1) ?? null;
+  const latestSteeringAck = steeringRows.filter((row) => row.rowKind === "steering_ack_receipt").at(-1) ?? null;
+  const latestSteeringDecisionRow =
+    steeringRows
+      .filter((row) =>
+        row.rowKind !== "voice_steering_received" &&
+        row.rowKind !== "steering_ack_receipt"
+      )
+      .at(-1) ?? null;
+  const latestSteeringReceived = steeringRows.filter((row) => row.rowKind === "voice_steering_received").at(-1) ?? null;
+  const steeringStatusRow = latestSteeringDecisionRow ?? latestSteeringAck ?? latestSteeringReceived ?? latestSteeringRow;
+  const steeringStatus = steeringStatusRow?.rowKind ?? "not_observed";
+  const steeringTone =
+    steeringStatus === "voice_steering_rejected" || steeringStatus === "voice_steering_cancel_requested"
+      ? "blocked"
+      : steeringStatus === "voice_steering_deferred" || steeringStatus === "voice_steering_queued" || steeringStatus === "voice_steering_received"
+        ? "warn"
+        : steeringStatus === "voice_steering_applied" || steeringStatus === "steering_ack_receipt"
+          ? "good"
+          : "default";
+  const steeringStatusText = steeringStatusRow
+    ? stagePlaySteeringRowLabel(steeringStatusRow.rowKind)
+    : "No steering timeline evidence yet.";
+  const steeringPreview = steeringStatusRow
+    ? `${steeringStatusText}: ${compactStagePlayText(steeringStatusRow.body, steeringStatusText)}`
+    : "No voice steering row has been recorded for this Stage Play mailbox.";
+  const steeringEventRefs = uniqueSorted([
+    ...(transcript?.transcriptEntryIds ?? []),
+    ...(transcript?.evidenceRefs ?? []),
+    ...steeringRows.flatMap((row) => [
+      row.source.artifactId ?? "",
+      ...row.evidenceRefs,
+    ]),
+  ].filter(Boolean));
   const mailboxThreadId = mailbox?.mailboxThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
   const requestedThreadId = mailbox?.requestedThreadId ?? STAGE_PLAY_PANEL_THREAD_ID;
   const visualMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
@@ -2242,7 +2355,7 @@ function buildObserverMailLoopNodes(input: {
         },
       ],
       edgeToNext: {
-        label: latestDecision ? "output state" : "decision missing",
+        label: steeringRows.length > 0 ? "steering audit" : latestDecision ? "output state" : "decision missing",
         tone: latestDecision ? "connected" : "pending",
       },
       inputLabel: "Input",
@@ -2252,6 +2365,62 @@ function buildObserverMailLoopNodes(input: {
       outputLabel: "Output",
       outputRefs: latestDecision ? [latestDecision.decisionId, ...latestDecision.evidenceRefs] : [],
       outputPreview: latestDecision?.decision ?? (unreadCount > 0 ? "awaiting Ask mail read" : "wait_for_next_summary"),
+    },
+    {
+      id: "observer_mail_loop:steering",
+      title: "Steering",
+      subtitle: "voice steering timeline",
+      status: steeringStatus,
+      preview: steeringPreview,
+      statusChips: [
+        steeringRows.length > 0 ? `${steeringRows.length} row${steeringRows.length === 1 ? "" : "s"}` : "no rows",
+        latestSteeringAck ? "ack receipt" : null,
+      ].filter((entry): entry is string => Boolean(entry)),
+      statusBand: steeringRows.length > 0
+        ? {
+            title: "Steering timeline",
+            lines: [
+              latestSteeringReceived ? `Heard: ${compactStagePlayText(latestSteeringReceived.body, "voice steering received", 82)}` : null,
+              latestSteeringDecisionRow ? `Decision: ${stagePlaySteeringRowLabel(latestSteeringDecisionRow.rowKind)}` : "Decision: not recorded yet",
+              latestSteeringAck ? `Ack: ${compactStagePlayText(latestSteeringAck.body, "receipt recorded", 82)}` : "Ack: no receipt yet",
+            ].filter((line): line is string => Boolean(line)),
+            tone: steeringTone === "good" ? "good" : steeringTone === "blocked" ? "blocked" : "pending",
+          }
+        : null,
+      payloadRows: [
+        {
+          label: "Status",
+          value: steeringStatusText,
+          tone: steeringTone,
+        },
+        {
+          label: "Target",
+          value: steeringStatusRow?.source.artifactId ?? latestWakeAskTurnId ?? "No target turn evidence yet.",
+          tone: steeringStatusRow ? "good" : "default",
+        },
+        {
+          label: "Debug",
+          value: steeringRows.length > 0
+            ? "Transcript rows back voice_steering_debug; receipts remain evidence-only."
+            : "Waiting for voice_steering_debug rows from live transcript.",
+          tone: steeringRows.length > 0 ? "good" : "warn",
+        },
+      ],
+      edgeToNext: {
+        label: steeringRows.length > 0 ? "visible timeline" : "no steering",
+        tone: steeringRows.length > 0 ? "connected" : latestDecision ? "pending" : "blocked",
+      },
+      inputLabel: "Input",
+      inputRefs: steeringRows.flatMap((row) => row.evidenceRefs).slice(0, 8),
+      inputPreview: latestSteeringReceived?.body
+        ? compactStagePlayText(latestSteeringReceived.body, "voice steering received")
+        : "voice steering transcript rows pending",
+      transformLabel: "voice steering event/decision/ack -> console timeline",
+      outputLabel: "Output",
+      outputRefs: steeringEventRefs.slice(0, 12),
+      outputPreview: steeringRows.length > 0
+        ? steeringRows.slice(-3).map((row) => stagePlaySteeringRowLabel(row.rowKind)).join(" -> ")
+        : "no steering timeline rows observed",
     },
     {
       id: "observer_mail_loop:output_wait",
@@ -2320,11 +2489,13 @@ function buildObserverMailLoopNodes(input: {
 function StagePlayObserverMailLoopCanvas({
   graph,
   mailbox,
+  transcript,
 }: {
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+  transcript: StagePlayLiveSourceMailTranscriptResponse | null | undefined;
 }) {
-  const nodes = useMemo(() => buildObserverMailLoopNodes({ graph, mailbox }), [graph, mailbox]);
+  const nodes = useMemo(() => buildObserverMailLoopNodes({ graph, mailbox, transcript }), [graph, mailbox, transcript]);
   const [selectedInspectorNodeId, setSelectedInspectorNodeId] = useState<string | null>(null);
   const selectedInspectorNode =
     nodes.find((node) => node.id === selectedInspectorNodeId && node.inspector) ??
@@ -2336,7 +2507,13 @@ function StagePlayObserverMailLoopCanvas({
       data-testid="stage-play-badge-graph-scrollport"
       data-stage-play-graph-mode="observer_mail_loop_v1"
     >
-      <div className="grid min-w-[3120px] grid-cols-[repeat(13,220px)] items-start gap-6">
+      <div
+        className="grid items-start gap-6"
+        style={{
+          minWidth: `${Math.max(13, nodes.length) * 244}px`,
+          gridTemplateColumns: `repeat(${nodes.length}, 220px)`,
+        }}
+      >
         {nodes.map((node) => (
           <div
             key={node.id}
@@ -2441,7 +2618,13 @@ function StagePlayObserverMailLoopCanvas({
           </div>
         ))}
       </div>
-      <div className="mt-4 grid min-w-[3120px] grid-cols-[repeat(13,220px)] gap-6 font-mono text-[10px] text-slate-500">
+      <div
+        className="mt-4 grid gap-6 font-mono text-[10px] text-slate-500"
+        style={{
+          minWidth: `${Math.max(13, nodes.length) * 244}px`,
+          gridTemplateColumns: `repeat(${nodes.length}, 220px)`,
+        }}
+      >
         {nodes.map((node, index) => (
           <div key={`${node.id}:edge`} className="flex items-center justify-center">
             {index < nodes.length - 1 ? (
@@ -5179,6 +5362,15 @@ export default function StagePlayBadgeGraphPanel() {
     refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
   });
   const mailbox = mailboxQuery.data ?? null;
+  const transcriptQuery = useQuery<StagePlayLiveSourceMailTranscriptResponse>({
+    queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY,
+    queryFn: () => fetchStagePlayLiveSourceMailTranscript({
+      threadId: STAGE_PLAY_PANEL_THREAD_ID,
+      mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
+    }),
+    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
+  });
+  const transcript = transcriptQuery.data ?? null;
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
     queryKey: [
       "/api/helix/stage-play/raw-session-buffer",
@@ -5244,8 +5436,10 @@ export default function StagePlayBadgeGraphPanel() {
   useEffect(() => {
     if (graphDisplayMode !== "observer_mail_loop_v1") return;
     void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY });
     void mailboxQuery.refetch();
-  }, [graphDisplayMode, mailboxQuery.refetch, queryClient]);
+    void transcriptQuery.refetch();
+  }, [graphDisplayMode, mailboxQuery.refetch, queryClient, transcriptQuery.refetch]);
 
   useEffect(() => {
     const handleMailboxRefresh = (event: Event) => {
@@ -5253,13 +5447,15 @@ export default function StagePlayBadgeGraphPanel() {
       const mailboxThreadId = detail?.mailboxThreadId ?? detail?.threadId ?? STAGE_PLAY_PANEL_THREAD_ID;
       if (mailboxThreadId && mailboxThreadId !== STAGE_PLAY_PANEL_THREAD_ID) return;
       void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY });
       void mailboxQuery.refetch();
+      void transcriptQuery.refetch();
     };
     window.addEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
     return () => {
       window.removeEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
     };
-  }, [mailboxQuery.refetch, queryClient]);
+  }, [mailboxQuery.refetch, queryClient, transcriptQuery.refetch]);
 
   useEffect(() => {
     if (!graph) return;
@@ -6111,6 +6307,7 @@ export default function StagePlayBadgeGraphPanel() {
             <StagePlayObserverMailLoopCanvas
               graph={graph}
               mailbox={mailbox}
+              transcript={transcript}
             />
           ) : (
             <StagePlayGraphCanvas

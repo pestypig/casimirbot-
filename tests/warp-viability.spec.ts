@@ -37,6 +37,8 @@ import { buildNhm2ObserverAuditArtifact } from "../shared/contracts/nhm2-observe
 import { buildNhm2SourceClosureArtifact } from "../shared/contracts/nhm2-source-closure.v1";
 import { buildNhm2SourceClosureArtifactV2 } from "../shared/contracts/nhm2-source-closure.v2";
 import { buildNhm2StrictSignalReadinessArtifact } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
+import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { buildIdealCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
 import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
 import {
   makeShiftLapseTransportPromotionGateFixture,
@@ -86,6 +88,44 @@ const makePipeline = (overrides: Record<string, unknown> = {}) => ({
   },
   ...overrides,
 });
+
+const buildPassingQeiWorldlineDossier = () =>
+  buildNhm2QeiWorldlineDossier({
+    generatedAt: "2026-06-09T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    worldlines: [
+      {
+        worldlineId: "qei:wall:guardrail",
+        regionId: "wall",
+        chartId: "comoving_cartesian",
+        samplingFunction: {
+          kind: "gaussian",
+          tauSeconds: 1e-9,
+          normalized: true,
+        },
+        sampledRho: {
+          valueSI: -1,
+          provenanceRef: "warp.metric.T00.nhm2.shift_lapse",
+          status: "computed",
+        },
+        bound: {
+          valueSI: 0,
+          provenanceRef: "ford_roman_1996_quantum_inequality",
+          status: "literature_bound",
+        },
+        margin: {
+          valueSI: 1,
+          pass: true,
+        },
+        consistency: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+        },
+      },
+    ],
+  });
 
 const buildPassingObserverAudit = () =>
   buildNhm2ObserverAuditArtifact({
@@ -532,6 +572,29 @@ describe("warp viability congruence wiring", () => {
     expect((result.snapshot as any).nhm2_source_closure_cl3_secondary).toBe(true);
   });
 
+  it("surfaces Casimir material receipt status in the viability snapshot", async () => {
+    runtime.pipeline = makePipeline({
+      casimirMaterialReceipt: buildIdealCasimirMaterialReceipt({
+        generatedAt: "2026-06-09T00:00:00.000Z",
+        tileBatchId: "tile_batch:ideal",
+        gapMeters: 1e-9,
+        temperatureK: 20,
+      }),
+    });
+
+    const result = await evaluateWarpViability({});
+
+    expect((result.snapshot as any).casimir_material_receipt_status).toBe(
+      "ideal_scalar_only",
+    );
+    expect((result.snapshot as any).casimir_material_receipt_model_kind).toBe(
+      "perfect_conductor_ideal",
+    );
+    expect((result.snapshot as any).casimir_material_receipt?.contractVersion).toBe(
+      "casimir_material_receipt/v1",
+    );
+  });
+
   it("surfaces the emitted NHM2 observer artifact with dual tensor states and model labels", async () => {
     runtime.pipeline = makePipeline({
       nhm2ObserverAudit: buildNhm2ObserverAuditArtifact({
@@ -918,6 +981,7 @@ describe("warp viability congruence wiring", () => {
         toleranceRelLInf: 0.1,
         scalarCl3RhoDeltaRel: 0,
       }),
+      nhm2QeiWorldlineDossier: buildPassingQeiWorldlineDossier(),
       nhm2ObserverAudit: buildPassingObserverAudit(),
     });
 
@@ -928,6 +992,12 @@ describe("warp viability congruence wiring", () => {
     expect(layer?.policyId).toBe("nhm2_full_loop_audit");
     expect(layer?.artifact.sections.mission_time_outputs.state).toBe("pass");
     expect(layer?.artifact.sections.strict_signal_readiness.state).toBe("pass");
+    expect(
+      layer?.artifact.sections.strict_signal_readiness.qeiWorldlineDossier?.summary
+        .dossierComplete,
+    ).toBe(true);
+    expect((result.snapshot as any).nhm2_qei_worldline_dossier_complete).toBe(true);
+    expect((result.snapshot as any).nhm2_qei_worldline_dossier_has_wall).toBe(true);
     expect(layer?.artifact.sections.source_closure.state).toBe("review");
     expect(layer?.artifact.sections.source_closure.reasons).toContain(
       "source_closure_version_lag",
@@ -1110,6 +1180,7 @@ describe("warp viability congruence wiring", () => {
           scalarCl3RhoDeltaRel: 0,
         });
       })(),
+      nhm2QeiWorldlineDossier: buildPassingQeiWorldlineDossier(),
       nhm2ObserverAudit: buildPassingObserverAudit(),
     });
 
@@ -1243,6 +1314,7 @@ describe("warp viability congruence wiring", () => {
         },
         scalarCl3RhoDeltaRel: 0,
       }),
+      nhm2QeiWorldlineDossier: buildPassingQeiWorldlineDossier(),
       nhm2ObserverAudit: buildPassingObserverAudit(),
     });
 

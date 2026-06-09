@@ -635,6 +635,7 @@ function renderPanel(options: {
   producers?: Array<Record<string, unknown>>;
   graph?: StagePlayBadgeGraphV1;
   mailboxResponse?: Record<string, unknown>;
+  transcriptResponse?: Record<string, unknown>;
 } = {}) {
   const graph = options.graph ?? buildFixture();
   const sourceHandles = buildSourceHandles(options);
@@ -794,6 +795,32 @@ function renderPanel(options: {
           context_role: "tool_evidence",
           raw_content_included: false,
         },
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.includes("/api/helix/stage-play/live-source-mail/transcript")) {
+      if (options.transcriptResponse) {
+        return new Response(JSON.stringify(options.transcriptResponse), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        schema: "stage_play_live_source_mail_transcript_response/v1",
+        requestedThreadId: "helix-ask:desktop",
+        mailboxThreadId: "helix-ask:desktop",
+        threadId: "helix-ask:desktop",
+        entries: [],
+        transcriptRows: [],
+        transcriptEntryIds: [],
+        evidenceRefs: [],
         assistant_answer: false,
         terminal_eligible: false,
         context_role: "tool_evidence",
@@ -1532,19 +1559,21 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.queryByText(/Observer -> Visual Summary Mail -> Interpreter Profile -> Profile Comparison -> Wake Ask -> Decision -> Output \/ Wait/i)).toBeNull();
     expect(screen.queryByRole("button", { name: "Run armed mail wake" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy observer mail loop refs" })).toBeNull();
-    expect(screen.getAllByTestId("stage-play-observer-mail-loop-node")).toHaveLength(7);
-    expect(screen.getAllByText("Observer").length).toBeGreaterThan(0);
+    const mailLoopNodes = screen.getAllByTestId("stage-play-observer-mail-loop-node");
+    expect(mailLoopNodes.length).toBeGreaterThanOrEqual(8);
+    expect(screen.getAllByText("Visual Source").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mailbox").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Interpreter Profile").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Profile Comparison").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Comparator|profile lens over mail/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Wake Ask").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Steering").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("stage-play-tool-activity-strip")).toBeNull();
     expect(screen.queryByTestId("stage-play-mail-loop-header")).toBeNull();
     expect(screen.queryByTestId("stage-play-mail-loop-activity")).toBeNull();
     expect(screen.getAllByTestId("stage-play-mail-loop-node-payload").length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId("stage-play-mail-loop-edge")).toHaveLength(6);
+    expect(screen.getAllByTestId("stage-play-mail-loop-edge")).toHaveLength(mailLoopNodes.length - 1);
     expect(screen.getByText("Objective")).toBeTruthy();
     expect(screen.getByText("Source")).toBeTruthy();
     expect(screen.getByText("Latest")).toBeTruthy();
@@ -1579,18 +1608,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Recommended: record_interpretation/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/interpretation: The visual source still appears to show a stable Minecraft-like scene/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/watch next: Watch for a new actor, opened UI, or scene transition/i).length).toBeGreaterThan(0);
-    expect(screen.getByText("summary mail")).toBeTruthy();
-    expect(screen.getByText("profile lens")).toBeTruthy();
-    expect(screen.getByText("comparison")).toBeTruthy();
-    expect(screen.getByText("wake queued")).toBeTruthy();
-    expect(screen.getByText("output state")).toBeTruthy();
+    expect(screen.getAllByText(/steering audit|visible timeline|no steering/i).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Open Interpreter Profile inspector" }));
     expect(screen.getByTestId("stage-play-interpreter-profile-inspector")).toBeTruthy();
     expect(screen.getByText(/Preserve observations and compare them to survival priorities/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Open linked note" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Compile from note" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pause / archive" })).toBeTruthy();
-    expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(7);
+    expect(screen.getAllByTestId("stage-play-mail-loop-node-tray")).toHaveLength(mailLoopNodes.length);
   });
 
   it("renders an active unscoped interpreter profile returned by the mailbox namespace", async () => {
@@ -2010,6 +2035,87 @@ describe("StagePlayBadgeGraphPanel", () => {
       ).length;
       expect(nextMailboxCalls).toBeGreaterThan(initialMailboxCalls);
     });
+  });
+
+  it("renders voice steering timeline evidence in the processed mail loop", async () => {
+    renderPanel({
+      transcriptResponse: {
+        ok: true,
+        schema: "stage_play_live_source_mail_transcript_response/v1",
+        requestedThreadId: "helix-ask:desktop",
+        mailboxThreadId: "helix-ask:desktop",
+        threadId: "helix-ask:desktop",
+        entries: [],
+        transcriptEntryIds: ["stage_play_live_source_mail_transcript_entry:steering-ui"],
+        evidenceRefs: [
+          "helix_voice_steering_event:ui",
+          "helix_voice_steering_decision:ui",
+          "helix_interim_voice_callout_receipt:steering-ui",
+        ],
+        transcriptRows: [
+          {
+            rowId: "voice_steering_received:ui",
+            rowKind: "voice_steering_received",
+            title: "Voice steering received",
+            body: "Actually focus on whether the active Ask turn was steered.",
+            source: {
+              toolName: "live_env.record_voice_steering",
+              artifactId: "helix_voice_steering_event:ui",
+              artifactKind: "helix.voice_steering_event.v1",
+            },
+            evidenceRefs: ["helix_voice_steering_event:ui"],
+            authority: "tool_evidence",
+            assistantAnswer: false,
+            terminalEligible: false,
+            createdAt: "2026-06-02T00:01:05.000Z",
+          },
+          {
+            rowId: "voice_steering_applied:ui",
+            rowKind: "voice_steering_applied",
+            title: "Voice steering applied",
+            body: "User voice steering was routed into the active turn.",
+            source: {
+              toolName: "live_env.record_voice_steering",
+              artifactId: "helix_voice_steering_decision:ui",
+              artifactKind: "helix.voice_steering_decision.v1",
+            },
+            evidenceRefs: ["helix_voice_steering_decision:ui", "helix_voice_steering_event:ui"],
+            authority: "tool_evidence",
+            assistantAnswer: false,
+            terminalEligible: false,
+            createdAt: "2026-06-02T00:01:06.000Z",
+          },
+          {
+            rowId: "steering_ack_receipt:ui",
+            rowKind: "steering_ack_receipt",
+            title: "Steering acknowledgement receipt",
+            body: "Acknowledged steering without claiming final answer authority.",
+            source: {
+              toolName: "live_env.request_interim_voice_callout",
+              artifactId: "helix_interim_voice_callout_receipt:steering-ui",
+              artifactKind: "helix.interim_voice_callout.receipt.v1",
+            },
+            evidenceRefs: ["helix_voice_steering_event:ui", "helix_voice_steering_decision:ui"],
+            authority: "tool_evidence",
+            assistantAnswer: false,
+            terminalEligible: false,
+            createdAt: "2026-06-02T00:01:07.000Z",
+          },
+        ],
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      },
+    });
+
+    await screen.findByTestId("stage-play-badge-graph-scrollport");
+
+    expect(screen.getAllByText("Steering").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Voice steering applied").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Heard: Actually focus on whether the active Ask turn was steered/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ack: Acknowledged steering without claiming final answer authority/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Transcript rows back voice_steering_debug/i).length).toBeGreaterThan(0);
   });
 
   it("keeps mail wake execution out of the graph controls", async () => {

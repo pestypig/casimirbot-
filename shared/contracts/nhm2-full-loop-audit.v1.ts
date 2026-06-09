@@ -42,6 +42,22 @@ import {
   isNhm2ObserverRobustEnergyConditionArtifact,
   type Nhm2ObserverRobustEnergyConditionArtifactV1,
 } from "./nhm2-observer-robust-energy-conditions.v1";
+import {
+  isNhm2QeiWorldlineDossier,
+  type Nhm2QeiWorldlineDossierV1,
+} from "./nhm2-qei-worldline-dossier.v1";
+import {
+  NHM2_NATARIO_CONVERGENCE_STATUS_VALUES,
+  NHM2_NATARIO_INVARIANT_STATUS_VALUES,
+  NHM2_NATARIO_MOMENTUM_DENSITY_STATUS_VALUES,
+  NHM2_NATARIO_THETA_FLATNESS_STATUS_VALUES,
+  isNhm2NatarioInvariantAudit,
+  type Nhm2NatarioConvergenceStatus,
+  type Nhm2NatarioInvariantAuditV1,
+  type Nhm2NatarioInvariantStatus,
+  type Nhm2NatarioMomentumDensityStatus,
+  type Nhm2NatarioThetaFlatnessStatus,
+} from "./nhm2-natario-invariant-audit.v1";
 
 export const NHM2_FULL_LOOP_AUDIT_CONTRACT_VERSION = "nhm2_full_loop_audit/v1";
 export const NHM2_FULL_LOOP_AUDIT_ID = "nhm2_full_loop";
@@ -57,6 +73,7 @@ export const NHM2_FULL_LOOP_AUDIT_SECTION_ORDER = [
   "gr_stability_safety",
   "mission_time_outputs",
   "shift_vs_lapse_decomposition",
+  "natario_invariant_audit",
   "uncertainty_perturbation_reproducibility",
   "certificate_policy_result",
 ] as const;
@@ -92,10 +109,18 @@ export const NHM2_FULL_LOOP_AUDIT_REASON_CODES = [
   "observer_robust_energy_condition_incomplete",
   "observer_robust_energy_condition_violation",
   "qei_applicability_non_pass",
+  "qei_worldline_dossier_missing",
+  "qei_worldline_dossier_incomplete",
+  "qei_worldline_dossier_margin_failed",
   "mission_output_missing",
   "mission_output_not_certified",
   "shift_lapse_decomposition_missing",
   "expansion_leakage_unbounded",
+  "natario_invariant_audit_missing",
+  "natario_invariants_missing",
+  "natario_momentum_density_missing",
+  "natario_stability_diagnostics_missing",
+  "natario_zero_expansion_failed",
   "perturbation_suite_missing",
   "reproducibility_missing",
   "certificate_missing",
@@ -127,6 +152,7 @@ export const NHM2_FULL_LOOP_AUDIT_SECTION_TIER_MAP: Record<
   gr_stability_safety: ["reduced-order", "certified"],
   mission_time_outputs: ["diagnostic", "reduced-order", "certified"],
   shift_vs_lapse_decomposition: ["reduced-order", "certified"],
+  natario_invariant_audit: ["reduced-order", "certified"],
   uncertainty_perturbation_reproducibility: ["reduced-order", "certified"],
   certificate_policy_result: ["certified"],
 };
@@ -151,6 +177,7 @@ export const NHM2_FULL_LOOP_AUDIT_TIER_SECTION_MAP: Record<
     "gr_stability_safety",
     "mission_time_outputs",
     "shift_vs_lapse_decomposition",
+    "natario_invariant_audit",
     "uncertainty_perturbation_reproducibility",
   ],
   certified: [...NHM2_FULL_LOOP_AUDIT_SECTION_ORDER],
@@ -216,6 +243,7 @@ export type Nhm2StrictSignalReadinessSection =
     qiMetricDerived: boolean | null;
     qiApplicabilityStatus: string | null;
     missingSignals: Nhm2StrictSignalId[];
+    qeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1 | null;
   };
 
 export type Nhm2SourceClosureLeadBlockerProjection = {
@@ -427,6 +455,28 @@ export type Nhm2ShiftVsLapseDecompositionSection =
     natarioBaselineComparisonRef: string | null;
   };
 
+export type Nhm2NatarioInvariantAuditSection =
+  Nhm2FullLoopAuditSectionBase<"natario_invariant_audit"> & {
+    natarioInvariantAudit?: Nhm2NatarioInvariantAuditV1 | null;
+    thetaFlatnessStatus: Nhm2NatarioThetaFlatnessStatus;
+    invariantStatus: Nhm2NatarioInvariantStatus;
+    momentumDensityStatus: Nhm2NatarioMomentumDensityStatus;
+    convergenceStatus: Nhm2NatarioConvergenceStatus;
+    thetaMaxAbs: number | null;
+    expansionLeakageBound: number | null;
+    ricciScalar: number | null;
+    kretschmannScalar: number | null;
+    weylScalarProxy: number | null;
+    petrovClass: string | null;
+    Jx: number | null;
+    Jy: number | null;
+    Jz: number | null;
+    tidalMax: number | null;
+    blueshiftMax: number | null;
+    zeroExpansionSeparatelyReported: true;
+    zeroExpansionIsNotSafetyCertificate: true;
+  };
+
 export type Nhm2UncertaintyPerturbationReproducibilitySection =
   Nhm2FullLoopAuditSectionBase<"uncertainty_perturbation_reproducibility"> & {
     precisionAgreementStatus: string | null;
@@ -460,6 +510,7 @@ export type Nhm2FullLoopAuditSections = {
   gr_stability_safety: Nhm2GrStabilitySafetySection;
   mission_time_outputs: Nhm2MissionTimeOutputsSection;
   shift_vs_lapse_decomposition: Nhm2ShiftVsLapseDecompositionSection;
+  natario_invariant_audit: Nhm2NatarioInvariantAuditSection;
   uncertainty_perturbation_reproducibility: Nhm2UncertaintyPerturbationReproducibilitySection;
   certificate_policy_result: Nhm2CertificatePolicyResultSection;
 };
@@ -500,6 +551,12 @@ export type Nhm2FullLoopAuditSectionsInput = {
       Omit<
         Nhm2ShiftVsLapseDecompositionSection,
         keyof Nhm2FullLoopAuditSectionBase<"shift_vs_lapse_decomposition">
+      >;
+  natario_invariant_audit:
+    Nhm2FullLoopAuditSectionBaseInput<"natario_invariant_audit"> &
+      Omit<
+        Nhm2NatarioInvariantAuditSection,
+        keyof Nhm2FullLoopAuditSectionBase<"natario_invariant_audit">
       >;
   uncertainty_perturbation_reproducibility:
     Nhm2FullLoopAuditSectionBaseInput<"uncertainty_perturbation_reproducibility"> &
@@ -831,6 +888,148 @@ const cloneObserverRobustEnergyConditionSet = (
   };
 };
 
+const cloneQeiWorldlineDossier = (
+  dossier: Nhm2QeiWorldlineDossierV1 | null | undefined,
+): Nhm2QeiWorldlineDossierV1 | null | undefined => {
+  if (dossier === undefined) return undefined;
+  if (dossier === null) return null;
+  return {
+    ...dossier,
+    worldlines: dossier.worldlines.map((worldline) => ({
+      ...worldline,
+      samplingFunction: { ...worldline.samplingFunction },
+      sampledRho: { ...worldline.sampledRho },
+      bound: { ...worldline.bound },
+      margin: { ...worldline.margin },
+      consistency: { ...worldline.consistency },
+      blockers: [...worldline.blockers],
+    })),
+    summary: { ...dossier.summary },
+    literatureRefs: [...dossier.literatureRefs] as ["ford_roman_1996_quantum_inequality"],
+    claimBoundary: { ...dossier.claimBoundary },
+  };
+};
+
+const cloneNatarioInvariantAudit = (
+  audit: Nhm2NatarioInvariantAuditV1 | null | undefined,
+): Nhm2NatarioInvariantAuditV1 | null | undefined => {
+  if (audit === undefined) return undefined;
+  if (audit === null) return null;
+  return {
+    ...audit,
+    expansion: { ...audit.expansion },
+    invariants: { ...audit.invariants },
+    momentumDensity: { ...audit.momentumDensity },
+    stability: { ...audit.stability },
+    literatureRefs: [...audit.literatureRefs] as [
+      "rodal_2025_natario_zero_expansion_analysis",
+    ],
+    blockers: [...audit.blockers],
+    claimBoundary: { ...audit.claimBoundary },
+  };
+};
+
+const normalizeStrictSignalStateForQeiDossier = (args: {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+  qeiWorldlineDossier: Nhm2QeiWorldlineDossierV1 | null | undefined;
+}): {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+} => {
+  const reasons = new Set<Nhm2FullLoopAuditReasonCode>(args.reasons);
+  const dossier = args.qeiWorldlineDossier ?? null;
+  if (dossier == null) {
+    reasons.add("qei_worldline_dossier_missing");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  if (dossier.summary.allMarginsPass === false) {
+    reasons.add("qei_worldline_dossier_margin_failed");
+    return {
+      state: "fail",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  if (!dossier.summary.hasWallWorldline || !dossier.summary.dossierComplete) {
+    reasons.add("qei_worldline_dossier_incomplete");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  return {
+    state: args.state,
+    reasons: orderReasonCodes([...reasons]),
+  };
+};
+
+const normalizeNatarioInvariantAuditState = (args: {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+  natarioInvariantAudit: Nhm2NatarioInvariantAuditV1 | null | undefined;
+}): {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+} => {
+  const reasons = new Set<Nhm2FullLoopAuditReasonCode>(args.reasons);
+  const audit = args.natarioInvariantAudit ?? null;
+  if (audit == null) {
+    reasons.add("natario_invariant_audit_missing");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+
+  if (audit.expansion.thetaFlatnessStatus === "fail") {
+    reasons.add("natario_zero_expansion_failed");
+  }
+  if (audit.invariants.status !== "computed") {
+    reasons.add("natario_invariants_missing");
+  }
+  if (audit.momentumDensity.status !== "computed") {
+    reasons.add("natario_momentum_density_missing");
+  }
+  if (
+    audit.stability.convergenceStatus !== "pass" ||
+    audit.stability.tidalMax == null ||
+    audit.stability.blueshiftMax == null
+  ) {
+    reasons.add("natario_stability_diagnostics_missing");
+  }
+
+  if (
+    audit.expansion.thetaFlatnessStatus === "fail" ||
+    audit.stability.convergenceStatus === "fail"
+  ) {
+    return {
+      state: "fail",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  const introducedReviewReason = [...reasons].some(
+    (reason) => !args.reasons.includes(reason),
+  );
+  return {
+    state:
+      introducedReviewReason &&
+      args.state !== "fail" &&
+      args.state !== "unavailable"
+        ? "review"
+        : args.state,
+    reasons: orderReasonCodes([...reasons]),
+  };
+};
+
 const normalizeObserverAuditStateForRobustEnergy = (args: {
   state: Nhm2FullLoopAuditState;
   reasons: Nhm2FullLoopAuditReasonCode[];
@@ -1020,6 +1219,22 @@ const cloneSections = (
     reasons: sections.observer_audit.reasons,
     observerRobustEnergyConditions,
   });
+  const qeiWorldlineDossier = cloneQeiWorldlineDossier(
+    sections.strict_signal_readiness.qeiWorldlineDossier,
+  );
+  const strictSignalQeiDossierState = normalizeStrictSignalStateForQeiDossier({
+    state: sections.strict_signal_readiness.state,
+    reasons: sections.strict_signal_readiness.reasons,
+    qeiWorldlineDossier,
+  });
+  const natarioInvariantAudit = cloneNatarioInvariantAudit(
+    sections.natario_invariant_audit.natarioInvariantAudit,
+  );
+  const natarioInvariantState = normalizeNatarioInvariantAuditState({
+    state: sections.natario_invariant_audit.state,
+    reasons: sections.natario_invariant_audit.reasons,
+    natarioInvariantAudit,
+  });
   return {
   family_semantics: {
     ...sections.family_semantics,
@@ -1047,8 +1262,10 @@ const cloneSections = (
   },
   strict_signal_readiness: {
     ...sections.strict_signal_readiness,
-    reasons: orderReasonCodes([...sections.strict_signal_readiness.reasons]),
+    state: strictSignalQeiDossierState.state,
+    reasons: strictSignalQeiDossierState.reasons,
     missingSignals: [...sections.strict_signal_readiness.missingSignals],
+    ...(qeiWorldlineDossier !== undefined ? { qeiWorldlineDossier } : {}),
     supportedClaimTiers: computeTierListForSection("strict_signal_readiness"),
     artifactRefs: cloneArtifactRefs(sections.strict_signal_readiness.artifactRefs),
   },
@@ -1166,6 +1383,16 @@ const cloneSections = (
     supportedClaimTiers: computeTierListForSection("shift_vs_lapse_decomposition"),
     artifactRefs: cloneArtifactRefs(
       sections.shift_vs_lapse_decomposition.artifactRefs,
+    ),
+  },
+  natario_invariant_audit: {
+    ...sections.natario_invariant_audit,
+    state: natarioInvariantState.state,
+    reasons: natarioInvariantState.reasons,
+    ...(natarioInvariantAudit !== undefined ? { natarioInvariantAudit } : {}),
+    supportedClaimTiers: computeTierListForSection("natario_invariant_audit"),
+    artifactRefs: cloneArtifactRefs(
+      sections.natario_invariant_audit.artifactRefs,
     ),
   },
   uncertainty_perturbation_reproducibility: {
@@ -1359,7 +1586,10 @@ const isStrictSignalReadinessSection = (
     Array.isArray(record.missingSignals) &&
     record.missingSignals.every(
       (entry) => entry === "theta" || entry === "ts" || entry === "qi",
-    )
+    ) &&
+    (record.qeiWorldlineDossier === undefined ||
+      record.qeiWorldlineDossier === null ||
+      isNhm2QeiWorldlineDossier(record.qeiWorldlineDossier))
   );
 };
 
@@ -1557,6 +1787,63 @@ const isShiftVsLapseDecompositionSection = (
   );
 };
 
+const isNatarioThetaFlatnessStatus = (
+  value: unknown,
+): value is Nhm2NatarioThetaFlatnessStatus =>
+  NHM2_NATARIO_THETA_FLATNESS_STATUS_VALUES.includes(
+    value as Nhm2NatarioThetaFlatnessStatus,
+  );
+
+const isNatarioInvariantStatus = (
+  value: unknown,
+): value is Nhm2NatarioInvariantStatus =>
+  NHM2_NATARIO_INVARIANT_STATUS_VALUES.includes(
+    value as Nhm2NatarioInvariantStatus,
+  );
+
+const isNatarioMomentumDensityStatus = (
+  value: unknown,
+): value is Nhm2NatarioMomentumDensityStatus =>
+  NHM2_NATARIO_MOMENTUM_DENSITY_STATUS_VALUES.includes(
+    value as Nhm2NatarioMomentumDensityStatus,
+  );
+
+const isNatarioConvergenceStatus = (
+  value: unknown,
+): value is Nhm2NatarioConvergenceStatus =>
+  NHM2_NATARIO_CONVERGENCE_STATUS_VALUES.includes(
+    value as Nhm2NatarioConvergenceStatus,
+  );
+
+const isNatarioInvariantAuditSection = (
+  value: unknown,
+): value is Nhm2NatarioInvariantAuditSection => {
+  const record = asRecord(value);
+  return (
+    hasValidSectionBase(record, "natario_invariant_audit") &&
+    (record.natarioInvariantAudit === undefined ||
+      record.natarioInvariantAudit === null ||
+      isNhm2NatarioInvariantAudit(record.natarioInvariantAudit)) &&
+    isNatarioThetaFlatnessStatus(record.thetaFlatnessStatus) &&
+    isNatarioInvariantStatus(record.invariantStatus) &&
+    isNatarioMomentumDensityStatus(record.momentumDensityStatus) &&
+    isNatarioConvergenceStatus(record.convergenceStatus) &&
+    isNullableFiniteNumber(record.thetaMaxAbs) &&
+    isNullableFiniteNumber(record.expansionLeakageBound) &&
+    isNullableFiniteNumber(record.ricciScalar) &&
+    isNullableFiniteNumber(record.kretschmannScalar) &&
+    isNullableFiniteNumber(record.weylScalarProxy) &&
+    (record.petrovClass === null || asText(record.petrovClass) != null) &&
+    isNullableFiniteNumber(record.Jx) &&
+    isNullableFiniteNumber(record.Jy) &&
+    isNullableFiniteNumber(record.Jz) &&
+    isNullableFiniteNumber(record.tidalMax) &&
+    isNullableFiniteNumber(record.blueshiftMax) &&
+    record.zeroExpansionSeparatelyReported === true &&
+    record.zeroExpansionIsNotSafetyCertificate === true
+  );
+};
+
 const isUncertaintyPerturbationReproducibilitySection = (
   value: unknown,
 ): value is Nhm2UncertaintyPerturbationReproducibilitySection => {
@@ -1652,6 +1939,8 @@ export const isNhm2FullLoopAuditContract = (
       sectionsRecord.mission_time_outputs as Nhm2MissionTimeOutputsSection,
     shift_vs_lapse_decomposition:
       sectionsRecord.shift_vs_lapse_decomposition as Nhm2ShiftVsLapseDecompositionSection,
+    natario_invariant_audit:
+      sectionsRecord.natario_invariant_audit as Nhm2NatarioInvariantAuditSection,
     uncertainty_perturbation_reproducibility:
       sectionsRecord.uncertainty_perturbation_reproducibility as Nhm2UncertaintyPerturbationReproducibilitySection,
     certificate_policy_result:
@@ -1668,6 +1957,7 @@ export const isNhm2FullLoopAuditContract = (
     !isGrStabilitySafetySection(sections.gr_stability_safety) ||
     !isMissionTimeOutputsSection(sections.mission_time_outputs) ||
     !isShiftVsLapseDecompositionSection(sections.shift_vs_lapse_decomposition) ||
+    !isNatarioInvariantAuditSection(sections.natario_invariant_audit) ||
     !isUncertaintyPerturbationReproducibilitySection(
       sections.uncertainty_perturbation_reproducibility,
     ) ||

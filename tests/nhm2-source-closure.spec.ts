@@ -15,6 +15,36 @@ import {
   buildNhm2WallSourceClosureArtifact,
   isNhm2WallSourceClosureArtifact,
 } from "../shared/contracts/nhm2-wall-source-closure.v1";
+import { buildCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
+
+const makeMaterialReceiptedCasimirReceipt = () =>
+  buildCasimirMaterialReceipt({
+    generatedAt: "2026-06-09T00:00:00.000Z",
+    tileBatchId: "tile_batch:wall-receipted",
+    geometry: {
+      gapMeters: 1e-9,
+      gapMetrologyStatus: "measured",
+      roughnessRmsMeters: 1e-10,
+      beyondPfaValidity: "pass",
+    },
+    material: {
+      modelKind: "lifshitz",
+      dielectricResponseRef: "artifact://dielectric/au",
+      finiteConductivityIncluded: true,
+      finiteTemperatureIncluded: true,
+      roughnessCorrectionIncluded: true,
+    },
+    environment: {
+      vacuumSealEvidence: "present",
+      temperatureK: 300,
+    },
+    correctionFactors: {
+      conductivity: 0.82,
+      temperature: 0.98,
+      roughness: 0.94,
+      geometry: 0.91,
+    },
+  });
 
 describe("nhm2 source closure artifact", () => {
   it("represents matched tensors honestly", () => {
@@ -491,6 +521,7 @@ describe("nhm2 source closure artifact v2", () => {
       available: {
         sourceKind: "material_receipted",
         tensorRef: "artifact://tile-wall",
+        materialReceipt: makeMaterialReceiptedCasimirReceipt(),
         T00_SI: -90,
         componentStatus: "computed",
       },
@@ -501,7 +532,115 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.residual.absolute).toBe(10);
     expect(artifact.residual.relative).toBe(0.1);
     expect(artifact.residual.pass).toBe(false);
+    expect(artifact.available.sourceKind).toBe("material_receipted");
+    expect(artifact.available.materialReceiptStatus).toBe("material_receipted");
     expect(artifact.claimBoundary.globalResidualCannotOverrideWallFailure).toBe(true);
+  });
+
+  it("does not mark wall source closure as material_receipted without a material receipt", () => {
+    const artifact = buildNhm2WallSourceClosureArtifact({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+      chartId: "adm_eulerian",
+      required: {
+        tensorRef: "artifact://metric-wall",
+        T00_SI: -100,
+        componentStatus: "computed",
+      },
+      available: {
+        sourceKind: "material_receipted",
+        tensorRef: "artifact://tile-wall",
+        T00_SI: -90,
+        componentStatus: "computed",
+      },
+      tolerance: 0.05,
+    });
+
+    expect(isNhm2WallSourceClosureArtifact(artifact)).toBe(true);
+    expect(artifact.available.sourceKind).toBe("tile_effective");
+    expect(artifact.blockers).toContain(
+      "casimir_material_receipt_required_for_material_source",
+    );
+  });
+
+  it("carries ideal scalar Casimir receipts through wall source closure without promoting material evidence", () => {
+    const idealReceipt = buildCasimirMaterialReceipt({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      tileBatchId: "tile_batch:ideal",
+      geometry: {
+        gapMeters: 1e-9,
+        gapMetrologyStatus: "design",
+        roughnessRmsMeters: null,
+        beyondPfaValidity: "not_evaluated",
+      },
+      material: {
+        modelKind: "perfect_conductor_ideal",
+        finiteConductivityIncluded: false,
+        finiteTemperatureIncluded: false,
+        roughnessCorrectionIncluded: false,
+      },
+      environment: {
+        vacuumSealEvidence: "missing",
+        temperatureK: 20,
+      },
+      correctionFactors: {
+        conductivity: null,
+        temperature: null,
+        roughness: null,
+        geometry: null,
+      },
+    });
+    const makeInferredT00Diagnostics = (sampleCount: number, meanT00: number) => ({
+      sampleCount,
+      includedCount: sampleCount,
+      skippedCount: null,
+      nonFiniteCount: null,
+      meanT00,
+      sumT00: sampleCount * meanT00,
+      sourceRef: "gr.matter.material.wall.T00",
+      normalizationBasis: "sample_count",
+      aggregationMode: "mean" as const,
+      evidenceStatus: "inferred" as const,
+    });
+
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      requiredRegionIds: ["wall"],
+      casimirMaterialReceipt: idealReceipt,
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "gr.matter.material.wall.tensor",
+          metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          sampleCount: 8,
+          metricAccounting: makeAccounting(8, "metric"),
+          tileAccounting: makeAccounting(8, "tile"),
+          metricT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+          tileT00Diagnostics: makeInferredT00Diagnostics(8, -100),
+        },
+      ],
+      toleranceRelLInf: 0.1,
+    });
+
+    expect(artifact.casimirMaterialReceipt?.status).toBe("ideal_scalar_only");
+    expect(artifact.reasonCodes).toContain("casimir_material_receipt_missing");
+    expect(artifact.wallSourceClosure.available.sourceKind).toBe("tile_effective");
+    expect(artifact.wallSourceClosure.available.materialReceiptStatus).toBe(
+      "ideal_scalar_only",
+    );
+    expect(artifact.wallSourceClosure.warnings).toEqual(
+      expect.arrayContaining([
+        "casimir_material_receipt_ideal_scalar_only",
+        "casimir_material_receipt_required_before_material_source_evidence",
+      ]),
+    );
   });
 
   it("maps pressure proxy dominance to pressure-proxy follow-up guidance", () => {

@@ -647,9 +647,9 @@ const badges: TheoryBadgeV1[] = [
   },
   {
     id: "nhm2.qei.sampling_window",
-    title: "QEI sampling window",
-    plainMeaning: "Compares a sampled inequality proxy with a bound proxy over a declared window.",
-    whyItMatters: "It keeps inequality language tied to a scalar diagnostic margin that can be replayed later.",
+    title: "QEI badge replay margin",
+    plainMeaning: "Replays the scalar badge calculation qei_margin = qei_bound - qei_sample; the runtime dossier is the authoritative QEI artifact when available.",
+    whyItMatters: "It keeps the calculator-loadable scalar margin available without presenting it as a final QEI proof.",
     subjects: ["nhm2", "qei", "sampling"],
     level: "diagnostic_gate",
     status: "diagnostic",
@@ -672,7 +672,11 @@ const badges: TheoryBadgeV1[] = [
       { symbol: "bound_{qei}", unit: "J/m^3", quantity: "inequality_bound", dimensionSignature: "M L^-1 T^-2" },
       { symbol: "sample_{qei}", unit: "J/m^3", quantity: "sampled_density", dimensionSignature: "M L^-1 T^-2" },
     ],
-    assumptions: ["Diagnostic margin only.", "Bound comparison is not a validation claim."],
+    assumptions: [
+      "Diagnostic badge replay only.",
+      "Bound comparison is a proxy unless backed by the QEI worldline dossier.",
+      "The runtime dossier carries worldline, sampling, consistency, and regional margin provenance.",
+    ],
     calculatorPayloads: [
       {
         id: "qei_margin_difference_payload",
@@ -684,7 +688,7 @@ const badges: TheoryBadgeV1[] = [
           schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
           expression: "qei_margin = qei_bound - qei_sample",
           display_latex: "margin_{qei}=bound_{qei}-sample_{qei}",
-          subgoal: "Compute a diagnostic inequality margin from bound and sample proxies.",
+          subgoal: "Compute a badge replay inequality margin from bound and sample proxies.",
           domain: "generic",
           equation: "qei_margin = qei_bound - qei_sample",
           variables: [
@@ -692,14 +696,14 @@ const badges: TheoryBadgeV1[] = [
               symbol: "qei_bound",
               value: "1",
               unit: "J/m^3",
-              meaning: "diagnostic inequality bound proxy",
+              meaning: "badge replay inequality bound proxy",
               dimension_signature: "M L^-1 T^-2",
             },
             {
               symbol: "qei_sample",
               value: "0.25",
               unit: "J/m^3",
-              meaning: "sampled density proxy",
+              meaning: "badge replay sampled density proxy",
               dimension_signature: "M L^-1 T^-2",
             },
           ],
@@ -707,7 +711,7 @@ const badges: TheoryBadgeV1[] = [
           result_unit: "J/m^3",
           result_quantity: "inequality_margin",
           result_dimension_signature: "M L^-1 T^-2",
-          assumptions: ["Diagnostic scalar proxy only.", "Does not validate NHM2."],
+          assumptions: ["Badge replay scalar proxy only.", "Does not validate NHM2."],
           unit_options: [],
         },
       },
@@ -715,12 +719,17 @@ const badges: TheoryBadgeV1[] = [
     sourceRefs: [
       repoRef("client/src/components/QiWidgetPanel.tsx", "QI widget owner when present in the app."),
       repoRef("shared/contracts/nhm2-observable-equation-map.v1.ts", "Observable equation claim-boundary source."),
+      repoRef("shared/contracts/nhm2-qei-worldline-dossier.v1.ts", "Runtime QEI dossier artifact when available."),
     ],
     hintKeys: {
       subjects: ["nhm2", "qei", "sampling"],
       symbols: ["qei_margin", "qei_bound", "qei_sample"],
       unitSignatures: ["M L^-1 T^-2"],
-      repoPaths: ["client/src/components/QiWidgetPanel.tsx", "shared/contracts/nhm2-observable-equation-map.v1.ts"],
+      repoPaths: [
+        "client/src/components/QiWidgetPanel.tsx",
+        "shared/contracts/nhm2-observable-equation-map.v1.ts",
+        "shared/contracts/nhm2-qei-worldline-dossier.v1.ts",
+      ],
       equationFamilies: ["qei_sampling_window"],
       simulationOwners: ["NHM2"],
     },
@@ -824,7 +833,7 @@ const edges: TheoryBadgeEdgeV1[] = [
     from: "nhm2.source.energy_density_proxy",
     to: "nhm2.qei.sampling_window",
     relation: "shares_units",
-    label: "The source proxy and QEI sampling margin share energy-density units.",
+    label: "The source proxy and QEI badge replay margin share energy-density units.",
     claimBoundaryNote: "Shared units are excluded from executable playback.",
   },
   {

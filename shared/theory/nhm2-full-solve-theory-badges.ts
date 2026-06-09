@@ -637,14 +637,14 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     calculatorPayloads: [],
     sourceRefs: [
       docRef(NHM2_FULL_SOLVE_WHITEPAPER, "qei-reproducibility-limits", "QEI blocker context."),
-      artifactRef("shared/contracts/nhm2-qei-dossier.v1.ts", "nhm2-qei-dossier-contract", "Typed QEI dossier contract."),
+      artifactRef("shared/contracts/nhm2-qei-worldline-dossier.v1.ts", "nhm2-qei-worldline-dossier-contract", "Typed QEI worldline dossier contract."),
       equationMapRef("qei_sampling_requirement", "Observable equation map node."),
     ],
     hintKeys: {
       subjects: ["nhm2", "qei", "worldline_dossier", "sampling", "provenance"],
       symbols: ["worldline", "f_tau", "rho_source", "qei_bound", "regional_margin", "qei_dossier_status"],
       unitSignatures: ["M L^-1 T^-2"],
-      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, "shared/contracts/nhm2-qei-dossier.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, "shared/contracts/nhm2-qei-worldline-dossier.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["qei_worldline_dossier", "stress_energy_sampling"],
       simulationOwners: ["NHM2", "general_relativity"],
     },

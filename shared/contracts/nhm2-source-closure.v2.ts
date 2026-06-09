@@ -17,6 +17,10 @@ import {
   isNhm2WallSourceClosureArtifact,
   type Nhm2WallSourceClosureArtifactV1,
 } from "./nhm2-wall-source-closure.v1";
+import {
+  isCasimirMaterialReceipt,
+  type CasimirMaterialReceiptV1,
+} from "./casimir-material-receipt.v1";
 
 export const NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION = "nhm2_source_closure/v2";
 
@@ -33,6 +37,7 @@ export const NHM2_SOURCE_CLOSURE_V2_REASON_CODES = [
   "region_metric_tensor_incomplete",
   "region_tile_tensor_incomplete",
   "region_basis_diagnostic_only",
+  "casimir_material_receipt_missing",
 ] as const;
 
 export const NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES = [
@@ -310,6 +315,7 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   metricT00Diagnostics?: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileT00Diagnostics?: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileProxyDiagnostics?: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
+  casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
   note?: string | null;
 };
 
@@ -339,6 +345,7 @@ export type Nhm2SourceClosureV2RegionComparison = {
   metricT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileProxyDiagnostics: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
+  casimirMaterialReceipt: CasimirMaterialReceiptV1 | null;
   mismatchDiagnostics: Nhm2SourceClosureV2RegionMismatchDiagnostics | null;
   residualComponents: Record<
     Nhm2SourceClosureComponent,
@@ -389,6 +396,7 @@ export type Nhm2SourceClosureV2Artifact = {
     requiredRegionIds: string[];
     regions: Nhm2SourceClosureV2RegionComparison[];
   };
+  casimirMaterialReceipt: CasimirMaterialReceiptV1 | null;
   wallSourceClosure: Nhm2WallSourceClosureArtifactV1;
   leadBlocker: Nhm2SourceClosureV2LeadBlocker;
   scalarProjections: {
@@ -416,6 +424,7 @@ export type BuildNhm2SourceClosureArtifactV2Input = {
   tileEffectiveTensor?: Nhm2SourceClosureTensorInput | null;
   requiredRegionIds?: string[] | null;
   regionComparisons?: Nhm2SourceClosureV2RegionComparisonInput[] | null;
+  casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
   toleranceRelLInf?: number | null;
   scalarCl3RhoDeltaRel?: number | null;
   assumptionsDrifted?: boolean | null;
@@ -1911,6 +1920,11 @@ const buildRegionComparison = (args: {
   );
   const tileT00Diagnostics = normalizeRegionT00Diagnostics(args.input.tileT00Diagnostics);
   const tileProxyDiagnostics = normalizeProxyDiagnostics(args.input.tileProxyDiagnostics);
+  const casimirMaterialReceipt = isCasimirMaterialReceipt(
+    args.input.casimirMaterialReceipt,
+  )
+    ? args.input.casimirMaterialReceipt
+    : null;
   const mismatchDiagnostics = buildMismatchDiagnostics(metricTensor, tileTensor);
   const t00Mechanism = summarizeT00Mechanism({
     residualComponents,
@@ -2002,6 +2016,12 @@ const buildRegionComparison = (args: {
   if (comparisonBasisStatus === "same_basis" && completeness === "complete" && residualNorms.pass === false) {
     reasonCodes.add("tensor_residual_exceeded");
   }
+  if (
+    normalizeRegionId(args.input.regionId) === "wall" &&
+    casimirMaterialReceipt?.status === "ideal_scalar_only"
+  ) {
+    reasonCodes.add("casimir_material_receipt_missing");
+  }
 
   let status: Nhm2SourceClosureStatus = "unavailable";
   if (comparisonBasisStatus === "same_basis") {
@@ -2039,6 +2059,7 @@ const buildRegionComparison = (args: {
       metricT00Diagnostics,
       tileT00Diagnostics,
       tileProxyDiagnostics,
+      casimirMaterialReceipt,
       mismatchDiagnostics,
       residualComponents,
       residualNorms,
@@ -2230,6 +2251,11 @@ export const buildNhm2SourceClosureArtifactV2 = (
   if (globalCompleteness === "complete" && residualNorms.pass === false) {
     reasonCodes.add("tensor_residual_exceeded");
   }
+  const casimirMaterialReceipt = isCasimirMaterialReceipt(
+    input.casimirMaterialReceipt,
+  )
+    ? input.casimirMaterialReceipt
+    : null;
 
   const requiredRegionIds = Array.from(
     new Set(
@@ -2240,12 +2266,20 @@ export const buildNhm2SourceClosureArtifactV2 = (
     ),
   );
 
-  const regionResults = (input.regionComparisons ?? []).map((entry) =>
-    buildRegionComparison({
-      input: entry,
+  const regionResults = (input.regionComparisons ?? []).map((entry) => {
+    const entryRegionId =
+      typeof entry.regionId === "string" ? normalizeRegionId(entry.regionId) : "";
+    const regionInput =
+      entryRegionId === "wall" &&
+      entry.casimirMaterialReceipt == null &&
+      casimirMaterialReceipt != null
+        ? { ...entry, casimirMaterialReceipt }
+        : entry;
+    return buildRegionComparison({
+      input: regionInput,
       toleranceRelLInf,
-    }),
-  );
+    });
+  });
   for (const entry of regionResults) {
     for (const reasonCode of entry.reasonCodes) {
       reasonCodes.add(reasonCode);
@@ -2340,6 +2374,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
       requiredRegionIds,
       regions,
     },
+    casimirMaterialReceipt,
     wallSourceClosure,
     leadBlocker,
     scalarProjections,
@@ -2365,6 +2400,7 @@ export const isNhm2SourceClosureV2Artifact = (
     ? (regionComparisons?.regions as Array<Record<string, unknown>>)
     : null;
   const wallSourceClosure = record.wallSourceClosure;
+  const casimirMaterialReceipt = record.casimirMaterialReceipt;
   return (
     record.artifactId === NHM2_SOURCE_CLOSURE_ARTIFACT_ID &&
     record.schemaVersion === NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION &&
@@ -2377,6 +2413,9 @@ export const isNhm2SourceClosureV2Artifact = (
     Array.isArray(record.reasonCodes) &&
     (wallSourceClosure === undefined ||
       isNhm2WallSourceClosureArtifact(wallSourceClosure)) &&
+    (casimirMaterialReceipt === undefined ||
+      casimirMaterialReceipt === null ||
+      isCasimirMaterialReceipt(casimirMaterialReceipt)) &&
     regionComparisons != null &&
     regions != null &&
     regions.every((entry) => {

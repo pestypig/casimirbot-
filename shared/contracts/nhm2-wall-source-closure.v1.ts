@@ -1,3 +1,10 @@
+import {
+  isCasimirMaterialReceipt,
+  isMaterialReceiptedCasimirMaterialReceipt,
+  type CasimirMaterialReceiptStatus,
+  type CasimirMaterialReceiptV1,
+} from "./casimir-material-receipt.v1";
+
 export const NHM2_WALL_SOURCE_CLOSURE_CONTRACT_VERSION =
   "nhm2_wall_source_closure/v1";
 
@@ -26,6 +33,8 @@ export type Nhm2WallSourceClosureArtifactV1 = {
   available: {
     sourceKind: Nhm2WallSourceClosureSourceKind;
     tensorRef?: string;
+    materialReceiptRef?: string;
+    materialReceiptStatus?: CasimirMaterialReceiptStatus;
     T00_SI: number | null;
     componentStatus: string;
   };
@@ -56,6 +65,9 @@ export type BuildNhm2WallSourceClosureArtifactInput = {
   available?: {
     sourceKind?: Nhm2WallSourceClosureSourceKind | null;
     tensorRef?: string | null;
+    materialReceiptRef?: string | null;
+    materialReceiptStatus?: CasimirMaterialReceiptStatus | null;
+    materialReceipt?: CasimirMaterialReceiptV1 | null;
     T00_SI?: number | null;
     componentStatus?: string | null;
   } | null;
@@ -87,6 +99,8 @@ type Nhm2WallSourceClosureRegionLike = {
     brickProxyMode?: string | null;
     pressureSource?: string | null;
   } | null;
+  casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
+  materialReceipt?: CasimirMaterialReceiptV1 | null;
 };
 
 export type BuildNhm2WallSourceClosureFromRegionInput = {
@@ -130,6 +144,25 @@ const normalizeSourceKind = (
     ? (value as Nhm2WallSourceClosureSourceKind)
     : "missing";
 
+const normalizeMaterialReceipt = (
+  value: unknown,
+): CasimirMaterialReceiptV1 | null =>
+  isCasimirMaterialReceipt(value) ? value : null;
+
+const normalizeMaterialReceiptStatus = (
+  value: unknown,
+): CasimirMaterialReceiptStatus | null => {
+  if (
+    value === "material_receipted" ||
+    value === "ideal_scalar_only" ||
+    value === "blocked" ||
+    value === "missing"
+  ) {
+    return value;
+  }
+  return null;
+};
+
 const resolveRelativeResidual = (
   required: number,
   available: number,
@@ -147,6 +180,12 @@ const inferAvailableSourceKind = (
   availableT00: number | null,
 ): Nhm2WallSourceClosureSourceKind => {
   if (availableT00 == null || region == null) return "missing";
+  const materialReceipt =
+    normalizeMaterialReceipt(region.casimirMaterialReceipt) ??
+    normalizeMaterialReceipt(region.materialReceipt);
+  if (isMaterialReceiptedCasimirMaterialReceipt(materialReceipt)) {
+    return "material_receipted";
+  }
   const sourceText = [
     region.tileT00Diagnostics?.sourceRef,
     region.tileT00Diagnostics?.trace?.valueRef,
@@ -164,7 +203,7 @@ const inferAvailableSourceKind = (
     sourceText.includes("material") ||
     sourceText.includes("stressenergy")
   ) {
-    return "material_receipted";
+    return "tile_effective";
   }
   const proxy = region.tileProxyDiagnostics;
   if (
@@ -195,6 +234,23 @@ export const buildNhm2WallSourceClosureArtifact = (
       ? resolveRelativeResidual(requiredT00, availableT00)
       : null;
   const sourceKind = normalizeSourceKind(input.available?.sourceKind);
+  const materialReceipt = normalizeMaterialReceipt(input.available?.materialReceipt);
+  const materialReceiptStatus =
+    normalizeMaterialReceiptStatus(input.available?.materialReceiptStatus) ??
+    materialReceipt?.status ??
+    null;
+  const materialReceiptRef =
+    toText(input.available?.materialReceiptRef) ??
+    (materialReceipt != null
+      ? `runtime://pipeline/casimirMaterialReceipt/${materialReceipt.tileBatchId}`
+      : null);
+  const resolvedSourceKind =
+    sourceKind === "material_receipted" &&
+    !isMaterialReceiptedCasimirMaterialReceipt(materialReceipt)
+      ? availableT00 == null
+        ? "missing"
+        : "tile_effective"
+      : sourceKind;
   const blockers = normalizeTextList(input.blockers);
   const warnings = normalizeTextList(input.warnings);
 
@@ -203,7 +259,19 @@ export const buildNhm2WallSourceClosureArtifact = (
   if (relative != null && relative > tolerance) {
     blockers.push("wall_T00_source_residual_exceeds_tolerance");
   }
-  if (sourceKind === "proxy") warnings.push("wall_available_source_is_proxy");
+  if (sourceKind === "material_receipted" && resolvedSourceKind !== "material_receipted") {
+    blockers.push("casimir_material_receipt_required_for_material_source");
+  }
+  if (materialReceiptStatus === "blocked") {
+    blockers.push("casimir_material_receipt_blocked");
+  }
+  if (resolvedSourceKind === "proxy") warnings.push("wall_available_source_is_proxy");
+  if (materialReceiptStatus === "ideal_scalar_only") {
+    warnings.push("casimir_material_receipt_ideal_scalar_only");
+  }
+  if (materialReceiptStatus === "missing") {
+    warnings.push("casimir_material_receipt_missing");
+  }
 
   return {
     contractVersion: NHM2_WALL_SOURCE_CLOSURE_CONTRACT_VERSION,
@@ -221,10 +289,12 @@ export const buildNhm2WallSourceClosureArtifact = (
       ),
     },
     available: {
-      sourceKind,
+      sourceKind: resolvedSourceKind,
       ...(toText(input.available?.tensorRef) != null
         ? { tensorRef: toText(input.available?.tensorRef) as string }
         : {}),
+      ...(materialReceiptRef != null ? { materialReceiptRef } : {}),
+      ...(materialReceiptStatus != null ? { materialReceiptStatus } : {}),
       T00_SI: availableT00,
       componentStatus: statusFromT00(
         availableT00,
@@ -270,6 +340,28 @@ export const buildNhm2WallSourceClosureFromRegionComparison = (
     toText(region?.tileTensorRef) ??
     null;
   const blockers = normalizeTextList(input.blockers);
+  const warnings = normalizeTextList(input.warnings);
+  const materialReceipt =
+    normalizeMaterialReceipt(region?.casimirMaterialReceipt) ??
+    normalizeMaterialReceipt(region?.materialReceipt);
+  const sourceText = [
+    region?.tileT00Diagnostics?.sourceRef,
+    region?.tileT00Diagnostics?.trace?.valueRef,
+    region?.tileT00Diagnostics?.trace?.tensorRef,
+    region?.tileTensorRef,
+  ]
+    .filter((entry): entry is string => typeof entry === "string")
+    .join(" ")
+    .toLowerCase();
+  if (
+    availableT00 != null &&
+    (sourceText.includes("gr.matter") ||
+      sourceText.includes("material") ||
+      sourceText.includes("stressenergy")) &&
+    !isMaterialReceiptedCasimirMaterialReceipt(materialReceipt)
+  ) {
+    warnings.push("casimir_material_receipt_required_before_material_source_evidence");
+  }
   if (!regionIsWall) {
     blockers.push("wall_region_comparison_missing");
   }
@@ -290,6 +382,7 @@ export const buildNhm2WallSourceClosureFromRegionComparison = (
     available: {
       sourceKind: inferAvailableSourceKind(region, availableT00),
       tensorRef: availableTensorRef,
+      materialReceipt,
       T00_SI: availableT00,
       componentStatus: statusFromT00(
         availableT00,
@@ -298,7 +391,7 @@ export const buildNhm2WallSourceClosureFromRegionComparison = (
     },
     tolerance: input.tolerance,
     blockers,
-    warnings: input.warnings,
+    warnings,
   });
 };
 
@@ -339,6 +432,10 @@ export const isNhm2WallSourceClosureArtifact = (
       available.sourceKind as Nhm2WallSourceClosureSourceKind,
     ) &&
     (available.tensorRef === undefined || toText(available.tensorRef) != null) &&
+    (available.materialReceiptRef === undefined ||
+      toText(available.materialReceiptRef) != null) &&
+    (available.materialReceiptStatus === undefined ||
+      normalizeMaterialReceiptStatus(available.materialReceiptStatus) != null) &&
     (available.T00_SI === null || toFiniteOrNull(available.T00_SI) != null) &&
     toText(available.componentStatus) != null &&
     residual != null &&

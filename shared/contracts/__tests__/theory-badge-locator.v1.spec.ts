@@ -23,7 +23,7 @@ describe("theory-badge-locator/v1", () => {
       matches: [
         {
           badgeId: "nhm2.qei.sampling_window",
-          title: "QEI sampling window",
+          title: "QEI badge replay margin",
           score: 92,
           reasons: ["matched symbol qei_margin"],
           matchedSubjects: ["qei"],
@@ -59,7 +59,7 @@ describe("theory-badge-locator/v1", () => {
       recommendedActions: [
         {
           actionId: "theory-badge-graph.load_payloads_to_calculator",
-          label: "Load QEI margin into calculator",
+          label: "Load QEI badge replay margin into calculator",
           badgeId: "nhm2.qei.sampling_window",
           payloadIds: ["qei_margin_difference_payload"],
         },
