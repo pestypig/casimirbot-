@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import type {
   StagePlayLiveSourceMailDecisionV1,
+  StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailItemV1,
   StagePlayLiveSourceNarrativeStateV1,
+  StagePlayLiveSourcePredictionValidationV1,
   StagePlayLiveSourceVoiceDeliveryReceiptV1,
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -25,12 +27,14 @@ import type {
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import {
   getStagePlayLiveSourceMailItem,
+  getLatestStagePlayLiveSourceImmersionState,
   getStagePlayLiveSourceWatchJobPolicy,
   getStagePlayMailDecision,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceWatchJobPolicies,
   listUnreadStagePlayLiveSourceMailItems,
+  recordStagePlayLiveSourceImmersionState,
 } from "./stage-play-live-source-mailbox-store";
 import {
   getLatestStagePlayLiveSourceNarrativeState,
@@ -70,6 +74,9 @@ import type {
   LiveSourceBudgetStateV1,
 } from "@shared/contracts/stage-play-live-source-current-state.v1";
 import { recordLiveSourceBudgetState } from "./stage-play-live-source-budget-store";
+import { extractStagePlayLiveSourceDelta } from "./stage-play-live-source-delta-extractor";
+import { validateStagePlayLiveSourcePredictionFromMail } from "./stage-play-live-source-prediction-validator";
+import { recordLiveSourceMailDecisionForAsk } from "./stage-play-visual-summary-mail-ingest";
 
 type AskWakeTurnResponse = Record<string, unknown>;
 
@@ -537,6 +544,203 @@ const formatLatestPredictionErrorReceipt = (
       ].join("\n")
     : "- none recorded";
 
+const formatLatestImmersionState = (
+  state: StagePlayLiveSourceImmersionStateV1 | null,
+): string => {
+  if (!state) return "- none recorded";
+  return [
+    `- state_id: ${state.immersionStateId}`,
+    `  identity: ${state.sourceIdentity.label} (${Math.round(state.sourceIdentity.confidence * 100)}%, stable=${state.sourceIdentity.stable})`,
+    `  activity: ${state.currentActivity}`,
+    `  salience: ${state.salience.level}${state.salience.voiceCandidate ? " (voice candidate)" : ""}`,
+    state.stableFacts.length > 0 ? `  stable_facts: ${state.stableFacts.slice(0, 8).join(" | ")}` : null,
+    state.currentSceneFacts.length > 0 ? `  current_scene_facts: ${state.currentSceneFacts.slice(0, 8).join(" | ")}` : null,
+    state.changedFacts.length > 0 ? `  changed_facts: ${state.changedFacts.slice(0, 8).join(" | ")}` : null,
+    state.uncertainties.length > 0 ? `  uncertainties: ${state.uncertainties.slice(0, 5).join(" | ")}` : null,
+    state.prediction ? `  prediction: ${clipPromptText(state.prediction.text, 360)}` : null,
+    state.prediction ? `  prediction_watch_targets: ${state.prediction.watchTargets.slice(0, 8).join(" | ") || "none"}` : null,
+  ].filter(Boolean).join("\n");
+};
+
+const formatPredictionValidation = (
+  validation: StagePlayLiveSourcePredictionValidationV1 | null,
+): string => {
+  if (!validation) return "- none recorded";
+  return [
+    `- validation_id: ${validation.validationId}`,
+    `  result: ${validation.result}`,
+    `  prior_prediction: ${validation.priorPredictionId ?? "none"}`,
+    `  salience_hint: ${validation.salienceHint}`,
+    `  recommended_next: ${validation.recommendedNext}`,
+    validation.supportedSignals.length > 0 ? `  supported: ${validation.supportedSignals.slice(0, 8).join(" | ")}` : null,
+    validation.contradictedSignals.length > 0 ? `  contradicted: ${validation.contradictedSignals.slice(0, 8).join(" | ")}` : null,
+    validation.newSignals.length > 0 ? `  new_signals: ${validation.newSignals.slice(0, 8).join(" | ")}` : null,
+  ].filter(Boolean).join("\n");
+};
+
+const buildImmersionPredictionForWake = (input: {
+  jobId: string;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+  delta: ReturnType<typeof extractStagePlayLiveSourceDelta>;
+}): NonNullable<StagePlayLiveSourceImmersionStateV1["prediction"]> => {
+  const latestSummary = clipPromptText(input.mailBatch.at(-1)?.summary.text ?? input.mailBatch.at(-1)?.summary.preview ?? "", 240);
+  const predictionText = input.delta.watchTargets.length > 0
+    ? `Watch whether ${input.delta.watchTargets.slice(0, 3).join(", ")} changes in the next live-source window.`
+    : latestSummary
+      ? `Watch whether the current scene remains consistent with: ${latestSummary}`
+      : "Watch the next compact source update for scene, activity, or salience changes.";
+  return {
+    predictionId: `stage_play_live_source_prediction:${hashShort([
+      input.jobId,
+      input.mailBatch.map((item) => item.mailId),
+      predictionText,
+    ])}`,
+    text: predictionText,
+    horizonMs: 10_000,
+    watchTargets: input.delta.watchTargets,
+    validationSignals: uniqueStrings([
+      ...input.delta.watchTargets,
+      ...input.delta.changedFacts,
+      input.delta.currentActivity,
+      input.delta.salience.level,
+    ]),
+    confidence: 0.48,
+  };
+};
+
+const policyWantsEveryBatch = (policy: StagePlayLiveSourceWatchJobPolicyV1 | null): boolean =>
+  policy?.outputCadence === "every_batch";
+
+const salienceNeedsSlowAsk = (salience: StagePlayLiveSourceImmersionStateV1["salience"]): boolean =>
+  salience.level === "high" || salience.level === "urgent" || salience.voiceCandidate;
+
+const validationNeedsSlowAsk = (validation: StagePlayLiveSourcePredictionValidationV1): boolean =>
+  validation.result === "contradicted" || validation.result === "partially_supported";
+
+const buildWakeFastLayer = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  activeInterpreterProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+  now: string;
+  manualRun?: boolean;
+}): {
+  priorImmersionState: StagePlayLiveSourceImmersionStateV1 | null;
+  immersionState: StagePlayLiveSourceImmersionStateV1;
+  predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+  shouldRunSlowAsk: boolean;
+  slowAskReason: string;
+} => {
+  const jobId = input.policy?.jobId ?? input.wake.jobId ?? `stage_play_live_source_job:${hashShort([
+    input.wake.threadId,
+    input.wake.roomId ?? null,
+    input.wake.environmentId ?? null,
+    input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "source",
+  ])}`;
+  const priorImmersionState = getLatestStagePlayLiveSourceImmersionState({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    jobId,
+    policyId: input.policy?.policyId ?? null,
+    profileId: input.activeInterpreterProfile?.profileId ?? null,
+    sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? null,
+  }) ?? getLatestStagePlayLiveSourceImmersionState({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? null,
+  });
+  const delta = extractStagePlayLiveSourceDelta({
+    latestMailItems: input.mailBatch,
+    priorImmersionState,
+    activeProfile: input.activeInterpreterProfile,
+  });
+  const predictionValidation = validateStagePlayLiveSourcePredictionFromMail({
+    jobId,
+    priorImmersionState,
+    latestMailItems: input.mailBatch,
+    delta,
+    createdAt: input.now,
+  });
+  const prediction = buildImmersionPredictionForWake({
+    jobId,
+    mailBatch: input.mailBatch,
+    delta,
+  });
+  const evidenceRefs = uniqueStrings([
+    input.wake.wakeRequestId,
+    input.policy?.policyId,
+    input.activeInterpreterProfile?.profileId,
+    priorImmersionState?.immersionStateId,
+    predictionValidation.validationId,
+    ...input.wake.evidenceRefs,
+    ...input.wake.mailIds,
+    ...input.wake.sourceIds,
+    ...input.mailBatch.flatMap((item) => item.evidenceRefs),
+  ]);
+  const immersionState = recordStagePlayLiveSourceImmersionState({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    jobId,
+    policyId: input.policy?.policyId ?? priorImmersionState?.policyId ?? null,
+    profileId: input.activeInterpreterProfile?.profileId ?? priorImmersionState?.profileId ?? null,
+    sourceIds: uniqueStrings([
+      ...input.wake.sourceIds,
+      ...input.mailBatch.map((item) => item.sourceId),
+      ...(input.policy?.sourceIds ?? []),
+      ...(priorImmersionState?.sourceIds ?? []),
+    ]),
+    latestMailIds: input.mailBatch.map((item) => item.mailId),
+    latestEvidenceRefs: uniqueStrings([
+      ...input.mailBatch.flatMap((item) => item.evidenceRefs),
+      ...input.mailBatch.flatMap((item) => [item.sourceRefs.frameRef, item.sourceRefs.evidenceRef, item.sourceRefs.observationRef]),
+    ]),
+    sourceIdentity: delta.sourceIdentity,
+    stableFacts: delta.stableFacts,
+    currentSceneFacts: delta.currentSceneFacts,
+    changedFacts: delta.changedFacts,
+    uncertainties: delta.uncertainties,
+    currentActivity: delta.currentActivity,
+    salience: delta.salience,
+    prediction,
+    lastValidation: {
+      validationId: predictionValidation.validationId,
+      priorPredictionId: predictionValidation.priorPredictionId,
+      result: predictionValidation.result,
+      evidenceSummary: predictionValidation.newSignals.slice(0, 6).join("; ") || "No validation signals were available.",
+    },
+    evidenceRefs,
+    causalTrace: input.wake.causalTrace,
+    createdAt: input.now,
+  });
+  const shouldRunSlowAsk =
+    input.manualRun === true ||
+    !input.policy ||
+    policyWantsEveryBatch(input.policy) ||
+    salienceNeedsSlowAsk(immersionState.salience) ||
+    validationNeedsSlowAsk(predictionValidation);
+  const slowAskReason = input.manualRun === true
+    ? "manual_or_explicit_checkpoint"
+    : !input.policy
+      ? "missing_policy_requires_model_decision"
+      : policyWantsEveryBatch(input.policy)
+        ? "policy_output_cadence_every_batch"
+        : salienceNeedsSlowAsk(immersionState.salience)
+          ? `salience_${immersionState.salience.level}`
+          : validationNeedsSlowAsk(predictionValidation)
+            ? `prediction_validation_${predictionValidation.result}`
+            : "fast_layer_wait";
+  return {
+    priorImmersionState,
+    immersionState,
+    predictionValidation,
+    shouldRunSlowAsk,
+    slowAskReason,
+  };
+};
+
 const immediatePredictionTextForMail = (
   mailBatch: StagePlayLiveSourceMailItemV1[],
 ): string => {
@@ -688,6 +892,9 @@ const buildDurableWakeTranscriptRows = (input: {
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorNarrativeState?: StagePlayLiveSourceNarrativeStateV1 | null;
+  immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  slowAskRan?: boolean;
   decisionIds: string[];
   budgetState?: LiveSourceBudgetStateV1 | null;
   voiceReceipts?: StagePlayLiveSourceVoiceDeliveryReceiptV1[];
@@ -704,6 +911,52 @@ const buildDurableWakeTranscriptRows = (input: {
       artifactId: item.mailId,
       artifactKind: item.artifactId,
       evidenceRefs: item.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  if (input.immersionState) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_immersion_update:${hashShort(input.immersionState.immersionStateId)}`,
+      rowKind: "interpretation_state",
+      title: "Immersion state",
+      body: [
+        `Identity: ${input.immersionState.sourceIdentity.label} (${Math.round(input.immersionState.sourceIdentity.confidence * 100)}%).`,
+        `Activity: ${input.immersionState.currentActivity}. Salience: ${input.immersionState.salience.level}.`,
+        input.immersionState.changedFacts.length > 0
+          ? `Deltas: ${input.immersionState.changedFacts.slice(0, 4).join("; ")}.`
+          : "Deltas: no new heuristic deltas.",
+        input.immersionState.prediction
+          ? `Prediction: ${input.immersionState.prediction.text}`
+          : null,
+      ].filter(Boolean).join("\n"),
+      toolName: "live_env.update_live_source_immersion_state",
+      artifactId: input.immersionState.immersionStateId,
+      artifactKind: input.immersionState.artifactId,
+      evidenceRefs: input.immersionState.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  if (input.predictionValidation) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_prediction_validation:${hashShort(input.predictionValidation.validationId)}`,
+      rowKind: "prediction_check",
+      title: "Prediction validation",
+      body: [
+        `${input.predictionValidation.result}; recommended next ${input.predictionValidation.recommendedNext}.`,
+        input.predictionValidation.supportedSignals.length > 0
+          ? `Supported: ${input.predictionValidation.supportedSignals.slice(0, 4).join("; ")}.`
+          : null,
+        input.predictionValidation.contradictedSignals.length > 0
+          ? `Contradicted: ${input.predictionValidation.contradictedSignals.slice(0, 4).join("; ")}.`
+          : null,
+        input.predictionValidation.newSignals.length > 0
+          ? `New: ${input.predictionValidation.newSignals.slice(0, 4).join("; ")}.`
+          : null,
+      ].filter(Boolean).join("\n"),
+      toolName: "live_env.validate_live_source_prediction",
+      artifactId: input.predictionValidation.validationId,
+      artifactKind: input.predictionValidation.artifactId,
+      evidenceRefs: input.predictionValidation.evidenceRefs,
       createdAt: input.createdAt,
     }));
   }
@@ -745,28 +998,30 @@ const buildDurableWakeTranscriptRows = (input: {
     evidenceRefs: input.evidenceRefs,
     createdAt: input.createdAt,
   }));
-  rows.push(makeWakeTranscriptRow({
-    rowId: `wake_mail_read_tool_call:${hashShort(input.wake.wakeRequestId)}`,
-    rowKind: "mail_read_tool_call",
-    title: "Tool call",
-    body: "live_env.read_live_source_mail",
-    toolName: "live_env.read_live_source_mail",
-    artifactId: input.wake.wakeRequestId,
-    artifactKind: input.wake.artifactId,
-    evidenceRefs: input.evidenceRefs,
-    createdAt: input.createdAt,
-  }));
-  rows.push(makeWakeTranscriptRow({
-    rowId: `wake_mail_read_receipt:${hashShort(input.wake.wakeRequestId)}`,
-    rowKind: "mail_read_receipt",
-    title: "Tool receipt",
-    body: `Read ${input.mailBatch.length || input.wake.mailIds.length} ${mailBatchLabel(input.mailBatch)} mail item${(input.mailBatch.length || input.wake.mailIds.length) === 1 ? "" : "s"}.`,
-    toolName: "live_env.read_live_source_mail",
-    artifactId: input.wake.wakeRequestId,
-    artifactKind: input.wake.artifactId,
-    evidenceRefs: input.evidenceRefs,
-    createdAt: input.createdAt,
-  }));
+  if (input.slowAskRan !== false) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_mail_read_tool_call:${hashShort(input.wake.wakeRequestId)}`,
+      rowKind: "mail_read_tool_call",
+      title: "Tool call",
+      body: "live_env.read_live_source_mail",
+      toolName: "live_env.read_live_source_mail",
+      artifactId: input.wake.wakeRequestId,
+      artifactKind: input.wake.artifactId,
+      evidenceRefs: input.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_mail_read_receipt:${hashShort(input.wake.wakeRequestId)}`,
+      rowKind: "mail_read_receipt",
+      title: "Tool receipt",
+      body: `Read ${input.mailBatch.length || input.wake.mailIds.length} ${mailBatchLabel(input.mailBatch)} mail item${(input.mailBatch.length || input.wake.mailIds.length) === 1 ? "" : "s"}.`,
+      toolName: "live_env.read_live_source_mail",
+      artifactId: input.wake.wakeRequestId,
+      artifactKind: input.wake.artifactId,
+      evidenceRefs: input.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
   if (input.budgetState) {
     rows.push(buildBudgetTranscriptRow(input.budgetState, input.createdAt));
   }
@@ -1161,6 +1416,8 @@ const buildWakePrompt = (input: {
   mailBatch: StagePlayLiveSourceMailItemV1[];
   priorDecisions: StagePlayLiveSourceMailDecisionV1[];
   latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
+  latestImmersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
   taskQueueSnapshot: StagePlayLiveSourceTaskQueueSnapshotV1 | null;
   conversationContextPack: StagePlayLiveSourceConversationContextPackV1 | null;
   heldCallouts: StagePlayHeldCalloutV1[];
@@ -1261,6 +1518,12 @@ const buildWakePrompt = (input: {
     "",
     "Latest narrative state:",
     formatLatestNarrativeState(input.latestNarrativeState),
+    "",
+    "Latest immersion state:",
+    formatLatestImmersionState(input.latestImmersionState ?? null),
+    "",
+    "Prediction validation receipt:",
+    formatPredictionValidation(input.predictionValidation ?? null),
     "",
     "Prior prediction:",
     formatPriorPrediction(input.latestNarrativeState),
@@ -1573,7 +1836,7 @@ export async function runNextMailWakeRequest(input: {
     jobId: policy?.jobId ?? running.jobId ?? null,
     limit: 8,
   });
-  const evidenceRefs = uniqueStrings([
+  let evidenceRefs = uniqueStrings([
     ...running.evidenceRefs,
     ...running.mailIds,
     ...running.sourceIds,
@@ -1589,6 +1852,131 @@ export async function runNextMailWakeRequest(input: {
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
+  const fastLayer = buildWakeFastLayer({
+    wake: running,
+    policy,
+    activeInterpreterProfile,
+    mailBatch,
+    now,
+    manualRun: input.manualRun,
+  });
+  evidenceRefs = uniqueStrings([
+    ...evidenceRefs,
+    fastLayer.immersionState.immersionStateId,
+    fastLayer.predictionValidation.validationId,
+    ...(fastLayer.immersionState.evidenceRefs ?? []),
+    ...(fastLayer.predictionValidation.evidenceRefs ?? []),
+  ]);
+  if (!fastLayer.shouldRunSlowAsk) {
+    const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
+    const decision = recordLiveSourceMailDecisionForAsk({
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      mailIds: running.mailIds,
+      decision: "wait_for_next_summary",
+      rationalePreview: [
+        "Fast live-source layer updated immersion state and validated the prior prediction.",
+        `Slow Ask was skipped because ${fastLayer.slowAskReason}.`,
+        `Prediction validation: ${fastLayer.predictionValidation.result}; salience: ${fastLayer.immersionState.salience.level}.`,
+      ].join(" "),
+      nextLoopState: "armed_for_next_summary",
+      interpreterProfileRef: activeInterpreterProfile?.profileId ?? null,
+      observedFacts: fastLayer.immersionState.currentSceneFacts,
+      inferredMeaning: fastLayer.immersionState.changedFacts,
+      mailCoverage: {
+        readMailIds: running.mailIds,
+        interpretedMailIds: [],
+        compressedMailIds: running.mailIds.length > 1 ? running.mailIds : [],
+        skippedMailIds: [],
+        mode: policy?.mailProcessingMode ?? (running.mailIds.length > 1 ? "micro_batch" : "latest_only"),
+        reason: "Fast layer updated immersion and prediction validation; slow Ask was not admitted for this non-salient batch.",
+      },
+      evidenceRefs: uniqueStrings([
+        ...evidenceRefs,
+        fastLayer.immersionState.immersionStateId,
+        fastLayer.predictionValidation.validationId,
+      ]),
+      modelReviewed: false,
+      now,
+    });
+    const completed = markStagePlayMailWakeCompleted({
+      wakeRequestId: running.wakeRequestId,
+      askTurnId: null,
+      decisionIds: [decision.decisionId],
+      evidenceRefs,
+      now,
+    });
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: running.wakeRequestId,
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      status: "completed",
+      askTurnId: null,
+      decisionIds: [decision.decisionId],
+      evidenceRefs: uniqueStrings([
+        ...evidenceRefs,
+        decision.decisionId,
+        fastLayer.immersionState.immersionStateId,
+        fastLayer.predictionValidation.validationId,
+      ]),
+      skippedReason: "fast_layer_wait_for_next_summary",
+      createdAt: now,
+    });
+    const budgetReceipt = recordWakeBudgetReceipt({
+      wake: completed ?? runningAttempt,
+      wakeResult,
+      action: retainedMailCount > 0 ? "batched" : "processed",
+      reason: retainedMailCount > 0 ? "fast_layer_wait_batch_split" : "fast_layer_wait_for_next_summary",
+      processedMailCount: running.mailIds.length,
+      retainedMailCount,
+      evidenceRefs: wakeResult.evidenceRefs,
+      createdAt: wakeResult.createdAt,
+    });
+    const transcriptRows = buildDurableWakeTranscriptRows({
+      wake: completed ?? runningAttempt,
+      wakeResult: budgetReceipt.wakeResult,
+      mailBatch,
+      priorNarrativeState: latestNarrativeState,
+      immersionState: fastLayer.immersionState,
+      predictionValidation: fastLayer.predictionValidation,
+      slowAskRan: false,
+      decisionIds: [decision.decisionId],
+      budgetState: budgetReceipt.budgetState,
+      evidenceRefs: uniqueStrings([
+        ...budgetReceipt.wakeResult.evidenceRefs,
+        budgetReceipt.budgetState.budgetStateId,
+      ]),
+      createdAt: budgetReceipt.wakeResult.createdAt,
+    });
+    const transcriptEntries = recordStagePlayLiveSourceMailTranscriptEntries({
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      wakeRequestId: running.wakeRequestId,
+      wakeResultId: budgetReceipt.wakeResult.wakeResultId,
+      askTurnId: null,
+      decisionIds: [decision.decisionId],
+      mailIds: running.mailIds,
+      sourceIds: running.sourceIds,
+      rows: transcriptRows,
+      evidenceRefs: uniqueStrings([
+        ...budgetReceipt.wakeResult.evidenceRefs,
+        budgetReceipt.budgetState.budgetStateId,
+      ]),
+      causalTrace: budgetReceipt.wakeResult.causalTrace ?? budgetReceipt.budgetState.causalTrace ?? completed?.causalTrace ?? running.causalTrace,
+      createdAt: budgetReceipt.wakeResult.createdAt,
+    });
+    return {
+      ...budgetReceipt.wakeResult,
+      evidenceRefs: uniqueStrings([
+        ...budgetReceipt.wakeResult.evidenceRefs,
+        budgetReceipt.budgetState.budgetStateId,
+        ...transcriptEntries.map((entry) => entry.entryId),
+      ]),
+    };
+  }
   const batchLimit = policyAwareWakeAskBatchLimit(policy);
   if (running.mailIds.length > batchLimit) {
     const failedAt = now;

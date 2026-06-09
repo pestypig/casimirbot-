@@ -16,6 +16,7 @@ import type { StagePlayCheckpointRequestReasonV1 } from "@shared/contracts/stage
 import type { HelixInterpretedEventKind } from "@shared/helix-interpreted-event-log";
 import type {
   AskTurnTranscriptRowDraftV1,
+  StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailItemV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -74,10 +75,15 @@ import {
 } from "../stage-play/stage-play-visual-summary-mail-ingest";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
+  getLatestStagePlayLiveSourceImmersionState,
+  getStagePlayLiveSourceImmersionState,
   getStagePlayLiveSourceMailItem,
+  listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceWatchJobPolicies,
+  listUnreadStagePlayLiveSourceMailItems,
+  recordStagePlayLiveSourceImmersionState,
 } from "../stage-play/stage-play-live-source-mailbox-store";
 import {
   getLatestStagePlayLiveSourceNarrativeState,
@@ -107,6 +113,15 @@ import {
   queryStagePlayLiveSourceQuality,
   summarizeStagePlayLiveSourceCurrentState,
 } from "../stage-play/stage-play-live-source-current-state";
+import {
+  extractStagePlayLiveSourceDelta,
+} from "../stage-play/stage-play-live-source-delta-extractor";
+import {
+  validateStagePlayLiveSourcePredictionFromMail,
+} from "../stage-play/stage-play-live-source-prediction-validator";
+import {
+  listStagePlayLiveSourceMailWakeRequests,
+} from "../stage-play/stage-play-live-source-mail-wake-store";
 import {
   recordInterimVoiceCalloutRequest,
 } from "./interim-voice-callout-store";
@@ -821,6 +836,208 @@ const resolveLatestNarrativeState = (args: Record<string, unknown>, input: Execu
     environmentId: readString(args.environment_id) ?? readString(args.environmentId) ?? input.environment_id ?? null,
     sourceId: readString(args.source_id) ?? readString(args.sourceId),
   });
+};
+
+const resolveLatestImmersionState = (args: Record<string, unknown>, input: ExecuteLiveEnvironmentToolInput) => {
+  const immersionStateId = readString(args.immersion_state_id) ?? readString(args.immersionStateId);
+  if (immersionStateId) return getStagePlayLiveSourceImmersionState(immersionStateId);
+  return getLatestStagePlayLiveSourceImmersionState({
+    threadId: input.thread_id,
+    roomId: readString(args.room_id) ?? readString(args.roomId),
+    environmentId: readString(args.environment_id) ?? readString(args.environmentId) ?? input.environment_id ?? null,
+    jobId: readString(args.job_id) ?? readString(args.jobId),
+    policyId: readString(args.policy_id) ?? readString(args.policyId),
+    profileId: readString(args.profile_id) ?? readString(args.profileId),
+    sourceId: readString(args.source_id) ?? readString(args.sourceId),
+  });
+};
+
+const resolveLiveSourceToolScope = (input: {
+  args: Record<string, unknown>;
+  threadId: string;
+  effectiveThreadId: string;
+  roomId?: string | null;
+  environmentThreadId?: string | null;
+  environmentId?: string | null;
+  explicitSourceId?: string | null;
+}) => {
+  const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
+    askThreadId: input.threadId,
+    requestedThreadId: input.effectiveThreadId,
+    uiThreadId: readString(input.args.ui_thread_id) ?? readString(input.args.uiThreadId),
+    environmentThreadId: input.environmentThreadId ?? null,
+    explicitMailboxThreadId:
+      readString(input.args.mailbox_thread_id) ??
+      readString(input.args.mailboxThreadId) ??
+      readString(input.args.thread_id) ??
+      readString(input.args.threadId),
+    mailIds: readStringArray(input.args.mail_ids ?? input.args.mailIds),
+  });
+  const scopedInput: ExecuteLiveEnvironmentToolInput = {
+    thread_id: mailboxThreadResolution.mailboxThreadId,
+    environment_id: input.environmentId ?? null,
+    tool_name: "live_env.read_live_source_mail",
+    args: input.args,
+  };
+  const sourceId = readString(input.args.source_id) ?? readString(input.args.sourceId) ?? input.explicitSourceId ?? null;
+  const sourceKind = readString(input.args.source_kind) ?? readString(input.args.sourceKind);
+  return {
+    mailboxThreadResolution,
+    scopedInput,
+    sourceId,
+    sourceKind,
+  };
+};
+
+const resolveImmersionMailItems = (input: {
+  args: Record<string, unknown>;
+  scopedInput: ExecuteLiveEnvironmentToolInput;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  sourceKind?: string | null;
+  defaultLimit?: number;
+}): StagePlayLiveSourceMailItemV1[] => {
+  const requestedMailIds = readStringArray(input.args.mail_ids ?? input.args.mailIds);
+  const limit = Math.max(1, Math.min(readNumber(input.args.limit, input.defaultLimit ?? 12), 24));
+  const byId = requestedMailIds
+    .map((mailId) => getStagePlayLiveSourceMailItem(mailId))
+    .filter((item): item is StagePlayLiveSourceMailItemV1 => Boolean(item))
+    .filter((item) => item.threadId === input.scopedInput.thread_id)
+    .slice(-limit);
+  if (byId.length > 0) return byId;
+  const unread = listUnreadStagePlayLiveSourceMailItems({
+    threadId: input.scopedInput.thread_id,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? input.scopedInput.environment_id ?? null,
+    sourceId: input.sourceId ?? null,
+    sourceKind: input.sourceKind ?? null,
+    includeDelivered: true,
+    limit,
+  });
+  if (unread.length > 0) return unread;
+  return listStagePlayLiveSourceMailItems({
+    threadId: input.scopedInput.thread_id,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? input.scopedInput.environment_id ?? null,
+    sourceId: input.sourceId ?? null,
+    sourceKind: input.sourceKind ?? null,
+    limit,
+  });
+};
+
+const resolveActiveWatchJobAndPolicy = (input: {
+  args: Record<string, unknown>;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+}) => {
+  const explicitJobId = readString(input.args.job_id) ?? readString(input.args.jobId);
+  const explicitPolicyId = readString(input.args.policy_id) ?? readString(input.args.policyId);
+  const jobStates = listStagePlayLiveSourceJobStates({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    limit: 50,
+  });
+  const policies = listStagePlayLiveSourceWatchJobPolicies({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    limit: 50,
+  });
+  const activeJob =
+    (explicitJobId ? jobStates.find((state) => state.jobId === explicitJobId) : null) ??
+    jobStates.find((state) =>
+      (state.status === "armed" || state.status === "checking" || state.status === "blocked") &&
+      (!input.sourceId || state.sourceIds.includes(input.sourceId))
+    ) ??
+    jobStates.at(-1) ??
+    null;
+  const activePolicy =
+    (explicitPolicyId ? policies.find((policy) => policy.policyId === explicitPolicyId) : null) ??
+    (activeJob?.watchJobPolicyRef ? policies.find((policy) => policy.policyId === activeJob.watchJobPolicyRef) : null) ??
+    policies.find((policy) => policy.status === "armed" && (!input.sourceId || policy.sourceIds.includes(input.sourceId))) ??
+    policies.find((policy) => policy.status === "armed") ??
+    policies.at(-1) ??
+    null;
+  const jobId =
+    explicitJobId ??
+    activeJob?.jobId ??
+    activePolicy?.jobId ??
+    `stage_play_live_source_job:${hashShort([input.threadId, input.roomId ?? null, input.environmentId ?? null, input.sourceId ?? "all_sources"])}`;
+  return {
+    activeJob,
+    activePolicy,
+    jobId,
+    policies,
+    jobStates,
+  };
+};
+
+const resolveActiveInterpreterProfile = (input: {
+  args: Record<string, unknown>;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  policyId?: string | null;
+  sourceKind?: string | null;
+}): StagePlayLiveSourceInterpreterProfileV1 | null => {
+  const explicitProfileId = readString(input.args.profile_id) ?? readString(input.args.profileId);
+  if (explicitProfileId) return getStagePlayLiveSourceInterpreterProfile(explicitProfileId);
+  return getActiveInterpreterProfileForJob({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    policyId: input.policyId ?? null,
+    sourceKind: input.sourceKind ?? null,
+  }) ?? listStagePlayLiveSourceInterpreterProfiles({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    status: "active",
+    limit: 1,
+  }).at(-1) ?? null;
+};
+
+const buildImmersionPrediction = (input: {
+  args: Record<string, unknown>;
+  jobId: string;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  delta: ReturnType<typeof extractStagePlayLiveSourceDelta>;
+}): NonNullable<StagePlayLiveSourceImmersionStateV1["prediction"]> => {
+  const explicitText = readString(input.args.prediction_text) ?? readString(input.args.predictionText);
+  const latestPreview = clipText(input.mailItems.at(-1)?.summary.text ?? input.mailItems.at(-1)?.summary.preview, 180);
+  const watchTargets = readStringArray(input.args.watch_targets ?? input.args.watchTargets);
+  const validationSignals = readStringArray(input.args.validation_signals ?? input.args.validationSignals);
+  const predictionText = explicitText ??
+    (input.delta.watchTargets.length > 0
+      ? `Watch whether ${input.delta.watchTargets.slice(0, 3).join(", ")} changes in the next live-source window.`
+      : latestPreview
+        ? `Watch whether the current scene remains consistent with: ${latestPreview}`
+        : "Watch the next compact source update for scene, activity, or salience changes.");
+  return {
+    predictionId: `stage_play_live_source_prediction:${hashShort([
+      input.jobId,
+      input.mailItems.map((item) => item.mailId),
+      predictionText,
+    ])}`,
+    text: predictionText,
+    horizonMs: Math.max(1_000, Math.min(readNumber(input.args.horizon_ms ?? input.args.horizonMs, 10_000), 300_000)),
+    watchTargets: watchTargets.length > 0 ? watchTargets : input.delta.watchTargets,
+    validationSignals: validationSignals.length > 0
+      ? validationSignals
+      : uniqueStrings([
+          ...input.delta.watchTargets,
+          ...input.delta.changedFacts,
+          input.delta.currentActivity,
+          input.delta.salience.level,
+        ]),
+    confidence: Math.max(0, Math.min(readNumber(input.args.prediction_confidence ?? input.args.predictionConfidence, 0.48), 1)),
+  };
 };
 
 const buildImmediateLiveSourcePrediction = (input: {
@@ -1803,6 +2020,410 @@ export function executeLiveEnvironmentTool(
         ...readResult.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.update_live_source_immersion_state" ||
+    input.tool_name === "live_env.validate_live_source_prediction"
+  ) {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const { activeJob, activePolicy, jobId } = resolveActiveWatchJobAndPolicy({
+      args,
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+    });
+    const priorImmersionState = resolveLatestImmersionState(args, {
+      ...scope.scopedInput,
+      environment_id: environmentId,
+    });
+    const activeProfile = resolveActiveInterpreterProfile({
+      args,
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      jobId,
+      policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+      sourceKind: scope.sourceKind,
+    });
+    const mailItems = resolveImmersionMailItems({
+      args,
+      scopedInput: {
+        ...scope.scopedInput,
+        environment_id: environmentId,
+      },
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      defaultLimit: input.tool_name === "live_env.update_live_source_immersion_state" ? 12 : 8,
+    });
+    const delta = extractStagePlayLiveSourceDelta({
+      latestMailItems: mailItems,
+      priorImmersionState,
+      activeProfile,
+    });
+    const evidenceRefs = uniqueStrings([
+      scope.mailboxThreadResolution.mailboxThreadId,
+      activeJob?.jobId,
+      activePolicy?.policyId,
+      activeProfile?.profileId,
+      priorImmersionState?.immersionStateId,
+      ...mailItems.map((item) => item.mailId),
+      ...mailItems.flatMap((item) => item.evidenceRefs),
+      ...mailItems.flatMap((item) => [item.sourceRefs.frameRef, item.sourceRefs.evidenceRef, item.sourceRefs.observationRef]),
+    ]);
+
+    if (input.tool_name === "live_env.validate_live_source_prediction") {
+      const validation = validateStagePlayLiveSourcePredictionFromMail({
+        jobId,
+        priorImmersionState,
+        latestMailItems: mailItems,
+        delta,
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId,
+        toolName: input.tool_name,
+        ok: true,
+        summary: `Prediction validation ${validation.result}; recommended next ${validation.recommendedNext}.`,
+        observation: {
+          schema: "stage_play_live_source_prediction_validation_tool_result/v1",
+          validation,
+          validationId: validation.validationId,
+          validation_id: validation.validationId,
+          priorPredictionId: validation.priorPredictionId,
+          prior_prediction_id: validation.priorPredictionId,
+          result: validation.result,
+          supportedSignals: validation.supportedSignals,
+          supported_signals: validation.supportedSignals,
+          contradictedSignals: validation.contradictedSignals,
+          contradicted_signals: validation.contradictedSignals,
+          newSignals: validation.newSignals,
+          new_signals: validation.newSignals,
+          salienceHint: validation.salienceHint,
+          salience_hint: validation.salienceHint,
+          recommendedNext: validation.recommendedNext,
+          recommended_next: validation.recommendedNext,
+          mailIds: validation.newMailIds,
+          mail_ids: validation.newMailIds,
+          mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+          mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+          priorImmersionStateRef: priorImmersionState?.immersionStateId ?? null,
+          prior_immersion_state_ref: priorImmersionState?.immersionStateId ?? null,
+          delta,
+          evidenceRefs: validation.evidenceRefs,
+          evidence_refs: validation.evidenceRefs,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([...validation.evidenceRefs, ...evidenceRefs]),
+      });
+    }
+
+    const prediction = buildImmersionPrediction({
+      args,
+      jobId,
+      mailItems,
+      delta,
+    });
+    const updated = recordStagePlayLiveSourceImmersionState({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      jobId,
+      policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+      profileId: activeProfile?.profileId ?? priorImmersionState?.profileId ?? null,
+      sourceIds: uniqueStrings([
+        scope.sourceId,
+        ...mailItems.map((item) => item.sourceId),
+        ...(activeJob?.sourceIds ?? []),
+        ...(activePolicy?.sourceIds ?? []),
+        ...(priorImmersionState?.sourceIds ?? []),
+      ]),
+      latestMailIds: mailItems.map((item) => item.mailId),
+      latestEvidenceRefs: uniqueStrings([
+        ...mailItems.flatMap((item) => item.evidenceRefs),
+        ...mailItems.flatMap((item) => [item.sourceRefs.frameRef, item.sourceRefs.evidenceRef, item.sourceRefs.observationRef]),
+      ]),
+      sourceIdentity: delta.sourceIdentity,
+      stableFacts: delta.stableFacts,
+      currentSceneFacts: delta.currentSceneFacts,
+      changedFacts: delta.changedFacts,
+      uncertainties: delta.uncertainties,
+      currentActivity: delta.currentActivity,
+      salience: delta.salience,
+      prediction,
+      evidenceRefs,
+      causalTrace: mergeLiveSourceCausalTraces([
+        priorImmersionState?.causalTrace,
+        ...mailItems.map((item) => item.causalTrace),
+        activeProfile?.causalTrace,
+      ], {
+        parentRefs: uniqueStrings([
+          priorImmersionState?.immersionStateId,
+          ...mailItems.map((item) => item.mailId),
+          activePolicy?.policyId,
+          activeProfile?.profileId,
+        ]),
+        causedBy: mailItems.map((item) => item.mailId),
+        sourceIds: mailItems.map((item) => item.sourceId),
+        jobId,
+        policyId: activePolicy?.policyId ?? priorImmersionState?.policyId ?? null,
+        profileId: activeProfile?.profileId ?? priorImmersionState?.profileId ?? null,
+        evidenceRefs,
+      }),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Updated immersion state ${updated.immersionStateId}; activity ${updated.currentActivity}; salience ${updated.salience.level}.`,
+      observation: {
+        schema: "stage_play_live_source_immersion_update_tool_result/v1",
+        immersionState: updated,
+        immersion_state: updated,
+        immersionStateId: updated.immersionStateId,
+        immersion_state_id: updated.immersionStateId,
+        sourceIdentity: updated.sourceIdentity,
+        source_identity: updated.sourceIdentity,
+        stableFacts: updated.stableFacts,
+        stable_facts: updated.stableFacts,
+        currentSceneFacts: updated.currentSceneFacts,
+        current_scene_facts: updated.currentSceneFacts,
+        changedFacts: updated.changedFacts,
+        changed_facts: updated.changedFacts,
+        deltas: updated.changedFacts,
+        salience: updated.salience,
+        currentActivity: updated.currentActivity,
+        current_activity: updated.currentActivity,
+        watchTargets: delta.watchTargets,
+        watch_targets: delta.watchTargets,
+        prediction: updated.prediction,
+        priorImmersionStateRef: priorImmersionState?.immersionStateId ?? null,
+        prior_immersion_state_ref: priorImmersionState?.immersionStateId ?? null,
+        currentPolicyRef: activePolicy?.policyId ?? null,
+        current_policy_ref: activePolicy?.policyId ?? null,
+        currentProfileRef: activeProfile?.profileId ?? null,
+        current_profile_ref: activeProfile?.profileId ?? null,
+        mailIds: mailItems.map((item) => item.mailId),
+        mail_ids: mailItems.map((item) => item.mailId),
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        delta,
+        causalTrace: updated.causalTrace,
+        causal_trace: updated.causalTrace,
+        evidenceRefs: updated.evidenceRefs,
+        evidence_refs: updated.evidenceRefs,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: updated.evidenceRefs,
+    });
+  }
+
+  if (input.tool_name === "live_env.query_live_source_loop_health") {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const expectedCadenceMs = readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, Number.NaN);
+    const quality = queryStagePlayLiveSourceQuality({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      expectedCadenceMs: Number.isFinite(expectedCadenceMs) ? expectedCadenceMs : null,
+    });
+    const currentState = summarizeStagePlayLiveSourceCurrentState({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      expectedCadenceMs: Number.isFinite(expectedCadenceMs) ? expectedCadenceMs : null,
+      limit: 6,
+    });
+    const { activeJob, activePolicy } = resolveActiveWatchJobAndPolicy({
+      args,
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+    });
+    const activeProfile = resolveActiveInterpreterProfile({
+      args,
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      jobId: activeJob?.jobId ?? activePolicy?.jobId ?? null,
+      policyId: activePolicy?.policyId ?? null,
+      sourceKind: scope.sourceKind,
+    });
+    const latestImmersionState = getLatestStagePlayLiveSourceImmersionState({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      jobId: activeJob?.jobId ?? activePolicy?.jobId ?? null,
+      policyId: activePolicy?.policyId ?? null,
+      profileId: activeProfile?.profileId ?? null,
+      sourceId: scope.sourceId,
+    }) ?? getLatestStagePlayLiveSourceImmersionState({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+    });
+    const deliveredCount = listStagePlayLiveSourceMailItems({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      status: "delivered_to_ask",
+      limit: 250,
+    }).length;
+    const wakes = listStagePlayLiveSourceMailWakeRequests({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 100,
+    }).filter((wake) => !scope.sourceId || wake.sourceIds.includes(scope.sourceId));
+    const queuedWakeCount = wakes.filter((wake) => wake.status === "queued").length;
+    const runningWakeCount = wakes.filter((wake) => wake.status === "running").length;
+    const deferredWakeCount = wakes.filter((wake) => wake.status === "deferred_for_pressure").length;
+    const latestWake = wakes.at(-1) ?? null;
+    const health =
+      !activePolicy
+        ? "missing_policy"
+        : !activeProfile
+          ? "missing_profile"
+          : quality.freshness === "stale" || quality.quality === "stale"
+            ? "stale_source"
+            : deferredWakeCount > 0
+              ? "deferred_for_pressure"
+              : runningWakeCount > 0 || queuedWakeCount > 0 || quality.backlog.unreadMailCount > 0
+                ? "catching_up"
+                : quality.quality === "good"
+                  ? "green"
+                  : "blocked";
+    const nextUsefulTool =
+      !activePolicy
+        ? "live_env.configure_live_source_watch_job"
+        : !activeProfile
+          ? "live_env.configure_interpreter_profile"
+          : latestImmersionState?.prediction && quality.backlog.unreadMailCount > 0
+            ? "live_env.validate_live_source_prediction"
+            : quality.backlog.unreadMailCount > 0
+              ? "live_env.update_live_source_immersion_state"
+              : currentState.nextUsefulTool;
+    const evidenceRefs = uniqueStrings([
+      quality.qualityId,
+      currentState.currentStateId,
+      activeJob?.jobId,
+      activePolicy?.policyId,
+      activeProfile?.profileId,
+      latestImmersionState?.immersionStateId,
+      latestImmersionState?.prediction?.predictionId,
+      latestImmersionState?.lastValidation?.validationId,
+      latestWake?.wakeRequestId,
+      ...quality.evidenceRefs,
+    ]);
+    const loopHealth = {
+      schema: "stage_play_live_source_loop_health/v1",
+      sourceQuality: quality,
+      source_quality: quality,
+      captureCadence: quality.cadence.cadenceActualMs,
+      capture_cadence: quality.cadence.cadenceActualMs,
+      expectedCadence: quality.cadence.expectedCadenceMs,
+      expected_cadence: quality.cadence.expectedCadenceMs,
+      latestMailAgeMs: quality.cadence.latestSummaryAgeMs,
+      latest_mail_age_ms: quality.cadence.latestSummaryAgeMs,
+      unreadCount: quality.backlog.unreadMailCount,
+      unread_count: quality.backlog.unreadMailCount,
+      deliveredCount,
+      delivered_count: deliveredCount,
+      queuedWakeCount,
+      queued_wake_count: queuedWakeCount,
+      runningWakeCount,
+      running_wake_count: runningWakeCount,
+      deferredWakeCount,
+      deferred_wake_count: deferredWakeCount,
+      pressureReason: quality.pressure.reason,
+      pressure_reason: quality.pressure.reason,
+      currentPolicyRef: activePolicy?.policyId ?? null,
+      current_policy_ref: activePolicy?.policyId ?? null,
+      currentProfileRef: activeProfile?.profileId ?? null,
+      current_profile_ref: activeProfile?.profileId ?? null,
+      latestImmersionStateRef: latestImmersionState?.immersionStateId ?? null,
+      latest_immersion_state_ref: latestImmersionState?.immersionStateId ?? null,
+      latestPredictionRef: latestImmersionState?.prediction?.predictionId ?? null,
+      latest_prediction_ref: latestImmersionState?.prediction?.predictionId ?? null,
+      latestValidationRef: latestImmersionState?.lastValidation?.validationId ?? null,
+      latest_validation_ref: latestImmersionState?.lastValidation?.validationId ?? null,
+      nextUsefulTool,
+      next_useful_tool: nextUsefulTool,
+      health,
+      currentState,
+      current_state: currentState,
+      latestWakeRef: latestWake?.wakeRequestId ?? null,
+      latest_wake_ref: latestWake?.wakeRequestId ?? null,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+      evidenceRefs,
+      evidence_refs: evidenceRefs,
+      causalTrace: mergeLiveSourceCausalTraces([
+        quality.causalTrace,
+        currentState.causalTrace,
+        latestImmersionState?.causalTrace,
+        latestWake?.causalTrace,
+      ], {
+        parentRefs: evidenceRefs,
+        sourceIds: currentState.sourceIds,
+        jobId: activeJob?.jobId ?? activePolicy?.jobId ?? latestImmersionState?.jobId ?? null,
+        policyId: activePolicy?.policyId ?? latestImmersionState?.policyId ?? null,
+        profileId: activeProfile?.profileId ?? latestImmersionState?.profileId ?? null,
+        evidenceRefs,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Live-source loop health is ${health}; next useful tool ${nextUsefulTool ?? "none"}.`,
+      observation: loopHealth,
+      evidenceRefs,
     });
   }
 
