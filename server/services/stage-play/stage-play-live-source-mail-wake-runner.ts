@@ -109,6 +109,14 @@ const hashShort = (value: unknown, size = 18): string =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const wordsFromText = (value: string): string[] =>
+  Array.from(new Set(value.toLowerCase().match(/\b[a-z0-9][a-z0-9-]{2,}\b/g) ?? []))
+    .filter((word) => !new Set([
+      "the", "and", "for", "with", "that", "this", "from", "into", "visual", "source",
+      "summary", "mail", "latest", "shows", "showing", "appears", "near", "should",
+      "next", "only", "when", "thing", "things", "record", "decision", "policy",
+    ]).has(word));
+
 const mailBatchLabel = (items: StagePlayLiveSourceMailItemV1[]): string =>
   items.length > 0 && items.every((item) => item.sourceKind === "visual_frame")
     ? "visual-summary"
@@ -617,6 +625,30 @@ const salienceNeedsSlowAsk = (salience: StagePlayLiveSourceImmersionStateV1["sal
 const validationNeedsSlowAsk = (validation: StagePlayLiveSourcePredictionValidationV1): boolean =>
   validation.result === "contradicted" || validation.result === "partially_supported";
 
+const policyCriteriaNeedsSlowAsk = (input: {
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+}): boolean => {
+  if (!input.policy) return false;
+  const text = [
+    ...input.mailBatch.map((item) => item.summary.text || item.summary.preview),
+    input.policy.objectiveText,
+    input.policy.decisionPolicyPrompt,
+  ].join("\n").toLowerCase();
+  const criteria = [
+    ...input.policy.importanceCriteria,
+    ...(input.policy.outputPolicy.allowVoiceCallout ? input.policy.importanceCriteria : []),
+  ].join("\n").toLowerCase();
+  const textWords = new Set(wordsFromText(text));
+  const criteriaWords = wordsFromText(criteria);
+  const overlap = criteriaWords.filter((word) => textWords.has(word));
+  if (overlap.length > 0) return true;
+  return (
+    /\b(?:dark|darker|night|hostile|mob|creeper|zombie|skeleton|fire|damage|danger|urgent|risk|lava|combat)\b/i.test(text) &&
+    /\b(?:night|hostile|mob|danger|urgent|risk|voice|callout|important|salient)\b/i.test(criteria || input.policy.decisionPolicyPrompt)
+  );
+};
+
 const buildWakeFastLayer = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
@@ -720,6 +752,10 @@ const buildWakeFastLayer = (input: {
     !input.policy ||
     policyWantsEveryBatch(input.policy) ||
     salienceNeedsSlowAsk(immersionState.salience) ||
+    policyCriteriaNeedsSlowAsk({
+      policy: input.policy,
+      mailBatch: input.mailBatch,
+    }) ||
     validationNeedsSlowAsk(predictionValidation);
   const slowAskReason = input.manualRun === true
     ? "manual_or_explicit_checkpoint"
@@ -729,6 +765,8 @@ const buildWakeFastLayer = (input: {
         ? "policy_output_cadence_every_batch"
         : salienceNeedsSlowAsk(immersionState.salience)
           ? `salience_${immersionState.salience.level}`
+          : policyCriteriaNeedsSlowAsk({ policy: input.policy, mailBatch: input.mailBatch })
+            ? "policy_criteria_matched"
           : validationNeedsSlowAsk(predictionValidation)
             ? `prediction_validation_${predictionValidation.result}`
             : "fast_layer_wait";
