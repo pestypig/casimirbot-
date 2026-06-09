@@ -46,6 +46,7 @@ import {
   type Nhm2StrictSignalReadinessArtifact,
 } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
 import { isNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { isNhm2NatarioInvariantAudit } from "../shared/contracts/nhm2-natario-invariant-audit.v1";
 import { isCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
 import {
   isNhm2ShiftVsLapseDecompositionArtifact,
@@ -726,6 +727,7 @@ const buildNhm2FullLoopPolicyLayer = (args: {
   nhm2SourceClosure: unknown;
   nhm2StrictSignalReadiness: unknown;
   nhm2QeiWorldlineDossier: unknown;
+  nhm2NatarioInvariantAudit: unknown;
 }): WarpNhm2FullLoopPolicyLayer | undefined => {
   const strictSignal = isNhm2StrictSignalReadinessArtifact(args.nhm2StrictSignalReadiness)
     ? args.nhm2StrictSignalReadiness
@@ -738,6 +740,15 @@ const buildNhm2FullLoopPolicyLayer = (args: {
     : null;
   const observerAudit = isNhm2ObserverAuditArtifact(args.nhm2ObserverAudit)
     ? args.nhm2ObserverAudit
+    : null;
+  const natarioInvariantCandidate =
+    args.nhm2NatarioInvariantAudit ??
+    (args.pipeline as any).nhm2NatarioInvariantAudit ??
+    (args.pipeline as any).natario?.nhm2NatarioInvariantAudit ??
+    (args.snapshot as any).nhm2NatarioInvariantAudit ??
+    (args.snapshot as any).nhm2_natario_invariant_audit;
+  const natarioInvariantAudit = isNhm2NatarioInvariantAudit(natarioInvariantCandidate)
+    ? natarioInvariantCandidate
     : null;
 
   const decompositionCandidate =
@@ -1060,6 +1071,38 @@ const buildNhm2FullLoopPolicyLayer = (args: {
     decomposition != null
       ? (normalizeAuditState(decomposition.status) ?? "review")
       : "unavailable";
+
+  const natarioInvariantReasons: Nhm2FullLoopAuditReasonCode[] = [];
+  if (natarioInvariantAudit == null) {
+    natarioInvariantReasons.push("natario_invariant_audit_missing");
+  } else {
+    if (natarioInvariantAudit.expansion.thetaFlatnessStatus === "fail") {
+      natarioInvariantReasons.push("natario_zero_expansion_failed");
+    }
+    if (natarioInvariantAudit.invariants.status !== "computed") {
+      natarioInvariantReasons.push("natario_invariants_missing");
+    }
+    if (natarioInvariantAudit.momentumDensity.status !== "computed") {
+      natarioInvariantReasons.push("natario_momentum_density_missing");
+    }
+    if (
+      natarioInvariantAudit.stability.convergenceStatus !== "pass" ||
+      natarioInvariantAudit.stability.tidalMax == null ||
+      natarioInvariantAudit.stability.blueshiftMax == null
+    ) {
+      natarioInvariantReasons.push("natario_stability_diagnostics_missing");
+    }
+  }
+  const uniqueNatarioInvariantReasons = uniqueList(natarioInvariantReasons);
+  const natarioInvariantState: Nhm2FullLoopAuditState =
+    natarioInvariantAudit == null
+      ? "review"
+      : natarioInvariantAudit.expansion.thetaFlatnessStatus === "fail" ||
+          natarioInvariantAudit.stability.convergenceStatus === "fail"
+        ? "fail"
+        : uniqueNatarioInvariantReasons.length > 0
+          ? "review"
+          : "pass";
 
   const boundarySuite = envelope?.suites.find((suite) => suite.axis === "boundary_condition") ?? null;
   const reproducibilityReady =
@@ -1408,6 +1451,51 @@ const buildNhm2FullLoopPolicyLayer = (args: {
         decomposition?.sourceArtifacts.missionTimeComparison ??
         decomposition?.sourceArtifacts.worldline ??
         null,
+    },
+    natario_invariant_audit: {
+      sectionId: "natario_invariant_audit",
+      state: natarioInvariantState,
+      reasons: uniqueNatarioInvariantReasons,
+      artifactRefs: natarioInvariantAudit
+        ? [
+            makeAuditRef(
+              "nhm2_natario_invariant_audit",
+              "runtime://pipeline/nhm2NatarioInvariantAudit",
+              natarioInvariantAudit.contractVersion,
+              natarioInvariantState,
+            ),
+          ]
+        : [
+            makeAuditRef(
+              "nhm2_natario_invariant_audit_contract",
+              "shared/contracts/nhm2-natario-invariant-audit.v1.ts",
+            ),
+          ],
+      natarioInvariantAudit,
+      thetaFlatnessStatus:
+        natarioInvariantAudit?.expansion.thetaFlatnessStatus ?? "missing",
+      invariantStatus: natarioInvariantAudit?.invariants.status ?? "missing",
+      momentumDensityStatus:
+        natarioInvariantAudit?.momentumDensity.status ?? "missing",
+      convergenceStatus:
+        natarioInvariantAudit?.stability.convergenceStatus ?? "not_run",
+      thetaMaxAbs: finiteOrUndefined(natarioInvariantAudit?.expansion.thetaMaxAbs) ?? null,
+      expansionLeakageBound:
+        finiteOrUndefined(natarioInvariantAudit?.expansion.expansionLeakageBound) ?? null,
+      ricciScalar: finiteOrUndefined(natarioInvariantAudit?.invariants.ricciScalar) ?? null,
+      kretschmannScalar:
+        finiteOrUndefined(natarioInvariantAudit?.invariants.kretschmannScalar) ?? null,
+      weylScalarProxy:
+        finiteOrUndefined(natarioInvariantAudit?.invariants.weylScalarProxy) ?? null,
+      petrovClass: natarioInvariantAudit?.invariants.petrovClass ?? null,
+      Jx: finiteOrUndefined(natarioInvariantAudit?.momentumDensity.Jx) ?? null,
+      Jy: finiteOrUndefined(natarioInvariantAudit?.momentumDensity.Jy) ?? null,
+      Jz: finiteOrUndefined(natarioInvariantAudit?.momentumDensity.Jz) ?? null,
+      tidalMax: finiteOrUndefined(natarioInvariantAudit?.stability.tidalMax) ?? null,
+      blueshiftMax:
+        finiteOrUndefined(natarioInvariantAudit?.stability.blueshiftMax) ?? null,
+      zeroExpansionSeparatelyReported: true,
+      zeroExpansionIsNotSafetyCertificate: true,
     },
     uncertainty_perturbation_reproducibility: {
       sectionId: "uncertainty_perturbation_reproducibility",
@@ -1994,6 +2082,9 @@ export async function evaluateWarpViability(
   const nhm2QeiWorldlineDossier =
     (pipeline as any)?.nhm2QeiWorldlineDossier ??
     (pipeline as any)?.natario?.nhm2QeiWorldlineDossier;
+  const nhm2NatarioInvariantAudit =
+    (pipeline as any)?.nhm2NatarioInvariantAudit ??
+    (pipeline as any)?.natario?.nhm2NatarioInvariantAudit;
   const casimirMaterialReceiptCandidate =
     (pipeline as any)?.casimirMaterialReceipt ??
     (pipeline as any)?.natario?.casimirMaterialReceipt;
@@ -2515,6 +2606,25 @@ export async function evaluateWarpViability(
       typeof nhm2QeiWorldlineDossier?.summary?.anyProxy === "boolean"
         ? Boolean(nhm2QeiWorldlineDossier.summary.anyProxy)
         : undefined,
+    nhm2_natario_invariant_audit: nhm2NatarioInvariantAudit,
+    nhm2_natario_theta_flatness_status:
+      typeof nhm2NatarioInvariantAudit?.expansion?.thetaFlatnessStatus === "string"
+        ? String(nhm2NatarioInvariantAudit.expansion.thetaFlatnessStatus)
+        : undefined,
+    nhm2_natario_invariant_status:
+      typeof nhm2NatarioInvariantAudit?.invariants?.status === "string"
+        ? String(nhm2NatarioInvariantAudit.invariants.status)
+        : undefined,
+    nhm2_natario_momentum_density_status:
+      typeof nhm2NatarioInvariantAudit?.momentumDensity?.status === "string"
+        ? String(nhm2NatarioInvariantAudit.momentumDensity.status)
+        : undefined,
+    nhm2_natario_convergence_status:
+      typeof nhm2NatarioInvariantAudit?.stability?.convergenceStatus === "string"
+        ? String(nhm2NatarioInvariantAudit.stability.convergenceStatus)
+        : undefined,
+    nhm2_natario_zero_expansion_not_safety_certificate:
+      nhm2NatarioInvariantAudit?.claimBoundary?.zeroExpansionIsNotSafetyCertificate === true,
     nhm2_source_closure: nhm2SourceClosure,
     nhm2_source_closure_status:
       typeof nhm2SourceClosure?.status === "string" ? String(nhm2SourceClosure.status) : undefined,
@@ -2990,6 +3100,7 @@ export async function evaluateWarpViability(
     nhm2SourceClosure,
     nhm2StrictSignalReadiness,
     nhm2QeiWorldlineDossier,
+    nhm2NatarioInvariantAudit,
   });
   if (nhm2FullLoopPolicyLayer) {
     snapshot.nhm2_full_loop_policy_id = nhm2FullLoopPolicyLayer.policyId;
@@ -3011,6 +3122,8 @@ export async function evaluateWarpViability(
     snapshot.nhm2_full_loop_uncertainty_status =
       nhm2FullLoopPolicyLayer.artifact.sections
         .uncertainty_perturbation_reproducibility.state;
+    snapshot.nhm2_full_loop_natario_invariant_audit_status =
+      nhm2FullLoopPolicyLayer.artifact.sections.natario_invariant_audit.state;
   }
 
   return {
