@@ -2553,7 +2553,7 @@ describe("Stage Play live-source mailbox", () => {
         objectiveText: "Interpret the Minecraft video mail, predict what might happen next, and say what should be watched next.",
         interpretationMode: "prediction_watch",
         mailProcessingMode: "chronological_batch",
-        outputCadence: "only_salient",
+        outputCadence: "every_batch",
         now: "2026-06-04T12:02:50.000Z",
       });
       const mailIds = Array.from({ length: 7 }, (_unused, index) =>
@@ -2601,6 +2601,7 @@ describe("Stage Play live-source mailbox", () => {
       expect(prompt).toContain("Interpretation mode: prediction_watch");
       expect(prompt).toContain("Mail processing mode: chronological_batch");
       expect(prompt).toContain("Wake batch size for this policy: 3");
+      expect(prompt).toContain("Output cadence: every_batch");
       expect(prompt).toContain("Retained unread mail outside this Ask batch: 4");
       expect(prompt).toContain("- prediction_watch: produce record_interpretation with prediction and validation signals.");
       const wakeRequests = listStagePlayLiveSourceMailWakeRequests({ threadId });
@@ -2646,7 +2647,9 @@ describe("Stage Play live-source mailbox", () => {
           sourceKind: "visual_frame",
           frameRef: `visual_frame:voice-policy-${index}`,
           evidenceRef: `visual_evidence:voice-policy-${index}`,
-          summaryText: `Voice commentary compact summary ${index}.`,
+          summaryText: index === 2
+            ? "Voice commentary compact summary 2: hostile mob appears near the Minecraft player."
+            : `Voice commentary compact summary ${index}.`,
           createdAt: `2026-06-04T12:03:1${index}.000Z`,
         }).mailId
       );

@@ -630,11 +630,7 @@ const policyCriteriaNeedsSlowAsk = (input: {
   mailBatch: StagePlayLiveSourceMailItemV1[];
 }): boolean => {
   if (!input.policy) return false;
-  const text = [
-    ...input.mailBatch.map((item) => item.summary.text || item.summary.preview),
-    input.policy.objectiveText,
-    input.policy.decisionPolicyPrompt,
-  ].join("\n").toLowerCase();
+  const text = input.mailBatch.map((item) => item.summary.text || item.summary.preview).join("\n").toLowerCase();
   const criteria = [
     ...input.policy.importanceCriteria,
     ...(input.policy.outputPolicy.allowVoiceCallout ? input.policy.importanceCriteria : []),
@@ -645,7 +641,11 @@ const policyCriteriaNeedsSlowAsk = (input: {
   if (overlap.length > 0) return true;
   return (
     /\b(?:dark|darker|night|hostile|mob|creeper|zombie|skeleton|fire|damage|danger|urgent|risk|lava|combat)\b/i.test(text) &&
-    /\b(?:night|hostile|mob|danger|urgent|risk|voice|callout|important|salient)\b/i.test(criteria || input.policy.decisionPolicyPrompt)
+    /\b(?:night|hostile|mob|danger|urgent|risk|voice|callout|important|salient)\b/i.test([
+      criteria,
+      input.policy.objectiveText,
+      input.policy.decisionPolicyPrompt,
+    ].join("\n"))
   );
 };
 
