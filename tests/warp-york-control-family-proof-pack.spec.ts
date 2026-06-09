@@ -2221,32 +2221,43 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2FullLoopAuditContract(json)).toBe(true);
-    expect((json as any).sections.source_closure.state).toBe("pass");
-    expect((json as any).sections.source_closure.reasons).not.toContain(
+    const sourceClosure = (json as any).sections.source_closure;
+    expect(sourceClosure.state).toBe("fail");
+    expect(sourceClosure.reasons).not.toContain(
       "source_closure_residual_exceeded",
     );
-    expect((json as any).sections.source_closure.reasons).not.toContain(
+    expect(sourceClosure.reasons).toContain(
+      "wall_source_closure_residual_exceeded",
+    );
+    expect(sourceClosure.reasons).not.toContain(
       "source_closure_missing",
     );
-    expect((json as any).sections.source_closure.reasons).not.toContain(
+    expect(sourceClosure.reasons).not.toContain(
       "policy_review_required",
     );
-    expect((json as any).sections.source_closure.metricTensorRef).toContain(
+    expect(sourceClosure.wallSourceClosure).toEqual(
+      expect.objectContaining({
+        contractVersion: "nhm2_wall_source_closure/v1",
+        regionId: "wall",
+        residual: expect.objectContaining({ pass: false }),
+      }),
+    );
+    expect(sourceClosure.metricTensorRef).toContain(
       "nhm2-source-closure-metric-required-tensor-latest.json",
     );
-    expect((json as any).sections.source_closure.tileEffectiveTensorRef).toContain(
+    expect(sourceClosure.tileEffectiveTensorRef).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
     );
-    expect((json as any).sections.source_closure.residualRms).not.toBeNull();
-    expect((json as any).sections.source_closure.residualMax).not.toBeNull();
-    expect((json as any).sections.source_closure.residualMax).toBeLessThan(0.1);
-    expect((json as any).sections.source_closure.residualByRegion.hull).toBeGreaterThan(0.1);
-    expect((json as any).sections.source_closure.residualByRegion.wall).toBeGreaterThan(0.1);
-    expect((json as any).sections.source_closure.residualByRegion.exteriorShell).toBeGreaterThan(
+    expect(sourceClosure.residualRms).not.toBeNull();
+    expect(sourceClosure.residualMax).not.toBeNull();
+    expect(sourceClosure.residualMax).toBeLessThan(0.1);
+    expect(sourceClosure.residualByRegion.hull).toBeGreaterThan(0.1);
+    expect(sourceClosure.residualByRegion.wall).toBeGreaterThan(0.1);
+    expect(sourceClosure.residualByRegion.exteriorShell).toBeGreaterThan(
       0.1,
     );
-    expect((json as any).sections.source_closure.assumptionsDrifted).toBe(true);
-    expect((json as any).sections.source_closure.artifactRefs).toEqual(
+    expect(sourceClosure.assumptionsDrifted).toBe(true);
+    expect(sourceClosure.artifactRefs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           artifactId: "nhm2_source_closure",
@@ -2280,6 +2291,10 @@ describe("nhm2 publication completion surfaces", () => {
     );
 
     const markdown = fs.readFileSync(published.auditArtifact.latestMdPath, "utf8");
+    expect(markdown.indexOf("## Wall Source Closure (Front Door)")).toBeLessThan(
+      markdown.indexOf("## Global Source Closure (Secondary Context)"),
+    );
+    expect(markdown).toContain("| residual.pass | false |");
     expect(markdown).toContain(
       "artifacts/research/full-solve/nhm2-source-closure-latest.json",
     );
@@ -2344,6 +2359,21 @@ describe("nhm2 publication completion surfaces", () => {
     );
     expect((json as any).tensors.tileEffective.tensorRef).toContain(
       "nhm2-source-closure-tile-effective-tensor-latest.json",
+    );
+    expect((json as any).observerRobustEnergyConditions).toBeTruthy();
+    expect(
+      (json as any).observerRobustEnergyConditions.metricRequired.contractVersion,
+    ).toBe("nhm2_observer_robust_energy_conditions/v1");
+    expect(
+      (json as any).observerRobustEnergyConditions.metricRequired.observerFamilies,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ familyId: "algebraic_type_i" }),
+        expect.objectContaining({
+          familyId: "continuous_optimizer",
+          status: "not_run",
+        }),
+      ]),
     );
     expect((json as any).tensors.metricRequired.model.pressureModel).not.toBeNull();
     expect((json as any).tensors.tileEffective.model.pressureModel).not.toBeNull();
@@ -3603,6 +3633,25 @@ describe("nhm2 publication completion surfaces", () => {
       fs.readFileSync(published.auditArtifact.latestJsonPath, "utf8"),
     ) as Record<string, unknown>;
     expect(isNhm2FullLoopAuditContract(json)).toBe(true);
+    const observerRobust = (observerJson as any).observerRobustEnergyConditions;
+    const observerRobustArtifacts = [
+      observerRobust?.metricRequired,
+      observerRobust?.tileEffective,
+    ];
+    const observerRobustAnyViolation = observerRobustArtifacts.some(
+      (artifact: any) => artifact?.summary?.anyViolation === true,
+    );
+    const observerRobustIncomplete = observerRobustArtifacts.some(
+      (artifact: any) =>
+        artifact == null ||
+        artifact.summary?.eulerianOnly === true ||
+        artifact.summary?.robustCheckComplete !== true,
+    );
+    const expectedObserverAuditState = observerRobustAnyViolation
+      ? "fail"
+      : observerRobustIncomplete && (observerJson as any).status !== "fail"
+        ? "review"
+        : (observerJson as any).status;
     expect((json as any).sections.observer_audit.artifactRefs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -3612,8 +3661,11 @@ describe("nhm2 publication completion surfaces", () => {
       ]),
     );
     expect((json as any).sections.observer_audit.state).toBe(
-      (observerJson as any).status,
+      expectedObserverAuditState,
     );
+    expect(
+      (json as any).sections.observer_audit.observerRobustEnergyConditions,
+    ).toEqual((observerJson as any).observerRobustEnergyConditions);
     expect((json as any).sections.observer_audit.observerBlockingAssessmentStatus).toBe(
       (observerJson as any).observerBlockingAssessmentStatus,
     );
@@ -3715,6 +3767,15 @@ describe("nhm2 publication completion surfaces", () => {
         "policy_review_required",
       );
     }
+    if (observerRobustAnyViolation) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_robust_energy_condition_violation",
+      );
+    } else if (observerRobustIncomplete) {
+      expect((json as any).sections.observer_audit.reasons).toContain(
+        "observer_robust_energy_condition_incomplete",
+      );
+    }
     expect((json as any).sections.observer_audit.metric.typeIFraction).toBe(
       (observerJson as any).tensors.metricRequired.typeI.fraction,
     );
@@ -3727,6 +3788,8 @@ describe("nhm2 publication completion surfaces", () => {
       "artifacts/research/full-solve/nhm2-observer-audit-latest.json",
     );
     expect(markdown).toContain("observerBlockingAssessmentStatus");
+    expect(markdown).toContain("Observer-Robust Energy Conditions");
+    expect(markdown).toContain("metric.observerFamilies");
     expect(markdown).toContain("observerMetricPrimaryDriver");
     expect(markdown).toContain("observerSharedRootDriverStatus");
     expect(markdown).toContain(

@@ -191,6 +191,118 @@ const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
     ].includes(receiptStatus));
   });
 
+const hasLiveSourceMailDecisionReceipt = (payload: RecordLike): boolean =>
+  readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    const artifactKind = readString(artifact?.kind);
+    const artifactPayload = readRecord(artifact?.payload);
+    const observation = readRecord(artifactPayload?.observation);
+    return (
+      (
+        artifactKind === "live_environment_tool_observation" &&
+        readString(artifactPayload?.tool_name) === "live_env.record_live_source_mail_decision"
+      ) ||
+      readString(artifactPayload?.artifactId) === "stage_play_live_source_mail_decision" ||
+      readString(artifactPayload?.schemaVersion) === "stage_play_live_source_mail_decision/v1" ||
+      readString(observation?.artifactId) === "stage_play_live_source_mail_decision" ||
+      readString(observation?.schemaVersion) === "stage_play_live_source_mail_decision/v1"
+    );
+  });
+
+const hasObservationKind = (payload: RecordLike, expectedKind: string): boolean =>
+  expectedKind === "live_source_interim_voice_callout_receipt" && hasFinalInterimVoiceCalloutReceipt(payload)
+    ? true
+    : readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    const artifactKind = readString(artifact?.kind);
+    const artifactSchema = readString(artifact?.schema);
+    const artifactId = readString(artifact?.artifact_id) ?? readString(artifact?.artifactId);
+    const artifactPayload = readRecord(artifact?.payload);
+    const observation = readRecord(artifactPayload?.observation);
+    const result = readRecord(artifactPayload?.result);
+    return [
+      artifactKind,
+      artifactSchema,
+      artifactId,
+      readString(artifactPayload?.kind),
+      readString(artifactPayload?.schema),
+      readString(artifactPayload?.schemaVersion),
+      readString(artifactPayload?.artifactId),
+      readString(observation?.kind),
+      readString(observation?.schema),
+      readString(observation?.schemaVersion),
+      readString(observation?.artifactId),
+      readString(result?.kind),
+      readString(result?.schema),
+      readString(result?.schemaVersion),
+      readString(result?.artifactId),
+    ].some((value) => value === expectedKind || value === `${expectedKind}/v1`);
+  });
+
+const liveSourcePhaseRequiresMailDecision = (payload: RecordLike): boolean => {
+  const phase = readRecord(payload.live_source_turn_phase_resolution);
+  if (readBoolean(readRecord(phase?.phaseLock)?.locked) !== true) return false;
+  if (readString(phase?.phase) !== "record_decision") return false;
+  if (!readStringArray(phase?.requiredEvidence).includes("stage_play_processed_mail_packet")) return false;
+  return !hasLiveSourceMailDecisionReceipt(payload);
+};
+
+const liveSourcePhaseRequiresVoiceReceiptOrHold = (payload: RecordLike): boolean => {
+  const phase = readRecord(payload.live_source_turn_phase_resolution);
+  if (readBoolean(readRecord(phase?.phaseLock)?.locked) !== true) return false;
+  if (readString(phase?.phase) !== "request_voice_after_decision") return false;
+  const completionEvidence = readStringArray(phase?.completionEvidence);
+  if (
+    completionEvidence.length > 0 &&
+    completionEvidence.some((kind) => kind !== "live_source_interim_voice_callout_receipt" && hasObservationKind(payload, kind))
+  ) {
+    return false;
+  }
+  if (!hasLiveSourceMailDecisionReceipt(payload)) return false;
+  return !hasFinalInterimVoiceCalloutReceipt(payload);
+};
+
+const terminalForbiddenByLiveSourcePhaseLock = (payload: RecordLike): boolean => {
+  const phase = readRecord(payload.live_source_turn_phase_resolution);
+  if (readBoolean(readRecord(phase?.phaseLock)?.locked) !== true) return false;
+  if (readBoolean(phase?.terminal_eligible) === true || readBoolean(phase?.terminalAllowed) === true) return false;
+  const phaseName = readString(phase?.phase);
+  if (phaseName !== "record_decision" && phaseName !== "request_voice_after_decision") return false;
+  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  if (!terminalArtifactKind) return false;
+  const completionEvidence = readStringArray(phase?.completionEvidence);
+  return completionEvidence.length === 0 || completionEvidence.every((kind) => !hasObservationKind(payload, kind));
+};
+
+const receiptTerminalNotEligible = (payload: RecordLike): boolean => {
+  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  const responseType = readString(payload.response_type);
+  const terminalPresentation = readRecord(payload.terminal_presentation);
+  const terminalEligible =
+    readBoolean(payload.terminal_eligible) ??
+    readBoolean(terminalPresentation?.terminal_eligible);
+  const receiptLike =
+    terminalArtifactKind === "tool_receipt" ||
+    terminalArtifactKind === "live_environment_tool_observation" ||
+    Boolean(terminalArtifactKind && /receipt/i.test(terminalArtifactKind)) ||
+    responseType === "tool_receipt";
+  return receiptLike && terminalEligible === false;
+};
+
+const terminalWriterRejectedReasons = (payload: RecordLike): HelixSolverControllerBlockingReason[] => {
+  const writer = readRecord(payload.terminal_authority_single_writer);
+  return readArray(writer?.rejected_candidates)
+    .map((entry) => readString(readRecord(entry)?.reason))
+    .filter((reason): reason is HelixSolverControllerBlockingReason =>
+      reason === "stale_model_only_after_observation" ||
+      reason === "composer_claimed_no_observations_but_receipts_exist" ||
+      reason === "receipt_not_terminal_eligible" ||
+      reason === "terminal_forbidden_by_phase_lock" ||
+      reason === "missing_required_live_source_mail_decision" ||
+      reason === "missing_required_voice_receipt_or_hold",
+    );
+};
+
 const hasLiveSourceSetupReceipt = (payload: RecordLike): boolean => {
   const phase = readRecord(payload.live_source_turn_phase_resolution);
   const phaseName = readString(phase?.phase);
@@ -517,6 +629,7 @@ export function buildSolverControllerDecision(input: {
   const modelOnlyAnswerCoverageSupersedesCompoundGate = hasModelOnlyCompoundAnswerCoverage(payload);
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
+  const liveSourcePhaseBlockingReasons: HelixSolverControllerBlockingReason[] = [];
   const consumedRefs: string[] = [
     "canonical_goal_frame",
     "terminal_answer_authority",
@@ -534,7 +647,24 @@ export function buildSolverControllerDecision(input: {
     "capability_lifecycle_ledger",
     "capability_adapter_request",
     "capability_adapter_result",
+    "live_source_turn_phase_resolution",
   ];
+
+  if (liveSourcePhaseRequiresMailDecision(payload)) {
+    pushUnique(liveSourcePhaseBlockingReasons, "missing_required_live_source_mail_decision");
+  }
+  if (liveSourcePhaseRequiresVoiceReceiptOrHold(payload)) {
+    pushUnique(liveSourcePhaseBlockingReasons, "missing_required_voice_receipt_or_hold");
+  }
+  if (liveSourcePhaseBlockingReasons.length === 0 && terminalForbiddenByLiveSourcePhaseLock(payload)) {
+    pushUnique(liveSourcePhaseBlockingReasons, "terminal_forbidden_by_phase_lock");
+  }
+  if (receiptTerminalNotEligible(payload)) {
+    pushUnique(liveSourcePhaseBlockingReasons, "receipt_not_terminal_eligible");
+  }
+  for (const reason of terminalWriterRejectedReasons(payload)) {
+    pushUnique(liveSourcePhaseBlockingReasons, reason);
+  }
 
   if (!nonAnswerTerminal) {
     if (!goalSatisfaction) {
@@ -738,7 +868,7 @@ export function buildSolverControllerDecision(input: {
   if (
     !liveSourceSetupReceiptTerminal &&
     readBoolean(solverTrace?.completed_solver_path) === false &&
-    blockingReasons.some((reason) =>
+    [...blockingReasons, ...liveSourcePhaseBlockingReasons].some((reason) =>
       reason === "poison_audit_failed" ||
       reason === "route_authority_failed" ||
       reason === "terminal_route_mismatch" ||
@@ -758,6 +888,12 @@ export function buildSolverControllerDecision(input: {
       reason === "agent_step_decision_missing" ||
       reason === "selected_capability_observation_missing" ||
       reason === "post_observation_model_decision_missing" ||
+      reason === "stale_model_only_after_observation" ||
+      reason === "composer_claimed_no_observations_but_receipts_exist" ||
+      reason === "missing_required_live_source_mail_decision" ||
+      reason === "missing_required_voice_receipt_or_hold" ||
+      reason === "receipt_not_terminal_eligible" ||
+      reason === "terminal_forbidden_by_phase_lock" ||
       reason === "direct_answer_text_missing" ||
       reason === "subgoals_observed_not_satisfied" ||
       reason === "prompt_requirement_coverage_incomplete" ||
@@ -768,7 +904,9 @@ export function buildSolverControllerDecision(input: {
     pushUnique(blockingReasons, "solver_path_incomplete");
   }
 
-  const effectiveBlockingReasons = nonAnswerTerminal ? [] : blockingReasons;
+  const effectiveBlockingReasons = nonAnswerTerminal
+    ? liveSourcePhaseBlockingReasons
+    : [...blockingReasons, ...liveSourcePhaseBlockingReasons];
   const bindingMismatchRepairable =
     Boolean(capabilityBindingMismatchObservation) &&
     effectiveBlockingReasons.includes("selected_capability_observation_missing") &&
@@ -778,6 +916,14 @@ export function buildSolverControllerDecision(input: {
       reason === "capability_lifecycle_incomplete" ||
       reason === "solver_path_incomplete",
     );
+  const proceduralTerminalBlocked = effectiveBlockingReasons.some((reason) =>
+    reason === "missing_required_live_source_mail_decision" ||
+    reason === "missing_required_voice_receipt_or_hold" ||
+    reason === "terminal_forbidden_by_phase_lock" ||
+    reason === "stale_model_only_after_observation" ||
+    reason === "composer_claimed_no_observations_but_receipts_exist" ||
+    reason === "receipt_not_terminal_eligible",
+  );
   const goalBlocked = effectiveBlockingReasons.some((reason) =>
     reason === "goal_satisfaction_missing" ||
     reason === "goal_not_satisfied" ||
@@ -798,6 +944,8 @@ export function buildSolverControllerDecision(input: {
   const controllerDecision =
     effectiveBlockingReasons.length === 0
       ? "allow_terminal"
+      : proceduralTerminalBlocked
+        ? "continue"
       : bindingMismatchRepairable
         ? "retry"
       : requestedGoalDecision

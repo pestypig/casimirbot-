@@ -6,6 +6,7 @@ import {
   type HelixToolCallAdmissionFamily,
 } from "@shared/helix-tool-call-admission";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import { buildToolUseRestatement } from "./internet-search-intent";
 import { buildTurnOperationalConstraints } from "./operational-constraints";
 import {
   isStagePlayCheckpointRequestPrompt,
@@ -87,6 +88,7 @@ export function buildToolCallAdmissionDecision(input: {
     required_surface: operationalConstraints.required_surface,
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
+  const toolUseRestatement = buildToolUseRestatement(promptText);
   if (contextualSuppression) {
     return {
       schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
@@ -105,7 +107,11 @@ export function buildToolCallAdmissionDecision(input: {
     };
   }
 
-  let required = HARD_SOURCE_TARGETS.has(sourceTarget);
+  const effectiveSourceTarget =
+    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
+      ? "internet_search"
+      : sourceTarget;
+  let required = HARD_SOURCE_TARGETS.has(effectiveSourceTarget);
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];
   let extraForbiddenTerminalKinds: string[] = [];
   let extraForbiddenRoutes: string[] = [];
@@ -118,12 +124,12 @@ export function buildToolCallAdmissionDecision(input: {
       isStagePlayReflectionPrompt(promptText)
     );
 
-  if (sourceTarget === "docs_viewer") {
+  if (effectiveSourceTarget === "docs_viewer") {
     admittedToolFamilies = ["docs_viewer"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
     reason = "docs_viewer_requires_document_tool_path";
-  } else if (sourceTarget === "scholarly_research") {
+  } else if (effectiveSourceTarget === "scholarly_research") {
     admittedToolFamilies = ["scholarly_research"];
     extraForbiddenTerminalKinds = [
       "direct_answer_text",
@@ -150,7 +156,7 @@ export function buildToolCallAdmissionDecision(input: {
       "no_tool_direct",
     ];
     reason = "scholarly_research_requires_external_paper_evidence_path";
-  } else if (sourceTarget === "internet_search") {
+  } else if (effectiveSourceTarget === "internet_search") {
     admittedToolFamilies = ["internet_search"];
     extraForbiddenTerminalKinds = [
       "direct_answer_text",
@@ -306,7 +312,7 @@ export function buildToolCallAdmissionDecision(input: {
   return {
     schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
     turn_id: input.turnId,
-    source_target: sourceTarget,
+    source_target: effectiveSourceTarget,
     required,
     admitted_tool_families: unique(admittedToolFamilies),
     forbidden_terminal_artifact_kinds: unique([

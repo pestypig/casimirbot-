@@ -2,6 +2,11 @@ import {
   isNhm2SameChartFullTensorArtifact,
   type Nhm2SameChartFullTensorArtifactV1,
 } from "./nhm2-same-chart-full-tensor.v1";
+import {
+  buildNhm2ObserverRobustEnergyConditionFromTensor,
+  isNhm2ObserverRobustEnergyConditionArtifact,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "./nhm2-observer-robust-energy-conditions.v1";
 
 export const NHM2_OBSERVER_AUDIT_ARTIFACT_ID = "nhm2_observer_audit";
 export const NHM2_OBSERVER_AUDIT_SCHEMA_VERSION =
@@ -1716,6 +1721,10 @@ export type Nhm2ObserverAuditArtifact = {
   tileObserverConditionAuthorityNote?: string | null;
   tileObserverLegacyProxyDiagnostics?: Nhm2ObserverTileObserverLegacyProxyDiagnostics | null;
   sameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1 | null;
+  observerRobustEnergyConditions?: {
+    metricRequired: Nhm2ObserverRobustEnergyConditionArtifactV1;
+    tileEffective: Nhm2ObserverRobustEnergyConditionArtifactV1;
+  } | null;
   tensors: {
     metricRequired: Nhm2ObserverAuditTensor;
     tileEffective: Nhm2ObserverAuditTensor;
@@ -1793,6 +1802,7 @@ export type BuildNhm2ObserverAuditTensorInput = {
 } | null;
 
 export type BuildNhm2ObserverAuditArtifactInput = {
+  generatedAt?: string | null;
   familyId?: string | null;
   shiftLapseProfileId?: string | null;
   metricRequired?: BuildNhm2ObserverAuditTensorInput;
@@ -9048,11 +9058,33 @@ export const buildNhm2ObserverAuditArtifact = (
   )
     ? input.sameChartFullTensor
     : null;
+  const generatedAt =
+    asText(input.generatedAt) ??
+    sameChartFullTensor?.generatedAt ??
+    "1970-01-01T00:00:00.000Z";
+  const familyId = asText(input.familyId) ?? "nhm2_shift_lapse";
+  const selectedProfileId = asText(input.shiftLapseProfileId) ?? "unknown";
+  const observerRobustEnergyConditions = {
+    metricRequired: buildNhm2ObserverRobustEnergyConditionFromTensor({
+      generatedAt,
+      laneId: familyId,
+      selectedProfileId,
+      tensor: metricRequired,
+      tensorRef: metricRequired.tensorRef,
+    }),
+    tileEffective: buildNhm2ObserverRobustEnergyConditionFromTensor({
+      generatedAt,
+      laneId: familyId,
+      selectedProfileId,
+      tensor: tileEffective,
+      tensorRef: tileEffective.tensorRef,
+    }),
+  };
 
   return {
     artifactId: NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
     schemaVersion: NHM2_OBSERVER_AUDIT_SCHEMA_VERSION,
-    familyId: asText(input.familyId) ?? "nhm2_shift_lapse",
+    familyId,
     shiftLapseProfileId: asText(input.shiftLapseProfileId),
     status,
     completeness,
@@ -9123,6 +9155,7 @@ export const buildNhm2ObserverAuditArtifact = (
     tileObserverConditionAuthorityNote: tileObserverConditionAuthority.note,
     tileObserverLegacyProxyDiagnostics,
     sameChartFullTensor,
+    observerRobustEnergyConditions,
     tensors: {
       metricRequired,
       tileEffective,
@@ -9418,6 +9451,22 @@ export const isNhm2ObserverAuditArtifact = (
     (record.sameChartFullTensor === undefined ||
       record.sameChartFullTensor === null ||
       isNhm2SameChartFullTensorArtifact(record.sameChartFullTensor)) &&
+    (record.observerRobustEnergyConditions === undefined ||
+      record.observerRobustEnergyConditions === null ||
+      (() => {
+        const robust =
+          record.observerRobustEnergyConditions &&
+          typeof record.observerRobustEnergyConditions === "object" &&
+          !Array.isArray(record.observerRobustEnergyConditions)
+            ? (record.observerRobustEnergyConditions as Record<string, unknown>)
+            : {};
+        return (
+          isNhm2ObserverRobustEnergyConditionArtifact(
+            robust.metricRequired,
+          ) &&
+          isNhm2ObserverRobustEnergyConditionArtifact(robust.tileEffective)
+        );
+      })()) &&
     tensors != null &&
     isTensor(tensors.metricRequired) &&
     isTensor(tensors.tileEffective)

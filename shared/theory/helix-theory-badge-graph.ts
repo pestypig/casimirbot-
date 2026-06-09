@@ -506,6 +506,104 @@ const badges: TheoryBadgeV1[] = [
     claimBoundary: DIAGNOSTIC_BOUNDARY,
   },
   {
+    id: "nhm2.closure.wall_t00_source_residual",
+    title: "Wall T00 source residual",
+    plainMeaning:
+      "Compares metric-required wall T00 with the available wall-region source T00 before global source residuals are interpreted.",
+    whyItMatters:
+      "It makes the wall-region source mismatch the front-door closure blocker so global averages cannot hide local wall failure.",
+    subjects: ["nhm2", "source_closure", "wall_region", "T00", "residual"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["wall_t00_source_residual", "source_residual"],
+    tags: ["wall_region", "T00", "residual", "calculator_loadable", "wall_first"],
+    equations: [
+      {
+        id: "wall_t00_source_residual_difference",
+        role: "residual",
+        displayLatex:
+          "R_{wall,T00}=T00_{wall,required}-T00_{wall,available}",
+        computableExpression:
+          "R_wall_T00 = T00_wall_required - T00_wall_available",
+        operatorKind: "residual",
+        inputSymbols: ["T00_wall_required", "T00_wall_available"],
+        outputSymbols: ["R_wall_T00"],
+      },
+    ],
+    units: [
+      { symbol: "R_{wall,T00}", unit: "J/m^3", quantity: "wall_t00_source_residual", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "T00_{wall,required}", unit: "J/m^3", quantity: "metric_required_wall_t00", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "T00_{wall,available}", unit: "J/m^3", quantity: "available_wall_t00", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      "Wall T00 residual is a diagnostic comparison.",
+      "Global source residuals are secondary context and cannot override wall failure.",
+      "A small wall residual is not a validation statement.",
+    ],
+    calculatorPayloads: [
+      {
+        id: "wall_t00_source_residual_payload",
+        expression: "R_wall_T00 = T00_wall_required - T00_wall_available",
+        displayLatex:
+          "R_{wall,T00}=T00_{wall,required}-T00_{wall,available}",
+        preferredAction: "solve_with_steps",
+        targetVariable: "R_wall_T00",
+        setupContext: {
+          schema: HELIX_CALCULATOR_SETUP_CONTEXT_SCHEMA,
+          expression: "R_wall_T00 = T00_wall_required - T00_wall_available",
+          display_latex:
+            "R_{wall,T00}=T00_{wall,required}-T00_{wall,available}",
+          subgoal: "Compute the diagnostic wall-region T00 source residual.",
+          domain: "generic",
+          equation: "R_wall_T00 = T00_wall_required - T00_wall_available",
+          variables: [
+            {
+              symbol: "T00_wall_required",
+              value: "1",
+              unit: "J/m^3",
+              meaning: "metric-required wall T00",
+              dimension_signature: "M L^-1 T^-2",
+            },
+            {
+              symbol: "T00_wall_available",
+              value: "0.5",
+              unit: "J/m^3",
+              meaning: "available wall-region source T00",
+              dimension_signature: "M L^-1 T^-2",
+            },
+          ],
+          unit_system: "SI",
+          result_unit: "J/m^3",
+          result_quantity: "wall_t00_source_residual",
+          result_dimension_signature: "M L^-1 T^-2",
+          assumptions: [
+            "Diagnostic scalar proxy only.",
+            "Global residuals cannot override a failed wall closure.",
+            "Does not validate NHM2.",
+          ],
+          unit_options: [],
+        },
+      },
+    ],
+    sourceRefs: [
+      repoRef("shared/contracts/nhm2-wall-source-closure.v1.ts", "Wall source-closure contract."),
+      repoRef("shared/contracts/nhm2-source-closure.v2.ts", "Source-closure v2 embeds the wall contract."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_closure", "wall_region", "T00", "residual"],
+      symbols: ["R_wall_T00", "T00_wall_required", "T00_wall_available"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [
+        "shared/contracts/nhm2-wall-source-closure.v1.ts",
+        "shared/contracts/nhm2-source-closure.v2.ts",
+      ],
+      equationFamilies: ["wall_t00_source_residual", "source_residual"],
+      simulationOwners: ["NHM2"],
+    },
+    claimBoundary: DIAGNOSTIC_BOUNDARY,
+  },
+  {
     id: "nhm2.energy_condition.diagnostic_gate",
     title: "Energy-condition diagnostic gate",
     plainMeaning: "Collects source and inequality indicators into a diagnostic gate label.",
@@ -738,6 +836,22 @@ const edges: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Residual comparison remains diagnostic.",
   },
   {
+    id: "energy_density_requires_wall_t00_source_residual",
+    from: "nhm2.source.energy_density_proxy",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "requires",
+    label: "Wall T00 source closure compares energy-density-like quantities.",
+    claimBoundaryNote: "Wall residual comparison remains diagnostic.",
+  },
+  {
+    id: "wall_t00_source_residual_specializes_source_residual",
+    from: "nhm2.closure.wall_t00_source_residual",
+    to: "nhm2.closure.source_residual",
+    relation: "diagnostic_checks",
+    label: "Wall T00 is the front-door regional source residual before global source closure.",
+    claimBoundaryNote: "Global residuals cannot override wall failure.",
+  },
+  {
     id: "source_residual_checks_energy_gate",
     from: "nhm2.closure.source_residual",
     to: "nhm2.energy_condition.diagnostic_gate",
@@ -768,6 +882,14 @@ const edges: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "Residual diagnostics cannot promote themselves into a physical claim.",
     claimBoundaryNote: "Promotion is intentionally disallowed in v1.",
+  },
+  {
+    id: "wall_t00_source_residual_blocks_promotion",
+    from: "nhm2.closure.wall_t00_source_residual",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "blocks",
+    label: "Wall residual diagnostics cannot promote themselves into source closure.",
+    claimBoundaryNote: "Wall failure is a blocker even when global residual context looks acceptable.",
   },
 ];
 

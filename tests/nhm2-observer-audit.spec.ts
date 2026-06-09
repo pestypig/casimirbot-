@@ -6,6 +6,7 @@ import {
   NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
   NHM2_OBSERVER_AUDIT_SCHEMA_VERSION,
 } from "../shared/contracts/nhm2-observer-audit.v1";
+import { buildNhm2SameChartFullTensorArtifact } from "../shared/contracts/nhm2-same-chart-full-tensor.v1";
 
 const positiveCondition = (value: number) => ({
   eulerianMin: value + 0.1,
@@ -28,6 +29,53 @@ const positiveCondition = (value: number) => ({
 });
 
 describe("nhm2 observer audit artifact", () => {
+  it("preserves same-chart full tensor evidence without zero-filling missing channels", () => {
+    const sameChartFullTensor = buildNhm2SameChartFullTensorArtifact({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      chartId: "comoving_cartesian",
+      metricFamily: "nhm2_shift_lapse",
+      routeId: "adm_quasi_stationary_recovery_v1",
+      tensor: {
+        T00: -1,
+        T11: 2,
+        T22: 3,
+        T33: 4,
+      },
+    });
+    const artifact = buildNhm2ObserverAuditArtifact({
+      familyId: "nhm2_shift_lapse",
+      sameChartFullTensor,
+      metricRequired: {
+        tensorRef: "warp.metricStressEnergy",
+        missingInputs: ["metric_t0i_missing", "metric_tij_off_diagonal_missing"],
+      },
+      tileEffective: {
+        tensorRef: "warp.tileEffectiveStressEnergy",
+      },
+    });
+
+    expect(artifact.sameChartFullTensor?.components).toHaveLength(10);
+    expect(artifact.sameChartFullTensor?.completeness.fullTensorComplete).toBe(false);
+    expect(artifact.sameChartFullTensor?.completeness.missingComponentIds).toEqual(
+      expect.arrayContaining(["T0x", "T0y", "T0z", "Txy", "Txz", "Tyz"]),
+    );
+    expect(
+      artifact.sameChartFullTensor?.components.find(
+        (entry) => entry.componentId === "T0x",
+      )?.valueSI,
+    ).toBeNull();
+    expect(
+      artifact.observerRobustEnergyConditions?.metricRequired.summary.eulerianOnly,
+    ).toBe(true);
+    expect(
+      artifact.observerRobustEnergyConditions?.metricRequired.summary.robustCheckComplete,
+    ).toBe(false);
+    expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
+    expect(isNhm2ObserverAuditArtifact(JSON.parse(JSON.stringify(artifact)))).toBe(
+      true,
+    );
+  });
+
   it("captures both tensor paths and labels surrogate limits explicitly", () => {
     const artifact = buildNhm2ObserverAuditArtifact({
       familyId: "nhm2_shift_lapse",
@@ -194,6 +242,19 @@ describe("nhm2 observer audit artifact", () => {
     expect(artifact.tensors.tileEffective.model.pressureModel).toBe(
       "isotropic_pressure_proxy",
     );
+    expect(
+      artifact.observerRobustEnergyConditions?.metricRequired.summary
+        .robustCheckComplete,
+    ).toBe(true);
+    expect(
+      artifact.observerRobustEnergyConditions?.tileEffective.summary
+        .robustCheckComplete,
+    ).toBe(false);
+    expect(
+      artifact.observerRobustEnergyConditions?.tileEffective.observerFamilies.find(
+        (family) => family.familyId === "algebraic_type_i",
+      )?.status,
+    ).toBe("proxy");
     expect(artifact.distinction.preserveNegativeAndMixedResults).toBe(true);
     expect(isNhm2ObserverAuditArtifact(artifact)).toBe(true);
   });

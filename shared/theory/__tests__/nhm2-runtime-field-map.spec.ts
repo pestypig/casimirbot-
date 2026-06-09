@@ -32,6 +32,7 @@ describe("NHM2 runtime field map", () => {
       "model_relation",
     );
     expect(isNhm2RuntimeBoundBadge("physics.gr.einstein_field_equation")).toBe(false);
+    expect(isNhm2RuntimeBoundBadge("nhm2.closure.wall_t00_source_residual")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.source.wall_t00_trace")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.tensor.full_authority_gate")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.sampling_window")).toBe(true);
@@ -40,15 +41,37 @@ describe("NHM2 runtime field map", () => {
   });
 
   it("maps wall T00 and full tensor authority badges to explicit blocker fields", () => {
+    const wallClosure = getNhm2RuntimeFieldBinding("nhm2.closure.wall_t00_source_residual");
     const wall = getNhm2RuntimeFieldBinding("nhm2.source.wall_t00_trace");
     const tensor = getNhm2RuntimeFieldBinding("nhm2.tensor.full_authority_gate");
 
+    expect(wallClosure?.artifactFields).toEqual(
+      expect.arrayContaining([
+        "nhm2WallSourceClosure.required.T00_SI",
+        "nhm2WallSourceClosure.available.T00_SI",
+        "nhm2WallSourceClosure.residual.pass",
+        "sourceClosure.wallSourceClosure.residual.pass",
+      ]),
+    );
+    expect(wallClosure?.scalarCuts.map((cut) => cut.expression)).toContain(
+      "R_wall_T00 = T00_wall_required - T00_wall_available",
+    );
+    expect(wallClosure?.gates).toEqual(
+      expect.arrayContaining(["source_closure", "wall_source_closure"]),
+    );
     expect(wall?.artifactFields).toEqual(
       expect.arrayContaining(["sourceClosureWallT00RelLInf", "wallT00RelLInf", "t00_mismatch_present"]),
     );
     expect(wall?.gates).toEqual(expect.arrayContaining(["source_closure", "wall_t00_trace"]));
     expect(tensor?.artifactFields).toEqual(
-      expect.arrayContaining(["observerMetricT0iAdmissionStatus", "observerMetricOffDiagonalTijAdmissionStatus"]),
+      expect.arrayContaining([
+        "observerMetricT0iAdmissionStatus",
+        "observerMetricOffDiagonalTijAdmissionStatus",
+        "sameChartFullTensor.components[].status",
+        "sameChartFullTensor.components[].provenance.source",
+        "sameChartFullTensor.completeness.fullTensorComplete",
+        "sameChartFullTensor.completeness.missingComponentIds",
+      ]),
     );
     expect(tensor?.requiredEvidence).toEqual(
       expect.arrayContaining(["metric_t0i_emission", "metric_off_diagonal_tij_emission"]),
@@ -63,6 +86,7 @@ describe("NHM2 runtime field map", () => {
       expect.arrayContaining([
         "physics.gr.stress_energy_conservation",
         "nhm2.source.energy_density_proxy",
+        "nhm2.closure.wall_t00_source_residual",
         "nhm2.closure.source_residual",
         "nhm2.energy_condition.diagnostic_gate",
       ]),

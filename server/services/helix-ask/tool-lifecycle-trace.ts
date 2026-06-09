@@ -7,6 +7,11 @@ import {
   type HelixToolLifecycleTrace,
   type HelixToolRetryRecommendation,
 } from "@shared/helix-tool-lifecycle";
+import {
+  inferToolFamilyFromToolName,
+  resolveToolFamilyContract,
+  type ToolFamilyContract,
+} from "./tool-family-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -45,6 +50,8 @@ const capabilityFromPlan = (plan: RecordLike | null): string | null => {
 
 const toolFamilyFromCapability = (capability: string | null): string => {
   if (!capability) return "none";
+  const registeredFamily = inferToolFamilyFromToolName(capability);
+  if (registeredFamily) return registeredFamily;
   const normalized = capability.toLowerCase();
   if (/workspace[_-]?os|workspace_diagnostic/.test(normalized)) return "workspace_diagnostic";
   if (/calculator|scientific-calculator/.test(normalized)) return "calculator";
@@ -240,14 +247,16 @@ const terminalEligible = (input: {
   result: RecordLike | null;
   operationalEvaluation: RecordLike | null;
   lifecycleLedger: RecordLike | null;
+  contract: ToolFamilyContract | null;
 }): boolean => {
   if (input.status === "running" || input.status === "failed" || input.status === "blocked") return false;
+  if (input.contract?.requiredReentry && input.stage !== "reentered_solver") return false;
   if (input.stage !== "reentered_solver" && input.result && !readBoolean(input.result.reentered_solver)) return false;
   if (readString(input.operationalEvaluation?.next_decision) && readString(input.operationalEvaluation?.next_decision) !== "allow_terminal") {
     return false;
   }
   if (input.lifecycleLedger && input.lifecycleLedger.ok !== true) return false;
-  return input.stage === "reentered_solver" || !input.result;
+  return input.stage === "reentered_solver" || (!input.result && input.contract?.requiredReentry !== true);
 };
 
 const retryRecommendation = (input: {
@@ -313,12 +322,17 @@ export const buildToolLifecycleTrace = (input: {
     executedCapability,
     failureReason,
   });
+  const familyContract = resolveToolFamilyContract({
+    toolName: executedCapability ?? admittedCapability ?? requestedCapability ?? readString(plan?.requested_action),
+    toolFamily: readString(plan?.capability_family) || readStringArray(admission?.admitted_tool_families)[0],
+  });
   const eligible = terminalEligible({
     stage: lifecycle.stage,
     status: lifecycle.status,
     result,
     operationalEvaluation,
     lifecycleLedger,
+    contract: familyContract,
   });
   const recommendation = retryRecommendation({
     stage: lifecycle.stage,

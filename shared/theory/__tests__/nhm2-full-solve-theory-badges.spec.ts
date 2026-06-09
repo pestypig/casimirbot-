@@ -101,6 +101,7 @@ describe("NHM2 full-solve theory badges", () => {
       expect.arrayContaining([
         "nhm2.observer.eulerian_normal",
         "nhm2.tensor.metric_required_stress_energy",
+        "nhm2.closure.wall_t00_source_residual",
         "nhm2.source.wall_t00_trace",
         "nhm2.tensor.full_authority_gate",
         "nhm2.closure.same_basis_regional_residual",
@@ -108,6 +109,12 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.natario.curvature_invariants",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
+    );
+    const wallClosure = graph.badges.find(
+      (badge: TheoryBadgeV1) => badge.id === "nhm2.closure.wall_t00_source_residual",
+    );
+    expect(wallClosure?.calculatorPayloads.map((payload) => payload.expression)).toContain(
+      "R_wall_T00 = T00_wall_required - T00_wall_available",
     );
   });
 

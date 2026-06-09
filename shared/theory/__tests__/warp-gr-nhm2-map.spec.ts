@@ -16,12 +16,14 @@ describe("Warp / GR / NHM2 map", () => {
       "proper_time_scalar_offset_payload",
       "rho_equals_E_over_V_payload",
       "average_power_from_cycle_energy_payload",
+      "wall_t00_source_residual_payload",
       "source_residual_difference_payload",
       "qei_margin_difference_payload",
     ]);
     expect(path?.theoryBadgeIds).toEqual(
       expect.arrayContaining([
         "nhm2.source.wall_t00_trace",
+        "nhm2.closure.wall_t00_source_residual",
         "nhm2.tensor.full_authority_gate",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",

@@ -50,7 +50,17 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "route_requires_synthesis"
   | "deterministic_receipt_fallback_nonterminal"
   | "route_contract_forbids_model_synthesized_answer"
-  | "coverage_valid_model_only_answer_exists";
+  | "coverage_valid_model_only_answer_exists"
+  | "stale_model_only_after_observation"
+  | "composer_claimed_no_observations_but_receipts_exist"
+  | "missing_required_live_source_mail_decision"
+  | "missing_required_voice_receipt_or_hold"
+  | "receipt_not_terminal_eligible"
+  | "terminal_forbidden_by_phase_lock"
+  | "solver_continuation_pending"
+  | "stale_solver_continuation_superseded_by_repo_terminal"
+  | "stale_solver_continuation_superseded_by_scholarly_terminal"
+  | "stale_solver_continuation_superseded_by_stage_play_terminal";
 
 export type HelixTerminalAuthoritySingleWriterResult = {
   schema: "helix.terminal_authority_single_writer_result.v1";

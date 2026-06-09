@@ -13,7 +13,7 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
-import { detectInternetSearchIntent } from "./internet-search-intent";
+import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -77,7 +77,8 @@ const classifySourceFamily = (input: {
   if (
     input.sourceTarget === "internet_search" ||
     input.admittedFamilies.includes("internet_search") ||
-    detectInternetSearchIntent(input.promptText).searchRequested
+    detectInternetSearchIntent(input.promptText).searchRequested ||
+    buildToolUseRestatement(input.promptText).requiredToolFamilies.includes("internet_search")
   ) {
     return "internet_search";
   }
@@ -280,10 +281,16 @@ export const buildCapabilityPlan = (input: {
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
   const instructionFrame = readRecord(input.instructionFrame);
   const contextualSuppression = detectContextualToolAdmissionSuppression(input.promptText);
+  const toolUseRestatement = buildToolUseRestatement(input.promptText);
   const repoConceptDetection = detectRepoConcept(input.promptText);
   const requiresRepoConceptEvidence = !contextualSuppression && repoConceptDetection.require_repo_evidence === true;
+  const requiresInternetEvidence =
+    !contextualSuppression &&
+    !requiresRepoConceptEvidence &&
+    toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const sourceTarget =
     (contextualSuppression ? "model_only" : "") ||
+    (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
@@ -300,11 +307,13 @@ export const buildCapabilityPlan = (input: {
   });
   const family: HelixCapabilityFamily = requiresRepoConceptEvidence
     ? "repo_evidence"
-    : contextualSuppression
-      ? "debug_export"
-      : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
-        ? "workstation_action"
-        : classifiedFamily;
+    : requiresInternetEvidence
+      ? "internet_search"
+      : contextualSuppression
+        ? "debug_export"
+        : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
+          ? "workstation_action"
+          : classifiedFamily;
   const rules = instructionRules(instructionFrame);
   const requestedAction = contextualSuppression
     ? "suppressed_contextual_tool_reference"
@@ -349,10 +358,14 @@ export const buildCapabilityPlan = (input: {
     source_target: sourceTarget,
     goal_kind: requiresRepoConceptEvidence
       ? "repo_concept_explanation"
-      : canonicalGoalKind || "unknown",
+      : requiresInternetEvidence
+        ? "internet_search_lookup"
+        : canonicalGoalKind || "unknown",
     required_terminal_kind: requiresRepoConceptEvidence
       ? "repo_code_evidence_answer"
-      : readString(canonicalGoalFrame?.required_terminal_kind) || null,
+      : requiresInternetEvidence
+        ? "internet_search_answer"
+        : readString(canonicalGoalFrame?.required_terminal_kind) || null,
     admission_status: admission.status,
     ...(contextualSuppression
       ? {

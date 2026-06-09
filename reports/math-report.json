@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-08T18:58:23.611Z",
-  "registryCount": 124,
+  "generatedAt": "2026-06-09T21:43:23.302Z",
+  "registryCount": 127,
   "coverage": {
     "exploratory": {
       "count": 19,
@@ -70,7 +70,7 @@
       ]
     },
     "diagnostic": {
-      "count": 60,
+      "count": 63,
       "modules": [
         "modules/gr/bssn-state.ts",
         "modules/gr/bssn-evolve.ts",
@@ -86,6 +86,9 @@
         "server/gr/gr-constraint-network.ts",
         "tools/warpViability.ts",
         "shared/contracts/nhm2-full-loop-audit.v1.ts",
+        "shared/contracts/nhm2-same-chart-full-tensor.v1.ts",
+        "shared/contracts/nhm2-wall-source-closure.v1.ts",
+        "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
         "server/services/observability/training-trace-store.ts",
         "server/routes/training-trace.ts",
         "server/services/observability/gr-agent-loop-store.ts",
@@ -210,7 +213,7 @@
     }
   },
   "unitCoverage": {
-    "entriesWithUnits": 124,
+    "entriesWithUnits": 127,
     "entriesMissingUnits": [],
     "byStage": {
       "exploratory": {
@@ -224,8 +227,8 @@
         "missing": []
       },
       "diagnostic": {
-        "total": 60,
-        "withUnits": 60,
+        "total": 63,
+        "withUnits": 63,
         "missing": []
       },
       "certified": {
@@ -246,8 +249,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1903,
-    "edgeCount": 4451
+    "nodeCount": 1924,
+    "edgeCount": 4507
   },
   "evidenceProfiles": [
     {

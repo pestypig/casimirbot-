@@ -1333,6 +1333,70 @@ export const mathStageRegistry: MathStageEntry[] = [
     },
   },
   {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-same-chart-full-tensor.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Typed NHM2 same-chart full tensor artifact for component coverage, ADM support statuses, provenance, and explicit missing/blocked tensor channels.",
+    checks: [
+      { type: "stability", path: "tests/nhm2-same-chart-full-tensor.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      alphaStatus: "1",
+      betaStatus: "1",
+      gammaStatus: "1",
+      extrinsicCurvatureStatus: "1",
+      T00: "M L^-1 T^-2",
+      T0i: "M L^-1 T^-2",
+      Tij: "M L^-1 T^-2",
+      fullTensorComplete: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-wall-source-closure.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Typed NHM2 wall-region source-closure artifact for metric-required wall T00, tile/material/proxy wall T00, wall residuals, blockers, and diagnostic-only claim boundary.",
+    checks: [
+      { type: "stability", path: "tests/nhm2-source-closure.spec.ts" },
+      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      T00_SI: "M L^-1 T^-2",
+      absolute: "M L^-1 T^-2",
+      relative: "1",
+      tolerance: "1",
+      pass: "1",
+    },
+  },
+  {
+    tag: "WARP_AUDIT",
+    module: "shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts",
+    stage: "diagnostic",
+    notes:
+      "Typed NHM2 observer-family energy-condition artifact for Eulerian, algebraic Type I, bounded-grid, null-grid, and continuous-optimizer status reporting without promoting friendly-frame checks to observer-robust claims.",
+    checks: [
+      {
+        type: "stability",
+        path: "tests/nhm2-observer-robust-energy-conditions.spec.ts",
+      },
+      { type: "stability", path: "tests/nhm2-observer-audit.spec.ts" },
+      { type: "stability", path: "tests/nhm2-full-loop-audit-contract.spec.ts" },
+      { type: "policy", path: "WARP_AGENTS.md" },
+    ],
+    units: {
+      eulerianOnly: "1",
+      robustCheckComplete: "1",
+      anyViolation: "1",
+      missedViolationRisk: "1",
+      worstCaseValue: "M L^-1 T^-2",
+      sampleCount: "1",
+    },
+  },
+  {
     tag: "WARP_POLICY",
     module: "modules/physics/warpAgents.ts",
     stage: "reduced-order",

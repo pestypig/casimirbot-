@@ -12,6 +12,11 @@ import {
   type Nhm2SourceClosureTensorInput,
   normalizeNhm2SourceClosureTensor,
 } from "./nhm2-source-closure.v1";
+import {
+  buildNhm2WallSourceClosureFromRegionComparison,
+  isNhm2WallSourceClosureArtifact,
+  type Nhm2WallSourceClosureArtifactV1,
+} from "./nhm2-wall-source-closure.v1";
 
 export const NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION = "nhm2_source_closure/v2";
 
@@ -384,6 +389,7 @@ export type Nhm2SourceClosureV2Artifact = {
     requiredRegionIds: string[];
     regions: Nhm2SourceClosureV2RegionComparison[];
   };
+  wallSourceClosure: Nhm2WallSourceClosureArtifactV1;
   leadBlocker: Nhm2SourceClosureV2LeadBlocker;
   scalarProjections: {
     cl3RhoDeltaRel: number | null;
@@ -400,6 +406,10 @@ export type Nhm2SourceClosureV2Artifact = {
 };
 
 export type BuildNhm2SourceClosureArtifactV2Input = {
+  generatedAt?: string | null;
+  laneId?: string | null;
+  selectedProfileId?: string | null;
+  chartId?: string | null;
   metricTensorRef?: string | null;
   tileEffectiveTensorRef?: string | null;
   metricRequiredTensor?: Nhm2SourceClosureTensorInput | null;
@@ -2051,6 +2061,11 @@ const buildRegionComparison = (args: {
 
 const normalizeRegionId = (value: string): string => value.trim().toLowerCase().replace(/-/g, "_");
 
+const findWallRegion = (
+  regions: Nhm2SourceClosureV2RegionComparison[],
+): Nhm2SourceClosureV2RegionComparison | null =>
+  regions.find((entry) => normalizeRegionId(entry.regionId) === "wall") ?? null;
+
 const leadBlockerNone = (): Nhm2SourceClosureV2LeadBlocker => ({
   regionId: null,
   kind: "none",
@@ -2290,6 +2305,14 @@ export const buildNhm2SourceClosureArtifactV2 = (
     residualComponents,
     scalarCl3RhoDeltaRel: toFiniteOrNull(input.scalarCl3RhoDeltaRel),
   });
+  const wallSourceClosure = buildNhm2WallSourceClosureFromRegionComparison({
+    generatedAt: input.generatedAt,
+    laneId: input.laneId,
+    selectedProfileId: input.selectedProfileId,
+    chartId: input.chartId,
+    regionComparison: findWallRegion(regions),
+    tolerance: toleranceRelLInf,
+  });
   const leadBlocker = buildNhm2SourceClosureLeadBlocker({
     regions,
     requiredRegionIds,
@@ -2317,6 +2340,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
       requiredRegionIds,
       regions,
     },
+    wallSourceClosure,
     leadBlocker,
     scalarProjections,
     distinction: {
@@ -2340,6 +2364,7 @@ export const isNhm2SourceClosureV2Artifact = (
   const regions = Array.isArray(regionComparisons?.regions)
     ? (regionComparisons?.regions as Array<Record<string, unknown>>)
     : null;
+  const wallSourceClosure = record.wallSourceClosure;
   return (
     record.artifactId === NHM2_SOURCE_CLOSURE_ARTIFACT_ID &&
     record.schemaVersion === NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION &&
@@ -2350,6 +2375,8 @@ export const isNhm2SourceClosureV2Artifact = (
     record.tensorRefs != null &&
     record.residualNorms != null &&
     Array.isArray(record.reasonCodes) &&
+    (wallSourceClosure === undefined ||
+      isNhm2WallSourceClosureArtifact(wallSourceClosure)) &&
     regionComparisons != null &&
     regions != null &&
     regions.every((entry) => {

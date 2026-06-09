@@ -22,7 +22,7 @@ import {
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
-import { detectInternetSearchIntent } from "./internet-search-intent";
+import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
 import { buildAskEvidenceTargetArbitration } from "./evidence-target-arbitration";
@@ -826,6 +826,7 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  const toolUseRestatement = buildToolUseRestatement(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
   if (internetSearchIntent.searchRequested) {
     return toSourceTargetIntent({
@@ -833,9 +834,20 @@ export function arbitrateAskSourceTarget(input: {
       threadId: input.threadId,
       target: "internet_search",
       targetKind: "internet_search",
-      strength: internetSearchIntent.strength,
-      explicitCues: internetSearchIntent.explicitCues,
-      reasons: internetSearchIntent.reasons,
+      strength: toolUseRestatement.currentAffairsRequired || toolUseRestatement.freshnessRequired
+        ? "hard"
+        : internetSearchIntent.strength,
+      explicitCues: [
+        ...internetSearchIntent.explicitCues,
+        ...(toolUseRestatement.freshnessRequired ? ["tool_use_restatement:freshness_required"] : []),
+        ...(toolUseRestatement.currentAffairsRequired ? ["tool_use_restatement:current_affairs_required"] : []),
+      ],
+      reasons: [
+        ...internetSearchIntent.reasons,
+        ...(toolUseRestatement.requiredToolFamilies.includes("internet_search")
+          ? ["tool_use_restatement_requires_internet_search"]
+          : []),
+      ],
       requestedOutputs: internetSearchIntent.requestedOutputs,
       suppressedRoutes: [
         "active_doc_identity",

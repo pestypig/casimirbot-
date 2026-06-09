@@ -8,12 +8,75 @@ import {
   isNhm2FullLoopAuditContract,
   type Nhm2FullLoopAuditSectionsInput,
 } from "../shared/contracts/nhm2-full-loop-audit.v1";
+import { buildNhm2WallSourceClosureArtifact } from "../shared/contracts/nhm2-wall-source-closure.v1";
+import { buildNhm2ObserverRobustEnergyConditionArtifact } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 
 const makeArtifactRef = (artifactId: string, path: string) => ({
   artifactId,
   path,
   contractVersion: null,
   status: null,
+});
+
+const makeWallSourceClosure = (args?: {
+  requiredT00?: number | null;
+  availableT00?: number | null;
+  tolerance?: number | null;
+}) =>
+  buildNhm2WallSourceClosureArtifact({
+    generatedAt: "2026-04-07T12:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    chartId: "adm_eulerian",
+    required: {
+      tensorRef: "artifact://metric-wall",
+      T00_SI: args?.requiredT00 ?? -100,
+      componentStatus: args?.requiredT00 === null ? "missing" : "computed",
+    },
+    available: {
+      sourceKind: "tile_effective",
+      tensorRef: "artifact://tile-wall",
+      T00_SI: args?.availableT00 ?? -100,
+      componentStatus: args?.availableT00 === null ? "missing" : "computed",
+    },
+    tolerance: args?.tolerance ?? 0.1,
+  });
+
+const makeObserverRobustEnergyConditionArtifact = (tensorRef: string) =>
+  buildNhm2ObserverRobustEnergyConditionArtifact({
+    generatedAt: "2026-04-07T12:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    tensorRef,
+    observerFamilies: [
+      {
+        familyId: "eulerian",
+        status: "pass",
+        sampleCount: 4,
+        worstCase: { condition: "WEC", value: 0.2, locationRef: "wall" },
+      },
+      {
+        familyId: "algebraic_type_i",
+        status: "pass",
+        sampleCount: 4,
+        worstCase: { condition: "SEC", value: 0.1, locationRef: "wall" },
+      },
+      {
+        familyId: "continuous_optimizer",
+        status: "not_run",
+        optimizerUsed: false,
+        blockers: ["continuous_optimizer_not_implemented"],
+      },
+    ],
+  });
+
+const makeObserverRobustEnergyConditions = () => ({
+  metricRequired: makeObserverRobustEnergyConditionArtifact(
+    "artifact://metric-tensor",
+  ),
+  tileEffective: makeObserverRobustEnergyConditionArtifact(
+    "artifact://tile-effective",
+  ),
 });
 
 const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
@@ -249,6 +312,94 @@ const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
   },
 });
 
+const makeReducedOrderReadySections = (): Nhm2FullLoopAuditSectionsInput => {
+  const sections = makeSections();
+  sections.claim_tier = {
+    ...sections.claim_tier,
+    state: "pass",
+    reasons: [],
+    viabilityStatus: "ADMISSIBLE",
+    promotionReason: null,
+  };
+  sections.lapse_provenance = {
+    ...sections.lapse_provenance,
+    state: "pass",
+    reasons: [],
+  };
+  sections.strict_signal_readiness = {
+    ...sections.strict_signal_readiness,
+    state: "pass",
+    reasons: [],
+    tsMetricDerived: true,
+    qiMetricDerived: true,
+    qiApplicabilityStatus: "PASS",
+    missingSignals: [],
+  };
+  sections.source_closure = {
+    ...sections.source_closure,
+    state: "pass",
+    reasons: [],
+    metricTensorRef: "artifact://metric-tensor",
+    tileEffectiveTensorRef: "artifact://tile-effective",
+    residualRms: 1e-6,
+    residualMax: 1e-5,
+    residualByRegion: { hull: 1e-6, wall: 1e-5, exteriorShell: 1e-6 },
+    toleranceRef: "source_closure_tolerance/v1",
+    assumptionsDrifted: false,
+    wallSourceClosure: makeWallSourceClosure(),
+  };
+  sections.observer_audit = {
+    ...sections.observer_audit,
+    state: "pass",
+    reasons: [],
+    metric: {
+      ...sections.observer_audit.metric,
+      state: "pass",
+    },
+    tile: {
+      state: "pass",
+      wecMinOverAllTimelike: 0,
+      necMinOverAllNull: 0,
+      decStatus: "PASS",
+      secStatus: "PASS",
+      observerWorstCaseLocation: "wall",
+      typeIFraction: 1,
+      missedViolationFraction: 0,
+      maxRobustMinusEulerian: 0,
+    },
+    observerRobustEnergyConditions: makeObserverRobustEnergyConditions(),
+  };
+  sections.gr_stability_safety = {
+    ...sections.gr_stability_safety,
+    state: "pass",
+    reasons: [],
+  };
+  sections.shift_vs_lapse_decomposition = {
+    ...sections.shift_vs_lapse_decomposition,
+    state: "pass",
+    reasons: [],
+    shiftDrivenContribution: 0.5,
+    lapseDrivenContribution: 0.5,
+    expansionLeakageBound: 0,
+    thetaFlatnessStatus: "PASS",
+    divBetaFlatnessStatus: "PASS",
+    natarioBaselineComparisonRef: "artifact://natario-baseline",
+  };
+  sections.uncertainty_perturbation_reproducibility = {
+    ...sections.uncertainty_perturbation_reproducibility,
+    state: "pass",
+    reasons: [],
+    precisionAgreementStatus: "within_tolerance",
+    meshConvergenceOrder: 2,
+    boundaryConditionSensitivity: 0.01,
+    smoothingKernelSensitivity: 0.01,
+    coldStartReproductionStatus: "reproduced",
+    independentReproductionStatus: "reproduced",
+    artifactHashConsistencyStatus: "ok",
+  };
+  return sections;
+};
+
 describe("nhm2 full-loop audit contract", () => {
   it("builds a serializable contract that represents incomplete NHM2 evidence honestly", () => {
     const contract = buildNhm2FullLoopAuditContract({
@@ -368,6 +519,118 @@ describe("nhm2 full-loop audit contract", () => {
     expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
   });
 
+  it("makes wall source closure failure override passing global source residuals", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.source_closure = {
+      ...sections.source_closure,
+      wallSourceClosure: makeWallSourceClosure({
+        requiredT00: -100,
+        availableT00: -20,
+        tolerance: 0.1,
+      }),
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-04-07T12:15:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.source_closure.state).toBe("fail");
+    expect(contract?.sections.source_closure.reasons).toContain(
+      "wall_source_closure_residual_exceeded",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("fail");
+    expect(contract?.sections.source_closure.wallSourceClosure?.residual.pass).toBe(false);
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
+  it("keeps full-loop readiness in review when wall closure is missing", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.source_closure = {
+      ...sections.source_closure,
+      wallSourceClosure: null,
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-04-07T12:20:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.source_closure.state).toBe("review");
+    expect(contract?.sections.source_closure.reasons).toContain(
+      "wall_source_closure_missing",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("review");
+    expect(contract?.highestPassingClaimTier).toBe("diagnostic");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
+  it("keeps full-loop readiness in review when observer-robust checks are missing", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.observer_audit = {
+      ...sections.observer_audit,
+      observerRobustEnergyConditions: null,
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.observer_audit.state).toBe("review");
+    expect(contract?.sections.observer_audit.reasons).toContain(
+      "observer_robust_energy_condition_missing",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("review");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
+  it("fails full-loop observer readiness when any observer family violates an energy condition", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.observer_audit = {
+      ...sections.observer_audit,
+      observerRobustEnergyConditions: {
+        metricRequired: makeObserverRobustEnergyConditionArtifact(
+          "artifact://metric-tensor",
+        ),
+        tileEffective: buildNhm2ObserverRobustEnergyConditionArtifact({
+          generatedAt: "2026-06-09T00:00:00.000Z",
+          laneId: "nhm2_shift_lapse",
+          selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+          tensorRef: "artifact://tile-effective",
+          observerFamilies: [
+            {
+              familyId: "algebraic_type_i",
+              status: "fail",
+              sampleCount: 4,
+              worstCase: {
+                condition: "NEC",
+                value: -0.1,
+                locationRef: "wall",
+              },
+            },
+          ],
+        }),
+      },
+    };
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.observer_audit.state).toBe("fail");
+    expect(contract?.sections.observer_audit.reasons).toContain(
+      "observer_robust_energy_condition_violation",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("fail");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
   it("clamps highest passing tier to the declared maximum claim tier", () => {
     const sections = makeSections();
     sections.claim_tier = {
@@ -403,6 +666,11 @@ describe("nhm2 full-loop audit contract", () => {
       residualByRegion: { hull: 1e-6, wall: 1e-5, exteriorShell: 1e-6 },
       toleranceRef: "source_closure_tolerance/v1",
       assumptionsDrifted: false,
+      wallSourceClosure: makeWallSourceClosure({
+        requiredT00: -100,
+        availableT00: -100.000001,
+        tolerance: 0.1,
+      }),
     };
     sections.observer_audit = {
       ...sections.observer_audit,
@@ -423,6 +691,7 @@ describe("nhm2 full-loop audit contract", () => {
         missedViolationFraction: 0,
         maxRobustMinusEulerian: 0,
       },
+      observerRobustEnergyConditions: makeObserverRobustEnergyConditions(),
     };
     sections.gr_stability_safety = {
       ...sections.gr_stability_safety,

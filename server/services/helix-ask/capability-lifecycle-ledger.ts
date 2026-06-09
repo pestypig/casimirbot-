@@ -9,6 +9,7 @@ import {
   type HelixCapabilityLifecycleStageStatus,
 } from "@shared/helix-capability-lifecycle-ledger";
 import { capabilityPlanId } from "./capability-result-gate";
+import { evaluateToolFamilyTerminalPolicy, isReceiptTerminalKind } from "./tool-family-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -25,7 +26,7 @@ const readStringArray = (value: unknown): string[] =>
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
 
-const isReceiptKind = (kind: string): boolean => /receipt|tool_evaluation|workstation_tool_evaluation/i.test(kind);
+const isReceiptKind = (kind: string): boolean => isReceiptTerminalKind(kind);
 
 const artifacts = (payload: RecordLike): RecordLike[] =>
   Array.isArray(payload.current_turn_artifact_ledger)
@@ -96,6 +97,15 @@ const hasSatisfiedWorkstationToolEvaluation = (payload: RecordLike, terminalArti
   });
 };
 
+const goalSatisfied = (payload: RecordLike): boolean | undefined => {
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (!goalSatisfaction) return undefined;
+  return (
+    readString(goalSatisfaction?.satisfaction) === "satisfied" ||
+    readString(goalSatisfaction?.next_decision) === "allow_terminal"
+  );
+};
+
 const stage = (
   stageName: HelixCapabilityLifecycleStageName,
   status: HelixCapabilityLifecycleStageStatus,
@@ -123,15 +133,20 @@ const terminalReceiptAllowed = (input: {
 }): boolean => {
   const terminalKind = readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind);
   if (!isReceiptKind(terminalKind)) return true;
-  if (
-    input.plan?.source_target === "calculator_stream" &&
-    ["workspace_action_receipt", "calculator_receipt", "tool_evaluation", "workstation_tool_evaluation"].includes(terminalKind)
-  ) {
-    return true;
-  }
   const goal = readRecord(input.payload.canonical_goal_frame);
-  const required = readString(input.plan?.required_terminal_kind) || readString(goal?.required_terminal_kind);
-  return Boolean(required && required === terminalKind);
+  const policy = evaluateToolFamilyTerminalPolicy({
+    toolName: input.plan?.requested_action,
+    toolFamily: input.plan?.capability_family,
+    terminalArtifactKind: terminalKind,
+    routeProductContract: readRecord(input.payload.route_product_contract),
+    canonicalGoalFrame: goal,
+    admitted: Boolean(input.plan && (input.plan.admission_status === "admitted" || input.plan.admission_status === "needs_evidence")),
+    goalSatisfied: goalSatisfied(input.payload),
+    operatorCommandPresent: input.plan?.operator_command_present,
+    mutating: input.plan?.mutating,
+  });
+  input.payload.tool_family_terminal_policy = policy;
+  return policy.allowed;
 };
 
 const resultRefs = (result: HelixCapabilityResult | null): string[] =>

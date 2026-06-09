@@ -48,6 +48,11 @@ const textHash = (value: string): string => {
 const isStaleWorkspaceFailureText = (value: unknown): boolean =>
   /(?:workspace_step_failed|Failed to execute)/i.test(readString(value) ?? "");
 
+const isStaleModelOnlyNoObservationText = (value: unknown): boolean =>
+  /\b(?:no\s+(?:accepted\s+)?observations?|no\s+(?:live[-\s]?source\s+)?context|no\s+context\s+(?:is\s+)?available|unable\s+to\s+provide\s+(?:the\s+)?context|unable\s+to\s+provide\s+(?:an\s+)?answer\s+from\s+(?:observations|context)|could\s+not\s+provide\s+(?:the\s+)?context|can't\s+provide\s+(?:the\s+)?context|cannot\s+provide\s+(?:the\s+)?context|without\s+(?:any\s+)?observations?|no\s+receipts?\s+(?:exist|available|were\s+found))\b/i.test(
+    readString(value) ?? "",
+  );
+
 const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
   /^(?:Stage Play reflected\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b|Stage Play checkpoint request (?:queued|running|completed):)/i.test(
     readString(value) ?? "",
@@ -110,6 +115,49 @@ const isPostToolObservation = (artifact: ArtifactLike): boolean => {
     payload?.post_tool_model_step_required === true ||
     payload?.terminal_eligible === false ||
     readString(payload?.status) === "succeeded"
+  );
+};
+
+const nestedObservationPayloads = (artifact: ArtifactLike): Array<Record<string, unknown>> => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  return [payload, observation, result].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
+const artifactMatchesObservationKind = (artifact: ArtifactLike, pattern: RegExp): boolean => {
+  const values = [
+    artifactKind(artifact),
+    artifactSchema(artifact),
+    artifactId(artifact),
+    ...nestedObservationPayloads(artifact).flatMap((payload) => [
+      readString(payload.schema),
+      readString(payload.schemaVersion),
+      readString(payload.artifactId),
+      readString(payload.kind),
+      readString(payload.tool_name),
+      readString(payload.toolName),
+      readString(payload.receipt_id),
+      readString(payload.receiptId),
+    ]),
+  ].filter((entry): entry is string => Boolean(entry));
+  return values.some((value) => pattern.test(value));
+};
+
+const isAcceptedObservationPacket = (artifact: ArtifactLike): boolean => {
+  const sourceScope = readString((artifact as Record<string, unknown>).source_scope);
+  if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") {
+    return false;
+  }
+  if (isPostToolObservation(artifact)) return true;
+  const kind = artifactKind(artifact);
+  const payload = artifactPayload(artifact);
+  const ok = payload?.ok;
+  if (kind === "live_environment_tool_observation" && ok !== false) return true;
+  return (
+    artifactMatchesObservationKind(artifact, /stage_play_processed_mail_packet/i) ||
+    artifactMatchesObservationKind(artifact, /stage_play_live_source_mail_decision/i) ||
+    artifactMatchesObservationKind(artifact, /helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_receipt/i)
   );
 };
 
@@ -408,7 +456,7 @@ const findSelectedDraftAfterRequiredObservation = (
   artifacts: ArtifactLike[],
 ): { artifact: ArtifactLike; sequence: number; latestObservationSequence: number } | null => {
   const latestObservationSequence = artifacts.reduce((latest, artifact, index) =>
-    isPostToolObservation(artifact) ? index : latest, -1);
+    isAcceptedObservationPacket(artifact) ? index : latest, -1);
   if (latestObservationSequence < 0) return null;
 
   for (let index = artifacts.length - 1; index > latestObservationSequence; index -= 1) {
@@ -426,7 +474,7 @@ const findDeterministicReceiptFallbackDraftAfterRequiredObservation = (
   artifacts: ArtifactLike[],
 ): { artifact: ArtifactLike; sequence: number; latestObservationSequence: number } | null => {
   const latestObservationSequence = artifacts.reduce((latest, artifact, index) =>
-    isPostToolObservation(artifact) ? index : latest, -1);
+    isAcceptedObservationPacket(artifact) ? index : latest, -1);
   if (latestObservationSequence < 0) return null;
 
   for (let index = artifacts.length - 1; index > latestObservationSequence; index -= 1) {
@@ -495,6 +543,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
     artifactLedger: artifacts,
     routeProductContract: readRecord(input.payload.route_product_contract),
   });
+  const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
+  const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;
+  const latestDraftCandidateForStaleCheck = findLatestFinalAnswerDraftCandidate(artifacts);
+  const materializedDraftRejectedForStaleObservation =
+    draftMaterialization?.ok === true &&
+    hasAcceptedObservation &&
+    isStaleModelOnlyNoObservationText(latestDraftCandidateForStaleCheck?.text);
+  const usableDraftMaterialization =
+    draftMaterialization?.ok === true && !materializedDraftRejectedForStaleObservation;
   if (draftMaterialization) {
     input.payload.final_answer_draft_selection = {
       candidate_count: artifacts.filter(isFinalAnswerDraft).length,
@@ -504,12 +561,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
       latest_final_answer_draft_quality_violations: draftMaterialization.final_answer_draft_quality_gate.violations,
       materialized_terminal_artifact_kind: draftMaterialization.materialized_terminal_artifact_kind ?? null,
       materialized_terminal_artifact_ref: draftMaterialization.materialized_terminal_artifact_ref ?? null,
-      selected_over_direct_answer_text: draftMaterialization.ok && latestDirectAnswerSequence(artifacts) >= 0,
+      selected_over_direct_answer_text: usableDraftMaterialization && latestDirectAnswerSequence(artifacts) >= 0,
       rejected_direct_answer_text_reason:
-        draftMaterialization.ok && latestDirectAnswerSequence(artifacts) >= 0
+        usableDraftMaterialization && latestDirectAnswerSequence(artifacts) >= 0
           ? "later_valid_final_answer_draft"
           : null,
-      blocked_reason: draftMaterialization.blocked_reason ?? null,
+      blocked_reason: materializedDraftRejectedForStaleObservation
+        ? "composer_claimed_no_observations_but_receipts_exist"
+        : draftMaterialization.blocked_reason ?? null,
     };
     input.payload.route_terminal_materialization = {
       route_family: draftMaterialization.final_answer_draft_quality_gate.route_family,
@@ -517,23 +576,34 @@ export function applyHelixTerminalAuthoritySingleWriter(
       required_terminal_kind: readString(readRecord(input.payload.canonical_goal_frame)?.required_terminal_kind),
       allowed_terminal_artifact_kinds: draftMaterialization.route_allowed_terminal_artifact_kinds,
       materialization_attempted: true,
-      materialization_ok: draftMaterialization.ok,
+      materialization_ok: usableDraftMaterialization,
       materialization_blocked_reason: draftMaterialization.blocked_reason ?? null,
+      stale_model_only_blocked_reason: materializedDraftRejectedForStaleObservation
+        ? "composer_claimed_no_observations_but_receipts_exist"
+        : null,
     };
+  }
+  if (materializedDraftRejectedForStaleObservation) {
+    rejectedCandidates.push({
+      ref: latestDraftCandidateForStaleCheck?.ref ?? undefined,
+      kind: draftMaterialization?.materialized_terminal_artifact_kind ?? "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "composer_claimed_no_observations_but_receipts_exist",
+    });
   }
   const goalEvaluation = readRecord(input.payload.goal_satisfaction_evaluation);
   const goalAllowsTerminal =
     readString(goalEvaluation?.satisfaction) === "satisfied" ||
     readString(goalEvaluation?.next_decision) === "allow_terminal";
   const repoTerminalMaterialized =
-    draftMaterialization?.ok === true &&
+    usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
   const scholarlyTerminalMaterialized =
-    draftMaterialization?.ok === true &&
+    usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "scholarly_research_answer";
   const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
   const stagePlayTerminalMaterialized =
-    draftMaterialization?.ok === true &&
+    usableDraftMaterialization &&
     isStagePlayPostObservationSynthesisText(latestDraftForContinuation?.text);
   const solverContinuationPending =
     rawSolverContinuationPending &&
@@ -572,13 +642,24 @@ export function applyHelixTerminalAuthoritySingleWriter(
       reason: "stale_solver_continuation_superseded_by_stage_play_terminal",
     });
   }
-  const selectedDraft = findSelectedDraftAfterRequiredObservation(artifacts);
+  const selectedDraftCandidate = findSelectedDraftAfterRequiredObservation(artifacts);
+  const selectedDraftRejectedForStaleObservation =
+    Boolean(selectedDraftCandidate && hasAcceptedObservation && isStaleModelOnlyNoObservationText(artifactText(selectedDraftCandidate.artifact)));
+  if (selectedDraftCandidate && selectedDraftRejectedForStaleObservation && !materializedDraftRejectedForStaleObservation) {
+    rejectedCandidates.push({
+      ref: artifactId(selectedDraftCandidate.artifact) ?? undefined,
+      kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "composer_claimed_no_observations_but_receipts_exist",
+    });
+  }
+  const selectedDraft = selectedDraftRejectedForStaleObservation ? null : selectedDraftCandidate;
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
   const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
-    artifacts.reduce((latest, artifact, index) => isPostToolObservation(artifact) ? index : latest, -1);
+    artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);
   const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
   const deterministicReceiptFallbackCanSurface =
     Boolean(deterministicReceiptFallbackDraft) &&
@@ -628,6 +709,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
         text: value ?? "",
         reason: `stale_${field}`,
       }));
+    }
+    if (hasAcceptedObservation && isStaleModelOnlyNoObservationText(value)) {
+      rejectedCandidates.push({
+        kind: readString(input.payload.terminal_artifact_kind) ?? "direct_answer_text",
+        source: readString(input.payload.final_answer_source) ?? "legacy_fallback",
+        reason: "stale_model_only_after_observation",
+      });
     }
   }
   for (const candidate of legacyCandidates) {
@@ -685,7 +773,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       raw_content_included: false,
     };
     delete input.payload.terminal_error_code;
-  } else if (!solverContinuationPending && draftMaterialization?.ok) {
+  } else if (!solverContinuationPending && usableDraftMaterialization) {
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
     selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;
     selectedArtifactKind = draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer";
@@ -887,7 +975,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       stale_failure_visible: isStaleWorkspaceFailureText(visibleText),
       receipt_visible_as_answer: receiptVisibleAsAnswer,
       post_tool_model_step_satisfied: latestRequiredObservationSequence < 0 || Boolean(
-        draftMaterialization?.ok ||
+        usableDraftMaterialization ||
         selectedGoalArtifact ||
         (selectedDraft && routeAllowsModelSynthesizedAnswer)
       ),
@@ -896,7 +984,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         entry.reason === "receipt_or_projection" || entry.reason === "route_contract_forbidden"
       ).length,
       payload_mirror_written_after_terminal_selection: true,
-      selected_over_direct_answer_text: draftMaterialization?.ok === true && latestDirectAnswerSequence(artifacts) >= 0,
+      selected_over_direct_answer_text: usableDraftMaterialization && latestDirectAnswerSequence(artifacts) >= 0,
       final_answer_draft_quality_ok: draftMaterialization?.final_answer_draft_quality_gate.ok,
       final_answer_draft_quality_violations: draftMaterialization?.final_answer_draft_quality_gate.violations,
       materialized_terminal_artifact_kind: draftMaterialization?.materialized_terminal_artifact_kind ?? null,

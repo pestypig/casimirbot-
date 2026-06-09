@@ -1237,6 +1237,12 @@ const buildNhm2FullLoopPolicyLayer = (args: {
             missedViolationFraction: null,
             maxRobustMinusEulerian: null,
           },
+      observerRobustEnergyConditions: observerAudit?.observerRobustEnergyConditions
+        ? {
+            metricRequired: observerAudit.observerRobustEnergyConditions.metricRequired,
+            tileEffective: observerAudit.observerRobustEnergyConditions.tileEffective,
+          }
+        : null,
     },
     gr_stability_safety: {
       sectionId: "gr_stability_safety",

@@ -79,6 +79,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
     ownedBadgeIds: [
       "physics.units.dimension_consistency",
       "physics.fields.stress_energy_tensor",
+      "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",
       "nhm2.energy_condition.diagnostic_gate",
       "nhm2.claim_boundary.diagnostic_only",
@@ -224,6 +225,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
       "nhm2.geometry.lapse_shift_profile",
       "nhm2.source.energy_density_proxy",
       "nhm2.tile.duty_cycle_average",
+      "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",
       "nhm2.source.wall_t00_trace",
       "nhm2.tensor.full_authority_gate",
@@ -273,6 +275,7 @@ export const THEORY_RUNTIME_ENTRYPOINTS: TheoryRuntimeEntrypointV1[] = [
     ownedBadgeIds: [
       "nhm2.geometry.lapse_shift_profile",
       "nhm2.source.energy_density_proxy",
+      "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",
       "nhm2.source.wall_t00_trace",
       "nhm2.tensor.full_authority_gate",

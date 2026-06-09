@@ -67,6 +67,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     description: "Compares required and available sampled source density.",
     theoryBadgeIds: [
       "nhm2.source.energy_density_proxy",
+      "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",
       "nhm2.source.wall_t00_trace",
       "nhm2.energy_condition.diagnostic_gate",
@@ -74,6 +75,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     ],
     calculatorPayloadRefs: [
       { badgeId: "nhm2.source.energy_density_proxy", payloadId: "rho_equals_E_over_V_payload" },
+      { badgeId: "nhm2.closure.wall_t00_source_residual", payloadId: "wall_t00_source_residual_payload" },
       { badgeId: "nhm2.closure.source_residual", payloadId: "source_residual_difference_payload" },
     ],
     claimBoundaryBadgeIds: NHM2_BOUNDARY_BADGES,
@@ -87,6 +89,8 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
           label: "QEI/stress sample source residual",
           E: 1,
           V: 1,
+          T00_wall_required: 1,
+          T00_wall_available: 0.8,
           source_required: 1,
           source_available: 0.8,
         },
@@ -129,6 +133,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
     band: "gate",
     description: "Shows source residual and QEI margin feeding a diagnostic gate context.",
     theoryBadgeIds: [
+      "nhm2.closure.wall_t00_source_residual",
       "nhm2.closure.source_residual",
       "nhm2.source.wall_t00_trace",
       "nhm2.qei.sampling_window",
@@ -137,6 +142,7 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
       ...NHM2_BOUNDARY_BADGES,
     ],
     calculatorPayloadRefs: [
+      { badgeId: "nhm2.closure.wall_t00_source_residual", payloadId: "wall_t00_source_residual_payload" },
       { badgeId: "nhm2.closure.source_residual", payloadId: "source_residual_difference_payload" },
       { badgeId: "nhm2.qei.sampling_window", payloadId: "qei_margin_difference_payload" },
     ],
@@ -149,6 +155,8 @@ export const QEI_STRESS_ENERGY_GROUPS: QeiStressEnergyGroup[] = [
         input: {
           objectId: "qei-stress:sample-gate-margins",
           label: "QEI/stress sample gate margins",
+          T00_wall_required: 1,
+          T00_wall_available: 0.8,
           source_required: 1,
           source_available: 0.8,
           qei_bound: 1,

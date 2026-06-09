@@ -933,6 +933,10 @@ describe("warp viability congruence wiring", () => {
       "source_closure_version_lag",
     );
     expect(layer?.artifact.sections.observer_audit.state).toBe("pass");
+    expect(
+      layer?.artifact.sections.observer_audit.observerRobustEnergyConditions
+        ?.metricRequired?.summary.robustCheckComplete,
+    ).toBe(true);
     expect(layer?.artifact.sections.shift_vs_lapse_decomposition.reasons).toContain(
       "shift_lapse_decomposition_missing",
     );

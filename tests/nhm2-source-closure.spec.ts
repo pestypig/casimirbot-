@@ -11,6 +11,10 @@ import {
   isNhm2SourceClosureV2Artifact,
   NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION,
 } from "../shared/contracts/nhm2-source-closure.v2";
+import {
+  buildNhm2WallSourceClosureArtifact,
+  isNhm2WallSourceClosureArtifact,
+} from "../shared/contracts/nhm2-wall-source-closure.v1";
 
 describe("nhm2 source closure artifact", () => {
   it("represents matched tensors honestly", () => {
@@ -315,6 +319,13 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.completeness).toBe("complete");
     expect(artifact.reasonCodes).toContain("tensor_residual_exceeded");
     expect(artifact.assumptionsDrifted).toBe(false);
+    expect(isNhm2WallSourceClosureArtifact(artifact.wallSourceClosure)).toBe(true);
+    expect(artifact.wallSourceClosure.residual.pass).toBe(false);
+    expect(artifact.wallSourceClosure.required.T00_SI).toBe(-100);
+    expect(artifact.wallSourceClosure.available.T00_SI).toBe(-10);
+    expect(artifact.wallSourceClosure.blockers).toContain(
+      "wall_T00_source_residual_exceeds_tolerance",
+    );
     expect(artifact.regionComparisons.regions[0]?.status).toBe("fail");
     expect((artifact.regionComparisons.regions[0]?.residualNorms.relLInf ?? 0) > 0.1).toBe(
       true,
@@ -440,6 +451,57 @@ describe("nhm2 source closure artifact v2", () => {
     expect(hullPressureFloor).toBeGreaterThan(
       hull!.residualComponents.T11.absResidual ?? 0,
     );
+  });
+
+  it("emits a missing wall artifact instead of letting global closure stand alone", () => {
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [],
+      toleranceRelLInf: 0.1,
+      scalarCl3RhoDeltaRel: 0,
+    });
+
+    expect(artifact.status).toBe("unavailable");
+    expect(isNhm2WallSourceClosureArtifact(artifact.wallSourceClosure)).toBe(true);
+    expect(artifact.wallSourceClosure.residual.pass).toBeNull();
+    expect(artifact.wallSourceClosure.blockers).toEqual(
+      expect.arrayContaining([
+        "wall_region_comparison_missing",
+        "wall_required_T00_missing",
+        "wall_available_T00_missing",
+      ]),
+    );
+  });
+
+  it("builds the standalone wall source-closure contract with explicit provenance and boundary", () => {
+    const artifact = buildNhm2WallSourceClosureArtifact({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+      chartId: "adm_eulerian",
+      required: {
+        tensorRef: "artifact://metric-wall",
+        T00_SI: -100,
+        componentStatus: "computed",
+      },
+      available: {
+        sourceKind: "material_receipted",
+        tensorRef: "artifact://tile-wall",
+        T00_SI: -90,
+        componentStatus: "computed",
+      },
+      tolerance: 0.05,
+    });
+
+    expect(isNhm2WallSourceClosureArtifact(artifact)).toBe(true);
+    expect(artifact.residual.absolute).toBe(10);
+    expect(artifact.residual.relative).toBe(0.1);
+    expect(artifact.residual.pass).toBe(false);
+    expect(artifact.claimBoundary.globalResidualCannotOverrideWallFailure).toBe(true);
   });
 
   it("maps pressure proxy dominance to pressure-proxy follow-up guidance", () => {

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
   HELIX_LIVE_ENVIRONMENT_AGENT_LOOP_SCHEMA,
   type HelixLiveAgentStepDecision,
   type HelixLiveEnvironmentAgentLoopResult,
@@ -7,6 +8,7 @@ import {
   type HelixLiveEnvironmentToolName,
   type HelixLiveEnvironmentToolObservation,
 } from "@shared/helix-live-agent-step";
+import type { LiveSourceTurnPhaseResolutionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { HelixVoiceSteeringEventV1 } from "@shared/contracts/helix-voice-steering-event.v1";
 import type { AskTurnTranscriptRowDraftV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { buildLiveEnvironmentRuntimePacket } from "../situation-room/live-environment-runtime-packet-builder";
@@ -21,6 +23,12 @@ export type LiveEnvironmentStepChooser = (input: {
   history: HelixLiveEnvironmentAgentLoopResult["iterations"];
   stepIndex: number;
 }) => Promise<HelixLiveAgentStepDecision> | HelixLiveAgentStepDecision;
+
+export type LiveEnvironmentPhaseResolver = (input: {
+  packet: HelixLiveEnvironmentRuntimePacket;
+  history: HelixLiveEnvironmentAgentLoopResult["iterations"];
+  stepIndex: number;
+}) => LiveSourceTurnPhaseResolutionV1 | null | undefined;
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -41,6 +49,49 @@ const terminalDecisionFor = (decision: HelixLiveAgentStepDecision): HelixLiveEnv
   if (decision.next_step === "fail_closed") return "fail_closed";
   return null;
 };
+
+const forcedToolForLockedPhase = (
+  phase: LiveSourceTurnPhaseResolutionV1 | null | undefined,
+): HelixLiveEnvironmentToolName | null => {
+  if (phase?.phaseLock.locked !== true || phase.allowedTools.length !== 1) return null;
+  return phase.allowedTools[0] as HelixLiveEnvironmentToolName;
+};
+
+const forceDecisionForPhase = (input: {
+  phase: LiveSourceTurnPhaseResolutionV1;
+  toolName: HelixLiveEnvironmentToolName;
+  threadId: string;
+  environmentId?: string | null;
+  stepIndex: number;
+}): HelixLiveAgentStepDecision => ({
+  schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+  decision_id: `live_step:phase_force:${hashShort([
+    input.threadId,
+    input.environmentId ?? null,
+    input.stepIndex,
+    input.phase.phase,
+    input.toolName,
+  ])}`,
+  thread_id: input.threadId,
+  environment_id: input.environmentId ?? null,
+  step_index: input.stepIndex,
+  decision_authority: "deterministic_policy_fallback",
+  decision_timing: "pre_observation",
+  next_step: "call_tool",
+  selected_tool: input.toolName,
+  tool_args: {},
+  rationale_summary:
+    input.phase.phaseLock.reason ??
+    input.phase.reason ??
+    `Live-source phase ${input.phase.phase} is locked to ${input.toolName}.`,
+  expected_evidence_kind: input.phase.completionEvidence.join(", ") || null,
+  evidence_refs: uniqueStrings([
+    "live_source_turn_phase_resolution",
+    ...input.phase.evidenceRefs,
+  ]),
+  assistant_answer: false,
+  raw_content_included: false,
+});
 
 const commentaryRefsFromObservation = (observation: HelixLiveEnvironmentToolObservation | null): string[] => {
   if (!observation) return [];
@@ -81,6 +132,8 @@ export async function runLiveEnvironmentAgentLoop(input: {
   chooser: LiveEnvironmentStepChooser;
   maxIterations?: number;
   now?: string;
+  phaseResolution?: LiveSourceTurnPhaseResolutionV1 | null;
+  phaseResolver?: LiveEnvironmentPhaseResolver;
 }): Promise<HelixLiveEnvironmentAgentLoopResult> {
   const now = input.now ?? new Date().toISOString();
   const iterations: HelixLiveEnvironmentAgentLoopResult["iterations"] = [];
@@ -117,11 +170,24 @@ export async function runLiveEnvironmentAgentLoop(input: {
       pending_voice_steering_refs: pendingSteering.map((event) => event.steeringEventId),
       voice_steering_summary: summarizeVoiceSteeringForModel(pendingSteering),
     };
-    const decision = await input.chooser({
+    const modelDecision = await input.chooser({
       packet,
       history: iterations,
       stepIndex,
     });
+    const phase = input.phaseResolver
+      ? input.phaseResolver({ packet, history: iterations, stepIndex })
+      : input.phaseResolution;
+    const forcedPhaseTool = forcedToolForLockedPhase(phase);
+    const decision = forcedPhaseTool && phase
+      ? forceDecisionForPhase({
+          phase,
+          toolName: forcedPhaseTool,
+          threadId: input.threadId,
+          environmentId: input.environmentId ?? packet.environment_id ?? null,
+          stepIndex,
+        })
+      : modelDecision;
     const terminal = terminalDecisionFor(decision);
     if (terminal) {
       terminalDecision = terminal;

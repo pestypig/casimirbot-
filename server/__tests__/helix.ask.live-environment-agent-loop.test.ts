@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA } from "@shared/helix-live-agent-step";
+import type { LiveSourceTurnPhaseResolutionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { runLiveEnvironmentAgentLoop } from "../services/helix-ask/live-environment-agent-loop";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
@@ -595,6 +596,71 @@ describe("Helix Ask live environment agent loop", () => {
       ask_context_policy: "evidence_only",
     });
     expect(loop.evidence_refs).toEqual(expect.arrayContaining(["navigation_state:1"]));
+  });
+
+  it("forces locked live-source phase tools before terminal answers", async () => {
+    const environment = seedEnvironment();
+    const phase: LiveSourceTurnPhaseResolutionV1 = {
+      artifactId: "live_source_turn_phase_resolution",
+      schemaVersion: "live_source_turn_phase_resolution/v1",
+      phase: "record_decision",
+      reason: "Processed packet recommends a voice callout.",
+      canonicalGoal: "processed_mail_voice_decision",
+      allowedTools: ["live_env.record_live_source_mail_decision"],
+      fallbackTools: [],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.request_interim_voice_callout",
+        "final_answer",
+      ],
+      requiredEvidence: ["stage_play_processed_mail_packet"],
+      completionEvidence: ["stage_play_live_source_mail_decision"],
+      nextPhase: "request_voice_after_decision",
+      phaseLock: {
+        locked: true,
+        reason: "Decision authority must be recorded before voice output.",
+      },
+      evidenceRefs: ["stage_play_processed_mail_packet:voice"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_policy",
+    };
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      maxIterations: 2,
+      now: "2026-05-26T12:00:05.000Z",
+      phaseResolver: ({ history }) => history.length === 0 ? phase : null,
+      chooser: ({ stepIndex }) => ({
+        schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+        decision_id: `live_step:premature_answer:${stepIndex}`,
+        thread_id: environment.thread_id,
+        environment_id: environment.environment_id,
+        step_index: stepIndex,
+        decision_authority: "model",
+        decision_timing: stepIndex === 0 ? "pre_observation" : "post_observation",
+        next_step: "answer",
+        selected_tool: null,
+        tool_args: null,
+        rationale_summary: "The model tried to answer before the live-source mail decision receipt existed.",
+        expected_evidence_kind: null,
+        evidence_refs: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+
+    expect(loop.iterations[0]?.step_decision).toMatchObject({
+      decision_authority: "deterministic_policy_fallback",
+      next_step: "call_tool",
+      selected_tool: "live_env.record_live_source_mail_decision",
+      expected_evidence_kind: "stage_play_live_source_mail_decision",
+    });
+    expect(loop.iterations[0]?.tool_observation?.tool_name).toBe("live_env.record_live_source_mail_decision");
+    expect(loop.iterations[1]?.step_decision.next_step).toBe("answer");
+    expect(loop.terminal_decision).toBe("answer_allowed");
   });
 
   it("drains pending voice steering before the next model step as compact evidence", async () => {

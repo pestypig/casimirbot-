@@ -34,6 +34,14 @@ import {
   type Nhm2ObserverWecPropagationStatus,
   NHM2_OBSERVER_SHARED_ROOT_DRIVER_STATUS_VALUES,
 } from "./nhm2-observer-audit.v1";
+import {
+  isNhm2WallSourceClosureArtifact,
+  type Nhm2WallSourceClosureArtifactV1,
+} from "./nhm2-wall-source-closure.v1";
+import {
+  isNhm2ObserverRobustEnergyConditionArtifact,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "./nhm2-observer-robust-energy-conditions.v1";
 
 export const NHM2_FULL_LOOP_AUDIT_CONTRACT_VERSION = "nhm2_full_loop_audit/v1";
 export const NHM2_FULL_LOOP_AUDIT_ID = "nhm2_full_loop";
@@ -76,8 +84,13 @@ export const NHM2_FULL_LOOP_AUDIT_REASON_CODES = [
   "source_closure_missing",
   "source_closure_version_lag",
   "source_closure_residual_exceeded",
+  "wall_source_closure_missing",
+  "wall_source_closure_residual_exceeded",
   "observer_audit_incomplete",
   "observer_blocking_violation",
+  "observer_robust_energy_condition_missing",
+  "observer_robust_energy_condition_incomplete",
+  "observer_robust_energy_condition_violation",
   "qei_applicability_non_pass",
   "mission_output_missing",
   "mission_output_not_certified",
@@ -231,6 +244,7 @@ export type Nhm2SourceClosureSection =
     };
     toleranceRef: string | null;
     assumptionsDrifted: boolean | null;
+    wallSourceClosure?: Nhm2WallSourceClosureArtifactV1 | null;
     leadBlocker?: Nhm2SourceClosureLeadBlockerProjection | null;
   };
 
@@ -285,6 +299,10 @@ export type Nhm2ObserverAuditSection =
     observerNextTechnicalAction: Nhm2ObserverNextTechnicalAction;
     metric: Nhm2ObserverFamilyAudit;
     tile: Nhm2ObserverFamilyAudit;
+    observerRobustEnergyConditions?: {
+      metricRequired: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
+      tileEffective: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
+    } | null;
   };
 
 type Nhm2ObserverAuditSectionInput =
@@ -755,6 +773,154 @@ const cloneSourceClosureLeadBlocker = (
   };
 };
 
+const cloneWallSourceClosure = (
+  wallSourceClosure: Nhm2WallSourceClosureArtifactV1 | null | undefined,
+): Nhm2WallSourceClosureArtifactV1 | null | undefined => {
+  if (wallSourceClosure === undefined) return undefined;
+  if (wallSourceClosure === null) return null;
+  return {
+    ...wallSourceClosure,
+    required: { ...wallSourceClosure.required },
+    available: { ...wallSourceClosure.available },
+    residual: { ...wallSourceClosure.residual },
+    blockers: [...wallSourceClosure.blockers],
+    warnings: [...wallSourceClosure.warnings],
+    claimBoundary: { ...wallSourceClosure.claimBoundary },
+  };
+};
+
+const cloneObserverRobustEnergyConditionArtifact = (
+  artifact: Nhm2ObserverRobustEnergyConditionArtifactV1 | null | undefined,
+): Nhm2ObserverRobustEnergyConditionArtifactV1 | null | undefined => {
+  if (artifact === undefined) return undefined;
+  if (artifact === null) return null;
+  return {
+    ...artifact,
+    observerFamilies: artifact.observerFamilies.map((family) => ({
+      ...family,
+      ...(family.worstCase != null
+        ? {
+            worstCase: {
+              ...family.worstCase,
+              ...(family.worstCase.observerParams != null
+                ? { observerParams: { ...family.worstCase.observerParams } }
+                : {}),
+            },
+          }
+        : {}),
+      blockers: [...family.blockers],
+    })),
+    summary: { ...artifact.summary },
+    literatureRefs: [...artifact.literatureRefs],
+    claimBoundary: { ...artifact.claimBoundary },
+  };
+};
+
+const cloneObserverRobustEnergyConditionSet = (
+  artifacts:
+    | Nhm2ObserverAuditSection["observerRobustEnergyConditions"]
+    | undefined,
+): Nhm2ObserverAuditSection["observerRobustEnergyConditions"] | undefined => {
+  if (artifacts === undefined) return undefined;
+  if (artifacts === null) return null;
+  return {
+    metricRequired:
+      cloneObserverRobustEnergyConditionArtifact(artifacts.metricRequired) ?? null,
+    tileEffective:
+      cloneObserverRobustEnergyConditionArtifact(artifacts.tileEffective) ?? null,
+  };
+};
+
+const normalizeObserverAuditStateForRobustEnergy = (args: {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+  observerRobustEnergyConditions:
+    | Nhm2ObserverAuditSection["observerRobustEnergyConditions"]
+    | undefined;
+}): {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+} => {
+  const reasons = new Set<Nhm2FullLoopAuditReasonCode>(args.reasons);
+  const artifacts = args.observerRobustEnergyConditions ?? null;
+  if (artifacts == null) {
+    reasons.add("observer_robust_energy_condition_missing");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+
+  const artifactList = [artifacts.metricRequired, artifacts.tileEffective];
+  if (artifactList.some((artifact) => artifact == null)) {
+    reasons.add("observer_robust_energy_condition_missing");
+  }
+  if (
+    artifactList.some((artifact) => artifact?.summary.anyViolation === true)
+  ) {
+    reasons.add("observer_robust_energy_condition_violation");
+    return {
+      state: "fail",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  if (
+    artifactList.some(
+      (artifact) =>
+        artifact == null ||
+        artifact.summary.eulerianOnly ||
+        !artifact.summary.robustCheckComplete,
+    )
+  ) {
+    reasons.add("observer_robust_energy_condition_incomplete");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+
+  return {
+    state: args.state,
+    reasons: orderReasonCodes([...reasons]),
+  };
+};
+
+const normalizeSourceClosureStateForWall = (args: {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+  wallSourceClosure: Nhm2WallSourceClosureArtifactV1 | null | undefined;
+}): {
+  state: Nhm2FullLoopAuditState;
+  reasons: Nhm2FullLoopAuditReasonCode[];
+} => {
+  const reasons = new Set<Nhm2FullLoopAuditReasonCode>(args.reasons);
+  const wall = args.wallSourceClosure ?? null;
+  if (wall?.residual.pass === false) {
+    reasons.add("wall_source_closure_residual_exceeded");
+    return {
+      state: "fail",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  if (wall == null || wall.residual.pass == null) {
+    reasons.add("wall_source_closure_missing");
+    return {
+      state: args.state === "fail" || args.state === "unavailable"
+        ? args.state
+        : "review",
+      reasons: orderReasonCodes([...reasons]),
+    };
+  }
+  return {
+    state: args.state,
+    reasons: orderReasonCodes([...reasons]),
+  };
+};
+
 const cloneObserverFamilyAudit = (
   audit: Nhm2ObserverFamilyAudit,
 ): Nhm2ObserverFamilyAudit => ({
@@ -836,7 +1002,25 @@ const computeBlockingReasons = (
 
 const cloneSections = (
   sections: Nhm2FullLoopAuditSectionsInput,
-): Nhm2FullLoopAuditSections => ({
+): Nhm2FullLoopAuditSections => {
+  const wallSourceClosure = cloneWallSourceClosure(
+    sections.source_closure.wallSourceClosure,
+  );
+  const sourceClosureWallState = normalizeSourceClosureStateForWall({
+    state: sections.source_closure.state,
+    reasons: sections.source_closure.reasons,
+    wallSourceClosure,
+  });
+  const observerRobustEnergyConditions =
+    cloneObserverRobustEnergyConditionSet(
+      sections.observer_audit.observerRobustEnergyConditions,
+    );
+  const observerAuditRobustState = normalizeObserverAuditStateForRobustEnergy({
+    state: sections.observer_audit.state,
+    reasons: sections.observer_audit.reasons,
+    observerRobustEnergyConditions,
+  });
+  return {
   family_semantics: {
     ...sections.family_semantics,
     semanticBoundaries: [...sections.family_semantics.semanticBoundaries],
@@ -870,8 +1054,10 @@ const cloneSections = (
   },
   source_closure: {
     ...sections.source_closure,
-    reasons: orderReasonCodes([...sections.source_closure.reasons]),
+    state: sourceClosureWallState.state,
+    reasons: sourceClosureWallState.reasons,
     residualByRegion: { ...sections.source_closure.residualByRegion },
+    ...(wallSourceClosure !== undefined ? { wallSourceClosure } : {}),
     ...(sections.source_closure.leadBlocker !== undefined
       ? { leadBlocker: cloneSourceClosureLeadBlocker(sections.source_closure.leadBlocker) }
       : {}),
@@ -880,7 +1066,8 @@ const cloneSections = (
   },
   observer_audit: {
     ...sections.observer_audit,
-    reasons: orderReasonCodes([...sections.observer_audit.reasons]),
+    state: observerAuditRobustState.state,
+    reasons: observerAuditRobustState.reasons,
     observerBlockingAssessmentStatus:
       sections.observer_audit.observerBlockingAssessmentStatus ?? "unknown",
     observerBlockingAssessmentNote:
@@ -954,6 +1141,9 @@ const cloneSections = (
       sections.observer_audit.observerNextTechnicalAction ?? "unknown",
     metric: cloneObserverFamilyAudit(sections.observer_audit.metric),
     tile: cloneObserverFamilyAudit(sections.observer_audit.tile),
+    ...(observerRobustEnergyConditions !== undefined
+      ? { observerRobustEnergyConditions }
+      : {}),
     supportedClaimTiers: computeTierListForSection("observer_audit"),
     artifactRefs: cloneArtifactRefs(sections.observer_audit.artifactRefs),
   },
@@ -998,7 +1188,8 @@ const cloneSections = (
       sections.certificate_policy_result.artifactRefs,
     ),
   },
-});
+  };
+};
 
 export const buildNhm2FullLoopAuditContract = (args: {
   generatedAt: string;
@@ -1178,6 +1369,7 @@ const isSourceClosureSection = (
   const record = asRecord(value);
   const residualByRegion = asRecord(record.residualByRegion);
   const leadBlocker = asRecord(record.leadBlocker);
+  const wallSourceClosure = record.wallSourceClosure;
   const hasValidLeadBlocker =
     record.leadBlocker === undefined ||
     record.leadBlocker === null ||
@@ -1206,6 +1398,9 @@ const isSourceClosureSection = (
     isNullableFiniteNumber(residualByRegion.exteriorShell) &&
     (record.toleranceRef === null || asText(record.toleranceRef) != null) &&
     isNullableBoolean(record.assumptionsDrifted) &&
+    (wallSourceClosure === undefined ||
+      wallSourceClosure === null ||
+      isNhm2WallSourceClosureArtifact(wallSourceClosure)) &&
     hasValidLeadBlocker
   );
 };
@@ -1214,6 +1409,11 @@ const isObserverAuditSection = (
   value: unknown,
 ): value is Nhm2ObserverAuditSection => {
   const record = asRecord(value);
+  const robustEnergyConditions =
+    record.observerRobustEnergyConditions === undefined ||
+    record.observerRobustEnergyConditions === null
+      ? null
+      : asRecord(record.observerRobustEnergyConditions);
   return (
     hasValidSectionBase(record, "observer_audit") &&
     isObserverBlockingAssessmentStatus(record.observerBlockingAssessmentStatus) &&
@@ -1285,7 +1485,15 @@ const isObserverAuditSection = (
       asText(record.observerLeadReadinessReason) != null) &&
     isObserverNextTechnicalAction(record.observerNextTechnicalAction) &&
     isObserverFamilyAudit(record.metric) &&
-    isObserverFamilyAudit(record.tile)
+    isObserverFamilyAudit(record.tile) &&
+    (record.observerRobustEnergyConditions === undefined ||
+      record.observerRobustEnergyConditions === null ||
+      (isNhm2ObserverRobustEnergyConditionArtifact(
+        robustEnergyConditions?.metricRequired,
+      ) &&
+        isNhm2ObserverRobustEnergyConditionArtifact(
+          robustEnergyConditions?.tileEffective,
+        )))
   );
 };
 

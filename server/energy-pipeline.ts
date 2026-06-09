@@ -105,6 +105,16 @@ import {
   type Nhm2ObserverT00PolicyAdmissionBridgeEvidence,
 } from "../shared/contracts/nhm2-observer-audit.v1.ts";
 import {
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts";
+import {
+  buildNhm2SameChartFullTensorArtifact,
+  type Nhm2SameChartFullTensorArtifactV1,
+  type Nhm2SameChartFullTensorComponentId,
+  type Nhm2SameChartFullTensorProvenanceSource,
+  type Nhm2TensorComponentStatus,
+} from "../shared/contracts/nhm2-same-chart-full-tensor.v1.ts";
+import {
   NHM2_SOURCE_CLOSURE_COMPONENTS,
   normalizeNhm2SourceClosureTensor,
   type Nhm2SourceClosureArtifact,
@@ -121,6 +131,7 @@ import {
   type Nhm2SourceClosureV2RegionProxyComponentAttribution,
   type Nhm2SourceClosureV2RegionProxyDiagnostics,
 } from "../shared/contracts/nhm2-source-closure.v2.ts";
+import type { Nhm2WallSourceClosureArtifactV1 } from "../shared/contracts/nhm2-wall-source-closure.v1.ts";
 import {
   buildNhm2StrictSignalReadinessArtifact,
   type Nhm2StrictSignalReadinessArtifact,
@@ -837,6 +848,11 @@ const buildNatarioRuntimePayload = (
   const tileEffectiveStressEnergy = normalizePublishedTensor(tileEffectiveStress);
   const stressEnergyTensor = normalizePublishedTensor(stress);
   const nhm2ObserverAudit = state.nhm2ObserverAudit;
+  const nhm2ObserverRobustEnergyConditions =
+    state.nhm2ObserverRobustEnergyConditions;
+  const nhm2SameChartFullTensor = state.nhm2SameChartFullTensor;
+  const nhm2SourceClosure = state.nhm2SourceClosure;
+  const nhm2WallSourceClosure = state.nhm2WallSourceClosure;
   const nhm2StrictSignalReadiness = state.nhm2StrictSignalReadiness;
   const nhm2PhaseTopology = state.nhm2PhaseTopology;
 
@@ -868,6 +884,12 @@ const buildNatarioRuntimePayload = (
         ? String(warp.tileEffectiveStressSource)
         : undefined,
     ...(nhm2ObserverAudit ? { nhm2ObserverAudit } : {}),
+    ...(nhm2ObserverRobustEnergyConditions
+      ? { nhm2ObserverRobustEnergyConditions }
+      : {}),
+    ...(nhm2SameChartFullTensor ? { nhm2SameChartFullTensor } : {}),
+    ...(nhm2SourceClosure ? { nhm2SourceClosure } : {}),
+    ...(nhm2WallSourceClosure ? { nhm2WallSourceClosure } : {}),
     ...(nhm2StrictSignalReadiness
       ? { nhm2StrictSignalReadiness }
       : {}),
@@ -1840,7 +1862,13 @@ export interface EnergyPipelineState {
   stressMeta?: CongruenceMeta;
   metricConstraint?: MetricConstraintAudit;
   nhm2ObserverAudit?: Nhm2ObserverAuditArtifact;
+  nhm2ObserverRobustEnergyConditions?: {
+    metricRequired: Nhm2ObserverRobustEnergyConditionArtifactV1;
+    tileEffective: Nhm2ObserverRobustEnergyConditionArtifactV1;
+  };
+  nhm2SameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1;
   nhm2SourceClosure?: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact;
+  nhm2WallSourceClosure?: Nhm2WallSourceClosureArtifactV1;
   nhm2StrictSignalReadiness?: Nhm2StrictSignalReadinessArtifact;
 }
 
@@ -7718,6 +7746,300 @@ const deriveNhm2MetricAdmissionSummaryFromEvidence = (args: {
   };
 };
 
+type Nhm2MetricAdmissionSummary = ReturnType<
+  typeof deriveNhm2MetricAdmissionSummaryFromEvidence
+>;
+
+const isNhm2SameChartCompleteStatus = (
+  status: Nhm2TensorComponentStatus,
+): boolean => status === "computed" || status === "derived_same_chart";
+
+const mapNhm2SupportEvidenceStatusToTensorStatus = (
+  status: Nhm2MetricProducerEvidenceStatus | undefined,
+): Nhm2TensorComponentStatus => {
+  if (status === "present_admitted") return "computed";
+  if (status === "present_but_not_admitted") return "blocked";
+  if (status === "missing") return "missing";
+  return "missing";
+};
+
+const firstFiniteTensorComponent = (
+  tensor: Record<string, unknown> | null,
+  keys: readonly string[],
+): number | undefined => {
+  if (tensor == null) return undefined;
+  for (const key of keys) {
+    const value = toFiniteNumber(tensor[key]);
+    if (value != null) return value;
+  }
+  return undefined;
+};
+
+const finiteSameChartComponentValue = (
+  tensor: Record<string, unknown> | null,
+  componentId: Nhm2SameChartFullTensorComponentId,
+): number | undefined => {
+  switch (componentId) {
+    case "T00":
+      return firstFiniteTensorComponent(tensor, ["T00"]);
+    case "T0x":
+      return firstFiniteTensorComponent(tensor, ["T0x", "T01", "T10"]);
+    case "T0y":
+      return firstFiniteTensorComponent(tensor, ["T0y", "T02", "T20"]);
+    case "T0z":
+      return firstFiniteTensorComponent(tensor, ["T0z", "T03", "T30"]);
+    case "Txx":
+      return firstFiniteTensorComponent(tensor, ["Txx", "T11"]);
+    case "Txy":
+      return firstFiniteTensorComponent(tensor, ["Txy", "T12", "T21"]);
+    case "Txz":
+      return firstFiniteTensorComponent(tensor, ["Txz", "T13", "T31"]);
+    case "Tyy":
+      return firstFiniteTensorComponent(tensor, ["Tyy", "T22"]);
+    case "Tyz":
+      return firstFiniteTensorComponent(tensor, ["Tyz", "T23", "T32"]);
+    case "Tzz":
+      return firstFiniteTensorComponent(tensor, ["Tzz", "T33"]);
+  }
+};
+
+const mapNhm2MetricAdmissionToTensorStatus = (args: {
+  admissionStatus: Nhm2ObserverMetricComponentAdmissionStatus;
+  emissionAdmissionStatus: "admitted" | "not_admitted" | "unknown";
+  hasFiniteValue: boolean;
+}): Nhm2TensorComponentStatus => {
+  if (args.hasFiniteValue) {
+    if (
+      args.emissionAdmissionStatus === "admitted" &&
+      (args.admissionStatus === "derivable_same_chart_from_existing_state" ||
+        args.admissionStatus === "existing_internal_quantity_not_serialized")
+    ) {
+      return "derived_same_chart";
+    }
+    if (
+      args.admissionStatus === "requires_new_model_term" ||
+      args.admissionStatus === "basis_or_semantics_ambiguous" ||
+      args.emissionAdmissionStatus !== "admitted"
+    ) {
+      return "blocked";
+    }
+    return "computed";
+  }
+  if (
+    args.admissionStatus === "derivable_same_chart_from_existing_state" ||
+    args.admissionStatus === "existing_internal_quantity_not_serialized" ||
+    args.admissionStatus === "basis_or_semantics_ambiguous" ||
+    args.admissionStatus === "unknown"
+  ) {
+    return "blocked";
+  }
+  return "missing";
+};
+
+const resolveNhm2SameChartFullTensorSource = (args: {
+  routeId: string | null;
+  selectedPath: Nhm2ObserverModelTermClosurePath | null;
+  hasRuntimeTensor: boolean;
+}): Nhm2SameChartFullTensorProvenanceSource => {
+  if (
+    args.routeId === NHM2_MODEL_TERM_EINSTEIN_ROUTE_ID ||
+    args.selectedPath === "full_einstein_tensor"
+  ) {
+    return "einstein_tensor_geometry_fd4_v1";
+  }
+  if (
+    args.routeId === NHM2_MODEL_TERM_LEGACY_ROUTE_ID ||
+    args.selectedPath === "adm_complete" ||
+    (args.routeId != null && args.routeId.toLowerCase().includes("adm"))
+  ) {
+    return "adm_projection";
+  }
+  return args.hasRuntimeTensor ? "runtime_artifact" : "missing";
+};
+
+const nonCompleteBlockers = (
+  status: Nhm2TensorComponentStatus,
+  blockers: Array<string | null | undefined>,
+): string[] => {
+  if (isNhm2SameChartCompleteStatus(status) || status === "not_applicable") {
+    return [];
+  }
+  return blockers.filter(
+    (entry): entry is string => typeof entry === "string" && entry.length > 0,
+  );
+};
+
+const buildNhm2SameChartFullTensorFromState = (args: {
+  state: EnergyPipelineState;
+  metricAdmissionSummary: Nhm2MetricAdmissionSummary;
+  metricProducerAdmissionEvidence: Nhm2ObserverMetricProducerAdmissionEvidence;
+  modelTermSemanticAdmissionEvidence: Nhm2ObserverModelTermSemanticAdmissionEvidence;
+  metricTensorInput: BuildNhm2ObserverAuditTensorInput;
+}): Nhm2SameChartFullTensorArtifactV1 => {
+  const { warpState, adapter, metricT00Ref, metricFamily } =
+    resolveNhm2ArtifactContext(args.state);
+  const metricStressRaw =
+    ((warpState?.metricStressEnergy ??
+      ((warpState?.metricT00Source === "metric" ||
+      warpState?.stressEnergySource === "metric"
+        ? warpState?.stressEnergyTensor
+        : null) as Record<string, unknown> | null)) as
+      | Record<string, unknown>
+      | null) ?? null;
+  const tensor: Record<string, unknown> | null =
+    metricStressRaw != null ? { ...metricStressRaw } : null;
+  const einsteinRouteT00 = toFiniteNumber(metricStressRaw?.T00_modelTermEinstein);
+  const preferEinsteinT00 =
+    args.metricAdmissionSummary.t00AdmissionStatus ===
+      "derivable_same_chart_from_existing_state" &&
+    args.metricAdmissionSummary.t00ComparabilityStatus === "pass";
+  if (tensor != null && preferEinsteinT00 && einsteinRouteT00 != null) {
+    tensor.T00 = einsteinRouteT00;
+  }
+
+  const routeId =
+    asText(args.modelTermSemanticAdmissionEvidence.einsteinTensorRouteEvidence?.routeId) ??
+    asText(args.modelTermSemanticAdmissionEvidence.routeId) ??
+    asText(metricStressRaw?.modelTermRoute) ??
+    args.metricAdmissionSummary.t00RouteId ??
+    "missing";
+  const selectedPath =
+    args.modelTermSemanticAdmissionEvidence.closurePathDecision?.selectedPath ?? null;
+  const source = resolveNhm2SameChartFullTensorSource({
+    routeId,
+    selectedPath,
+    hasRuntimeTensor: metricStressRaw != null,
+  });
+  const chartId =
+    asText(args.modelTermSemanticAdmissionEvidence.chartRef) ??
+    asText(args.metricProducerAdmissionEvidence.chartRef) ??
+    asText(adapter?.chart?.label) ??
+    "unknown";
+  const selectedProfileId =
+    asText((warpState?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+    asText((adapter?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+    asText((args.state.dynamicConfig as Record<string, unknown> | null | undefined)?.shiftLapseProfileId) ??
+    DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID;
+  const support = args.metricProducerAdmissionEvidence.supportFieldEvidence;
+  const componentStatuses: Partial<
+    Record<Nhm2SameChartFullTensorComponentId, Nhm2TensorComponentStatus>
+  > = {};
+  const componentBlockers: Partial<
+    Record<Nhm2SameChartFullTensorComponentId, string[]>
+  > = {};
+  const componentAssumptions: Partial<
+    Record<Nhm2SameChartFullTensorComponentId, string[]>
+  > = {};
+  const setComponent = (
+    componentId: Nhm2SameChartFullTensorComponentId,
+    status: Nhm2TensorComponentStatus,
+    blockers: Array<string | null | undefined>,
+    assumptions: string[] = [],
+  ): void => {
+    componentStatuses[componentId] = status;
+    componentBlockers[componentId] = nonCompleteBlockers(status, blockers);
+    componentAssumptions[componentId] = assumptions;
+  };
+
+  const t00Value = finiteSameChartComponentValue(tensor, "T00");
+  setComponent(
+    "T00",
+    t00Value != null
+      ? preferEinsteinT00
+        ? "derived_same_chart"
+        : "computed"
+      : args.metricAdmissionSummary.t00AdmissionStatus === "requires_new_model_term" ||
+          args.metricAdmissionSummary.t00AdmissionStatus === "basis_or_semantics_ambiguous"
+        ? "blocked"
+        : "missing",
+    [
+      args.metricAdmissionSummary.t00AdmissionNote,
+      "metric_T00_required_for_same_chart_full_tensor",
+    ],
+    [
+      `t00AdmissionStatus=${args.metricAdmissionSummary.t00AdmissionStatus}`,
+      `t00ComparabilityStatus=${args.metricAdmissionSummary.t00ComparabilityStatus}`,
+    ],
+  );
+
+  for (const componentId of ["Txx", "Tyy", "Tzz"] as const) {
+    const value = finiteSameChartComponentValue(tensor, componentId);
+    setComponent(
+      componentId,
+      value != null ? "computed" : "missing",
+      [`metric_${componentId}_required_for_same_chart_full_tensor`],
+    );
+  }
+
+  for (const componentId of ["T0x", "T0y", "T0z"] as const) {
+    const status = mapNhm2MetricAdmissionToTensorStatus({
+      admissionStatus: args.metricAdmissionSummary.t0iAdmissionStatus,
+      emissionAdmissionStatus: args.metricAdmissionSummary.emissionAdmissionStatus,
+      hasFiniteValue: finiteSameChartComponentValue(tensor, componentId) != null,
+    });
+    setComponent(
+      componentId,
+      status,
+      [
+        args.metricAdmissionSummary.t0iAdmissionNote,
+        "metric_T0i_required_for_same_chart_full_tensor",
+      ],
+      [
+        `metricT0iAdmissionStatus=${args.metricAdmissionSummary.t0iAdmissionStatus}`,
+        `metricEmissionAdmissionStatus=${args.metricAdmissionSummary.emissionAdmissionStatus}`,
+      ],
+    );
+  }
+
+  for (const componentId of ["Txy", "Txz", "Tyz"] as const) {
+    const status = mapNhm2MetricAdmissionToTensorStatus({
+      admissionStatus: args.metricAdmissionSummary.offDiagonalAdmissionStatus,
+      emissionAdmissionStatus: args.metricAdmissionSummary.emissionAdmissionStatus,
+      hasFiniteValue: finiteSameChartComponentValue(tensor, componentId) != null,
+    });
+    setComponent(
+      componentId,
+      status,
+      [
+        args.metricAdmissionSummary.offDiagonalAdmissionNote,
+        "metric_off_diagonal_Tij_required_for_same_chart_full_tensor",
+      ],
+      [
+        `metricOffDiagonalTijAdmissionStatus=${args.metricAdmissionSummary.offDiagonalAdmissionStatus}`,
+        `metricEmissionAdmissionStatus=${args.metricAdmissionSummary.emissionAdmissionStatus}`,
+      ],
+    );
+  }
+
+  return buildNhm2SameChartFullTensorArtifact({
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId,
+    chartId,
+    metricFamily,
+    routeId,
+    source,
+    artifactRef: args.metricTensorInput.tensorRef ?? metricT00Ref ?? "warp.metricStressEnergy",
+    tensor,
+    componentStatuses,
+    componentAssumptions,
+    componentBlockers,
+    defaultAssumptions: [
+      "diagnostic-only same-chart tensor inventory",
+      "missing T0i or off-diagonal Tij channels block full tensor completeness",
+      "observer audit diagonal closures do not define missing components as zero",
+      `selectedPath=${selectedPath ?? "unknown"}`,
+    ],
+    adm: {
+      alphaStatus: mapNhm2SupportEvidenceStatusToTensorStatus(support.alpha),
+      betaStatus: mapNhm2SupportEvidenceStatusToTensorStatus(support.beta_i),
+      gammaStatus: mapNhm2SupportEvidenceStatusToTensorStatus(support.gamma_ij),
+      extrinsicCurvatureStatus: mapNhm2SupportEvidenceStatusToTensorStatus(
+        support.K_ij,
+      ),
+    },
+  });
+};
+
 const getNhm2ModelTermNoteValue = (
   notes: string[] | undefined,
   key: string,
@@ -12965,10 +13287,12 @@ const resolveNhm2QiStrictSignalInput = (state: EnergyPipelineState) => {
 };
 
 const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
-  const { warpState, metricT00Ref, nhm2Active } = resolveNhm2ArtifactContext(state);
+  const { warpState, adapter, metricT00Ref, nhm2Active } =
+    resolveNhm2ArtifactContext(state);
 
   if (!nhm2Active) {
     delete state.nhm2SourceClosure;
+    delete state.nhm2WallSourceClosure;
     return;
   }
 
@@ -12990,7 +13314,14 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
     metricTensorRef,
   );
 
-  state.nhm2SourceClosure = buildNhm2SourceClosureArtifactV2({
+  const sourceClosure = buildNhm2SourceClosureArtifactV2({
+    generatedAt: new Date().toISOString(),
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId:
+      asText((adapter?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+      asText(warpState?.shiftLapseProfileId) ??
+      "runtime",
+    chartId: asText(adapter?.chart?.label) ?? "unknown",
     metricTensorRef,
     tileEffectiveTensorRef,
     metricRequiredTensor,
@@ -13001,6 +13332,8 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
     scalarCl3RhoDeltaRel:
       Number.isFinite(state.rho_delta_metric_mean) ? Number(state.rho_delta_metric_mean) : null,
   });
+  state.nhm2SourceClosure = sourceClosure;
+  state.nhm2WallSourceClosure = sourceClosure.wallSourceClosure;
 };
 
 const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
@@ -13008,6 +13341,8 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
 
   if (!nhm2Active) {
     delete state.nhm2ObserverAudit;
+    delete state.nhm2ObserverRobustEnergyConditions;
+    delete state.nhm2SameChartFullTensor;
     return;
   }
 
@@ -13137,6 +13472,14 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
     emissionAdmissionStatus: metricAdmissionSummary.emissionAdmissionStatus,
     decRemediationEvidence: observerDecRemediationEvidenceFinal,
   });
+  const sameChartFullTensor = buildNhm2SameChartFullTensorFromState({
+    state,
+    metricAdmissionSummary,
+    metricProducerAdmissionEvidence,
+    modelTermSemanticAdmissionEvidence,
+    metricTensorInput: metricRequired,
+  });
+  state.nhm2SameChartFullTensor = sameChartFullTensor;
   state.nhm2ObserverAudit = buildNhm2ObserverAuditArtifact({
     familyId: "nhm2_shift_lapse",
     metricRequired: runtimeAppliedTensorProjection.metricTensorInput,
@@ -13176,7 +13519,10 @@ const refreshNhm2ObserverAudit = (state: EnergyPipelineState): void => {
     tileObserverConditionAuthorityMode: tileObserverConditionAuthority.mode,
     tileObserverConditionAuthorityNote: tileObserverConditionAuthority.note,
     tileObserverLegacyProxyDiagnostics,
+    sameChartFullTensor,
   });
+  state.nhm2ObserverRobustEnergyConditions =
+    state.nhm2ObserverAudit.observerRobustEnergyConditions ?? undefined;
 };
 
 const refreshNhm2StrictSignalReadiness = (state: EnergyPipelineState): void => {
@@ -20012,6 +20358,18 @@ export async function computeEnergySnapshot(sim: any) {
   nhm2ObserverAudit:
     (result as any).natario?.nhm2ObserverAudit ??
     (result as any).nhm2ObserverAudit,
+  nhm2ObserverRobustEnergyConditions:
+    (result as any).natario?.nhm2ObserverRobustEnergyConditions ??
+    (result as any).nhm2ObserverRobustEnergyConditions,
+  nhm2SameChartFullTensor:
+    (result as any).natario?.nhm2SameChartFullTensor ??
+    (result as any).nhm2SameChartFullTensor,
+  nhm2SourceClosure:
+    (result as any).natario?.nhm2SourceClosure ??
+    (result as any).nhm2SourceClosure,
+  nhm2WallSourceClosure:
+    (result as any).natario?.nhm2WallSourceClosure ??
+    (result as any).nhm2WallSourceClosure,
   nhm2StrictSignalReadiness:
     (result as any).natario?.nhm2StrictSignalReadiness ??
     (result as any).nhm2StrictSignalReadiness,

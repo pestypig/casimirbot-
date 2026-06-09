@@ -1,6 +1,7 @@
 export type HelixContextualToolAdmissionSuppressionReason =
   | "negated_tool_instruction"
   | "quoted_tool_command"
+  | "screen_visible_tool_reference"
   | "hypothetical_tool_reference"
   | "historical_tool_reference"
   | "explanatory_only";
@@ -19,6 +20,9 @@ const SCHOLARLY_CUE_RE = /\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pu
 const SCHOLARLY_ACTION_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
 const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
 const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
+const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
+const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
+const REWRITE_ONLY_CURRENT_TEXT_RE = /\b(?:do\s+not|don't|dont|without|no)\s+(?:browse|browsing|search(?:ing)?|web|internet|look\s*up|lookup|google|check\s+online)\b[\s\S]{0,160}\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b|\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b[\s\S]{0,160}\b(?:this|the)\s+(?:paragraph|passage|prompt|text|quote)\b[\s\S]{0,120}\b(?:about\s+(?:current|recent|latest)|current\s+events?|ongoing\s+(?:conflict|war|crisis))/i;
 
 const scholarlyVerbOrCue = (text: string): string =>
   /\b(?:pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b/i.test(text)
@@ -27,7 +31,7 @@ const scholarlyVerbOrCue = (text: string): string =>
 
 export function detectContextualToolAdmissionSuppression(promptText: string): HelixContextualToolAdmissionSuppression | null {
   const prompt = promptText.trim();
-  if (!prompt || (!DOCS_VIEWER_CUE_RE.test(prompt) && !SCHOLARLY_CUE_RE.test(prompt))) return null;
+  if (!prompt || (!DOCS_VIEWER_CUE_RE.test(prompt) && !SCHOLARLY_CUE_RE.test(prompt) && !INTERNET_SEARCH_CUE_RE.test(prompt))) return null;
 
   const quoted = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
   if (quoted) {
@@ -45,6 +49,24 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "quoted_tool_command",
       verb_or_cue: scholarlyVerbOrCue(quotedScholarly),
       text: quotedScholarly,
+    };
+  }
+  const screenVisibleInternet = prompt.match(/\b(?:phrase|text|screen|page|button|label|headline)\b[\s\S]{0,160}(?:latest|current|recent|breaking|search|browse|web|internet)[\s\S]{0,120}\b(?:appears|says|shows|reads|contains)\b[\s\S]{0,80}\b(?:screen|page|label|headline)\b[\s\S]{0,120}\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no)\b[\s\S]{0,80}(?:search|browse|open|click|run)\b|\b(?:phrase|text|screen|page|button|label|headline)\b[\s\S]{0,80}(?:says|shows|appears|reads|contains)\b[\s\S]{0,120}(?:latest|current|recent|breaking|search|browse|web\s+search|internet\s+search)[\s\S]{0,120}\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no)\b[\s\S]{0,80}(?:search|browse|open|click|run)\b/i)?.[0];
+  if (screenVisibleInternet) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "screen_visible_tool_reference",
+      verb_or_cue: "internet_search.web_research",
+      text: screenVisibleInternet,
+    };
+  }
+  const quotedInternet = prompt.match(/["'`][^"'`]*(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|latest|current|recent|breaking)[^"'`]*["'`]/i)?.[0];
+  if (quotedInternet) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "internet_search.web_research",
+      text: quotedInternet,
     };
   }
 
@@ -66,7 +88,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: negatedScholarly,
     };
   }
-
+  const negatedInternet = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[\s\S]{0,120}(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online)\b/i)?.[0];
+  if (negatedInternet || REWRITE_ONLY_CURRENT_TEXT_RE.test(prompt)) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "internet_search.web_research",
+      text: negatedInternet ?? prompt.match(REWRITE_ONLY_CURRENT_TEXT_RE)?.[0] ?? "rewrite-only current-affairs prompt",
+    };
+  }
   const hypothetical = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,100}(?:I|we|you)?\s*(?:opened?|open|show|view|pull\s+up|bring\s+up)\b[\s\S]{0,100}(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)\b/i)?.[0];
   if (hypothetical) {
     return {
@@ -83,6 +113,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "hypothetical_tool_reference",
       verb_or_cue: scholarlyVerbOrCue(hypotheticalScholarly),
       text: hypotheticalScholarly,
+    };
+  }
+  const hypotheticalInternet = prompt.match(/\b(?:in\s+the\s+future|later|next\s+time|if|when|before|after|would|could|might|hypothetically|may\s+ask)\b[\s\S]{0,160}(?:browse|search|searched|find|look\s*up|lookup|google|check\s+online|current\s+events?|latest|recent|breaking)\b[\s\S]{0,160}\b(?:not\s+now|not\s+yet|but\s+not\s+now|without\s+doing\s+it\s+now)\b/i)?.[0];
+  if (hypotheticalInternet) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "hypothetical_tool_reference",
+      verb_or_cue: "internet_search.web_research",
+      text: hypotheticalInternet,
     };
   }
 
@@ -104,6 +143,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: historicalScholarly,
     };
   }
+  const historicalInternet = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+up|searched|browsed|googled|checked\s+online)\b[\s\S]{0,160}(?:latest|current|recent|breaking|web|internet|news|events?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,140}(?:looked\s+up|searched|browsed|googled|checked\s+online)\b[\s\S]{0,160}(?:latest|current|recent|breaking|web|internet|news|events?)\b/i)?.[0];
+  if (historicalInternet) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "historical_tool_reference",
+      verb_or_cue: "internet_search.web_research",
+      text: historicalInternet,
+    };
+  }
 
   if (DOCS_VIEWER_EXPLANATION_RE.test(prompt) && !DOCS_VIEWER_ACTION_RE.test(prompt)) {
     return {
@@ -119,6 +167,17 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "explanatory_only",
       verb_or_cue: "scholarly-research.lookup_papers",
       text: prompt.match(SCHOLARLY_EXPLANATION_RE)?.[0] ?? "scholarly research explanation request",
+    };
+  }
+  if (
+    /\b(?:what\s+is|what\s+are|explain|describe|tell\s+me)\b[\s\S]{0,120}\b(?:web\s+search|internet\s+search|browser|browsing)\b/i.test(prompt) &&
+    !INTERNET_SEARCH_ACTION_RE.test(prompt.replace(/\b(?:web\s+search|internet\s+search)\b/ig, "internet-search-term"))
+  ) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "explanatory_only",
+      verb_or_cue: "internet_search.web_research",
+      text: prompt,
     };
   }
 

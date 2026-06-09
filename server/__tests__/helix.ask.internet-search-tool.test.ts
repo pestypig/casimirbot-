@@ -7,9 +7,13 @@ import {
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
+import { detectContextualToolAdmissionSuppression } from "../services/helix-ask/contextual-tool-admission";
+import { buildEvidenceReentryGate } from "../services/helix-ask/evidence-reentry-gate";
 import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
+import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
 import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
 import {
   isInternetSearchProviderConfigurationMissing,
@@ -71,6 +75,244 @@ const withInternetSearchEnv = async <T>(
 };
 
 describe("Helix internet search tool admission", () => {
+  it("restates synthetic current-affairs analysis as a required internet evidence plan", () => {
+    const promptText = [
+      "Assess this current border conflict ceasefire resource-capacity scenario:",
+      "Country A's marginal gains become too expensive, Country B has enough air defense capacity,",
+      "and regional trade partners decide infrastructure stability is worth more than battlefield leverage.",
+      "Is that a true prediction decision makers should keep in mind?",
+    ].join(" ");
+    const restatement = buildToolUseRestatement(promptText);
+    expect(restatement).toMatchObject({
+      artifactId: "tool_use_restatement",
+      schemaVersion: "helix.tool_use_restatement.v1",
+      freshnessRequired: true,
+      currentAffairsRequired: true,
+      requiredToolFamilies: ["internet_search"],
+      notTerminal: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(restatement.minimumEvidencePlan).toMatchObject({
+      minSearches: 2,
+      minIndependentSources: 2,
+      citationRequired: true,
+    });
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: "ask:current-affairs",
+      threadId: "helix-ask:test",
+      promptText,
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "internet_search",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.explicit_cues).toEqual(expect.arrayContaining([
+      "freshness_required",
+      "current_affairs_required",
+    ]));
+
+    const routeProductContract = buildRouteProductContract({
+      turnId: "ask:current-affairs",
+      threadId: "helix-ask:test",
+      sourceTargetIntent,
+      promptText,
+    });
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: "ask:current-affairs",
+      sourceTargetIntent,
+      routeProductContract,
+      promptText,
+    });
+    expect(toolAdmission).toMatchObject({
+      source_target: "internet_search",
+      required: true,
+      admitted_tool_families: ["internet_search"],
+    });
+
+    const plan = buildCapabilityPlan({
+      turnId: "ask:current-affairs",
+      promptText,
+      sourceTargetIntent,
+      routeProductContract,
+      toolCallAdmissionDecision: toolAdmission,
+      canonicalGoalFrame: canonicalGoal("internet_search_lookup", "internet_search_answer"),
+    });
+    expect(plan).toMatchObject({
+      capability_family: "internet_search",
+      requested_action: HELIX_INTERNET_SEARCH_CAPABILITY,
+      admission_status: "needs_evidence",
+      required_terminal_kind: "internet_search_answer",
+    });
+  });
+
+  it.each([
+    {
+      label: "negated cue",
+      prompt: "Do not browse, just rewrite this paragraph about current events.",
+      reason: "negated_tool_instruction",
+    },
+    {
+      label: "screen-visible cue",
+      prompt: "The phrase 'latest war update' appears on screen, do not search it.",
+      reason: "screen_visible_tool_reference",
+    },
+    {
+      label: "future/conditional cue",
+      prompt: "In the future I may ask you to search current events, but not now.",
+      reason: "hypothetical_tool_reference",
+    },
+    {
+      label: "historical cue",
+      prompt: "Earlier I searched current events; explain what that search step was meant to prove.",
+      reason: "historical_tool_reference",
+    },
+    {
+      label: "quoted cue",
+      prompt: "Quote this prompt literally: 'search the latest conflict news'.",
+      reason: "quoted_tool_command",
+    },
+    {
+      label: "mixed intent prompt",
+      prompt: "Country A / Country B current ceasefire reconstruction capacity analysis: do not browse; identify what evidence would be needed.",
+      reason: "negated_tool_instruction",
+    },
+  ])("suppresses internet admission for adversarial $label", ({ prompt, reason }) => {
+    const suppression = detectContextualToolAdmissionSuppression(prompt);
+    expect(suppression).toMatchObject({
+      tool_admission_suppressed: true,
+      suppression_reason: reason,
+      verb_or_cue: "internet_search.web_research",
+    });
+    const restatement = buildToolUseRestatement(prompt);
+    expect(restatement.requiredToolFamilies).not.toContain("internet_search");
+    expect(restatement.negativeConstraints.length + restatement.quotedOrContextualMentions.length).toBeGreaterThan(0);
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId: `ask:internet-adversarial:${reason}`,
+      threadId: "helix-ask:test",
+      promptText: prompt,
+    });
+    expect(sourceTargetIntent.target_source).not.toBe("internet_search");
+
+    const toolAdmission = buildToolCallAdmissionDecision({
+      turnId: `ask:internet-adversarial:${reason}`,
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    expect(toolAdmission.admitted_tool_families).not.toContain("internet_search");
+  });
+
+  it("fails evidence re-entry when a complex current-affairs plan lacks independent search receipts", () => {
+    const turnId = "ask:current-affairs-reentry";
+    const restatement = buildToolUseRestatement("ongoing current-affairs resource constraint prompt: assess a ceasefire capacity prediction for decision makers.");
+    const oneSourcePayload = {
+      current_turn_artifact_ledger: [{
+        artifact_id: `${turnId}:internet_search_observation:one`,
+        kind: "internet_search_observation",
+        payload: {
+          schema: HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
+          artifact_id: `${turnId}:internet_search_observation:one`,
+          selected_for_answer: true,
+          results: [{
+            result_id: "source-a:1",
+            title: "Source A",
+            url: "https://source-a.example/current-analysis",
+          }],
+        },
+      }],
+    };
+    const incompleteGate = buildEvidenceReentryGate({
+      turnId,
+      payload: oneSourcePayload,
+      primaryIntent: "content_question",
+      terminalArtifactKind: "internet_search_answer",
+      finalAnswerSource: "model_synthesis_from_internet_search",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["internet_search_answer"],
+      toolUseRestatement: restatement,
+    });
+    expect(incompleteGate.violation_codes).toContain("internet_search_evidence_plan_incomplete");
+    expect(incompleteGate.completed).toBe(false);
+
+    const twoSourcePayload = {
+      current_turn_artifact_ledger: [
+        oneSourcePayload.current_turn_artifact_ledger[0],
+        {
+          artifact_id: `${turnId}:internet_search_observation:two`,
+          kind: "internet_search_observation",
+          payload: {
+            schema: HELIX_INTERNET_SEARCH_OBSERVATION_SCHEMA,
+            artifact_id: `${turnId}:internet_search_observation:two`,
+            selected_for_answer: true,
+            results: [{
+              result_id: "source-b:1",
+              title: "Source B",
+              url: "https://source-b.example/current-analysis",
+            }],
+          },
+        },
+      ],
+    };
+    const completeGate = buildEvidenceReentryGate({
+      turnId,
+      payload: twoSourcePayload,
+      primaryIntent: "content_question",
+      terminalArtifactKind: "internet_search_answer",
+      finalAnswerSource: "model_synthesis_from_internet_search",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["internet_search_answer"],
+      toolUseRestatement: restatement,
+    });
+    expect(completeGate.violation_codes).not.toContain("internet_search_evidence_plan_incomplete");
+    expect(completeGate.completed).toBe(true);
+  });
+
+  it("surfaces tool-use restatement in the ask turn solver trace", () => {
+    const turnId = "ask:solver-current-affairs";
+    const promptText = "ongoing current-affairs resource constraint prompt: should Country A / Country B decision makers treat ceasefire capacity margins as predictive?";
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId: "helix-ask:test",
+      promptText,
+    });
+    const routeProductContract = buildRouteProductContract({
+      turnId,
+      threadId: "helix-ask:test",
+      sourceTargetIntent,
+      promptText,
+    });
+    const trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText,
+      selectedRoute: "internet_search_lookup",
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "model_direct_answer",
+      payload: {
+        turn_id: turnId,
+        source_target_intent: sourceTargetIntent,
+        route_product_contract: routeProductContract,
+      },
+    });
+    expect(trace.tool_use_restatement).toMatchObject({
+      schemaVersion: "helix.tool_use_restatement.v1",
+      freshnessRequired: true,
+      currentAffairsRequired: true,
+      requiredToolFamilies: ["internet_search"],
+      notTerminal: true,
+    });
+    expect(trace.evidence_reentry.required).toBe(true);
+    expect(trace.evidence_reentry_gate.violation_codes).toEqual(expect.arrayContaining([
+      "source_observation_terminal_without_selection",
+      "internet_search_evidence_plan_incomplete",
+    ]));
+  });
+
   it("routes explicit web search prompts to the internet search evidence path", () => {
     const promptText = "Search the web for the latest NASA Artemis news and include source links.";
     const sourceTargetIntent = arbitrateAskSourceTarget({

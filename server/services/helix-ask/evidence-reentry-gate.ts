@@ -1,4 +1,5 @@
 import type { HelixIntentKind } from "./intent-hypothesis";
+import type { ToolUseRestatementV1 } from "./internet-search-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -7,7 +8,8 @@ export type HelixEvidenceReentryViolationCode =
   | "projection_terminal_without_reentry"
   | "tool_result_terminal_without_reentry"
   | "source_observation_terminal_without_selection"
-  | "evidence_selected_but_finalizer_missing";
+  | "evidence_selected_but_finalizer_missing"
+  | "internet_search_evidence_plan_incomplete";
 
 export type HelixEvidenceReentryGate = {
   schema: "helix.evidence_reentry_gate.v1";
@@ -194,6 +196,69 @@ const collectInternetSearchEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectInternetSearchObservationArtifacts = (payload: RecordLike): RecordLike[] => {
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      return (
+        readString(entry.kind) === "internet_search_observation" ||
+        readString(payloadRecord?.schema) === "helix.internet_search_observation.v1"
+      );
+    });
+};
+
+const hostForUrl = (value: string): string => {
+  try {
+    return new URL(value).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const internetSearchEvidencePlanIncomplete = (input: {
+  payload: RecordLike;
+  selectedEvidenceRefs: string[];
+  toolUseRestatement?: ToolUseRestatementV1 | RecordLike | null;
+}): boolean => {
+  const restatement = readRecord(input.toolUseRestatement ?? input.payload.tool_use_restatement);
+  const families = readStringArray(restatement?.requiredToolFamilies ?? restatement?.required_tool_families);
+  if (!families.includes("internet_search")) return false;
+  const plan = readRecord(restatement?.minimumEvidencePlan ?? restatement?.minimum_evidence_plan);
+  const minSearches = typeof plan?.minSearches === "number" ? plan.minSearches : 1;
+  const minIndependentSources = typeof plan?.minIndependentSources === "number" ? plan.minIndependentSources : 1;
+  const observations = collectInternetSearchObservationArtifacts(input.payload);
+  const selected = observations.filter((entry) => {
+    const artifactId = readString(entry.artifact_id) || readString(readRecord(entry.payload)?.artifact_id);
+    const payloadRecord = readRecord(entry.payload);
+    return (
+      payloadRecord?.selected_for_answer !== false &&
+      (!artifactId || input.selectedEvidenceRefs.length === 0 || input.selectedEvidenceRefs.includes(artifactId))
+    );
+  });
+  const hosts = new Set<string>();
+  for (const entry of selected) {
+    const payloadRecord = readRecord(entry.payload);
+    const results = Array.isArray(payloadRecord?.results) ? payloadRecord.results : [];
+    for (const result of results) {
+      const url = readString(readRecord(result)?.url);
+      const host = hostForUrl(url);
+      if (host) hosts.add(host);
+    }
+    const evidenceRefs = Array.isArray(payloadRecord?.evidence_refs) ? payloadRecord.evidence_refs : [];
+    for (const ref of evidenceRefs) {
+      const url = readString(readRecord(ref)?.url);
+      const host = hostForUrl(url);
+      if (host) hosts.add(host);
+    }
+  }
+  return selected.length < minSearches || hosts.size < minIndependentSources;
+};
+
 const collectReceiptRefs = (input: {
   payload: RecordLike;
   loopTrace: RecordLike | null;
@@ -226,6 +291,7 @@ export function buildEvidenceReentryGate(input: {
   finalArbitrationRan: boolean;
   sourceEvidenceRequired?: boolean;
   allowedTerminalProducts?: string[];
+  toolUseRestatement?: ToolUseRestatementV1 | RecordLike | null;
 }): HelixEvidenceReentryGate {
   const loopTrace = input.loopTrace ?? null;
   const selectedEvidenceRefs = unique([
@@ -310,6 +376,13 @@ export function buildEvidenceReentryGate(input: {
       : "",
     selectedEvidenceRefs.length > 0 && !input.finalArbitrationRan
       ? "evidence_selected_but_finalizer_missing"
+      : "",
+    internetSearchEvidencePlanIncomplete({
+      payload: input.payload,
+      selectedEvidenceRefs,
+      toolUseRestatement: input.toolUseRestatement,
+    })
+      ? "internet_search_evidence_plan_incomplete"
       : "",
   ].filter((entry): entry is HelixEvidenceReentryViolationCode => Boolean(entry)));
 

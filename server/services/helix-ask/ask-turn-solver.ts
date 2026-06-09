@@ -38,6 +38,10 @@ import {
   detectRepoConcept,
   type RepoConceptDetection,
 } from "./repo-concept-detector";
+import {
+  buildToolUseRestatement,
+  type ToolUseRestatementV1,
+} from "./internet-search-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -95,6 +99,7 @@ export type HelixAskTurnSolverTrace = {
   prompt_hash: string;
 
   prompt_interpretation: HelixPromptInterpretation;
+  tool_use_restatement: ToolUseRestatementV1;
   repo_concept_detection?: RepoConceptDetection;
   compound_prompt_contract?: HelixCompoundPromptContract;
   compound_prompt_coverage?: {
@@ -315,6 +320,8 @@ const sourceTargeted = new Set([
   "workspace_diagnostic",
   "docs_viewer",
   "active_doc",
+  "internet_search",
+  "scholarly_research",
   "process_graph",
   "live_pipeline",
   "world_event",
@@ -322,7 +329,7 @@ const sourceTargeted = new Set([
 ]);
 
 const sourceRequiresEvidence = (sourceTarget: string): boolean =>
-  /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_diagnostic|docs_viewer|active_doc|world_event/i.test(sourceTarget);
+  /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_diagnostic|docs_viewer|active_doc|world_event|internet_search|scholarly_research/i.test(sourceTarget);
 
 const toolFamilyMutating = (family: string): boolean =>
   /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);
@@ -847,6 +854,7 @@ export function buildAskTurnSolverTrace(input: {
   const loopTrace = (input.loopParityTrace ?? readRecord(input.payload.loop_parity_trace)) as HelixLoopParityTrace | RecordLike | null;
   const sourceTargetInfo = sourceTargetFromPayload(input.payload);
   const promptInterpretation = interpretHelixAskPrompt(promptText);
+  const toolUseRestatement = buildToolUseRestatement(promptText);
   const repoConceptDetection = detectRepoConcept(promptText);
   const repoConceptRequiresEvidence = repoConceptDetection.require_repo_evidence === true;
   const compoundContract = promptInterpretation.compound_contract;
@@ -881,7 +889,10 @@ export function buildAskTurnSolverTrace(input: {
   const secondary = intentArbitration.secondary_intent_ids
     .map((id) => intentHypotheses.find((entry) => entry.id === id)?.kind)
     .filter((kind): kind is HelixAskTurnIntentKind => Boolean(kind));
-  const evidenceRequired = sourceRequiresEvidence(sourceTargetInfo.sourceTarget) || repoConceptRequiresEvidence;
+  const evidenceRequired =
+    sourceRequiresEvidence(sourceTargetInfo.sourceTarget) ||
+    repoConceptRequiresEvidence ||
+    toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const evidenceResults = buildEvidenceResults(loopTrace, input.payload);
   const repoEvidenceResultSelected = evidenceResults.some((entry) =>
     entry.source_kind === "repo_code" && entry.selected_for_answer,
@@ -903,6 +914,7 @@ export function buildAskTurnSolverTrace(input: {
     finalArbitrationRan,
     sourceEvidenceRequired: evidenceRequired,
     allowedTerminalProducts: terminalProductsAllowed,
+    toolUseRestatement,
   });
   const followupReasoningGate = buildFollowupReasoningGate({
     turnId: input.turnId,
@@ -988,6 +1000,7 @@ export function buildAskTurnSolverTrace(input: {
     turn_id: input.turnId,
     prompt_hash: hashShort(promptText),
     prompt_interpretation: promptInterpretation,
+    tool_use_restatement: toolUseRestatement,
     ...(repoConceptDetection.applies ? { repo_concept_detection: repoConceptDetection } : {}),
     ...(compoundContract ? { compound_prompt_contract: compoundContract } : {}),
     ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
@@ -1005,7 +1018,16 @@ export function buildAskTurnSolverTrace(input: {
           evidence_required: evidenceRequired,
         }],
     tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace),
-    evidence_requests: repoConceptRequiresEvidence
+    evidence_requests: toolUseRestatement.requiredToolFamilies.includes("internet_search")
+      ? [({
+          request_id: `internet-search:${input.turnId}`,
+          source_target: "internet_search",
+          required: true,
+          purpose: toolUseRestatement.currentAffairsRequired
+            ? "Search-ground current-affairs claims before final answer"
+            : "Search-ground freshness-sensitive claims before final answer",
+        })]
+      : repoConceptRequiresEvidence
       ? [{
           request_id: `repo-concept:${input.turnId}`,
           source_target: "repo_code",

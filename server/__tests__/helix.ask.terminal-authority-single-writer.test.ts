@@ -211,4 +211,76 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.terminal_error_code).toBe("post_tool_model_step_missing");
     expect(String(payload.selected_final_answer)).toContain("follow-up model answer step");
   });
+
+  it("rejects stale no-context model fallbacks after live-source observations exist", () => {
+    const turnId = "ask:test:stale-live-source-fallback";
+    const staleText = "I am unable to provide context because no observations are available.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:processed_packet`,
+        turn_id: turnId,
+        kind: "live_environment_tool_observation",
+        payload: {
+          tool_name: "live_env.read_processed_live_source_mail",
+          observation: {
+            artifactId: "stage_play_processed_mail_packet",
+            schemaVersion: "stage_play_processed_mail_packet/v1",
+            recommendedNext: "request_voice_callout",
+          },
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: staleText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["live_environment_tool_observation", "tool_receipt"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: staleText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).not.toBe(staleText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          reason: "composer_claimed_no_observations_but_receipts_exist",
+        }),
+      ]),
+    );
+    expect(["post_tool_model_step_missing", "terminal_boundary_ineligible"]).toContain(payload.terminal_error_code);
+    expect(payload.selected_final_answer).not.toBe(staleText);
+  });
 });

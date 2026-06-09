@@ -113,6 +113,10 @@ import {
   type Nhm2SourceClosureV2RegionComparisonInput,
 } from "../shared/contracts/nhm2-source-closure.v2";
 import {
+  isNhm2WallSourceClosureArtifact,
+  type Nhm2WallSourceClosureArtifactV1,
+} from "../shared/contracts/nhm2-wall-source-closure.v1";
+import {
   buildNhm2SourceClosureDiagonalTensorSnapshotArtifact,
   isNhm2SourceClosureDiagonalTensorSnapshotArtifact,
   type Nhm2SourceClosureDiagonalTensorSnapshotArtifact,
@@ -124,6 +128,9 @@ import {
   type BuildNhm2ObserverAuditTensorInput,
   type Nhm2ObserverTileDiminishingReturnStatus,
 } from "../shared/contracts/nhm2-observer-audit.v1";
+import {
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import {
   buildNhm2SuccessorTileFluxLaneAdmissibilityArtifact,
   isNhm2SuccessorTileFluxLaneAdmissibilityArtifact,
@@ -7039,6 +7046,7 @@ const isNhm2SourceClosureArtifactLike = (
   regionComparisons?: {
     regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
   };
+  wallSourceClosure?: Nhm2WallSourceClosureArtifactV1 | null;
   reasonCodes: string[];
 } => isNhm2SourceClosureArtifact(value) || isNhm2SourceClosureV2Artifact(value);
 
@@ -7054,6 +7062,7 @@ type SourceClosureInspectionArtifact = {
   regionComparisons?: {
     regions: Array<{ regionId: string; residualNorms?: { relLInf?: number | null } }>;
   };
+  wallSourceClosure?: Nhm2WallSourceClosureArtifactV1 | null;
 };
 
 const getPublishedSourceClosureRegions = (
@@ -7064,6 +7073,13 @@ const getPublishedSourceClosureRegions = (
   }
   return value?.sampledSummaries?.regions ?? [];
 };
+
+const getPublishedWallSourceClosure = (
+  value: SourceClosureInspectionArtifact | null | undefined,
+): Nhm2WallSourceClosureArtifactV1 | null =>
+  isNhm2WallSourceClosureArtifact(value?.wallSourceClosure)
+    ? value.wallSourceClosure
+    : null;
 
 const isRegionSourceClosureReviewCode = (reasonCode: string): boolean =>
   ["region_basis_diagnostic_only", "assumption_drift"].includes(reasonCode);
@@ -28324,6 +28340,39 @@ const renderNhm2SourceClosureMarkdown = (
       .join("\n");
   const componentRows = renderComponentRows(payload.residualComponents);
   const isV2 = payload.schemaVersion === "nhm2_source_closure/v2";
+  const wallSourceClosure = isV2 ? payload.wallSourceClosure : null;
+  const wallSourceClosureRows = wallSourceClosure
+    ? [
+        ["contractVersion", wallSourceClosure.contractVersion],
+        ["regionId", wallSourceClosure.regionId],
+        ["chartId", wallSourceClosure.chartId],
+        ["required.tensorRef", wallSourceClosure.required.tensorRef],
+        ["required.T00_SI", wallSourceClosure.required.T00_SI],
+        ["required.componentStatus", wallSourceClosure.required.componentStatus],
+        ["available.sourceKind", wallSourceClosure.available.sourceKind],
+        ["available.tensorRef", wallSourceClosure.available.tensorRef ?? "null"],
+        ["available.T00_SI", wallSourceClosure.available.T00_SI],
+        ["available.componentStatus", wallSourceClosure.available.componentStatus],
+        ["residual.absolute", wallSourceClosure.residual.absolute],
+        ["residual.relative", wallSourceClosure.residual.relative],
+        ["residual.tolerance", wallSourceClosure.residual.tolerance],
+        ["residual.pass", wallSourceClosure.residual.pass],
+        [
+          "blockers",
+          wallSourceClosure.blockers.length > 0
+            ? wallSourceClosure.blockers.join(", ")
+            : "none",
+        ],
+        [
+          "warnings",
+          wallSourceClosure.warnings.length > 0
+            ? wallSourceClosure.warnings.join(", ")
+            : "none",
+        ],
+      ]
+        .map(([field, value]) => `| ${field} | ${value ?? "null"} |`)
+        .join("\n")
+    : "| status | missing |";
   const scalarCl3RhoDeltaRel = isV2
     ? payload.scalarProjections.cl3RhoDeltaRel
     : payload.scalarProjections.cl3RhoDeltaRel;
@@ -28855,6 +28904,11 @@ ${renderAccountingRows(accounting)}
 | scalarCl3RhoDeltaRel | ${scalarCl3RhoDeltaRel ?? "null"} |
 | scalarCongruenceSecondary | ${String(payload.distinction.scalarCongruenceSecondary)} |
 | scalarSurfaceId | ${payload.distinction.scalarSurfaceId} |
+
+## Wall Source Closure (Front Door)
+| field | value |
+|---|---|
+${wallSourceClosureRows}
 
 ## Global Tensor Comparison
 | component | metricRequired | tileEffective | absResidual | relResidual |
@@ -29780,6 +29834,15 @@ const publishNhm2ShiftLapseSourceClosureImpl = async (options?: {
   }
 
   const artifact = buildNhm2SourceClosureArtifactV2({
+    generatedAt: new Date().toISOString(),
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId,
+    chartId:
+      asText(asRecord(worldlineArtifact?.sourceSurface).chartId) ??
+      asText(asRecord(missionTimeComparisonArtifact?.sourceSurface).chartId) ??
+      asText(asRecord(worldlineArtifact?.sourceSurface).chart) ??
+      asText(asRecord(missionTimeComparisonArtifact?.sourceSurface).chart) ??
+      "selected-family-publication",
     metricTensorRef: normalizePath(metricTensorSnapshot.latestJsonPath),
     tileEffectiveTensorRef: normalizePath(tileTensorSnapshot.latestJsonPath),
     metricRequiredTensor: metricTensor,
@@ -30129,6 +30192,8 @@ const buildNhm2ObserverAuditArtifactFromPublishedSelectedProfile = (args: {
       args.observerAuditArtifact.tileObserverConditionAuthorityNote ?? null,
     tileObserverLegacyProxyDiagnostics:
       args.observerAuditArtifact.tileObserverLegacyProxyDiagnostics ?? null,
+    sameChartFullTensor:
+      args.observerAuditArtifact.sameChartFullTensor ?? null,
     metricRequired: toObserverAuditTensorInput(
       args.observerAuditArtifact.tensors.metricRequired,
       normalizePath(tensorSnapshotPaths.metricRequiredLatestJsonPath),
@@ -30245,6 +30310,108 @@ const renderNhm2ObserverAuditMarkdown = (
 | model.limitationNotes | ${limitationNotes} |
 | model.note | ${tensor.model.note ?? "null"} |
 | missingInputs | ${missingInputs} |
+`;
+  };
+  const renderSameChartFullTensor = (): string => {
+    const tensor = payload.sameChartFullTensor;
+    if (tensor == null) {
+      return `## Same-Chart Full Tensor
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const missingComponentIds =
+      tensor.completeness.missingComponentIds.length > 0
+        ? tensor.completeness.missingComponentIds.join(", ")
+        : "none";
+    const componentRows = tensor.components
+      .map((entry) => {
+        const blockers =
+          entry.blockers.length > 0 ? entry.blockers.join("<br>") : "none";
+        const assumptions =
+          entry.assumptions.length > 0 ? entry.assumptions.join("<br>") : "none";
+        return `| ${entry.componentId} | ${entry.valueSI ?? "null"} | ${entry.unit ?? "null"} | ${entry.status} | ${entry.provenance.source} | ${entry.provenance.routeId} | ${entry.provenance.chartId} | ${entry.provenance.artifactRef ?? "null"} | ${blockers} | ${assumptions} |`;
+      })
+      .join("\n");
+    return `## Same-Chart Full Tensor
+| field | value |
+|---|---|
+| contractVersion | ${tensor.contractVersion} |
+| generatedAt | ${tensor.generatedAt} |
+| laneId | ${tensor.laneId} |
+| selectedProfileId | ${tensor.selectedProfileId} |
+| chartId | ${tensor.chartId} |
+| metricFamily | ${tensor.metricFamily} |
+| adm.alphaStatus | ${tensor.adm.alphaStatus} |
+| adm.betaStatus | ${tensor.adm.betaStatus} |
+| adm.gammaStatus | ${tensor.adm.gammaStatus} |
+| adm.extrinsicCurvatureStatus | ${tensor.adm.extrinsicCurvatureStatus} |
+| hasT00 | ${String(tensor.completeness.hasT00)} |
+| hasT0i | ${String(tensor.completeness.hasT0i)} |
+| hasDiagonalTij | ${String(tensor.completeness.hasDiagonalTij)} |
+| hasOffDiagonalTij | ${String(tensor.completeness.hasOffDiagonalTij)} |
+| fullTensorComplete | ${String(tensor.completeness.fullTensorComplete)} |
+| missingComponentIds | ${missingComponentIds} |
+| diagnosticOnly | ${String(tensor.claimBoundary.diagnosticOnly)} |
+| validatesPhysicalSource | ${String(tensor.claimBoundary.validatesPhysicalSource)} |
+| promotesViability | ${String(tensor.claimBoundary.promotesViability)} |
+
+| component | valueSI | unit | status | provenance.source | provenance.routeId | provenance.chartId | artifactRef | blockers | assumptions |
+|---|---:|---|---|---|---|---|---|---|---|
+${componentRows}
+`;
+  };
+  const renderObserverRobustEnergyConditionArtifact = (
+    label: string,
+    artifact: Nhm2ObserverRobustEnergyConditionArtifactV1 | null | undefined,
+  ): string => {
+    if (artifact == null) {
+      return `### ${label}
+| field | value |
+|---|---|
+| status | unavailable |
+`;
+    }
+    const familyRows = artifact.observerFamilies
+      .map((family) => {
+        const blockers =
+          family.blockers.length > 0 ? family.blockers.join("<br>") : "none";
+        const observerParams =
+          family.worstCase?.observerParams == null
+            ? "null"
+            : Object.entries(family.worstCase.observerParams)
+                .map(([key, value]) => `${key}=${value}`)
+                .join(", ");
+        return `| ${family.familyId} | ${family.status} | ${family.sampleCount ?? "null"} | ${family.optimizerUsed == null ? "null" : String(family.optimizerUsed)} | ${family.worstCase?.condition ?? "null"} | ${family.worstCase?.value ?? "null"} | ${family.worstCase?.locationRef ?? "null"} | ${observerParams} | ${blockers} |`;
+      })
+      .join("\n");
+    return `### ${label}
+| field | value |
+|---|---|
+| contractVersion | ${artifact.contractVersion} |
+| generatedAt | ${artifact.generatedAt} |
+| laneId | ${artifact.laneId} |
+| selectedProfileId | ${artifact.selectedProfileId} |
+| tensorRef | ${artifact.tensorRef} |
+| eulerianOnly | ${String(artifact.summary.eulerianOnly)} |
+| robustCheckComplete | ${String(artifact.summary.robustCheckComplete)} |
+| anyViolation | ${String(artifact.summary.anyViolation)} |
+| missedViolationRisk | ${artifact.summary.missedViolationRisk} |
+| diagnosticOnly | ${String(artifact.claimBoundary.diagnosticOnly)} |
+| friendlyObserverCannotProveWec | ${String(artifact.claimBoundary.friendlyObserverCannotProveWec)} |
+
+| observerFamily | status | sampleCount | optimizerUsed | worstCondition | worstValue | locationRef | observerParams | blockers |
+|---|---|---:|---|---|---:|---|---|---|
+${familyRows}
+`;
+  };
+  const renderObserverRobustEnergyConditions = (): string => {
+    const robust = payload.observerRobustEnergyConditions;
+    return `## Observer-Robust Energy Conditions
+
+${renderObserverRobustEnergyConditionArtifact("Metric Required", robust?.metricRequired)}
+${renderObserverRobustEnergyConditionArtifact("Tile Effective", robust?.tileEffective)}
 `;
   };
   const renderMetricProducerAdmissionEvidence = (): string => {
@@ -31345,11 +31512,16 @@ const renderNhm2ObserverAuditMarkdown = (
 | tileObserverConditionAuthorityMode | ${payload.tileObserverConditionAuthorityMode ?? "null"} |
 | tileObserverConditionAuthorityNote | ${payload.tileObserverConditionAuthorityNote ?? "null"} |
 | tileObserverLegacyProxyDiagnostics | ${payload.tileObserverLegacyProxyDiagnostics == null ? "null" : "available"} |
+| sameChartFullTensor | ${payload.sameChartFullTensor == null ? "null" : "available"} |
+| sameChartFullTensor.fullTensorComplete | ${payload.sameChartFullTensor?.completeness.fullTensorComplete == null ? "null" : String(payload.sameChartFullTensor.completeness.fullTensorComplete)} |
+| sameChartFullTensor.missingComponentIds | ${payload.sameChartFullTensor == null ? "null" : payload.sameChartFullTensor.completeness.missingComponentIds.join(", ") || "none"} |
 | observerBlockingAssessmentNote | ${payload.observerBlockingAssessmentNote ?? "null"} |
 | metricBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.metricRequired)} |
 | tileBlockingSummary | ${renderTensorBlockingSummary(payload.tensors.tileEffective)} |
 
 ${renderMetricProducerAdmissionEvidence()}
+${renderSameChartFullTensor()}
+${renderObserverRobustEnergyConditions()}
 ${renderModelTermSemanticAdmissionEvidence()}
 ${renderObserverDecRemediationEvidence()}
 ${renderObserverDecPhysicsControlEvidence()}
@@ -37189,7 +37361,95 @@ const renderNhm2FullLoopAuditMarkdown = (args: {
         `| ${entry.tier} | ${entry.state} | ${entry.satisfiedSections.join(", ") || "none"} | ${entry.blockingReasons.join(", ") || "none"} |`,
     )
     .join("\n");
+  const sourceClosure = args.audit.sections.source_closure;
+  const wallSourceClosure = sourceClosure.wallSourceClosure ?? null;
+  const wallClosureRows = wallSourceClosure
+    ? [
+        ["state", sourceClosure.state],
+        ["reasons", sourceClosure.reasons.join(", ") || "none"],
+        ["contractVersion", wallSourceClosure.contractVersion],
+        ["chartId", wallSourceClosure.chartId],
+        ["required.tensorRef", wallSourceClosure.required.tensorRef],
+        ["required.T00_SI", wallSourceClosure.required.T00_SI],
+        ["required.componentStatus", wallSourceClosure.required.componentStatus],
+        ["available.sourceKind", wallSourceClosure.available.sourceKind],
+        ["available.tensorRef", wallSourceClosure.available.tensorRef ?? "null"],
+        ["available.T00_SI", wallSourceClosure.available.T00_SI],
+        ["available.componentStatus", wallSourceClosure.available.componentStatus],
+        ["residual.absolute", wallSourceClosure.residual.absolute],
+        ["residual.relative", wallSourceClosure.residual.relative],
+        ["residual.tolerance", wallSourceClosure.residual.tolerance],
+        ["residual.pass", wallSourceClosure.residual.pass],
+        [
+          "blockers",
+          wallSourceClosure.blockers.length > 0
+            ? wallSourceClosure.blockers.join(", ")
+            : "none",
+        ],
+        [
+          "warnings",
+          wallSourceClosure.warnings.length > 0
+            ? wallSourceClosure.warnings.join(", ")
+            : "none",
+        ],
+      ]
+        .map(([field, value]) => `| ${field} | ${value ?? "null"} |`)
+        .join("\n")
+    : `| state | ${sourceClosure.state} |
+| reasons | ${sourceClosure.reasons.join(", ") || "none"} |
+| wallSourceClosure | missing |`;
+  const globalSourceClosureRows = [
+    ["metricTensorRef", sourceClosure.metricTensorRef ?? "null"],
+    ["tileEffectiveTensorRef", sourceClosure.tileEffectiveTensorRef ?? "null"],
+    ["residualRms", sourceClosure.residualRms ?? "null"],
+    ["residualMax", sourceClosure.residualMax ?? "null"],
+    ["residualByRegion.hull", sourceClosure.residualByRegion.hull ?? "null"],
+    ["residualByRegion.wall", sourceClosure.residualByRegion.wall ?? "null"],
+    [
+      "residualByRegion.exteriorShell",
+      sourceClosure.residualByRegion.exteriorShell ?? "null",
+    ],
+    ["toleranceRef", sourceClosure.toleranceRef ?? "null"],
+    ["assumptionsDrifted", sourceClosure.assumptionsDrifted ?? "null"],
+    ["leadBlocker.kind", sourceClosure.leadBlocker?.kind ?? "null"],
+    ["leadBlocker.regionId", sourceClosure.leadBlocker?.regionId ?? "null"],
+    ["leadBlocker.t00Rel", sourceClosure.leadBlocker?.t00Rel ?? "null"],
+  ]
+    .map(([field, value]) => `| ${field} | ${value} |`)
+    .join("\n");
   const observerAudit = args.audit.sections.observer_audit;
+  const renderObserverRobustEnergyConditionSummary = (
+    label: string,
+    artifact: Nhm2ObserverRobustEnergyConditionArtifactV1 | null | undefined,
+  ): string => {
+    if (artifact == null) {
+      return `| ${label}.status | missing |
+| ${label}.eulerianOnly | null |
+| ${label}.robustCheckComplete | null |
+| ${label}.anyViolation | null |
+| ${label}.missedViolationRisk | unknown |`;
+    }
+    const families = artifact.observerFamilies
+      .map((family) => `${family.familyId}:${family.status}`)
+      .join(", ");
+    return `| ${label}.contractVersion | ${artifact.contractVersion} |
+| ${label}.tensorRef | ${artifact.tensorRef} |
+| ${label}.eulerianOnly | ${String(artifact.summary.eulerianOnly)} |
+| ${label}.robustCheckComplete | ${String(artifact.summary.robustCheckComplete)} |
+| ${label}.anyViolation | ${String(artifact.summary.anyViolation)} |
+| ${label}.missedViolationRisk | ${artifact.summary.missedViolationRisk} |
+| ${label}.observerFamilies | ${families || "none"} |`;
+  };
+  const observerRobustEnergyConditionRows = [
+    renderObserverRobustEnergyConditionSummary(
+      "metric",
+      observerAudit.observerRobustEnergyConditions?.metricRequired,
+    ),
+    renderObserverRobustEnergyConditionSummary(
+      "tile",
+      observerAudit.observerRobustEnergyConditions?.tileEffective,
+    ),
+  ].join("\n");
   return `# NHM2 Full-Loop Audit (${DATE_STAMP})
 
 "This checklist audits the currently selected nhm2_shift_lapse profile against the existing NHM2 full-loop contract using emitted artifact evidence only. Missing or mismatched publication surfaces remain explicit blockers and do not widen route ETA, transport, gravity, or viability claims."
@@ -37213,6 +37473,21 @@ const renderNhm2FullLoopAuditMarkdown = (args: {
 | tier | state | satisfiedSections | blockingReasons |
 |---|---|---|---|
 ${tierRows}
+
+## Wall Source Closure (Front Door)
+| field | value |
+|---|---|
+${wallClosureRows}
+
+## Global Source Closure (Secondary Context)
+| field | value |
+|---|---|
+${globalSourceClosureRows}
+
+## Observer-Robust Energy Conditions
+| field | value |
+|---|---|
+${observerRobustEnergyConditionRows}
 
 ## Observer Audit Summary
 | field | value |
@@ -37903,6 +38178,8 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     observerAuditInspection.parseStatus === "pass"
       ? (observerAuditInspection.parsed as Nhm2ObserverAuditArtifact)
       : null;
+  const observerRobustEnergyConditions =
+    observerAuditArtifact?.observerRobustEnergyConditions ?? null;
   const selectedDecompositionArtifact =
     selectedDecompositionInspection.parseStatus === "pass"
       ? (selectedDecompositionInspection.parsed as Nhm2ShiftVsLapseDecompositionArtifact)
@@ -38083,6 +38360,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
 
   const sourceClosureReasons: Nhm2FullLoopAuditReasonCode[] = [];
   let sourceClosurePolicyOnlyReview = false;
+  const wallSourceClosureArtifact = getPublishedWallSourceClosure(sourceClosureArtifact);
   if (sourceClosureArtifact != null) {
     if (
       sourceClosureArtifact.reasonCodes.some((entry) =>
@@ -38108,6 +38386,11 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     if (sourceClosureArtifact.reasonCodes.includes("tensor_residual_exceeded")) {
       sourceClosureReasons.push("source_closure_residual_exceeded");
     }
+    if (wallSourceClosureArtifact == null || wallSourceClosureArtifact.residual.pass == null) {
+      sourceClosureReasons.push("wall_source_closure_missing");
+    } else if (wallSourceClosureArtifact.residual.pass === false) {
+      sourceClosureReasons.push("wall_source_closure_residual_exceeded");
+    }
     sourceClosurePolicyOnlyReview =
       sourceClosureArtifact.reasonCodes.length > 0 &&
       sourceClosureArtifact.reasonCodes.every(
@@ -38127,10 +38410,13 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       ? "unavailable"
       : hasInspectionMismatch(sourceClosureInspections)
         ? "review"
-        : sourceClosureReasons.includes("source_closure_residual_exceeded")
+        : sourceClosureReasons.includes("wall_source_closure_residual_exceeded") ||
+            sourceClosureReasons.includes("source_closure_residual_exceeded")
           ? "fail"
-          : sourceClosureReasons.includes("source_closure_missing")
-            ? "unavailable"
+        : sourceClosureReasons.includes("source_closure_missing")
+          ? "unavailable"
+          : sourceClosureReasons.includes("wall_source_closure_missing")
+            ? "review"
             : sourceClosurePolicyOnlyReview
               ? "pass"
               : normalizeFullLoopAuditState(sourceClosureArtifact.status) ?? "review";
@@ -38155,17 +38441,48 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     if (observerAuditArtifact.reasonCodes.includes("surrogate_model_limited")) {
       observerAuditReasons.push("policy_review_required");
     }
+    if (observerRobustEnergyConditions == null) {
+      observerAuditReasons.push("observer_robust_energy_condition_missing");
+    } else if (
+      [observerRobustEnergyConditions.metricRequired, observerRobustEnergyConditions.tileEffective]
+        .some((artifact) => artifact == null)
+    ) {
+      observerAuditReasons.push("observer_robust_energy_condition_missing");
+    }
+    if (
+      [observerRobustEnergyConditions?.metricRequired, observerRobustEnergyConditions?.tileEffective]
+        .some((artifact) => artifact?.summary.anyViolation === true)
+    ) {
+      observerAuditReasons.push("observer_robust_energy_condition_violation");
+    }
+    if (
+      [observerRobustEnergyConditions?.metricRequired, observerRobustEnergyConditions?.tileEffective]
+        .some(
+          (artifact) =>
+            artifact == null ||
+            artifact.summary.eulerianOnly ||
+            !artifact.summary.robustCheckComplete,
+        )
+    ) {
+      observerAuditReasons.push("observer_robust_energy_condition_incomplete");
+    }
     if (hasInspectionMismatch(observerAuditInspections)) {
       observerAuditReasons.push("insufficient_provenance");
     }
   } else {
     observerAuditReasons.push("observer_audit_incomplete");
+    observerAuditReasons.push("observer_robust_energy_condition_missing");
   }
   const observerAuditState: Nhm2FullLoopAuditState =
     observerAuditArtifact == null
       ? "unavailable"
+      : observerAuditReasons.includes("observer_robust_energy_condition_violation")
+        ? "fail"
       : hasInspectionMismatch(observerAuditInspections)
         ? "review"
+        : observerAuditReasons.includes("observer_robust_energy_condition_missing") ||
+            observerAuditReasons.includes("observer_robust_energy_condition_incomplete")
+          ? "review"
         : normalizeFullLoopAuditState(observerAuditArtifact.status) ?? "review";
 
   const envelopeSuites = primaryEnvelopeArtifact?.suites ?? [];
@@ -38501,6 +38818,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       },
       toleranceRef: sourceClosureToleranceRef,
       assumptionsDrifted: sourceClosureArtifact?.assumptionsDrifted ?? null,
+      wallSourceClosure: wallSourceClosureArtifact,
       leadBlocker: projectSourceClosureLeadBlocker(sourceClosureArtifact),
     },
     observer_audit: {
@@ -38588,6 +38906,7 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       observerNextTechnicalAction: observerNextTechnicalAction,
       metric: toObserverFamilyAudit(observerAuditArtifact?.tensors.metricRequired ?? null),
       tile: toObserverFamilyAudit(observerAuditArtifact?.tensors.tileEffective ?? null),
+      observerRobustEnergyConditions,
     },
     gr_stability_safety: {
       sectionId: "gr_stability_safety",

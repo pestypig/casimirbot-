@@ -988,4 +988,257 @@ describe("helix ask solver controller decision", () => {
     expect(decision.decision).toBe("allow_terminal");
     expect(decision.blocking_reasons).not.toContain("capability_lifecycle_incomplete");
   });
+
+  it("continues live-source record_decision phase instead of allowing typed failure without decision receipt", () => {
+    const turnId = "ask:live-source-missing-decision";
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_reason_code: "live_environment_review",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "live_environment_review",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: false },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("live_environment_review", "model_synthesized_answer"),
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      live_source_turn_phase_resolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "record_decision",
+        reason: "Processed packet recommends a voice callout.",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.record_live_source_mail_decision"],
+        fallbackTools: [],
+        forbiddenTools: ["live_env.request_interim_voice_callout", "final_answer"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_live_source_mail_decision"],
+        nextPhase: "request_voice_after_decision",
+        phaseLock: {
+          locked: true,
+          reason: "Decision authority must be recorded before voice output.",
+        },
+        evidenceRefs: ["stage_play_processed_mail_packet:voice"],
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_policy",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:processed_packet`,
+          turn_id: turnId,
+          kind: "live_environment_tool_observation",
+          payload: {
+            tool_name: "live_env.read_processed_live_source_mail",
+            observation: {
+              artifactId: "stage_play_processed_mail_packet",
+              schemaVersion: "stage_play_processed_mail_packet/v1",
+              recommendedNext: "request_voice_callout",
+            },
+          },
+        },
+      ],
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "live_environment_review",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "live_environment_review",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("continue");
+    expect(decision.blocking_reasons).toContain("missing_required_live_source_mail_decision");
+  });
+
+  it("continues live-source voice phase until the voice receipt or hold receipt exists", () => {
+    const turnId = "ask:live-source-missing-voice-receipt";
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_reason_code: "live_environment_review",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "live_environment_review",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: false },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("live_environment_review", "model_synthesized_answer"),
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      live_source_turn_phase_resolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "request_voice_after_decision",
+        reason: "Recorded decision requests a voice callout.",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.request_interim_voice_callout"],
+        fallbackTools: [],
+        forbiddenTools: ["live_env.record_live_source_mail_decision", "final_answer"],
+        requiredEvidence: ["stage_play_live_source_mail_decision"],
+        completionEvidence: ["live_source_interim_voice_callout_receipt"],
+        phaseLock: {
+          locked: true,
+          reason: "Voice output is only allowed after a recorded request_voice_callout decision.",
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_policy",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:decision`,
+          turn_id: turnId,
+          kind: "live_environment_tool_observation",
+          payload: {
+            tool_name: "live_env.record_live_source_mail_decision",
+            observation: {
+              artifactId: "stage_play_live_source_mail_decision",
+              schemaVersion: "stage_play_live_source_mail_decision/v1",
+              decision: "request_voice_callout",
+            },
+          },
+        },
+      ],
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "live_environment_review",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "live_environment_review",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("continue");
+    expect(decision.blocking_reasons).toContain("missing_required_voice_receipt_or_hold");
+  });
+
+  it("continues after terminal authority rejects a stale model-only fallback with observations present", () => {
+    const turnId = "ask:stale-model-after-observation";
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_reason_code: "live_environment_review",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "live_environment_review",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: false },
+      goal_satisfaction_evaluation: satisfiedGoal("live_environment_review", "model_synthesized_answer"),
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        rejected_candidates: [
+          {
+            kind: "model_synthesized_answer",
+            source: "final_answer_draft",
+            reason: "composer_claimed_no_observations_but_receipts_exist",
+          },
+        ],
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "live_environment_review",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "live_environment_review",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("continue");
+    expect(decision.blocking_reasons).toContain("composer_claimed_no_observations_but_receipts_exist");
+  });
+
+  it("continues when a receipt candidate explicitly is not terminal eligible", () => {
+    const turnId = "ask:receipt-not-terminal";
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "live_environment_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      route_reason_code: "live_environment_review",
+      terminal_artifact_kind: "tool_receipt",
+      final_answer_source: "deterministic_receipt_fallback",
+      terminal_eligible: false,
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "live_environment_review",
+        terminal_artifact_kind: "tool_receipt",
+        final_answer_source: "deterministic_receipt_fallback",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      goal_satisfaction_evaluation: satisfiedGoal("live_environment_review", "model_synthesized_answer"),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "live_environment_review",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "live_environment_review",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("continue");
+    expect(decision.blocking_reasons).toContain("receipt_not_terminal_eligible");
+  });
 });
