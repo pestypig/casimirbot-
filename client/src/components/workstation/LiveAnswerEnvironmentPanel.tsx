@@ -27,6 +27,7 @@ import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-requ
 import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
+import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
 import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import {
@@ -281,6 +282,12 @@ type VisualLatestRead = {
   visual_evidence_health?: HelixVisualEvidenceHealth | null;
 };
 
+type VisualObserverProfileListRead = {
+  profiles?: StagePlayVisualObserverProfileV1[];
+  activeProfile?: StagePlayVisualObserverProfileV1 | null;
+  active_profile?: StagePlayVisualObserverProfileV1 | null;
+};
+
 type SourceBindingTransitionRead = {
   transition_id: string;
   source_id: string;
@@ -457,6 +464,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [handoffConsumptions, setHandoffConsumptions] = useState<LiveAskHandoffConsumptionRead[]>([]);
   const [planExecutions, setPlanExecutions] = useState<LivePlanContractExecutionRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
+  const [visualObserverProfiles, setVisualObserverProfiles] = useState<StagePlayVisualObserverProfileV1[]>([]);
+  const [activeVisualObserverProfile, setActiveVisualObserverProfile] = useState<StagePlayVisualObserverProfileV1 | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -600,6 +609,18 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     [sourceHealthEntries],
   );
   const visualEvidenceHealth = visualLatest?.visual_evidence_health ?? null;
+  const minecraftVisualObserverProfile = useMemo(
+    () => visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === "stage_play_visual_observer_profile:minecraft-gameplay:v1") ??
+      visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.domain === "minecraft_gameplay") ??
+      null,
+    [visualObserverProfiles],
+  );
+  const genericVisualObserverProfile = useMemo(
+    () => visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === "stage_play_visual_observer_profile:generic:v1") ??
+      visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.title === "Generic Visual Observer") ??
+      null,
+    [visualObserverProfiles],
+  );
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     return sourceId ? state.producers[sourceId] ?? null : null;
@@ -748,6 +769,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setHandoffConsumptions(Array.isArray(handoffConsumptionBody.handoff_consumptions) ? handoffConsumptionBody.handoff_consumptions : []);
       setPlanExecutions(Array.isArray(planExecutionBody.plan_executions) ? planExecutionBody.plan_executions : []);
       setVisualLatest(visualLatestBody ?? null);
+      const visualSourceId =
+        typeof visualLatestBody?.active_source?.source_id === "string"
+          ? visualLatestBody.active_source.source_id
+          : typeof visualLatestBody?.source?.source_id === "string"
+            ? visualLatestBody.source.source_id
+            : "";
+      const visualObserverProfileBody: VisualObserverProfileListRead = await fetch(
+        `/api/helix/stage-play/visual-observer-profile?sourceId=${encodeURIComponent(visualSourceId)}&includePresets=true`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setVisualObserverProfiles(Array.isArray(visualObserverProfileBody.profiles) ? visualObserverProfileBody.profiles : []);
+      setActiveVisualObserverProfile(visualObserverProfileBody.activeProfile ?? visualObserverProfileBody.active_profile ?? null);
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -1033,6 +1065,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     } catch (error) {
       if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setLastActionStatus(error instanceof Error ? error.message : "visual_interval_start_failed");
+    }
+  };
+
+  const applyVisualObserverProfile = async (profile: StagePlayVisualObserverProfileV1 | null) => {
+    if (!profile) {
+      setLastActionStatus("Visual observer shade preset is not available.");
+      return;
+    }
+    try {
+      const source = await ensureVisualSourceRegistered();
+      const response = await postJson("/api/helix/stage-play/visual-observer-profile/apply", {
+        profileId: profile.profileId,
+        sourceIds: [source.source_id],
+      });
+      const applied = response?.profile as StagePlayVisualObserverProfileV1 | undefined;
+      setLastActionStatus(`${applied?.title ?? profile.title} shade applied to ${source.source_id}. Future visual frames will use this observer prompt.`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "visual_observer_profile_apply_failed");
     }
   };
 
@@ -1411,6 +1462,41 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           >
             Go to log
           </button>
+        </div>
+        <div className="mt-2 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase text-violet-100">Shades</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-300">
+                {activeVisualObserverProfile
+                  ? `${activeVisualObserverProfile.title} -> ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
+                  : "Generic visual capture prompt is active until a shade is applied."}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => void applyVisualObserverProfile(minecraftVisualObserverProfile)}
+                disabled={!minecraftVisualObserverProfile}
+                className="rounded border border-violet-300/30 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Minecraft
+              </button>
+              <button
+                type="button"
+                onClick={() => void applyVisualObserverProfile(genericVisualObserverProfile)}
+                disabled={!genericVisualObserverProfile}
+                className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Generic
+              </button>
+            </div>
+          </div>
+          {activeVisualObserverProfile?.prompt ? (
+            <p className="mt-2 line-clamp-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-slate-300">
+              {activeVisualObserverProfile.prompt}
+            </p>
+          ) : null}
         </div>
         {visualLatest?.evidence?.summary ? (
           <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
