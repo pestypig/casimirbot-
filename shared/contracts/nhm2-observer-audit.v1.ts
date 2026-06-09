@@ -1,3 +1,8 @@
+import {
+  isNhm2SameChartFullTensorArtifact,
+  type Nhm2SameChartFullTensorArtifactV1,
+} from "./nhm2-same-chart-full-tensor.v1";
+
 export const NHM2_OBSERVER_AUDIT_ARTIFACT_ID = "nhm2_observer_audit";
 export const NHM2_OBSERVER_AUDIT_SCHEMA_VERSION =
   "nhm2_observer_audit/v1";
@@ -1710,6 +1715,7 @@ export type Nhm2ObserverAuditArtifact = {
   tileObserverConditionAuthorityMode?: Nhm2ObserverTileObserverConditionAuthorityMode;
   tileObserverConditionAuthorityNote?: string | null;
   tileObserverLegacyProxyDiagnostics?: Nhm2ObserverTileObserverLegacyProxyDiagnostics | null;
+  sameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1 | null;
   tensors: {
     metricRequired: Nhm2ObserverAuditTensor;
     tileEffective: Nhm2ObserverAuditTensor;
@@ -1831,6 +1837,7 @@ export type BuildNhm2ObserverAuditArtifactInput = {
     | null;
   observerLeadReadinessReason?: string | null;
   observerNextTechnicalAction?: Nhm2ObserverNextTechnicalAction | null;
+  sameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1 | null;
   metricProducerAdmissionEvidence?: {
     semanticsRef?: string | null;
     chartRef?: string | null;
@@ -9036,6 +9043,11 @@ export const buildNhm2ObserverAuditArtifact = (
     normalizeTileObserverLegacyProxyDiagnostics(
       input.tileObserverLegacyProxyDiagnostics,
     );
+  const sameChartFullTensor = isNhm2SameChartFullTensorArtifact(
+    input.sameChartFullTensor,
+  )
+    ? input.sameChartFullTensor
+    : null;
 
   return {
     artifactId: NHM2_OBSERVER_AUDIT_ARTIFACT_ID,
@@ -9110,6 +9122,7 @@ export const buildNhm2ObserverAuditArtifact = (
     tileObserverConditionAuthorityMode: tileObserverConditionAuthority.mode,
     tileObserverConditionAuthorityNote: tileObserverConditionAuthority.note,
     tileObserverLegacyProxyDiagnostics,
+    sameChartFullTensor,
     tensors: {
       metricRequired,
       tileEffective,
@@ -9402,6 +9415,9 @@ export const isNhm2ObserverAuditArtifact = (
       isTileObserverLegacyProxyDiagnostics(
         record.tileObserverLegacyProxyDiagnostics,
       )) &&
+    (record.sameChartFullTensor === undefined ||
+      record.sameChartFullTensor === null ||
+      isNhm2SameChartFullTensorArtifact(record.sameChartFullTensor)) &&
     tensors != null &&
     isTensor(tensors.metricRequired) &&
     isTensor(tensors.tileEffective)
