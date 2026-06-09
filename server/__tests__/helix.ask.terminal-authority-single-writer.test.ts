@@ -62,6 +62,21 @@ describe("Helix terminal authority single writer", () => {
     });
 
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.artifactId).toBe("terminal_authority_single_writer");
+    expect(result.schemaVersion).toBe("helix.terminal_authority_single_writer.v1");
+    expect(result.selectedArtifactKind).toBe("model_synthesized_answer");
+    expect(result.audit).toMatchObject({
+      artifactId: "terminal_authority_single_writer",
+      schemaVersion: "helix.terminal_authority_single_writer.v1",
+      selectedArtifactKind: "model_synthesized_answer",
+      wroteVisibleFields: expect.arrayContaining([
+        "payload.text",
+        "payload.answer",
+        "payload.assistant_answer",
+        "payload.selected_final_answer",
+        "terminal_presentation.concise_text",
+      ]),
+    });
     expect(result.selected_terminal_artifact_ref).toBe(`${turnId}:model_synthesized_answer:from_final_answer_draft`);
     expect(result.visible_text).toBe("docs-viewer has been successfully opened.");
     expect(result.integrity.visible_matches_draft).toBe(true);
@@ -205,6 +220,17 @@ describe("Helix terminal authority single writer", () => {
     });
 
     expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.audit?.rejectedCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactKind: "normal_answer",
+          reason: "missing_evidence_reentry",
+        }),
+      ]),
+    );
+    expect(result.audit?.forbiddenPreAuthorityVisibleFields).toEqual(
+      expect.arrayContaining(["payload.selected_final_answer"]),
+    );
     expect(result.integrity.post_tool_model_step_satisfied).toBe(false);
     expect(payload.terminal_artifact_kind).toBe("typed_failure");
     expect(payload.final_answer_source).toBe("typed_failure");
@@ -280,6 +306,15 @@ describe("Helix terminal authority single writer", () => {
         }),
       ]),
     );
+    expect(result.audit?.rejectedCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifactKind: "model_synthesized_answer",
+          reason: "stale_model_only_after_observation",
+        }),
+      ]),
+    );
+    expect(payload.terminal_candidate_rejections).toEqual(result.audit?.rejectedCandidates);
     expect(["post_tool_model_step_missing", "terminal_boundary_ineligible"]).toContain(payload.terminal_error_code);
     expect(payload.selected_final_answer).not.toBe(staleText);
   });
