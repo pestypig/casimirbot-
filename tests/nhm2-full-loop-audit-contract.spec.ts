@@ -11,6 +11,7 @@ import {
 import { buildNhm2WallSourceClosureArtifact } from "../shared/contracts/nhm2-wall-source-closure.v1";
 import { buildNhm2ObserverRobustEnergyConditionArtifact } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { buildNhm2NatarioInvariantAudit } from "../shared/contracts/nhm2-natario-invariant-audit.v1";
 
 const makeArtifactRef = (artifactId: string, path: string) => ({
   artifactId,
@@ -120,6 +121,94 @@ const makeQeiWorldlineDossier = (args?: {
       },
     ],
   });
+
+const makeNatarioInvariantAudit = (args?: {
+  missingInvariants?: boolean;
+  thetaFlatnessStatus?: "pass" | "fail" | "missing";
+  convergenceStatus?: "pass" | "fail" | "missing" | "not_run";
+}) =>
+  buildNhm2NatarioInvariantAudit({
+    generatedAt: "2026-04-07T12:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    metricFamily: "nhm2_shift_lapse",
+    expansion: {
+      thetaMaxAbs: 0,
+      thetaFlatnessStatus: args?.thetaFlatnessStatus ?? "pass",
+      expansionLeakageBound: 1e-9,
+    },
+    invariants: args?.missingInvariants
+      ? {}
+      : {
+          ricciScalar: 0,
+          kretschmannScalar: 0,
+          weylScalarProxy: 0,
+          petrovClass: "O",
+        },
+    momentumDensity: {
+      Jx: 0,
+      Jy: 0,
+      Jz: 0,
+    },
+    stability: {
+      tidalMax: 0,
+      blueshiftMax: 0,
+      convergenceStatus: args?.convergenceStatus ?? "pass",
+    },
+  });
+
+const makeNatarioInvariantAuditSection = (args?: {
+  missingInvariants?: boolean;
+  thetaFlatnessStatus?: "pass" | "fail" | "missing";
+  convergenceStatus?: "pass" | "fail" | "missing" | "not_run";
+}): Nhm2FullLoopAuditSectionsInput["natario_invariant_audit"] => {
+  const audit = makeNatarioInvariantAudit(args);
+  return {
+    sectionId: "natario_invariant_audit",
+    state:
+      audit.expansion.thetaFlatnessStatus === "fail" ||
+      audit.stability.convergenceStatus === "fail"
+        ? "fail"
+        : audit.blockers.length > 0
+          ? "review"
+          : "pass",
+    reasons: [
+      ...(audit.expansion.thetaFlatnessStatus === "fail"
+        ? (["natario_zero_expansion_failed"] as const)
+        : []),
+      ...(audit.invariants.status !== "computed"
+        ? (["natario_invariants_missing"] as const)
+        : []),
+      ...(audit.momentumDensity.status !== "computed"
+        ? (["natario_momentum_density_missing"] as const)
+        : []),
+      ...(audit.stability.convergenceStatus !== "pass" ||
+      audit.stability.tidalMax == null ||
+      audit.stability.blueshiftMax == null
+        ? (["natario_stability_diagnostics_missing"] as const)
+        : []),
+    ],
+    artifactRefs: [makeArtifactRef("natario_invariant_audit", "runtime://natario")],
+    natarioInvariantAudit: audit,
+    thetaFlatnessStatus: audit.expansion.thetaFlatnessStatus,
+    invariantStatus: audit.invariants.status,
+    momentumDensityStatus: audit.momentumDensity.status,
+    convergenceStatus: audit.stability.convergenceStatus,
+    thetaMaxAbs: audit.expansion.thetaMaxAbs,
+    expansionLeakageBound: audit.expansion.expansionLeakageBound,
+    ricciScalar: audit.invariants.ricciScalar,
+    kretschmannScalar: audit.invariants.kretschmannScalar,
+    weylScalarProxy: audit.invariants.weylScalarProxy,
+    petrovClass: audit.invariants.petrovClass,
+    Jx: audit.momentumDensity.Jx,
+    Jy: audit.momentumDensity.Jy,
+    Jz: audit.momentumDensity.Jz,
+    tidalMax: audit.stability.tidalMax,
+    blueshiftMax: audit.stability.blueshiftMax,
+    zeroExpansionSeparatelyReported: true,
+    zeroExpansionIsNotSafetyCertificate: true,
+  };
+};
 
 const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
   family_semantics: {
@@ -325,6 +414,9 @@ const makeSections = (): Nhm2FullLoopAuditSectionsInput => ({
     divBetaFlatnessStatus: null,
     natarioBaselineComparisonRef: null,
   },
+  natario_invariant_audit: makeNatarioInvariantAuditSection({
+    missingInvariants: true,
+  }),
   uncertainty_perturbation_reproducibility: {
     sectionId: "uncertainty_perturbation_reproducibility",
     state: "unavailable",
@@ -428,6 +520,7 @@ const makeReducedOrderReadySections = (): Nhm2FullLoopAuditSectionsInput => {
     divBetaFlatnessStatus: "PASS",
     natarioBaselineComparisonRef: "artifact://natario-baseline",
   };
+  sections.natario_invariant_audit = makeNatarioInvariantAuditSection();
   sections.uncertainty_perturbation_reproducibility = {
     ...sections.uncertainty_perturbation_reproducibility,
     state: "pass",
@@ -674,6 +767,28 @@ describe("nhm2 full-loop audit contract", () => {
     expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
   });
 
+  it("keeps Natario invariant readiness in review when theta is pass but invariants are missing", () => {
+    const sections = makeReducedOrderReadySections();
+    sections.natario_invariant_audit = makeNatarioInvariantAuditSection({
+      missingInvariants: true,
+    });
+
+    const contract = buildNhm2FullLoopAuditContract({
+      generatedAt: "2026-06-09T00:00:00.000Z",
+      sections,
+    });
+
+    expect(contract).not.toBeNull();
+    expect(contract?.sections.natario_invariant_audit.thetaFlatnessStatus).toBe("pass");
+    expect(contract?.sections.natario_invariant_audit.invariantStatus).toBe("missing");
+    expect(contract?.sections.natario_invariant_audit.state).toBe("review");
+    expect(contract?.sections.natario_invariant_audit.reasons).toContain(
+      "natario_invariants_missing",
+    );
+    expect(contract?.claimTierReadiness["reduced-order"].state).toBe("review");
+    expect(isNhm2FullLoopAuditContract(contract)).toBe(true);
+  });
+
   it("keeps full-loop readiness in review when observer-robust checks are missing", () => {
     const sections = makeReducedOrderReadySections();
     sections.observer_audit = {
@@ -817,6 +932,7 @@ describe("nhm2 full-loop audit contract", () => {
       divBetaFlatnessStatus: "PASS",
       natarioBaselineComparisonRef: "artifact://natario-baseline",
     };
+    sections.natario_invariant_audit = makeNatarioInvariantAuditSection();
     sections.uncertainty_perturbation_reproducibility = {
       ...sections.uncertainty_perturbation_reproducibility,
       state: "pass",

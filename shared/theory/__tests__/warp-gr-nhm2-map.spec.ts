@@ -25,8 +25,11 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.source.wall_t00_trace",
         "nhm2.closure.wall_t00_source_residual",
         "nhm2.tensor.full_authority_gate",
+        "nhm2.tensor.same_chart_full_tensor",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
+        "nhm2.natario.invariant_audit",
+        "nhm2.energy_condition.observer_robust_gate",
       ]),
     );
     expect(path?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");

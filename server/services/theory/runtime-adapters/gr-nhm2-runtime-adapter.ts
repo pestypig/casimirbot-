@@ -25,7 +25,10 @@ export const GR_NHM2_SUPPORTED_BADGE_IDS = [
   "nhm2.closure.source_residual",
   "nhm2.source.wall_t00_trace",
   "nhm2.tensor.full_authority_gate",
+  "nhm2.tensor.same_chart_full_tensor",
   "nhm2.natario.curvature_invariants",
+  "nhm2.natario.invariant_audit",
+  "nhm2.energy_condition.observer_robust_gate",
   "nhm2.energy_condition.diagnostic_gate",
   "nhm2.claim_boundary.diagnostic_only",
 ] as const;

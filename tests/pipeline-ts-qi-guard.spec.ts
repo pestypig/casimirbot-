@@ -301,6 +301,12 @@ describe("pipeline ts/qi autoscale integration", () => {
       (snapshot as any).qiGuardrail?.lhs_Jm3 ?? null,
     );
     expect(wallWorldline.claimBoundary).toBeUndefined();
+    const natarioAudit = (snapshot as any).nhm2NatarioInvariantAudit;
+    expect(natarioAudit).toBeTruthy();
+    expect((snapshot as any).natario?.nhm2NatarioInvariantAudit).toEqual(natarioAudit);
+    expect(natarioAudit.contractVersion).toBe("nhm2_natario_invariant_audit/v1");
+    expect(natarioAudit.claimBoundary.zeroExpansionIsNotSafetyCertificate).toBe(true);
+    expect(["computed", "partial", "missing"]).toContain(natarioAudit.invariants.status);
   });
 
   it("labels NHM2 hardware-timed strict signals as proxy instead of metric-derived", async () => {

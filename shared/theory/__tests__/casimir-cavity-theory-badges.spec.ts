@@ -25,6 +25,20 @@ describe("casimir cavity theory badges", () => {
     expect(badgeIds).toContain("casimir.geometry.beyond_pfa_validity");
     expect(badgeIds).toContain("casimir.cavity.mode_frequency");
     expect(badgeIds).toContain("casimir.claim_boundary.diagnostic_source_context");
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "casimir.geometry.beyond_pfa_validity",
+          to: "casimir.material.lifshitz_receipt",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "casimir.material.lifshitz_receipt",
+          to: "nhm2.closure.wall_t00_source_residual",
+          relation: "diagnostic_checks",
+        }),
+      ]),
+    );
     expect(JSON.stringify(graph)).not.toMatch(/Casimir proves propulsion|validated propulsion|confirmed physical mechanism/i);
   });
 

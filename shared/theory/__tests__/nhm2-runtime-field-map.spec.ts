@@ -35,8 +35,11 @@ describe("NHM2 runtime field map", () => {
     expect(isNhm2RuntimeBoundBadge("nhm2.closure.wall_t00_source_residual")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.source.wall_t00_trace")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.tensor.full_authority_gate")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.tensor.same_chart_full_tensor")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.sampling_window")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.worldline_dossier")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.energy_condition.observer_robust_gate")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.natario.invariant_audit")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.energy_condition.diagnostic_gate")).toBe(true);
   });
 
@@ -44,6 +47,7 @@ describe("NHM2 runtime field map", () => {
     const wallClosure = getNhm2RuntimeFieldBinding("nhm2.closure.wall_t00_source_residual");
     const wall = getNhm2RuntimeFieldBinding("nhm2.source.wall_t00_trace");
     const tensor = getNhm2RuntimeFieldBinding("nhm2.tensor.full_authority_gate");
+    const sameChartTensor = getNhm2RuntimeFieldBinding("nhm2.tensor.same_chart_full_tensor");
 
     expect(wallClosure?.artifactFields).toEqual(
       expect.arrayContaining([
@@ -75,6 +79,46 @@ describe("NHM2 runtime field map", () => {
     );
     expect(tensor?.requiredEvidence).toEqual(
       expect.arrayContaining(["metric_t0i_emission", "metric_off_diagonal_tij_emission"]),
+    );
+    expect(sameChartTensor?.artifactFields).toEqual(
+      expect.arrayContaining([
+        "sameChartFullTensor.components[].componentId",
+        "sameChartFullTensor.components[].status",
+        "sameChartFullTensor.completeness.fullTensorComplete",
+        "sameChartFullTensor.completeness.missingComponentIds",
+      ]),
+    );
+    expect(sameChartTensor?.scalarCuts).toEqual([]);
+    expect(sameChartTensor?.requiredEvidence).toEqual(
+      expect.arrayContaining(["same_chart_full_tensor_artifact", "adm_projection_state"]),
+    );
+  });
+
+  it("maps observer-robust energy and Natario invariant gates without scalar cuts", () => {
+    const observerRobust = getNhm2RuntimeFieldBinding("nhm2.energy_condition.observer_robust_gate");
+    const natarioAudit = getNhm2RuntimeFieldBinding("nhm2.natario.invariant_audit");
+
+    expect(observerRobust?.scalarCuts).toEqual([]);
+    expect(observerRobust?.artifactFields).toEqual(
+      expect.arrayContaining([
+        "nhm2ObserverRobustEnergyConditions.summary.eulerianOnly",
+        "nhm2ObserverRobustEnergyConditions.summary.robustCheckComplete",
+        "nhm2ObserverRobustEnergyConditions.summary.anyViolation",
+      ]),
+    );
+    expect(observerRobust?.requiredEvidence).toEqual(
+      expect.arrayContaining(["observer_robust_energy_conditions_artifact", "same_chart_full_tensor_artifact"]),
+    );
+    expect(natarioAudit?.scalarCuts).toEqual([]);
+    expect(natarioAudit?.artifactFields).toEqual(
+      expect.arrayContaining([
+        "nhm2NatarioInvariantAudit.expansion.thetaFlatnessStatus",
+        "nhm2NatarioInvariantAudit.invariants.status",
+        "nhm2NatarioInvariantAudit.stability.convergenceStatus",
+      ]),
+    );
+    expect(natarioAudit?.requiredEvidence).toEqual(
+      expect.arrayContaining(["natario_invariant_audit_artifact", "stability_diagnostic_report"]),
     );
   });
 

@@ -914,6 +914,22 @@ export const CASIMIR_CAVITY_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Ideal plate geometry does not certify shaped tile geometry.",
   },
   {
+    id: "casimir_beyond_pfa_validity_feeds_lifshitz_receipt",
+    from: "casimir.geometry.beyond_pfa_validity",
+    to: "casimir.material.lifshitz_receipt",
+    relation: "requires",
+    label: "Lifshitz material receipts require geometry/metrology context before shaped-tile source interpretation.",
+    claimBoundaryNote: "A dielectric-response receipt without geometry validity remains diagnostic only.",
+  },
+  {
+    id: "casimir_lifshitz_receipt_feeds_wall_t00_source_residual",
+    from: "casimir.material.lifshitz_receipt",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "diagnostic_checks",
+    label: "Material receipts provide source-context evidence for the wall-region T00 residual gate.",
+    claimBoundaryNote: "Receipt-backed Casimir rows still do not override wall closure failure.",
+  },
+  {
     id: "casimir_ideal_scalar_requires_receipt_for_source_evidence",
     from: "casimir.cavity.parallel_plate_energy_density",
     to: "casimir.material.lifshitz_receipt",

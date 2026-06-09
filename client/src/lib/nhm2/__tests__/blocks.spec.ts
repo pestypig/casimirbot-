@@ -59,6 +59,43 @@ const makeAuthorityState = () => {
       congruentSolvePass: true,
       hull: { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
       lightCrossing: { tauLC_ms: 0.003359 },
+      nhm2SameChartFullTensor: {
+        completeness: { fullTensorComplete: true, missingComponentIds: [] },
+      },
+      nhm2WallSourceClosure: {
+        residual: { pass: true, relative: 0 },
+        blockers: [],
+      },
+      nhm2ObserverRobustEnergyConditions: {
+        metricRequired: {
+          summary: {
+            robustCheckComplete: true,
+            eulerianOnly: false,
+            anyViolation: false,
+          },
+        },
+        tileEffective: {
+          summary: {
+            robustCheckComplete: true,
+            eulerianOnly: false,
+            anyViolation: false,
+          },
+        },
+      },
+      nhm2QeiWorldlineDossier: {
+        summary: {
+          dossierComplete: true,
+          hasWallWorldline: true,
+          anyProxy: false,
+        },
+      },
+      casimirMaterialReceipt: { status: "material_receipted" },
+      nhm2NatarioInvariantAudit: {
+        expansion: { thetaFlatnessStatus: "pass" },
+        invariants: { status: "computed" },
+        stability: { convergenceStatus: "pass" },
+        blockers: [],
+      },
     } as any,
     proofPack,
     grConstraintContract,

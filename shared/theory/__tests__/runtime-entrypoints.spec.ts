@@ -72,6 +72,15 @@ describe("theory runtime entrypoint registry", () => {
     const wallEntrypoints = findTheoryRuntimeEntrypointsForBadge("nhm2.source.wall_t00_trace").map(
       (entrypoint) => entrypoint.runtimeId,
     );
+    const sameChartTensorEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.tensor.same_chart_full_tensor",
+    ).map((entrypoint) => entrypoint.runtimeId);
+    const observerRobustEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.energy_condition.observer_robust_gate",
+    ).map((entrypoint) => entrypoint.runtimeId);
+    const natarioInvariantEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.natario.invariant_audit",
+    ).map((entrypoint) => entrypoint.runtimeId);
     const casimirMaterialEntrypoints = findTheoryRuntimeEntrypointsForBadge("casimir.material_receipts").map(
       (entrypoint) => entrypoint.runtimeId,
     );
@@ -79,6 +88,13 @@ describe("theory runtime entrypoint registry", () => {
     expect(wallEntrypoints).toEqual(
       expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
     );
+    expect(sameChartTensorEntrypoints).toEqual(
+      expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(observerRobustEntrypoints).toEqual(
+      expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(natarioInvariantEntrypoints).toContain("warp.full_solve.campaign");
     expect(casimirMaterialEntrypoints).toContain("casimir.verify");
   });
 });

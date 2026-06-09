@@ -192,6 +192,42 @@ export type Nhm2SolveState = {
       vdbBand: GuardrailStatus;
     };
   };
+  closureStack: {
+    sameChartFullTensor: {
+      available: boolean;
+      fullTensorComplete: boolean | null;
+      missingComponentIds: string[];
+    };
+    wallSourceClosure: {
+      available: boolean;
+      pass: boolean | null;
+      relativeResidual: number | null;
+      blockers: string[];
+    };
+    observerRobustEnergyConditions: {
+      available: boolean;
+      robustCheckComplete: boolean | null;
+      eulerianOnly: boolean | null;
+      anyViolation: boolean | null;
+    };
+    qeiWorldlineDossier: {
+      available: boolean;
+      dossierComplete: boolean | null;
+      hasWallWorldline: boolean | null;
+      anyProxy: boolean | null;
+    };
+    casimirMaterialReceipt: {
+      available: boolean;
+      status: string | null;
+      idealScalarOnly: boolean | null;
+    };
+    natarioInvariantAudit: {
+      available: boolean;
+      status: string | null;
+      thetaFlatnessStatus: string | null;
+      invariantStatus: string | null;
+    };
+  };
   vacuum: {
     available: boolean;
     status: string | null;
@@ -241,6 +277,36 @@ const readText = (source: RecordLike | null, ...keys: string[]): string | null =
     if (value != null) return value;
   }
   return null;
+};
+
+const readBoolean = (source: RecordLike | null, ...keys: string[]): boolean | null => {
+  if (!source) return null;
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+};
+
+const readRecord = (source: RecordLike | null, ...keys: string[]): RecordLike | null => {
+  if (!source) return null;
+  for (const key of keys) {
+    const record = asRecord(source[key]);
+    if (record != null) return record;
+  }
+  return null;
+};
+
+const readStringArray = (source: RecordLike | null, ...keys: string[]): string[] => {
+  if (!source) return [];
+  for (const key of keys) {
+    const value = source[key];
+    if (!Array.isArray(value)) continue;
+    return value.filter(
+      (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+    );
+  }
+  return [];
 };
 
 const getProofValue = (
@@ -329,6 +395,19 @@ const normalizeGuardrailStatus = (value: unknown): GuardrailStatus => {
 const compareAxis = (authority: number, live: number | null) =>
   live != null && Math.abs(authority - live) <= HULL_MATCH_TOLERANCE_M;
 
+const combineBooleanAll = (values: Array<boolean | null>): boolean | null => {
+  const known = values.filter((value): value is boolean => typeof value === "boolean");
+  if (known.length === 0) return null;
+  if (known.some((value) => value === false)) return false;
+  return true;
+};
+
+const combineBooleanAny = (values: Array<boolean | null>): boolean | null => {
+  const known = values.filter((value): value is boolean => typeof value === "boolean");
+  if (known.length === 0) return null;
+  return known.some((value) => value === true);
+};
+
 export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveState {
   const pipeline = input.pipeline ?? null;
   const proofPack = input.proofPack ?? null;
@@ -338,6 +417,7 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
   const stageGate = input.stageGate ?? null;
 
   const pipelineRecord = asRecord(pipeline);
+  const natarioRecord = readRecord(pipelineRecord, "natario");
   const hull = asRecord(pipelineRecord?.hull);
   const lightCrossing = asRecord(pipelineRecord?.lightCrossing);
   const geometryFallback = asRecord(pipelineRecord?.geometryFallback);
@@ -401,6 +481,141 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
   const strictProxy = hasStrictProxy(proofPack);
   const geometryFallbackApplied = geometryFallback?.applied === true;
   const geometryFallbackBlocked = geometryFallback?.blocked === true;
+  const sameChartTensor =
+    readRecord(pipelineRecord, "nhm2SameChartFullTensor", "nhm2_same_chart_full_tensor") ??
+    readRecord(natarioRecord, "nhm2SameChartFullTensor", "nhm2_same_chart_full_tensor");
+  const sameChartCompleteness = readRecord(sameChartTensor, "completeness");
+  const sourceClosure =
+    readRecord(pipelineRecord, "nhm2SourceClosure", "nhm2_source_closure") ??
+    readRecord(natarioRecord, "nhm2SourceClosure", "nhm2_source_closure");
+  const wallSourceClosure =
+    readRecord(pipelineRecord, "nhm2WallSourceClosure", "nhm2_wall_source_closure") ??
+    readRecord(natarioRecord, "nhm2WallSourceClosure", "nhm2_wall_source_closure") ??
+    readRecord(sourceClosure, "wallSourceClosure", "wall_source_closure");
+  const wallResidual = readRecord(wallSourceClosure, "residual");
+  const robustEnergyConditions =
+    readRecord(
+      pipelineRecord,
+      "nhm2ObserverRobustEnergyConditions",
+      "nhm2_observer_robust_energy_conditions",
+    ) ??
+    readRecord(
+      natarioRecord,
+      "nhm2ObserverRobustEnergyConditions",
+      "nhm2_observer_robust_energy_conditions",
+    ) ??
+    readRecord(
+      readRecord(pipelineRecord, "nhm2ObserverAudit", "nhm2_observer_audit") ??
+        readRecord(natarioRecord, "nhm2ObserverAudit", "nhm2_observer_audit"),
+      "observerRobustEnergyConditions",
+    );
+  const robustConditionArtifacts = [
+    readRecord(robustEnergyConditions, "metricRequired"),
+    readRecord(robustEnergyConditions, "tileEffective"),
+    robustEnergyConditions?.contractVersion === "nhm2_observer_robust_energy_conditions/v1"
+      ? robustEnergyConditions
+      : null,
+  ].filter((entry): entry is RecordLike => entry != null);
+  const robustSummaries = robustConditionArtifacts.map((artifact) =>
+    readRecord(artifact, "summary"),
+  );
+  const qeiWorldlineDossier =
+    readRecord(pipelineRecord, "nhm2QeiWorldlineDossier", "nhm2_qei_worldline_dossier") ??
+    readRecord(natarioRecord, "nhm2QeiWorldlineDossier", "nhm2_qei_worldline_dossier");
+  const qeiSummary = readRecord(qeiWorldlineDossier, "summary");
+  const casimirMaterialReceipt =
+    readRecord(pipelineRecord, "casimirMaterialReceipt", "casimir_material_receipt") ??
+    readRecord(natarioRecord, "casimirMaterialReceipt", "casimir_material_receipt");
+  const casimirMaterialReceiptStatus =
+    readText(casimirMaterialReceipt, "status") ??
+    readText(pipelineRecord, "casimir_material_receipt_status");
+  const natarioInvariantAudit =
+    readRecord(
+      pipelineRecord,
+      "nhm2NatarioInvariantAudit",
+      "nhm2_natario_invariant_audit",
+    ) ??
+    readRecord(
+      natarioRecord,
+      "nhm2NatarioInvariantAudit",
+      "nhm2_natario_invariant_audit",
+    );
+  const natarioInvariantExpansion = readRecord(natarioInvariantAudit, "expansion");
+  const natarioInvariantCurvature = readRecord(natarioInvariantAudit, "invariants");
+  const natarioInvariantStability = readRecord(natarioInvariantAudit, "stability");
+  const natarioInvariantBlockers = readStringArray(natarioInvariantAudit, "blockers");
+  const natarioInvariantStatus =
+    readText(natarioInvariantAudit, "status") ??
+    readText(pipelineRecord, "nhm2_full_loop_natario_invariant_audit_status") ??
+    (natarioInvariantAudit == null
+      ? null
+      : readText(natarioInvariantExpansion, "thetaFlatnessStatus") === "fail" ||
+          readText(natarioInvariantStability, "convergenceStatus") === "fail"
+        ? "fail"
+        : natarioInvariantBlockers.length > 0
+          ? "review"
+          : "pass");
+  const closureStack: Nhm2SolveState["closureStack"] = {
+    sameChartFullTensor: {
+      available: sameChartTensor != null,
+      fullTensorComplete:
+        readBoolean(sameChartCompleteness, "fullTensorComplete") ??
+        readBoolean(pipelineRecord, "nhm2_same_chart_full_tensor_complete"),
+      missingComponentIds: readStringArray(sameChartCompleteness, "missingComponentIds"),
+    },
+    wallSourceClosure: {
+      available: wallSourceClosure != null,
+      pass:
+        readBoolean(wallResidual, "pass") ??
+        readBoolean(pipelineRecord, "nhm2_wall_source_closure_pass"),
+      relativeResidual:
+        readNumber(wallResidual, "relative") ??
+        readNumber(pipelineRecord, "nhm2_wall_source_closure_relative_residual"),
+      blockers: readStringArray(wallSourceClosure, "blockers"),
+    },
+    observerRobustEnergyConditions: {
+      available: robustConditionArtifacts.length > 0,
+      robustCheckComplete: combineBooleanAll(
+        robustSummaries.map((summary) => readBoolean(summary, "robustCheckComplete")),
+      ),
+      eulerianOnly: combineBooleanAny(
+        robustSummaries.map((summary) => readBoolean(summary, "eulerianOnly")),
+      ),
+      anyViolation: combineBooleanAny(
+        robustSummaries.map((summary) => readBoolean(summary, "anyViolation")),
+      ),
+    },
+    qeiWorldlineDossier: {
+      available: qeiWorldlineDossier != null,
+      dossierComplete:
+        readBoolean(qeiSummary, "dossierComplete") ??
+        readBoolean(pipelineRecord, "nhm2_qei_worldline_dossier_complete"),
+      hasWallWorldline:
+        readBoolean(qeiSummary, "hasWallWorldline") ??
+        readBoolean(pipelineRecord, "nhm2_qei_worldline_dossier_has_wall"),
+      anyProxy:
+        readBoolean(qeiSummary, "anyProxy") ??
+        readBoolean(pipelineRecord, "nhm2_qei_worldline_dossier_any_proxy"),
+    },
+    casimirMaterialReceipt: {
+      available: casimirMaterialReceipt != null,
+      status: casimirMaterialReceiptStatus,
+      idealScalarOnly:
+        casimirMaterialReceiptStatus == null
+          ? null
+          : casimirMaterialReceiptStatus === "ideal_scalar_only",
+    },
+    natarioInvariantAudit: {
+      available: natarioInvariantAudit != null,
+      status: natarioInvariantStatus,
+      thetaFlatnessStatus:
+        readText(natarioInvariantExpansion, "thetaFlatnessStatus") ??
+        readText(pipelineRecord, "nhm2_natario_theta_flatness_status"),
+      invariantStatus:
+        readText(natarioInvariantCurvature, "status") ??
+        readText(pipelineRecord, "nhm2_natario_invariant_status"),
+    },
+  };
   const overallReasons: string[] = [];
 
   if (!pipeline) overallReasons.push("pipeline unavailable");
@@ -427,13 +642,57 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
   } else if (guardrailStatuses.some((status) => status === "missing")) {
     overallReasons.push("one or more GR guardrails are missing");
   }
+  if (
+    !closureStack.sameChartFullTensor.available ||
+    closureStack.sameChartFullTensor.fullTensorComplete !== true
+  ) {
+    overallReasons.push("same-chart full tensor incomplete");
+  }
+  if (
+    !closureStack.wallSourceClosure.available ||
+    closureStack.wallSourceClosure.pass !== true
+  ) {
+    overallReasons.push("wall source closure missing/failing");
+  }
+  if (
+    !closureStack.observerRobustEnergyConditions.available ||
+    closureStack.observerRobustEnergyConditions.robustCheckComplete !== true ||
+    closureStack.observerRobustEnergyConditions.eulerianOnly === true
+  ) {
+    overallReasons.push("observer-robust energy-condition check incomplete");
+  }
+  if (
+    !closureStack.qeiWorldlineDossier.available ||
+    closureStack.qeiWorldlineDossier.dossierComplete !== true ||
+    closureStack.qeiWorldlineDossier.hasWallWorldline !== true
+  ) {
+    overallReasons.push("QEI worldline dossier incomplete");
+  }
+  if (
+    !closureStack.casimirMaterialReceipt.available ||
+    closureStack.casimirMaterialReceipt.status !== "material_receipted"
+  ) {
+    overallReasons.push("Casimir material receipt missing");
+  }
+  if (
+    !closureStack.natarioInvariantAudit.available ||
+    closureStack.natarioInvariantAudit.status !== "pass" ||
+    closureStack.natarioInvariantAudit.invariantStatus !== "computed"
+  ) {
+    overallReasons.push("Natário invariant audit incomplete");
+  }
 
+  const closureBlocked =
+    closureStack.wallSourceClosure.pass === false ||
+    closureStack.observerRobustEnergyConditions.anyViolation === true ||
+    closureStack.natarioInvariantAudit.status === "fail";
   const overallTone: OverallTone =
     !pipeline ||
     strictProxy ||
     grEvaluation?.pass === false ||
     integrityOk === false ||
-    geometryFallbackBlocked
+    geometryFallbackBlocked ||
+    closureBlocked
       ? "bad"
       : overallReasons.length > 0
         ? "warn"
@@ -565,6 +824,7 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
       failingConstraints,
       guardrails,
     },
+    closureStack,
     vacuum: {
       available: Boolean(vacuumContract),
       status: vacuumContract?.status ?? null,

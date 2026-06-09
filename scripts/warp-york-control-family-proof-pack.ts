@@ -37450,6 +37450,33 @@ const renderNhm2FullLoopAuditMarkdown = (args: {
       observerAudit.observerRobustEnergyConditions?.tileEffective,
     ),
   ].join("\n");
+  const natarioInvariantAudit = args.audit.sections.natario_invariant_audit;
+  const natarioInvariantRows = [
+    ["state", natarioInvariantAudit.state],
+    ["reasons", natarioInvariantAudit.reasons.join(", ") || "none"],
+    ["contractVersion", natarioInvariantAudit.natarioInvariantAudit?.contractVersion ?? "missing"],
+    ["zeroExpansion.thetaFlatnessStatus", natarioInvariantAudit.thetaFlatnessStatus],
+    ["zeroExpansion.thetaMaxAbs", natarioInvariantAudit.thetaMaxAbs ?? "null"],
+    ["zeroExpansion.expansionLeakageBound", natarioInvariantAudit.expansionLeakageBound ?? "null"],
+    ["curvature.invariantStatus", natarioInvariantAudit.invariantStatus],
+    ["curvature.ricciScalar", natarioInvariantAudit.ricciScalar ?? "null"],
+    ["curvature.kretschmannScalar", natarioInvariantAudit.kretschmannScalar ?? "null"],
+    ["curvature.weylScalarProxy", natarioInvariantAudit.weylScalarProxy ?? "null"],
+    ["curvature.petrovClass", natarioInvariantAudit.petrovClass ?? "null"],
+    ["momentumDensity.status", natarioInvariantAudit.momentumDensityStatus],
+    ["momentumDensity.Jx", natarioInvariantAudit.Jx ?? "null"],
+    ["momentumDensity.Jy", natarioInvariantAudit.Jy ?? "null"],
+    ["momentumDensity.Jz", natarioInvariantAudit.Jz ?? "null"],
+    ["stability.convergenceStatus", natarioInvariantAudit.convergenceStatus],
+    ["stability.tidalMax", natarioInvariantAudit.tidalMax ?? "null"],
+    ["stability.blueshiftMax", natarioInvariantAudit.blueshiftMax ?? "null"],
+    [
+      "zeroExpansionIsNotSafetyCertificate",
+      natarioInvariantAudit.zeroExpansionIsNotSafetyCertificate,
+    ],
+  ]
+    .map(([field, value]) => `| ${field} | ${value} |`)
+    .join("\n");
   return `# NHM2 Full-Loop Audit (${DATE_STAMP})
 
 "This checklist audits the currently selected nhm2_shift_lapse profile against the existing NHM2 full-loop contract using emitted artifact evidence only. Missing or mismatched publication surfaces remain explicit blockers and do not widen route ETA, transport, gravity, or viability claims."
@@ -37488,6 +37515,11 @@ ${globalSourceClosureRows}
 | field | value |
 |---|---|
 ${observerRobustEnergyConditionRows}
+
+## Natario Invariant Audit
+| field | value |
+|---|---|
+${natarioInvariantRows}
 
 ## Observer Audit Summary
 | field | value |
@@ -38252,6 +38284,17 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
     selectedDecompositionInspection,
     rootDecompositionInspection,
   ];
+  const natarioInvariantAuditInspections = [
+    makeExistingFileInspection(
+      path.join(
+        process.cwd(),
+        "shared",
+        "contracts",
+        "nhm2-natario-invariant-audit.v1.ts",
+      ),
+      "nhm2_natario_invariant_audit_contract",
+    ),
+  ];
   const uncertaintyInspections = [rootEnvelopeInspection, selectedEnvelopeInspection];
 
   const familySemanticsReasons: Nhm2FullLoopAuditReasonCode[] = [];
@@ -38985,6 +39028,30 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       natarioBaselineComparisonRef:
         transportArtifact?.canonicalBaselineMetricT00Ref ?? null,
     },
+    natario_invariant_audit: {
+      sectionId: "natario_invariant_audit",
+      state: "review",
+      reasons: ["natario_invariant_audit_missing"],
+      artifactRefs: collectFullLoopArtifactRefs(natarioInvariantAuditInspections),
+      natarioInvariantAudit: null,
+      thetaFlatnessStatus: "missing",
+      invariantStatus: "missing",
+      momentumDensityStatus: "missing",
+      convergenceStatus: "not_run",
+      thetaMaxAbs: null,
+      expansionLeakageBound: null,
+      ricciScalar: null,
+      kretschmannScalar: null,
+      weylScalarProxy: null,
+      petrovClass: null,
+      Jx: null,
+      Jy: null,
+      Jz: null,
+      tidalMax: null,
+      blueshiftMax: null,
+      zeroExpansionSeparatelyReported: true,
+      zeroExpansionIsNotSafetyCertificate: true,
+    },
     uncertainty_perturbation_reproducibility: {
       sectionId: "uncertainty_perturbation_reproducibility",
       state: uncertaintyState,
@@ -39118,6 +39185,16 @@ const publishNhm2ShiftLapseFullLoopAuditImpl = async (options?: {
       inspections: decompositionInspections,
       sectionState: audit.sections.shift_vs_lapse_decomposition.state,
       blockingReasons: audit.sections.shift_vs_lapse_decomposition.reasons,
+    }),
+    buildFullLoopSectionChecklist({
+      sectionId: "natario_invariant_audit",
+      expectedEvidence: [
+        "runtime NHM2 Natario invariant audit contract",
+        "shared/contracts/nhm2-natario-invariant-audit.v1.ts",
+      ],
+      inspections: natarioInvariantAuditInspections,
+      sectionState: audit.sections.natario_invariant_audit.state,
+      blockingReasons: audit.sections.natario_invariant_audit.reasons,
     }),
     buildFullLoopSectionChecklist({
       sectionId: "uncertainty_perturbation_reproducibility",

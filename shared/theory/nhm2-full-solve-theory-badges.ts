@@ -294,6 +294,55 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.tensor.same_chart_full_tensor",
+    title: "Same-Chart Full Tensor Artifact",
+    plainMeaning:
+      "Tracks explicit T00, T0i momentum-density, diagonal stress, and off-diagonal stress component status in one chart.",
+    whyItMatters:
+      "It prevents missing T0i or off-diagonal Tij components from being silently interpreted as zero or complete.",
+    subjects: ["nhm2", "tensor", "same_chart", "full_tensor", "adm"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["same_chart_full_tensor", "adm_decomposition"],
+    tags: ["full_tensor", "same_chart", "component_status", "adm", "blocks_promotion"],
+    equations: [
+      {
+        id: "same_chart_full_tensor_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{Tensor}_{full}=T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,i\\ne j}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["T00", "T0i", "Tii", "Tij_offdiag", "alpha", "beta_i", "gamma_ij", "K_ij"],
+        outputSymbols: ["same_chart_full_tensor_status"],
+      },
+    ],
+    units: [
+      { symbol: "T00", unit: "J/m^3", quantity: "energy_density_component", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "Tij", unit: "Pa", quantity: "spatial_stress_component", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The artifact is a component-status contract, not a tensor optimizer.",
+      "Missing components remain missing or blocked and are not zero-filled.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef("shared/contracts/nhm2-same-chart-full-tensor.v1.ts", "nhm2-same-chart-full-tensor-contract", "Typed component status and provenance contract."),
+      equationMapRef("momentum_density", "Momentum projection node."),
+      equationMapRef("spatial_stress", "Spatial-stress projection node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "tensor", "same_chart", "full_tensor", "adm"],
+      symbols: ["T00", "T0i", "Tii", "Tij_offdiag", "alpha", "beta_i", "gamma_ij", "K_ij"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: ["shared/contracts/nhm2-same-chart-full-tensor.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["same_chart_full_tensor", "adm_decomposition"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.tensor.metric_required_stress_energy",
     title: "Metric-Required Stress-Energy Tensor",
     plainMeaning: "Names the geometry-first stress-energy tensor required by the selected same-chart metric.",
@@ -556,6 +605,51 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.energy_condition.observer_robust_gate",
+    title: "Observer-Robust Energy-Condition Gate",
+    plainMeaning:
+      "Records whether WEC, NEC, DEC, and SEC were checked beyond a single Eulerian observer frame.",
+    whyItMatters:
+      "It prevents favorable Eulerian-frame language from being promoted into observer-robust energy-condition claims.",
+    subjects: ["nhm2", "energy_conditions", "observer_robust", "wec", "nec"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["observer_robust_energy_conditions", "energy_condition_family"],
+    tags: ["observer_robust", "eulerian_only_boundary", "wec", "nec", "blocks_promotion"],
+    equations: [
+      {
+        id: "observer_robust_energy_condition_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{EC}_{robust}=\\{WEC,NEC,DEC,SEC\\}_{observer\\ families}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["T_mu_nu", "observer_family", "WEC", "NEC", "DEC", "SEC"],
+        outputSymbols: ["observer_robust_ec_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Eulerian-only checks must be labeled as restricted observer-frame evidence.",
+      "Continuous optimization is not represented unless a runtime adapter exists.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef("shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts", "nhm2-observer-robust-energy-conditions-contract", "Typed observer-family EC contract."),
+      equationMapRef("energy_condition_family", "Observable equation map node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "energy_conditions", "observer_robust", "wec", "nec"],
+      symbols: ["T_mu_nu", "observer_family", "WEC", "NEC", "DEC", "SEC", "observer_robust_ec_status"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: ["shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["observer_robust_energy_conditions", "energy_condition_family"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.qei.worldline_sampling_requirement",
     title: "QEI Worldline Sampling Requirement",
     plainMeaning: "Records the weighted worldline stress-energy sampling requirement for a QEI dossier.",
@@ -695,6 +789,56 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: ["L^-4", "M L^-1 T^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["natario_curvature_invariants", "observer_projection"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.natario.invariant_audit",
+    title: "Natario Invariant Audit",
+    plainMeaning:
+      "Tracks zero-expansion status separately from curvature invariants, Petrov class, momentum density, tidal, blueshift, and convergence diagnostics.",
+    whyItMatters:
+      "It prevents theta-flat or zero-expansion rows from being treated as curvature, stability, or safety certificates.",
+    subjects: ["nhm2", "natario", "invariant_audit", "curvature_invariants", "stability"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["natario_invariant_audit", "observer_projection"],
+    tags: ["natario", "zero_expansion_boundary", "petrov", "momentum_density", "stability"],
+    equations: [
+      {
+        id: "natario_invariant_audit_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{Natario}_{invariant}=\\theta\\land R\\land K\\land C^2\\land Petrov\\land J_i\\land stability",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["theta", "R", "Kretschmann", "WeylProxy", "PetrovClass", "J_i", "tidalMax", "blueshiftMax"],
+        outputSymbols: ["natario_invariant_audit_status"],
+      },
+    ],
+    units: [
+      { symbol: "theta", quantity: "expansion", dimensionSignature: "T^-1" },
+      { symbol: "Kretschmann", quantity: "curvature_invariant", dimensionSignature: "L^-4" },
+      { symbol: "J_i", unit: "J/m^3", quantity: "momentum_density_projection", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Zero expansion is displayed separately and is not a safety certificate.",
+      "Missing invariants, momentum density, or stability diagnostics keep the audit blocked or review-gated.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef("shared/contracts/nhm2-natario-invariant-audit.v1.ts", "nhm2-natario-invariant-audit-contract", "Typed Natario invariant audit contract."),
+      equationMapRef("curvature_invariants", "Curvature invariant target node."),
+      equationMapRef("momentum_density", "Momentum projection node."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "natario", "invariant_audit", "curvature_invariants", "stability"],
+      symbols: ["theta", "R", "Kretschmann", "WeylProxy", "PetrovClass", "J_i", "tidalMax", "blueshiftMax"],
+      unitSignatures: ["T^-1", "L^-4", "M L^-1 T^-2"],
+      repoPaths: ["shared/contracts/nhm2-natario-invariant-audit.v1.ts", NHM2_OBSERVABLE_EQUATION_MAP],
+      equationFamilies: ["natario_invariant_audit", "observer_projection"],
       simulationOwners: ["NHM2", "general_relativity"],
     },
   }),
@@ -988,6 +1132,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Observer bookkeeping is same-chart geometry, not transport validation.",
   },
   {
+    id: "adm_requires_same_chart_full_tensor",
+    from: "physics.gr.3p1_decomposition",
+    to: "nhm2.tensor.same_chart_full_tensor",
+    relation: "requires",
+    label: "The 3+1 decomposition supplies the ADM variables required by the same-chart full tensor artifact.",
+    claimBoundaryNote: "ADM bookkeeping is component provenance, not source validation.",
+  },
+  {
     id: "efe_specializes_metric_required_tensor",
     from: "physics.gr.einstein_field_equation",
     to: "nhm2.tensor.metric_required_stress_energy",
@@ -1052,6 +1204,22 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Missing off-diagonal S_ij channels keep observer promotion blocked.",
   },
   {
+    id: "same_chart_full_tensor_feeds_wall_t00_source_residual",
+    from: "nhm2.tensor.same_chart_full_tensor",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "requires",
+    label: "Wall T00 closure reads the metric-required component status from the same-chart full tensor artifact.",
+    claimBoundaryNote: "Missing tensor components cannot be treated as zero in wall closure.",
+  },
+  {
+    id: "same_chart_full_tensor_feeds_observer_robust_gate",
+    from: "nhm2.tensor.same_chart_full_tensor",
+    to: "nhm2.energy_condition.observer_robust_gate",
+    relation: "requires",
+    label: "Observer-robust energy-condition checks require the same-chart tensor component surface.",
+    claimBoundaryNote: "Eulerian-only or component-incomplete checks cannot become observer-robust passes.",
+  },
+  {
     id: "tile_counterpart_checks_same_basis_closure",
     from: "nhm2.tensor.tile_effective_counterpart",
     to: "nhm2.closure.same_basis_regional_residual",
@@ -1108,6 +1276,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Observer diagnostics and QEI sampling remain separate review surfaces.",
   },
   {
+    id: "wall_t00_source_residual_feeds_qei_worldline_dossier",
+    from: "nhm2.closure.wall_t00_source_residual",
+    to: "nhm2.qei.worldline_dossier",
+    relation: "requires",
+    label: "The QEI dossier must include wall-region source-closure context before scalar margin language is trusted.",
+    claimBoundaryNote: "Wall closure failure remains a front-door blocker for QEI dossier completeness.",
+  },
+  {
     id: "qei_worldline_requires_dossier",
     from: "nhm2.qei.worldline_sampling_requirement",
     to: "nhm2.qei.worldline_dossier",
@@ -1122,6 +1298,22 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "Natario-adjacent curvature diagnostics document why tensor and momentum authority remain visible.",
     claimBoundaryNote: "Curvature badges are runtime targets, not promotion evidence.",
+  },
+  {
+    id: "natario_invariant_audit_feeds_observer_robust_gate",
+    from: "nhm2.natario.invariant_audit",
+    to: "nhm2.energy_condition.observer_robust_gate",
+    relation: "requires",
+    label: "Natario invariant and stability diagnostics inform observer-robust energy-condition review.",
+    claimBoundaryNote: "Zero expansion alone does not clear observer-family energy-condition language.",
+  },
+  {
+    id: "observer_robust_gate_blocks_nhm2_diagnostic_boundary",
+    from: "nhm2.energy_condition.observer_robust_gate",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "blocks",
+    label: "Observer-robust energy-condition incompleteness keeps NHM2 in diagnostic-only claim language.",
+    claimBoundaryNote: "Friendly observer checks cannot prove WEC/NEC/DEC/SEC robustness.",
   },
   {
     id: "same_basis_closure_blocks_diagonal_proxy_boundary",

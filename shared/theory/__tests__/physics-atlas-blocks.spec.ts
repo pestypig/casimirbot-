@@ -131,6 +131,8 @@ describe("physics atlas blocks", () => {
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.source.wall_t00_trace");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.closure.wall_t00_source_residual");
     expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.tensor.full_authority_gate");
+    expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.tensor.same_chart_full_tensor");
+    expect(byId.get("warp_gr_nhm2")?.primaryBadgeIds).toContain("nhm2.energy_condition.observer_robust_gate");
     expect(byId.get("qei_stress_energy")?.primaryBadgeIds).toContain("nhm2.closure.wall_t00_source_residual");
     expect(byId.get("qei_stress_energy")?.primaryBadgeIds).toContain("nhm2.qei.worldline_dossier");
     expect(byId.get("nhm2_full_solve")?.status).toBe("seed");
@@ -150,10 +152,19 @@ describe("physics atlas blocks", () => {
       "nhm2.tensor.full_authority_gate",
     );
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.tensor.same_chart_full_tensor",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.qei.worldline_dossier",
     );
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.natario.curvature_invariants",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.natario.invariant_audit",
+    );
+    expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
+      "nhm2.energy_condition.observer_robust_gate",
     );
     expect(byId.get("nhm2_full_solve")?.primaryBadgeIds).toContain(
       "nhm2.closure.same_basis_regional_residual",

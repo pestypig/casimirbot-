@@ -30,11 +30,14 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.tensor.tile_effective_counterpart");
     expect(ids).toContain("nhm2.source.wall_t00_trace");
     expect(ids).toContain("nhm2.tensor.full_authority_gate");
+    expect(ids).toContain("nhm2.tensor.same_chart_full_tensor");
     expect(ids).toContain("nhm2.closure.same_basis_regional_residual");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
+    expect(ids).toContain("nhm2.energy_condition.observer_robust_gate");
     expect(ids).toContain("nhm2.qei.worldline_sampling_requirement");
     expect(ids).toContain("nhm2.qei.worldline_dossier");
     expect(ids).toContain("nhm2.natario.curvature_invariants");
+    expect(ids).toContain("nhm2.natario.invariant_audit");
     expect(ids).toContain("nhm2.clock.centerline_tau_alpha_T");
     expect(ids).toContain("nhm2.artifact.frozen_reference_run_provenance");
   });
@@ -59,6 +62,16 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "blocks",
         }),
         expect.objectContaining({
+          from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.closure.wall_t00_source_residual",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.energy_condition.observer_robust_gate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
           from: "nhm2.clock.centerline_tau_alpha_T",
           to: "nhm2.claim_boundary.expected_clocking_not_route_result",
           relation: "blocks",
@@ -72,8 +85,33 @@ describe("NHM2 full-solve theory badges", () => {
           to: "nhm2.claim_boundary.literature_not_validation",
           relation: "blocks",
         }),
+        expect.objectContaining({
+          from: "nhm2.natario.invariant_audit",
+          to: "nhm2.energy_condition.observer_robust_gate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.energy_condition.observer_robust_gate",
+          to: "nhm2.claim_boundary.diagnostic_only",
+          relation: "blocks",
+        }),
       ]),
     );
+  });
+
+  it("keeps non-scalar full-solve artifacts out of calculator payloads", () => {
+    const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
+    const nonScalarIds = [
+      "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.energy_condition.observer_robust_gate",
+      "nhm2.qei.worldline_dossier",
+      "nhm2.natario.invariant_audit",
+    ];
+
+    for (const badgeId of nonScalarIds) {
+      const badge = badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId);
+      expect(badge?.calculatorPayloads).toEqual([]);
+    }
   });
 
   it("keeps the centerline clocking target calculator-loadable but bounded", () => {
@@ -104,9 +142,12 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.closure.wall_t00_source_residual",
         "nhm2.source.wall_t00_trace",
         "nhm2.tensor.full_authority_gate",
+        "nhm2.tensor.same_chart_full_tensor",
         "nhm2.closure.same_basis_regional_residual",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
+        "nhm2.natario.invariant_audit",
+        "nhm2.energy_condition.observer_robust_gate",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );

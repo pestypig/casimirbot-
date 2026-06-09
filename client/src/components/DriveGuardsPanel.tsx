@@ -318,6 +318,14 @@ const firstFinite = (...values: Array<unknown>): number => {
 
 };
 
+const asRecord = (value: unknown): Record<string, any> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : null;
+
+const readTextField = (record: Record<string, any> | null | undefined, key: string): string | null => {
+  const value = record?.[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+};
+
 const renderProxyBadge = (active?: boolean, strict?: boolean) =>
   active ? (
     <Badge
@@ -3009,6 +3017,40 @@ const natarioTheta =
     : Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
 const natarioThetaLabel = Number.isFinite(natarioThetaGeom) ? "?_geom" : "?_cal";
 const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
+const pipeRecord = asRecord(pipe);
+const pipeNatarioRecord = asRecord((pipe as any)?.natario);
+const natarioInvariantAuditRecord =
+  asRecord((pipe as any)?.nhm2NatarioInvariantAudit) ??
+  asRecord((pipe as any)?.nhm2_natario_invariant_audit) ??
+  asRecord(pipeNatarioRecord?.nhm2NatarioInvariantAudit) ??
+  asRecord(pipeNatarioRecord?.nhm2_natario_invariant_audit);
+const natarioInvariantExpansion = asRecord(natarioInvariantAuditRecord?.expansion);
+const natarioInvariantCurvature = asRecord(natarioInvariantAuditRecord?.invariants);
+const natarioInvariantStability = asRecord(natarioInvariantAuditRecord?.stability);
+const natarioInvariantClosure = nhm2SolveState.closureStack.natarioInvariantAudit;
+const natarioInvariantContractAvailable =
+  natarioInvariantClosure.available || natarioInvariantAuditRecord != null;
+const natarioInvariantContractStatus =
+  natarioInvariantClosure.status ??
+  readTextField(pipeRecord, "nhm2_full_loop_natario_invariant_audit_status") ??
+  (natarioInvariantContractAvailable ? "review" : "missing");
+const natarioThetaFlatnessStatus =
+  natarioInvariantClosure.thetaFlatnessStatus ??
+  readTextField(natarioInvariantExpansion, "thetaFlatnessStatus") ??
+  readTextField(pipeRecord, "nhm2_natario_theta_flatness_status") ??
+  "missing";
+const natarioCurvatureInvariantStatus =
+  natarioInvariantClosure.invariantStatus ??
+  readTextField(natarioInvariantCurvature, "status") ??
+  readTextField(pipeRecord, "nhm2_natario_invariant_status") ??
+  "missing";
+const natarioConvergenceStatus =
+  readTextField(natarioInvariantStability, "convergenceStatus") ??
+  readTextField(pipeRecord, "nhm2_natario_convergence_status") ??
+  "missing";
+const natarioInvariantBlockerCount = Array.isArray(natarioInvariantAuditRecord?.blockers)
+  ? natarioInvariantAuditRecord.blockers.length
+  : 0;
 
 
 
@@ -6811,6 +6853,20 @@ const natarioThetaTag = Number.isFinite(natarioThetaGeom) ? "metric" : "proxy";
                   {`K_sq_mean = ${
                     Number.isFinite(kSqMeanPack) ? kSqMeanPack.toExponential(3) : "—"
                   } (${kSqTag})`}
+                </li>
+
+                <li>
+                  {`Invariant audit artifact = ${
+                    natarioInvariantContractAvailable ? "available" : "missing"
+                  } (status=${natarioInvariantContractStatus})`}
+                </li>
+
+                <li>
+                  {`Zero-expansion thetaFlatnessStatus = ${natarioThetaFlatnessStatus}; invariantStatus = ${natarioCurvatureInvariantStatus}`}
+                </li>
+
+                <li>
+                  {`Stability convergenceStatus = ${natarioConvergenceStatus}; blockers = ${natarioInvariantBlockerCount}`}
                 </li>
 
 

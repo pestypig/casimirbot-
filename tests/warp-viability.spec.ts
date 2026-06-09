@@ -38,6 +38,7 @@ import { buildNhm2SourceClosureArtifact } from "../shared/contracts/nhm2-source-
 import { buildNhm2SourceClosureArtifactV2 } from "../shared/contracts/nhm2-source-closure.v2";
 import { buildNhm2StrictSignalReadinessArtifact } from "../shared/contracts/nhm2-strict-signal-readiness.v1";
 import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { buildNhm2NatarioInvariantAudit } from "../shared/contracts/nhm2-natario-invariant-audit.v1";
 import { buildIdealCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
 import { SI_TO_GEOM_STRESS } from "../shared/gr-units";
 import {
@@ -125,6 +126,35 @@ const buildPassingQeiWorldlineDossier = () =>
         },
       },
     ],
+  });
+
+const buildPassingNatarioInvariantAudit = () =>
+  buildNhm2NatarioInvariantAudit({
+    generatedAt: "2026-06-09T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p9625_v1",
+    metricFamily: "nhm2_shift_lapse",
+    expansion: {
+      thetaMaxAbs: 0,
+      thetaFlatnessStatus: "pass",
+      expansionLeakageBound: 1e-9,
+    },
+    invariants: {
+      ricciScalar: 0,
+      kretschmannScalar: 0,
+      weylScalarProxy: 0,
+      petrovClass: "O",
+    },
+    momentumDensity: {
+      Jx: 0,
+      Jy: 0,
+      Jz: 0,
+    },
+    stability: {
+      tidalMax: 0,
+      blueshiftMax: 0,
+      convergenceStatus: "pass",
+    },
   });
 
 const buildPassingObserverAudit = () =>
@@ -982,6 +1012,7 @@ describe("warp viability congruence wiring", () => {
         scalarCl3RhoDeltaRel: 0,
       }),
       nhm2QeiWorldlineDossier: buildPassingQeiWorldlineDossier(),
+      nhm2NatarioInvariantAudit: buildPassingNatarioInvariantAudit(),
       nhm2ObserverAudit: buildPassingObserverAudit(),
     });
 
@@ -1009,6 +1040,10 @@ describe("warp viability congruence wiring", () => {
     ).toBe(true);
     expect(layer?.artifact.sections.shift_vs_lapse_decomposition.reasons).toContain(
       "shift_lapse_decomposition_missing",
+    );
+    expect(layer?.artifact.sections.natario_invariant_audit.state).toBe("pass");
+    expect((result.snapshot as any).nhm2_full_loop_natario_invariant_audit_status).toBe(
+      "pass",
     );
     expect(
       layer?.artifact.sections.uncertainty_perturbation_reproducibility.reasons,
