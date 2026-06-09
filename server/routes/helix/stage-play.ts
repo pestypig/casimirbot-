@@ -250,6 +250,11 @@ helixStagePlayRouter.options("/live-source-mail", (_req, res) => {
   res.status(200).end();
 });
 
+helixStagePlayRouter.options("/live-source-visual-summaries", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 helixStagePlayRouter.options("/live-source-mail/check", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -296,6 +301,9 @@ const readStringArray = (value: unknown): string[] =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const stagePlayVisualSummaryText = (text: string): string =>
+  text.trim().replace(/\s+/g, " ").slice(0, 1200);
 
 const resolveMailboxThreadForRoute = (input: {
   threadId?: string | null;
@@ -821,6 +829,169 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       error: "stage-play-live-source-mail-list-failed",
       err,
       schema: "stage_play_live_source_mail_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/live-source-visual-summaries", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const requestedThreadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId: readQueryString(req.query.mailboxThreadId) ?? readQueryString(req.query.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
+    const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
+    const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
+    const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const status = readQueryString(req.query.status) as any;
+    const limit = Math.min(Math.max(readOptionalNumber(req.query.limit) ?? 10, 1), 100);
+    const mailItems = listStagePlayLiveSourceMailItems({
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+      status,
+      limit,
+    });
+    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const processedMailPackets = listStagePlayProcessedMailPackets({
+      sourceId,
+      limit: 100,
+    }).filter((packet) =>
+      packet.mailIds.some((mailId) => mailIds.has(mailId))
+    );
+    const processedPacketsByMailId = new Map<string, (typeof processedMailPackets)[number][]>();
+    for (const packet of processedMailPackets) {
+      for (const mailId of packet.mailIds) {
+        const packets = processedPacketsByMailId.get(mailId) ?? [];
+        packets.push(packet);
+        processedPacketsByMailId.set(mailId, packets);
+      }
+    }
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId,
+      limit: 100,
+    }).filter((run) =>
+      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
+      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
+    const summaries = mailItems.map((item) => {
+      const packets = processedPacketsByMailId.get(item.mailId) ?? [];
+      const latestPacket = packets.at(-1) ?? null;
+      return {
+        summaryId: item.mailId,
+        mailId: item.mailId,
+        threadId: item.threadId,
+        roomId: item.roomId ?? null,
+        environmentId: item.environmentId ?? null,
+        sourceId: item.sourceId,
+        sourceKind: item.sourceKind,
+        status: item.status,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        summaryText: stagePlayVisualSummaryText(item.summary.text),
+        summaryPreview: stagePlayVisualSummaryText(item.summary.preview),
+        confidence: item.summary.confidence ?? null,
+        analysisState: item.summary.analysisState,
+        priorMailId: item.priorContext.previousMailId ?? null,
+        previousSummaryPreview: item.priorContext.previousSummaryPreview ?? null,
+        deterministicChangeHint: item.hints.deterministicChangeHint,
+        elapsedMsSincePrevious: item.hints.elapsedMsSincePrevious ?? null,
+        sourceFreshness: item.hints.sourceFreshness,
+        sourceRefs: item.sourceRefs,
+        evidenceRefs: item.evidenceRefs,
+        processedPacketRefs: packets.map((packet) => packet.packetId),
+        processedPacket: latestPacket
+          ? {
+              packetId: latestPacket.packetId,
+              jobId: latestPacket.jobId,
+              observedFacts: latestPacket.observedFacts,
+              changedFacts: latestPacket.changedFacts,
+              inferredFacts: latestPacket.inferredFacts,
+              uncertainties: latestPacket.uncertainties,
+              salience: latestPacket.salience,
+              recommendedNext: latestPacket.recommendedNext,
+              watchNext: latestPacket.watchNext,
+              predictionValidation: latestPacket.predictionValidation,
+              resolutionState: latestPacket.resolutionState,
+              evidenceRefs: latestPacket.evidenceRefs,
+              createdAt: latestPacket.createdAt,
+              assistant_answer: false,
+              terminal_eligible: false,
+              context_role: "tool_evidence",
+            }
+          : null,
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      };
+    });
+    const evidenceRefs = uniqueStrings([
+      ...summaries.flatMap((summary) => [
+        summary.mailId,
+        ...summary.evidenceRefs,
+        ...summary.processedPacketRefs,
+        ...(summary.processedPacket?.evidenceRefs ?? []),
+      ]),
+      ...microReasonerRuns.map((run) => run.runId),
+    ]);
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_visual_summary_feed/v1",
+      generatedAt: new Date().toISOString(),
+      requestedThreadId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+      summaries,
+      latestSummary: summaries.at(-1) ?? null,
+      processedMailPackets: processedMailPackets.map((packet) => ({
+        packetId: packet.packetId,
+        jobId: packet.jobId,
+        sourceId: packet.sourceId,
+        mailIds: packet.mailIds,
+        observedFacts: packet.observedFacts,
+        changedFacts: packet.changedFacts,
+        inferredFacts: packet.inferredFacts,
+        uncertainties: packet.uncertainties,
+        salience: packet.salience,
+        recommendedNext: packet.recommendedNext,
+        watchNext: packet.watchNext,
+        predictionValidation: packet.predictionValidation,
+        resolutionState: packet.resolutionState,
+        evidenceRefs: packet.evidenceRefs,
+        createdAt: packet.createdAt,
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      })),
+      microReasonerRuns,
+      counts: {
+        summaryCount: summaries.length,
+        unreadCount: summaries.filter((summary) => summary.status === "unread").length,
+        processedPacketCount: processedMailPackets.length,
+        microReasonerRunCount: microReasonerRuns.length,
+      },
+      evidenceRefs,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-visual-summary-feed-failed",
+      err,
+      schema: "stage_play_live_source_visual_summary_feed/v1",
       contextRole: "tool_evidence",
     });
   }

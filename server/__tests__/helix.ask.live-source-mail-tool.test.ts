@@ -989,6 +989,74 @@ describe("live-source mail live environment tools", () => {
     expect(readPayload.terminal_eligible).toBe(false);
   });
 
+  it("records a processed-mail interpretation with recovered mail ids and narrative aliases", () => {
+    seedVisualSummaryText("Minecraft cave scene with low light and the player near fire damage.", "processed-default-interpretation");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const packet = (processObservation.observation as any).packets[0];
+
+    const decisionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        decision: "record_interpretation",
+        rationale_preview: "Interpret the latest processed Minecraft packet and say what to watch next.",
+        live_source_mail_output_intent: {
+          wants_interpretation: true,
+        },
+      },
+    });
+
+    const payload = decisionObservation.observation as any;
+    expect(decisionObservation).toMatchObject({
+      tool_name: "live_env.record_live_source_mail_decision",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+    expect(payload).toMatchObject({
+      decision: "record_interpretation",
+      mailIds: expect.arrayContaining(packet.mailIds),
+      narrativeStateRef: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      narrative_state_ref: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      narrative_state_id: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+      narrativeState: {
+        narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
+        mailBatchRefs: expect.arrayContaining(packet.mailIds),
+        interpretedSituation: {
+          userRelevantMeaning: expect.any(String),
+        },
+        watchNext: {
+          targets: expect.any(Array),
+          reason: expect.any(String),
+        },
+      },
+      processedPacketRefs: expect.arrayContaining([packet.packetId]),
+      processed_packet_refs: expect.arrayContaining([packet.packetId]),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+    });
+    expect(payload.narrativeStateId).toBe(payload.narrativeStateRef);
+    expect(payload.narrative_state_id).toBe(payload.narrativeStateRef);
+    expect(payload.narrativeState.currentSceneSummary).toContain("Minecraft");
+    expect(payload.transcriptRows.map((row: any) => row.rowKind)).toEqual(expect.arrayContaining([
+      "interpretation",
+      "watch_next",
+      "narrative_state",
+    ]));
+  });
+
   it("reads the same-source unread batch through live_env.read_live_source_mail even when model args supply a small limit", () => {
     seedVisualSummaries(6);
 

@@ -14,11 +14,15 @@ import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
 } from "../services/situation-room/live-source-chunk-buffer";
-import { resetStagePlayLiveSourceMailboxForTest } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  enqueueStagePlayLiveSourceMailItem,
+  resetStagePlayLiveSourceMailboxForTest,
+} from "../services/stage-play/stage-play-live-source-mailbox-store";
 import {
   recordStagePlayLiveSourceMailTranscriptEntries,
   resetStagePlayLiveSourceMailTranscriptStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
+import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 
 function makeApp() {
   const app = express();
@@ -32,6 +36,7 @@ beforeEach(() => {
   resetStagePlayCheckpointQueueForTest();
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
+  resetStagePlayProcessedMailPacketStoreForTest();
   resetLiveSourceChunkBufferForTest();
 });
 
@@ -582,6 +587,63 @@ describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
       "stage_play_live_source_mail:route",
       "visual_evidence:route",
     ]));
+  });
+});
+
+describe("GET /api/helix/stage-play/live-source-visual-summaries", () => {
+  it("returns compact visual summary mail as evidence-only observations", async () => {
+    const app = makeApp();
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId: "thread:visual-summary-feed",
+      roomId: "room:visual-summary-feed",
+      environmentId: "live_env:visual-summary-feed",
+      sourceId: "visual_source:visual-summary-feed",
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:visual-summary-feed",
+      evidenceRef: "visual_evidence:visual-summary-feed",
+      observationRef: "live_source_observation:visual-summary-feed",
+      summaryText: "A compact visual summary says the Helix Ask Chrome UI is showing a live answer panel.",
+      summaryPreview: "Helix Ask Chrome UI with live answer panel.",
+      confidence: 0.84,
+      createdAt: "2026-06-04T12:00:00.000Z",
+    });
+
+    const response = await request(app)
+      .get("/api/helix/stage-play/live-source-visual-summaries")
+      .query({ threadId: "thread:visual-summary-feed", sourceId: "visual_source:visual-summary-feed" })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_live_source_visual_summary_feed/v1",
+      requestedThreadId: "thread:visual-summary-feed",
+      mailboxThreadId: "thread:visual-summary-feed",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(response.body.counts).toMatchObject({
+      summaryCount: 1,
+      unreadCount: 1,
+    });
+    expect(response.body.latestSummary).toMatchObject({
+      mailId: mail.mailId,
+      sourceId: "visual_source:visual-summary-feed",
+      sourceKind: "visual_frame",
+      summaryText: "A compact visual summary says the Helix Ask Chrome UI is showing a live answer panel.",
+      confidence: 0.84,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(response.body.evidenceRefs).toEqual(expect.arrayContaining([
+      mail.mailId,
+      "visual_evidence:visual-summary-feed",
+      "live_source_observation:visual-summary-feed",
+    ]));
+    expect(JSON.stringify(response.body)).not.toMatch(/\b(?:image_ref|raw_image|base64|data:image)\b/i);
   });
 });
 

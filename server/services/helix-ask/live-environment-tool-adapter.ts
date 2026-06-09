@@ -3724,10 +3724,113 @@ export function executeLiveEnvironmentTool(
       "request_stage_play_checkpoint",
       "fail_closed",
     ]);
-    const decision = allowedDecisions.has(decisionRaw)
+    let decision = allowedDecisions.has(decisionRaw)
       ? decisionRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"]
       : "wait_for_next_summary";
-    const mailIds = readStringArray(args.mail_ids ?? args.mailIds);
+    const suppliedMailIds = readStringArray(args.mail_ids ?? args.mailIds);
+    const activeJobStatesForDecision = listStagePlayLiveSourceJobStates({ threadId: input.thread_id, limit: 100 });
+    const activeJobIdsForDecision = new Set(activeJobStatesForDecision.map((state) => state.jobId));
+    const recentProcessedPacketsForDecision = suppliedMailIds.length > 0
+      ? []
+      : listStagePlayProcessedMailPackets({ limit: 25 });
+    const activeJobMatchedProcessedPacketsForDecision = recentProcessedPacketsForDecision
+      .filter((packet) => activeJobIdsForDecision.size === 0 || activeJobIdsForDecision.has(packet.jobId));
+    const recoveredProcessedPacketsForDecision = suppliedMailIds.length > 0
+      ? []
+      : (activeJobMatchedProcessedPacketsForDecision.length > 0
+          ? activeJobMatchedProcessedPacketsForDecision
+          : recentProcessedPacketsForDecision
+        ).slice(-1);
+    const mailIds = suppliedMailIds.length > 0
+      ? suppliedMailIds
+      : uniqueStrings(recoveredProcessedPacketsForDecision.flatMap((packet) => packet.mailIds));
+    const processedPacketsForMailIds = mailIds.length > 0
+      ? listStagePlayProcessedMailPackets({ limit: 100 })
+          .filter((packet) => packet.mailIds.some((mailId) => mailIds.includes(mailId)))
+      : [];
+    const latestProcessedPacket = processedPacketsForMailIds.at(-1) ?? null;
+    const processedPacketEvidenceRefs = uniqueStrings(processedPacketsForMailIds.flatMap((packet) => packet.evidenceRefs));
+    const processedPacketRefs = processedPacketsForMailIds.map((packet) => packet.packetId);
+    const outputIntentRecord = readRecord(args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent);
+    const outputIntentWantsInterpretation =
+      outputIntentRecord?.wantsInterpretation === true ||
+      outputIntentRecord?.wants_interpretation === true;
+    const outputIntentWantsVoiceCallout =
+      outputIntentRecord?.wantsVoiceCallout === true ||
+      outputIntentRecord?.wants_voice_callout === true;
+    const outputIntentWantsTextAnswer =
+      outputIntentRecord?.wantsTextAnswer === true ||
+      outputIntentRecord?.wants_text_answer === true;
+    const outputIntentWantsInterpretationOnly =
+      outputIntentWantsInterpretation && !outputIntentWantsVoiceCallout;
+    const processedPacketRecommendedNext = latestProcessedPacket?.recommendedNext ?? null;
+    const processedPacketProfileRef = latestProcessedPacket?.profileRef ?? null;
+    const processedPacketSalience = latestProcessedPacket?.salience ?? null;
+    const processedPacketVoiceCandidate =
+      processedPacketSalience?.voiceCandidate === true ||
+      processedPacketRecommendedNext === "request_voice_callout";
+    const suppliedVoiceEnabled =
+      args.voice_enabled === true ||
+      args.voiceEnabled === true;
+    const suppliedVoiceAllowedNow =
+      args.voice_allowed_now === true ||
+      args.voiceAllowedNow === true;
+    const processedPacketCalloutDraft =
+      readString(processedPacketSalience?.calloutDraft) ??
+      latestProcessedPacket?.observedFacts.find((fact) => /\b(?:fire|damage|hostile|mob|lava|combat|danger)\b/i.test(fact)) ??
+      null;
+    const processedPacketJobId = latestProcessedPacket?.jobId ?? null;
+    const processedPacketJobState = processedPacketJobId
+      ? activeJobStatesForDecision.find((state) => state.jobId === processedPacketJobId) ?? null
+      : null;
+    const processedPacketPolicy =
+      processedPacketJobState?.watchJobPolicyRef
+        ? listStagePlayLiveSourceWatchJobPolicies({ threadId: input.thread_id, limit: 100 })
+            .find((policy) => policy.policyId === processedPacketJobState.watchJobPolicyRef) ?? null
+        : processedPacketJobId
+          ? listStagePlayLiveSourceWatchJobPolicies({ threadId: input.thread_id, jobId: processedPacketJobId, limit: 1 }).at(-1) ?? null
+          : null;
+    const processedPolicyAllowsVoice = processedPacketPolicy?.outputPolicy.allowVoiceCallout === true;
+    const processedPolicyRequiresConfirmation = processedPacketPolicy?.outputPolicy.confirmationRequired === true;
+    const effectiveVoiceEnabled =
+      suppliedVoiceEnabled ||
+      processedPolicyAllowsVoice ||
+      outputIntentWantsVoiceCallout;
+    const effectiveVoiceAllowedNow =
+      suppliedVoiceAllowedNow ||
+      (
+        effectiveVoiceEnabled &&
+        !processedPolicyRequiresConfirmation &&
+        (outputIntentWantsVoiceCallout || processedPolicyAllowsVoice)
+      );
+    if (mailIds.length > 0 && processedPacketsForMailIds.length > 0) {
+      if (decision === "request_voice_callout" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
+        decision = "record_interpretation";
+      } else if (decision === "wait_for_next_summary" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
+        decision = "record_interpretation";
+      } else if (
+        processedPacketVoiceCandidate &&
+        (!outputIntentWantsInterpretationOnly || processedPolicyAllowsVoice) &&
+        (
+          outputIntentWantsVoiceCallout ||
+          effectiveVoiceEnabled ||
+          effectiveVoiceAllowedNow ||
+          processedPacketRecommendedNext === "request_voice_callout"
+        )
+      ) {
+        decision = "request_voice_callout";
+      } else if (decision === "wait_for_next_summary" && (outputIntentWantsInterpretation || processedPacketRecommendedNext === "record_interpretation")) {
+        decision = "record_interpretation";
+      } else if (decision === "wait_for_next_summary" && (outputIntentWantsTextAnswer || processedPacketRecommendedNext === "draft_text_answer")) {
+        decision = "draft_text_answer";
+      } else if (decision === "wait_for_next_summary" && (
+        processedPacketRecommendedNext === "request_more_evidence" ||
+        processedPacketRecommendedNext === "request_stage_play_checkpoint" ||
+        processedPacketRecommendedNext === "fail_closed"
+      )) {
+        decision = processedPacketRecommendedNext;
+      }
+    }
     const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
       askThreadId: input.thread_id,
       requestedThreadId: effectiveThreadId,
@@ -3778,6 +3881,86 @@ export function executeLiveEnvironmentTool(
             reason: "Interpretation decision preserves mail as a time-aware observation batch.",
           }
         : null;
+    const defaultProcessedTextAnswerDraft =
+      latestProcessedPacket && decision === "draft_text_answer"
+        ? `The processed visual mail shows ${latestProcessedPacket.observedFacts.slice(0, 2).join("; ") || latestProcessedPacket.changedFacts.slice(0, 2).join("; ") || "a compact live-source observation"}.`
+        : null;
+    const defaultProcessedInterpretation =
+      latestProcessedPacket && decision === "record_interpretation"
+        ? {
+            currentSceneSummary:
+              latestProcessedPacket.observedFacts.slice(0, 3).join("; ") ||
+              "Processed live-source packet contains compact observations.",
+            runningStorySummary: uniqueStrings([
+              ...latestProcessedPacket.observedFacts,
+              ...latestProcessedPacket.changedFacts,
+            ]).slice(0, 5).join("; ") || "Processed live-source packet updated the running scene state.",
+            setting: null,
+            activeWindowOrScene: null,
+            entities: [],
+            objects: latestProcessedPacket.objectTags,
+            activities: latestProcessedPacket.activityTags,
+            userRelevantMeaning:
+              uniqueStrings([
+                ...latestProcessedPacket.changedFacts,
+                ...latestProcessedPacket.inferredFacts,
+                ...latestProcessedPacket.observedFacts,
+              ]).slice(0, 3).join("; ") ||
+              "The processed mail packet requires interpretation from the current observation window.",
+            meaningfulChanges: latestProcessedPacket.changedFacts,
+            uncertainties: latestProcessedPacket.uncertainties,
+            watchNextTargets: latestProcessedPacket.watchNext,
+            watchNextReason: latestProcessedPacket.watchNext.length > 0
+              ? `Watch next for ${latestProcessedPacket.watchNext.slice(0, 3).join(", ")}.`
+              : "Watch for meaningful changes in the next source update.",
+            predictionText: latestProcessedPacket.predictionValidation
+              ? `Prior prediction validation: ${latestProcessedPacket.predictionValidation.result}.`
+              : null,
+            predictionHorizon: "next_mail",
+            predictionConfidence: null,
+            validationSignals: latestProcessedPacket.predictionValidation?.newSignals ?? [],
+          }
+        : null;
+    const evidenceRefs = uniqueStrings([
+      ...readStringArray(args.evidence_refs ?? args.evidenceRefs),
+      ...processedPacketEvidenceRefs,
+      ...processedPacketRefs,
+      ...mailIds,
+    ]);
+    const processedVoiceReasonCodes = uniqueStrings([
+      ...(processedPacketSalience?.reasons ?? []),
+      ...(processedPacketCalloutDraft && /\b(?:fire|damage|burning)\b/i.test(processedPacketCalloutDraft)
+        ? ["minecraft_fire_or_damage_cue"]
+        : []),
+      ...(processedPacketVoiceCandidate ? ["processed_packet_voice_candidate"] : []),
+    ]);
+    const defaultProcessedRequestedTool =
+      decision === "request_voice_callout" && processedPacketCalloutDraft
+        ? {
+            toolName: "live_env.request_interim_voice_callout",
+            args: {
+              kind: "tool_result",
+              text: processedPacketCalloutDraft,
+              max_chars: 140,
+              evidence_refs: evidenceRefs,
+              reason_codes: processedVoiceReasonCodes.length > 0
+                ? processedVoiceReasonCodes
+                : ["processed_packet_voice_callout_requested"],
+            },
+          }
+        : null;
+    const suppliedReadMailItemCount =
+      typeof args.read_mail_item_count === "number"
+        ? args.read_mail_item_count
+        : typeof args.readMailItemCount === "number"
+          ? args.readMailItemCount
+          : null;
+    const effectiveReadMailItemCount = Math.max(
+      suppliedReadMailItemCount ?? 0,
+      mailIds.length,
+      processedPacketsForMailIds.flatMap((packet) => packet.mailIds).length,
+    );
+    const suppliedInterpretation = readInterpretationPayload(args.interpretation, args);
     const recordedDecision = recordLiveSourceMailDecisionForAsk({
       threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
@@ -3789,21 +3972,31 @@ export function executeLiveEnvironmentTool(
         readString(args.rationalePreview) ??
         readString(args.reason) ??
         `Agent recorded ${decision}.`,
-      textAnswerDraft: readString(args.text_answer_draft) ?? readString(args.textAnswerDraft),
+      textAnswerDraft: readString(args.text_answer_draft) ?? readString(args.textAnswerDraft) ?? defaultProcessedTextAnswerDraft,
       textAnswerTerminalEligible: args.text_answer_terminal_eligible === true || args.textAnswerTerminalEligible === true,
-      voiceCalloutDraft: readString(args.voice_callout_draft) ?? readString(args.voiceCalloutDraft),
-      voiceEnabled: args.voice_enabled === true || args.voiceEnabled === true,
-      voiceRequiresConfirmation: args.voice_requires_confirmation === true || args.voiceRequiresConfirmation === true,
-      voiceAllowedNow: args.voice_allowed_now === true || args.voiceAllowedNow === true,
-      voicePolicyReason: readString(args.voice_policy_reason) ?? readString(args.voicePolicyReason),
-      requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool),
-      interpretation: readInterpretationPayload(args.interpretation, args),
+      voiceCalloutDraft:
+        readString(args.voice_callout_draft) ??
+        readString(args.voiceCalloutDraft) ??
+        (decision === "request_voice_callout" ? processedPacketCalloutDraft : null),
+      voiceEnabled: effectiveVoiceEnabled,
+      voiceRequiresConfirmation:
+        args.voice_requires_confirmation === true ||
+        args.voiceRequiresConfirmation === true ||
+        (decision === "request_voice_callout" && processedPolicyRequiresConfirmation),
+      voiceAllowedNow: effectiveVoiceAllowedNow,
+      voicePolicyReason:
+        readString(args.voice_policy_reason) ??
+        readString(args.voicePolicyReason) ??
+        (processedPolicyAllowsVoice ? "active_watch_policy_allows_voice_callout" : null),
+      requestedTool: readRequestedTool(args.requested_tool ?? args.requestedTool) ?? defaultProcessedRequestedTool,
+      interpretation: suppliedInterpretation ?? defaultProcessedInterpretation,
       nextLoopState,
       interpreterProfileRef:
         readString(args.interpreter_profile_ref) ??
         readString(args.interpreterProfileRef) ??
         readString(args.profile_id) ??
-        readString(args.profileId),
+        readString(args.profileId) ??
+        processedPacketProfileRef,
       profileComparisonRefs: readStringArray(args.profile_comparison_refs ?? args.profileComparisonRefs),
       matchedCriteria: readStringArray(args.matched_criteria ?? args.matchedCriteria),
       suppressedCriteria: readStringArray(args.suppressed_criteria ?? args.suppressedCriteria),
@@ -3819,7 +4012,7 @@ export function executeLiveEnvironmentTool(
             reason: mailCoverage.reason,
           }
         : defaultDecisionMailCoverage,
-      evidenceRefs: readStringArray(args.evidence_refs ?? args.evidenceRefs),
+      evidenceRefs,
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
     });
     const transcriptRows = buildMailLoopTranscriptRows({
@@ -3848,6 +4041,12 @@ export function executeLiveEnvironmentTool(
         mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
         mailboxThreadResolution,
         mailbox_thread_resolution: mailboxThreadResolution,
+        narrativeStateRef: recordedDecision.narrativeStateRef ?? narrativeState?.narrativeStateId ?? null,
+        narrative_state_ref: recordedDecision.narrativeStateRef ?? narrativeState?.narrativeStateId ?? null,
+        narrativeStateId: recordedDecision.narrativeStateRef ?? narrativeState?.narrativeStateId ?? null,
+        narrative_state_id: recordedDecision.narrativeStateRef ?? narrativeState?.narrativeStateId ?? null,
+        interpreterProfileRef: recordedDecision.interpreterProfileRef ?? processedPacketProfileRef ?? null,
+        interpreter_profile_ref: recordedDecision.interpreterProfileRef ?? processedPacketProfileRef ?? null,
         narrativeState,
         narrative_state: narrativeState,
         causalTrace: recordedDecision.causalTrace,
@@ -3855,10 +4054,18 @@ export function executeLiveEnvironmentTool(
         transcriptRows,
         liveSourceMailOutputIntent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,
         live_source_mail_output_intent: args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent ?? null,
-        decisionValidationResult: readString(args.decision_validation_result) ?? readString(args.decisionValidationResult) ?? null,
-        decision_validation_result: readString(args.decision_validation_result) ?? readString(args.decisionValidationResult) ?? null,
-        readMailItemCount: typeof args.read_mail_item_count === "number" ? args.read_mail_item_count : args.readMailItemCount,
-        read_mail_item_count: typeof args.read_mail_item_count === "number" ? args.read_mail_item_count : args.readMailItemCount,
+        decisionValidationResult:
+          decision === "request_voice_callout"
+            ? "forced_request_voice_callout_for_read_mail_voice_intent"
+            : readString(args.decision_validation_result) ?? readString(args.decisionValidationResult) ?? null,
+        decision_validation_result:
+          decision === "request_voice_callout"
+            ? "forced_request_voice_callout_for_read_mail_voice_intent"
+            : readString(args.decision_validation_result) ?? readString(args.decisionValidationResult) ?? null,
+        processedPacketRefs,
+        processed_packet_refs: processedPacketRefs,
+        readMailItemCount: effectiveReadMailItemCount,
+        read_mail_item_count: effectiveReadMailItemCount,
         post_tool_model_step_required: recordedDecision.decision !== "wait_for_next_summary",
         assistant_answer: false,
         terminal_eligible: false,

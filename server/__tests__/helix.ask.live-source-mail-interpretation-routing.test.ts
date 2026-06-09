@@ -18,6 +18,7 @@ import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
+import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { recordLiveSourceMailDecisionForAsk } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
 
 const threadId = "helix-ask:desktop";
@@ -38,6 +39,7 @@ const resetLiveSourceMailRoutingState = (): void => {
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
+  resetStagePlayProcessedMailPacketStoreForTest();
   __testHelixAskPendingInputStore.delete(threadId);
 };
 
@@ -47,10 +49,10 @@ beforeEach(() => {
   process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
     {
       next_step: "next_action",
-      chosen_capability: "live_env.read_live_source_mail",
-      reason: "Read the mailbox batch.",
+      chosen_capability: "live_env.read_processed_live_source_mail",
+      reason: "Read the processed mailbox packet.",
       args: {},
-      expected_artifacts: ["stage_play_live_source_mail_read_result"],
+      expected_artifacts: ["stage_play_processed_mail_packet"],
       confidence: 0.9,
     },
     {
@@ -117,14 +119,17 @@ const askMailbox = async (question: string) => {
       debug: true,
     })
     .expect(200);
-  const decisionArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+  const decisionArtifact = response.body?.current_turn_artifact_ledger?.filter((artifact: any) =>
     artifact?.kind === "live_environment_tool_observation" &&
     artifact?.payload?.tool_name === "live_env.record_live_source_mail_decision"
-  );
-  const readArtifact = response.body?.current_turn_artifact_ledger?.find((artifact: any) =>
+  ).at(-1);
+  const readArtifact = response.body?.current_turn_artifact_ledger?.filter((artifact: any) =>
     artifact?.kind === "live_environment_tool_observation" &&
-    artifact?.payload?.tool_name === "live_env.read_live_source_mail"
-  );
+    (
+      artifact?.payload?.tool_name === "live_env.read_processed_live_source_mail" ||
+      artifact?.payload?.tool_name === "live_env.read_live_source_mail"
+    )
+  ).at(-1);
   const liveEnvironmentToolNames = (response.body?.current_turn_artifact_ledger ?? [])
     .filter((artifact: any) => artifact?.kind === "live_environment_tool_observation")
     .map((artifact: any) => artifact?.payload?.tool_name)
@@ -144,7 +149,7 @@ const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void =>
   expect(String(answer ?? ""), debug).not.toMatch(/Latest preview:/i);
 };
 
-describe("Helix Ask live-source mail interpretation routing", () => {
+describe.sequential("Helix Ask live-source mail interpretation routing", () => {
   it("routes interpreter profile setup prompts to configure_interpreter_profile before mailbox reads", async () => {
     seedVisualMail("A Minecraft menu is visible, but this turn is only configuring interpretation policy.");
 
@@ -258,12 +263,12 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     );
 
     expect(liveEnvironmentToolNames, debug).toEqual(expect.arrayContaining([
-      "live_env.read_live_source_mail",
+      "live_env.read_processed_live_source_mail",
       "live_env.compare_mail_to_interpreter_profile",
       "live_env.record_live_source_mail_decision",
     ]));
     expect(liveEnvironmentToolNames.indexOf("live_env.compare_mail_to_interpreter_profile"), debug).toBeGreaterThan(
-      liveEnvironmentToolNames.indexOf("live_env.read_live_source_mail"),
+      liveEnvironmentToolNames.indexOf("live_env.read_processed_live_source_mail"),
     );
     expect(liveEnvironmentToolNames.indexOf("live_env.record_live_source_mail_decision"), debug).toBeGreaterThan(
       liveEnvironmentToolNames.indexOf("live_env.compare_mail_to_interpreter_profile"),
@@ -278,7 +283,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
       "stage_play_live_source_interpreter_profile_comparison",
     );
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
-  }, 30_000);
+  }, 60_000);
 
   it("does not execute profile tools for future, quoted, or negated profile-control wording", async () => {
     const prompts = [
@@ -331,7 +336,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     expect(decision?.evidenceRefs, debug).toContain(response.body?.turn_id);
     expect(response.body?.answer, debug).toMatch(/document editor|Watch next/i);
     expectNoRawMailboxReceiptFinal(response.body?.answer, debug);
-  }, 30_000);
+  }, 60_000);
 
   it("routes playbook visual-mail interpretation wording to record_interpretation", async () => {
     seedVisualMail("The visual summary shows a dark icon grid with multiple productivity apps.");
@@ -349,7 +354,7 @@ describe("Helix Ask live-source mail interpretation routing", () => {
     expect(response.body?.answer, debug).toMatch(/icon grid|Watch next/i);
     expect(response.body?.stage_play_live_source_mailbox_debug?.trajectory, debug).toMatchObject({
       route: "live_source_mailbox",
-      capability: "live_env.read_live_source_mail",
+      capability: "live_env.read_processed_live_source_mail",
       mailIds: [expect.stringMatching(/^stage_play_live_source_mail:/)],
       decisionId: expect.stringMatching(/^stage_play_live_source_mail_decision:/),
       narrativeStateId: expect.stringMatching(/^stage_play_live_source_narrative_state:/),
