@@ -1,0 +1,47 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  applyStagePlayVisualObserverProfile,
+  ensureDefaultStagePlayVisualObserverProfiles,
+  getActiveStagePlayVisualObserverProfileForSource,
+  listStagePlayVisualObserverProfiles,
+  resetStagePlayVisualObserverProfileStoreForTest,
+} from "../services/stage-play/stage-play-visual-observer-profile-store";
+
+describe("stage play visual observer profile store", () => {
+  beforeEach(() => {
+    resetStagePlayVisualObserverProfileStoreForTest();
+    ensureDefaultStagePlayVisualObserverProfiles();
+  });
+
+  it("lists global shade presets for an active source when presets are requested", () => {
+    const profiles = listStagePlayVisualObserverProfiles({
+      sourceId: "visual_source:test",
+      includePresets: true,
+      limit: 25,
+    });
+
+    expect(profiles.some((profile) => profile.profileId === "stage_play_visual_observer_profile:minecraft-gameplay:v1")).toBe(true);
+    expect(profiles.some((profile) => profile.profileId === "stage_play_visual_observer_profile:generic:v1")).toBe(true);
+  });
+
+  it("does not treat global presets as source-applied active profiles before apply", () => {
+    const active = getActiveStagePlayVisualObserverProfileForSource({
+      sourceId: "visual_source:test",
+    });
+
+    expect(active).toBeNull();
+  });
+
+  it("returns the applied shade as active for the source", () => {
+    const profile = applyStagePlayVisualObserverProfile({
+      profileId: "stage_play_visual_observer_profile:minecraft-gameplay:v1",
+      sourceIds: ["visual_source:test"],
+    });
+    const active = getActiveStagePlayVisualObserverProfileForSource({
+      sourceId: "visual_source:test",
+    });
+
+    expect(profile?.profileId).toBe("stage_play_visual_observer_profile:minecraft-gameplay:v1");
+    expect(active?.profileId).toBe("stage_play_visual_observer_profile:minecraft-gameplay:v1");
+  });
+});

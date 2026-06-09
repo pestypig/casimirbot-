@@ -625,6 +625,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     return sourceId ? state.producers[sourceId] ?? null : null;
   });
+  const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+  const minecraftShadeApplied = Boolean(
+    activeVisualObserverProfile &&
+      minecraftVisualObserverProfile &&
+      activeVisualObserverProfile.profileId === minecraftVisualObserverProfile.profileId,
+  );
+  const genericShadeApplied = Boolean(
+    activeVisualObserverProfile &&
+      genericVisualObserverProfile &&
+      activeVisualObserverProfile.profileId === genericVisualObserverProfile.profileId,
+  );
+  const visualShadeStatus = activeVisualObserverProfile
+    ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
+    : "Generic visual capture prompt is active until a shade is applied.";
   const latestClientAction = useMemo(() => clientActions.at(-1) ?? null, [clientActions]);
   const latestClientAdoption = useMemo(() => clientAdoptions.at(-1) ?? null, [clientAdoptions]);
   const latestClientObserved = latestClientAdoption?.observed_state ?? {};
@@ -1464,34 +1478,58 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </button>
         </div>
         <div className="mt-2 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase text-violet-100">Shades</p>
               <p className="mt-0.5 truncate text-[11px] text-slate-300">
-                {activeVisualObserverProfile
-                  ? `${activeVisualObserverProfile.title} -> ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
-                  : "Generic visual capture prompt is active until a shade is applied."}
+                {visualShadeStatus}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                Source: {activeVisualSourceId ?? "will register on apply"}
               </p>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
+                aria-label="Apply Minecraft visual observer shade"
                 onClick={() => void applyVisualObserverProfile(minecraftVisualObserverProfile)}
                 disabled={!minecraftVisualObserverProfile}
-                className="rounded border border-violet-300/30 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                  minecraftShadeApplied
+                    ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                    : "border-violet-300/30 text-violet-100 hover:bg-violet-400/10"
+                }`}
               >
-                Minecraft
+                {minecraftShadeApplied ? "Minecraft applied" : "Apply Minecraft shade"}
               </button>
               <button
                 type="button"
+                aria-label="Apply generic visual observer shade"
                 onClick={() => void applyVisualObserverProfile(genericVisualObserverProfile)}
                 disabled={!genericVisualObserverProfile}
-                className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-45"
+                className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                  genericShadeApplied
+                    ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                    : "border-white/15 text-slate-200 hover:bg-white/10"
+                }`}
               >
-                Generic
+                {genericShadeApplied ? "Generic applied" : "Apply Generic shade"}
+              </button>
+              <button
+                type="button"
+                aria-label="Refresh visual observer shade presets"
+                onClick={() => void refresh()}
+                className="rounded border border-white/15 px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-white/10"
+              >
+                Refresh shades
               </button>
             </div>
           </div>
+          {!minecraftVisualObserverProfile || !genericVisualObserverProfile ? (
+            <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1.5 text-[11px] text-amber-100">
+              Shade presets are still loading. Refresh shades if the server was just restarted.
+            </p>
+          ) : null}
           {activeVisualObserverProfile?.prompt ? (
             <p className="mt-2 line-clamp-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-slate-300">
               {activeVisualObserverProfile.prompt}

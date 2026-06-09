@@ -218,7 +218,11 @@ export function listStagePlayVisualObserverProfiles(input: {
   return Array.from(profilesById.values())
     .filter((profile) => !domain || profile.domain === domain)
     .filter((profile) => !status || profile.status === status)
-    .filter((profile) => !input.sourceId || profile.sourceIds.includes(input.sourceId))
+    .filter((profile) =>
+      !input.sourceId ||
+      profile.sourceIds.includes(input.sourceId) ||
+      (input.includePresets === true && profile.sourceIds.length === 0)
+    )
     .filter((profile) => input.includePresets !== false || profile.sourceIds.length > 0)
     .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
     .slice(-limit);

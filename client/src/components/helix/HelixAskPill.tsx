@@ -17367,6 +17367,7 @@ export function HelixAskPill({
   const askLiveDraftBufferRef = useRef("");
   const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<string[]>([]);
+  const [steeringQueueExpanded, setSteeringQueueExpanded] = useState<boolean>(false);
   const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
   const askContextChooserRef = useRef<AskContextChooserState | null>(null);
   const [askContextChooserCountdownSec, setAskContextChooserCountdownSec] = useState<number | null>(null);
