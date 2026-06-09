@@ -144,6 +144,8 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   audit?: TerminalAuthoritySingleWriterAuditV1;
   integrity: {
     single_writer_applied: true;
+    terminal_authority_single_writer_audit?: TerminalAuthoritySingleWriterAuditV1;
+    forbidden_pre_authority_visible_fields?: string[];
     visible_matches_selected_artifact: boolean;
     visible_matches_draft: boolean;
     stale_failure_visible: boolean;

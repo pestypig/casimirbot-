@@ -1,6 +1,7 @@
 import type {
   HelixTerminalAuthoritySingleWriterResult,
   HelixTerminalCandidate,
+  TerminalAuthoritySingleWriterAuditRejectionReason,
 } from "@shared/helix-terminal-authority";
 import {
   applyTerminalAnswerEnvelope,
@@ -47,6 +48,14 @@ const textHash = (value: string): string => {
 
 const isStaleWorkspaceFailureText = (value: unknown): boolean =>
   /(?:workspace_step_failed|Failed to execute)/i.test(readString(value) ?? "");
+
+const VISIBLE_ANSWER_FIELDS = [
+  "payload.text",
+  "payload.answer",
+  "payload.assistant_answer",
+  "payload.selected_final_answer",
+  "terminal_presentation.concise_text",
+] as const;
 
 const isStaleModelOnlyNoObservationText = (value: unknown): boolean =>
   /\b(?:no\s+(?:accepted\s+)?observations?|no\s+(?:live[-\s]?source\s+)?context|no\s+context\s+(?:is\s+)?available|unable\s+to\s+provide\s+(?:the\s+)?context|unable\s+to\s+provide\s+(?:an\s+)?answer\s+from\s+(?:observations|context)|could\s+not\s+provide\s+(?:the\s+)?context|can't\s+provide\s+(?:the\s+)?context|cannot\s+provide\s+(?:the\s+)?context|without\s+(?:any\s+)?observations?|no\s+receipts?\s+(?:exist|available|were\s+found))\b/i.test(
@@ -142,6 +151,41 @@ const artifactMatchesObservationKind = (artifact: ArtifactLike, pattern: RegExp)
     ]),
   ].filter((entry): entry is string => Boolean(entry));
   return values.some((value) => pattern.test(value));
+};
+
+const normalizeSingleWriterAuditRejectionReason = (
+  reason: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"][number]["reason"],
+): TerminalAuthoritySingleWriterAuditRejectionReason => {
+  if (
+    reason === "receipt_not_terminal_eligible" ||
+    reason === "not_terminal_eligible" ||
+    reason === "receipt_or_projection" ||
+    reason === "deterministic_receipt_fallback_nonterminal"
+  ) {
+    return "receipt_not_terminal_eligible";
+  }
+  if (
+    reason === "stale_model_only_after_observation" ||
+    reason === "composer_claimed_no_observations_but_receipts_exist" ||
+    reason === "stale_failure_candidate" ||
+    reason === "legacy_direct_writer_quarantined"
+  ) {
+    return "stale_model_only_after_observation";
+  }
+  if (reason === "terminal_forbidden_by_phase_lock") return "terminal_forbidden_by_phase_lock";
+  if (reason === "missing_required_observation") return "missing_required_observation";
+  if (reason === "missing_evidence_reentry" || reason === "missing_post_tool_model_step") {
+    return "missing_evidence_reentry";
+  }
+  if (
+    reason === "route_contract_disallowed" ||
+    reason === "route_contract_forbidden" ||
+    reason === "route_contract_forbids_model_synthesized_answer" ||
+    reason === "route_requires_synthesis"
+  ) {
+    return "route_contract_disallowed";
+  }
+  return "missing_required_observation";
 };
 
 const isAcceptedObservationPacket = (artifact: ArtifactLike): boolean => {
@@ -532,6 +576,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     assistant_answer: readString(input.payload.assistant_answer),
     selected_final_answer: readString(input.payload.selected_final_answer),
   };
+  const priorTerminalPresentation = readRecord(input.payload.terminal_presentation);
+  const forbiddenPreAuthorityVisibleFields = [
+    priorPayloadFields.text ? "payload.text" : null,
+    priorPayloadFields.answer ? "payload.answer" : null,
+    priorPayloadFields.assistant_answer ? "payload.assistant_answer" : null,
+    priorPayloadFields.selected_final_answer ? "payload.selected_final_answer" : null,
+    readString(priorTerminalPresentation?.concise_text) ? "terminal_presentation.concise_text" : null,
+  ].filter((entry): entry is typeof VISIBLE_ANSWER_FIELDS[number] => Boolean(entry));
 
   const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] = [];
   const rawSolverContinuationPending =
@@ -937,19 +989,39 @@ export function applyHelixTerminalAuthoritySingleWriter(
     const text = artifactText(artifact);
     return Boolean(text && text === visibleText);
   });
+  const wroteVisibleFields = [...VISIBLE_ANSWER_FIELDS];
+  const selectedTerminalArtifactKind = selectedArtifactKind ?? (
+    appliedEnvelope.terminal_artifact_kind === "typed_failure"
+      ? "typed_failure"
+      : appliedEnvelope.terminal_artifact_kind === "request_user_input"
+        ? "request_user_input"
+        : appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
+          ? "direct_answer_text"
+          : null
+  );
+  const auditRejectedCandidates = rejectedCandidates.map((candidate) => ({
+    artifactKind: candidate.kind,
+    artifactRef: candidate.ref,
+    reason: normalizeSingleWriterAuditRejectionReason(candidate.reason),
+  }));
+  const terminalAuthoritySingleWriterAudit = {
+    artifactId: "terminal_authority_single_writer" as const,
+    schemaVersion: "helix.terminal_authority_single_writer.v1" as const,
+    selectedArtifactKind: selectedTerminalArtifactKind,
+    selectedArtifactRef: selectedArtifactRef,
+    rejectedCandidates: auditRejectedCandidates,
+    wroteVisibleFields,
+    forbiddenPreAuthorityVisibleFields,
+  };
   const result: HelixTerminalAuthoritySingleWriterResult = {
     schema: "helix.terminal_authority_single_writer_result.v1",
+    artifactId: "terminal_authority_single_writer",
+    schemaVersion: "helix.terminal_authority_single_writer.v1",
     turn_id: input.turnId,
+    selectedArtifactKind: selectedTerminalArtifactKind,
+    selectedArtifactRef: selectedArtifactRef,
     selected_terminal_artifact_ref: selectedArtifactRef,
-    selected_terminal_artifact_kind: selectedArtifactKind ?? (
-      appliedEnvelope.terminal_artifact_kind === "typed_failure"
-        ? "typed_failure"
-        : appliedEnvelope.terminal_artifact_kind === "request_user_input"
-          ? "request_user_input"
-          : appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
-            ? "direct_answer_text"
-            : null
-    ),
+    selected_terminal_artifact_kind: selectedTerminalArtifactKind,
     visible_text: visibleText,
     assistant_answer: false,
     source: selectedSource === "terminal_authority_repair_failure"
@@ -968,8 +1040,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       terminal_presentation_concise_text: visibleText,
       debug_selected_final_answer: visibleText,
     },
+    wroteVisibleFields,
+    forbiddenPreAuthorityVisibleFields,
+    audit: terminalAuthoritySingleWriterAudit,
     integrity: {
       single_writer_applied: true,
+      terminal_authority_single_writer_audit: terminalAuthoritySingleWriterAudit,
+      forbidden_pre_authority_visible_fields: forbiddenPreAuthorityVisibleFields,
       visible_matches_selected_artifact: !selectedArtifactTextForIntegrity || visibleText === selectedArtifactTextForIntegrity,
       visible_matches_draft: !draftText || visibleText === draftText || Boolean(selectedMaterializedAnswerText?.startsWith(draftText)),
       stale_failure_visible: isStaleWorkspaceFailureText(visibleText),
@@ -994,10 +1071,12 @@ export function applyHelixTerminalAuthoritySingleWriter(
   };
 
   input.payload.terminal_authority_single_writer = result;
+  input.payload.terminal_candidate_rejections = auditRejectedCandidates;
   input.payload.legacy_terminal_candidates = legacyCandidates;
   const debug = readRecord(input.payload.debug);
   if (debug) {
     debug.terminal_authority_single_writer = result;
+    debug.terminal_candidate_rejections = auditRejectedCandidates;
     debug.legacy_terminal_candidates = legacyCandidates;
   }
 
