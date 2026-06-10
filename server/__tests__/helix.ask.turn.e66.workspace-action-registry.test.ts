@@ -40,17 +40,17 @@ describe("helix ask E66 workspace action registry", () => {
   });
 
   it.each([
-    ["Open the Docs & Papers panel", "docs-viewer", "open"],
-    ["Show the docs directory", "docs-viewer", "open_directory"],
-    ["Open Workstation Notes", "workstation-notes", "open"],
-    ["Open Clipboard History", "workstation-clipboard-history", "open"],
-    ["Open Situation Room Sources", "situation-room-sources", "open"],
-    ["Open Situation Room Pipelines", "situation-room-pipelines", "open"],
-    ["Open Workflow Timeline", "workstation-workflow-timeline", "open"],
-    ["Open Essence Console", "agi-essence-console", "open"],
-    ["Open Task History", "agi-task-history", "open"],
-    ["Open Scientific Calculator", "scientific-calculator", "open"],
-  ])("routes %s to a workspace action envelope", async (prompt, panelId, actionId) => {
+    ["Open the Docs & Papers panel", "docs-viewer"],
+    ["Show the docs directory", "docs-viewer"],
+    ["Open Workstation Notes", "workstation-notes"],
+    ["Open Clipboard History", "workstation-clipboard-history"],
+    ["Open Situation Room Sources", "situation-room-sources"],
+    ["Open Situation Room Pipelines", "situation-room-pipelines"],
+    ["Open Workflow Timeline", "workstation-workflow-timeline"],
+    ["Open Essence Console", "agi-essence-console"],
+    ["Open Task History", "agi-task-history"],
+    ["Open Scientific Calculator", "scientific-calculator"],
+  ])("routes %s to a restore view-state action envelope", async (prompt, panelId) => {
     const app = createApp();
     const response = await request(app)
       .post("/api/agi/ask/turn")
@@ -64,12 +64,15 @@ describe("helix ask E66 workspace action registry", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("panel_control");
     expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("workspace_action_receipt");
-    expect(response.body?.capability_selection_result?.capability_id).toBe(`${panelId}.${actionId}`);
+    expect(response.body?.capability_selection_result?.capability_id).toBe("workstation.restore_view_state");
     expect(actions(response.body)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          panel_id: panelId,
-          action_id: actionId,
+          action: "restore_view_state",
+          view_state: expect.objectContaining({
+            panels: expect.arrayContaining([panelId]),
+            focusPanel: panelId,
+          }),
         }),
       ]),
     );
@@ -91,5 +94,6 @@ describe("helix ask E66 workspace action registry", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("panel_control");
     expect(String(response.body?.capability_selection_result?.capability_id ?? "")).not.toMatch(/\.open$/);
+    expect(String(response.body?.capability_selection_result?.capability_id ?? "")).not.toBe("workstation.restore_view_state");
   }, 90000);
 });

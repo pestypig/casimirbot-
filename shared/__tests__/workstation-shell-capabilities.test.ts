@@ -4,6 +4,7 @@ import {
   WORKSTATION_SHELL_CAPABILITY_CONTRACT_VERSION,
   findWorkstationShellCapability,
 } from "../workstation-shell-capabilities";
+import { WORKSTATION_VIEW_STATE_CONTRACT_VERSION } from "../workstation-view-state";
 
 describe("workstation shell capabilities", () => {
   it("defines deep-link and restore contracts as diagnostic shell capabilities", () => {
@@ -35,6 +36,7 @@ describe("workstation shell capabilities", () => {
       agent_triggered_emits_receipt: true,
       agent_receipt_kind: "workstation_view_state_restore",
       path_policy: "workspace_relative_path_ref_only",
+      view_state_contract_version: WORKSTATION_VIEW_STATE_CONTRACT_VERSION,
     });
   });
 });

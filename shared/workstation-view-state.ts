@@ -203,8 +203,12 @@ export function coerceWorkstationViewState(
         : null,
   ) ?? undefined;
   const anchor = typeof record.anchor === "string" && record.anchor.trim() ? record.anchor.trim() : undefined;
-  const pathRef = buildWorkstationPathRef(activeDocPath) ?? undefined;
   const normalizedPanels = activeDocPath && !panels.includes("docs-viewer") ? [...panels, "docs-viewer"] : panels;
+  const panelPathRef =
+    !activeDocPath && normalizedPanels.length === 1
+      ? buildWorkstationPanelPathRef(normalizedPanels[0], options?.resolvePanelTitle?.(normalizedPanels[0]))
+      : null;
+  const pathRef = buildWorkstationPathRef(activeDocPath) ?? panelPathRef ?? undefined;
   if (normalizedPanels.length === 0 && !focusPanel && !activeDocPath) return null;
   return {
     panels: normalizedPanels,

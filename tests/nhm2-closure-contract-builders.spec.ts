@@ -164,6 +164,21 @@ describe("NHM2 closure contract builders", () => {
       gapMeters: 1e-9,
       temperatureK: 20,
     });
+    const perfectConductorDesign = buildCasimirMaterialReceipt({
+      generatedAt: "2026-06-10T00:00:00.000Z",
+      tileBatchId: "tile_batch:perfect-conductor-design",
+      geometry: {
+        gapMeters: 1e-9,
+        gapMetrologyStatus: "design",
+        beyondPfaValidity: "not_evaluated",
+      },
+      material: {
+        modelKind: "perfect_conductor_ideal",
+        finiteConductivityIncluded: false,
+        finiteTemperatureIncluded: false,
+        roughnessCorrectionIncluded: false,
+      },
+    });
     const requestedMaterialReceipt = buildCasimirMaterialReceipt({
       generatedAt: "2026-06-10T00:00:00.000Z",
       tileBatchId: "tile_batch:requested-material-without-evidence",
@@ -182,8 +197,9 @@ describe("NHM2 closure contract builders", () => {
     });
 
     expect(idealReceipt.status).toBe("ideal_scalar_only");
+    expect(perfectConductorDesign.status).toBe("ideal_scalar_only");
     expect(requestedMaterialReceipt.status).not.toBe("material_receipted");
-    expect(requestedMaterialReceipt.status).toBe("ideal_scalar_only");
+    expect(requestedMaterialReceipt.status).toBe("blocked");
     expect(idealReceipt.claimBoundary.idealCasimirDoesNotValidateTileSource).toBe(true);
   });
 
