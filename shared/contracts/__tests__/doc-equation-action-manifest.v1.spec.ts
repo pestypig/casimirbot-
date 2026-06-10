@@ -1,15 +1,48 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import nhm2WhitepaperActions from "../../../docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.json";
+import nhm2WhitepaperActionSource from "../../../docs/research/nhm2-current-status-whitepaper-2026-05-02.equation-actions.source.json";
 import {
   isDocEquationActionManifestV1,
   validateDocEquationActionManifestV1,
 } from "../doc-equation-action-manifest.v1";
+import {
+  isDocEquationActionSourceV1,
+  validateDocEquationActionSourceV1,
+} from "../doc-equation-action-source.v1";
 import { buildNhm2TheoryBadgeGraphV1 } from "../../theory/nhm2-theory-badges";
+import {
+  buildDocEquationActionManifestFromMarkdown,
+  stableStringifyDocEquationActionManifest,
+} from "../../../scripts/doc-equation-action-generator";
+
+const NHM2_WHITEPAPER_PATH = "docs/research/nhm2-current-status-whitepaper-2026-05-02.md";
 
 describe("doc_equation_actions/v1", () => {
   it("validates the NHM2 whitepaper sidecar", () => {
     expect(validateDocEquationActionManifestV1(nhm2WhitepaperActions)).toEqual([]);
     expect(isDocEquationActionManifestV1(nhm2WhitepaperActions)).toBe(true);
+  });
+
+  it("validates the NHM2 whitepaper sidecar source metadata", () => {
+    expect(validateDocEquationActionSourceV1(nhm2WhitepaperActionSource)).toEqual([]);
+    expect(isDocEquationActionSourceV1(nhm2WhitepaperActionSource)).toBe(true);
+  });
+
+  it("generates the checked-in NHM2 whitepaper sidecar from marked equations", () => {
+    const markdown = fs.readFileSync(path.join(process.cwd(), NHM2_WHITEPAPER_PATH), "utf8");
+    const generated = buildDocEquationActionManifestFromMarkdown({
+      markdown,
+      source: nhm2WhitepaperActionSource,
+    });
+
+    expect(stableStringifyDocEquationActionManifest(generated)).toBe(
+      stableStringifyDocEquationActionManifest(nhm2WhitepaperActions),
+    );
+    expect(generated.entries.map((entry) => entry.equationId)).toEqual(
+      nhm2WhitepaperActionSource.entries.map((entry) => entry.equationId),
+    );
   });
 
   it("binds closure-stack equations to diagnostic runtime actions without scalar payload overreach", () => {

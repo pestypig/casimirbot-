@@ -67,6 +67,7 @@ import {
 } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
 import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../services/stage-play/stage-play-live-source-watch-policy-defaults";
+import { runtimeMemoryGovernor, type RuntimeMemoryReader } from "../services/runtime/runtime-memory-governor";
 import {
   analyzeVisualFrame,
   recordVisualFrame,
@@ -78,6 +79,15 @@ import { resetInterimVoiceCalloutsForTest } from "../services/helix-ask/interim-
 const threadId = "thread:stage-play-mailbox";
 const roomId = "room:stage-play-mailbox";
 const sourceId = "visual_source:stage-play-mailbox";
+const mib = 1024 * 1024;
+
+const memoryReader = (heapUsedMiB: number, rssMiB: number): RuntimeMemoryReader => () => ({
+  heapUsed: heapUsedMiB * mib,
+  heapTotal: Math.max(heapUsedMiB, 800) * mib,
+  rss: rssMiB * mib,
+  external: 20 * mib,
+  arrayBuffers: 5 * mib,
+});
 
 beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
@@ -91,6 +101,10 @@ beforeEach(() => {
   resetStagePlayHeldCalloutStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
+  runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+  delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS;
+  delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB;
+  delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_RSS_MB;
 });
 
 const seedVisualEvidence = () => {
@@ -2905,6 +2919,96 @@ describe("Stage Play live-source mailbox", () => {
     const autoArmJob = listStagePlayLiveSourceJobStates({ threadId, roomId })
       .find((entry) => entry.jobId === "stage_play_live_source_job:auto-arm");
     expect(autoArmJob?.watchJobPolicyRef).toBe(policy?.policyId);
+  });
+
+  it("auto-arms policy and runs local wake when stage-play refresh pressure is deferrable but within local caps", async () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader(700, 1200),
+    });
+    upsertStagePlayLiveSourceJobState({
+      jobId: "stage_play_live_source_job:local-pressure-bypass",
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      status: "armed",
+      nextWakePolicy: {
+        sourceKind: "visual_frame",
+        afterMs: 10_000,
+        maxConsecutiveReads: 3,
+      },
+      updatedAt: "2026-06-04T12:04:00.000Z",
+    });
+    enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:local-pressure-bypass",
+      evidenceRef: "visual_evidence:local-pressure-bypass",
+      summaryText: "Minecraft player is next to lava and fire with visible damage risk.",
+      createdAt: "2026-06-04T12:04:01.000Z",
+    });
+
+    let askCalls = 0;
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:04:02.000Z",
+      askTurnRunner: async ({ wakeRequest }) => {
+        askCalls += 1;
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId: wakeRequest.threadId,
+          roomId: wakeRequest.roomId,
+          environmentId: wakeRequest.environmentId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "Urgent Minecraft lava/fire/damage cue should wake Ask and request voice.",
+          voiceCalloutDraft: "Lava and fire risk visible.",
+          voiceEnabled: true,
+          voiceAllowedNow: true,
+          voiceRequiresConfirmation: false,
+          voicePolicyReason: "watch_policy_allows_urgent_voice_callout",
+          nextLoopState: "armed_for_next_summary",
+          now: "2026-06-04T12:04:03.000Z",
+        });
+        return {
+          turn_id: "ask:local-pressure-bypass",
+          current_turn_artifact_ledger: [{
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: decision,
+            },
+          }],
+        };
+      },
+    });
+
+    expect(askCalls).toBe(1);
+    expect(cycle.status).toBe("completed");
+    expect(cycle.runtimeAdmission).toMatchObject({
+      admitted: false,
+      action: "queue",
+      reason: "queue_deferrable",
+      pressureLevel: "hard_pressure",
+      localBypass: expect.objectContaining({
+        applied: true,
+      }),
+    });
+    expect(cycle.result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:local-pressure-bypass",
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      failureReason: null,
+    });
+    expect(listStagePlayLiveSourceWatchJobPolicies({ threadId, roomId })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        interpretationMode: "prediction_watch",
+        mailProcessingMode: "salience_window",
+      }),
+    ]));
   });
 
   it("falls back to a compact processed-packet handoff when the full wake prompt exceeds preflight budget", async () => {

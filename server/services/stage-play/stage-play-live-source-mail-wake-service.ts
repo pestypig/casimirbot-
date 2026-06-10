@@ -46,6 +46,14 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
     action: RuntimeAdmissionDecision["action"];
     reason: RuntimeAdmissionDecision["reason"];
     pressureLevel: RuntimeAdmissionDecision["pressureLevel"];
+    checkedAt: string;
+    source: "stage_play_live_source_mail_wake";
+    memory: RuntimeAdmissionDecision["memory"];
+    limits: RuntimeAdmissionDecision["limits"];
+    localBypass?: {
+      applied: boolean;
+      reason: string;
+    } | null;
   } | null;
   assistant_answer: false;
   terminal_eligible: false;
@@ -74,6 +82,14 @@ const wakeRuntimePressureCheck = (runtimeAdmissionSink?: (decision: RuntimeAdmis
       source: "stage_play_live_source_mail_wake",
     });
     runtimeAdmissionSink?.(admission);
+    const localBypass = localWakePressureBypass(admission);
+    if (localBypass.applied) {
+      admission.lease?.release("aborted");
+      return {
+        deferred: false,
+        reason: localBypass.reason,
+      };
+    }
     if (!admission.admitted) {
       return {
         deferred: true,
@@ -89,6 +105,34 @@ const wakeRuntimePressureCheck = (runtimeAdmissionSink?: (decision: RuntimeAdmis
 
 const immediateRunDelayMs = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_IMMEDIATE_DELAY_MS", 250);
+
+const readPositiveNumberEnv = (name: string, fallback: number): number => {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const localWakePressureBypass = (
+  admission: RuntimeAdmissionDecision,
+): { applied: boolean; reason: string } => {
+  if (process.env.NODE_ENV === "production") return { applied: false, reason: "production_disabled" };
+  if (String(process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS ?? "1").trim() === "0") {
+    return { applied: false, reason: "env_disabled" };
+  }
+  if (admission.admitted) return { applied: false, reason: "already_admitted" };
+  if (admission.reason !== "queue_deferrable") return { applied: false, reason: `not_deferrable:${admission.reason}` };
+  const maxHeap = readPositiveNumberEnv("STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB", 1200);
+  const maxRss = readPositiveNumberEnv("STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_RSS_MB", 1800);
+  if (admission.memory.heapUsedMiB > maxHeap || admission.memory.rssMiB > maxRss) {
+    return {
+      applied: false,
+      reason: `local_limits_exceeded:heap=${admission.memory.heapUsedMiB}/${maxHeap}:rss=${admission.memory.rssMiB}/${maxRss}`,
+    };
+  }
+  return {
+    applied: true,
+    reason: `local_stage_play_wake_bypass:${admission.pressureLevel}:heap=${admission.memory.heapUsedMiB}/${admission.limits.maxHeapUsedMiB}:rss=${admission.memory.rssMiB}/${admission.limits.maxRssMiB}`,
+  };
+};
 
 const ensureIntervalWatchPolicyForJob = (
   job: ReturnType<typeof listStagePlayLiveSourceJobStates>[number],
@@ -193,6 +237,11 @@ const summarizeWakeState = (input: {
       action: input.runtimeAdmission.action,
       reason: input.runtimeAdmission.reason,
       pressureLevel: input.runtimeAdmission.pressureLevel,
+      checkedAt: input.now,
+      source: "stage_play_live_source_mail_wake",
+      memory: input.runtimeAdmission.memory,
+      limits: input.runtimeAdmission.limits,
+      localBypass: localWakePressureBypass(input.runtimeAdmission),
     } : null,
     assistant_answer: false,
     terminal_eligible: false,

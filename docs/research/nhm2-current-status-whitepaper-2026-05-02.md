@@ -56,6 +56,8 @@ The closure-stack patch adds an eighth failure mode: a ledger can look complete 
 
 The ADM / 3+1 split writes the metric in terms of lapse `alpha`, shift `beta^i`, spatial metric `gamma_ij`, and coordinate time `t`:
 
+<!-- helix-doc-equation-action/v1 id=nhm2-adm-line-element -->
+
 \[
 ds^2 = -\alpha^2 dt^2 + \gamma_{ij}(dx^i+\beta^i dt)(dx^j+\beta^j dt).
 \]
@@ -96,6 +98,8 @@ Since `d tau^2 = -ds^2`, divide by `dt^2`:
 
 Therefore:
 
+<!-- helix-doc-equation-action/v1 id=nhm2-proper-time-normalization -->
+
 \[
 \left(\frac{d\tau}{dt}\right)^2=\alpha^2-\gamma_{ij}(v^i+\beta^i)(v^j+\beta^j).
 \]
@@ -119,6 +123,8 @@ The spatial projector associated with the same foliation is:
 \]
 
 The observer-facing matter variables are:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-observer-projections -->
 
 \[
 E=T_{\mu\nu}n^\mu n^\nu,
@@ -560,6 +566,8 @@ This reconstruction is admissible only if `E`, `J_i`, and `S_ij` come from the s
 
 The selected route is:
 
+<!-- helix-doc-equation-action/v1 id=nhm2-einstein-tensor-route -->
+
 \[
 G_{\mu\nu}=8\pi T_{\mu\nu},
 \qquad
@@ -588,28 +596,40 @@ QEI evidence now has the same diagnostic discipline. A scalar badge replay of `q
 
 The following expressions are not new physics claims. They are stable workstation anchors for connecting this paper to the Theory Badge Graph, Scientific Calculator, and artifact-backed runtime ledger. A calculator replay is allowed only for scalar rows; tensor, observer, receipt, dossier, and invariant rows open runtime/evidence surfaces instead.
 
+<!-- helix-doc-equation-action/v1 id=nhm2-same-chart-full-tensor-ledger -->
+
 \[
 \mathcal{T}^{\rm same-chart}_{\rm full}
 =\{T_{00},T_{0i},T_{ii},T_{ij,\ i\ne j}\}.
 \]
 
+<!-- helix-doc-equation-action/v1 id=nhm2-wall-t00-source-residual -->
+
 \[
 R_{{\rm wall},T00}=T00_{{\rm wall},{\rm required}}-T00_{{\rm wall},{\rm available}}.
 \]
+
+<!-- helix-doc-equation-action/v1 id=nhm2-observer-robust-energy-condition-gate -->
 
 \[
 {\rm EC}_{\rm observer\ robust}
 =\{ {\rm WEC},{\rm NEC},{\rm DEC},{\rm SEC}\}_{\rm observer\ families}.
 \]
 
+<!-- helix-doc-equation-action/v1 id=nhm2-qei-margin-dossier-bridge -->
+
 \[
 qei_{\rm margin}=qei_{\rm bound}-qei_{\rm sample}.
 \]
+
+<!-- helix-doc-equation-action/v1 id=casimir-material-receipt-ledger -->
 
 \[
 {\rm Receipt}_{\rm Casimir}
 =({\rm gap},{\rm material},{\rm temperature},{\rm roughness},{\rm geometry}).
 \]
+
+<!-- helix-doc-equation-action/v1 id=nhm2-natario-invariant-audit-ledger -->
 
 \[
 {\rm Natario}_{\rm audit}

@@ -44,11 +44,55 @@ const clip = (value: string, max = 180): string => {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}...`;
 };
 
+const scopeLabel = (artifact: DocEquationContextArtifactV1): string =>
+  artifact.commentaryHints.scope.replace(/_/g, " ");
+
+const preferredEvidenceTarget = (artifact: DocEquationContextArtifactV1): string =>
+  artifact.preferredBadgeId ?? artifact.calculatorPayloadRef?.badgeId ?? artifact.badgeIds[0] ?? "no badge target";
+
 export function summarizeDocEquationContext(artifact: DocEquationContextArtifactV1): string {
-  const preferred = artifact.preferredBadgeId ?? artifact.badgeIds[0] ?? "no badge";
-  const scope = artifact.commentaryHints.scope.replace(/_/g, " ");
+  const preferred = preferredEvidenceTarget(artifact);
+  const scope = scopeLabel(artifact);
   const note = artifact.actionClaimBoundaryNote ?? artifact.claimBoundaryNotes[0] ?? "Diagnostic context only.";
   return `Doc equation context: ${artifact.equationLabel} -> ${preferred}. Scope: ${scope}. ${clip(note, 140)}`;
+}
+
+export function buildDocEquationContextNarration(artifact: DocEquationContextArtifactV1): string {
+  const source = artifact.uri ?? `${artifact.docPath}#${artifact.anchor ?? artifact.equationId}`;
+  const target = preferredEvidenceTarget(artifact);
+  const panels = artifact.openedPanels.length ? artifact.openedPanels.join(", ") : "no panel recorded";
+  const calculator = artifact.calculatorPayloadRef
+    ? `Calculator payload: ${artifact.calculatorPayloadRef.badgeId}/${artifact.calculatorPayloadRef.payloadId}.`
+    : "Calculator payload: none; use runtime/evidence artifact status when available.";
+  const boundary = artifact.actionClaimBoundaryNote ?? artifact.claimBoundaryNotes[0] ?? "Diagnostic context only.";
+  const focus = artifact.commentaryHints.suggestedExplanationFocus.slice(0, 4).join("; ");
+
+  return [
+    `Doc equation context: ${artifact.equationLabel}.`,
+    `Source URI: ${source}.`,
+    `Scope: ${scopeLabel(artifact)}; preferred evidence target: ${target}.`,
+    `Workstation path: opens ${panels}. ${calculator}`,
+    `Claim boundary: ${boundary}`,
+    `Explanation focus: ${focus || "explain source, scope, and blockers"}.`,
+    "This receipt is observation-only and not terminal answer authority.",
+  ].join("\n");
+}
+
+export function buildDocEquationContextAskPrompt(artifact: DocEquationContextArtifactV1): string {
+  const prohibitedClaims = artifact.commentaryHints.prohibitedClaims.join(", ");
+  const boundary = artifact.actionClaimBoundaryNote ?? artifact.claimBoundaryNotes[0] ?? "Diagnostic context only.";
+  return [
+    "Explain the active doc equation context as workspace evidence.",
+    `Use this exact source URI: ${artifact.uri ?? `${artifact.docPath}#${artifact.anchor ?? artifact.equationId}`}`,
+    `Equation: ${artifact.equationLabel}`,
+    `LaTeX: ${artifact.latex}`,
+    `Scope: ${scopeLabel(artifact)}`,
+    `Preferred evidence target: ${preferredEvidenceTarget(artifact)}`,
+    `Panels opened by the action: ${artifact.openedPanels.join(", ") || "none recorded"}`,
+    `Claim boundary: ${boundary}`,
+    `Explain what the equation opens, which calculator or runtime artifact is relevant, and which blockers or proxy limits remain.`,
+    `Avoid these promotional claims unless a separate terminal proof gate supplies them: ${prohibitedClaims}.`,
+  ].join("\n");
 }
 
 export function buildDocEquationContextLiveEventPayload(
@@ -68,6 +112,7 @@ export function buildDocEquationContextLiveEventPayload(
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
+        narration: buildDocEquationContextNarration(artifact),
         artifact,
       },
     },

@@ -16,6 +16,8 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Doc Equation Context");
     expect(source).toContain("observation only");
     expect(source).toContain("docEquationScopeLabel");
+    expect(source).toContain("buildDocEquationContextAskPrompt");
+    expect(source).toContain('aria-label="Ask Helix to explain current doc equation context"');
   });
 
   it("exposes explicit apply controls in the visual capture panel", () => {

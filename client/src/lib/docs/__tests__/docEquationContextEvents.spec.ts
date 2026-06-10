@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DocEquationContextArtifactV1 } from "@shared/contracts/doc-equation-context.v1";
 import {
   DOC_EQUATION_CONTEXT_EVENT,
+  buildDocEquationContextAskPrompt,
   buildDocEquationContextLiveEventPayload,
+  buildDocEquationContextNarration,
   emitDocEquationContextArtifact,
   summarizeDocEquationContext,
 } from "../docEquationContextEvents";
@@ -15,6 +17,8 @@ const makeArtifact = (): DocEquationContextArtifactV1 => ({
   equationId: "nhm2-same-chart-full-tensor-ledger",
   equationLabel: "Same-chart full tensor ledger",
   sectionAnchor: "57-workstation-equation-anchors",
+  uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-same-chart-full-tensor-ledger",
+  anchor: "nhm2-same-chart-full-tensor-ledger",
   latex: "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}.",
   actionId: "open-same-chart-full-tensor-artifact",
   actionKind: "artifact_backed_theory_run",
@@ -69,6 +73,24 @@ describe("doc equation context events", () => {
     expect(summary).not.toMatch(/validated|viable|certified transport/i);
   });
 
+  it("builds a richer narration for on-demand Ask context", () => {
+    const narration = buildDocEquationContextNarration(makeArtifact());
+
+    expect(narration).toContain("Source URI: workspace://workspace/docs/research");
+    expect(narration).toContain("preferred evidence target: nhm2.tensor.same_chart_full_tensor");
+    expect(narration).toContain("observation-only");
+    expect(narration).not.toMatch(/certified transport|NHM2 proves viability|Casimir source proven/i);
+  });
+
+  it("builds an Ask prompt that preserves exact equation context and claim boundaries", () => {
+    const prompt = buildDocEquationContextAskPrompt(makeArtifact());
+
+    expect(prompt).toContain("Use this exact source URI");
+    expect(prompt).toContain("Same-chart full tensor ledger");
+    expect(prompt).toContain("Preferred evidence target: nhm2.tensor.same_chart_full_tensor");
+    expect(prompt).toContain("Avoid these promotional claims");
+  });
+
   it("builds an Ask-visible receipt that is observation-only", () => {
     const artifact = makeArtifact();
     const payload = buildDocEquationContextLiveEventPayload(artifact, "helix-ask:desktop");
@@ -83,6 +105,7 @@ describe("doc equation context events", () => {
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
+          narration: expect.stringContaining("Doc equation context: Same-chart full tensor ledger."),
           artifact,
         },
       },

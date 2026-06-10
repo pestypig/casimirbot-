@@ -228,6 +228,20 @@ type StagePlayLiveSourceMailListResponse = {
       action?: string;
       reason?: string;
       pressureLevel?: string;
+      checkedAt?: string;
+      source?: string;
+      memory?: {
+        heapUsedMiB?: number;
+        rssMiB?: number;
+      };
+      limits?: {
+        maxHeapUsedMiB?: number;
+        maxRssMiB?: number;
+      };
+      localBypass?: {
+        applied?: boolean;
+        reason?: string;
+      } | null;
     } | null;
     continuation?: {
       scheduled?: boolean;
@@ -1645,8 +1659,15 @@ function buildObserverMailLoopNodes(input: {
   const latestPolicy = watchPolicyResolution.activePolicy;
   const unreadCount = mailItems.filter((item) => item.status === "unread").length;
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
+  const visualBacklogCount = mailItems.filter((item) => item.sourceKind === "visual_frame" && item.status === "unread").length;
   const retryWakeCount = wakeRequests.filter((wake) => wake.status === "failed_retryable").length;
   const pressureWakeCount = wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
+  const askWakeRequestCount = wakeRequests.filter((wake) =>
+    wake.status === "queued" ||
+    wake.status === "running" ||
+    wake.status === "failed_retryable" ||
+    wake.status === "deferred_for_pressure"
+  ).length;
   const queuedWakeMailCount = wakeRequests
     .filter((wake) => wake.status === "queued")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
@@ -1776,6 +1797,13 @@ function buildObserverMailLoopNodes(input: {
     pressureDisplayWake?.failureReason ??
     null;
   const runtimePressureLevel = mailbox?.wakeAdmissionCycle?.runtimeAdmission?.pressureLevel ?? null;
+  const runtimeAdmission = mailbox?.wakeAdmissionCycle?.runtimeAdmission ?? null;
+  const runtimeMemoryText = runtimeAdmission?.memory && runtimeAdmission?.limits
+    ? `Memory: heap ${runtimeAdmission.memory.heapUsedMiB ?? "?"}/${runtimeAdmission.limits.maxHeapUsedMiB ?? "?"} MiB; rss ${runtimeAdmission.memory.rssMiB ?? "?"}/${runtimeAdmission.limits.maxRssMiB ?? "?"} MiB`
+    : null;
+  const localBypassText = runtimeAdmission?.localBypass?.applied
+    ? `Local wake bypass: ${runtimeAdmission.localBypass.reason}`
+    : null;
   const continuation = mailbox?.wakeAdmissionCycle?.continuation ?? null;
   const continuationRunnableWakeIds = continuation?.runnableWakeIds ?? [];
   const continuationRetainedMailCount = continuationRunnableWakeIds
@@ -1804,13 +1832,15 @@ function buildObserverMailLoopNodes(input: {
   const wakePressureActive = latestWakeStatus === "deferred_for_pressure" || pressureWakeCount > 0 || deferredWakeIds.length > 0;
   const wakePressureBand = wakePressureActive
     ? {
-        title: "Wake pressure",
+        title: "Wake admission",
         lines: [
-          "Deferred for pressure",
-          `${unreadCount} unread retained`,
+          "Deferred before Ask wake",
+          `${visualBacklogCount} raw visual backlog retained`,
           pressureNextRetryAt ? `Next retry: ${formatStagePlayClock(pressureNextRetryAt)}` : null,
           runtimePressureLevel ? `Pressure: ${labelize(runtimePressureLevel)}` : null,
           runtimePressureReason ? `Reason: ${labelize(runtimePressureReason)}` : null,
+          runtimeMemoryText,
+          localBypassText,
           pressureContinuationText,
         ].filter((line): line is string => Boolean(line)),
         tone: "pressure" as const,
@@ -1871,7 +1901,7 @@ function buildObserverMailLoopNodes(input: {
         : "visual source not active",
       statusChips: [
         graph.sourceWindow.freshness,
-        unreadCount > 0 ? `${unreadCount} unread` : "mail ready",
+        visualBacklogCount > 0 ? `${visualBacklogCount} visual backlog` : "visual backlog clear",
       ].filter((entry): entry is string => Boolean(entry)),
       payloadRows: [
         {
@@ -1910,7 +1940,7 @@ function buildObserverMailLoopNodes(input: {
       transformLabel: `source registry -> live-source mailbox (${mailboxThreadId})`,
       outputLabel: "Output",
       outputRefs: observerOutputRefs,
-      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mailbox ${mailboxThreadId} | unread ${unreadCount} | delivered ${deliveredCount}`,
+      outputPreview: `${visualSource?.sourceId ?? "visual_source missing"} ${visualSource?.status ?? "unknown"} | mailbox ${mailboxThreadId} | visual backlog ${visualBacklogCount} | delivered ${deliveredCount}`,
     },
     {
       id: "observer_mail_loop:observer_shades",
@@ -1977,15 +2007,15 @@ function buildObserverMailLoopNodes(input: {
     },
     {
       id: "observer_mail_loop:visual_mail",
-      title: "Raw Mail",
-      subtitle: "compact observation delivery",
+      title: "Visual Backlog",
+      subtitle: "raw observer mail, not Ask queue",
       status: visualMail?.status ?? "missing",
       preview: visualMail
-        ? `${unreadCount} unread; latest ${visualMail.summary.preview}`
+        ? `${visualBacklogCount} visual backlog; latest ${visualMail.summary.preview}`
         : "no compact mail yet",
       statusChips: [
-        unreadCount > 0 ? `${unreadCount} unread` : "no unread",
-        queuedRunningText,
+        visualBacklogCount > 0 ? `${visualBacklogCount} observer backlog` : "observer backlog clear",
+        askWakeRequestCount > 0 ? `${askWakeRequestCount} Ask wake request(s)` : "no Ask wake",
       ].filter((entry): entry is string => Boolean(entry)),
       payloadRows: [
         {
@@ -1994,9 +2024,14 @@ function buildObserverMailLoopNodes(input: {
           tone: visualMail ? "good" : "warn",
         },
         {
-          label: "Mail",
-          value: `${unreadCount} unread | ${deliveredCount} delivered | ${queuedWakeMailCount} queued`,
-          tone: unreadCount > 0 ? "warn" : "default",
+          label: "Observer backlog",
+          value: `${visualBacklogCount} raw visual unread | ${deliveredCount} delivered to Ask/read path`,
+          tone: visualBacklogCount > 0 ? "warn" : "default",
+        },
+        {
+          label: "Ask wake queue",
+          value: `${queuedWakeMailCount} queued mail | ${runningWakeMailCount} running | ${retryWakeMailCount} retry | ${pressureWakeMailCount} pressure-deferred`,
+          tone: askWakeRequestCount > 0 ? "warn" : "default",
         },
         {
           label: "Namespace",

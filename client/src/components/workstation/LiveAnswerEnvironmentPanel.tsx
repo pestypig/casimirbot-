@@ -6,6 +6,8 @@ import {
   type LiveAnswerEnvironmentState,
 } from "@/store/useLiveAnswerEnvironmentStore";
 import { useDocEquationContextStore } from "@/store/useDocEquationContextStore";
+import { buildDocEquationContextAskPrompt } from "@/lib/docs/docEquationContextEvents";
+import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type { DocEquationContextArtifactV1 } from "@shared/contracts/doc-equation-context.v1";
 import type { WorkstationLiveSource, WorkstationLiveSourceEvent, LiveSourceWindowSummary } from "@shared/helix-workstation-live-source";
 import type { LiveAnswerEnvironmentDelta, LiveAnswerLineState } from "@shared/helix-live-answer-environment";
@@ -504,6 +506,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     (state: LiveAnswerEnvironmentState) => state.latestReadByThread[threadId] ?? null,
   );
   const latestDocEquationContext = useDocEquationContextStore((state) => state.latestContext);
+  const handleExplainLatestDocEquationContext = React.useCallback(() => {
+    if (!latestDocEquationContext) return;
+    launchHelixAskPrompt({
+      question: buildDocEquationContextAskPrompt(latestDocEquationContext),
+      blockId: latestDocEquationContext.equationId,
+      panelId: "live-answer-environment",
+      forceReasoningDispatch: true,
+      suppressWorkstationPayloadActions: true,
+    });
+  }, [latestDocEquationContext]);
   const sourceDescriptors = Array.isArray(latestReadResponse?.source_descriptors)
     ? latestReadResponse.source_descriptors
     : [];
@@ -1268,9 +1280,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
               Doc Equation Context
             </p>
-            <span className="rounded border border-cyan-300/25 px-2 py-0.5 text-[10px] text-cyan-100">
-              {docEquationScopeLabel(latestDocEquationContext)}
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded border border-cyan-300/25 px-2 py-0.5 text-[10px] text-cyan-100">
+                {docEquationScopeLabel(latestDocEquationContext)}
+              </span>
+              <button
+                type="button"
+                onClick={handleExplainLatestDocEquationContext}
+                className="rounded border border-cyan-300/30 px-2 py-0.5 text-[10px] text-cyan-100 hover:bg-cyan-400/10"
+                aria-label="Ask Helix to explain current doc equation context"
+              >
+                Explain
+              </button>
+            </div>
           </div>
           <p className="mt-1 text-xs font-semibold text-slate-100">{latestDocEquationContext.equationLabel}</p>
           <p className="mt-1 truncate text-[11px] text-slate-300">

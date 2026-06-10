@@ -171,6 +171,7 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
   sourceFreshness?: StagePlayLiveSourceMailItemV1["hints"]["sourceFreshness"];
   evidenceRefs?: string[];
   supersedesMailIds?: string[];
+  captureIntervalMs?: number | null;
   createdAt?: string;
 }): StagePlayLiveSourceMailItemV1 {
   const evidenceRefs = uniqueStrings([
@@ -259,6 +260,10 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     updateMailStatus(superseded, "superseded", createdAt);
   }
   trimThreadMail(input.threadId);
+  const visualSourceIntervalMs =
+    input.sourceKind === "visual_frame" && typeof input.captureIntervalMs === "number" && input.captureIntervalMs > 0
+      ? input.captureIntervalMs
+      : null;
   const jobState = upsertStagePlayLiveSourceJobState({
     threadId: input.threadId,
     roomId: input.roomId ?? null,
@@ -266,6 +271,13 @@ export function enqueueStagePlayLiveSourceMailItem(input: {
     sourceIds: [input.sourceId],
     lastMailId: mail.mailId,
     nextLoopState: "continue_with_unread_mail",
+    nextWakePolicy: visualSourceIntervalMs
+      ? {
+          sourceKind: input.sourceKind,
+          afterMs: visualSourceIntervalMs,
+          maxConsecutiveReads: 3,
+        }
+      : undefined,
     status: "armed",
     updatedAt: createdAt,
   });

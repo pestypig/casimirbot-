@@ -329,6 +329,7 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
   const existing = evidenceByThread.get(frame.thread_id) ?? [];
   evidenceByThread.set(frame.thread_id, [...existing.filter((entry) => entry.evidence_id !== evidence.evidence_id), evidence].slice(-500));
   touchVisualSnapshotSource({ sourceId: frame.source_id, status: "active", ts: evidence.ts });
+  const source = sourcesById.get(evidence.source_id) ?? null;
   enqueueStagePlayLiveSourceMailItem({
     threadId: evidence.thread_id,
     roomId: frame.room_id ?? null,
@@ -346,6 +347,7 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
       evidence.visual_observer_profile_id,
       evidence.visual_prompt_hash ? `visual_prompt_hash:${evidence.visual_prompt_hash}` : null,
     ].filter((ref): ref is string => Boolean(ref)),
+    captureIntervalMs: source?.capture_mode === "interval" ? source.cadence_ms : null,
     createdAt: evidence.ts,
   });
   return evidence;

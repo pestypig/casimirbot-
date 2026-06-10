@@ -1,0 +1,332 @@
+{
+  "contractVersion": "doc_equation_action_source/v1",
+  "docPath": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "entries": [
+    {
+      "equationId": "nhm2-adm-line-element",
+      "label": "ADM 3+1 line element",
+      "aliases": [
+        "ds^2 = -\\alpha^2 dt^2 + \\gamma_{ij}(dx^i+\\beta^i dt)(dx^j+\\beta^j dt)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-adm-3p1-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open ADM / 3+1 theory path",
+          "badgeIds": ["physics.gr.3p1_decomposition"],
+          "preferredBadgeId": "physics.gr.3p1_decomposition",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.gr.reference_roots",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "ADM context orients the graph; it is formalism, not NHM2 validation."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "ADM / 3+1 formalism is a reference grammar, not a validation result."
+      ]
+    },
+    {
+      "equationId": "nhm2-proper-time-normalization",
+      "label": "3+1 proper-time normalization",
+      "aliases": [
+        "\\frac{d\\tau^2}{dt^2}=\\alpha^2-\\gamma_{ij}(v^i+\\beta^i)(v^j+\\beta^j)",
+        "\\left(\\frac{d\\tau}{dt}\\right)^2=\\alpha^2-\\gamma_{ij}(v^i+\\beta^i)(v^j+\\beta^j)"
+      ],
+      "actions": [
+        {
+          "actionId": "open-lapse-shift-geometry-sample",
+          "kind": "calculator_ingest",
+          "label": "Load proper-time relation in calculator",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.geometry.lapse_shift_profile",
+            "payloadId": "proper_time_scalar_offset_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.geometry_sample",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "Calculator replay is a scalar timing aid, not a route result."
+        },
+        {
+          "actionId": "open-lapse-shift-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open lapse-shift theory path",
+          "badgeIds": ["physics.gr.3p1_decomposition", "nhm2.geometry.lapse_shift_profile"],
+          "preferredBadgeId": "nhm2.geometry.lapse_shift_profile",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.geometry_sample",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The timing relation remains chart and observer dependent."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The proper-time relation does not turn shift into ordinary ship speed."
+      ]
+    },
+    {
+      "equationId": "nhm2-observer-projections",
+      "label": "Eulerian observer stress-energy projections",
+      "mathBlockCount": 3,
+      "aliases": [
+        "E=T_{\\mu\\nu}n^\\mu n^\\nu",
+        "J_i=-T_{\\mu\\nu}n^\\mu\\gamma^\\nu{}_i",
+        "S_{ij}=T_{\\mu\\nu}\\gamma^\\mu{}_i\\gamma^\\nu{}_j"
+      ],
+      "actions": [
+        {
+          "actionId": "open-observer-projection-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open observer projection theory path",
+          "badgeIds": [
+            "physics.fields.stress_energy_tensor",
+            "physics.gr.3p1_decomposition",
+            "nhm2.tensor.same_chart_full_tensor",
+            "nhm2.energy_condition.observer_robust_gate"
+          ],
+          "preferredBadgeId": "nhm2.energy_condition.observer_robust_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Observer projections require same-chart tensor evidence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A diagonal T00 proxy is not an observer-complete tensor."
+      ]
+    },
+    {
+      "equationId": "nhm2-einstein-tensor-route",
+      "label": "Geometry-first Einstein tensor route",
+      "aliases": [
+        "G_{\\mu\\nu}=8\\pi T_{\\mu\\nu}",
+        "T_{\\mu\\nu}^{\\rm geom}=\\frac{1}{8\\pi}G_{\\mu\\nu}"
+      ],
+      "actions": [
+        {
+          "actionId": "open-einstein-tensor-runtime-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Einstein tensor runtime path",
+          "badgeIds": [
+            "physics.gr.einstein_field_equation",
+            "physics.gr.3p1_decomposition",
+            "nhm2.tensor.same_chart_full_tensor"
+          ],
+          "preferredBadgeId": "nhm2.tensor.same_chart_full_tensor",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Geometry-first tensor evaluation is diagnostic unless source, observer, QEI, and policy ledgers also close."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Einstein tensor evaluation is a metric-required route, not source validation."
+      ]
+    },
+    {
+      "equationId": "nhm2-same-chart-full-tensor-ledger",
+      "label": "Same-chart full tensor ledger",
+      "aliases": [
+        "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}"
+      ],
+      "actions": [
+        {
+          "actionId": "open-same-chart-full-tensor-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open same-chart full tensor artifact",
+          "badgeIds": [
+            "physics.gr.3p1_decomposition",
+            "nhm2.tensor.same_chart_full_tensor"
+          ],
+          "preferredBadgeId": "nhm2.tensor.same_chart_full_tensor",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Missing T0i or off-diagonal Tij is a blocker, not a zero."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Full-tensor completeness is an evidence ledger, not a propulsion claim."
+      ]
+    },
+    {
+      "equationId": "nhm2-wall-t00-source-residual",
+      "label": "Wall T00 source residual",
+      "aliases": [
+        "R_wall_T00 = T00_wall_required - T00_wall_available",
+        "R_{{\\rm wall},T00}=T00_{{\\rm wall},{\\rm required}}-T00_{{\\rm wall},{\\rm available}}"
+      ],
+      "actions": [
+        {
+          "actionId": "load-wall-t00-source-residual-calculator",
+          "kind": "calculator_ingest",
+          "label": "Replay wall T00 residual scalar",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.closure.wall_t00_source_residual",
+            "payloadId": "wall_t00_source_residual_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.source_closure",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "Scalar residual replay is secondary to wall-source closure artifact status."
+        },
+        {
+          "actionId": "open-wall-t00-source-closure-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open wall T00 closure artifact",
+          "badgeIds": [
+            "nhm2.tensor.same_chart_full_tensor",
+            "nhm2.closure.wall_t00_source_residual"
+          ],
+          "preferredBadgeId": "nhm2.closure.wall_t00_source_residual",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.source_closure",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Global residual cannot override a missing or failing wall closure."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Wall closure is the front-door source blocker."
+      ]
+    },
+    {
+      "equationId": "nhm2-observer-robust-energy-condition-gate",
+      "label": "Observer-robust energy-condition gate",
+      "aliases": [
+        "{\\rm EC}_{\\rm observer\\ robust}=\\{ {\\rm WEC},{\\rm NEC},{\\rm DEC},{\\rm SEC}\\}_{\\rm observer\\ families}"
+      ],
+      "actions": [
+        {
+          "actionId": "open-observer-robust-energy-condition-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open observer-robust energy-condition artifact",
+          "badgeIds": [
+            "nhm2.tensor.same_chart_full_tensor",
+            "nhm2.energy_condition.observer_robust_gate"
+          ],
+          "preferredBadgeId": "nhm2.energy_condition.observer_robust_gate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Eulerian-only checks are restricted scope and cannot be called observer-robust."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Observer-family scope must be stated before energy-condition pass language is allowed."
+      ]
+    },
+    {
+      "equationId": "nhm2-qei-margin-dossier-bridge",
+      "label": "QEI scalar margin to worldline dossier bridge",
+      "aliases": [
+        "qei_margin = qei_bound - qei_sample",
+        "qei_{\\rm margin}=qei_{\\rm bound}-qei_{\\rm sample}"
+      ],
+      "actions": [
+        {
+          "actionId": "load-qei-margin-calculator",
+          "kind": "calculator_ingest",
+          "label": "Replay scalar QEI margin",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.qei.sampling_window",
+            "payloadId": "qei_margin_difference_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "Scalar QEI margin is badge replay, not a worldline dossier."
+        },
+        {
+          "actionId": "open-qei-worldline-dossier-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open QEI worldline dossier",
+          "badgeIds": [
+            "nhm2.closure.wall_t00_source_residual",
+            "nhm2.qei.sampling_window",
+            "nhm2.qei.worldline_dossier"
+          ],
+          "preferredBadgeId": "nhm2.qei.worldline_dossier",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "A scalar margin cannot substitute for worldline, sampling, bound, and consistency evidence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Missing wall worldline blocks QEI dossier completeness."
+      ]
+    },
+    {
+      "equationId": "casimir-material-receipt-ledger",
+      "label": "Casimir material receipt ledger",
+      "aliases": [
+        "{\\rm Receipt}_{\\rm Casimir}=({\\rm gap},{\\rm material},{\\rm temperature},{\\rm roughness},{\\rm geometry})"
+      ],
+      "actions": [
+        {
+          "actionId": "open-casimir-material-receipt-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Casimir material receipt path",
+          "badgeIds": [
+            "casimir.geometry.beyond_pfa_validity",
+            "casimir.material.lifshitz_receipt",
+            "nhm2.closure.wall_t00_source_residual"
+          ],
+          "preferredBadgeId": "casimir.material.lifshitz_receipt",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.source_closure",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Ideal Casimir plate math is not material-receipted source evidence."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Material receipts are required before Casimir rows can support material source evidence."
+      ]
+    },
+    {
+      "equationId": "nhm2-natario-invariant-audit-ledger",
+      "label": "Natario invariant audit ledger",
+      "aliases": [
+        "{\\rm Natario}_{\\rm audit}=\\theta\\land R\\land K\\land C^2\\land{\\rm Petrov}\\land J_i\\land{\\rm stability}"
+      ],
+      "actions": [
+        {
+          "actionId": "open-natario-invariant-audit-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Natario invariant audit",
+          "badgeIds": [
+            "nhm2.natario.invariant_audit",
+            "nhm2.energy_condition.observer_robust_gate"
+          ],
+          "preferredBadgeId": "nhm2.natario.invariant_audit",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Zero expansion is separate from invariant, curvature, stability, and safety status."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Natario zero-expansion status does not imply invariant audit pass."
+      ]
+    }
+  ]
+}

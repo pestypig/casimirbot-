@@ -147,6 +147,8 @@
     "validate:toe:research-gates": "tsx scripts/validate-toe-research-gate-policy.ts",
     "validate:needle-hull-mark2:cavity-contract": "tsx scripts/validate-needle-hull-mark2-cavity-contract.ts",
     "validate:physics:root-leaf": "tsx scripts/validate-physics-root-leaf-manifest.ts",
+    "docs:equation-actions:generate": "tsx scripts/generate-doc-equation-actions.ts",
+    "docs:equation-actions:check": "tsx scripts/generate-doc-equation-actions.ts --check",
     "validate:curvature:collapse:contract": "tsx scripts/validate-curvature-collapse-contract.ts",
     "helix:decision:package": "tsx scripts/helix-decision-package.ts",
     "helix:decision:validate": "tsx scripts/helix-decision-validate.ts",
