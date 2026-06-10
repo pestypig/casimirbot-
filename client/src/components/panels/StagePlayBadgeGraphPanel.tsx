@@ -3744,6 +3744,78 @@ function StagePlayMailLoopLiveOverview({
         </div>
       </div>
 
+      <div
+        className="grid gap-4 rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3 lg:grid-cols-[320px_minmax(0,1fr)]"
+        data-testid="stage-play-mail-transform-rail"
+      >
+        <div className="rounded-md border border-cyan-800/50 bg-black/25 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail box</div>
+              <div className="mt-1 text-sm font-semibold text-slate-50">
+                {latestMail ? "Observation payload moving through loop" : "Waiting for observation"}
+              </div>
+            </div>
+            <Waypoints className="h-4 w-4 text-cyan-300" aria-hidden="true" />
+          </div>
+          <div className="mt-3 min-h-[128px] rounded border border-cyan-900/50 bg-slate-950 p-3 text-sm leading-relaxed text-cyan-50">
+            {compactStagePlayText(latestSummary, "The next visual-source observation will appear here before it is transformed.", 560)}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">mail age</div>
+              <div className="mt-0.5 font-mono text-slate-200">{formatStagePlayMs(mailAgeMs)}</div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">payload</div>
+              <div className="mt-0.5 font-mono text-slate-200">{formatStagePlayCount(latestMail?.summary.text.length ?? 0)}</div>
+            </div>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Transformation route</div>
+              <div className="mt-0.5 text-xs text-cyan-100/70">Each stop rewrites the same mail payload into the next artifact; the final box hands off to Helix Ask.</div>
+            </div>
+            <div className="font-mono text-[10px] text-cyan-100/60">{mailTransformSteps.length} stops</div>
+          </div>
+          <div className="grid gap-3 xl:grid-cols-7" data-testid="stage-play-mail-transform-steps">
+            {mailTransformSteps.map((step, index) => {
+              const isAskHandoff = step.key === "ask-handoff";
+              return (
+                <div
+                  key={step.key}
+                  className={`relative min-h-[168px] rounded-md border p-3 ${stagePlayOperatorStepTone(step.state)} ${
+                    isAskHandoff ? "shadow-[12px_0_32px_rgba(34,211,238,0.18)]" : ""
+                  }`}
+                  data-testid="stage-play-mail-transform-step"
+                >
+                  {index < mailTransformSteps.length - 1 ? (
+                    <div className="pointer-events-none absolute -right-3 top-1/2 hidden h-px w-3 bg-cyan-500/60 xl:block" />
+                  ) : (
+                    <div className="pointer-events-none absolute -right-6 top-1/2 hidden h-px w-6 bg-gradient-to-r from-cyan-400/70 to-transparent xl:block" />
+                  )}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold">{step.title}</div>
+                      <div className="mt-0.5 truncate font-mono text-[10px] opacity-70">{step.status}</div>
+                    </div>
+                    <span className="rounded border border-current/30 px-1.5 py-0.5 font-mono text-[9px] opacity-80">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="mt-3 line-clamp-4 text-[11px] leading-snug opacity-90">{step.body}</div>
+                  <div className="absolute bottom-3 left-3 right-3 truncate border-t border-current/15 pt-2 font-mono text-[9px] opacity-70">
+                    {step.meta}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-summary">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

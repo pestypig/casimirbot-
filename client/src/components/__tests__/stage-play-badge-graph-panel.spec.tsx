@@ -2169,6 +2169,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/local bypass:/i)).toBeTruthy();
     expect(screen.getByText("Voice checkpoint")).toBeTruthy();
     expect(screen.getByText(/latest packet did not request a voice callout/i)).toBeTruthy();
+    expect(screen.getByTestId("stage-play-mail-transform-rail")).toBeTruthy();
+    expect(screen.getByText("Mail box")).toBeTruthy();
+    expect(screen.getByText("Transformation route")).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-mail-transform-step")).toHaveLength(7);
+    expect(screen.getByText("Original observation")).toBeTruthy();
+    expect(screen.getByText("Minecraft shade mail")).toBeTruthy();
+    expect(screen.getByText("Micro-reasoner deck")).toBeTruthy();
+    expect(screen.getByText("Helix Ask handoff")).toBeTruthy();
     const routeSteps = screen.getAllByTestId("stage-play-mail-loop-route-step");
     expect(routeSteps.length).toBe(7);
     expect(screen.getByText("mail")).toBeTruthy();
