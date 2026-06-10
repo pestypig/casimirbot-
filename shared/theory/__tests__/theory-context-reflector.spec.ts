@@ -4,6 +4,10 @@ import { buildNhm2TheoryBadgeGraphV1 } from "../nhm2-theory-badges";
 import { buildTheoryBiomeLayoutV1 } from "../theory-biome-layout";
 import { buildTheoryContextReflection } from "../theory-context-reflector";
 
+function probabilitySum(values: Record<string, number>): number {
+  return Object.values(values).reduce((total, probability) => total + probability, 0);
+}
+
 describe("theory context reflector", () => {
   it("reflects E=hf discussion into energy-frequency and photon-energy badges", () => {
     const reflection = buildTheoryContextReflection({
@@ -24,6 +28,8 @@ describe("theory context reflector", () => {
 
     expect(isTheoryContextReflectionV1(reflection)).toBe(true);
     expect(reflectedBadgeIds).toContain("physics.quantum.energy_frequency");
+    expect(reflection.overlay.uncertainty?.normalizedMass).toBeCloseTo(1, 5);
+    expect(reflection.overlay.uncertainty?.posteriorEntropyBits).toBeGreaterThan(0);
     expect(reflectedBadgeIds).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/solar\.spectrum\.photon_energy|casimir\.cavity\.mode_photon_energy/),
@@ -277,5 +283,14 @@ describe("theory context reflector", () => {
     expect(reflection.overlay.suggestedScaleBands).toEqual(expect.arrayContaining(["molecular", "stellar"]));
     expect(reflection.overlay.suggestedBiomeChunkIds).toContain(c60Coordinate.renderChunkId);
     expect(reflection.overlay.suggestedSemanticChunkIds).toContain(c60Coordinate.semanticChunkId);
+    expect(reflection.overlay.uncertainty?.badgeProbabilityById).toHaveProperty(
+      "astrochemistry.fullerene.c60_stellar_context",
+    );
+    expect(reflection.overlay.uncertainty?.renderChunkProbabilityById[c60Coordinate.renderChunkId]).toBeGreaterThan(0);
+    expect(reflection.overlay.uncertainty?.semanticChunkProbabilityById[c60Coordinate.semanticChunkId]).toBeGreaterThan(0);
+    expect(probabilitySum(reflection.overlay.uncertainty?.badgeProbabilityById ?? {})).toBeCloseTo(1, 5);
+    expect(reflection.overlay.uncertainty?.priorEntropyBits).toBeGreaterThanOrEqual(
+      reflection.overlay.uncertainty?.posteriorEntropyBits ?? 0,
+    );
   });
 });

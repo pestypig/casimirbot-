@@ -29,6 +29,11 @@ import {
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import {
+  executeDocEquationAction,
+  getDocEquationActionEntryForLatex,
+  getDocEquationTheoryActions,
+} from "@/lib/docs/docEquationActions";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 
@@ -227,9 +232,9 @@ export function DocViewerPanel() {
       .then((raw) => {
         if (canceled) return;
         setRawMarkdown(raw);
-        const rendered = marked.parse(renderMathMarkdown(raw));
+        const rendered = marked.parse(renderMathMarkdown(raw, currentEntry.relativePath));
         const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
-        setHtml(renderMathInRenderedHtml(renderedHtml));
+        setHtml(renderMathInRenderedHtml(renderedHtml, currentEntry.relativePath));
         setLoadedDocId(currentEntry.id);
       })
       .catch((err) => {
@@ -569,6 +574,17 @@ export function DocViewerPanel() {
       if (!latex) return;
       event.preventDefault();
       event.stopPropagation();
+      const actionSource = target.closest("[data-doc-equation-action-id]") as HTMLElement | null;
+      const actionId = actionSource?.dataset.docEquationActionId?.trim();
+      if (actionId) {
+        void executeDocEquationAction({
+          currentPath,
+          anchor,
+          actionId,
+          latex,
+        });
+        return;
+      }
       handleDocMathPick({
         latex,
         currentPath,
@@ -1079,7 +1095,7 @@ function cssEscape(value: string) {
   return value.replace(/"/g, '\\"');
 }
 
-function renderDocMath(expression: string, displayMode: boolean): string {
+function renderDocMath(expression: string, displayMode: boolean, docPath?: string | null): string {
   if (!expression.trim()) return "";
   try {
     const rendered = renderKatexToString(expression, {
@@ -1092,10 +1108,23 @@ function renderDocMath(expression: string, displayMode: boolean): string {
     const className = displayMode
       ? "doc-math-clickable doc-math-clickable-display"
       : "doc-math-clickable doc-math-clickable-inline";
+    const equationActionEntry = getDocEquationActionEntryForLatex(docPath, expression);
+    const theoryActions = getDocEquationTheoryActions(equationActionEntry);
+    const actionMarkup = theoryActions
+      .map((action) => {
+        const title = action.claimBoundaryNote
+          ? `${action.label}: ${action.claimBoundaryNote}`
+          : action.label;
+        return `<span class="doc-equation-action-chip" data-doc-equation-action-id="${escapeHtml(action.actionId)}" role="button" tabindex="0" title="${escapeHtml(title)}">T</span>`;
+      })
+      .join("");
+    const equationIdAttr = equationActionEntry
+      ? ` data-doc-equation-id="${escapeHtml(equationActionEntry.equationId)}"`
+      : "";
     if (displayMode) {
-      return `<div class="${className}" data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}</div>`;
+      return `<div class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${actionMarkup}${rendered}</div>`;
     }
-    return `<span class="${className}" data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}</span>`;
+    return `<span class="${className}"${equationIdAttr} data-doc-math-latex="${escapedExpression}" role="button" tabindex="0" title="Copy LaTeX to clipboard and ingest in calculator">${rendered}${actionMarkup}</span>`;
   } catch {
     return `<code>${escapeHtml(expression)}</code>`;
   }
@@ -1110,62 +1139,62 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function renderMathMarkdown(markdown: string): string {
+function renderMathMarkdown(markdown: string, docPath?: string | null): string {
   if (!markdown) return markdown;
   const FENCE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~)/g;
   let output = "";
   let cursor = 0;
   let match: RegExpExecArray | null;
   while ((match = FENCE_RE.exec(markdown)) !== null) {
-    output += renderMathInNonCodeMarkdown(markdown.slice(cursor, match.index));
-    output += renderMathFenceBlock(match[0]) ?? match[0];
+    output += renderMathInNonCodeMarkdown(markdown.slice(cursor, match.index), docPath);
+    output += renderMathFenceBlock(match[0], docPath) ?? match[0];
     cursor = match.index + match[0].length;
   }
-  output += renderMathInNonCodeMarkdown(markdown.slice(cursor));
+  output += renderMathInNonCodeMarkdown(markdown.slice(cursor), docPath);
   return output;
 }
 
-function renderMathInNonCodeMarkdown(segment: string): string {
+function renderMathInNonCodeMarkdown(segment: string, docPath?: string | null): string {
   const INLINE_CODE_RE = /`[^`\n]*`/g;
   let output = "";
   let cursor = 0;
   let match: RegExpExecArray | null;
   while ((match = INLINE_CODE_RE.exec(segment)) !== null) {
-    output += renderMathExpressions(segment.slice(cursor, match.index));
+    output += renderMathExpressions(segment.slice(cursor, match.index), docPath);
     output += match[0];
     cursor = match.index + match[0].length;
   }
-  output += renderMathExpressions(segment.slice(cursor));
+  output += renderMathExpressions(segment.slice(cursor), docPath);
   return output;
 }
 
-function renderMathExpressions(source: string): string {
+function renderMathExpressions(source: string, docPath?: string | null): string {
   return source
-    .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_full, expr: string) => renderDocMath(expr, true))
-    .replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_full, expr: string) => renderDocMath(expr, true))
-    .replace(/\\\((.+?)\\\)/g, (_full, expr: string) => renderDocMath(expr, false));
+    .replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_full, expr: string) => renderDocMath(expr, true, docPath))
+    .replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_full, expr: string) => renderDocMath(expr, true, docPath))
+    .replace(/\\\((.+?)\\\)/g, (_full, expr: string) => renderDocMath(expr, false, docPath));
 }
 
-function renderMathFenceBlock(fence: string): string | null {
+function renderMathFenceBlock(fence: string, docPath?: string | null): string | null {
   const match = fence.match(/^(?:```|~~~)\s*math\s*\r?\n([\s\S]*?)\r?\n(?:```|~~~)\s*$/i);
   if (!match) return null;
   const expr = match[1].trim();
   if (!expr) return "";
-  return renderDocMath(expr, true);
+  return renderDocMath(expr, true, docPath);
 }
 
-function renderMathInRenderedHtml(html: string): string {
+function renderMathInRenderedHtml(html: string, docPath?: string | null): string {
   if (!html) return html;
   const CODE_BLOCK_RE = /(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi;
   let output = "";
   let cursor = 0;
   let match: RegExpExecArray | null;
   while ((match = CODE_BLOCK_RE.exec(html)) !== null) {
-    output += renderMathExpressions(html.slice(cursor, match.index));
+    output += renderMathExpressions(html.slice(cursor, match.index), docPath);
     output += match[0];
     cursor = match.index + match[0].length;
   }
-  output += renderMathExpressions(html.slice(cursor));
+  output += renderMathExpressions(html.slice(cursor), docPath);
   return output;
 }
 

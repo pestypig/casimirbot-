@@ -340,7 +340,9 @@ export type StagePlayMicroReasonerRoleV1 =
   | "delta_extractor"
   | "prediction_validator"
   | "salience_scorer"
-  | "packet_composer";
+  | "packet_composer"
+  | "decision_selector"
+  | "voice_callout_drafter";
 
 export type StagePlayMicroReasonerPromptV1 = {
   artifactId: "stage_play_micro_reasoner_prompt";
@@ -378,6 +380,15 @@ export type StagePlayMicroReasonerRunV1 = {
   inputPreview: string;
   outputPreview: string;
   status: "queued" | "running" | "completed" | "failed" | "skipped";
+  reasoningMode?: "micro_live_interval" | "deterministic_batch" | "ask_review";
+  selectedDecision?: StagePlayLiveSourcePredictionValidationRecommendedNextV1 | null;
+  salienceLevel?: StagePlayLiveSourceImmersionSalienceLevelV1 | null;
+  voiceCandidate?: boolean | null;
+  recommendedNextTool?: string | null;
+  confidence?: "low" | "medium" | "high" | null;
+  latencyBudgetMs?: number | null;
+  tokenBudget?: number | null;
+  missingEvidence?: string[];
   modelUsed?: string | null;
   latencyMs?: number | null;
   tokenEstimateIn?: number | null;
@@ -388,7 +399,8 @@ export type StagePlayMicroReasonerRunV1 = {
   causalTrace?: LiveSourceCausalTraceV1;
   assistant_answer: false;
   terminal_eligible: false;
-  context_role: "tool_evidence";
+  raw_content_included: false;
+  context_role: "tool_evidence" | "micro_reasoner_evidence";
 };
 
 export type StagePlayProcessedMailPacketResolutionStateV1 =

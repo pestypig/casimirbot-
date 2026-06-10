@@ -6,6 +6,7 @@ import {
   type TheoryContextReflectionMatchV1,
   type TheoryContextReflectionRecommendedActionV1,
   type TheoryContextReflectionSource,
+  type TheoryContextReflectionUncertaintyV1,
   type TheoryContextReflectionV1,
 } from "../contracts/theory-context-reflection.v1";
 import type { TheoryBadgeGraphV1, TheoryBadgeV1 } from "../contracts/theory-badge-graph.v1";
@@ -57,6 +58,73 @@ function normalizeKey(value: string): string {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function roundProbability(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function entropyBits(probabilities: number[]): number {
+  return Number(
+    probabilities
+      .filter((probability) => probability > 0)
+      .reduce((entropy, probability) => entropy - probability * Math.log2(probability), 0)
+      .toFixed(6),
+  );
+}
+
+function probabilityByBadgeId(matches: TheoryBadgeLookupMatch[]): Record<string, number> {
+  if (matches.length === 0) return {};
+  const weights = matches.map((match) => Math.max(0, match.score));
+  const totalWeight = sum(weights);
+  if (totalWeight <= 0) {
+    const uniform = roundProbability(1 / matches.length);
+    return Object.fromEntries(matches.map((match) => [match.badgeId, uniform]));
+  }
+  return Object.fromEntries(
+    matches.map((match, index) => [match.badgeId, roundProbability(weights[index] / totalWeight)]),
+  );
+}
+
+function aggregateProbabilityByKey(
+  badgeProbabilities: Record<string, number>,
+  keyForBadgeId: (badgeId: string) => string | null,
+): Record<string, number> {
+  const aggregate = new Map<string, number>();
+  for (const [badgeId, probability] of Object.entries(badgeProbabilities)) {
+    const key = keyForBadgeId(badgeId);
+    if (!key) continue;
+    aggregate.set(key, (aggregate.get(key) ?? 0) + probability);
+  }
+  return Object.fromEntries(
+    [...aggregate.entries()]
+      .map(([key, probability]) => [key, roundProbability(probability)] as const)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function uncertaintyMode(args: {
+  matchCount: number;
+  priorEntropyBits: number;
+  posteriorEntropyBits: number;
+  badgeProbabilityById: Record<string, number>;
+}): TheoryContextReflectionUncertaintyV1["uncertaintyMode"] {
+  if (args.matchCount === 0) return "broad";
+  const topProbability = Math.max(0, ...Object.values(args.badgeProbabilityById));
+  if (
+    topProbability >= 0.55 ||
+    (args.priorEntropyBits > 0 && args.posteriorEntropyBits <= args.priorEntropyBits * 0.45)
+  ) {
+    return "focused";
+  }
+  if (args.priorEntropyBits === 0 || args.posteriorEntropyBits >= args.priorEntropyBits * 0.78) {
+    return "broad";
+  }
+  return "ambiguous";
 }
 
 function queryText(args: BuildTheoryContextReflectionInput): string {
@@ -508,6 +576,34 @@ export function buildTheoryContextReflection(
   const biomeFocusCoordinates = unique([...centerBadgeIds, ...exactBadgeIds, ...likelyBadgeIds, ...connectedBadgeIds])
     .map((badgeId) => biomeCoordinateByBadgeId.get(badgeId))
     .filter((coordinate): coordinate is NonNullable<typeof coordinate> => Boolean(coordinate));
+  const badgeProbabilityById = probabilityByBadgeId(locatedMatches);
+  const renderChunkProbabilityById = aggregateProbabilityByKey(
+    badgeProbabilityById,
+    (badgeId) => biomeCoordinateByBadgeId.get(badgeId)?.renderChunkId ?? null,
+  );
+  const semanticChunkProbabilityById = aggregateProbabilityByKey(
+    badgeProbabilityById,
+    (badgeId) => biomeCoordinateByBadgeId.get(badgeId)?.semanticChunkId ?? null,
+  );
+  const priorEntropyBits =
+    locatedMatches.length > 0 ? Number(Math.log2(locatedMatches.length).toFixed(6)) : 0;
+  const posteriorEntropyBits = entropyBits(Object.values(badgeProbabilityById));
+  const informationGainBits = Number(Math.max(0, priorEntropyBits - posteriorEntropyBits).toFixed(6));
+  const uncertainty: TheoryContextReflectionUncertaintyV1 = {
+    badgeProbabilityById,
+    renderChunkProbabilityById,
+    semanticChunkProbabilityById,
+    priorEntropyBits,
+    posteriorEntropyBits,
+    informationGainBits,
+    normalizedMass: roundProbability(sum(Object.values(badgeProbabilityById))),
+    uncertaintyMode: uncertaintyMode({
+      matchCount: locatedMatches.length,
+      priorEntropyBits,
+      posteriorEntropyBits,
+      badgeProbabilityById,
+    }),
+  };
   const suggestedBiomeChunkIds = unique(
     biomeFocusCoordinates.map((coordinate) => coordinate.renderChunkId),
   ).slice(0, 8);
@@ -559,6 +655,7 @@ export function buildTheoryContextReflection(
       suggestedBiomeChunkIds,
       suggestedSemanticChunkIds,
       suggestedScaleBands,
+      uncertainty,
       softRegion: allowSoftRegion
         ? {
             id: `discussion-zone:${args.graph.graphId}:${centerBadgeIds[0] ?? softRegionBadgeIds[0]}`,

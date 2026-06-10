@@ -54,6 +54,22 @@ export type TheoryContextReflectionDomainV1 = {
   reasons: string[];
 };
 
+export type TheoryContextReflectionUncertaintyModeV1 =
+  | "broad"
+  | "focused"
+  | "ambiguous";
+
+export type TheoryContextReflectionUncertaintyV1 = {
+  badgeProbabilityById: Record<string, number>;
+  renderChunkProbabilityById: Record<string, number>;
+  semanticChunkProbabilityById: Record<string, number>;
+  priorEntropyBits: number;
+  posteriorEntropyBits: number;
+  informationGainBits: number;
+  normalizedMass: number;
+  uncertaintyMode: TheoryContextReflectionUncertaintyModeV1;
+};
+
 export type TheoryContextReflectionOverlayV1 = {
   centerBadgeIds: string[];
   highlightedBadgeIds: string[];
@@ -64,6 +80,7 @@ export type TheoryContextReflectionOverlayV1 = {
   suggestedBiomeChunkIds?: string[];
   suggestedSemanticChunkIds?: string[];
   suggestedScaleBands?: TheoryBiomeBand[];
+  uncertainty?: TheoryContextReflectionUncertaintyV1;
   softRegion: {
     id: string;
     label: string;
@@ -161,6 +178,48 @@ const isFiniteNumber = (value: unknown): value is number =>
 const includes = <T extends readonly string[]>(items: T, value: unknown): value is T[number] =>
   typeof value === "string" && items.includes(value);
 
+function validateProbabilityMap(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const [key, probability] of Object.entries(value)) {
+    if (!key) issues.push(`${prefix} keys must be non-empty`);
+    if (!isFiniteNumber(probability)) {
+      issues.push(`${prefix}.${key} must be a finite number`);
+    } else if (probability < 0 || probability > 1) {
+      issues.push(`${prefix}.${key} must be between 0 and 1`);
+    }
+  }
+}
+
+function validateUncertainty(value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push("overlay.uncertainty must be an object");
+    return;
+  }
+  validateProbabilityMap("overlay.uncertainty.badgeProbabilityById", value.badgeProbabilityById, issues);
+  validateProbabilityMap("overlay.uncertainty.renderChunkProbabilityById", value.renderChunkProbabilityById, issues);
+  validateProbabilityMap("overlay.uncertainty.semanticChunkProbabilityById", value.semanticChunkProbabilityById, issues);
+  for (
+    const field of [
+      "priorEntropyBits",
+      "posteriorEntropyBits",
+      "informationGainBits",
+      "normalizedMass",
+    ] as const
+  ) {
+    if (!isFiniteNumber(value[field])) {
+      issues.push(`overlay.uncertainty.${field} must be a finite number`);
+    } else if (value[field] < 0) {
+      issues.push(`overlay.uncertainty.${field} must be non-negative`);
+    }
+  }
+  if (!["broad", "focused", "ambiguous"].includes(String(value.uncertaintyMode))) {
+    issues.push("overlay.uncertainty.uncertaintyMode is invalid");
+  }
+}
+
 function newReflectionId(): string {
   return `theory-context-reflection:${Date.now().toString(36)}:${Math.random()
     .toString(36)
@@ -239,6 +298,9 @@ function validateOverlay(value: unknown, issues: string[]): void {
   }
   if (value.suggestedSemanticChunkIds !== undefined && !isStringArray(value.suggestedSemanticChunkIds)) {
     issues.push("overlay.suggestedSemanticChunkIds must be an array of strings");
+  }
+  if (value.uncertainty !== undefined) {
+    validateUncertainty(value.uncertainty, issues);
   }
   if (value.suggestedScaleBands !== undefined) {
     if (!isStringArray(value.suggestedScaleBands)) {

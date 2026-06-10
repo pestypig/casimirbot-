@@ -1437,6 +1437,16 @@ const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
     subtitle: "wake + voice scoring",
     missingPreview: "waiting for salience score",
   },
+  decision_selector: {
+    title: "Decision Selector",
+    subtitle: "packet -> procedural next step",
+    missingPreview: "waiting for decision selection",
+  },
+  voice_callout_drafter: {
+    title: "Voice Draft",
+    subtitle: "voice candidate -> draft receipt",
+    missingPreview: "waiting for voice draft",
+  },
   packet_composer: {
     title: "Processed Packet",
     subtitle: "structured packet composer",
@@ -2232,6 +2242,44 @@ function buildObserverMailLoopNodes(input: {
       fallbackOutputPreview: latestProcessedPacket
         ? `${latestProcessedPacket.salience.level}; voice ${latestProcessedPacket.salience.voiceCandidate ? "candidate" : "no"}; recommended ${latestProcessedPacket.recommendedNext}`
         : null,
+      edgeLabel: microRun("decision_selector") ? "decision selected" : "needs decision",
+      edgeTone: microRun("decision_selector") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "decision_selector",
+      run: microRun("decision_selector"),
+      prompt: microPrompt("decision_selector"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: latestProcessedPacket ? [
+        latestProcessedPacket.packetId,
+        ...latestProcessedPacket.microReasonerRunRefs,
+      ] : [],
+      fallbackInputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.recommendedNext}; ${latestProcessedPacket.salience.level}`
+        : "processed packet pending",
+      fallbackOutputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.recommendedNext}; next ${latestProcessedPacket.recommendedNext === "wait_for_next_summary" ? "none" : "record decision"}`
+        : null,
+      edgeLabel: latestProcessedPacket?.recommendedNext === "request_voice_callout"
+        ? microRun("voice_callout_drafter") ? "voice draft" : "needs voice draft"
+        : microRun("packet_composer") ? "packet ready" : "needs packet",
+      edgeTone: latestProcessedPacket?.recommendedNext === "request_voice_callout"
+        ? microRun("voice_callout_drafter") ? "connected" : latestProcessedPacket ? "pending" : "blocked"
+        : microRun("packet_composer") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "voice_callout_drafter",
+      run: microRun("voice_callout_drafter"),
+      prompt: microPrompt("voice_callout_drafter"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: latestProcessedPacket ? [
+        latestProcessedPacket.packetId,
+        ...latestProcessedPacket.salience.reasons,
+      ] : [],
+      fallbackInputPreview: latestProcessedPacket
+        ? `${latestProcessedPacket.salience.level}; ${latestProcessedPacket.salience.reasons.slice(0, 2).join(" | ") || "no reason"}`
+        : "voice candidate pending",
+      fallbackOutputPreview: latestProcessedPacket?.salience.calloutDraft ?? null,
       edgeLabel: microRun("packet_composer") ? "packet ready" : "needs packet",
       edgeTone: microRun("packet_composer") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
     }),

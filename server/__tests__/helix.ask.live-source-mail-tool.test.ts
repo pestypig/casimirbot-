@@ -1000,7 +1000,20 @@ describe("live-source mail live environment tools", () => {
       context_role: "tool_evidence",
     });
     expect(processPayload.packets[0].salience.voiceCandidate).toBe(true);
-    expect(processPayload.microReasonerRunRefs.length).toBeGreaterThanOrEqual(6);
+    expect(processPayload.microReasonerRunRefs.length).toBeGreaterThanOrEqual(8);
+    expect(processPayload.microReasonerRuns.map((run: any) => run.role)).toEqual(expect.arrayContaining([
+      "decision_selector",
+      "voice_callout_drafter",
+    ]));
+    expect(processPayload.microReasonerRuns.find((run: any) => run.role === "decision_selector")).toMatchObject({
+      selectedDecision: "request_voice_callout",
+      recommendedNextTool: "live_env.record_live_source_mail_decision",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+    });
+    expect(processPayload.transcriptRows.map((row: any) => row.rowKind)).toContain("micro_reasoner_run");
     expect(processPayload.microReasonerRuns.every((run: any) => run.promptId)).toBe(true);
 
     const readObservation = executeLiveEnvironmentTool({

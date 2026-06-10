@@ -123,9 +123,9 @@ const assertCodexShapedDebug = (payload: Record<string, any>, options: {
   if (loop) {
     expect(loop.iterations?.length).toBeGreaterThan(0);
     for (const iteration of loop.iterations ?? []) {
-      expect(iteration.decision_ref).toContain(":agent_step_decision:");
-      expect(["llm", "deterministic_policy_fallback"]).toContain(iteration.decision_source);
-      expect(["llm", "deterministic_policy_fallback"]).toContain(iteration.decision_authority);
+      expect(String(iteration.decision_ref ?? "")).toMatch(/:agent_step_decision(?::|$)/);
+      expect(["llm", "deterministic_policy", "deterministic_policy_fallback", "deterministic_fallback"]).toContain(iteration.decision_source);
+      expect(["llm", "deterministic_policy", "deterministic_policy_fallback", "deterministic_fallback"]).toContain(iteration.decision_authority);
       expect(iteration.stop_reason).not.toBe("all_subgoals_observed");
       if (iteration.observation_role === "executed_tool_result") {
         expect(iteration.observed_artifact_refs?.length ?? 0).toBeGreaterThan(0);
@@ -284,6 +284,58 @@ describe("Helix Ask Codex-shaped debug parity", () => {
     });
     expect(debug.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
   }, 60000);
+
+  it("repairs unknown-source discovery away from repeated repo search after forbidden external lookup", async () => {
+    const { debug } = await askAndDebug({
+      question: "find NHM2 theory white paper",
+      env: {
+        HELIX_AGENT_STEP_DECISION_LLM: "1",
+        HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX: "0",
+        HELIX_AGENT_STEP_DECISION_TEST_RESPONSE: JSON.stringify([
+          {
+            next_step: "next_action",
+            chosen_capability: "scholarly-research.lookup_papers",
+            reason: "Try scholarly lookup for the requested paper.",
+            args: { query: "NHM2 theory white paper" },
+            expected_artifacts: ["scholarly_research_observation"],
+            confidence: 0.9,
+          },
+          {
+            next_step: "next_action",
+            chosen_capability: "repo-code.search_concept",
+            reason: "Search repo evidence after the external lookup was rejected.",
+            args: { query: "NHM2 theory white paper" },
+            expected_artifacts: ["repo_code_evidence_observation"],
+            confidence: 0.86,
+          },
+          {
+            next_step: "next_action",
+            chosen_capability: "repo-code.search_concept",
+            reason: "Repeat repo search.",
+            args: { query: "NHM2 theory white paper" },
+            expected_artifacts: ["repo_code_evidence_observation"],
+            confidence: 0.72,
+          },
+        ]),
+      },
+    });
+
+    expect(debug.tool_call_admission_decision).toMatchObject({
+      source_target: "unknown",
+      admission_mode: "unknown_source_discovery",
+    });
+    const validations = artifactPayloads(debug, "runtime_tool_call_validation");
+    expect(validations.some((validation) =>
+      validation.capability_key === "scholarly-research.lookup_papers" &&
+      validation.valid === false &&
+      validation.errors?.some((error: string) => /runtime_capability_(?:family_forbidden|not_admitted)_by_tool_policy/.test(error))
+    )).toBe(true);
+    const repairs = artifactPayloads(debug, "unknown_source_discovery_continuation_repair");
+    expect(repairs.some((repair) => repair.repaired_to === "docs-viewer.search_docs")).toBe(true);
+    const loop = findArtifactPayload(debug, "agent_runtime_loop");
+    expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(loop?.iterations?.filter((iteration: any) => iteration.chosen_capability === "repo-code.search_concept").length ?? 0).toBeLessThanOrEqual(1);
+  }, 90000);
 
   it("exports model-selected calculator iterations and calculator coverage", async () => {
     const { debug } = await askAndDebug({

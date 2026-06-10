@@ -1327,7 +1327,7 @@ describe("Stage Play live-source mailbox", () => {
         voiceCandidate: false,
       }),
     });
-    expect(daylightPacket?.microReasonerRunRefs.length).toBeGreaterThanOrEqual(6);
+    expect(daylightPacket?.microReasonerRunRefs.length).toBeGreaterThanOrEqual(7);
     const defaultPrompts = listStagePlayMicroReasonerPrompts({ active: true });
     expect(defaultPrompts.map((prompt) => prompt.role)).toEqual(expect.arrayContaining([
       "claim_extractor",
@@ -1336,6 +1336,8 @@ describe("Stage Play live-source mailbox", () => {
       "delta_extractor",
       "prediction_validator",
       "salience_scorer",
+      "decision_selector",
+      "voice_callout_drafter",
       "packet_composer",
     ]));
     const daylightRuns = listStagePlayMicroReasonerRuns({
@@ -1349,8 +1351,17 @@ describe("Stage Play live-source mailbox", () => {
       "delta_extractor",
       "prediction_validator",
       "salience_scorer",
+      "decision_selector",
       "packet_composer",
     ]));
+    expect(daylightRuns.find((run) => run.role === "decision_selector")).toMatchObject({
+      selectedDecision: "record_interpretation",
+      recommendedNextTool: "live_env.record_live_source_mail_decision",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+    });
     expect(daylightRuns.every((run) => run.promptId)).toBe(true);
     expect(daylightRows.find((row) => row.title === "Observation mail")?.body).toBe("Forest daylight scene; player visible.");
     expect(daylightRows.find((row) => row.title === "Processed mail packet")?.body).toContain("processed_packet_ready");

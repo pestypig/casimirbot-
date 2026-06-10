@@ -238,6 +238,14 @@ const makeRun = (input: {
   inputPreview: string;
   outputPreview: string;
   now: string;
+  selectedDecision?: StagePlayMicroReasonerRunV1["selectedDecision"];
+  salienceLevel?: StagePlayMicroReasonerRunV1["salienceLevel"];
+  voiceCandidate?: StagePlayMicroReasonerRunV1["voiceCandidate"];
+  recommendedNextTool?: string | null;
+  confidence?: StagePlayMicroReasonerRunV1["confidence"];
+  latencyBudgetMs?: number | null;
+  tokenBudget?: number | null;
+  missingEvidence?: string[];
   causalTrace?: LiveSourceCausalTraceV1;
 }): StagePlayMicroReasonerRunV1 => {
   const activePrompt = getActiveStagePlayMicroReasonerPromptForRole(input.role);
@@ -261,9 +269,18 @@ const makeRun = (input: {
     inputPreview: clipText(input.inputPreview, 320),
     outputPreview: clipText(input.outputPreview, 320),
     status: "completed",
+    reasoningMode: "micro_live_interval",
+    selectedDecision: input.selectedDecision ?? null,
+    salienceLevel: input.salienceLevel ?? null,
+    voiceCandidate: input.voiceCandidate ?? null,
+    recommendedNextTool: input.recommendedNextTool ?? null,
+    confidence: input.confidence ?? null,
+    latencyBudgetMs: input.latencyBudgetMs ?? 250,
+    tokenBudget: input.tokenBudget ?? null,
+    missingEvidence: uniqueStrings(input.missingEvidence ?? []),
     modelUsed: "deterministic",
     latencyMs: 0,
-    tokenEstimateIn: null,
+    tokenEstimateIn: input.tokenBudget ?? null,
     tokenEstimateOut: null,
     error: null,
     startedAt: input.now,
@@ -271,7 +288,8 @@ const makeRun = (input: {
     causalTrace: input.causalTrace,
     assistant_answer: false,
     terminal_eligible: false,
-    context_role: "tool_evidence",
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
   });
 };
 
@@ -435,6 +453,80 @@ export function buildStagePlayProcessedMailPacket(input: {
       causalTrace: input.causalTrace,
     }),
   ];
+  const decisionSelectorMissingEvidence = uniqueStrings([
+    comparison ? null : "active_interpreter_profile_comparison",
+    input.predictionValidation.result === "no_prior_prediction" ? "prior_prediction_for_validation" : null,
+    visualEvidenceRefs.length === 0 ? "visual_evidence_ref" : null,
+  ]);
+  const decisionSelectorRun = makeRun({
+    role: "decision_selector",
+    jobId: input.jobId,
+    sourceId,
+    mailIds,
+    inputRefs: uniqueStrings([
+      recommendedNext,
+      input.immersionState.salience.level,
+      input.predictionValidation.validationId,
+      comparison?.comparisonId,
+      ...visualEvidenceRefs,
+      ...microReasonerRuns.map((run) => run.runId),
+    ]),
+    outputRefs: uniqueStrings([
+      recommendedNext,
+      recommendedNext === "wait_for_next_summary" ? "no_operator_action_required" : "decision_receipt_required",
+      recommendedNext === "request_voice_callout" ? "voice_decision_before_voice_tool" : null,
+      ...decisionSelectorMissingEvidence,
+    ]),
+    inputPreview: `packet candidate: ${recommendedNext}; salience ${input.immersionState.salience.level}; voice ${input.immersionState.salience.voiceCandidate ? "candidate" : "no"}`,
+    outputPreview: `${recommendedNext}; next tool ${recommendedNext === "wait_for_next_summary" ? "none" : "live_env.record_live_source_mail_decision"}; confidence ${
+      decisionSelectorMissingEvidence.length > 0 ? "medium" : "high"
+    }`,
+    selectedDecision: recommendedNext,
+    salienceLevel: input.immersionState.salience.level,
+    voiceCandidate: input.immersionState.salience.voiceCandidate || recommendedNext === "request_voice_callout",
+    recommendedNextTool: recommendedNext === "wait_for_next_summary"
+      ? null
+      : "live_env.record_live_source_mail_decision",
+    confidence: decisionSelectorMissingEvidence.length > 0 ? "medium" : "high",
+    latencyBudgetMs: 150,
+    tokenBudget: 160,
+    missingEvidence: decisionSelectorMissingEvidence,
+    now,
+    causalTrace: input.causalTrace,
+  });
+  microReasonerRuns.push(decisionSelectorRun);
+  if (recommendedNext === "request_voice_callout") {
+    microReasonerRuns.push(makeRun({
+      role: "voice_callout_drafter",
+      jobId: input.jobId,
+      sourceId,
+      mailIds,
+      inputRefs: uniqueStrings([
+        decisionSelectorRun.runId,
+        ...input.immersionState.salience.reasons,
+        ...structured.voiceCalloutMatches,
+        ...(comparison?.voiceCalloutMatches ?? []),
+      ]),
+      outputRefs: uniqueStrings([
+        calloutDraft,
+        ...input.immersionState.salience.reasons,
+        ...structured.voiceCalloutMatches,
+        ...(comparison?.voiceCalloutMatches ?? []),
+      ]),
+      inputPreview: `voice candidate: ${input.immersionState.salience.level}; ${input.immersionState.salience.reasons.slice(0, 2).join(" | ") || "no salience reason"}`,
+      outputPreview: calloutDraft ?? "voice callout draft unavailable",
+      selectedDecision: recommendedNext,
+      salienceLevel: input.immersionState.salience.level,
+      voiceCandidate: true,
+      recommendedNextTool: "live_env.request_interim_voice_callout",
+      confidence: calloutDraft ? "high" : "low",
+      latencyBudgetMs: 150,
+      tokenBudget: 120,
+      missingEvidence: calloutDraft ? [] : ["voice_callout_draft"],
+      now,
+      causalTrace: input.causalTrace,
+    }));
+  }
   const packetId = `stage_play_processed_mail_packet:${hashShort([
     input.jobId,
     sourceId,

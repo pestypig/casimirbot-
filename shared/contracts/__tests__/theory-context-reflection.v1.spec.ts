@@ -67,6 +67,23 @@ function baseReflection(
       suggestedBiomeChunkIds: ["7:2"],
       suggestedSemanticChunkIds: ["warp_gr_nhm2:human_engineering:diagnostic:claim_medium"],
       suggestedScaleBands: ["human_engineering"],
+      uncertainty: {
+        badgeProbabilityById: {
+          "nhm2.qei.sampling_window": 0.555556,
+          "nhm2.closure.source_residual": 0.444444,
+        },
+        renderChunkProbabilityById: {
+          "7:2": 1,
+        },
+        semanticChunkProbabilityById: {
+          "warp_gr_nhm2:human_engineering:diagnostic:claim_medium": 1,
+        },
+        priorEntropyBits: 1,
+        posteriorEntropyBits: 0.991076,
+        informationGainBits: 0.008924,
+        normalizedMass: 1,
+        uncertaintyMode: "broad",
+      },
       softRegion: {
         id: "discussion-zone:test",
         label: "Current discussion zone",
@@ -112,6 +129,9 @@ describe("theory context reflection v1", () => {
       "warp_gr_nhm2:human_engineering:diagnostic:claim_medium",
     ]);
     expect(reflection.overlay.suggestedScaleBands).toEqual(["human_engineering"]);
+    expect(reflection.overlay.uncertainty?.normalizedMass).toBe(1);
+    expect(reflection.overlay.uncertainty?.posteriorEntropyBits).toBeGreaterThan(0);
+    expect(reflection.overlay.uncertainty?.informationGainBits).toBeGreaterThanOrEqual(0);
   });
 
   it("rejects terminal eligible receipts", () => {
@@ -218,6 +238,26 @@ describe("theory context reflection v1", () => {
 
     expect(validateTheoryContextReflectionV1(invalid)).toContain(
       "overlay.suggestedSemanticChunkIds must be an array of strings",
+    );
+  });
+
+  it("rejects invalid uncertainty probabilities", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      overlay: {
+        ...reflection.overlay,
+        uncertainty: {
+          ...reflection.overlay.uncertainty,
+          badgeProbabilityById: {
+            "nhm2.qei.sampling_window": 1.2,
+          },
+        },
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "overlay.uncertainty.badgeProbabilityById.nhm2.qei.sampling_window must be between 0 and 1",
     );
   });
 

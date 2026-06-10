@@ -584,6 +584,38 @@ This closure demonstrates an auditable same-chart tensor evaluation path inside 
 
 QEI evidence now has the same diagnostic discipline. A scalar badge replay of `qei_margin = qei_bound - qei_sample` is not a final QEI proof. The canonical runtime surface is `nhm2_qei_worldline_dossier/v1`, which records worldlines, region coverage, sampling function, sampled density, bound provenance, margins, and tau / duty / light-crossing consistency. Missing wall worldline coverage keeps the dossier incomplete.
 
+### 5.7 Workstation equation anchors
+
+The following expressions are not new physics claims. They are stable workstation anchors for connecting this paper to the Theory Badge Graph, Scientific Calculator, and artifact-backed runtime ledger. A calculator replay is allowed only for scalar rows; tensor, observer, receipt, dossier, and invariant rows open runtime/evidence surfaces instead.
+
+\[
+\mathcal{T}^{\rm same-chart}_{\rm full}
+=\{T_{00},T_{0i},T_{ii},T_{ij,\ i\ne j}\}.
+\]
+
+\[
+R_{{\rm wall},T00}=T00_{{\rm wall},{\rm required}}-T00_{{\rm wall},{\rm available}}.
+\]
+
+\[
+{\rm EC}_{\rm observer\ robust}
+=\{ {\rm WEC},{\rm NEC},{\rm DEC},{\rm SEC}\}_{\rm observer\ families}.
+\]
+
+\[
+qei_{\rm margin}=qei_{\rm bound}-qei_{\rm sample}.
+\]
+
+\[
+{\rm Receipt}_{\rm Casimir}
+=({\rm gap},{\rm material},{\rm temperature},{\rm roughness},{\rm geometry}).
+\]
+
+\[
+{\rm Natario}_{\rm audit}
+=\theta\land R\land K\land C^2\land{\rm Petrov}\land J_i\land{\rm stability}.
+\]
+
 ## 6. Centerline-lapse clocking calculation
 
 ### 6.1 General 3+1 normalization

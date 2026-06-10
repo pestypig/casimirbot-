@@ -19,6 +19,7 @@ import type {
   StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -798,11 +799,73 @@ const clipText = (value: string | null | undefined, limit = 260): string => {
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
 };
 
+const microReasonerTranscriptTitle = (role: StagePlayMicroReasonerRunV1["role"]): string => {
+  switch (role) {
+    case "claim_extractor":
+      return "Claims extracted";
+    case "observation_classifier":
+      return "Observation classified";
+    case "profile_comparator":
+      return "Interpreter profile compared";
+    case "delta_extractor":
+      return "Delta extracted";
+    case "prediction_validator":
+      return "Prediction checked";
+    case "salience_scorer":
+      return "Salience scored";
+    case "decision_selector":
+      return "Decision selected";
+    case "voice_callout_drafter":
+      return "Voice callout drafted";
+    case "packet_composer":
+      return "Packet composed";
+    default:
+      return "Micro-reasoner run";
+  }
+};
+
+const buildMicroReasonerTranscriptRows = (input: {
+  toolName: HelixLiveEnvironmentToolName;
+  runs: StagePlayMicroReasonerRunV1[];
+  createdAt?: string;
+}): AskTurnTranscriptRowDraftV1[] => {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  return input.runs.slice(0, 12).map((run) => ({
+    rowId: `micro_reasoner_run:${hashShort([run.runId, run.role])}`,
+    rowKind: "micro_reasoner_run",
+    title: microReasonerTranscriptTitle(run.role),
+    body: [
+      `Role: ${run.role}.`,
+      run.selectedDecision ? `Decision: ${run.selectedDecision}.` : null,
+      run.salienceLevel ? `Salience: ${run.salienceLevel}${run.voiceCandidate ? " / voice candidate" : ""}.` : null,
+      run.recommendedNextTool ? `Next tool: ${run.recommendedNextTool}.` : null,
+      run.confidence ? `Confidence: ${run.confidence}.` : null,
+      `Mode: ${run.reasoningMode ?? "micro_live_interval"}; model ${run.modelUsed ?? "deterministic"}; latency ${run.latencyMs ?? 0}ms.`,
+      run.outputPreview ? `Output: ${clipText(run.outputPreview, 220)}` : null,
+      run.missingEvidence && run.missingEvidence.length > 0
+        ? `Missing evidence: ${run.missingEvidence.join("; ")}.`
+        : null,
+    ].filter(Boolean).join("\n"),
+    source: {
+      toolName: input.toolName,
+      artifactId: run.runId,
+      artifactKind: run.artifactId,
+    },
+    evidenceRefs: uniqueStrings([run.runId, ...run.inputRefs, ...run.outputRefs]),
+    causalTrace: run.causalTrace,
+    authority: "tool_evidence",
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt,
+  }));
+};
+
 const buildProcessedMailTranscriptRows = (input: {
   toolName: HelixLiveEnvironmentToolName;
   packets: StagePlayProcessedMailPacketV1[];
   missingRawMailIds: string[];
   mailboxThreadId: string;
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   microReasonerRunRefs: string[];
   resolutionStateSummary: string;
   createdAt?: string;
@@ -878,6 +941,11 @@ const buildProcessedMailTranscriptRows = (input: {
       createdAt,
     });
   }
+  rows.push(...buildMicroReasonerTranscriptRows({
+    toolName: input.toolName,
+    runs: input.microReasonerRuns ?? [],
+    createdAt,
+  }));
   return rows;
 };
 
@@ -2619,6 +2687,7 @@ export function executeLiveEnvironmentTool(
       packets,
       missingRawMailIds,
       mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      microReasonerRuns,
       microReasonerRunRefs,
       resolutionStateSummary,
     });
@@ -4073,6 +4142,19 @@ export function executeLiveEnvironmentTool(
     const latestProcessedPacket = processedPacketsForMailIds.at(-1) ?? null;
     const processedPacketEvidenceRefs = uniqueStrings(processedPacketsForMailIds.flatMap((packet) => packet.evidenceRefs));
     const processedPacketRefs = processedPacketsForMailIds.map((packet) => packet.packetId);
+    const processedPacketMicroReasonerRefs = uniqueStrings(processedPacketsForMailIds.flatMap((packet) => packet.microReasonerRunRefs));
+    const suppliedMicroReasonerRefs = readStringArray(args.micro_reasoner_refs ?? args.microReasonerRefs);
+    const microReasonerRefs = uniqueStrings([
+      ...suppliedMicroReasonerRefs,
+      ...processedPacketMicroReasonerRefs,
+    ]);
+    const microReasonerRuns = microReasonerRefs.length > 0
+      ? listStagePlayMicroReasonerRuns({ limit: 200 })
+          .filter((run) => microReasonerRefs.includes(run.runId))
+      : [];
+    const decisionSelectorRun = microReasonerRuns
+      .filter((run) => run.role === "decision_selector")
+      .at(-1) ?? null;
     const outputIntentRecord = readRecord(args.live_source_mail_output_intent ?? args.liveSourceMailOutputIntent);
     const outputIntentWantsInterpretation =
       outputIntentRecord?.wantsInterpretation === true ||
@@ -4126,7 +4208,14 @@ export function executeLiveEnvironmentTool(
         (outputIntentWantsVoiceCallout || processedPolicyAllowsVoice)
       );
     if (!hasExplicitDecision && mailIds.length > 0 && processedPacketsForMailIds.length > 0) {
-      if (decision === "request_voice_callout" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
+      if (
+        decisionSelectorRun?.selectedDecision &&
+        decision === "wait_for_next_summary" &&
+        decisionSelectorRun.selectedDecision !== "wait_for_next_summary" &&
+        (!outputIntentWantsInterpretationOnly || processedPolicyAllowsVoice)
+      ) {
+        decision = decisionSelectorRun.selectedDecision as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"];
+      } else if (decision === "request_voice_callout" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
         decision = "record_interpretation";
       } else if (decision === "wait_for_next_summary" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
         decision = "record_interpretation";
@@ -4247,6 +4336,7 @@ export function executeLiveEnvironmentTool(
       ...readStringArray(args.evidence_refs ?? args.evidenceRefs),
       ...processedPacketEvidenceRefs,
       ...processedPacketRefs,
+      ...microReasonerRefs,
       ...mailIds,
     ]);
     const processedVoiceReasonCodes = uniqueStrings([
@@ -4337,9 +4427,19 @@ export function executeLiveEnvironmentTool(
       evidenceRefs,
       modelReviewed: args.model_reviewed !== false && args.modelReviewed !== false,
     });
-    const transcriptRows = buildMailLoopTranscriptRows({
-      decision: recordedDecision,
-    });
+    const transcriptRows = [
+      ...buildMicroReasonerTranscriptRows({
+        toolName: input.tool_name,
+        runs: microReasonerRuns.filter((run) =>
+          run.role === "decision_selector" ||
+          run.role === "voice_callout_drafter" ||
+          run.role === "salience_scorer"
+        ),
+      }),
+      ...buildMailLoopTranscriptRows({
+        decision: recordedDecision,
+      }),
+    ];
     const narrativeState = recordedDecision.narrativeStateRef
       ? getStagePlayLiveSourceNarrativeState(recordedDecision.narrativeStateRef)
       : null;
@@ -4386,6 +4486,12 @@ export function executeLiveEnvironmentTool(
             : readString(args.decision_validation_result) ?? readString(args.decisionValidationResult) ?? null,
         processedPacketRefs,
         processed_packet_refs: processedPacketRefs,
+        microReasonerRefs,
+        micro_reasoner_refs: microReasonerRefs,
+        microReasonerRuns,
+        micro_reasoner_runs: microReasonerRuns,
+        decisionSource: microReasonerRefs.length > 0 ? "micro_reasoner_pipeline" : "ask_agent_or_manual",
+        decision_source: microReasonerRefs.length > 0 ? "micro_reasoner_pipeline" : "ask_agent_or_manual",
         readMailItemCount: effectiveReadMailItemCount,
         read_mail_item_count: effectiveReadMailItemCount,
         post_tool_model_step_required: recordedDecision.decision !== "wait_for_next_summary",
