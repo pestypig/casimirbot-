@@ -1606,8 +1606,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
     expect(screen.getAllByText("Ask wake queue").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/failed_retryable: mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/failed_retryable; mail_wake_ask_turn_timeout:120000/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/pressure deferred before Ask/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/runtime_memory_queue_deferrable/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("record_interpretation").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Minecraft Survival Coach/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Policy resolution/i).length).toBeGreaterThan(0);
@@ -2018,7 +2018,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Unread retained: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Runnable wakes: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Last completed").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/completed; ask:completed-ui; 1 decision; voice checkpoint reached/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/voice delivered; 1 voice checkpoint; ask ask:completed-ui; 1 decision/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Current pending").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/queued; 1 mail/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Watch policy: batch_interpretation; mail latest_only; cadence every_batch; continuation scheduled/i).length).toBeGreaterThan(0);

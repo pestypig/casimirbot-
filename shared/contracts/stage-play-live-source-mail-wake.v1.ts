@@ -20,6 +20,19 @@ export type StagePlayLiveSourceMailWakeStatusV1 =
   | "skipped"
   | "failed";
 
+export type StagePlayLiveSourceMailWakeLifecycleStageV1 =
+  | "queued"
+  | "pressure_deferred"
+  | "ask_entered"
+  | "decision_recorded"
+  | "voice_pending"
+  | "voice_delivered"
+  | "voice_held"
+  | "voice_blocked"
+  | "completed"
+  | "expired"
+  | "failed";
+
 export type StagePlayLiveSourceMailWakeRequestV1 = {
   artifactId: "stage_play_live_source_mail_wake_request";
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA;
@@ -40,6 +53,8 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   failureReason?: string | null;
   expiresAt?: string | null;
   supersededByWakeRequestId?: string | null;
+  lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
+  lifecycleReason?: string | null;
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   queuedAt: string;
@@ -72,6 +87,8 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   budgetStateRef?: string | null;
   skippedReason?: string | null;
   failedReason?: string | null;
+  lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
+  lifecycleReason?: string | null;
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;

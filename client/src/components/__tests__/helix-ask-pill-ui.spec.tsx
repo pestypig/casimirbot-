@@ -94,6 +94,9 @@ let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixA
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let sortHelixAskRepliesChronologically: typeof import("@/components/helix/HelixAskPill").sortHelixAskRepliesChronologically;
 let appendHelixAskReplyChronologically: typeof import("@/components/helix/HelixAskPill").appendHelixAskReplyChronologically;
+let shouldRenderHelixAskActiveTurnStream: typeof import("@/components/helix/HelixAskPill").shouldRenderHelixAskActiveTurnStream;
+let filterHelixAskActiveTurnStreamRows: typeof import("@/components/helix/HelixAskPill").filterHelixAskActiveTurnStreamRows;
+let isDurableHelixAskMailTranscriptGroup: typeof import("@/components/helix/HelixAskPill").isDurableHelixAskMailTranscriptGroup;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
 let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
@@ -192,6 +195,9 @@ beforeAll(async () => {
     readReasoningTheaterHardFailureSignals,
     sortHelixAskRepliesChronologically,
     appendHelixAskReplyChronologically,
+    shouldRenderHelixAskActiveTurnStream,
+    filterHelixAskActiveTurnStreamRows,
+    isDurableHelixAskMailTranscriptGroup,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
     evaluateVoiceAutoDispatchGovernance,
@@ -225,6 +231,152 @@ describe("HelixAskPill mic-first surface contract", () => {
     const appended = appendHelixAskReplyChronologically([newerFinal], olderActive, 8);
     expect(appended.map((reply: any) => reply.id)).toEqual(["reply-active-old", "reply-final-new"]);
     expect(appended.at(-1)?.content).toBe("Latest final answer");
+  });
+
+  it("hides the active stream once the same turn has a durable reply", () => {
+    const durableActiveReply = {
+      id: "reply-final",
+      createdAtMs: 2_000,
+      question: "active wake",
+      content: "Final answer",
+      debug: { turn_id: "ask:active-turn" },
+    } as any;
+    const differentReply = {
+      id: "reply-old",
+      createdAtMs: 1_000,
+      question: "older turn",
+      content: "Older answer",
+      debug: { turn_id: "ask:old-turn" },
+    } as any;
+
+    expect(shouldRenderHelixAskActiveTurnStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeStartedAtMs: 2_100,
+      latestReply: durableActiveReply,
+    })).toBe(false);
+    expect(shouldRenderHelixAskActiveTurnStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeStartedAtMs: 2_100,
+      latestReply: differentReply,
+    })).toBe(true);
+    expect(shouldRenderHelixAskActiveTurnStream({
+      askBusy: true,
+      activeTurnId: "ask:stale-active-turn",
+      activeStartedAtMs: 900,
+      latestReply: durableActiveReply,
+    })).toBe(false);
+    expect(shouldRenderHelixAskActiveTurnStream({
+      askBusy: true,
+      activeTurnId: null,
+      activeStartedAtMs: 900,
+      latestReply: durableActiveReply,
+    })).toBe(false);
+    expect(shouldRenderHelixAskActiveTurnStream({
+      askBusy: true,
+      activeTurnId: null,
+      activeStartedAtMs: 2_100,
+      latestReply: durableActiveReply,
+    })).toBe(true);
+  });
+
+  it("does not render terminal active stream rows as the latest console session", () => {
+    const runningRows = [
+      {
+        key: "active-question",
+        source: "question",
+        label: "Question",
+        text: "Watch the mailbox.",
+        meta: "current prompt",
+        status: "submitted",
+        tone: "question",
+        evidenceRefs: [],
+      },
+      {
+        key: "active-tool",
+        source: "agent_work",
+        label: "Agent decision",
+        text: "Reading live-source mail.",
+        meta: "tool",
+        status: "running",
+        tone: "working",
+        evidenceRefs: [],
+      },
+    ] as any[];
+    const terminalRows = [
+      ...runningRows,
+      {
+        key: "active-final",
+        source: "agent_work",
+        label: "Final",
+        text: "I have enough to answer, and the terminal checks allow the final response.",
+        meta: "agent work",
+        status: "final",
+        tone: "final",
+        evidenceRefs: [],
+      },
+    ] as any[];
+
+    expect(filterHelixAskActiveTurnStreamRows(runningRows)).toHaveLength(2);
+    expect(filterHelixAskActiveTurnStreamRows(terminalRows)).toEqual([]);
+  });
+
+  it("does not hydrate incomplete mail wake transcript groups as saved console turns", () => {
+    const buildEntry = (rowKind: string, overrides: Record<string, any> = {}) => ({
+      artifactId: "stage_play_live_source_mail_transcript_entry",
+      schemaVersion: "stage_play_live_source_mail_transcript_entry/v1",
+      entryId: `entry:${rowKind}`,
+      threadId: "helix-ask:desktop",
+      wakeRequestId: "wake:stale",
+      wakeResultId: "wake-result:stale",
+      askTurnId: null,
+      decisionIds: [],
+      mailIds: ["mail:1"],
+      sourceIds: [],
+      sequence: 1,
+      row: {
+        rowId: `row:${rowKind}`,
+        rowKind,
+        title: rowKind,
+        body: "",
+        source: {},
+        evidenceRefs: [],
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt: "2026-06-10T15:20:00.000Z",
+        ...(overrides.row ?? {}),
+      },
+      evidenceRefs: [],
+      createdAt: "2026-06-10T15:20:00.000Z",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+      ...overrides,
+    }) as any;
+
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("mail_wake_requested"),
+      buildEntry("budget_state", { row: { body: "runtime_memory_queue_deferrable" } }),
+      buildEntry("continuation_deferred"),
+      buildEntry("tool_budget_no_progress"),
+      buildEntry("blocked", { row: { body: "mail_wake_ask_turn_timeout:120000" } }),
+    ])).toBe(false);
+
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("mail_read_receipt"),
+      buildEntry("decision_recorded"),
+      buildEntry("checkpoint_summary"),
+    ])).toBe(true);
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("voice_tool_call"),
+      buildEntry("voice_receipt"),
+    ])).toBe(true);
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("text_answer", { row: { terminalEligible: true } }),
+    ])).toBe(true);
   });
 
   it("keeps voice turns ordered behind unified Ask by default", () => {

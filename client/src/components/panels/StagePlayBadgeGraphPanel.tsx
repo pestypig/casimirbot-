@@ -1399,6 +1399,49 @@ const isStagePlayMailWakeVoiceCheckpointResult = (
     /^(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt):/i.test(ref)
   );
 
+const stagePlayWakeLifecycleTone = (
+  lifecycleStage?: string | null,
+  fallbackStatus?: string | null,
+): "good" | "warn" | "blocked" | "default" => {
+  if (lifecycleStage === "voice_delivered" || lifecycleStage === "voice_held" || lifecycleStage === "voice_blocked" || lifecycleStage === "completed") return "good";
+  if (lifecycleStage === "voice_pending" || lifecycleStage === "pressure_deferred" || lifecycleStage === "ask_entered" || lifecycleStage === "decision_recorded") return "warn";
+  if (lifecycleStage === "failed" || lifecycleStage === "expired") return "blocked";
+  if (fallbackStatus === "completed") return "good";
+  if (fallbackStatus === "deferred_for_pressure" || fallbackStatus === "failed_retryable") return "warn";
+  if (fallbackStatus === "failed_terminal" || fallbackStatus === "failed") return "blocked";
+  return "default";
+};
+
+const stagePlayWakeLifecycleSummary = (input: {
+  lifecycleStage?: string | null;
+  status?: string | null;
+  askTurnId?: string | null;
+  decisionIds?: string[];
+  voiceRefs?: string[];
+  nextRetryAt?: string | null;
+  failureReason?: string | null;
+}): string => {
+  const voiceCount = input.voiceRefs?.length ?? 0;
+  const stage = input.lifecycleStage ?? (voiceCount > 0 ? "voice_delivered" : null) ?? input.status ?? "missing";
+  const decisionCount = input.decisionIds?.length ?? 0;
+  if (stage === "pressure_deferred" || input.status === "deferred_for_pressure") {
+    return `pressure deferred before Ask${input.nextRetryAt ? `; next retry ${formatStagePlayClock(input.nextRetryAt)}` : ""}${input.failureReason ? `; ${input.failureReason}` : ""}`;
+  }
+  if (stage === "voice_pending") {
+    return `decision recorded; voice pending${input.askTurnId ? `; ask ${input.askTurnId}` : ""}${decisionCount ? `; ${decisionCount} decision${decisionCount === 1 ? "" : "s"}` : ""}`;
+  }
+  if (stage === "voice_delivered" || stage === "voice_held" || stage === "voice_blocked") {
+    return `${labelize(stage)}; ${voiceCount} voice checkpoint${voiceCount === 1 ? "" : "s"}${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
+  }
+  if (stage === "decision_recorded") {
+    return `decision recorded${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
+  }
+  if (stage === "ask_entered") {
+    return `Ask entered${input.askTurnId ? `; ${input.askTurnId}` : ""}`;
+  }
+  return `${labelize(stage)}${input.failureReason ? `; ${input.failureReason}` : ""}`;
+};
+
 function resolveActiveWatchPolicy(input: {
   jobStates: StagePlayLiveSourceJobStateV1[];
   policies: StagePlayLiveSourceWatchJobPolicyV1[];
@@ -1845,6 +1888,7 @@ function buildObserverMailLoopNodes(input: {
     wake.status === "deferred_for_pressure"
   );
   const latestPendingWake =
+    pendingWakeRequests.filter((wake) => wake.lifecycleStage === "voice_pending").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
     pendingWakeRequests.filter((wake) => wake.status === "deferred_for_pressure").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
     pendingWakeRequests.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
     null;
@@ -1861,6 +1905,8 @@ function buildObserverMailLoopNodes(input: {
   const latestWakeFailureReason = latestWakeResult?.failedReason ?? displayWake?.failureReason ?? null;
   const latestWakeAskTurnId = latestWakeResult?.askTurnId ?? displayWake?.askTurnId ?? null;
   const latestWakeDecisionIds = latestWakeResult?.decisionIds ?? displayWake?.decisionIds ?? [];
+  const latestWakeLifecycleStage = latestWakeResult?.lifecycleStage ?? displayWake?.lifecycleStage ?? null;
+  const latestWakeLifecycleReason = latestWakeResult?.lifecycleReason ?? displayWake?.lifecycleReason ?? null;
   const completedWakeAskTurnId = latestCompletedWakeResult?.askTurnId ?? latestCompletedWake?.askTurnId ?? null;
   const completedWakeDecisionIds = latestCompletedWakeResult?.decisionIds ?? latestCompletedWake?.decisionIds ?? [];
   const completedWakeVoiceRefs = uniqueSorted([
@@ -1869,6 +1915,8 @@ function buildObserverMailLoopNodes(input: {
   ].filter((ref) => /(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt)/i.test(ref)));
   const pendingWakeStatus = latestPendingWakeResult?.status ?? latestPendingWake?.status ?? null;
   const pendingWakeFailureReason = latestPendingWakeResult?.failedReason ?? latestPendingWake?.failureReason ?? null;
+  const pendingWakeLifecycleStage = latestPendingWakeResult?.lifecycleStage ?? latestPendingWake?.lifecycleStage ?? null;
+  const pendingWakeLifecycleReason = latestPendingWakeResult?.lifecycleReason ?? latestPendingWake?.lifecycleReason ?? null;
   const hasWatchPolicy = Boolean(latestPolicy);
   const manualCheckpointWithoutPolicy = Boolean(
     latestDecision &&
@@ -2553,16 +2601,34 @@ function buildObserverMailLoopNodes(input: {
       id: "observer_mail_loop:ask_wake",
       title: "Wake Ask",
       subtitle: "mail wake admission",
-      status: latestWakeStatus ?? (unreadCount > 0 ? "queued pending" : "missing"),
+      status: latestWakeLifecycleStage ?? latestWakeStatus ?? (unreadCount > 0 ? "queued pending" : "missing"),
       preview: manualCheckpointWithoutPolicy && unreadCount > 0
         ? `manual checkpoint completed; ${unreadCount} unread retained until a watch policy is configured`
         : pressureText
         ? pressureText
+        : pendingWakeLifecycleStage === "voice_pending" && latestPendingWake
+        ? stagePlayWakeLifecycleSummary({
+            lifecycleStage: pendingWakeLifecycleStage,
+            status: pendingWakeStatus,
+            askTurnId: latestPendingWake.askTurnId,
+            decisionIds: latestPendingWake.decisionIds,
+            failureReason: pendingWakeLifecycleReason ?? pendingWakeFailureReason,
+          })
         : latestWakeStatus
-          ? `${latestWakeStatus}${latestWakeFailureReason ? `: ${latestWakeFailureReason}` : ""}; ${latestWakeAskText}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
+          ? `${stagePlayWakeLifecycleSummary({
+              lifecycleStage: latestWakeLifecycleStage,
+              status: latestWakeStatus,
+              askTurnId: latestWakeAskTurnId,
+              decisionIds: latestWakeDecisionIds,
+              voiceRefs: completedWakeVoiceRefs,
+              nextRetryAt: pressureNextRetryAt,
+              failureReason: latestWakeLifecycleReason ?? latestWakeFailureReason,
+            })}; ${latestWakeAskText}; ${unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
         manualCheckpointWithoutPolicy ? "policy missing" : null,
+        latestWakeLifecycleStage ? `latest ${labelize(latestWakeLifecycleStage)}` : null,
+        pendingWakeLifecycleStage ? `pending ${labelize(pendingWakeLifecycleStage)}` : null,
         latestCompletedWakeResult ? "last wake completed" : null,
         completedWakeVoiceRefs.length > 0 ? "voice checkpoint" : null,
         latestPendingWake ? "current wake pending" : null,
@@ -2578,18 +2644,37 @@ function buildObserverMailLoopNodes(input: {
         {
           label: "Last completed",
           value: latestCompletedWakeResult
-            ? `${latestCompletedWakeResult.status}; ${completedWakeAskTurnId ?? "Ask turn unknown"}; ${completedWakeDecisionIds.length} decision${completedWakeDecisionIds.length === 1 ? "" : "s"}; ${completedWakeVoiceRefs.length > 0 ? "voice checkpoint reached" : "voice checkpoint not shown"}`
+            ? `${stagePlayWakeLifecycleSummary({
+                lifecycleStage: latestCompletedWakeResult.lifecycleStage,
+                status: latestCompletedWakeResult.status,
+                askTurnId: completedWakeAskTurnId,
+                decisionIds: completedWakeDecisionIds,
+                voiceRefs: completedWakeVoiceRefs,
+                failureReason: latestCompletedWakeResult.lifecycleReason,
+              })}; ${completedWakeDecisionIds.length} decision${completedWakeDecisionIds.length === 1 ? "" : "s"}`
             : "No completed Ask wake yet.",
           tone: latestCompletedWakeResult ? "good" : "default",
         },
         {
           label: "Current pending",
           value: latestPendingWake
-            ? `${pendingWakeStatus ?? latestPendingWake.status}${pendingWakeFailureReason ? `; ${pendingWakeFailureReason}` : ""}; ${latestPendingWake.mailIds.length} mail; ${latestPendingWake.nextRetryAt ? `next retry ${formatStagePlayClock(latestPendingWake.nextRetryAt)}` : "retry not scheduled"}`
+            ? `${stagePlayWakeLifecycleSummary({
+                lifecycleStage: pendingWakeLifecycleStage,
+                status: pendingWakeStatus ?? latestPendingWake.status,
+                askTurnId: latestPendingWake.askTurnId,
+                decisionIds: latestPendingWake.decisionIds,
+                nextRetryAt: latestPendingWake.nextRetryAt,
+                failureReason: pendingWakeLifecycleReason ?? pendingWakeFailureReason,
+              })}; ${latestPendingWake.mailIds.length} mail`
             : "No current pending/deferred wake.",
-          tone: latestPendingWake
-            ? latestPendingWake.status === "deferred_for_pressure" || latestPendingWake.status === "failed_retryable" ? "warn" : "good"
-            : "default",
+          tone: latestPendingWake ? stagePlayWakeLifecycleTone(pendingWakeLifecycleStage, pendingWakeStatus ?? latestPendingWake.status) : "default",
+        },
+        {
+          label: "Lifecycle",
+          value: latestWakeLifecycleStage || pendingWakeLifecycleStage
+            ? `${labelize(latestWakeLifecycleStage ?? pendingWakeLifecycleStage ?? "unknown")}${latestWakeLifecycleReason || pendingWakeLifecycleReason ? `; ${latestWakeLifecycleReason ?? pendingWakeLifecycleReason}` : ""}`
+            : "No lifecycle evidence yet.",
+          tone: stagePlayWakeLifecycleTone(latestWakeLifecycleStage ?? pendingWakeLifecycleStage, latestWakeStatus ?? pendingWakeStatus),
         },
         {
           label: "Tool",
@@ -2644,7 +2729,14 @@ function buildObserverMailLoopNodes(input: {
           ? `manual checkpoint complete; ${unreadCount} unread retained; configure live_env.configure_live_source_watch_job for the continuing loop`
           : latestWakeStatus === "deferred_for_pressure"
           ? `deferred_for_pressure; ${runtimePressureReason ?? "runtime pressure"}; ${unreadCount} unread retained${pressureNextRetryAt ? `; next retry ${formatStagePlayClock(pressureNextRetryAt)}` : ""}; ${pressureContinuationText}`
-          : `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}${latestWakeAskTurnId ? `; ask ${latestWakeAskTurnId}` : ""}${latestWakeDecisionIds.length > 0 ? `; decisions ${latestWakeDecisionIds.length}` : ""}; continuation ${continuationStateText}; ${continuationRetainedMailCount || unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
+          : `${stagePlayWakeLifecycleSummary({
+              lifecycleStage: latestWakeLifecycleStage,
+              status: latestWakeStatus,
+              askTurnId: latestWakeAskTurnId,
+              decisionIds: latestWakeDecisionIds,
+              voiceRefs: completedWakeVoiceRefs,
+              failureReason: latestWakeLifecycleReason ?? latestWakeFailureReason,
+            })}; continuation ${continuationStateText}; ${continuationRetainedMailCount || unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
           ? "unread mail is waiting for wake admission"
           : "no wake request yet",
@@ -2960,6 +3052,20 @@ function StagePlayMailLoopLiveOverview({
   const latestWakeResult =
     latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
     latestStagePlayMailWakeResult(wakeResults);
+  const liveOverviewPendingWakes = wakeRequests.filter((wake) =>
+    wake.status === "queued" ||
+    wake.status === "running" ||
+    wake.status === "failed_retryable" ||
+    wake.status === "deferred_for_pressure"
+  );
+  const liveOverviewPendingWake =
+    liveOverviewPendingWakes.filter((wake) => wake.lifecycleStage === "voice_pending").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
+    liveOverviewPendingWakes.filter((wake) => wake.status === "deferred_for_pressure").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
+    liveOverviewPendingWakes.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
+    null;
+  const liveOverviewPendingWakeResult = liveOverviewPendingWake
+    ? latestStagePlayMailWakeResult(wakeResults, liveOverviewPendingWake.wakeRequestId)
+    : null;
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
@@ -2973,6 +3079,12 @@ function StagePlayMailLoopLiveOverview({
   const packetAgeMs = ageMsFromIso(latestPacket?.createdAt);
   const mailAgeMs = ageMsFromIso(latestMail?.createdAt);
   const wakeStatus = latestWakeResult?.status ?? latestWake?.status ?? "none";
+  const wakeLifecycleStage =
+    latestWakeResult?.lifecycleStage ??
+    latestWake?.lifecycleStage ??
+    liveOverviewPendingWakeResult?.lifecycleStage ??
+    liveOverviewPendingWake?.lifecycleStage ??
+    null;
   const wakeBridgeEligible = shouldBridgeStagePlayWakeToAsk({
     wake: latestWake,
     wakeResult: latestWakeResult,
@@ -3138,7 +3250,11 @@ function StagePlayMailLoopLiveOverview({
           <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
           <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
           <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
-          <StagePlayMetricPill label="wake" value={labelize(wakeStatus)} tone={wakeStatus === "completed" ? "good" : wakeStatus === "deferred_for_pressure" ? "warn" : wakeStatus === "failed_terminal" ? "blocked" : "default"} />
+          <StagePlayMetricPill
+            label="wake"
+            value={labelize(wakeLifecycleStage ?? wakeStatus)}
+            tone={stagePlayWakeLifecycleTone(wakeLifecycleStage, wakeStatus)}
+          />
         </div>
       </div>
 

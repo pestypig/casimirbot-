@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type {
   StagePlayLiveSourceMailWakeReasonV1,
+  StagePlayLiveSourceMailWakeLifecycleStageV1,
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
   StagePlayLiveSourceMailWakeStatusV1,
@@ -53,6 +54,32 @@ const decisionRequiresVoiceCheckpoint = (decision: StagePlayLiveSourceMailDecisi
 
 const isVoiceCheckpointRef = (ref: string): boolean =>
   /(?:^|:)(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt)/i.test(ref);
+
+const voiceCheckpointLifecycleStage = (refs: string[]): StagePlayLiveSourceMailWakeLifecycleStageV1 | null => {
+  if (refs.some((ref) => /(?:^|:)voice_hold_receipt:/i.test(ref))) return "voice_held";
+  if (refs.some((ref) => /(?:^|:)voice_block_receipt:/i.test(ref))) return "voice_blocked";
+  return refs.some(isVoiceCheckpointRef) ? "voice_delivered" : null;
+};
+
+const resolveWakeLifecycleStage = (input: {
+  status: StagePlayLiveSourceMailWakeStatusV1 | StagePlayLiveSourceMailWakeResultV1["status"];
+  askTurnId?: string | null;
+  decisionIds?: string[];
+  evidenceRefs?: string[];
+  requiresVoiceCheckpoint?: boolean;
+}): StagePlayLiveSourceMailWakeLifecycleStageV1 => {
+  const evidenceRefs = input.evidenceRefs ?? [];
+  const voiceStage = voiceCheckpointLifecycleStage(evidenceRefs);
+  if (voiceStage) return voiceStage;
+  if (input.status === "deferred_for_pressure") return "pressure_deferred";
+  if (input.status === "expired_stale" || input.status === "expired_superseded") return "expired";
+  if (input.status === "failed" || input.status === "failed_retryable" || input.status === "failed_terminal") return "failed";
+  if (input.status === "completed" || input.status === "skipped") return "completed";
+  if (input.requiresVoiceCheckpoint && (input.decisionIds?.length ?? 0) > 0) return "voice_pending";
+  if ((input.decisionIds?.length ?? 0) > 0) return "decision_recorded";
+  if (input.askTurnId) return "ask_entered";
+  return "queued";
+};
 
 const decisionsRequireVoiceCheckpoint = (decisions: StagePlayLiveSourceMailDecisionV1[]): boolean =>
   decisions.some(decisionRequiresVoiceCheckpoint);
@@ -215,6 +242,8 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     failureReason: null,
     expiresAt: ttlMs ? addMsIso(now, ttlMs) : null,
     supersededByWakeRequestId: null,
+    lifecycleStage: "queued",
+    lifecycleReason: "wake_request_queued",
     evidenceRefs: uniqueStrings([...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
     causalTrace: mergeLiveSourceCausalTraces(input.causalTraces ?? [], {
       parentRefs: boundedMailIds,
@@ -325,6 +354,8 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
     failureReason: null,
     expiresAt: null,
     supersededByWakeRequestId: null,
+    lifecycleStage: "queued",
+    lifecycleReason: "retained_after_bounded_ask",
     evidenceRefs: uniqueStrings([
       ...retainedMailIds,
       ...existing.sourceIds,
@@ -434,7 +465,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -443,6 +474,8 @@ const updateWake = (
     ...patch,
     decisionIds: patch.decisionIds ? uniqueStrings(patch.decisionIds) : existing.decisionIds,
     evidenceRefs: patch.evidenceRefs ? uniqueStrings(patch.evidenceRefs) : existing.evidenceRefs,
+    lifecycleStage: patch.lifecycleStage ?? existing.lifecycleStage,
+    lifecycleReason: patch.lifecycleReason ?? existing.lifecycleReason ?? null,
     updatedAt: patch.updatedAt ?? new Date().toISOString(),
   };
   wakeById.set(wakeRequestId, updated);
@@ -454,6 +487,8 @@ export const markStagePlayMailWakeRunning = (wakeRequestId: string, now?: string
   const updatedAt = now ?? new Date().toISOString();
   return updateWake(wakeRequestId, {
     status: "running",
+    lifecycleStage: existing?.askTurnId ? "ask_entered" : "queued",
+    lifecycleReason: "wake_runner_started",
     attemptCount: (existing?.attemptCount ?? 0) + 1,
     lastAttemptAt: updatedAt,
     nextRetryAt: null,
@@ -474,6 +509,13 @@ export const markStagePlayMailWakeCompleted = (input: {
     askTurnId: input.askTurnId ?? undefined,
     decisionIds: input.decisionIds,
     evidenceRefs: input.evidenceRefs,
+    lifecycleStage: resolveWakeLifecycleStage({
+      status: "completed",
+      askTurnId: input.askTurnId ?? null,
+      decisionIds: input.decisionIds ?? [],
+      evidenceRefs: input.evidenceRefs ?? [],
+    }),
+    lifecycleReason: "wake_completion_evidence_satisfied",
     nextRetryAt: null,
     failureReason: null,
     expiresAt: null,
@@ -481,10 +523,10 @@ export const markStagePlayMailWakeCompleted = (input: {
   });
 
 export const markStagePlayMailWakeSkipped = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(wakeRequestId, { status: "skipped", updatedAt: now });
+  updateWake(wakeRequestId, { status: "skipped", lifecycleStage: "completed", lifecycleReason: "wake_skipped", updatedAt: now });
 
 export const markStagePlayMailWakeFailed = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(wakeRequestId, { status: "failed", updatedAt: now });
+  updateWake(wakeRequestId, { status: "failed", lifecycleStage: "failed", lifecycleReason: "wake_failed", updatedAt: now });
 
 export const markStagePlayMailWakeRetryable = (input: {
   wakeRequestId: string;
@@ -496,6 +538,8 @@ export const markStagePlayMailWakeRetryable = (input: {
   updateWake(input.wakeRequestId, {
     status: input.status ?? "failed_retryable",
     failureReason: input.failureReason,
+    lifecycleStage: input.status === "deferred_for_pressure" ? "pressure_deferred" : "failed",
+    lifecycleReason: input.failureReason,
     nextRetryAt: input.nextRetryAt ?? null,
     expiresAt: addMsIso(input.nextRetryAt ?? input.now ?? new Date().toISOString(), DEFAULT_WAKE_RELEVANCE_TTL_MS),
     updatedAt: input.now,
@@ -509,6 +553,8 @@ export const markStagePlayMailWakeTerminalFailed = (input: {
   updateWake(input.wakeRequestId, {
     status: "failed_terminal",
     failureReason: input.failureReason,
+    lifecycleStage: "failed",
+    lifecycleReason: input.failureReason,
     nextRetryAt: null,
     expiresAt: null,
     updatedAt: input.now,
@@ -544,6 +590,8 @@ export function expireStaleStagePlayLiveSourceMailWakeRequests(input: {
     const updated = updateWake(wake.wakeRequestId, {
       status: "expired_stale",
       failureReason: "wake_relevance_ttl_expired",
+      lifecycleStage: "expired",
+      lifecycleReason: "wake_relevance_ttl_expired",
       nextRetryAt: null,
       expiresAt: wake.expiresAt ?? (ttlMs ? addMsIso(wake.queuedAt, ttlMs) : now),
       updatedAt: now,
@@ -589,6 +637,8 @@ export function supersedeActiveStagePlayLiveSourceMailWakeRequests(input: {
     const updated = updateWake(wake.wakeRequestId, {
       status: "expired_superseded",
       failureReason: "wake_superseded_by_newer_source_packet",
+      lifecycleStage: "expired",
+      lifecycleReason: "wake_superseded_by_newer_source_packet",
       supersededByWakeRequestId: input.replacementWakeRequestId,
       nextRetryAt: null,
       expiresAt: now,
@@ -647,6 +697,18 @@ export function recordStagePlayMailWakeResult(input: {
     budgetStateRef: null,
     skippedReason: input.skippedReason ?? null,
     failedReason: input.failedReason ?? null,
+    lifecycleStage: resolveWakeLifecycleStage({
+      status: input.status,
+      askTurnId: input.askTurnId ?? null,
+      decisionIds,
+      evidenceRefs,
+    }),
+    lifecycleReason:
+      input.status === "deferred_for_pressure"
+        ? input.failedReason ?? "runtime_pressure_deferred_before_ask"
+        : input.status === "completed"
+          ? "wake_result_completion_evidence_satisfied"
+          : input.failedReason ?? input.skippedReason ?? null,
     evidenceRefs,
     causalTrace: mergeLiveSourceCausalTraces([wake?.causalTrace], {
       parentRefs: [input.wakeRequestId],
@@ -750,6 +812,15 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
       decisionsRequireVoiceCheckpoint(matchingDecisionRecords) &&
       !hasVoiceCheckpointForDecisions(matchingDecisionRecords, evidenceRefs)
     ) {
+      updateWake(wake.wakeRequestId, {
+        status: wake.status,
+        askTurnId: askTurnId ?? undefined,
+        decisionIds: decisions,
+        evidenceRefs,
+        lifecycleStage: "voice_pending",
+        lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+        updatedAt: now,
+      });
       continue;
     }
     const updated = markStagePlayMailWakeCompleted({
@@ -843,6 +914,15 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
       continue;
     }
     if (input.requiresVoiceCheckpoint === true && voiceReceiptRefs.length === 0) {
+      updateWake(wakeRequestId, {
+        status: wake.status === "queued" ? "running" : wake.status,
+        askTurnId: input.askTurnId ?? null,
+        decisionIds,
+        evidenceRefs: uniqueStrings([...wake.evidenceRefs, ...evidenceRefs]),
+        lifecycleStage: "voice_pending",
+        lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+        updatedAt: now,
+      });
       skippedWakeIds.push({ wakeRequestId, reason: "missing_decision_or_voice_receipt" });
       continue;
     }

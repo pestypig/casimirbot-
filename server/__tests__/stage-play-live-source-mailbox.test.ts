@@ -2334,6 +2334,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(reconciled[0]).toMatchObject({
       wakeRequestId: wake?.wakeRequestId,
       status: "completed",
+      lifecycleStage: "completed",
       askTurnId: "ask:direct-mailbox-turn",
       decisionIds: [decision.decisionId],
     });
@@ -2341,6 +2342,7 @@ describe("Stage Play live-source mailbox", () => {
       expect.objectContaining({
         wakeRequestId: wake?.wakeRequestId,
         status: "completed",
+        lifecycleStage: "completed",
         askTurnId: "ask:direct-mailbox-turn",
         decisionIds: [decision.decisionId],
       }),
@@ -2398,7 +2400,9 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
       wakeRequestId: wake?.wakeRequestId,
       status: "queued",
-      decisionIds: [],
+      lifecycleStage: "voice_pending",
+      lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+      decisionIds: [decision.decisionId],
     });
     expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([]);
 
@@ -2417,6 +2421,14 @@ describe("Stage Play live-source mailbox", () => {
         reason: "missing_decision_or_voice_receipt",
       },
     ]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "running",
+      lifecycleStage: "voice_pending",
+      lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+      askTurnId: "ask:voice-decision-without-checkpoint",
+      decisionIds: [decision.decisionId],
+    });
   });
 
   it("reconciles a UI-bridged Ask wake by wake id after decision and voice receipt evidence", () => {
@@ -2485,6 +2497,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
       wakeRequestId: wake?.wakeRequestId,
       status: "completed",
+      lifecycleStage: "voice_delivered",
       askTurnId: "ask:ui-bridge-mailbox-turn",
       decisionIds: [decision.decisionId],
       evidenceRefs: expect.arrayContaining([
@@ -2496,6 +2509,7 @@ describe("Stage Play live-source mailbox", () => {
       expect.objectContaining({
         wakeRequestId: wake?.wakeRequestId,
         status: "completed",
+        lifecycleStage: "voice_delivered",
         askTurnId: "ask:ui-bridge-mailbox-turn",
         decisionIds: [decision.decisionId],
         evidenceRefs: expect.arrayContaining([

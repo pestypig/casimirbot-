@@ -244,6 +244,7 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 const HELIX_ASK_TURN_EXPANSION_STORAGE_KEY = "helix.ask.turnExpansion.v1";
 const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
+const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
 
@@ -8678,6 +8679,30 @@ function groupStagePlayMailTranscriptEntries(
     });
 }
 
+export function isDurableHelixAskMailTranscriptGroup(
+  entries: StagePlayLiveSourceMailTranscriptEntryV1[],
+): boolean {
+  if (!entries.length) return false;
+  return entries.some((entry) => {
+    const row = entry.row;
+    if (row.terminalEligible === true) return true;
+    switch (row.rowKind) {
+      case "checkpoint_summary":
+      case "final_answer":
+      case "terminal_answer":
+      case "text_answer":
+      case "typed_failure":
+      case "wait_for_next_summary":
+      case "voice_receipt":
+      case "voice_blocked":
+      case "steering_ack_receipt":
+        return true;
+      default:
+        return false;
+    }
+  });
+}
+
 function buildHelixAskReplyFromMailTranscriptEntries(
   entries: StagePlayLiveSourceMailTranscriptEntryV1[],
 ): HelixAskReply | null {
@@ -9625,7 +9650,7 @@ export function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): He
 
 function limitHelixAskRepliesChronologically(
   replies: HelixAskReply[],
-  limit = 8,
+  limit = HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
 ): HelixAskReply[] {
   return sortHelixAskRepliesChronologically(replies).slice(-limit);
 }
@@ -9633,7 +9658,7 @@ function limitHelixAskRepliesChronologically(
 export function appendHelixAskReplyChronologically(
   replies: HelixAskReply[],
   reply: HelixAskReply,
-  limit = 8,
+  limit = HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
 ): HelixAskReply[] {
   const incomingKey = resolveHelixAskReplyCanonicalKey(reply);
   const next = [...replies];
@@ -9644,6 +9669,37 @@ export function appendHelixAskReplyChronologically(
     next.push(reply);
   }
   return limitHelixAskRepliesChronologically(next, limit);
+}
+
+export function shouldRenderHelixAskActiveTurnStream(input: {
+  askBusy: boolean;
+  activeTurnId?: string | null;
+  activeStartedAtMs?: number | null;
+  latestReply?: HelixAskReply | null;
+}): boolean {
+  if (!input.askBusy) return false;
+  const activeTurnId = coerceText(input.activeTurnId).trim();
+  const latestReply = input.latestReply ?? null;
+  if (!latestReply) return true;
+  if (activeTurnId && resolveHelixAskReplyCanonicalKey(latestReply) === activeTurnId) return false;
+  const activeStartedAtMs =
+    typeof input.activeStartedAtMs === "number" && Number.isFinite(input.activeStartedAtMs)
+      ? input.activeStartedAtMs
+      : null;
+  const latestReplyOrderMs = resolveHelixAskReplyOrderMs(latestReply);
+  if (activeStartedAtMs !== null && latestReplyOrderMs !== null && activeStartedAtMs <= latestReplyOrderMs) {
+    return false;
+  }
+  if (!activeTurnId && activeStartedAtMs === null) return false;
+  return true;
+}
+
+export function filterHelixAskActiveTurnStreamRows(
+  rows: HelixContinuousTurnStreamRow[],
+): HelixContinuousTurnStreamRow[] {
+  if (!rows.length) return rows;
+  const hasTerminalRow = rows.some((row) => row.tone === "final" || row.source === "final" || row.status === "final");
+  return hasTerminalRow ? [] : rows;
 }
 
 function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {
@@ -17330,6 +17386,7 @@ export function HelixAskPill({
   const askImageInputRef = useRef<HTMLInputElement | null>(null);
   const [askBusy, setAskBusy] = useState(false);
   const activeAskTurnIdRef = useRef<string | null>(null);
+  const activeAskStartedAtMsRef = useRef<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askImageAttachment, setAskImageAttachment] = useState<HelixAskImageAttachment | null>(null);
@@ -17456,6 +17513,7 @@ export function HelixAskPill({
         if (cancelled || response.ok === false) return;
         const entries = Array.isArray(response.entries) ? response.entries : [];
         const durableReplies = groupStagePlayMailTranscriptEntries(entries)
+          .filter(isDurableHelixAskMailTranscriptGroup)
           .map(buildHelixAskReplyFromMailTranscriptEntries)
           .filter((reply): reply is HelixAskReply => Boolean(reply));
         if (durableReplies.length === 0) return;
@@ -17468,7 +17526,7 @@ export function HelixAskPill({
             liveSourceMailWakeReplyIdsRef.current.add(reply.id);
           }
           if (nextDurableReplies.length === 0 && merged.every((reply, index) => reply === prev[index])) return prev;
-          return limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], 8);
+          return limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT);
         });
       } catch (error) {
         console.warn("[HelixAskPill] live-source mail transcript refresh failed", error);
@@ -24142,7 +24200,9 @@ export function HelixAskPill({
         askLiveDraftRef.current = "";
         askLiveDraftBufferRef.current = "";
         clearLiveDraftFlush();
-        askStartRef.current = Date.now();
+        const startedAtMs = Date.now();
+        askStartRef.current = startedAtMs;
+        activeAskStartedAtMsRef.current = startedAtMs;
         setAskElapsedMs(0);
         setAskActiveQuestion(attempt.prompt);
         setAskLiveSessionId(sessionId ?? null);
@@ -25544,7 +25604,7 @@ export function HelixAskPill({
                   liveEvents: liveEventsSnapshot,
                   convergenceSnapshot,
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
             appendSyntheticLiveEvent(
@@ -25835,6 +25895,7 @@ export function HelixAskPill({
           askLiveDraftBufferRef.current = "";
           clearLiveDraftFlush();
           setAskActiveQuestion(null);
+          activeAskStartedAtMsRef.current = null;
         }
       }
     } finally {
@@ -30126,15 +30187,23 @@ export function HelixAskPill({
         : [],
     [askActiveQuestion, askBusy, askLiveAgenticEventRows, askLiveDraft],
   );
+  const visibleActiveTurnStreamRows = shouldRenderHelixAskActiveTurnStream({
+    askBusy,
+    activeTurnId: activeAskTurnIdRef.current,
+    activeStartedAtMs: activeAskStartedAtMsRef.current,
+    latestReply: latestAskReply,
+  })
+    ? filterHelixAskActiveTurnStreamRows(activeTurnStreamRows)
+    : [];
   const steeringQueueItems = useMemo(
     () =>
       buildHelixAskSteeringQueueItems({
-        activeTurnStreamRows,
+        activeTurnStreamRows: visibleActiveTurnStreamRows,
         latestReply: latestAskReply,
         mailbox: liveSourceMailState,
         maxItems: HELIX_ASK_STEERING_QUEUE_MAX_ITEMS,
       }),
-    [activeTurnStreamRows, latestAskReply, liveSourceMailState],
+    [visibleActiveTurnStreamRows, latestAskReply, liveSourceMailState],
   );
   const activeSteeringQueueCount = steeringQueueItems.filter((item) => item.status !== "completed").length;
   useEffect(() => {
@@ -30188,12 +30257,12 @@ export function HelixAskPill({
       cancelled = true;
     };
   }, [askBusy, steeringQueueItems]);
-  const activeTurnStreamTail = activeTurnStreamRows.length
-    ? activeTurnStreamRows[activeTurnStreamRows.length - 1]
+  const activeTurnStreamTail = visibleActiveTurnStreamRows.length
+    ? visibleActiveTurnStreamRows[visibleActiveTurnStreamRows.length - 1]
     : null;
   const activeTurnStreamScrollToken = activeTurnStreamTail
-    ? `${activeTurnStreamRows.length}:${activeTurnStreamTail.key}:${activeTurnStreamTail.text}:${activeTurnStreamTail.status}`
-    : `${activeTurnStreamRows.length}:idle`;
+    ? `${visibleActiveTurnStreamRows.length}:${activeTurnStreamTail.key}:${activeTurnStreamTail.text}:${activeTurnStreamTail.status}`
+    : `${visibleActiveTurnStreamRows.length}:idle`;
   const handleAskReplyListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const element = event.currentTarget;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
@@ -30522,7 +30591,9 @@ export function HelixAskPill({
       askLiveDraftRef.current = "";
       askLiveDraftBufferRef.current = "";
       clearLiveDraftFlush();
-      askStartRef.current = Date.now();
+      const startedAtMs = Date.now();
+      askStartRef.current = startedAtMs;
+      activeAskStartedAtMsRef.current = startedAtMs;
       setAskElapsedMs(0);
       setAskActiveQuestion(questionText || null);
       if (questionText) {
@@ -30719,7 +30790,7 @@ export function HelixAskPill({
                 liveEvents: liveEventsSnapshot,
                 convergenceSnapshot,
               },
-              3,
+              HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
             ),
           );
           if (sessionId) {
@@ -30740,6 +30811,7 @@ export function HelixAskPill({
           askLiveDraftBufferRef.current = "";
           clearLiveDraftFlush();
           setAskActiveQuestion(null);
+          activeAskStartedAtMsRef.current = null;
         }
         if (askAbortRef.current === controller) {
           askAbortRef.current = null;
@@ -30935,7 +31007,7 @@ export function HelixAskPill({
                 process_graph_execution_authority: "none",
               } as unknown as HelixAskReply["debug"],
             },
-            3,
+            HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
           ),
         );
         return;
@@ -30977,7 +31049,7 @@ export function HelixAskPill({
                   question: trimmed,
                   mode: "observe",
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
             return;
@@ -31073,7 +31145,7 @@ export function HelixAskPill({
                   question: trimmed,
                   mode: "observe",
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
             if (routerSessionId) {
@@ -31160,7 +31232,7 @@ export function HelixAskPill({
                 question: trimmed,
                 mode: "observe",
               },
-              3,
+              HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
             ),
           );
           return;
@@ -31251,7 +31323,7 @@ export function HelixAskPill({
                   mode: "act",
                   liveEvents: [fastPathEvent],
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
             if (sessionId) {
@@ -31360,7 +31432,9 @@ export function HelixAskPill({
       askLiveDraftRef.current = "";
       askLiveDraftBufferRef.current = "";
       clearLiveDraftFlush();
-      askStartRef.current = Date.now();
+      const startedAtMs = Date.now();
+      askStartRef.current = startedAtMs;
+      activeAskStartedAtMsRef.current = startedAtMs;
       setAskElapsedMs(0);
       setAskActiveQuestion(trimmed);
       if (askInputRef.current) {
@@ -32298,7 +32372,7 @@ export function HelixAskPill({
                   liveEvents: liveEventsSnapshot,
                   convergenceSnapshot,
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
           }
@@ -32546,6 +32620,7 @@ export function HelixAskPill({
           askLiveDraftBufferRef.current = "";
           clearLiveDraftFlush();
           setAskActiveQuestion(null);
+          activeAskStartedAtMsRef.current = null;
         }
         if (askAbortRef.current === controller) {
           askAbortRef.current = null;
@@ -32955,7 +33030,7 @@ export function HelixAskPill({
                   question: singleEntry,
                   mode: "observe",
                 },
-                3,
+                HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
               ),
             );
             if (askInputRef.current) {
@@ -32994,7 +33069,7 @@ export function HelixAskPill({
             appendHelixAskReplyChronologically(
               prev,
               { id: replyId, createdAtMs: Date.now(), content: responseText, question: normalizedEntries[0] ?? entries[0] },
-              3,
+              HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
             ),
           );
           if (sessionId) {
@@ -34811,7 +34886,7 @@ export function HelixAskPill({
         <style>
           {`@keyframes helixAskTurnFadeIn{0%{opacity:0;transform:translate3d(0,8px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}@keyframes helixAskTurnLineFadeIn{0%{opacity:0;transform:translate3d(0,5px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}.helix-ask-turn-enter{animation:helixAskTurnFadeIn 220ms ease-out both}.helix-ask-turn-line-enter{animation:helixAskTurnLineFadeIn 180ms ease-out both}@media (prefers-reduced-motion:reduce){.helix-ask-turn-enter,.helix-ask-turn-line-enter{animation:none}}`}
         </style>
-        {askReplies.length > 0 || activeTurnStreamRows.length > 0 ? (
+        {askReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
           <div
             ref={askReplyListRef}
             className={replyListClassNameResolved}
@@ -35355,20 +35430,20 @@ export function HelixAskPill({
               </details>
             );
             })}
-            {activeTurnStreamRows.length > 0 ? (
+            {visibleActiveTurnStreamRows.length > 0 ? (
               <div
                 className="relative px-1 py-1 text-xs text-slate-100"
                 aria-label="Active turn stream"
                 data-testid="helix-ask-active-turn-stream"
-                data-turn-stream-lines={activeTurnStreamRows.length}
+                data-turn-stream-lines={visibleActiveTurnStreamRows.length}
               >
                 <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
-                  {activeTurnStreamRows.map((row, index) => {
+                  {visibleActiveTurnStreamRows.map((row, index) => {
                     const isQuestionRow = row.source === "question";
                     const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
                     const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
                     const visibleText = clipText(row.text, row.detailLimit ?? 360);
-                    const isLatestActiveRow = index === activeTurnStreamRows.length - 1;
+                    const isLatestActiveRow = index === visibleActiveTurnStreamRows.length - 1;
                     return (
                       <div
                         key={row.key}
