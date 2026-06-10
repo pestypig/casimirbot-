@@ -208,7 +208,7 @@ describe("TS strict proof-pack rendering", () => {
   });
 
   it("shows NHM2 closure stack rows with diagnostic claim-boundary copy", () => {
-    render(<WarpProofPanel />);
+    const { container } = render(<WarpProofPanel />);
 
     expect(screen.getByText("Closure Stack")).toBeDefined();
     expect(screen.getByText("Same-chart full tensor")).toBeDefined();
@@ -222,6 +222,7 @@ describe("TS strict proof-pack rendering", () => {
     expect(screen.getByText("Observer scope: Eulerian only.")).toBeDefined();
     expect(screen.getByText("Ideal Casimir scalar budget is not material-receipted.")).toBeDefined();
     expect(screen.getByText("Zero expansion is separate from curvature, stability, and safety diagnostics.")).toBeDefined();
+    expect(container.textContent).not.toMatch(/validated|viable|certified transport/i);
   });
 
   it("shows ts strict row in NeedleCavityBubblePanel", () => {

@@ -26,6 +26,8 @@ function summarizeAction(action: HelixWorkstationAction): string {
       return `open settings${action.tab ? ` (${action.tab})` : ""}`;
     case "set_chat_dock":
       return "set chat dock";
+    case "restore_view_state":
+      return "restore workstation view state";
     case "toggle_mobile_drawer":
       return "toggle mobile drawer";
     case "run_panel_action":
@@ -42,7 +44,11 @@ export function emitWorkstationActionLiveEvent(args: {
   traceId: string;
   action: HelixWorkstationAction;
   ok: boolean;
-  kind?: "workstation_action_receipt" | "workstation_procedural_step" | "situation_room_setup_execution_receipt";
+  kind?:
+    | "workstation_action_receipt"
+    | "workstation_procedural_step"
+    | "workstation_view_state_restore"
+    | "situation_room_setup_execution_receipt";
   message?: string;
   durationMs?: number;
   artifact?: Record<string, unknown> | null;

@@ -2,6 +2,96 @@ import { describe, expect, it } from "vitest";
 import { buildNhm2SolveState } from "@/lib/nhm2/solve-state";
 import type { GrConstraintContract, GrEvaluation, ProofPack } from "@shared/schema";
 
+const makeAuthorityInputs = () => {
+  const proofPack = {
+    values: {
+      hull_Lx_m: { value: 1007, proxy: false },
+      hull_Ly_m: { value: 264, proxy: false },
+      hull_Lz_m: { value: 173, proxy: false },
+      metric_adapter_family: { value: "natario_like_low_expansion", proxy: false },
+      metric_chart_contract_status: { value: "ok", proxy: false },
+    },
+  } as unknown as ProofPack;
+
+  const grConstraintContract = {
+    sources: { grDiagnostics: "gr-evolve-brick", certificate: "physics.warp.viability" },
+    diagnostics: { brickMeta: { status: "CERTIFIED", reasons: [] } },
+    certificate: {
+      status: "ADMISSIBLE",
+      admissibleStatus: "ADMISSIBLE",
+      hasCertificate: true,
+      certificateHash: "cert-hash",
+      certificateId: "cert-id",
+    },
+    guardrails: {
+      fordRoman: "ok",
+      thetaAudit: "ok",
+      tsRatio: "ok",
+      vdbBand: "ok",
+    },
+    constraints: [],
+    proxy: false,
+  } as unknown as GrConstraintContract;
+
+  const grEvaluation = {
+    pass: true,
+    constraints: [],
+    certificate: {
+      status: "ADMISSIBLE",
+      admissibleStatus: "ADMISSIBLE",
+      hasCertificate: true,
+      certificateHash: "cert-hash",
+      certificateId: "cert-id",
+      integrityOk: true,
+    },
+  } as unknown as GrEvaluation;
+
+  return {
+    proofPack,
+    grConstraintContract,
+    grEvaluation,
+    stageGate: { ok: true, stage: "reduced-order", pending: false } as any,
+  };
+};
+
+const passingClosurePipeline = () =>
+  ({
+    claim_tier: "diagnostic",
+    provenance_class: "simulation",
+    currentMode: "hover",
+    warpFieldType: "natario_sdf",
+    hull: { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+    nhm2SameChartFullTensor: {
+      completeness: { fullTensorComplete: true, missingComponentIds: [] },
+    },
+    nhm2WallSourceClosure: {
+      residual: { pass: true, relative: 0 },
+      blockers: [],
+    },
+    nhm2ObserverRobustEnergyConditions: {
+      contractVersion: "nhm2_observer_robust_energy_conditions/v1",
+      summary: {
+        robustCheckComplete: true,
+        eulerianOnly: false,
+        anyViolation: false,
+      },
+    },
+    nhm2QeiWorldlineDossier: {
+      summary: {
+        dossierComplete: true,
+        hasWallWorldline: true,
+        anyProxy: false,
+      },
+    },
+    casimirMaterialReceipt: { status: "material_receipted" },
+    nhm2NatarioInvariantAudit: {
+      expansion: { thetaFlatnessStatus: "pass" },
+      invariants: { status: "computed" },
+      stability: { convergenceStatus: "pass" },
+      blockers: [],
+    },
+  }) as any;
+
 describe("buildNhm2SolveState", () => {
   it("reports an authority-wired state when live inputs line up with NHM2 authority", () => {
     const proofPack = {
@@ -185,5 +275,76 @@ describe("buildNhm2SolveState", () => {
     expect(state.closureStack.sameChartFullTensor.missingComponentIds).toEqual(["T0x", "Txy"]);
     expect(state.closureStack.wallSourceClosure.pass).toBe(false);
     expect(state.closureStack.casimirMaterialReceipt.idealScalarOnly).toBe(true);
+  });
+
+  it("keeps missing closure artifacts guarded and partial instead of successful", () => {
+    const state = buildNhm2SolveState({
+      ...makeAuthorityInputs(),
+      pipeline: {
+        claim_tier: "diagnostic",
+        provenance_class: "simulation",
+        currentMode: "hover",
+        warpFieldType: "natario_sdf",
+        hull: { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+      } as any,
+    });
+
+    expect(state.overall.label).toBe("Guarded / partial");
+    expect(state.closureStack.sameChartFullTensor.available).toBe(false);
+    expect(state.closureStack.wallSourceClosure.available).toBe(false);
+    expect(state.closureStack.observerRobustEnergyConditions.available).toBe(false);
+    expect(state.closureStack.qeiWorldlineDossier.available).toBe(false);
+    expect(state.closureStack.casimirMaterialReceipt.available).toBe(false);
+    expect(state.closureStack.natarioInvariantAudit.available).toBe(false);
+    expect(state.overall.reasons).toEqual(
+      expect.arrayContaining([
+        "same-chart full tensor incomplete",
+        "wall source closure missing/failing",
+        "observer-robust energy-condition check incomplete",
+        "QEI worldline dossier incomplete",
+        "Casimir material receipt missing",
+        expect.stringMatching(/invariant audit incomplete/),
+      ]),
+    );
+  });
+
+  it("keeps wall closure failure blocking even when global residual-style context passes", () => {
+    const pipeline = passingClosurePipeline();
+    pipeline.nhm2SourceClosure = {
+      residual: { pass: true, relative: 0 },
+      residualRms: 0,
+      residualMax: 0,
+    };
+    pipeline.nhm2WallSourceClosure = {
+      residual: { pass: false, relative: 0.8 },
+      blockers: ["wall_T00_source_residual_exceeds_tolerance"],
+    };
+
+    const state = buildNhm2SolveState({
+      ...makeAuthorityInputs(),
+      pipeline,
+    });
+
+    expect(state.overall.label).toBe("Blocked / proxy");
+    expect(state.closureStack.wallSourceClosure.pass).toBe(false);
+    expect(state.closureStack.wallSourceClosure.relativeResidual).toBe(0.8);
+    expect(state.overall.reasons).toContain("wall source closure missing/failing");
+    expect(state.overall.reasons).not.toContain("same-chart full tensor incomplete");
+  });
+
+  it("does not let scalar qei_margin substitute for a QEI worldline dossier", () => {
+    const pipeline = passingClosurePipeline();
+    pipeline.qei_margin = 1;
+    delete pipeline.nhm2QeiWorldlineDossier;
+
+    const state = buildNhm2SolveState({
+      ...makeAuthorityInputs(),
+      pipeline,
+    });
+
+    expect(state.closureStack.qeiWorldlineDossier.available).toBe(false);
+    expect(state.closureStack.qeiWorldlineDossier.dossierComplete).toBeNull();
+    expect(state.overall.label).toBe("Guarded / partial");
+    expect(state.overall.reasons).toContain("QEI worldline dossier incomplete");
   });
 });

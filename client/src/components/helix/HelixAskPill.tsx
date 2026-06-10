@@ -6960,6 +6960,10 @@ function readHelixWorkstationActionRuntimeKeys(action: HelixWorkstationAction | 
     keys.add(`${panelId}/${actionId}`);
   }
   if (panelId && actionName === "open_panel") keys.add(`${panelId}.open`);
+  if (actionName === "restore_view_state") {
+    keys.add("workstation.restore_view_state");
+    keys.add("workstation/restore_view_state");
+  }
   if (panelId && actionName) keys.add(`${panelId}.${actionName}`);
   if (actionId) keys.add(actionId);
   if (actionName) keys.add(actionName);
@@ -13730,10 +13734,19 @@ function buildCompactToolTraceDisclosure(actionEnvelope: Record<string, unknown>
     ? actionEnvelope.workstation_actions
         .map((entry) => readAgentLoopAuditRecord(entry))
         .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-        .map((entry) => ({
-          panel_id: coerceText(entry.panel_id).trim() || null,
-          action_id: coerceText(entry.action_id).trim() || null,
-        }))
+        .map((entry) => {
+          const action = coerceText(entry.action).trim();
+          if (action === "restore_view_state") {
+            return {
+              panel_id: "workstation",
+              action_id: "restore_view_state",
+            };
+          }
+          return {
+            panel_id: coerceText(entry.panel_id).trim() || null,
+            action_id: coerceText(entry.action_id).trim() || null,
+          };
+        })
         .filter((entry) => Boolean(entry.panel_id && entry.action_id))
     : [];
   if (workstationActions.length === 0) return null;
