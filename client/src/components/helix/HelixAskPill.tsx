@@ -43,7 +43,7 @@ import {
   type ToolLogEvent,
 } from "@/lib/agi/api";
 import { buildHelixAskClientBypassAudit, buildWorkspaceActionClientAckSnapshot } from "@/lib/agi/workspaceActionAck";
-import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useAgiChatStore, type ChatMessage, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { HELIX_SETTINGS_OPEN_STATE_EVENT } from "@/hooks/useHelixSettingsDialog";
 import { classifyMoodFromWhisper } from "@/lib/luma-mood-spectrum";
@@ -6826,6 +6826,65 @@ function coerceText(value: unknown): string {
   }
 }
 
+function parseChatMessageTimeMs(message: ChatMessage): number | null {
+  const parsed = Date.parse(message.at);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function buildHelixAskChatProjectionId(
+  session: ChatSession,
+  userMessage: ChatMessage | null,
+  assistantMessage: ChatMessage,
+): string {
+  const traceId = assistantMessage.traceId?.trim() || userMessage?.traceId?.trim();
+  if (traceId) return `helix-chat-turn:${session.id}:${traceId}`;
+  return `helix-chat-turn:${session.id}:${userMessage?.id ?? "standalone"}:${assistantMessage.id}`;
+}
+
+export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
+  const messages = [...(session.messages ?? [])].sort((left, right) => {
+    const leftMs = parseChatMessageTimeMs(left);
+    const rightMs = parseChatMessageTimeMs(right);
+    if (leftMs !== null && rightMs !== null && leftMs !== rightMs) return leftMs - rightMs;
+    if (leftMs !== null && rightMs === null) return -1;
+    if (leftMs === null && rightMs !== null) return 1;
+    return left.id.localeCompare(right.id);
+  });
+  const replies: HelixAskReply[] = [];
+  let pendingUser: ChatMessage | null = null;
+  for (const message of messages) {
+    if (message.role === "user") {
+      pendingUser = message;
+      continue;
+    }
+    if (message.role !== "assistant") continue;
+    const answer = message.content.trim();
+    if (!answer) continue;
+    const createdAtMs = parseChatMessageTimeMs(message) ?? parseChatMessageTimeMs(pendingUser ?? message) ?? Date.now();
+    const turnId = message.traceId?.trim() || pendingUser?.traceId?.trim() || null;
+    replies.push({
+      id: buildHelixAskChatProjectionId(session, pendingUser, message),
+      createdAtMs,
+      content: answer,
+      question: pendingUser?.content ?? "",
+      turn_id: turnId,
+      ok: true,
+      final_answer_source: "durable_chat_session",
+      terminal_artifact_kind: "chat_final_answer",
+      debug: {
+        durable_chat_projection: true,
+        session_id: session.id,
+        user_message_id: pendingUser?.id ?? null,
+        assistant_message_id: message.id,
+        created_at_ms: createdAtMs,
+        turn_id: turnId,
+      } as HelixAskReply["debug"],
+    });
+    pendingUser = null;
+  }
+  return replies;
+}
+
 function readAgentLoopAuditRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
@@ -8656,96 +8715,22 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
   return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
 }
 
-function groupStagePlayMailTranscriptEntries(
-  entries: StagePlayLiveSourceMailTranscriptEntryV1[],
-): StagePlayLiveSourceMailTranscriptEntryV1[][] {
-  const groups = new Map<string, StagePlayLiveSourceMailTranscriptEntryV1[]>();
-  for (const entry of entries) {
-    const groupId = entry.wakeResultId ?? entry.askTurnId ?? entry.wakeRequestId ?? entry.entryId;
-    groups.set(groupId, [...(groups.get(groupId) ?? []), entry]);
-  }
-  return Array.from(groups.values())
-    .map((group: StagePlayLiveSourceMailTranscriptEntryV1[]) =>
-      [...group].sort((left: StagePlayLiveSourceMailTranscriptEntryV1, right: StagePlayLiveSourceMailTranscriptEntryV1) =>
-        left.createdAt.localeCompare(right.createdAt) ||
-        left.sequence - right.sequence ||
-        left.entryId.localeCompare(right.entryId)
-      )
-    )
-    .sort((left: StagePlayLiveSourceMailTranscriptEntryV1[], right: StagePlayLiveSourceMailTranscriptEntryV1[]) => {
-      const leftAt = left[0]?.createdAt ?? "";
-      const rightAt = right[0]?.createdAt ?? "";
-      return leftAt.localeCompare(rightAt);
-    });
-}
-
 export function isDurableHelixAskMailTranscriptGroup(
   entries: StagePlayLiveSourceMailTranscriptEntryV1[],
 ): boolean {
   if (!entries.length) return false;
   return entries.some((entry) => {
     const row = entry.row;
-    if (row.terminalEligible === true) return true;
     switch (row.rowKind) {
-      case "checkpoint_summary":
       case "final_answer":
       case "terminal_answer":
       case "typed_failure":
-      case "wait_for_next_summary":
-      case "voice_receipt":
-      case "voice_blocked":
-      case "steering_ack_receipt":
+      case "text_answer":
         return true;
       default:
         return false;
     }
   });
-}
-
-function buildHelixAskReplyFromMailTranscriptEntries(
-  entries: StagePlayLiveSourceMailTranscriptEntryV1[],
-): HelixAskReply | null {
-  const first = entries[0] ?? null;
-  if (!first) return null;
-  const groupId = first.wakeResultId ?? first.askTurnId ?? first.wakeRequestId ?? first.entryId;
-  const parsedEntryTimes = entries
-    .map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => Date.parse(entry.createdAt))
-    .filter((value: number) => Number.isFinite(value));
-  const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now();
-  const transcriptRows = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row);
-  const transcriptEntryIds = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId);
-  const mailIds = uniqueTextValues(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.mailIds));
-  const evidenceRefs = uniqueTextValues(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
-    entry.entryId,
-    ...entry.evidenceRefs,
-  ]));
-  const currentTurnArtifactLedger = entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => ({
-    kind: "stage_play_live_source_mail_transcript_entry",
-    ref: entry.entryId,
-    payload: entry,
-  }));
-  const debugPayload = {
-    createdAtMs,
-    live_source_mail_wake_transcript: true,
-    live_source_mail_wake_transcript_durable: true,
-    stage_play_live_source_mail_transcript_entries: entries,
-    stage_play_live_source_mail_transcript_entry_ids: transcriptEntryIds,
-    stage_play_live_source_mail_transcript_rows: transcriptRows,
-    transcriptRows,
-    current_turn_artifact_ledger: currentTurnArtifactLedger,
-  };
-  return {
-    id: `live-source-mail-transcript:${groupId}`,
-    content: "",
-    createdAtMs,
-    turn_id: first.askTurnId ?? groupId,
-    ok: true,
-    final_answer_source: "live_source_mail_wake",
-    terminal_artifact_kind: "tool_receipt",
-    question: "",
-    debug: debugPayload as HelixAskReply["debug"],
-    sources: evidenceRefs,
-  };
 }
 
 function toneForHelixTranscriptRow(row: HelixTurnTranscriptRow): HelixContinuousTurnStreamTone {
@@ -17379,6 +17364,7 @@ export function HelixAskPill({
     return raw;
   }, [userSettings.preferredResponseLanguage]);
   const { ensureContextSession, addMessage, setActive } = useAgiChatStore();
+  const helixChatSessions = useAgiChatStore((state) => state.sessions);
   const helixAskSessionRef = useRef<string | null>(null);
   const helixAskSessionContextRef = useRef<string | null>(null);
   const askInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -17398,7 +17384,6 @@ export function HelixAskPill({
   );
   const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null;
   const latestAskReplyId = latestAskReply?.id ?? null;
-  const liveSourceMailWakeReplyIdsRef = useRef<Set<string>>(new Set());
   const [liveSourceMailTranscriptRefreshSeq, setLiveSourceMailTranscriptRefreshSeq] = useState(0);
   const [liveSourceMailStateRefreshSeq, setLiveSourceMailStateRefreshSeq] = useState(0);
   const [liveSourceMailState, setLiveSourceMailState] = useState<StagePlayLiveSourceMailStateResponse | null>(null);
@@ -17510,23 +17495,9 @@ export function HelixAskPill({
           limit: 80,
         });
         if (cancelled || response.ok === false) return;
-        const entries = Array.isArray(response.entries) ? response.entries : [];
-        const durableReplies = groupStagePlayMailTranscriptEntries(entries)
-          .filter(isDurableHelixAskMailTranscriptGroup)
-          .map(buildHelixAskReplyFromMailTranscriptEntries)
-          .filter((reply): reply is HelixAskReply => Boolean(reply));
-        if (durableReplies.length === 0) return;
-        setAskReplies((prev) => {
-          const durableById = new Map(durableReplies.map((reply) => [reply.id, reply]));
-          const merged = prev.map((reply) => durableById.get(reply.id) ?? reply);
-          const existingIds = new Set(merged.map((reply) => reply.id));
-          const nextDurableReplies = durableReplies.filter((reply) => !existingIds.has(reply.id));
-          for (const reply of durableReplies) {
-            liveSourceMailWakeReplyIdsRef.current.add(reply.id);
-          }
-          if (nextDurableReplies.length === 0 && merged.every((reply, index) => reply === prev[index])) return prev;
-          return limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT);
-        });
+        // The mailbox transcript is operational history. It refreshes queue and
+        // status panels, but only completed Ask chat messages hydrate the main
+        // Helix console transcript.
       } catch (error) {
         console.warn("[HelixAskPill] live-source mail transcript refresh failed", error);
       }
@@ -18159,6 +18130,31 @@ export function HelixAskPill({
     helixAskSessionContextRef.current = normalizedContextId || null;
     return helixAskSessionRef.current;
   }, [contextId, ensureContextSession]);
+
+  useEffect(() => {
+    const sessionId = getHelixAskSessionId();
+    if (!sessionId) return;
+    const session = helixChatSessions[sessionId];
+    if (!session) return;
+    const durableReplies = buildHelixAskRepliesFromChatSession(session);
+    setAskReplies((prev) => {
+      const nonDurableReplies = prev.filter((reply) => {
+        const debug = readAgentLoopAuditRecord(reply.debug);
+        return debug?.durable_chat_projection !== true && debug?.live_source_mail_wake_transcript !== true;
+      });
+      const next = limitHelixAskRepliesChronologically(
+        [...durableReplies, ...nonDurableReplies],
+        HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
+      );
+      if (
+        next.length === prev.length &&
+        next.every((reply, index) => reply === prev[index])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [getHelixAskSessionId, helixChatSessions]);
 
   const upsertContextCapsuleSessionLedger = useCallback(
     (summary: ContextCapsuleSummary, pin = false) => {
@@ -25638,7 +25634,7 @@ export function HelixAskPill({
               }),
             );
             if (sessionId) {
-              addMessage(sessionId, { role: "assistant", content: outputText });
+              addMessage(sessionId, { role: "assistant", content: outputText, traceId: attempt.traceId });
             }
             if (attempt.explorationTopicKey) {
               const existing = explorationRuntimeByTopicRef.current[attempt.explorationTopicKey];
@@ -31547,7 +31543,7 @@ export function HelixAskPill({
       if (sessionId) {
         setActive(sessionId);
         if (!userMessageCommitted) {
-          addMessage(sessionId, { role: "user", content: trimmed });
+          addMessage(sessionId, { role: "user", content: trimmed, traceId });
         }
       }
 
@@ -32424,7 +32420,7 @@ export function HelixAskPill({
             });
           }
           if (sessionId) {
-            addMessage(sessionId, { role: "assistant", content: responseText });
+            addMessage(sessionId, { role: "assistant", content: responseText, traceId });
           }
           if (manualAttempt) {
             const detailMode =

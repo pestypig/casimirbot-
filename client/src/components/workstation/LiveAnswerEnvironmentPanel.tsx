@@ -1140,8 +1140,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       ts: new Date().toISOString(),
     }).catch(() => null);
     setLastActionStatus(track && track.readyState !== "ended"
-      ? "Paused visual interval capture; browser stream is still available for resume."
+      ? "Paused visual interval capture; browser stream is still shared for resume. Use Stop sharing to end the Chrome capture."
       : "Paused visual interval capture; stream is no longer available.");
+    await refresh();
+  };
+
+  const stopVisualSharing = async () => {
+    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+    if (!sourceId) {
+      setLastActionStatus("No visual source is registered.");
+      return;
+    }
+    stopVisualFrameProducerInterval(sourceId, { stopStream: true });
+    await postJson("/api/agi/situation/live-source/producer/heartbeat", {
+      source_id: sourceId,
+      thread_id: threadId,
+      environment_id: environment?.environment_id ?? null,
+      client_stream_confirmed: false,
+      status: "stopped",
+      ts: new Date().toISOString(),
+    }).catch(() => null);
+    await setSourceStatus(sourceId, "stop").catch(() => null);
+    setLastActionStatus("Stopped visual sharing and interval capture. Restart visual capture to resume frames.");
     await refresh();
   };
 
@@ -1534,7 +1554,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             disabled={!visualProducerState?.interval_active}
             className="rounded border border-amber-300/30 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Pause interval
+            Pause interval, keep sharing
+          </button>
+          <button
+            type="button"
+            onClick={() => void stopVisualSharing()}
+            disabled={!visualProducerState?.stream_active}
+            className="rounded border border-rose-300/30 px-2 py-1 text-[11px] text-rose-100 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Stop sharing
           </button>
           <button
             type="button"
@@ -1615,7 +1643,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ) : null}
         {visualProducerState?.capture_mode === "interval" ? (
           <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
-            Interval {visualProducerState.interval_active ? "active" : "configured"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; scheduler {visualProducerState.scheduler_adoption_status ?? "not adopted"}; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
+            Interval {visualProducerState.interval_active ? "active" : "paused"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; stream {visualProducerState.stream_active ? "shared" : "stopped"}; track {visualProducerState.track_ready_state}; scheduler {visualProducerState.scheduler_adoption_status ?? "not adopted"}; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
           </p>
         ) : null}
         {(clientActions.length > 0 || clientAdoptions.length > 0) ? (

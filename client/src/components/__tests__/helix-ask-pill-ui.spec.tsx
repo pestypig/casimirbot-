@@ -94,6 +94,7 @@ let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixA
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
 let sortHelixAskRepliesChronologically: typeof import("@/components/helix/HelixAskPill").sortHelixAskRepliesChronologically;
 let appendHelixAskReplyChronologically: typeof import("@/components/helix/HelixAskPill").appendHelixAskReplyChronologically;
+let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
 let shouldRenderHelixAskActiveTurnStream: typeof import("@/components/helix/HelixAskPill").shouldRenderHelixAskActiveTurnStream;
 let filterHelixAskActiveTurnStreamRows: typeof import("@/components/helix/HelixAskPill").filterHelixAskActiveTurnStreamRows;
 let isDurableHelixAskMailTranscriptGroup: typeof import("@/components/helix/HelixAskPill").isDurableHelixAskMailTranscriptGroup;
@@ -195,6 +196,7 @@ beforeAll(async () => {
     readReasoningTheaterHardFailureSignals,
     sortHelixAskRepliesChronologically,
     appendHelixAskReplyChronologically,
+    buildHelixAskRepliesFromChatSession,
     shouldRenderHelixAskActiveTurnStream,
     filterHelixAskActiveTurnStreamRows,
     isDurableHelixAskMailTranscriptGroup,
@@ -340,7 +342,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(filterHelixAskActiveTurnStreamRows(terminalRows)).toEqual([]);
   });
 
-  it("does not hydrate incomplete mail wake transcript groups as saved console turns", () => {
+  it("only treats terminal answer mail transcript groups as saved console turn candidates", () => {
     const buildEntry = (rowKind: string, overrides: Record<string, any> = {}) => {
       const { row: rowOverrides, ...entryOverrides } = overrides;
       return ({
@@ -390,11 +392,11 @@ describe("HelixAskPill mic-first surface contract", () => {
       buildEntry("mail_read_receipt"),
       buildEntry("decision_recorded"),
       buildEntry("checkpoint_summary"),
-    ])).toBe(true);
+    ])).toBe(false);
     expect(isDurableHelixAskMailTranscriptGroup([
       buildEntry("voice_tool_call"),
       buildEntry("voice_receipt"),
-    ])).toBe(true);
+    ])).toBe(false);
     expect(isDurableHelixAskMailTranscriptGroup([
       buildEntry("text_answer", { row: { terminalEligible: true } }),
     ])).toBe(true);
@@ -404,6 +406,60 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(isDurableHelixAskMailTranscriptGroup([
       buildEntry("final_answer", { row: { body: "Completed mailbox answer." } }),
     ])).toBe(true);
+  });
+
+  it("hydrates console turns from durable chat messages in chronological order", () => {
+    const session = {
+      id: "session:helix",
+      title: "Helix Ask",
+      createdAt: "2026-06-10T15:00:00.000Z",
+      updatedAt: "2026-06-10T15:04:00.000Z",
+      personaId: "default",
+      contextId: "helix-ask:desktop",
+      messages: [
+        {
+          id: "user-2",
+          role: "user",
+          content: "second prompt",
+          at: "2026-06-10T15:02:00.000Z",
+          traceId: "ask:second",
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "first answer",
+          at: "2026-06-10T15:01:00.000Z",
+          traceId: "ask:first",
+        },
+        {
+          id: "user-1",
+          role: "user",
+          content: "first prompt",
+          at: "2026-06-10T15:00:00.000Z",
+          traceId: "ask:first",
+        },
+        {
+          id: "tool-1",
+          role: "tool",
+          content: "voice receipt",
+          at: "2026-06-10T15:02:30.000Z",
+        },
+        {
+          id: "assistant-2",
+          role: "assistant",
+          content: "second answer",
+          at: "2026-06-10T15:03:00.000Z",
+          traceId: "ask:second",
+        },
+      ],
+    } as any;
+
+    const replies = buildHelixAskRepliesFromChatSession(session);
+
+    expect(replies.map((reply: any) => reply.question)).toEqual(["first prompt", "second prompt"]);
+    expect(replies.map((reply: any) => reply.content)).toEqual(["first answer", "second answer"]);
+    expect(replies.map((reply: any) => reply.turn_id)).toEqual(["ask:first", "ask:second"]);
+    expect(replies.every((reply: any) => reply.debug?.durable_chat_projection === true)).toBe(true);
   });
 
   it("keeps voice turns ordered behind unified Ask by default", () => {
@@ -1164,7 +1220,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('row.rowKind.startsWith("voice_steering_")');
   });
 
-  it("persists wake mail transcript rows through backend fetch and chronological reply merge", () => {
+  it("keeps wake mail transcript rows out of the durable chat projection", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("fetchStagePlayLiveSourceMailTranscript");
     expect(source).toContain("/api/helix/stage-play/live-source-mail/transcript?");
@@ -1172,16 +1228,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("shouldAutoWakeHelixMailboxQueueItem");
     expect(source).toContain("helix_ask_steering_queue_auto_wake");
     expect(source).toContain("mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID");
-    expect(source).toContain("groupStagePlayMailTranscriptEntries(entries)");
-    expect(source).toContain("buildHelixAskReplyFromMailTranscriptEntries");
-    expect(source).toContain("live_source_mail_wake_transcript_durable: true");
-    expect(source).toContain("stage_play_live_source_mail_transcript_entries: entries");
-    expect(source).toContain("stage_play_live_source_mail_transcript_entry_ids: transcriptEntryIds");
-    expect(source).toContain("current_turn_artifact_ledger: currentTurnArtifactLedger");
-    expect(source).toContain("setAskReplies((prev) =>");
-    expect(source).toContain('question: ""');
-    expect(source).toContain("durableById.get(reply.id) ?? reply");
-    expect(source).toContain("limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT)");
+    expect(source).toContain("buildHelixAskRepliesFromChatSession");
+    expect(source).toContain("durable_chat_projection");
+    expect(source).toContain("The mailbox transcript is operational history.");
+    expect(source).not.toContain("groupStagePlayMailTranscriptEntries(entries)");
+    expect(source).not.toContain("buildHelixAskReplyFromMailTranscriptEntries");
+    expect(source).not.toContain("live_source_mail_wake_transcript_durable: true");
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("appendHelixAskReplyChronologically");
     expect(source).toContain("chronologicalAskRepliesForState");
@@ -1189,12 +1241,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain("const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId");
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");
-    expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
-    expect(source).toContain("left.sequence - right.sequence");
+    expect(source).toContain("parseChatMessageTimeMs");
+    expect(source).toContain("buildHelixAskChatProjectionId");
     expect(source).toContain(".sort((left, right) => {");
     expect(source).toContain("return left.orderMs - right.orderMs;");
     expect(source).toContain("reply.createdAtMs");
-    expect(source).toContain("const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now()");
+    expect(source).toContain('final_answer_source: "durable_chat_session"');
   });
 
   it("marks poisoned or contract-invalid terminal answers as hard theater failures", () => {

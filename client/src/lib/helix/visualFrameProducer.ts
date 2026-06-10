@@ -240,6 +240,7 @@ export function stopVisualFrameProducerInterval(sourceId: string, options: { sto
   activeIntervals.delete(sourceId);
   activeCaptureLocks.delete(sourceId);
   const stream = activeStreams.get(sourceId);
+  const track = stream?.getVideoTracks()[0] ?? stream?.getTracks()[0] ?? null;
   if (stream && options.stopStream !== false) {
     stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
   }
@@ -247,6 +248,9 @@ export function stopVisualFrameProducerInterval(sourceId: string, options: { sto
   useVisualSourceCaptureStore.getState().patchProducer(sourceId, {
     interval_active: false,
     stream_active: options.stopStream === false,
+    track_ready_state: options.stopStream === false && track?.readyState !== "ended" ? "live" : "ended",
+    scheduler_adoption_status: options.stopStream === false ? "paused" : "stopped",
+    last_heartbeat_at: new Date().toISOString(),
   });
 }
 

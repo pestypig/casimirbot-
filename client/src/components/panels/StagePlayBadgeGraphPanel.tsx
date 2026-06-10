@@ -54,6 +54,7 @@ import {
   startVisualFrameProducerInterval,
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
+import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT,
@@ -3069,11 +3070,32 @@ function StagePlayMailLoopLiveOverview({
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) =>
+    visualSource?.sourceId ? state.producers[visualSource.sourceId] ?? null : null
+  );
   const latestPolicy = (mailbox?.watchJobPolicies ?? []).at(-1) ?? null;
   const cadenceMs =
+    visualProducerState?.cadence_ms ??
     visualSource?.cadenceMs ??
     latestPolicy?.nextWakePolicy?.afterMs ??
     STAGE_PLAY_SOURCE_SETUP_DEFAULTS.visualCadenceMs;
+  const captureStateLabel = visualProducerState
+    ? visualProducerState.stream_active
+      ? visualProducerState.interval_active
+        ? "capturing"
+        : "paused, stream shared"
+      : "stopped"
+    : visualSource?.status
+      ? labelize(visualSource.status)
+      : "unknown";
+  const captureStateTone =
+    visualProducerState?.stream_active && visualProducerState.interval_active
+      ? "good"
+      : visualProducerState?.stream_active
+        ? "warn"
+        : visualProducerState
+          ? "blocked"
+          : "default";
   const latestSummary = formatStagePlayLiveSummaryForOverview(latestMail);
   const latestDeckVerdict = formatStagePlayDeckVerdictForOverview(latestPacket);
   const packetAgeMs = ageMsFromIso(latestPacket?.createdAt);
@@ -3247,9 +3269,18 @@ function StagePlayMailLoopLiveOverview({
           ) : null}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StagePlayMetricPill label="source" value={captureStateLabel} tone={captureStateTone} />
           <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
-          <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
-          <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
+          <StagePlayMetricPill
+            label={visualProducerState?.interval_active === false ? "last mail" : "mail age"}
+            value={formatStagePlayMs(mailAgeMs)}
+            tone={visualProducerState?.interval_active === false ? "default" : mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"}
+          />
+          <StagePlayMetricPill
+            label={visualProducerState?.interval_active === false ? "last packet" : "packet age"}
+            value={formatStagePlayMs(packetAgeMs)}
+            tone={visualProducerState?.interval_active === false ? "default" : packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"}
+          />
           <StagePlayMetricPill
             label="wake"
             value={labelize(wakeLifecycleStage ?? wakeStatus)}
@@ -3262,7 +3293,9 @@ function StagePlayMailLoopLiveOverview({
         <div className="rounded-md border border-slate-800 bg-black/20 p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Minecraft shade summary</div>
-            <div className="font-mono text-[10px] text-slate-500">{latestMail?.mailId ?? "mail pending"}</div>
+            <div className="font-mono text-[10px] text-slate-500">
+              {latestMail?.mailId ?? "mail pending"} · {captureStateLabel}
+            </div>
           </div>
           <div
             className="mt-2 min-h-[96px] rounded border border-slate-800 bg-slate-950 p-3 text-sm leading-relaxed text-slate-100"
