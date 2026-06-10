@@ -79,6 +79,8 @@ const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
   compactObservationWindowMs: 10_000,
   rawRetention: "session_ttl",
 } as const;
+const STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY = "stage-play:mail-wake-ui-bridge:v1";
+const STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS = 30_000;
 
 const STAGE_PLAY_VISUAL_CADENCE_OPTIONS = [5_000, 10_000, 15_000, 30_000] as const;
 
@@ -696,6 +698,102 @@ function stagePlaySteeringRowLabel(rowKind: AskTurnTranscriptRowDraftV1["rowKind
 function compactStagePlayText(value: string | null | undefined, fallback: string, max = 160): string {
   const text = String(value ?? "").replace(/\s+/g, " ").trim() || fallback;
   return text.length > max ? `${text.slice(0, Math.max(0, max - 1)).trimEnd()}...` : text;
+}
+
+function readStagePlayRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function readStagePlayString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readStagePlayScalar(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  return null;
+}
+
+function readStagePlayList(value: unknown, max = 4): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => readStagePlayScalar(item))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, max);
+}
+
+function parseStagePlayVisualSummaryJson(value: string): Record<string, unknown> | null {
+  const text = value.trim();
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const jsonText = fenced?.[1]?.trim() ?? text;
+  if (!jsonText.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(jsonText);
+    return readStagePlayRecord(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function formatStagePlayLiveSummaryForOverview(
+  mail: StagePlayLiveSourceMailItemV1 | null | undefined,
+): string {
+  const preview = mail?.summary.preview?.trim();
+  if (preview) return compactStagePlayText(preview, "Waiting for visual summary mail.", 720);
+  const rawSummary = mail?.summary.text || "";
+  const parsed = parseStagePlayVisualSummaryJson(rawSummary);
+  const segments: string[] = [];
+  if (parsed) {
+    const hud = readStagePlayRecord(parsed.hud);
+    const hotbar = readStagePlayRecord(parsed.hotbar);
+    const scene = readStagePlayScalar(parsed.scene);
+    const action = readStagePlayScalar(parsed.current_action);
+    const selected = readStagePlayScalar(parsed.selected_item);
+    const health = readStagePlayScalar(hud.health);
+    const damage = readStagePlayScalar(hud.damage_cues);
+    const lowHealth = readStagePlayScalar(hud.low_health_cues);
+    const selectedSlot = readStagePlayScalar(hotbar.selected_slot);
+    const entities = readStagePlayList(parsed.visible_entities);
+    const risks = readStagePlayList(parsed.risk_cues);
+    const opportunities = readStagePlayList(parsed.opportunity_cues);
+    const changed = readStagePlayList(parsed.changed_since_last_frame);
+    const prediction = readStagePlayString(parsed.next_10s_prediction);
+
+    if (scene) segments.push(`Scene: ${scene}.`);
+    if (action) segments.push(`Action: ${action}.`);
+    if (selected || selectedSlot) segments.push(`Held state: ${selected ?? "selected item unknown"}${selectedSlot ? ` in slot ${selectedSlot}` : ""}.`);
+    if (health || damage || lowHealth) {
+      segments.push(`Player state: ${[
+        health ? `health ${health}` : null,
+        damage && damage !== "none visible" ? `damage ${damage}` : null,
+        lowHealth && lowHealth !== "none visible" ? `low health ${lowHealth}` : null,
+      ].filter(Boolean).join(", ") || "no visible damage cues"}.`);
+    }
+    segments.push(`Visible entities: ${entities.length ? entities.join(", ") : "none reported"}.`);
+    segments.push(`Risk cues: ${risks.length ? risks.join(", ") : "none reported"}.`);
+    if (opportunities.length) segments.push(`Opportunity cues: ${opportunities.join(", ")}.`);
+    if (changed.length) segments.push(`Changed: ${changed.join(", ")}.`);
+    if (prediction) segments.push(`Next 10s: ${prediction}.`);
+  } else if (rawSummary) {
+    segments.push(compactStagePlayText(rawSummary, "Waiting for visual summary mail.", 420));
+  }
+
+  return compactStagePlayText(segments.join(" "), "Waiting for visual summary mail.", 720);
+}
+
+function formatStagePlayDeckVerdictForOverview(
+  packet: StagePlayProcessedMailPacketV1 | null,
+): string {
+  const segments: string[] = [];
+  const effort = packet?.effortEstimate?.currentEffort;
+  const arbiter = packet?.arbiter;
+  if (effort || packet?.recommendedNext) {
+    segments.push(`Deck verdict: ${effort ? labelize(effort) : "effort unknown"}; ${labelize(arbiter?.recommendedNext ?? packet?.recommendedNext ?? "wait_for_next_summary")}.`);
+  }
+  if (arbiter?.reason) segments.push(`Reason: ${arbiter.reason}.`);
+
+  return compactStagePlayText(segments.join(" "), "Micro-reasoner deck has not produced a wake verdict yet.", 420);
 }
 
 function statusTone(status: string): string {
@@ -2766,10 +2864,21 @@ function StagePlayMailLoopLiveOverview({
     visualSource?.cadenceMs ??
     latestPolicy?.nextWakePolicy?.afterMs ??
     STAGE_PLAY_SOURCE_SETUP_DEFAULTS.visualCadenceMs;
-  const latestSummary = latestMail?.summary.text || latestMail?.summary.preview || "Waiting for visual summary mail.";
+  const latestSummary = formatStagePlayLiveSummaryForOverview(latestMail);
+  const latestDeckVerdict = formatStagePlayDeckVerdictForOverview(latestPacket);
   const packetAgeMs = ageMsFromIso(latestPacket?.createdAt);
   const mailAgeMs = ageMsFromIso(latestMail?.createdAt);
   const wakeStatus = latestWakeResult?.status ?? latestWake?.status ?? "none";
+  const wakeBridgeEligible = shouldBridgeStagePlayWakeToAsk({
+    wake: latestWake,
+    wakeResult: latestWakeResult,
+    packet: latestPacket,
+  });
+  const wakeBridgeReason = wakeStatus === "deferred_for_pressure"
+    ? "backend wake admission deferred for pressure, opening visible Helix Ask wake"
+    : wakeStatus === "failed_retryable"
+      ? "backend wake attempt failed retryably, opening visible Helix Ask wake"
+      : "micro-reasoner wake candidate ready for Helix Ask";
   const packetChars = latestPacket ? jsonCharCount(latestPacket) : 0;
   const runChars = jsonCharCount(latestPacketRuns.length > 0 ? latestPacketRuns : runs);
   const compactPacketChars = latestPacket ? jsonCharCount({
@@ -2804,6 +2913,47 @@ function StagePlayMailLoopLiveOverview({
     };
   });
 
+  useEffect(() => {
+    if (!wakeBridgeEligible || !latestWake) return;
+    const memory = readStagePlayWakeBridgeMemory();
+    if (memory.launchedWakeIds.includes(latestWake.wakeRequestId)) return;
+    if (Date.now() - memory.lastLaunchedAt < STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS) return;
+    launchStagePlayWakeInHelixAsk({
+      wake: latestWake,
+      mailItems,
+      processedPacket: latestPacket,
+      wakeResult: latestWakeResult,
+      bridgeReason: wakeBridgeReason,
+    });
+    writeStagePlayWakeBridgeMemory({
+      launchedWakeIds: [...memory.launchedWakeIds, latestWake.wakeRequestId],
+      lastLaunchedAt: Date.now(),
+    });
+  }, [
+    latestPacket?.packetId,
+    latestWake?.wakeRequestId,
+    latestWakeResult?.wakeResultId,
+    mailItems,
+    wakeBridgeEligible,
+    wakeBridgeReason,
+  ]);
+
+  const handleOpenWakeInAsk = () => {
+    if (!latestWake) return;
+    launchStagePlayWakeInHelixAsk({
+      wake: latestWake,
+      mailItems,
+      processedPacket: latestPacket,
+      wakeResult: latestWakeResult,
+      bridgeReason: "operator opened queued wake from Stage Play mail-loop UI",
+    });
+    const memory = readStagePlayWakeBridgeMemory();
+    writeStagePlayWakeBridgeMemory({
+      launchedWakeIds: [...memory.launchedWakeIds, latestWake.wakeRequestId],
+      lastLaunchedAt: Date.now(),
+    });
+  };
+
   return (
     <section
       className="mb-5 space-y-4 rounded-md border border-slate-800 bg-slate-950/80 p-4"
@@ -2818,6 +2968,27 @@ function StagePlayMailLoopLiveOverview({
           <div className="mt-1 text-xs text-slate-400">
             {latestPacket?.arbiter?.reason ?? "Micro-reasoner deck has not produced a wake verdict yet."}
           </div>
+          {latestWake ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenWakeInAsk}
+                disabled={!wakeBridgeEligible}
+                className={`rounded border px-3 py-1.5 text-[10px] font-semibold ${
+                  wakeBridgeEligible
+                    ? "border-cyan-600 bg-cyan-950/35 text-cyan-100 hover:border-cyan-300"
+                    : "border-slate-800 bg-slate-950 text-slate-500"
+                }`}
+                data-testid="stage-play-open-wake-in-ask"
+                title={wakeBridgeEligible ? "Open and auto-submit this constrained mailbox wake in Helix Ask." : "No eligible unresolved wake candidate is ready."}
+              >
+                Open queued wake in Helix Ask
+              </button>
+              <span className="font-mono text-[10px] text-slate-500">
+                {latestWake.wakeRequestId}
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
@@ -2830,7 +3001,7 @@ function StagePlayMailLoopLiveOverview({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <div className="rounded-md border border-slate-800 bg-black/20 p-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Changing summary</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Minecraft shade summary</div>
             <div className="font-mono text-[10px] text-slate-500">{latestMail?.mailId ?? "mail pending"}</div>
           </div>
           <div
@@ -2838,6 +3009,10 @@ function StagePlayMailLoopLiveOverview({
             data-testid="stage-play-live-summary-textbox"
           >
             {compactStagePlayText(latestSummary, "Waiting for visual summary mail.", 720)}
+          </div>
+          <div className="mt-2 rounded border border-cyan-900/50 bg-cyan-950/15 p-2 text-xs leading-relaxed text-cyan-100">
+            <div className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-cyan-300/80">Processed deck verdict</div>
+            {latestDeckVerdict}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -3372,22 +3547,105 @@ function buildStagePlayCheckpointAskQuestion(input: {
 function buildStagePlayMailWakeAskQuestion(input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   mailItems?: StagePlayLiveSourceMailItemV1[];
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+  wakeResult?: StagePlayLiveSourceMailWakeResultV1 | null;
+  bridgeReason?: string | null;
 }): string {
   const mailPreviews = (input.mailItems ?? [])
     .filter((item) => input.wake.mailIds.includes(item.mailId))
     .map((item) => `${item.mailId}: ${item.summary.preview}`)
     .slice(0, 3);
+  const packet = input.processedPacket ?? null;
   return [
     "Use live_env.read_live_source_mail for the active Stage Play live-source mailbox.",
     "Read the latest unread source update, then record a model-reviewed decision with live_env.record_live_source_mail_decision.",
+    "This is a constrained mailbox wake turn, not a generic workspace/docs turn.",
     "If there is no user-facing change, record wait_for_next_summary.",
     "If there is a meaningful user-facing change, draft a concise text answer.",
     "If voice is allowed and the update is urgent, request a voice callout.",
     `Wake request: ${input.wake.wakeRequestId}.`,
+    input.bridgeReason ? `UI bridge reason: ${input.bridgeReason}.` : "",
+    input.wakeResult?.wakeResultId ? `Wake result: ${input.wakeResult.wakeResultId}.` : "",
+    input.wakeResult?.status ? `Wake status: ${input.wakeResult.status}${input.wakeResult.failedReason ? ` (${input.wakeResult.failedReason})` : ""}.` : "",
     input.wake.mailIds.length > 0 ? `Mail refs: ${input.wake.mailIds.join(", ")}.` : "",
     input.wake.sourceIds.length > 0 ? `Source refs: ${input.wake.sourceIds.join(", ")}.` : "",
+    packet ? `Processed packet: ${packet.packetId}.` : "",
+    packet?.recommendedNext ? `Micro-reasoner recommended next: ${packet.recommendedNext}.` : "",
+    packet?.effortEstimate?.currentEffort ? `Current effort: ${packet.effortEstimate.currentEffort}.` : "",
+    packet?.arbiter ? `Hypothesis arbiter: ${packet.arbiter.recommendedNext}; wake ${packet.arbiter.wakeAsk ? "yes" : "no"}; ${packet.arbiter.reason}.` : "",
     mailPreviews.length > 0 ? `Mail previews:\n${mailPreviews.join("\n")}` : "",
   ].filter(Boolean).join("\n");
+}
+
+function readStagePlayWakeBridgeMemory(): { launchedWakeIds: string[]; lastLaunchedAt: number } {
+  if (typeof window === "undefined") return { launchedWakeIds: [], lastLaunchedAt: 0 };
+  try {
+    const raw = window.sessionStorage.getItem(STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY);
+    if (!raw) return { launchedWakeIds: [], lastLaunchedAt: 0 };
+    const parsed = JSON.parse(raw) as Partial<{ launchedWakeIds: unknown; lastLaunchedAt: unknown }>;
+    return {
+      launchedWakeIds: Array.isArray(parsed.launchedWakeIds)
+        ? parsed.launchedWakeIds.filter((id): id is string => typeof id === "string")
+        : [],
+      lastLaunchedAt: typeof parsed.lastLaunchedAt === "number" && Number.isFinite(parsed.lastLaunchedAt)
+        ? parsed.lastLaunchedAt
+        : 0,
+    };
+  } catch {
+    return { launchedWakeIds: [], lastLaunchedAt: 0 };
+  }
+}
+
+function writeStagePlayWakeBridgeMemory(next: { launchedWakeIds: string[]; lastLaunchedAt: number }) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY, JSON.stringify({
+      launchedWakeIds: next.launchedWakeIds.slice(-25),
+      lastLaunchedAt: next.lastLaunchedAt,
+    }));
+  } catch {
+    // session storage is best-effort; the visible button still works without it
+  }
+}
+
+function shouldBridgeStagePlayWakeToAsk(input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1 | null;
+  wakeResult: StagePlayLiveSourceMailWakeResultV1 | null;
+  packet: StagePlayProcessedMailPacketV1 | null;
+}): boolean {
+  const wake = input.wake;
+  if (!wake) return false;
+  if (wake.askTurnId || wake.decisionIds.length > 0) return false;
+  if (input.wakeResult?.askTurnId || (input.wakeResult?.decisionIds.length ?? 0) > 0) return false;
+  const wakeStatus = input.wakeResult?.status ?? wake.status;
+  if (!["queued", "running", "failed_retryable", "deferred_for_pressure"].includes(wakeStatus)) return false;
+  const recommendedNext = input.packet?.arbiter?.recommendedNext ?? input.packet?.recommendedNext;
+  if (!input.packet) return true;
+  const wakeAsk = input.packet.arbiter?.wakeAsk === true || recommendedNext === "request_voice_callout";
+  return (wakeAsk || wake.status === "deferred_for_pressure" || wake.status === "failed_retryable") &&
+    recommendedNext !== "wait_for_next_summary";
+}
+
+function launchStagePlayWakeInHelixAsk(input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  processedPacket: StagePlayProcessedMailPacketV1 | null;
+  wakeResult: StagePlayLiveSourceMailWakeResultV1 | null;
+  bridgeReason: string;
+}) {
+  launchHelixAskPrompt({
+    question: buildStagePlayMailWakeAskQuestion({
+      wake: input.wake,
+      mailItems: input.mailItems,
+      processedPacket: input.processedPacket,
+      wakeResult: input.wakeResult,
+      bridgeReason: input.bridgeReason,
+    }),
+    autoSubmit: true,
+    panelId: "stage-play-badge-graph",
+    forceReasoningDispatch: true,
+    suppressWorkstationPayloadActions: true,
+  });
 }
 
 const STAGE_PLAY_NODE_BUILDER_TYPES: StagePlayNodeBuilderType[] = [

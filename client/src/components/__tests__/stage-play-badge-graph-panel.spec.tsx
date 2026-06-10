@@ -1535,6 +1535,8 @@ function dispatchPointer(target: EventTarget, type: string, clientX: number, cli
 }
 
 afterEach(() => {
+  window.sessionStorage.clear();
+  window.localStorage.clear();
   useStagePlayBadgeGraphPanelStore.getState().resetPanelMemory();
   useLiveAnswerEnvironmentStore.setState({
     environmentByThread: {},
@@ -2125,6 +2127,34 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.queryByRole("button", { name: "Run armed mail wake" })).toBeNull();
     expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/run"))).toBe(false);
     expect(fetchCallUrls().some((url) => url.includes("/api/helix/stage-play/live-source-mail/wake/cycle"))).toBe(false);
+  });
+
+  it("bridges a pressure-deferred mail wake into the visible Helix Ask UI", async () => {
+    const promptEvents: CustomEvent[] = [];
+    window.addEventListener("helix-ask:prompt", ((event: Event) => {
+      promptEvents.push(event as CustomEvent);
+    }) as EventListener);
+    renderPanel();
+
+    expect(await screen.findByTestId("stage-play-mail-loop-live-overview")).toBeTruthy();
+    const bridgeButton = await screen.findByTestId("stage-play-open-wake-in-ask");
+    expect(bridgeButton).toBeEnabled();
+
+    await waitFor(() => {
+      expect(promptEvents.length).toBeGreaterThan(0);
+    });
+    const question = String(promptEvents[0]?.detail?.question ?? "");
+    expect(promptEvents[0]?.detail).toMatchObject({
+      autoSubmit: true,
+      panelId: "stage-play-badge-graph",
+      forceReasoningDispatch: true,
+      suppressWorkstationPayloadActions: true,
+    });
+    expect(question).toContain("Use live_env.read_live_source_mail");
+    expect(question).toContain("live_env.record_live_source_mail_decision");
+    expect(question).toContain("This is a constrained mailbox wake turn, not a generic workspace/docs turn.");
+    expect(question).toContain("Wake request: stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui");
+    expect(question).toContain("UI bridge reason: backend wake admission deferred for pressure");
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {
