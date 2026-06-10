@@ -1907,6 +1907,132 @@ const buildWakePrompt = (input: {
   ].join("\n");
 };
 
+const formatCompactMicroReasonerFinding = (
+  runs: StagePlayMicroReasonerRunV1[],
+): string => {
+  const preferred = runs
+    .filter((run) =>
+      run.role === "decision_selector" ||
+      run.role === "voice_callout_drafter" ||
+      run.role === "packet_composer" ||
+      run.role === "prediction_validator" ||
+      run.role === "salience_scorer"
+    )
+    .slice(-4);
+  const selected = preferred.length > 0 ? preferred : runs.slice(-2);
+  if (selected.length === 0) return "- none recorded";
+  return selected.map((run) => [
+    `- ${run.runId}`,
+    `  role: ${run.role}`,
+    run.selectedDecision ? `  selected_decision: ${run.selectedDecision}` : null,
+    run.recommendedNextTool ? `  next_tool: ${run.recommendedNextTool}` : null,
+    run.salienceLevel ? `  salience: ${run.salienceLevel}${run.voiceCandidate ? " (voice candidate)" : ""}` : null,
+    run.outputPreview ? `  finding: ${clipPromptText(run.outputPreview, 220)}` : null,
+  ].filter(Boolean).join("\n")).join("\n");
+};
+
+const buildCompactWakePrompt = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  mailBatch: StagePlayLiveSourceMailItemV1[];
+  priorDecisions: StagePlayLiveSourceMailDecisionV1[];
+  latestNarrativeState: StagePlayLiveSourceNarrativeStateV1 | null;
+  latestImmersionState: StagePlayLiveSourceImmersionStateV1;
+  predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+  processedPacket: StagePlayProcessedMailPacketV1;
+  microReasonerRuns: StagePlayMicroReasonerRunV1[];
+  voicePolicy: StagePlayLiveSourceVoicePolicyV1;
+  retainedMailCount?: number;
+}): string => {
+  const latestMail = input.mailBatch.at(-1) ?? null;
+  const latestDecision = input.priorDecisions.at(-1) ?? null;
+  const phaseRequirement =
+    input.processedPacket.recommendedNext === "request_voice_callout"
+      ? "phase requirement: record live_env.record_live_source_mail_decision first; then request live_env.request_interim_voice_callout; do not terminal-answer until voice receipt/hold/block exists."
+      : input.processedPacket.recommendedNext === "wait_for_next_summary"
+        ? "phase requirement: do not wake Ask for routine mail; record/keep wait_for_next_summary and retain observer backlog."
+        : "phase requirement: record live_env.record_live_source_mail_decision before terminal synthesis.";
+  return [
+    "Continuing live-source watch job compact Ask handoff:",
+    input.policy?.objectiveText ?? "Watch the active visual source through micro-reasoner findings.",
+    `Watch policy ref: ${input.policy?.policyId ?? "none"}`,
+    `Watch job ref: ${input.policy?.jobId ?? input.wake.jobId ?? "none"}`,
+    `Wake request: ${input.wake.wakeRequestId}`,
+    `Retained unread mail outside this Ask batch: ${Math.max(0, input.retainedMailCount ?? 0)}`,
+    "",
+    "Use this compact grammar only:",
+    "1. Treat the processed packet as primary evidence.",
+    "2. Use raw mail only as a short audit trail.",
+    "3. Do not widen to newer mailbox items.",
+    "4. Receipts are evidence, not the final answer.",
+    `5. ${phaseRequirement}`,
+    "",
+    "Processed packet:",
+    `- packet_id: ${input.processedPacket.packetId}`,
+    `  recommended_next: ${input.processedPacket.recommendedNext}`,
+    `  salience: ${input.processedPacket.salience.level}${input.processedPacket.salience.voiceCandidate ? " (voice candidate)" : ""}`,
+    input.processedPacket.salience.calloutDraft ? `  callout_candidate: ${clipPromptText(input.processedPacket.salience.calloutDraft, 180)}` : null,
+    input.processedPacket.observedFacts.length > 0
+      ? `  observed: ${input.processedPacket.observedFacts.slice(0, 4).map((fact) => clipPromptText(fact, 150)).join(" | ")}`
+      : null,
+    input.processedPacket.changedFacts.length > 0
+      ? `  changed: ${input.processedPacket.changedFacts.slice(0, 4).map((fact) => clipPromptText(fact, 130)).join(" | ")}`
+      : null,
+    input.processedPacket.watchNext.length > 0
+      ? `  watch_next: ${input.processedPacket.watchNext.slice(0, 6).join(" | ")}`
+      : null,
+    "",
+    "Latest micro-reasoner finding:",
+    formatCompactMicroReasonerFinding(input.microReasonerRuns),
+    "",
+    "Prediction/immersion:",
+    `- prediction_validation: ${input.predictionValidation.result}; recommended ${input.predictionValidation.recommendedNext}`,
+    `- activity: ${clipPromptText(input.latestImmersionState.currentActivity, 180)}`,
+    input.latestImmersionState.prediction ? `- latest_prediction: ${clipPromptText(input.latestImmersionState.prediction.text, 240)}` : null,
+    "",
+    "Latest unresolved/prior decision:",
+    latestDecision
+      ? [
+          `- ${latestDecision.decisionId}`,
+          `  decision: ${latestDecision.decision}`,
+          `  rationale: ${clipPromptText(latestDecision.rationalePreview, 220)}`,
+        ].join("\n")
+      : "- none recorded",
+    "",
+    "Short mailbox summary:",
+    latestMail
+      ? [
+          `- latest_mail: ${latestMail.mailId}`,
+          `  source: ${latestMail.sourceId}`,
+          `  summary: ${clipPromptText(latestMail.summary.text || latestMail.summary.preview, 360)}`,
+        ].join("\n")
+      : "- compact mail unavailable",
+    "",
+    "Voice policy:",
+    formatVoicePolicy(input.voicePolicy),
+    "",
+    "Required evidence refs:",
+    uniqueStrings([
+      input.wake.wakeRequestId,
+      input.processedPacket.packetId,
+      input.predictionValidation.validationId,
+      input.latestImmersionState.immersionStateId,
+      latestMail?.mailId,
+      ...(latestMail?.evidenceRefs ?? []),
+      ...input.processedPacket.microReasonerRunRefs.slice(-6),
+    ]).slice(0, 32).map((ref) => `- ${ref}`).join("\n") || "- none",
+    "",
+    "Choose one:",
+    "- wait_for_next_summary",
+    "- record_interpretation",
+    "- draft_text_answer",
+    "- request_voice_callout",
+    "- request_more_evidence",
+    "- request_stage_play_checkpoint",
+    "- fail_closed",
+  ].filter((entry): entry is string => Boolean(entry)).join("\n");
+};
+
 const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
   async ({ prompt, threadId, evidenceRefs, wakeRequest }) => {
     const timeoutMs = wakeAskTurnTimeoutMs();
@@ -2364,7 +2490,7 @@ export async function runNextMailWakeRequest(input: {
       createdAt: wakeResult.createdAt,
     });
   }
-  const prompt = buildWakePrompt({
+  const fullPrompt = buildWakePrompt({
     wake: running,
     policy,
     activeInterpreterProfile,
@@ -2382,6 +2508,22 @@ export async function runNextMailWakeRequest(input: {
     retainedMailCount,
   });
   const promptMaxChars = wakeAskPromptMaxChars();
+  const compactPrompt = fullPrompt.length > promptMaxChars
+    ? buildCompactWakePrompt({
+        wake: running,
+        policy,
+        mailBatch,
+        priorDecisions,
+        latestNarrativeState,
+        latestImmersionState: fastLayer.immersionState,
+        predictionValidation: fastLayer.predictionValidation,
+        processedPacket: fastLayer.processedPacket,
+        microReasonerRuns: fastLayer.microReasonerRuns,
+        voicePolicy,
+        retainedMailCount,
+      })
+    : null;
+  const prompt = compactPrompt && compactPrompt.length <= promptMaxChars ? compactPrompt : fullPrompt;
   if (prompt.length > promptMaxChars) {
     const failedAt = now;
     const failedReason = `wake_preflight_blocked:prompt_too_large:${prompt.length}>${promptMaxChars}`;

@@ -9,7 +9,7 @@ const arbitrate = (promptText: string) =>
     promptText,
   });
 
-describe("Helix Ask evidence-target arbitration", () => {
+describe("Helix Ask evidence target arbitration", () => {
   it("treats Stage Play panel definition prompts as repo/product evidence before live reflection", () => {
     const arbitration = arbitrate("ok what is the stage play panel?");
 
@@ -74,5 +74,76 @@ describe("Helix Ask evidence-target arbitration", () => {
     expect(arbitration.selected_target_source).not.toBe("live_environment");
     expect(arbitration.available_capabilities).not.toContain("live_env.reflect_stage_play_context");
     expect(arbitration.available_capabilities).not.toContain("live-source.set_rate");
+  });
+
+  it("keeps ZenGraph reflection primary when research words are quoted conversation context", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:zen-contextual-research",
+      threadId: "thread:zen-contextual-research",
+      promptText:
+        "Use the Zen Badge Graph to reflect this conversation and classify procedural next moves. In the conversation someone says they need research papers and data before trusting decisions, but I am not asking you to search external sources.",
+    });
+
+    expect(arbitration.selected_candidate_id).toBe("workstation_panel.zen_graph_reflection");
+    expect(arbitration.selected_target_source).toBe("workstation_panel");
+    expect(arbitration.reason_codes).toEqual(
+      expect.arrayContaining([
+        "zen_graph_reflection_explicit_cue",
+        "workstation_tool_plan_capability_candidate",
+        "receipt_must_reenter_model_solver",
+      ]),
+    );
+    expect(arbitration.available_capabilities).toEqual(
+      expect.arrayContaining(["helix_ask.reflect_ideology_context"]),
+    );
+
+    const scholarlyCandidate = arbitration.evidence_target_candidates.find(
+      (candidate) => candidate.candidate_id === "scholarly_research.external_sources",
+    );
+    expect(scholarlyCandidate).toBeTruthy();
+    expect(scholarlyCandidate?.strength).toBe("soft");
+    expect(scholarlyCandidate?.reason_codes).toEqual(
+      expect.arrayContaining([
+        "contextual_research_mention_only",
+        "no_external_research_operator_command",
+        "available_as_contrast_evidence_not_primary_target",
+      ]),
+    );
+  });
+
+  it("lets explicit scholarly search commands outrank ZenGraph as an external evidence target", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:zen-explicit-scholar",
+      threadId: "thread:zen-explicit-scholar",
+      promptText:
+        "Use ZenGraph as context, but search scholarly papers and cite sources about moral guilt, rumination, and Buddhist practice.",
+    });
+
+    expect(arbitration.selected_candidate_id).toBe("scholarly_research.external_sources");
+    expect(arbitration.selected_target_source).toBe("scholarly_research");
+    expect(arbitration.available_capabilities).toEqual(
+      expect.arrayContaining(["helix_ask.reflect_ideology_context", "scholarly_research.lookup"]),
+    );
+  });
+
+  it("exposes Theory-Zen bridge as a model-visible candidate when both graph families are requested", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:bridge",
+      threadId: "thread:bridge",
+      promptText:
+        "Use the Theory Badge Graph and ZenGraph to reflect entropy, conservation, fairness, and due process as an evidence-only procedural bridge.",
+    });
+
+    expect(arbitration.selected_candidate_id).toBe("workstation_panel.theory_ideology_bridge_reflection");
+    expect(arbitration.available_capabilities).toEqual(
+      expect.arrayContaining([
+        "helix_ask.reflect_theory_context",
+        "helix_ask.reflect_ideology_context",
+        "helix_ask.bridge_theory_ideology_context",
+      ]),
+    );
+    expect(arbitration.evidence_target_candidates[0]?.requested_outputs).toEqual(
+      expect.arrayContaining(["ideology_context_reflection", "theory_ideology_bridge", "workstation_tool_evaluation"]),
+    );
   });
 });

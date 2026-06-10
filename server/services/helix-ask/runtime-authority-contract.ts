@@ -147,7 +147,8 @@ const artifactKindMatchesCapability = (
   if (capability === "docs-viewer.validate_doc_candidates") return /doc_candidate_validation|doc_search_results/i.test(joined);
   if (capability === "docs-viewer.open_doc_by_path") return /doc_open_receipt|active_doc_path|workspace_action_receipt|doc_summary/i.test(joined);
   if (capability === "docs-viewer.summarize_doc") return /doc_summary/i.test(joined);
-  if (capability === "docs-viewer.locate_in_doc") return /doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined);
+  if (capability === "docs-viewer.locate_in_doc") return /doc_location_result|doc_location_matches|doc_evidence_location|doc_equation_context|line_backed_locations/i.test(joined);
+  if (capability === "docs-viewer.doc_equation_context") return /doc_equation_context|doc_equation_context\/v1/i.test(joined);
   if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
   if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
   if (capability.startsWith("live_env.")) return /live_environment_tool_observation|live_environment_agent_loop|interpreted_log|minecraft_navigation_state|source_capability|runtime_tool_observation|tool_observation/i.test(joined);
@@ -239,6 +240,7 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   }
   if (/calculator_receipt|calculator_result/i.test(joined)) return "scientific-calculator.solve_expression";
   if (/doc_summary/i.test(joined)) return "docs-viewer.summarize_doc";
+  if (/doc_equation_context|doc_equation_context\/v1/i.test(joined)) return "docs-viewer.doc_equation_context";
   if (/doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined)) return "docs-viewer.locate_in_doc";
   if (/doc_open_receipt|active_doc_path/i.test(joined)) return "docs-viewer.open_doc_by_path";
   if (/doc_search_results|doc_candidate_validation/i.test(joined)) return "docs-viewer.search_docs";

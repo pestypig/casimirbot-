@@ -57,6 +57,26 @@ describe("workstationDeepLink", () => {
     ).toBe("?panels=docs-viewer&focus=docs-viewer&doc=docs%2Ffoo.md&anchor=section-a");
   });
 
+  it("round-trips equation and artifact targets in workstation view state", () => {
+    const state = parseWorkstationViewStateFromUrl(
+      "/desktop?panels=docs-viewer,scientific-calculator&focus=docs-viewer&doc=docs/papers.md&anchor=eq-12&equation=eq-12&artifact=runtime_artifact%3Aabc123",
+    );
+
+    expect(state).toMatchObject({
+      panels: ["docs-viewer", "scientific-calculator"],
+      focusPanel: "docs-viewer",
+      activeDocPath: "docs/papers.md",
+      anchor: "eq-12",
+      selectedObjectKind: "doc_equation",
+      selectedObjectId: "eq-12",
+      artifactKind: "runtime_artifact",
+      artifactId: "abc123",
+    });
+    expect(encodeWorkstationViewStateSearch(state)).toBe(
+      "?panels=docs-viewer%2Cscientific-calculator&focus=docs-viewer&doc=docs%2Fpapers.md&anchor=eq-12&equation=eq-12&artifact=runtime_artifact%3Aabc123",
+    );
+  });
+
   it("builds workspace path refs for breadcrumbs and agent traces", () => {
     expect(buildWorkstationPathRef("docs/a/b.md")).toEqual({
       root: "workspace",
@@ -85,6 +105,14 @@ describe("workstationDeepLink", () => {
       focusPanel: "docs-viewer",
       activeDocPath: "docs/a/b.md",
       anchor: "intro",
+    });
+    expect(coerceWorkstationViewStateFromPathInput("workspace://workspace/docs/a/b.md#eq-12")).toMatchObject({
+      panels: ["docs-viewer"],
+      focusPanel: "docs-viewer",
+      activeDocPath: "docs/a/b.md",
+      anchor: "eq-12",
+      selectedObjectKind: "doc_equation",
+      selectedObjectId: "eq-12",
     });
     expect(coerceWorkstationViewStateFromPathInput("C:\\Users\\dan\\secret.md")).toBeNull();
   });

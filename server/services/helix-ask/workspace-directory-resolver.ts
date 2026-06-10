@@ -7,6 +7,7 @@ import {
   normalizeWorkstationDocPath,
   normalizeWorkstationPathInput,
 } from "@shared/workstation-view-state";
+import { isDocEquationActionManifestV1, type DocEquationActionManifestV1 } from "@shared/contracts/doc-equation-action-manifest.v1";
 import {
   WORKSPACE_ACTION_REGISTRY,
   WORKSPACE_ACTION_VISIBLE_PANEL_IDS,
@@ -16,13 +17,17 @@ import {
 export const HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY = "workspace-directory.resolve" as const;
 export const HELIX_WORKSPACE_DIRECTORY_RESOLUTION_SCHEMA = "helix.workspace_directory_resolution.v1" as const;
 
-export type HelixWorkspaceDirectoryTargetKind = "doc" | "panel" | "path";
+export type HelixWorkspaceDirectoryTargetKind = "doc" | "doc_equation" | "panel" | "path" | "runtime_artifact";
 
 export type HelixWorkspaceDirectoryResolutionCandidate = {
   uri: string;
   target_kind: HelixWorkspaceDirectoryTargetKind;
   relative_path?: string;
   doc_path?: string;
+  anchor?: string;
+  equation_id?: string;
+  artifact_kind?: string;
+  artifact_id?: string;
   panel_id?: string;
   label: string;
   score: number;
@@ -46,6 +51,9 @@ export type HelixWorkspaceDirectoryResolution = {
   selected_uri?: string;
   selected_target_kind?: HelixWorkspaceDirectoryTargetKind;
   selected_doc_path?: string;
+  selected_anchor?: string;
+  selected_artifact_kind?: string;
+  selected_artifact_id?: string;
   selected_panel_id?: string;
   candidates: HelixWorkspaceDirectoryResolutionCandidate[];
   searched_scopes: string[];
@@ -122,6 +130,33 @@ const listDocFiles = (rootDir: string, relativeDir = "docs", depth = 0): string[
     }
   }
   return files;
+};
+
+const listDocEquationManifestFiles = (rootDir: string, relativeDir = "docs", depth = 0): string[] => {
+  if (depth > 8) return [];
+  const absoluteDir = path.join(rootDir, relativeDir);
+  if (!existsSync(absoluteDir)) return [];
+  const entries = readdirSync(absoluteDir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const relativePath = `${relativeDir}/${entry.name}`.replace(/\\/g, "/");
+    if (entry.isDirectory()) {
+      files.push(...listDocEquationManifestFiles(rootDir, relativePath, depth + 1));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".equation-actions.json")) files.push(relativePath);
+  }
+  return files;
+};
+
+const readDocEquationManifest = (rootDir: string, relativePath: string): DocEquationActionManifestV1 | null => {
+  try {
+    const parsed = JSON.parse(readFileSync(path.join(rootDir, relativePath), "utf8")) as unknown;
+    return isDocEquationActionManifestV1(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 };
 
 const readDocPreview = (rootDir: string, relativePath: string): { text: string; snippets: Array<{ line: number; text: string }> } => {
@@ -255,6 +290,81 @@ const buildDocCandidates = (rootDir: string, query: string): HelixWorkspaceDirec
   });
 };
 
+const hasDocEquationIntent = (query: string): boolean =>
+  /\b(?:equation|latex|formula|scalar\s+replay|replay|runtime\s+artifact|theory\s+orientation|badge|tensor|residual|proper\s+time|einstein|observer\s+projection)\b/i.test(query);
+
+const buildDocEquationCandidates = (rootDir: string, query: string): HelixWorkspaceDirectoryResolutionCandidate[] => {
+  return listDocEquationManifestFiles(rootDir).flatMap((relativePath) => {
+    const manifest = readDocEquationManifest(rootDir, relativePath);
+    if (!manifest) return [];
+    const docPath = normalizeWorkstationDocPath(manifest.docPath) ?? manifest.docPath;
+    const pathRef = buildWorkstationPathRef(docPath);
+    return manifest.entries.map((entry) => {
+      const actionText = entry.actions
+        .flatMap((action) => [
+          action.actionId,
+          action.label,
+          action.kind,
+          action.preferredBadgeId,
+          action.calculatorPayloadRef?.badgeId,
+          ...(action.badgeIds ?? []),
+          ...(action.openPanels ?? []),
+        ])
+        .filter(Boolean)
+        .join(" ");
+      const searchable = [
+        docPath,
+        entry.equationId,
+        entry.label,
+        entry.sectionAnchor,
+        entry.latex,
+        ...(entry.aliases ?? []),
+        actionText,
+        ...entry.claimBoundaryNotes,
+      ].join(" ");
+      const score = scoreCandidateText({
+        query,
+        label: entry.label,
+        pathText: `${docPath}#${entry.equationId}`,
+        bodyText: searchable,
+      });
+      const preferredAction = entry.actions.find((action) => action.preferredBadgeId || action.calculatorPayloadRef) ?? entry.actions[0];
+      const artifactId = preferredAction?.preferredBadgeId ?? preferredAction?.calculatorPayloadRef?.badgeId ?? preferredAction?.badgeIds?.[0];
+      let equationScore = score.score + 5;
+      const reasons = [...score.reasons, "doc_equation_action_manifest_match"];
+      if (hasDocEquationIntent(query)) {
+        equationScore += 30;
+        reasons.push("explicit_doc_equation_intent");
+      }
+      if (/\bscalar\s+replay|replay\b/i.test(query) && preferredAction?.kind === "calculator_ingest") {
+        equationScore += 12;
+        reasons.push("scalar_replay_action_match");
+      }
+      if (/\bruntime\s+artifact\b/i.test(query) && preferredAction?.kind === "artifact_backed_theory_run") {
+        equationScore += 12;
+        reasons.push("runtime_artifact_action_match");
+      }
+      return {
+        uri: `${pathRef?.virtualUri ?? `workspace://workspace/${docPath.split("/").map(encodeURIComponent).join("/")}`}#${encodeURIComponent(entry.equationId)}`,
+        target_kind: "doc_equation" as const,
+        relative_path: `${docPath}#${entry.equationId}`,
+        doc_path: docPath,
+        anchor: entry.equationId,
+        equation_id: entry.equationId,
+        artifact_kind: "doc_equation_context/v1",
+        ...(artifactId ? { artifact_id: artifactId } : {}),
+        label: entry.label,
+        score: Math.round(equationScore * 10000) / 10000,
+        reasons,
+        snippets: [
+          ...(entry.sectionAnchor ? [{ line: 0, text: `Section anchor: ${entry.sectionAnchor}` }] : []),
+          { line: 0, text: entry.latex },
+        ],
+      };
+    });
+  });
+};
+
 const panelLabel = (panelId: string): string => {
   const registryEntry = WORKSPACE_ACTION_REGISTRY.find((entry: WorkspaceActionRegistryEntry) => entry.target_id === panelId);
   return registryEntry?.label ?? panelId.replace(/[-_]+/g, " ");
@@ -288,8 +398,19 @@ const buildPanelCandidates = (query: string): HelixWorkspaceDirectoryResolutionC
   });
 };
 
+const splitSafePathAnchor = (value: string): { path: string; anchor?: string } => {
+  const index = value.indexOf("#");
+  if (index < 0) return { path: value };
+  const anchor = value.slice(index + 1).trim();
+  return {
+    path: value.slice(0, index),
+    ...(anchor ? { anchor } : {}),
+  };
+};
+
 const candidateForSafePath = (rootDir: string, relativePath: string): HelixWorkspaceDirectoryResolutionCandidate | null => {
-  const normalized = normalizeWorkstationPathInput(relativePath);
+  const split = splitSafePathAnchor(relativePath);
+  const normalized = normalizeWorkstationPathInput(split.path);
   if (!normalized) return null;
   const panelMatch = normalized.match(/^panels\/([^/]+)$/i);
   if (panelMatch) {
@@ -311,6 +432,20 @@ const candidateForSafePath = (rootDir: string, relativePath: string): HelixWorks
     if (!docPath) return null;
     const exists = existsSync(path.join(rootDir, docPath));
     const pathRef = buildWorkstationPathRef(docPath);
+    if (split.anchor) {
+      return {
+        uri: `${pathRef?.virtualUri ?? `workspace://workspace/${docPath.split("/").map(encodeURIComponent).join("/")}`}#${encodeURIComponent(split.anchor)}`,
+        target_kind: "doc_equation",
+        relative_path: `${docPath}#${split.anchor}`,
+        doc_path: docPath,
+        anchor: split.anchor,
+        equation_id: split.anchor,
+        artifact_kind: "doc_equation_context/v1",
+        label: `${path.basename(docPath).replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ")} #${split.anchor}`,
+        score: exists ? 100 : 45,
+        reasons: [exists ? "exact_existing_doc_equation_path" : "safe_doc_equation_path_not_found"],
+      };
+    }
     return {
       uri: pathRef?.virtualUri ?? `workspace://workspace/${docPath.split("/").map(encodeURIComponent).join("/")}`,
       target_kind: "doc",
@@ -347,7 +482,7 @@ export function executeWorkspaceDirectoryResolveTool(input: {
   const query = rawQuery || rawUri;
   const normalizedQuery = normalizeText(query);
   const limit = Math.max(1, Math.min(20, Math.floor(Number(input.limit ?? DEFAULT_LIMIT)) || DEFAULT_LIMIT));
-  const targetKindSet = new Set(input.targetKinds?.length ? input.targetKinds : ["doc", "panel", "path"]);
+  const targetKindSet = new Set(input.targetKinds?.length ? input.targetKinds : ["doc", "doc_equation", "panel", "path"]);
   const candidates: HelixWorkspaceDirectoryResolutionCandidate[] = [];
 
   if ((rawUri && isRawAbsoluteWorkstationPath(rawUri)) || (!rawUri && rawQuery && isRawAbsoluteWorkstationPath(rawQuery))) {
@@ -371,13 +506,18 @@ export function executeWorkspaceDirectoryResolveTool(input: {
   }
 
   const directInput = rawUri || rawQuery;
-  const directPath = directInput ? normalizeWorkstationPathInput(directInput) : null;
-  if (directPath) {
-    const directCandidate = candidateForSafePath(workspaceRoot, directPath);
+  if (directInput) {
+    const directCandidate = candidateForSafePath(workspaceRoot, directInput);
     if (directCandidate && targetKindSet.has(directCandidate.target_kind)) candidates.push(directCandidate);
   }
 
   if (targetKindSet.has("doc")) candidates.push(...buildDocCandidates(workspaceRoot, query));
+  if (
+    targetKindSet.has("doc_equation") &&
+    (hasDocEquationIntent(query) || input.targetKinds?.includes("doc_equation"))
+  ) {
+    candidates.push(...buildDocEquationCandidates(workspaceRoot, query));
+  }
   if (targetKindSet.has("panel")) candidates.push(...buildPanelCandidates(query));
 
   const deduped = new Map<string, HelixWorkspaceDirectoryResolutionCandidate>();
@@ -412,11 +552,15 @@ export function executeWorkspaceDirectoryResolveTool(input: {
     ...(selected?.uri ? { selected_uri: selected.uri } : {}),
     ...(selected?.target_kind ? { selected_target_kind: selected.target_kind } : {}),
     ...(selected?.doc_path ? { selected_doc_path: selected.doc_path } : {}),
+    ...(selected?.anchor ? { selected_anchor: selected.anchor } : {}),
+    ...(selected?.artifact_kind ? { selected_artifact_kind: selected.artifact_kind } : {}),
+    ...(selected?.artifact_id ? { selected_artifact_id: selected.artifact_id } : {}),
     ...(selected?.panel_id ? { selected_panel_id: selected.panel_id } : {}),
     candidates: ranked,
     searched_scopes: [
       "workspace_safe_uri_parser",
       ...(targetKindSet.has("doc") ? ["workspace_docs_directory"] : []),
+      ...(targetKindSet.has("doc_equation") ? ["workspace_doc_equation_manifests"] : []),
       ...(targetKindSet.has("panel") ? ["workspace_panel_registry"] : []),
     ],
     assistant_answer: false,

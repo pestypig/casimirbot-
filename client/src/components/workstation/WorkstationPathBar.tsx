@@ -11,8 +11,10 @@ import {
   buildWorkstationPanelPathRef,
   buildWorkstationPathRef,
   coerceWorkstationViewStateFromPathInput,
+  normalizeWorkstationDocPath,
   type WorkstationPathRef,
 } from "@/lib/workstation/workstationDeepLink";
+import { useDocEquationContextStore } from "@/store/useDocEquationContextStore";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { cn } from "@/lib/utils";
@@ -27,12 +29,25 @@ export function WorkstationPathBar({
   const docMode = useDocViewerStore((state) => state.mode);
   const currentDocPath = useDocViewerStore((state) => state.currentPath);
   const docAnchor = useDocViewerStore((state) => state.anchor);
+  const latestEquationContext = useDocEquationContextStore((state) => state.latestContext);
   const openPanelInGroup = useWorkstationLayoutStore((state) => state.openPanelInGroup);
   const setActivePanel = useWorkstationLayoutStore((state) => state.setActivePanel);
   const focusGroup = useWorkstationLayoutStore((state) => state.focusGroup);
+  const normalizedCurrentDocPath = normalizeWorkstationDocPath(currentDocPath);
+  const activeEquationContext =
+    activePanelId === "docs-viewer" &&
+    docMode === "doc" &&
+    latestEquationContext?.docPath === normalizedCurrentDocPath
+      ? latestEquationContext
+      : null;
   const pathRef =
-    activePanelId === "docs-viewer" && docMode === "doc"
-      ? buildWorkstationPathRef(currentDocPath) ?? buildWorkstationPanelPathRef(activePanelId)
+    activeEquationContext?.pathRef && activeEquationContext.uri
+      ? {
+          ...activeEquationContext.pathRef,
+          virtualUri: activeEquationContext.uri,
+        }
+      : activePanelId === "docs-viewer" && docMode === "doc"
+        ? buildWorkstationPathRef(currentDocPath) ?? buildWorkstationPanelPathRef(activePanelId)
       : buildWorkstationPanelPathRef(activePanelId);
 
   if (!pathRef) return null;
@@ -40,15 +55,25 @@ export function WorkstationPathBar({
   return (
     <WorkstationPathBreadcrumb
       pathRef={pathRef}
-      anchor={activePanelId === "docs-viewer" ? docAnchor : undefined}
+      anchor={activeEquationContext?.equationId ?? (activePanelId === "docs-viewer" ? docAnchor : undefined)}
       onNavigate={(value) => {
         const viewState = coerceWorkstationViewStateFromPathInput(value);
         if (!viewState) return false;
+        const matchedEquationContext =
+          activeEquationContext?.uri === value.trim()
+            ? activeEquationContext
+            : null;
         for (const panelId of viewState.panels) {
           openPanelInGroup(groupId, panelId);
         }
+        for (const panelId of matchedEquationContext?.openedPanels ?? []) {
+          openPanelInGroup(groupId, panelId);
+        }
         if (viewState.activeDocPath) {
-          useDocViewerStore.getState().viewDoc(viewState.activeDocPath, viewState.anchor);
+          useDocViewerStore.getState().viewDoc(
+            viewState.activeDocPath,
+            matchedEquationContext?.equationId ?? viewState.selectedObjectId ?? viewState.anchor,
+          );
         }
         const focusPanel = viewState.focusPanel ?? (viewState.activeDocPath ? "docs-viewer" : undefined);
         if (focusPanel) {

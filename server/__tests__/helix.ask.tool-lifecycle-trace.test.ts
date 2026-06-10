@@ -232,20 +232,20 @@ describe("Helix Ask tool lifecycle trace", () => {
           },
         },
         {
-          artifact_id: "calculation_trace:1",
-          kind: "calculation_trace",
+          artifact_id: "calculator_result_trace:1",
+          kind: "calculator_result_trace",
           payload: {
-            schema: "helix.calculation_trace.v1",
+            schema: "helix.calculator_result_trace.v1",
             assistant_answer: false,
             terminal_eligible: false,
             raw_content_included: false,
           },
         },
         {
-          artifact_id: "calculator_validation:1",
-          kind: "calculator_validation",
+          artifact_id: "calculator_result_validation:1",
+          kind: "calculator_result_validation",
           payload: {
-            schema: "helix.calculator_validation.v1",
+            schema: "helix.calculator_result_validation.v1",
             assistant_answer: false,
             terminal_eligible: false,
             raw_content_included: false,
@@ -272,7 +272,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
     expect(index.missing_required_observation_kinds).toEqual([]);
     expect(index.queryable_artifact_keys).toEqual(
-      expect.arrayContaining(["calculator_receipt:1", "calculation_trace:1", "calculator_validation:1"]),
+      expect.arrayContaining(["calculator_receipt:1", "calculator_result_trace:1", "calculator_result_validation:1"]),
     );
   });
 
@@ -303,7 +303,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-index-missing", payload });
 
     expect(index.missing_required_observation_kinds).toEqual(
-      expect.arrayContaining(["calculation_trace", "calculator_validation"]),
+      expect.arrayContaining(["calculator_result_trace", "calculator_result_validation"]),
     );
     expect(index.reentry_status).toMatchObject({
       evidence_reentered: false,

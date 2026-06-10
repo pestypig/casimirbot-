@@ -35,6 +35,43 @@ const ledgerEntries = (payload: RecordLike): RecordLike[] =>
         .filter((entry): entry is RecordLike => Boolean(entry))
     : [];
 
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : value ? [value] : [];
+
+const supplementalPayloadArtifacts = (payload: RecordLike): RecordLike[] => {
+  const entries: RecordLike[] = [];
+  for (const validation of readArray(payload.calculator_result_validations)) {
+    const record = readRecord(validation);
+    if (!record) continue;
+    entries.push({
+      artifact_id: readString(record.validation_id) || `${readString(record.turn_id) || "turn"}:calculator_result_validation`,
+      kind: "calculator_result_validation",
+      schema: readString(record.schema) || "helix.calculator_result_validation.v1",
+      source_scope: "debug_payload",
+      payload: record,
+    });
+  }
+  for (const receipt of readArray(payload.calculator_subgoal_receipts)) {
+    const record = readRecord(receipt);
+    if (!record) continue;
+    entries.push({
+      artifact_id: readString(record.receipt_id) || `${readString(record.turn_id) || "turn"}:calculator_subgoal_receipt`,
+      kind: "calculator_subgoal_receipt",
+      schema: readString(record.schema) || "helix.calculator_subgoal_receipt.v1",
+      source_scope: "debug_payload",
+      payload: record,
+    });
+  }
+  return entries;
+};
+
+const artifactsForPayload = (payload: RecordLike): RecordLike[] => {
+  const byRef = new Map<string, RecordLike>();
+  for (const artifact of [...ledgerEntries(payload), ...supplementalPayloadArtifacts(payload)]) {
+    byRef.set(artifactRef(artifact), artifact);
+  }
+  return Array.from(byRef.values());
+};
+
 const artifactPayload = (artifact: RecordLike): RecordLike | null => readRecord(artifact.payload);
 
 const artifactRef = (artifact: RecordLike): string =>
@@ -167,7 +204,7 @@ export const buildArtifactQueryIndex = (input: {
 }): RecordLike => {
   const lifecycleTrace = readRecord(input.payload.tool_lifecycle_trace);
   const followupDecision = readRecord(input.payload.tool_followup_decision);
-  const artifacts = ledgerEntries(input.payload);
+  const artifacts = artifactsForPayload(input.payload);
   const capability = capabilityFromPayload(input.payload, lifecycleTrace);
   const lifecycleFamily = familyFromPayload(input.payload, lifecycleTrace);
   const inferredArtifactFamily = artifactInferredFamily(artifacts);

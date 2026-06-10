@@ -6,8 +6,10 @@ import {
 } from "@shared/contracts/doc-equation-action-manifest.v1";
 import type {
   DocEquationContextArtifactV1,
+  DocEquationContextLinkV1,
   DocEquationContextScopeV1,
 } from "@shared/contracts/doc-equation-context.v1";
+import { buildWorkstationPathRef, normalizeWorkstationDocPath } from "@shared/workstation-view-state";
 import { isTheoryCompoundRunV1, type TheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
 import { emitDocEquationContextArtifact } from "@/lib/docs/docEquationContextEvents";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
@@ -160,13 +162,21 @@ export function buildDocEquationContextArtifact(args: {
       ? [args.action.calculatorPayloadRef.badgeId]
       : [];
   const scope = classifyActionScope(args.action);
+  const docPath = normalizeDocPath(args.currentPath ?? "docs/unknown.md");
+  const anchor = args.entry.equationId;
+  const pathRef = buildWorkstationPathRef(docPath) ?? undefined;
+  const uri = pathRef ? `${pathRef.virtualUri}#${encodeURIComponent(anchor)}` : undefined;
+  const openedPanels = Array.from(new Set(args.openedPanels.filter(Boolean)));
   return {
     contractVersion: "doc_equation_context/v1",
     generatedAt: args.generatedAt ?? new Date().toISOString(),
-    docPath: normalizeDocPath(args.currentPath ?? "docs/unknown.md"),
+    docPath,
     equationId: args.entry.equationId,
     equationLabel: args.entry.label,
     ...(args.entry.sectionAnchor ? { sectionAnchor: args.entry.sectionAnchor } : {}),
+    ...(uri ? { uri } : {}),
+    ...(pathRef ? { pathRef } : {}),
+    anchor,
     latex: args.latex.trim() || args.entry.latex,
     actionId: args.action.actionId,
     actionKind: args.action.kind,
@@ -175,9 +185,18 @@ export function buildDocEquationContextArtifact(args: {
     ...(args.action.calculatorPayloadRef ? { calculatorPayloadRef: args.action.calculatorPayloadRef } : {}),
     ...(args.action.atlasLensId ? { atlasLensId: args.action.atlasLensId } : {}),
     ...(args.action.atlasGroupId ? { atlasGroupId: args.action.atlasGroupId } : {}),
-    openedPanels: Array.from(new Set(args.openedPanels.filter(Boolean))),
+    openedPanels,
     claimBoundaryNotes: [...args.entry.claimBoundaryNotes],
     ...(args.action.claimBoundaryNote ? { actionClaimBoundaryNote: args.action.claimBoundaryNote } : {}),
+    links: buildDocEquationContextLinks({
+      docPath,
+      anchor,
+      sectionAnchor: args.entry.sectionAnchor,
+      action: args.action,
+      openedPanels,
+      scope,
+      badgeIds,
+    }),
     commentaryHints: {
       summary: buildContextSummary(args.entry, args.action, scope),
       scope,
@@ -185,6 +204,40 @@ export function buildDocEquationContextArtifact(args: {
       suggestedExplanationFocus: buildSuggestedExplanationFocus(args.entry, args.action, scope),
     },
   };
+}
+
+function buildDocEquationContextLinks(args: {
+  docPath: string;
+  anchor: string;
+  sectionAnchor?: string;
+  action: DocEquationActionV1;
+  openedPanels: string[];
+  scope: DocEquationContextScopeV1;
+  badgeIds: string[];
+}): DocEquationContextLinkV1[] {
+  const links: DocEquationContextLinkV1[] = [
+    {
+      rel: "supports_doc_section",
+      docPath: args.docPath,
+      anchor: args.sectionAnchor ?? args.anchor,
+    },
+  ];
+
+  for (const panelId of args.openedPanels) {
+    links.push({ rel: "opens_panel", panelId });
+  }
+
+  const artifactId = args.action.preferredBadgeId ?? args.action.calculatorPayloadRef?.badgeId ?? args.badgeIds[0];
+  if (artifactId) {
+    links.push({
+      rel: args.scope === "theory_orientation" ? "orients_theory_graph" : "opens_runtime_artifact",
+      artifactId,
+      artifactKind: args.scope,
+      ...(args.openedPanels[0] ? { panelId: args.openedPanels[0] } : {}),
+    });
+  }
+
+  return links;
 }
 
 function emitActionContext(args: {
@@ -259,6 +312,8 @@ export function normalizeLatexForDocAction(value: string): string {
 }
 
 function normalizeDocPath(raw: string): string {
+  const workstationDocPath = normalizeWorkstationDocPath(raw);
+  if (workstationDocPath) return workstationDocPath;
   const normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
   const matchIndex = normalized.search(DOC_PATH_PATTERN);
   const fromDocs = matchIndex === -1 ? normalized : normalized.slice(matchIndex);

@@ -51,6 +51,32 @@ const hasLiveSourceCurrentStateCue = (prompt: string): boolean =>
   /\b(?:what\s+do\s+you\s+know\s+right\s+now|what\s+is\s+the\s+current\s+(?:live\s+source|source|mailbox|watch|observation)\s+state|current\s+live\s+source\s+state|summari[sz]e\s+(?:the\s+)?(?:current\s+)?live\s+source\s+state|source\s+quality|live\s+source\s+quality|is\s+(?:the\s+)?(?:source|visual\s+source|mailbox)\s+(?:fresh|stale|degraded|under\s+pressure)|how\s+fresh\s+is\s+(?:the\s+)?(?:source|visual\s+source)|cadence|backlog|under\s+pressure)\b/i.test(prompt) &&
   /\b(?:live\s+source|visual\s+source|mailbox|mail|summary|summaries|observation|source|watch|quality|fresh|stale|cadence|backlog|pressure)\b/i.test(prompt);
 
+const hasZenGraphReflectionCue = (prompt: string): boolean => {
+  if (!/\b(?:zen\s*(?:badge\s*)?graph|zengraph|zenbridge|fruition|procedural\s+zen|zen\s+classifier|inner[-\s]?practice|zen\s+reflection)\b/i.test(prompt)) {
+    return false;
+  }
+  return /\b(?:use|reflect|classify|compare|evaluate|plot|map|apply|through|with|using|proper\s+reflection|what\s+kind\s+of\s+output|procedural\s+next\s+moves?)\b/i.test(prompt);
+};
+
+const hasTheoryIdeologyBridgeCue = (prompt: string): boolean => {
+  const hasTheoryCue =
+    /\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|observable\s+physics|mathematics|entropy|conservation|self[-\s]?organization|chemistry|first\s+principles|boundary\s+conditions?|feedback\s+loops?|symmetry|invariance)\b/i.test(prompt);
+  const hasZenCue =
+    /\b(?:zen\s*(?:badge\s*)?graph|zengraph|zenbridge|fruition|justice|fairness|due\s+process|morality|moral|ethos|procedural\s+justice|personalization|priorit(?:y|ies)|non[-\s]?harm|right\s+speech)\b/i.test(prompt);
+  return hasTheoryCue && hasZenCue;
+};
+
+const hasNegatedExternalResearchCommand = (prompt: string): boolean =>
+  /\b(?:not\s+asking|do\s+not|don't|dont|without|no)\b[\s\S]{0,100}\b(?:search|find|look\s+up|retrieve|browse|cite|fetch|pull|external\s+sources?|citations?|sources?)\b/i.test(prompt);
+
+const hasExplicitExternalResearchCommand = (prompt: string): boolean =>
+  !hasNegatedExternalResearchCommand(prompt) &&
+  (
+    /\b(?:search|find|look\s+up|retrieve|browse|cite|fetch|pull)\b[\s\S]{0,100}\b(?:papers?|stud(?:y|ies)|scholarly|academic|citations?|sources?|research|pdf|doi|arxiv|web|internet)\b/i.test(prompt) ||
+    /\b(?:give|include|provide)\b[\s\S]{0,80}\b(?:citations?|sources?|links|papers?|studies)\b/i.test(prompt) ||
+    /\b(?:with|using)\s+(?:citations?|sources?|scholarly\s+sources|external\s+sources)\b/i.test(prompt)
+  );
+
 const makeCandidate = (input: {
   candidateId: string;
   targetSource: HelixAskSourceTarget;
@@ -107,6 +133,13 @@ export function buildAskEvidenceTargetArbitration(input: {
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
   const scholarlyIntent = detectScholarlyResearchIntent(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
+  const zenGraphReflectionCue = hasZenGraphReflectionCue(prompt);
+  const theoryIdeologyBridgeCue = hasTheoryIdeologyBridgeCue(prompt);
+  const explicitExternalResearchCommand = hasExplicitExternalResearchCommand(prompt);
+  const contextualScholarlyMentionOnly =
+    scholarlyIntent.researchRequested &&
+    zenGraphReflectionCue &&
+    !explicitExternalResearchCommand;
   const stagePlayNegative = hasStagePlayNegativeCue(prompt);
   const stagePlayLexical = hasStagePlayLexicalCue(prompt);
   const stagePlayOperational =
@@ -168,15 +201,82 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
+  if (!contextualSuppression && zenGraphReflectionCue) {
+    promptIntentCandidates.push(theoryIdeologyBridgeCue ? "theory_ideology_bridge_reflection" : "zen_graph_reflection");
+    candidates.push(makeCandidate({
+      candidateId: theoryIdeologyBridgeCue
+        ? "workstation_panel.theory_ideology_bridge_reflection"
+        : "workstation_panel.zen_graph_reflection",
+      targetSource: "workstation_panel",
+      targetKind: "workstation_panel",
+      strength: explicitExternalResearchCommand ? "soft" : "hard",
+      score: explicitExternalResearchCommand
+        ? (theoryIdeologyBridgeCue ? 0.82 : 0.78)
+        : (theoryIdeologyBridgeCue ? 0.94 : 0.93),
+      reasonCodes: unique([
+        theoryIdeologyBridgeCue
+          ? "theory_ideology_bridge_explicit_cue"
+          : "zen_graph_reflection_explicit_cue",
+        "workstation_tool_plan_capability_candidate",
+        "receipt_must_reenter_model_solver",
+        contextualScholarlyMentionOnly ? "quoted_or_inline_research_terms_are_contextual" : "",
+      ]),
+      requestedOutputs: theoryIdeologyBridgeCue
+        ? [
+            "ideology_context_reflection",
+            "theory_ideology_bridge",
+            "workstation_tool_evaluation",
+            "typed_failure",
+          ]
+        : [
+            "ideology_context_reflection",
+            "zen_badge_locator",
+            "fruition_procedure_expression",
+            "procedural_zen_classification",
+            "workstation_tool_evaluation",
+            "typed_failure",
+          ],
+      capabilityKeys: theoryIdeologyBridgeCue
+        ? [
+            "helix_ask.reflect_theory_context",
+            "helix_ask.reflect_ideology_context",
+            "helix_ask.bridge_theory_ideology_context",
+          ]
+        : ["helix_ask.reflect_ideology_context"],
+      terminalProductConstraints: [
+        "workstation_tool_evaluation",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    }));
+  }
+
   if (!contextualSuppression && scholarlyIntent.researchRequested) {
     promptIntentCandidates.push("scholarly_research");
     candidates.push(makeCandidate({
       candidateId: "scholarly_research.external_sources",
       targetSource: "scholarly_research",
       targetKind: "scholarly_research",
-      strength: scholarlyIntent.strength,
-      score: scholarlyIntent.strength === "hard" ? 0.94 : 0.76,
-      reasonCodes: scholarlyIntent.reasons,
+      strength: contextualScholarlyMentionOnly
+        ? "soft"
+        : explicitExternalResearchCommand
+          ? "hard"
+          : scholarlyIntent.strength,
+      score: contextualScholarlyMentionOnly
+        ? 0.52
+        : explicitExternalResearchCommand
+          ? 0.95
+          : scholarlyIntent.strength === "hard"
+          ? 0.94
+          : 0.76,
+      reasonCodes: contextualScholarlyMentionOnly
+        ? unique([
+            ...scholarlyIntent.reasons,
+            "contextual_research_mention_only",
+            "no_external_research_operator_command",
+            "available_as_contrast_evidence_not_primary_target",
+          ])
+        : scholarlyIntent.reasons,
       requestedOutputs: scholarlyIntent.requestedOutputs,
       capabilityKeys: scholarlyIntent.fullTextRequested
         ? ["scholarly_research.lookup", "scholarly_research.fetch_full_text"]

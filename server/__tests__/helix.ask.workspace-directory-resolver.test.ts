@@ -45,4 +45,44 @@ describe("Helix Ask workspace directory resolver", () => {
     expect(invalid.candidates).toEqual([]);
     expect(HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY).toBe("workspace-directory.resolve");
   });
+
+  it("preserves equation anchors in direct workspace URIs", () => {
+    const result = executeWorkspaceDirectoryResolveTool({
+      turnId: "ask:workspace-directory",
+      callId: "call:direct-equation-uri",
+      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+      workspaceRoot,
+    });
+
+    expect(result.status).toBe("resolved");
+    expect(result.selected_target_kind).toBe("doc_equation");
+    expect(result.selected_anchor).toBe("nhm2-wall-t00-source-residual");
+    expect(result.selected_uri).toBe(
+      "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+    );
+  });
+
+  it("resolves doc equation targets from equation action sidecars", () => {
+    const result = executeWorkspaceDirectoryResolveTool({
+      turnId: "ask:workspace-directory",
+      callId: "call:equation",
+      query: "open the scalar replay equation for wall T00 residual in the NHM2 whitepaper",
+      workspaceRoot,
+    });
+
+    expect(result.status).toBe("resolved");
+    expect(result.selected_target_kind).toBe("doc_equation");
+    expect(result.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(result.selected_anchor).toBe("nhm2-wall-t00-source-residual");
+    expect(result.selected_artifact_kind).toBe("doc_equation_context/v1");
+    expect(result.selected_uri).toBe(
+      "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-wall-t00-source-residual",
+    );
+    expect(result.candidates[0]).toMatchObject({
+      target_kind: "doc_equation",
+      equation_id: "nhm2-wall-t00-source-residual",
+      artifact_id: "nhm2.closure.wall_t00_source_residual",
+    });
+    expect(result.searched_scopes).toContain("workspace_doc_equation_manifests");
+  });
 });

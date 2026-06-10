@@ -82,6 +82,7 @@ describe("doc equation context events", () => {
           kind: "doc_equation_context",
           assistant_answer: false,
           terminal_eligible: false,
+          raw_content_included: false,
           artifact,
         },
       },

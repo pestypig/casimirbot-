@@ -11,15 +11,41 @@ export const DOC_EQUATION_CONTEXT_SCOPE_VALUES = [
   "theory_orientation",
 ] as const;
 
+export const DOC_EQUATION_CONTEXT_LINK_REL_VALUES = [
+  "opens_panel",
+  "supports_doc_section",
+  "opens_runtime_artifact",
+  "orients_theory_graph",
+] as const;
+
 export type DocEquationContextActionKindV1 =
   (typeof DOC_EQUATION_CONTEXT_ACTION_KIND_VALUES)[number];
 
 export type DocEquationContextScopeV1 =
   (typeof DOC_EQUATION_CONTEXT_SCOPE_VALUES)[number];
 
+export type DocEquationContextLinkRelV1 =
+  (typeof DOC_EQUATION_CONTEXT_LINK_REL_VALUES)[number];
+
 export type DocEquationContextCalculatorPayloadRefV1 = {
   badgeId: string;
   payloadId: string;
+};
+
+export type DocEquationContextPathRefV1 = {
+  root: "workspace";
+  relativePath: string;
+  displaySegments: string[];
+  virtualUri: string;
+};
+
+export type DocEquationContextLinkV1 = {
+  rel: DocEquationContextLinkRelV1;
+  panelId?: string;
+  docPath?: string;
+  anchor?: string;
+  artifactId?: string;
+  artifactKind?: string;
 };
 
 export type DocEquationContextArtifactV1 = {
@@ -29,6 +55,9 @@ export type DocEquationContextArtifactV1 = {
   equationId: string;
   equationLabel: string;
   sectionAnchor?: string;
+  uri?: string;
+  pathRef?: DocEquationContextPathRefV1;
+  anchor?: string;
   latex: string;
   actionId: string;
   actionKind: DocEquationContextActionKindV1;
@@ -40,6 +69,7 @@ export type DocEquationContextArtifactV1 = {
   openedPanels: string[];
   claimBoundaryNotes: string[];
   actionClaimBoundaryNote?: string;
+  links?: DocEquationContextLinkV1[];
   commentaryHints: {
     summary: string;
     scope: DocEquationContextScopeV1;
@@ -67,6 +97,44 @@ function validateCalculatorPayloadRef(path: string, value: unknown, issues: stri
   }
   if (!isNonEmptyString(value.badgeId)) issues.push(`${path}.badgeId must be a non-empty string`);
   if (!isNonEmptyString(value.payloadId)) issues.push(`${path}.payloadId must be a non-empty string`);
+}
+
+function validatePathRef(path: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return;
+  }
+  if (value.root !== "workspace") issues.push(`${path}.root must be workspace`);
+  if (!isNonEmptyString(value.relativePath)) issues.push(`${path}.relativePath must be a non-empty string`);
+  if (!isStringArray(value.displaySegments) || value.displaySegments.length === 0) {
+    issues.push(`${path}.displaySegments must be a non-empty string array`);
+  }
+  if (!isNonEmptyString(value.virtualUri)) issues.push(`${path}.virtualUri must be a non-empty string`);
+}
+
+function validateLink(path: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return;
+  }
+  if (!includes(DOC_EQUATION_CONTEXT_LINK_REL_VALUES, value.rel)) {
+    issues.push(`${path}.rel must be one of ${DOC_EQUATION_CONTEXT_LINK_REL_VALUES.join(", ")}`);
+  }
+  if (value.panelId !== undefined && !isNonEmptyString(value.panelId)) {
+    issues.push(`${path}.panelId must be a non-empty string when present`);
+  }
+  if (value.docPath !== undefined && !isNonEmptyString(value.docPath)) {
+    issues.push(`${path}.docPath must be a non-empty string when present`);
+  }
+  if (value.anchor !== undefined && !isNonEmptyString(value.anchor)) {
+    issues.push(`${path}.anchor must be a non-empty string when present`);
+  }
+  if (value.artifactId !== undefined && !isNonEmptyString(value.artifactId)) {
+    issues.push(`${path}.artifactId must be a non-empty string when present`);
+  }
+  if (value.artifactKind !== undefined && !isNonEmptyString(value.artifactKind)) {
+    issues.push(`${path}.artifactKind must be a non-empty string when present`);
+  }
 }
 
 function validateCommentaryHints(path: string, value: unknown, issues: string[]): void {
@@ -100,6 +168,15 @@ export function validateDocEquationContextArtifactV1(value: unknown): string[] {
   if (value.sectionAnchor !== undefined && !isNonEmptyString(value.sectionAnchor)) {
     issues.push("sectionAnchor must be a non-empty string when present");
   }
+  if (value.uri !== undefined && !isNonEmptyString(value.uri)) {
+    issues.push("uri must be a non-empty string when present");
+  }
+  if (value.pathRef !== undefined) {
+    validatePathRef("pathRef", value.pathRef, issues);
+  }
+  if (value.anchor !== undefined && !isNonEmptyString(value.anchor)) {
+    issues.push("anchor must be a non-empty string when present");
+  }
   if (!isNonEmptyString(value.latex)) issues.push("latex must be a non-empty string");
   if (!isNonEmptyString(value.actionId)) issues.push("actionId must be a non-empty string");
   if (!includes(DOC_EQUATION_CONTEXT_ACTION_KIND_VALUES, value.actionKind)) {
@@ -122,6 +199,13 @@ export function validateDocEquationContextArtifactV1(value: unknown): string[] {
   if (!isStringArray(value.claimBoundaryNotes)) issues.push("claimBoundaryNotes must be a string array");
   if (value.actionClaimBoundaryNote !== undefined && !isNonEmptyString(value.actionClaimBoundaryNote)) {
     issues.push("actionClaimBoundaryNote must be a non-empty string when present");
+  }
+  if (value.links !== undefined) {
+    if (!Array.isArray(value.links)) {
+      issues.push("links must be an array when present");
+    } else {
+      value.links.forEach((link, index) => validateLink(`links[${index}]`, link, issues));
+    }
   }
   validateCommentaryHints("commentaryHints", value.commentaryHints, issues);
 

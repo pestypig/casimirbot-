@@ -72,6 +72,8 @@ describe("doc equation actions", () => {
     expect(contexts[0]).toMatchObject({
       contractVersion: "doc_equation_context/v1",
       equationId: "nhm2-same-chart-full-tensor-ledger",
+      uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-same-chart-full-tensor-ledger",
+      anchor: "nhm2-same-chart-full-tensor-ledger",
       actionId: "open-same-chart-full-tensor-artifact",
       actionKind: "artifact_backed_theory_run",
       preferredBadgeId: "nhm2.tensor.same_chart_full_tensor",
@@ -80,6 +82,21 @@ describe("doc equation actions", () => {
       },
     });
     expect(contexts[0]?.calculatorPayloadRef).toBeUndefined();
+    expect(contexts[0]?.links).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rel: "supports_doc_section",
+          docPath: NHM2_WHITEPAPER,
+          anchor: "57-workstation-equation-anchors",
+        }),
+        expect.objectContaining({ rel: "opens_panel", panelId: "theory-badge-graph" }),
+        expect.objectContaining({
+          rel: "opens_runtime_artifact",
+          artifactId: "nhm2.tensor.same_chart_full_tensor",
+          artifactKind: "runtime_artifact",
+        }),
+      ]),
+    );
     expect(contexts[0]?.commentaryHints.prohibitedClaims).toEqual(
       expect.arrayContaining(["validated", "viable", "certified transport"]),
     );

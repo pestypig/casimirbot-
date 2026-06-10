@@ -2,6 +2,7 @@ import type { RuntimeAdmissionDecision } from "../runtime/runtime-memory-governo
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
 import {
   listStagePlayLiveSourceJobStates,
+  configureStagePlayLiveSourceWatchJobPolicy,
   subscribeStagePlayLiveSourceMailEnqueued,
   type StagePlayLiveSourceMailEnqueuedEvent,
 } from "./stage-play-live-source-mailbox-store";
@@ -88,6 +89,51 @@ const wakeRuntimePressureCheck = (runtimeAdmissionSink?: (decision: RuntimeAdmis
 
 const immediateRunDelayMs = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_IMMEDIATE_DELAY_MS", 250);
+
+const ensureIntervalWatchPolicyForJob = (
+  job: ReturnType<typeof listStagePlayLiveSourceJobStates>[number],
+  now: string,
+): ReturnType<typeof configureStagePlayLiveSourceWatchJobPolicy>["policy"] | null => {
+  if (job.watchJobPolicyRef) return null;
+  const hasExplicitWatchIntent =
+    Boolean(job.objective?.trim()) ||
+    typeof job.nextWakePolicy.afterMs === "number";
+  if (!hasExplicitWatchIntent) return null;
+  const configured = configureStagePlayLiveSourceWatchJobPolicy({
+    jobId: job.jobId,
+    threadId: job.threadId,
+    roomId: job.roomId ?? null,
+    environmentId: job.environmentId ?? null,
+    sourceIds: job.sourceIds,
+    objectiveText: job.objective ??
+      "Use micro-reasoners to watch the active visual source, track the latest prediction horizon, and wake Helix Ask only for salient findings.",
+    decisionPolicyPrompt: [
+      "Process interval mail through the fast micro-reasoner layer first.",
+      "If the processed packet recommends wait_for_next_summary, keep the result as observer backlog and do not wake Ask.",
+      "If the processed packet recommends record_interpretation, draft_text_answer, request_voice_callout, request_more_evidence, or request_stage_play_checkpoint, wake Ask with the compact processed packet context.",
+      "For Minecraft-style live sources, request voice only for urgent risk/opportunity findings such as lava, fire, damage, hostile mobs, low health, or a profile-specified rare opportunity.",
+      "After any decision, keep nextLoopState armed_for_next_summary.",
+    ].join("\n"),
+    interpretationMode: "prediction_watch",
+    mailProcessingMode: "salience_window",
+    outputCadence: "voice_only_salient",
+    outputPolicy: {
+      allowTextAnswer: true,
+      allowVoiceCallout: true,
+      voiceRequiresUrgency: true,
+      confirmationRequired: false,
+    },
+    importanceCriteria: [
+      "Urgent risk, prediction contradiction, meaningful scene transition, hostile encounter, lava/fire/damage cue, low health, or profile-specified opportunity.",
+    ],
+    suppressCriteria: [
+      "Routine movement, stable inventory/chest/base frames, repeated low-salience scene summaries, and wait_for_next_summary processed packets.",
+    ],
+    evidenceRefs: [job.jobId, ...job.sourceIds],
+    now,
+  });
+  return configured.policy;
+};
 
 export function requestStagePlayLiveSourceMailWakeRun(
   event?: StagePlayLiveSourceMailEnqueuedEvent,
@@ -321,6 +367,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       limit: 100,
     }).filter((job) => job.status === "armed" || job.status === "checking");
     for (const job of jobs) {
+      ensureIntervalWatchPolicyForJob(job, now);
       const sourceIds = job.sourceIds.length > 0 ? job.sourceIds : [null];
       for (const sourceId of sourceIds) {
         queueMailWakeForUnreadItems({

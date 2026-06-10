@@ -13,6 +13,7 @@ import {
   listStagePlayMailDecisions,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
+  listStagePlayLiveSourceWatchJobPolicies,
   recordStagePlayMailDecision,
   resetStagePlayLiveSourceMailboxForTest,
   subscribeStagePlayLiveSourceMailEnqueued,
@@ -2851,6 +2852,137 @@ describe("Stage Play live-source mailbox", () => {
       } else {
         process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = previousMaxChars;
       }
+    }
+  });
+
+  it("auto-arms a micro-reasoner watch policy for interval jobs before queueing wake mail", async () => {
+    upsertStagePlayLiveSourceJobState({
+      jobId: "stage_play_live_source_job:auto-arm",
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      status: "armed",
+      nextWakePolicy: {
+        sourceKind: "visual_frame",
+        afterMs: 10_000,
+        maxConsecutiveReads: 3,
+      },
+      updatedAt: "2026-06-04T12:02:00.000Z",
+    });
+    enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:auto-arm",
+      evidenceRef: "visual_evidence:auto-arm",
+      summaryText: "A routine Minecraft interval summary near a crafting table.",
+      createdAt: "2026-06-04T12:02:01.000Z",
+    });
+
+    await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:02.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async () => {
+        throw new Error("routine_auto_arm_should_not_need_slow_ask");
+      },
+    });
+
+    const policies = listStagePlayLiveSourceWatchJobPolicies({ threadId, roomId });
+    const policy = policies.find((entry) => entry.jobId === "stage_play_live_source_job:auto-arm");
+    expect(policy).toBeTruthy();
+    expect(policy).toMatchObject({
+      interpretationMode: "prediction_watch",
+      mailProcessingMode: "salience_window",
+      outputCadence: "voice_only_salient",
+      outputPolicy: expect.objectContaining({
+        allowVoiceCallout: true,
+        confirmationRequired: false,
+      }),
+    });
+    const autoArmJob = listStagePlayLiveSourceJobStates({ threadId, roomId })
+      .find((entry) => entry.jobId === "stage_play_live_source_job:auto-arm");
+    expect(autoArmJob?.watchJobPolicyRef).toBe(policy?.policyId);
+  });
+
+  it("falls back to a compact processed-packet handoff when the full wake prompt exceeds preflight budget", async () => {
+    const previousMaxChars = process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS;
+    const previousBatchLimit = process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT;
+    process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = "9000";
+    process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT = "12";
+    try {
+      configureStagePlayLiveSourceWatchJobPolicy({
+        jobId: "stage_play_live_source_job:compact-prompt",
+        threadId,
+        roomId,
+        sourceIds: [sourceId],
+        objectiveText: "Use micro-reasoners to watch the Minecraft interval source and request voice only for urgent risk.",
+        interpretationMode: "prediction_watch",
+        mailProcessingMode: "salience_window",
+        outputCadence: "voice_only_salient",
+        outputPolicy: {
+          allowTextAnswer: true,
+          allowVoiceCallout: true,
+          voiceRequiresUrgency: true,
+          confirmationRequired: false,
+        },
+        importanceCriteria: ["lava, fire, damage, hostile mobs, and low health are urgent."],
+        suppressCriteria: ["routine movement and repeated interior frames are not user-facing."],
+        now: "2026-06-04T12:03:00.000Z",
+      });
+      for (let index = 0; index < 12; index += 1) {
+        enqueueStagePlayLiveSourceMailItem({
+          threadId,
+          roomId,
+          sourceId,
+          sourceKind: "visual_frame",
+          frameRef: `visual_frame:compact-${index}`,
+          evidenceRef: `visual_evidence:compact-${index}`,
+          summaryText: `Minecraft player is near lava and fire with possible damage risk while moving forward. Observation ${index}. ${"repeat salient scene detail ".repeat(18)}`,
+          createdAt: `2026-06-04T12:03:${String(index).padStart(2, "0")}.000Z`,
+        });
+      }
+
+      let prompt = "";
+      const result = await runNextMailWakeRequest({
+        threadId,
+        roomId,
+        now: "2026-06-04T12:03:20.000Z",
+        askTurnRunner: async ({ prompt: wakePrompt, wakeRequest }) => {
+          prompt = wakePrompt;
+          return {
+            turn_id: "ask:compact-wake",
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: {
+                    artifactId: "stage_play_live_source_mail_decision",
+                    decisionId: "stage_play_live_source_mail_decision:compact-wake",
+                    mailIds: wakeRequest.mailIds,
+                  },
+                },
+              },
+            ],
+          };
+        },
+      });
+
+      expect(result?.status).toBe("completed");
+      expect(prompt).toContain("compact Ask handoff");
+      expect(prompt).toContain("Processed packet:");
+      expect(prompt).toContain("Latest micro-reasoner finding:");
+      expect(prompt.length).toBeLessThanOrEqual(9000);
+      expect(prompt).not.toContain("Active interpreter profile:");
+      expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0].status).toBe("completed");
+    } finally {
+      if (previousMaxChars === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS;
+      else process.env.STAGE_PLAY_MAIL_WAKE_PROMPT_MAX_CHARS = previousMaxChars;
+      if (previousBatchLimit === undefined) delete process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT;
+      else process.env.STAGE_PLAY_MAIL_WAKE_VOICE_SALIENCE_BATCH_LIMIT = previousBatchLimit;
     }
   });
 

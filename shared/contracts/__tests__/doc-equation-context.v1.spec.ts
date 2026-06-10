@@ -12,6 +12,14 @@ const makeArtifact = (): DocEquationContextArtifactV1 => ({
   equationId: "nhm2-same-chart-full-tensor-ledger",
   equationLabel: "Same-chart full tensor ledger",
   sectionAnchor: "57-workstation-equation-anchors",
+  uri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md#nhm2-same-chart-full-tensor-ledger",
+  pathRef: {
+    root: "workspace",
+    relativePath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+    displaySegments: ["Workspace", "docs", "research", "nhm2-current-status-whitepaper-2026-05-02.md"],
+    virtualUri: "workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+  },
+  anchor: "nhm2-same-chart-full-tensor-ledger",
   latex: "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}.",
   actionId: "open-same-chart-full-tensor-artifact",
   actionKind: "artifact_backed_theory_run",
@@ -22,6 +30,20 @@ const makeArtifact = (): DocEquationContextArtifactV1 => ({
   openedPanels: ["theory-badge-graph", "scientific-calculator"],
   claimBoundaryNotes: ["Full-tensor completeness is an evidence ledger, not a propulsion claim."],
   actionClaimBoundaryNote: "Missing T0i or off-diagonal Tij is a blocker, not a zero.",
+  links: [
+    {
+      rel: "supports_doc_section",
+      docPath: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
+      anchor: "57-workstation-equation-anchors",
+    },
+    { rel: "opens_panel", panelId: "theory-badge-graph" },
+    {
+      rel: "opens_runtime_artifact",
+      artifactId: "nhm2.tensor.same_chart_full_tensor",
+      artifactKind: "runtime_artifact",
+      panelId: "theory-badge-graph",
+    },
+  ],
   commentaryHints: {
     summary: "Same-chart full tensor ledger maps the whitepaper equation to a runtime evidence row.",
     scope: "runtime_artifact",
@@ -49,6 +71,18 @@ describe("doc_equation_context/v1", () => {
 
     expect(validateDocEquationContextArtifactV1(artifact)).toContain(
       "commentaryHints.prohibitedClaims must be a non-empty string array",
+    );
+    expect(isDocEquationContextArtifactV1(artifact)).toBe(false);
+  });
+
+  it("rejects unknown workspace link relationships", () => {
+    const artifact = {
+      ...makeArtifact(),
+      links: [{ rel: "answers_question", panelId: "docs-viewer" }],
+    };
+
+    expect(validateDocEquationContextArtifactV1(artifact)).toContain(
+      "links[0].rel must be one of opens_panel, supports_doc_section, opens_runtime_artifact, orients_theory_graph",
     );
     expect(isDocEquationContextArtifactV1(artifact)).toBe(false);
   });

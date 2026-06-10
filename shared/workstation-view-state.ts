@@ -7,12 +7,23 @@ export type WorkstationPathRef = {
   virtualUri: string;
 };
 
+export type WorkstationObjectKind =
+  | "doc_equation"
+  | "doc_figure"
+  | "doc_table"
+  | "doc_claim"
+  | "runtime_artifact";
+
 export type WorkstationViewState = {
   projectSlug?: string;
   panels: string[];
   focusPanel?: string;
   activeDocPath?: string;
   anchor?: string;
+  selectedObjectKind?: WorkstationObjectKind;
+  selectedObjectId?: string;
+  artifactId?: string;
+  artifactKind?: string;
   pathRef?: WorkstationPathRef;
 };
 
@@ -48,6 +59,52 @@ function splitAnchor(value: string): { path: string; anchor?: string } {
     path,
     ...(anchor ? { anchor } : {}),
   };
+}
+
+function parseKindedValue(value: string | null | undefined): { kind: string; id: string } | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  const separatorIndex = raw.indexOf(":");
+  if (separatorIndex < 1 || separatorIndex === raw.length - 1) return null;
+  const kind = raw.slice(0, separatorIndex).trim();
+  const id = raw.slice(separatorIndex + 1).trim();
+  return kind && id ? { kind, id } : null;
+}
+
+export function normalizeWorkstationObjectKind(value: string | null | undefined): WorkstationObjectKind | null {
+  const normalized = value?.trim();
+  if (
+    normalized === "doc_equation" ||
+    normalized === "doc_figure" ||
+    normalized === "doc_table" ||
+    normalized === "doc_claim" ||
+    normalized === "runtime_artifact"
+  ) {
+    return normalized;
+  }
+  return null;
+}
+
+export function parseWorkstationObjectParam(value: string | null | undefined): {
+  selectedObjectKind: WorkstationObjectKind;
+  selectedObjectId: string;
+} | null {
+  const parsed = parseKindedValue(value);
+  if (!parsed) return null;
+  const selectedObjectKind = normalizeWorkstationObjectKind(parsed.kind);
+  if (!selectedObjectKind) return null;
+  return { selectedObjectKind, selectedObjectId: parsed.id };
+}
+
+export function parseWorkstationArtifactParam(value: string | null | undefined): {
+  artifactKind?: string;
+  artifactId: string;
+} | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  const parsed = parseKindedValue(raw);
+  if (parsed) return { artifactKind: parsed.kind, artifactId: parsed.id };
+  return { artifactId: raw };
 }
 
 export function normalizeWorkspaceRelativePath(value: string | null | undefined): string | null {
@@ -124,16 +181,30 @@ export function buildWorkstationPanelViewState(
 export function buildWorkstationDocViewState(
   path: string | null | undefined,
   anchor?: string | null,
+  object?: {
+    selectedObjectKind?: WorkstationObjectKind | null;
+    selectedObjectId?: string | null;
+    artifactKind?: string | null;
+    artifactId?: string | null;
+  } | null,
 ): WorkstationViewState | null {
   const activeDocPath = normalizeWorkstationDocPath(path);
   if (!activeDocPath) return null;
   const pathRef = buildWorkstationPathRef(activeDocPath) ?? undefined;
   const cleanAnchor = anchor?.trim();
+  const selectedObjectKind = normalizeWorkstationObjectKind(object?.selectedObjectKind ?? null) ?? undefined;
+  const selectedObjectId = object?.selectedObjectId?.trim() || undefined;
+  const artifactKind = object?.artifactKind?.trim() || undefined;
+  const artifactId = object?.artifactId?.trim() || undefined;
   return {
     panels: ["docs-viewer"],
     focusPanel: "docs-viewer",
     activeDocPath,
     ...(cleanAnchor ? { anchor: cleanAnchor } : {}),
+    ...(selectedObjectKind ? { selectedObjectKind } : {}),
+    ...(selectedObjectId ? { selectedObjectId } : {}),
+    ...(artifactKind ? { artifactKind } : {}),
+    ...(artifactId ? { artifactId } : {}),
     ...(pathRef ? { pathRef } : {}),
   };
 }
@@ -165,7 +236,10 @@ export function coerceWorkstationViewStateFromPathInput(
     return buildWorkstationPanelViewState(directPanelId, options?.resolvePanelTitle?.(directPanelId));
   }
   if (/^docs(?:\/|$)/i.test(relativePath)) {
-    return buildWorkstationDocViewState(relativePath, anchor);
+    const anchorLooksEquation = anchor && /^eq[-_:]/i.test(anchor);
+    return buildWorkstationDocViewState(relativePath, anchor, anchorLooksEquation
+      ? { selectedObjectKind: "doc_equation", selectedObjectId: anchor }
+      : null);
   }
   return null;
 }
@@ -203,6 +277,20 @@ export function coerceWorkstationViewState(
         : null,
   ) ?? undefined;
   const anchor = typeof record.anchor === "string" && record.anchor.trim() ? record.anchor.trim() : undefined;
+  const objectParam = typeof record.object === "string" ? parseWorkstationObjectParam(record.object) : null;
+  const equationId = typeof record.equation === "string" && record.equation.trim() ? record.equation.trim() : undefined;
+  const selectedObjectKind = objectParam?.selectedObjectKind ??
+    normalizeWorkstationObjectKind(typeof record.selectedObjectKind === "string" ? record.selectedObjectKind : null) ??
+    (equationId ? "doc_equation" : undefined);
+  const selectedObjectId = objectParam?.selectedObjectId ??
+    (typeof record.selectedObjectId === "string" && record.selectedObjectId.trim()
+      ? record.selectedObjectId.trim()
+      : equationId);
+  const artifactParam = typeof record.artifact === "string" ? parseWorkstationArtifactParam(record.artifact) : null;
+  const artifactKind = artifactParam?.artifactKind ??
+    (typeof record.artifactKind === "string" && record.artifactKind.trim() ? record.artifactKind.trim() : undefined);
+  const artifactId = artifactParam?.artifactId ??
+    (typeof record.artifactId === "string" && record.artifactId.trim() ? record.artifactId.trim() : undefined);
   const normalizedPanels = activeDocPath && !panels.includes("docs-viewer") ? [...panels, "docs-viewer"] : panels;
   const panelPathRef =
     !activeDocPath && normalizedPanels.length === 1
@@ -215,6 +303,10 @@ export function coerceWorkstationViewState(
     ...(focusPanel ? { focusPanel } : activeDocPath ? { focusPanel: "docs-viewer" } : {}),
     ...(activeDocPath ? { activeDocPath } : {}),
     ...(anchor ? { anchor } : {}),
+    ...(selectedObjectKind ? { selectedObjectKind } : {}),
+    ...(selectedObjectId ? { selectedObjectId } : {}),
+    ...(artifactKind ? { artifactKind } : {}),
+    ...(artifactId ? { artifactId } : {}),
     ...(pathRef ? { pathRef } : {}),
   };
 }
@@ -229,6 +321,9 @@ export function encodeWorkstationViewStateSearch(
   params.delete("focus");
   params.delete("doc");
   params.delete("anchor");
+  params.delete("object");
+  params.delete("equation");
+  params.delete("artifact");
   const panels: string[] = [];
   for (const entry of state.panels) {
     const panelId = resolvePanel(entry, options);
@@ -240,6 +335,14 @@ export function encodeWorkstationViewStateSearch(
   const activeDocPath = normalizeWorkstationDocPath(state.activeDocPath);
   if (activeDocPath) params.set("doc", activeDocPath);
   if (state.anchor) params.set("anchor", state.anchor);
+  if (state.selectedObjectKind === "doc_equation" && state.selectedObjectId) {
+    params.set("equation", state.selectedObjectId);
+  } else if (state.selectedObjectKind && state.selectedObjectId) {
+    params.set("object", `${state.selectedObjectKind}:${state.selectedObjectId}`);
+  }
+  if (state.artifactId) {
+    params.set("artifact", state.artifactKind ? `${state.artifactKind}:${state.artifactId}` : state.artifactId);
+  }
   const query = params.toString();
   return query ? `?${query}` : "";
 }

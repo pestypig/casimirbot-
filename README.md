@@ -168,6 +168,33 @@ Receipts are observations.
 Only the completed solver path can answer.
 ```
 
+Controller path corollary: the runtime may build a model-visible capability
+surface, carry classifier/source/workspace hints, and record typed receipts, but
+those packets are not answer authority. Terminal output is allowed only when the
+solver controller sees the required lifecycle: admitted route, selected
+capability or direct-answer path, structured observation, post-observation model
+decision, goal satisfaction, route/product compatibility, and terminal
+authority. Missing lifecycle evidence must continue, retry, request user input,
+typed-fail, or fail closed rather than promote a receipt into an answer.
+
+Best-practice policy for agent and panel work:
+
+- Authority ladder: routes propose, classifiers hint, tools observe, the model
+  synthesizes, and the controller authorizes.
+- Receipt exception rule: a receipt can be terminal only when the route-product
+  contract explicitly names that receipt kind as the terminal product.
+- No shortcut answers: panels, process graphs, live cards, voice callouts, and
+  tool receipts must not write answer text just because they look complete.
+- Debug minimum: terminal decisions should expose the admitted goal, selected
+  capability or direct-answer path, re-entered observation, post-observation
+  model decision, and terminal allow/block reason.
+- Fail-closed standard: missing capability lifecycle, agent step decision,
+  selected capability observation, or post-observation model decision blocks the
+  terminal answer.
+- Shortcut tests: shortcut-like route rules need adversarial coverage for
+  contextual, negated, future or conditional, historical, quoted or
+  screen-visible, and mixed-intent prompts.
+
 In practical terms, the intended shape is:
 
 ```text

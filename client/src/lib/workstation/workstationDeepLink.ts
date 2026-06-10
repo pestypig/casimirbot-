@@ -8,6 +8,8 @@ import {
   normalizeWorkspaceRelativePath as normalizeSharedWorkspaceRelativePath,
   normalizeWorkstationDocPath as normalizeSharedWorkstationDocPath,
   normalizeWorkstationPathInput as normalizeSharedWorkstationPathInput,
+  parseWorkstationArtifactParam,
+  parseWorkstationObjectParam,
   type WorkstationPathRef,
   type WorkstationViewState,
 } from "@shared/workstation-view-state";
@@ -107,6 +109,11 @@ function readParams(params: URLSearchParams): WorkstationViewState {
     params.get("doc") ?? params.get("activeDocPath") ?? params.get("path"),
   ) ?? undefined;
   const anchor = params.get("anchor")?.trim() || undefined;
+  const objectParam = parseWorkstationObjectParam(params.get("object"));
+  const equation = params.get("equation")?.trim() || undefined;
+  const artifactParam = parseWorkstationArtifactParam(params.get("artifact"));
+  const selectedObjectKind = objectParam?.selectedObjectKind ?? (equation ? "doc_equation" : undefined);
+  const selectedObjectId = objectParam?.selectedObjectId ?? equation;
   const projectSlug = params.get("project")?.trim() || undefined;
   const pathRef = buildWorkstationPathRef(activeDocPath) ?? undefined;
   const resolvedPanels = activeDocPath && !panels.includes("docs-viewer") ? [...panels, "docs-viewer"] : panels;
@@ -116,6 +123,10 @@ function readParams(params: URLSearchParams): WorkstationViewState {
     ...(focusPanel ? { focusPanel } : activeDocPath ? { focusPanel: "docs-viewer" } : {}),
     ...(activeDocPath ? { activeDocPath } : {}),
     ...(anchor ? { anchor } : {}),
+    ...(selectedObjectKind ? { selectedObjectKind } : {}),
+    ...(selectedObjectId ? { selectedObjectId } : {}),
+    ...(artifactParam?.artifactKind ? { artifactKind: artifactParam.artifactKind } : {}),
+    ...(artifactParam?.artifactId ? { artifactId: artifactParam.artifactId } : {}),
     ...(pathRef ? { pathRef } : {}),
   };
 }
@@ -147,6 +158,10 @@ export function mergeWorkstationViewStates(
   }
   const activeDocPath = override.activeDocPath ?? base.activeDocPath;
   const pathRef = buildWorkstationPathRef(activeDocPath) ?? override.pathRef ?? base.pathRef;
+  const selectedObjectKind = override.selectedObjectKind ?? base.selectedObjectKind;
+  const selectedObjectId = override.selectedObjectId ?? base.selectedObjectId;
+  const artifactKind = override.artifactKind ?? base.artifactKind;
+  const artifactId = override.artifactId ?? base.artifactId;
   return {
     ...(override.projectSlug ?? base.projectSlug ? { projectSlug: override.projectSlug ?? base.projectSlug } : {}),
     panels: activeDocPath && !panels.includes("docs-viewer") ? [...panels, "docs-viewer"] : panels,
@@ -157,6 +172,10 @@ export function mergeWorkstationViewStates(
         : {}),
     ...(activeDocPath ? { activeDocPath } : {}),
     ...(override.anchor ?? base.anchor ? { anchor: override.anchor ?? base.anchor } : {}),
+    ...(selectedObjectKind ? { selectedObjectKind } : {}),
+    ...(selectedObjectId ? { selectedObjectId } : {}),
+    ...(artifactKind ? { artifactKind } : {}),
+    ...(artifactId ? { artifactId } : {}),
     ...(pathRef ? { pathRef } : {}),
   };
 }

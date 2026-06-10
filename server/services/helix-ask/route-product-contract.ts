@@ -282,6 +282,7 @@ export function buildRouteProductContract(input: {
       allowedCore: ["doc_location_result"],
       allowedExtra: ["active_doc_identity", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation", "model_synthesized_answer"],
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
+      sideArtifactKindsAllowed: ["doc_equation_context", "doc_equation_context/v1"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
     });
   }
@@ -315,6 +316,8 @@ export function buildRouteProductContract(input: {
       sideArtifactKindsAllowed: [
         "doc_search_results",
         "workspace_directory_resolution",
+        "doc_equation_context",
+        "doc_equation_context/v1",
         "doc_candidate_validation",
         "doc_location_result",
         "repo_code_evidence_observation",

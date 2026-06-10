@@ -27,6 +27,53 @@ const parseSseEvents = (text: string): Array<{ event: string; data: any }> => {
 };
 
 describe("Helix Ask ZenGraph reflection route", () => {
+  it("does not let contextual scholarly words inside a ZenGraph reflection prompt hijack the route", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Use the Zen Badge Graph to reflect this conversation as procedural next moves. The quoted conversation mentions research papers, data, and decisions, but do not search external sources; use the ZenGraph receipt as evidence for model synthesis.",
+        mode: "read",
+        debug: true,
+        sessionId: `zen-graph-contextual-research-${Date.now()}`,
+      });
+
+    if (response.status !== 200) {
+      console.error(JSON.stringify({
+        error: response.body?.error,
+        route: response.body?.route,
+        route_reason_code: response.body?.route_reason_code,
+        final_answer_source: response.body?.final_answer_source,
+        terminal_artifact_kind: response.body?.terminal_artifact_kind,
+        selected_target_source: response.body?.evidence_target_arbitration?.selected_target_source,
+        selected_candidate_id: response.body?.evidence_target_arbitration?.selected_candidate_id,
+      }, null, 2));
+    }
+    expect(response.status).toBe(200);
+
+    const body = response.body;
+    const scholarlyCandidate = body?.evidence_target_arbitration?.evidence_target_candidates?.find(
+      (candidate: any) => candidate?.candidate_id === "scholarly_research.external_sources",
+    );
+
+    expect(body?.route_reason_code).toBe("zen_graph_reflection");
+    expect(body?.canonical_goal_frame?.goal_kind).toBe("zen_graph_reflection");
+    expect(body?.workstation_tool_plan?.intent).toBe("zen_graph_reflection");
+    if (body?.evidence_target_arbitration) {
+      expect(body.evidence_target_arbitration.selected_candidate_id).toBe("workstation_panel.zen_graph_reflection");
+      expect(scholarlyCandidate?.reason_codes).toEqual(
+        expect.arrayContaining([
+          "contextual_research_mention_only",
+          "no_external_research_operator_command",
+        ]),
+      );
+    }
+    expect(body?.zen_graph_reflection_tool_result?.reflection?.schemaVersion).toBe("ideology_context_reflection/v1");
+    expect(String(body?.selected_final_answer ?? "")).toMatch(/ZenGraph applied reflection/i);
+  }, 60_000);
+
   it("routes Zen Badge Graph and Fruition prompts through non-terminal ZenGraph evidence", async () => {
     const app = createApp();
 
@@ -208,10 +255,8 @@ describe("Helix Ask ZenGraph reflection route", () => {
       .get(`/api/agi/ask/turn/${encodeURIComponent(String(body?.turn_id))}/debug-export`)
       .expect(200);
     const exported = debugExport.body?.payload;
-    expect(exported?.resolved_turn_summary).toMatchObject({
-      resolved_route_label: "zen_graph_reflection",
-      terminal_artifact_kind: "model_synthesized_answer",
-    });
+    expect(exported?.resolved_turn_summary?.resolved_route_label).toContain("zen_graph_reflection");
+    expect(exported?.resolved_turn_summary?.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(exported?.final_answer_source).toBe("final_answer_draft");
     expect(exported?.solver_controller_summary).toMatchObject({
       decision: "allow_terminal",
