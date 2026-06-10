@@ -1156,6 +1156,33 @@ describe("live-source mail live environment tools", () => {
       `visual_prompt_hash:${minecraftProfile.promptHash}`,
     ]));
     expect(packet.recommendedNext).toBe("request_voice_callout");
+    expect(packet.effortEstimate).toMatchObject({
+      currentEffort: "combat_or_recovery",
+      nextLikelyEfforts: expect.arrayContaining(["recover_or_retreat"]),
+    });
+    expect(packet.axioms.axioms).toEqual(expect.arrayContaining([
+      "current effort: combat_or_recovery",
+      "location: cave or underground exploration context",
+      "hazard: immediate risk cue present",
+    ]));
+    expect(packet.hypotheses.map((hypothesis: any) => hypothesis.label)).toEqual(expect.arrayContaining([
+      "recover_or_create_distance",
+      "continue_engagement",
+    ]));
+    expect(packet.arbiter).toMatchObject({
+      recommendedNext: "request_voice_callout",
+      wakeAsk: true,
+      voiceCandidate: true,
+      confidence: "high",
+    });
+    expect(packet.microReasonerRunRefs.length).toBeGreaterThanOrEqual(11);
+    const processedRuns = (processObservation.observation as any).microReasonerRuns ?? [];
+    expect(processedRuns.map((run: any) => run.role)).toEqual(expect.arrayContaining([
+      "effort_estimator",
+      "axiom_extractor",
+      "hypothesis_generator",
+      "hypothesis_arbiter",
+    ]));
     expect(packet.assistant_answer).toBe(false);
     expect(packet.terminal_eligible).toBe(false);
   });

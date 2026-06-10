@@ -651,6 +651,10 @@ const formatProcessedMailPacket = (
     packet.inferredFacts.length > 0 ? `  inferred: ${packet.inferredFacts.slice(0, 6).map((fact) => clipPromptText(fact, 160)).join(" | ")}` : null,
     packet.changedFacts.length > 0 ? `  changed: ${packet.changedFacts.slice(0, 6).join(" | ")}` : null,
     packet.uncertainties.length > 0 ? `  uncertain: ${packet.uncertainties.slice(0, 4).join(" | ")}` : null,
+    packet.effortEstimate ? `  effort: ${packet.effortEstimate.currentEffort}; confidence ${packet.effortEstimate.confidence.toFixed(2)}` : null,
+    packet.axioms?.axioms.length ? `  axioms: ${packet.axioms.axioms.slice(0, 5).join(" | ")}` : null,
+    packet.hypotheses?.length ? `  hypotheses: ${packet.hypotheses.slice(0, 4).map((hypothesis) => `${hypothesis.label}:${hypothesis.confidence.toFixed(2)}`).join(" | ")}` : null,
+    packet.arbiter ? `  arbiter: ${packet.arbiter.recommendedNext}; wake ${packet.arbiter.wakeAsk ? "yes" : "no"}; ${clipPromptText(packet.arbiter.reason, 180)}` : null,
     packet.watchNext.length > 0 ? `  watch_next: ${packet.watchNext.slice(0, 8).join(" | ")}` : null,
     packet.voiceCalloutMatches.length > 0 ? `  voice_matches: ${packet.voiceCalloutMatches.slice(0, 6).join(" | ")}` : null,
     packet.salience.calloutDraft ? `  callout_candidate: ${clipPromptText(packet.salience.calloutDraft, 180)}` : null,
@@ -1929,8 +1933,12 @@ const formatCompactMicroReasonerFinding = (
   const preferred = runs
     .filter((run) =>
       run.role === "decision_selector" ||
+      run.role === "hypothesis_arbiter" ||
       run.role === "voice_callout_drafter" ||
       run.role === "packet_composer" ||
+      run.role === "hypothesis_generator" ||
+      run.role === "axiom_extractor" ||
+      run.role === "effort_estimator" ||
       run.role === "prediction_validator" ||
       run.role === "salience_scorer"
     )
@@ -1993,6 +2001,18 @@ const buildCompactWakePrompt = (input: {
       : null,
     input.processedPacket.changedFacts.length > 0
       ? `  changed: ${input.processedPacket.changedFacts.slice(0, 4).map((fact) => clipPromptText(fact, 130)).join(" | ")}`
+      : null,
+    input.processedPacket.effortEstimate
+      ? `  effort: ${input.processedPacket.effortEstimate.currentEffort}; confidence ${input.processedPacket.effortEstimate.confidence.toFixed(2)}`
+      : null,
+    input.processedPacket.axioms?.axioms.length
+      ? `  axioms: ${input.processedPacket.axioms.axioms.slice(0, 4).join(" | ")}`
+      : null,
+    input.processedPacket.hypotheses?.length
+      ? `  hypotheses: ${input.processedPacket.hypotheses.slice(0, 3).map((hypothesis) => `${hypothesis.label}:${hypothesis.confidence.toFixed(2)}`).join(" | ")}`
+      : null,
+    input.processedPacket.arbiter
+      ? `  arbiter: ${input.processedPacket.arbiter.recommendedNext}; wake ${input.processedPacket.arbiter.wakeAsk ? "yes" : "no"}; ${clipPromptText(input.processedPacket.arbiter.reason, 160)}`
       : null,
     input.processedPacket.watchNext.length > 0
       ? `  watch_next: ${input.processedPacket.watchNext.slice(0, 6).join(" | ")}`

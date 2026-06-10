@@ -336,10 +336,14 @@ export type StagePlayLiveSourcePredictionValidationV1 = {
 export type StagePlayMicroReasonerRoleV1 =
   | "claim_extractor"
   | "observation_classifier"
+  | "effort_estimator"
+  | "axiom_extractor"
+  | "hypothesis_generator"
   | "profile_comparator"
   | "delta_extractor"
   | "prediction_validator"
   | "salience_scorer"
+  | "hypothesis_arbiter"
   | "packet_composer"
   | "decision_selector"
   | "voice_callout_drafter";
@@ -418,6 +422,39 @@ export type StagePlayProcessedMailPacketResolutionStateV1 =
   | "deferred_for_pressure"
   | "compacted";
 
+export type StagePlayEffortEstimateV1 = {
+  currentEffort: string;
+  evidenceFor: string[];
+  evidenceAgainst: string[];
+  confidence: number;
+  nextLikelyEfforts: string[];
+};
+
+export type StagePlayAxiomFrameV1 = {
+  axioms: string[];
+  missingAxioms: string[];
+  predictionRelevantVariables: string[];
+};
+
+export type StagePlaySceneBeatHypothesisV1 = {
+  label: string;
+  prediction: string;
+  confidence: number;
+  validationSignals: string[];
+  whatWouldContradictIt: string[];
+};
+
+export type StagePlayHypothesisArbiterV1 = {
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  wakeAsk: boolean;
+  reason: string;
+  confidence: "low" | "medium" | "high";
+  selectedHypothesis?: string | null;
+  voiceCandidate: boolean;
+  calloutDraft?: string | null;
+  missingEvidence: string[];
+};
+
 export type StagePlayProcessedMailPacketV1 = {
   artifactId: "stage_play_processed_mail_packet";
   schemaVersion: typeof STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA;
@@ -453,6 +490,10 @@ export type StagePlayProcessedMailPacketV1 = {
     voiceCandidate: boolean;
     calloutDraft?: string | null;
   };
+  effortEstimate?: StagePlayEffortEstimateV1 | null;
+  axioms?: StagePlayAxiomFrameV1 | null;
+  hypotheses?: StagePlaySceneBeatHypothesisV1[];
+  arbiter?: StagePlayHypothesisArbiterV1 | null;
   recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
   watchNext: string[];
   resolutionState: StagePlayProcessedMailPacketResolutionStateV1;

@@ -1431,6 +1431,21 @@ const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
     subtitle: "stable vs changed facts",
     missingPreview: "waiting for classified observations",
   },
+  effort_estimator: {
+    title: "Effort Estimator",
+    subtitle: "facts -> current ambition",
+    missingPreview: "waiting for effort estimate",
+  },
+  axiom_extractor: {
+    title: "Axiom Extractor",
+    subtitle: "effort -> constraints",
+    missingPreview: "waiting for axioms",
+  },
+  hypothesis_generator: {
+    title: "Hypothesis Generator",
+    subtitle: "axioms -> scene beats",
+    missingPreview: "waiting for hypotheses",
+  },
   profile_comparator: {
     title: "Interpreter Profile Comparator",
     subtitle: "profile lens over facts",
@@ -1450,6 +1465,11 @@ const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
     title: "Salience / Voice Candidate",
     subtitle: "wake + voice scoring",
     missingPreview: "waiting for salience score",
+  },
+  hypothesis_arbiter: {
+    title: "Hypothesis Arbiter",
+    subtitle: "council -> wake verdict",
+    missingPreview: "waiting for arbiter verdict",
   },
   decision_selector: {
     title: "Decision Selector",
@@ -2079,6 +2099,45 @@ function buildObserverMailLoopNodes(input: {
       edgeLabel: activeInterpreterProfile ? "profile lens" : "profile optional",
       edgeTone: activeInterpreterProfile ? "connected" : latestProcessedPacket ? "pending" : "blocked",
     }),
+    makeMicroReasonerNode({
+      role: "effort_estimator",
+      run: microRun("effort_estimator"),
+      prompt: microPrompt("effort_estimator"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: microRun("observation_classifier")?.outputRefs ?? [],
+      fallbackInputPreview: microRun("observation_classifier")?.outputPreview ?? "classified observations pending",
+      fallbackOutputPreview: latestProcessedPacket?.effortEstimate
+        ? `${latestProcessedPacket.effortEstimate.currentEffort}; confidence ${latestProcessedPacket.effortEstimate.confidence.toFixed(2)}`
+        : null,
+      edgeLabel: microRun("axiom_extractor") ? "axioms" : "needs axioms",
+      edgeTone: microRun("axiom_extractor") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "axiom_extractor",
+      run: microRun("axiom_extractor"),
+      prompt: microPrompt("axiom_extractor"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: microRun("effort_estimator")?.outputRefs ?? [],
+      fallbackInputPreview: microRun("effort_estimator")?.outputPreview ?? "effort estimate pending",
+      fallbackOutputPreview: latestProcessedPacket?.axioms
+        ? `${latestProcessedPacket.axioms.axioms.slice(0, 3).join(" | ") || "no axioms"}; missing ${latestProcessedPacket.axioms.missingAxioms.slice(0, 2).join(" | ") || "none"}`
+        : null,
+      edgeLabel: microRun("hypothesis_generator") ? "hypotheses" : "needs hypotheses",
+      edgeTone: microRun("hypothesis_generator") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "hypothesis_generator",
+      run: microRun("hypothesis_generator"),
+      prompt: microPrompt("hypothesis_generator"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: microRun("axiom_extractor")?.outputRefs ?? [],
+      fallbackInputPreview: microRun("axiom_extractor")?.outputPreview ?? "axioms pending",
+      fallbackOutputPreview: latestProcessedPacket?.hypotheses
+        ? latestProcessedPacket.hypotheses.slice(0, 3).map((hypothesis) => `${hypothesis.label}:${hypothesis.confidence.toFixed(2)}`).join(" | ")
+        : null,
+      edgeLabel: activeInterpreterProfile ? "profile lens" : "profile optional",
+      edgeTone: activeInterpreterProfile ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
     {
       id: "observer_mail_loop:interpreter_profile",
       title: "Interpreter Profile",
@@ -2276,6 +2335,25 @@ function buildObserverMailLoopNodes(input: {
         : "salience inputs pending",
       fallbackOutputPreview: latestProcessedPacket
         ? `${latestProcessedPacket.salience.level}; voice ${latestProcessedPacket.salience.voiceCandidate ? "candidate" : "no"}; recommended ${latestProcessedPacket.recommendedNext}`
+        : null,
+      edgeLabel: microRun("hypothesis_arbiter") ? "arbiter verdict" : "needs arbiter",
+      edgeTone: microRun("hypothesis_arbiter") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+    }),
+    makeMicroReasonerNode({
+      role: "hypothesis_arbiter",
+      run: microRun("hypothesis_arbiter"),
+      prompt: microPrompt("hypothesis_arbiter"),
+      packet: latestProcessedPacket,
+      fallbackInputRefs: latestProcessedPacket ? [
+        latestProcessedPacket.packetId,
+        ...(latestProcessedPacket.hypotheses ?? []).map((hypothesis) => hypothesis.label),
+        ...(latestProcessedPacket.microReasonerRunRefs ?? []),
+      ] : [],
+      fallbackInputPreview: latestProcessedPacket
+        ? `effort ${latestProcessedPacket.effortEstimate?.currentEffort ?? "unknown"}; hypotheses ${latestProcessedPacket.hypotheses?.length ?? 0}; salience ${latestProcessedPacket.salience.level}`
+        : "arbiter inputs pending",
+      fallbackOutputPreview: latestProcessedPacket?.arbiter
+        ? `${latestProcessedPacket.arbiter.recommendedNext}; wake ${latestProcessedPacket.arbiter.wakeAsk ? "yes" : "no"}; ${latestProcessedPacket.arbiter.reason}`
         : null,
       edgeLabel: microRun("decision_selector") ? "decision selected" : "needs decision",
       edgeTone: microRun("decision_selector") ? "connected" : latestProcessedPacket ? "pending" : "blocked",
@@ -2569,6 +2647,322 @@ function buildObserverMailLoopNodes(input: {
   ];
 }
 
+const STAGE_PLAY_DECK_ROLES: StagePlayMicroReasonerRoleV1[] = [
+  "claim_extractor",
+  "observation_classifier",
+  "effort_estimator",
+  "axiom_extractor",
+  "hypothesis_generator",
+  "profile_comparator",
+  "delta_extractor",
+  "prediction_validator",
+  "salience_scorer",
+  "hypothesis_arbiter",
+  "decision_selector",
+  "voice_callout_drafter",
+  "packet_composer",
+];
+
+function jsonCharCount(value: unknown): number {
+  try {
+    return JSON.stringify(value ?? null).length;
+  } catch {
+    return 0;
+  }
+}
+
+function formatStagePlayMs(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "pending";
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}s`;
+  return `${Math.round(value)}ms`;
+}
+
+function formatStagePlayCount(value: number): string {
+  return new Intl.NumberFormat().format(value);
+}
+
+function ageMsFromIso(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Date.now() - parsed);
+}
+
+function latestStagePlayPacketForMail(
+  packets: StagePlayProcessedMailPacketV1[],
+  mailId?: string | null,
+): StagePlayProcessedMailPacketV1 | null {
+  const matching = mailId ? packets.filter((packet) => packet.mailIds.includes(mailId)) : packets;
+  return matching.at(-1) ?? packets.at(-1) ?? null;
+}
+
+function latestStagePlayRunForPacket(
+  runs: StagePlayMicroReasonerRunV1[],
+  role: StagePlayMicroReasonerRoleV1,
+  packet: StagePlayProcessedMailPacketV1 | null,
+): StagePlayMicroReasonerRunV1 | null {
+  const runRefs = new Set(packet?.microReasonerRunRefs ?? []);
+  const mailIds = new Set(packet?.mailIds ?? []);
+  return runs
+    .filter((run) => run.role === role)
+    .filter((run) => runRefs.size > 0 ? runRefs.has(run.runId) : run.mailIds.some((mailId) => mailIds.has(mailId)))
+    .at(-1) ?? null;
+}
+
+function StagePlayMetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "good" | "warn" | "blocked";
+}) {
+  return (
+    <div
+      className={`rounded-md border px-3 py-2 ${
+        tone === "good"
+          ? "border-emerald-800 bg-emerald-950/25 text-emerald-100"
+          : tone === "warn"
+            ? "border-amber-800 bg-amber-950/25 text-amber-100"
+            : tone === "blocked"
+              ? "border-rose-800 bg-rose-950/25 text-rose-100"
+              : "border-slate-800 bg-slate-950/60 text-slate-200"
+      }`}
+    >
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 font-mono text-sm">{value}</div>
+    </div>
+  );
+}
+
+function StagePlayMailLoopLiveOverview({
+  graph,
+  mailbox,
+}: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+}) {
+  const mailItems = mailbox?.mailItems ?? [];
+  const packets = mailbox?.processedMailPackets ?? [];
+  const runs = mailbox?.microReasonerRuns ?? [];
+  const prompts = mailbox?.microReasonerPrompts ?? [];
+  const wakeRequests = mailbox?.wakeRequests ?? [];
+  const wakeResults = mailbox?.wakeResults ?? [];
+  const latestMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
+  const latestPacket = latestStagePlayPacketForMail(packets, latestMail?.mailId);
+  const latestPacketRuns = runs.filter((run) => latestPacket?.microReasonerRunRefs.includes(run.runId));
+  const latestWake =
+    latestStagePlayMailWakeRequest(wakeRequests, latestMail?.mailId) ??
+    latestStagePlayMailWakeRequest(wakeRequests);
+  const latestWakeResult =
+    latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
+    latestStagePlayMailWakeResult(wakeResults);
+  const visualSource = graph.sourceWindow.sources.find((source) =>
+    source.modality === "visual_frame" && source.status === "active"
+  ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const latestPolicy = (mailbox?.watchJobPolicies ?? []).at(-1) ?? null;
+  const cadenceMs =
+    visualSource?.cadenceMs ??
+    latestPolicy?.nextWakePolicy?.afterMs ??
+    STAGE_PLAY_SOURCE_SETUP_DEFAULTS.visualCadenceMs;
+  const latestSummary = latestMail?.summary.text || latestMail?.summary.preview || "Waiting for visual summary mail.";
+  const packetAgeMs = ageMsFromIso(latestPacket?.createdAt);
+  const mailAgeMs = ageMsFromIso(latestMail?.createdAt);
+  const wakeStatus = latestWakeResult?.status ?? latestWake?.status ?? "none";
+  const packetChars = latestPacket ? jsonCharCount(latestPacket) : 0;
+  const runChars = jsonCharCount(latestPacketRuns.length > 0 ? latestPacketRuns : runs);
+  const compactPacketChars = latestPacket ? jsonCharCount({
+    packetId: latestPacket.packetId,
+    mailIds: latestPacket.mailIds,
+    observedFacts: latestPacket.observedFacts.slice(0, 4),
+    changedFacts: latestPacket.changedFacts.slice(0, 4),
+    effort: latestPacket.effortEstimate,
+    axioms: latestPacket.axioms,
+    hypotheses: latestPacket.hypotheses?.slice(0, 4) ?? [],
+    arbiter: latestPacket.arbiter,
+    recommendedNext: latestPacket.recommendedNext,
+    watchNext: latestPacket.watchNext.slice(0, 4),
+  }) : 0;
+  const arbiterChars = latestPacket ? jsonCharCount({
+    packetId: latestPacket.packetId,
+    mailIds: latestPacket.mailIds,
+    effort: latestPacket.effortEstimate?.currentEffort ?? "unknown",
+    arbiter: latestPacket.arbiter,
+    recommendedNext: latestPacket.recommendedNext,
+    evidenceRefs: latestPacket.evidenceRefs.slice(0, 10),
+  }) : 0;
+  const recentPackets = packets.slice(-6);
+  const deckRows = STAGE_PLAY_DECK_ROLES.map((role) => {
+    const run = latestStagePlayRunForPacket(runs, role, latestPacket);
+    const prompt = activeMicroReasonerPromptForRole(prompts, role);
+    return {
+      role,
+      run,
+      prompt,
+      display: MICRO_REASONER_DISPLAY[role],
+    };
+  });
+
+  return (
+    <section
+      className="mb-5 space-y-4 rounded-md border border-slate-800 bg-slate-950/80 p-4"
+      data-testid="stage-play-mail-loop-live-overview"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Live Mail Loop</div>
+          <div className="mt-1 text-lg font-semibold text-slate-50">
+            {latestPacket?.effortEstimate?.currentEffort ? labelize(latestPacket.effortEstimate.currentEffort) : "Waiting for current effort"}
+          </div>
+          <div className="mt-1 text-xs text-slate-400">
+            {latestPacket?.arbiter?.reason ?? "Micro-reasoner deck has not produced a wake verdict yet."}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
+          <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
+          <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
+          <StagePlayMetricPill label="wake" value={labelize(wakeStatus)} tone={wakeStatus === "completed" ? "good" : wakeStatus === "deferred_for_pressure" ? "warn" : wakeStatus === "failed_terminal" ? "blocked" : "default"} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+        <div className="rounded-md border border-slate-800 bg-black/20 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Changing summary</div>
+            <div className="font-mono text-[10px] text-slate-500">{latestMail?.mailId ?? "mail pending"}</div>
+          </div>
+          <div
+            className="mt-2 min-h-[96px] rounded border border-slate-800 bg-slate-950 p-3 text-sm leading-relaxed text-slate-100"
+            data-testid="stage-play-live-summary-textbox"
+          >
+            {compactStagePlayText(latestSummary, "Waiting for visual summary mail.", 720)}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
+          <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(packetChars)} />
+          <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
+          <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
+          <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
+          <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
+        </div>
+      </div>
+
+      <div className="rounded-md border border-slate-800 bg-black/20 p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Packet flow</div>
+            <div className="mt-0.5 text-xs text-slate-500">latest packets arrive left to right; the deck below binds the selected/latest packet</div>
+          </div>
+          <div className="font-mono text-[10px] text-slate-500">{recentPackets.length} packet(s)</div>
+        </div>
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(recentPackets.length, 1)}, minmax(180px, 1fr))` }}>
+          {recentPackets.length > 0 ? recentPackets.map((packet) => {
+            const active = packet.packetId === latestPacket?.packetId;
+            return (
+              <div
+                key={packet.packetId}
+                className={`rounded-md border p-3 ${
+                  active
+                    ? "border-cyan-500 bg-cyan-950/30"
+                    : "border-slate-800 bg-slate-950/55"
+                }`}
+                data-testid="stage-play-packet-flow-card"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-semibold text-slate-100">{labelize(packet.recommendedNext)}</span>
+                  <span className="font-mono text-[10px] text-slate-500">{formatStagePlayClock(packet.createdAt)}</span>
+                </div>
+                <div className="mt-2 line-clamp-2 text-[11px] text-slate-300">
+                  {packet.effortEstimate?.currentEffort ? labelize(packet.effortEstimate.currentEffort) : "effort pending"}
+                  {packet.arbiter?.wakeAsk ? " | wake Ask" : " | local wait"}
+                </div>
+                <div className="mt-2 h-1.5 rounded bg-slate-800">
+                  <div
+                    className={`h-1.5 rounded ${packet.arbiter?.wakeAsk ? "bg-amber-400" : "bg-emerald-400"}`}
+                    style={{ width: `${Math.min(100, Math.max(18, (packet.hypotheses?.length ?? 1) * 24))}%` }}
+                  />
+                </div>
+                <div className="mt-2 font-mono text-[10px] text-slate-500">{formatStagePlayCount(jsonCharCount(packet))} chars</div>
+              </div>
+            );
+          }) : (
+            <div className="rounded-md border border-slate-800 bg-slate-950/55 p-3 text-sm text-slate-500">No processed packet yet.</div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="rounded-md border border-slate-800 bg-black/20 p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Deck synchrony</div>
+          <div className="mt-2 text-sm text-slate-100">
+            {latestPacket?.arbiter?.recommendedNext ? labelize(latestPacket.arbiter.recommendedNext) : "waiting for arbiter"}
+          </div>
+          <div className="mt-2 text-xs leading-relaxed text-slate-400">
+            The vertical deck shows independent micro-reasoner outputs for the current packet. Prompt text is visible on each row so prompt length can be compared with output size.
+          </div>
+          <div className="mt-3 space-y-1 font-mono text-[10px] text-slate-500">
+            <div>packet: {latestPacket?.packetId ?? "pending"}</div>
+            <div>selected hypothesis: {latestPacket?.arbiter?.selectedHypothesis ?? "none"}</div>
+            <div>voice candidate: {latestPacket?.arbiter?.voiceCandidate ? "yes" : "no"}</div>
+          </div>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3" data-testid="stage-play-micro-reasoner-deck">
+          {deckRows.map(({ role, run, prompt, display }) => (
+            <button
+              key={role}
+              type="button"
+              className={`min-h-[160px] rounded-md border p-3 text-left ${
+                run
+                  ? "border-slate-700 bg-slate-900/70 hover:border-cyan-500"
+                  : prompt
+                    ? "border-slate-800 bg-slate-950/70"
+                    : "border-rose-900 bg-rose-950/20"
+              }`}
+              title={prompt?.template ?? "Prompt missing"}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-semibold text-slate-100">{display.title}</div>
+                  <div className="mt-0.5 truncate text-[10px] text-slate-500">{display.subtitle}</div>
+                </div>
+                <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${
+                  run?.status === "completed"
+                    ? "border-emerald-800 text-emerald-100"
+                    : run
+                      ? "border-amber-800 text-amber-100"
+                      : "border-slate-700 text-slate-400"
+                }`}>
+                  {run?.status ?? "ready"}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-1 text-[9px]">
+                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
+                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
+                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount((run?.outputPreview ?? "").length)} out</span>
+              </div>
+              <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Output</div>
+                <div className="mt-1 line-clamp-3 text-[11px] leading-snug text-slate-200">
+                  {run?.outputPreview ?? display.missingPreview}
+                </div>
+              </div>
+              <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
+                <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
+                  {prompt?.template ?? "Prompt missing."}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function StagePlayObserverMailLoopCanvas({
   graph,
   mailbox,
@@ -2590,6 +2984,7 @@ function StagePlayObserverMailLoopCanvas({
       data-testid="stage-play-badge-graph-scrollport"
       data-stage-play-graph-mode="observer_mail_loop_v1"
     >
+      <StagePlayMailLoopLiveOverview graph={graph} mailbox={mailbox} />
       <div
         className="grid items-start gap-6"
         style={{

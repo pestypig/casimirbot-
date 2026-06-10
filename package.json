@@ -135,6 +135,8 @@
     "helix:ask:latency-study": "cross-env HELIX_ASK_SWEEP_PACK=scripts/helix-ask-latency-study-pack.json HELIX_ASK_SWEEP_MATRIX=scripts/helix-ask-latency-matrix.json HELIX_ASK_SWEEP_OUT_DIR=artifacts/helix-ask-latency npm run helix:ask:sweep",
     "helix:ask:agent-eval": "tsx scripts/helix-ask-agent-eval.ts",
     "helix:ask:dot:debug-loop": "tsx scripts/helix-ask-dot-debug-loop.ts",
+    "stage-play:mail-loop:timing": "tsx scripts/stage-play-mail-loop-timing.ts",
+    "stage-play:live-loop:validate": "tsx scripts/stage-play-live-loop-validate.ts",
     "helix:ask:prompt-quality:probe": "tsx scripts/helix-ask-prompt-quality-probe.ts",
     "helix:ask:audit:example": "tsx scripts/helix-ask-audited-reasoning-example.ts",
     "curvature:bundle:capture": "tsx scripts/curvature-bundle-capture.ts",
