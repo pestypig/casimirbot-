@@ -86,6 +86,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
     | "expired_superseded";
   askTurnId?: string | null;
   decisionIds: string[];
+  voiceCheckpointRefs: string[];
   budgetStateRef?: string | null;
   skippedReason?: string | null;
   failedReason?: string | null;

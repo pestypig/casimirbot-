@@ -253,6 +253,34 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(appended.map((reply: any) => reply.id)).toEqual(replies.map((reply) => reply.id));
   });
 
+  it("merges an optimistic active turn with its final answer by turn id", () => {
+    const optimistic = {
+      id: "ask:mail-wake-1",
+      turn_id: "ask:mail-wake-1",
+      createdAtMs: 1_000,
+      question: "Review latest mailbox wake",
+      content: "Reasoning in progress...",
+      liveEvents: [{ id: "turn-start:ask:mail-wake-1", text: "Turn started." }],
+    } as any;
+    const final = {
+      id: "ask:mail-wake-1",
+      turn_id: "ask:mail-wake-1",
+      createdAtMs: 5_000,
+      question: "Review latest mailbox wake",
+      content: "Voice callout delivered.",
+      debug: { turn_id: "ask:mail-wake-1", selected_final_answer: "Voice callout delivered." },
+      liveEvents: [{ id: "voice-receipt", text: "Voice requested." }],
+    } as any;
+
+    const appended = appendHelixAskReplyChronologically([optimistic], final, 8);
+
+    expect(appended).toHaveLength(1);
+    expect(appended[0]?.id).toBe("ask:mail-wake-1");
+    expect(appended[0]?.createdAtMs).toBe(1_000);
+    expect(appended[0]?.content).toBe("Voice callout delivered.");
+    expect(appended[0]?.debug?.selected_final_answer).toBe("Voice callout delivered.");
+  });
+
   it("hides the active stream once the same turn has a durable reply", () => {
     const durableActiveReply = {
       id: "reply-final",

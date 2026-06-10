@@ -348,6 +348,16 @@ type StagePlayMailJourneyStation = {
   body: string;
   meta: string;
   state: StagePlayJourneyState;
+  payloads?: StagePlayMailJourneyPayload[];
+};
+
+type StagePlayMailJourneyPayload = {
+  id: string;
+  label: string;
+  status: string;
+  preview: string;
+  meta: string;
+  state: StagePlayJourneyState;
 };
 
 type StagePlayMailJourneyReasonerRow = {
@@ -1650,56 +1660,84 @@ const activeStagePlayJourneyIndex = (stations: StagePlayMailJourneyStation[]): n
   return Math.max(0, lastDone);
 };
 
-function StagePlayMailPacketBox({
-  station,
+function StagePlayMailPayloadLedger({
+  stations,
   latestSummary,
   mailAgeMs,
   payloadChars,
   packetChars,
   deckLatencyMs,
 }: {
-  station: StagePlayMailJourneyStation;
+  stations: StagePlayMailJourneyStation[];
   latestSummary: string;
   mailAgeMs: number | null;
   payloadChars: number;
   packetChars: number;
   deckLatencyMs: number;
 }) {
+  const payloadCount = stations.reduce((sum, station) => sum + (station.payloads?.length ?? 0), 0);
   return (
     <div
-      className={`rounded-md border p-3 ${stagePlayJourneyStationTone(station.state)}`}
-      data-testid="stage-play-mail-journey-packet"
+      className="rounded-md border border-slate-800 bg-slate-950/70 p-3"
+      data-testid="stage-play-mail-journey-payload-ledger"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Moving mail payload</div>
-          <div className="mt-1 text-sm font-semibold">{station.title}</div>
-          <div className="mt-0.5 font-mono text-[10px] opacity-70">{station.status}</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail payloads</div>
+          <div className="mt-1 text-sm font-semibold text-slate-50">{payloadCount} block{payloadCount === 1 ? "" : "s"} across checkpoints</div>
+          <div className="mt-0.5 text-xs text-slate-400">Each block is an artifact occupying a stage, not one moving global payload.</div>
         </div>
-        <div className="rounded border border-current/25 px-2 py-1 font-mono text-[10px] opacity-80">
-          {labelize(station.state)}
+        <div className="rounded border border-cyan-900/70 px-2 py-1 font-mono text-[10px] text-cyan-100/80">
+          live ledger
         </div>
       </div>
-      <div className="mt-3 rounded border border-current/15 bg-black/25 p-3 text-sm leading-relaxed">
+      <div className="mt-3 rounded border border-slate-800 bg-black/25 p-3 text-sm leading-relaxed text-slate-200">
         {compactStagePlayText(latestSummary, "The next visual-source observation will appear here before it is transformed.", 560)}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
-        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
           <div className="uppercase tracking-wide opacity-60">mail age</div>
           <div className="mt-0.5 font-mono">{formatStagePlayMs(mailAgeMs)}</div>
         </div>
-        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
           <div className="uppercase tracking-wide opacity-60">mail chars</div>
           <div className="mt-0.5 font-mono">{formatStagePlayCount(payloadChars)}</div>
         </div>
-        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
           <div className="uppercase tracking-wide opacity-60">packet chars</div>
           <div className="mt-0.5 font-mono">{formatStagePlayCount(packetChars)}</div>
         </div>
-        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
           <div className="uppercase tracking-wide opacity-60">deck time</div>
           <div className="mt-0.5 font-mono">{formatStagePlayMs(deckLatencyMs)}</div>
         </div>
+      </div>
+      <div className="mt-3 grid max-h-[24rem] gap-2 overflow-auto pr-1" data-testid="stage-play-mail-journey-payload-stack">
+        {stations.flatMap((station) =>
+          (station.payloads ?? []).slice(0, 3).map((payload) => (
+            <div
+              key={`${station.key}:${payload.id}`}
+              className={`rounded-md border px-2.5 py-2 ${stagePlayJourneyStationTone(payload.state)}`}
+              data-testid="stage-play-mail-journey-payload"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate text-[10px] font-semibold uppercase tracking-wide opacity-70">{station.title}</div>
+                <div className="shrink-0 font-mono text-[9px] opacity-65">{payload.meta}</div>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <span className={`h-2 w-2 shrink-0 rounded-full border ${stagePlayJourneyDotTone(payload.state)}`} />
+                <div className="min-w-0 truncate text-[11px] font-semibold">{payload.label}</div>
+              </div>
+              <div className="mt-0.5 font-mono text-[9px] opacity-70">{payload.status}</div>
+              <div className="mt-1 line-clamp-2 text-[10px] leading-snug opacity-85">{payload.preview}</div>
+            </div>
+          ))
+        )}
+        {payloadCount === 0 ? (
+          <div className="rounded border border-slate-800 bg-black/20 p-2 text-xs text-slate-500">
+            No mail payloads have reached the loop yet.
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -1782,7 +1820,6 @@ function StagePlayMailJourneyRail({
   combinedRuntimeTone: "good" | "warn" | "blocked" | "default";
 }) {
   const activeIndex = activeStagePlayJourneyIndex(stations);
-  const activeStation = stations[activeIndex] ?? stations[0];
   const progressLeft = stations.length > 1 ? `${(activeIndex / (stations.length - 1)) * 100}%` : "0%";
   return (
     <div
@@ -1791,14 +1828,14 @@ function StagePlayMailJourneyRail({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail journey</div>
-          <div className="mt-0.5 text-xs text-cyan-100/70">One payload travels through each station before Helix Ask can act.</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail checkpoint ledger</div>
+          <div className="mt-0.5 text-xs text-cyan-100/70">Multiple mail artifacts can occupy different checkpoints at the same time.</div>
         </div>
         <div className="font-mono text-[10px] text-cyan-100/60">{stations.length} stations</div>
       </div>
       <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)_minmax(260px,320px)]">
-        <StagePlayMailPacketBox
-          station={activeStation}
+        <StagePlayMailPayloadLedger
+          stations={stations}
           latestSummary={latestSummary}
           mailAgeMs={mailAgeMs}
           payloadChars={payloadChars}
@@ -1816,7 +1853,7 @@ function StagePlayMailJourneyRail({
               className="absolute top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border border-cyan-300 bg-cyan-950 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.55)] transition-all duration-500"
               style={{ left: progressLeft }}
               data-testid="stage-play-mail-journey-moving-box"
-              title={`Current station: ${activeStation?.title ?? "unknown"}`}
+              title={`Current checkpoint pressure: ${stations[activeIndex]?.title ?? "unknown"}`}
             >
               <Waypoints className="h-4 w-4" aria-hidden="true" />
             </div>
@@ -1832,9 +1869,27 @@ function StagePlayMailJourneyRail({
                   <span className={`h-2.5 w-2.5 rounded-full border ${stagePlayJourneyDotTone(station.state)}`} />
                   <span className="font-mono text-[9px] opacity-70">{String(index + 1).padStart(2, "0")}</span>
                 </div>
-                <div className="mt-2 truncate text-[11px] font-semibold">{station.title}</div>
+                <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide opacity-75">Checkpoint {String(index + 1).padStart(2, "0")}</div>
+                <div className="mt-0.5 truncate text-[11px] font-semibold">{station.title}</div>
                 <div className="mt-0.5 truncate font-mono text-[9px] opacity-70">{station.status}</div>
                 <div className="mt-2 line-clamp-3 text-[10px] leading-snug opacity-85">{station.body}</div>
+                <div className="mt-2 flex flex-wrap gap-1" data-testid="stage-play-mail-journey-station-payloads">
+                  {(station.payloads ?? []).slice(0, 4).map((payload) => (
+                    <span
+                      key={payload.id}
+                      className={`inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[9px] ${stagePlayJourneyStationTone(payload.state)}`}
+                      title={`${payload.label}: ${payload.preview}`}
+                    >
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full border ${stagePlayJourneyDotTone(payload.state)}`} />
+                      <span className="truncate">{payload.label}</span>
+                    </span>
+                  ))}
+                  {(station.payloads?.length ?? 0) > 4 ? (
+                    <span className="rounded border border-slate-700 px-1.5 py-0.5 font-mono text-[9px] opacity-70">
+                      +{(station.payloads?.length ?? 0) - 4}
+                    </span>
+                  ) : null}
+                </div>
                 <div className="mt-2 truncate border-t border-current/15 pt-1.5 font-mono text-[9px] opacity-65">{station.meta}</div>
               </div>
             ))}
@@ -3633,9 +3688,11 @@ function StagePlayMailLoopLiveOverview({
       currentWakeStage === "pressure_deferred" ||
       /(?:pressure|runtime_memory|queue_deferrable|503)/i.test(currentWakeFailure ?? "")
     );
-  const voiceCheckpointRefs = (currentWakeResultForOperator?.evidenceRefs ?? []).filter((ref) =>
-    /^(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt):/i.test(ref)
-  );
+  const voiceCheckpointRefs = (currentWakeResultForOperator?.voiceCheckpointRefs?.length
+    ? currentWakeResultForOperator.voiceCheckpointRefs
+    : (currentWakeResultForOperator?.evidenceRefs ?? []).filter((ref) =>
+        /^(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt):/i.test(ref)
+      ));
   const voiceRequested =
     latestPacket?.recommendedNext === "request_voice_callout" ||
     latestPacket?.arbiter?.recommendedNext === "request_voice_callout" ||
@@ -3664,6 +3721,60 @@ function StagePlayMailLoopLiveOverview({
     nextRetryAt: currentWakeForOperator?.nextRetryAt ?? null,
     failureReason: currentWakeFailure,
   });
+  const recentMailPayloads: StagePlayMailJourneyPayload[] = mailItems.slice(-5).reverse().map((mail) => ({
+    id: mail.mailId,
+    label: mail.mailId.split(":").at(-1)?.slice(0, 8) ?? "mail",
+    status: labelize(mail.status),
+    preview: compactStagePlayText(mail.summary.preview || mail.summary.text, "No visual summary preview.", 120),
+    meta: formatStagePlayClock(mail.createdAt),
+    state: mail.status === "unread" ? "active" : "done",
+  }));
+  const recentPacketPayloads: StagePlayMailJourneyPayload[] = packets.slice(-5).reverse().map((packet) => ({
+    id: packet.packetId,
+    label: packet.packetId.split(":").at(-1)?.slice(0, 8) ?? "packet",
+    status: labelize(packet.recommendedNext),
+    preview: compactStagePlayText(packet.arbiter?.reason || formatStagePlayDeckVerdictForOverview(packet), "Packet verdict pending.", 120),
+    meta: formatStagePlayClock(packet.createdAt),
+    state: packet.arbiter?.wakeAsk || packet.recommendedNext !== "wait_for_next_summary" ? "active" : "done",
+  }));
+  const recentWakePayloads: StagePlayMailJourneyPayload[] = wakeRequests.slice(-6).reverse().map((wake) => ({
+    id: wake.wakeRequestId,
+    label: wake.wakeRequestId.split(":").at(-1)?.slice(0, 8) ?? "wake",
+    status: labelize(wake.lifecycleStage ?? wake.status),
+    preview: compactStagePlayText(wake.failureReason ?? `${wake.mailIds.length} mail item(s), ${wake.decisionIds.length} decision(s).`, "Wake queued.", 120),
+    meta: wake.askTurnId ? "ask" : formatStagePlayClock(wake.updatedAt),
+    state: wake.status === "completed"
+      ? "done"
+      : wake.status === "deferred_for_pressure" || wake.status === "failed_retryable"
+        ? "blocked"
+        : wake.status === "running"
+          ? "active"
+          : "pending",
+  }));
+  const askHandoffPayloads: StagePlayMailJourneyPayload[] = wakeRequests
+    .filter((wake) => wake.askTurnId || wake.status === "running")
+    .slice(-5)
+    .reverse()
+    .map((wake) => ({
+      id: `${wake.wakeRequestId}:ask`,
+      label: wake.askTurnId?.split(":").at(-1)?.slice(0, 8) ?? wake.wakeRequestId.split(":").at(-1)?.slice(0, 8) ?? "ask",
+      status: wake.askTurnId ? "Ask entered" : "launching",
+      preview: compactStagePlayText(wake.askTurnId ? "Structured mailbox route metadata attached to Ask." : "Waiting for Ask turn id.", "Ask handoff pending.", 120),
+      meta: wake.askTurnId ? "turn" : formatStagePlayClock(wake.updatedAt),
+      state: wake.askTurnId ? "done" : "active",
+    }));
+  const resultPayloads: StagePlayMailJourneyPayload[] = wakeResults.slice(-5).reverse().map((result) => ({
+    id: result.wakeResultId,
+    label: result.wakeResultId.split(":").at(-1)?.slice(0, 8) ?? "result",
+    status: labelize(result.lifecycleStage ?? result.status),
+    preview: compactStagePlayText(result.failedReason ?? result.skippedReason ?? `${result.decisionIds.length} decision(s), ${result.voiceCheckpointRefs?.length ?? 0} voice checkpoint(s).`, "Wake result pending.", 120),
+    meta: formatStagePlayClock(result.createdAt),
+    state: result.status === "completed"
+      ? "done"
+      : result.status === "deferred_for_pressure" || result.status === "failed_retryable" || result.status === "failed_terminal"
+        ? "blocked"
+        : "pending",
+  }));
   const mailTransformSteps: Array<{
     key: string;
     title: string;
@@ -3671,6 +3782,7 @@ function StagePlayMailLoopLiveOverview({
     body: string;
     meta: string;
     state: "done" | "active" | "blocked" | "pending" | "missing";
+    payloads?: StagePlayMailJourneyPayload[];
   }> = [
     {
       key: "observation",
@@ -3679,6 +3791,7 @@ function StagePlayMailLoopLiveOverview({
       body: compactStagePlayText(latestMail?.summary.text, "Waiting for visual source mail.", 190),
       meta: latestMail ? `${formatStagePlayClock(latestMail.createdAt)} | ${formatStagePlayCount(latestMail.summary.text.length)} chars` : captureStateLabel,
       state: latestMail ? "done" : "missing",
+      payloads: recentMailPayloads,
     },
     {
       key: "shade-mail",
@@ -3687,6 +3800,9 @@ function StagePlayMailLoopLiveOverview({
       body: compactStagePlayText(latestMail?.summary.preview, latestSummary, 190),
       meta: latestMail?.mailId ?? "no mail id",
       state: latestMail ? "done" : "missing",
+      payloads: recentMailPayloads.filter((payload) => payload.state === "active").length > 0
+        ? recentMailPayloads
+        : recentMailPayloads.slice(0, 3),
     },
     {
       key: "micro-deck",
@@ -3695,6 +3811,7 @@ function StagePlayMailLoopLiveOverview({
       body: compactStagePlayText(latestPacket?.arbiter?.reason, "Deck outputs are still binding into an arbiter verdict.", 190),
       meta: `${latestPacketRuns.length || runs.length} runs | ${formatStagePlayMs(deckLatencyMs)} | ${formatStagePlayCount(runChars)} chars`,
       state: latestPacket?.arbiter ? "done" : latestPacket ? "active" : "missing",
+      payloads: recentPacketPayloads.slice(0, 3),
     },
     {
       key: "processed-packet",
@@ -3705,6 +3822,7 @@ function StagePlayMailLoopLiveOverview({
         : "Micro-reasoner packet has not been composed yet.",
       meta: latestPacket ? `${formatStagePlayCount(packetChars)} chars | ${formatStagePlayClock(latestPacket.createdAt)}` : "packet pending",
       state: latestPacket ? "done" : latestMail ? "pending" : "missing",
+      payloads: recentPacketPayloads,
     },
     {
       key: "wake",
@@ -3721,6 +3839,7 @@ function StagePlayMailLoopLiveOverview({
           : latestPacket?.arbiter?.wakeAsk
             ? "pending"
             : "missing",
+      payloads: recentWakePayloads,
     },
     {
       key: "ask-handoff",
@@ -3733,6 +3852,7 @@ function StagePlayMailLoopLiveOverview({
           : "If the arbiter wakes Ask, this box is auto-sent into the Helix Ask lane.",
       meta: currentAskTurnId ?? "no Ask turn id",
       state: currentAskTurnId ? "done" : blockedBeforeAsk ? "blocked" : currentWakeForOperator ? "pending" : "missing",
+      payloads: askHandoffPayloads,
     },
     {
       key: "checkpoint",
@@ -3749,6 +3869,7 @@ function StagePlayMailLoopLiveOverview({
           : blockedBeforeAsk
             ? "blocked"
             : "missing",
+      payloads: resultPayloads,
     },
   ];
   const recentPackets = packets.slice(-6);

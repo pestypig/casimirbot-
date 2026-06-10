@@ -2264,7 +2264,7 @@ describe("Stage Play live-source mailbox", () => {
 
     expect(result).toMatchObject({
       status: "failed_retryable",
-      failedReason: "mail_wake_ask_turn_timeout:120000",
+      failedReason: "ask_launch_no_response_timeout:120000",
       askTurnId: null,
       decisionIds: [],
       assistant_answer: false,
@@ -2276,7 +2276,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
       "Processed mail packet",
       "Decision selected",
-      "Wake Ask timed out",
+      "Wake Ask launch timed out",
       "Loop state",
     ]));
     expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
@@ -2285,7 +2285,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(transcriptEntries.find((entry) => entry.row.title === "Wake requested")?.row.body)
       .toContain("decision_selector selected");
     expect(transcriptEntries.map((entry) => entry.row.body).join("\n")).toContain(
-      "no model-reviewed decision was recorded",
+      "Ask did not return a turn id or mailbox decision",
     );
   });
 
@@ -2512,6 +2512,7 @@ describe("Stage Play live-source mailbox", () => {
         lifecycleStage: "voice_queued_retry",
         askTurnId: "ask:ui-bridge-mailbox-turn",
         decisionIds: [decision.decisionId],
+        voiceCheckpointRefs: ["helix_interim_voice_callout_receipt:queued-for-retry"],
         evidenceRefs: expect.arrayContaining([
           "ui_bridge_ask_turn_reconciled",
           "helix_interim_voice_callout_receipt:queued-for-retry",
@@ -2858,6 +2859,10 @@ describe("Stage Play live-source mailbox", () => {
     expect(result?.decisionIds).toHaveLength(1);
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining([
       "stage_play_mail_wake_decision_fallback:ask_missing_decision",
+      expect.stringMatching(/^stage_play_live_source_voice_delivery_receipt:/),
+      expect.stringMatching(/^helix_interim_voice_callout_receipt:/),
+    ]));
+    expect(result?.voiceCheckpointRefs).toEqual(expect.arrayContaining([
       expect.stringMatching(/^stage_play_live_source_voice_delivery_receipt:/),
       expect.stringMatching(/^helix_interim_voice_callout_receipt:/),
     ]));
@@ -3635,6 +3640,7 @@ describe("Stage Play live-source mailbox", () => {
       expect(prompt).toContain("compact Ask handoff");
       expect(prompt).toContain("Processed packet:");
       expect(prompt).toContain("Latest micro-reasoner finding:");
+      expect(prompt).not.toMatch(/\blive_env\./);
       expect(prompt.length).toBeLessThanOrEqual(9000);
       expect(prompt).not.toContain("Active interpreter profile:");
       expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0].status).toBe("completed");
@@ -3966,7 +3972,7 @@ describe("Stage Play live-source mailbox", () => {
     }
   });
 
-  it("recovers a stale running wake into retryable state", async () => {
+  it("releases a stale running Ask-entry wake into retryable state", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
     markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z");
@@ -3992,14 +3998,86 @@ describe("Stage Play live-source mailbox", () => {
       }),
     });
 
-    expect(retry).toMatchObject({
-      status: "completed",
-      askTurnId: "ask:wake-stale-retry",
-    });
+    expect(retry).toBeNull();
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
-      status: "completed",
-      attemptCount: 2,
+      status: "failed_retryable",
+      attemptCount: 1,
+      failureReason: "ask_launch_stale_without_turn_id",
+      nextRetryAt: "2026-06-04T12:05:01.000Z",
     });
+  });
+
+  it("releases a stale Ask-entry wake and admits a newer queued wake", async () => {
+    seedVisualEvidence();
+    const firstWake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    markStagePlayMailWakeRunning(firstWake.wakeRequestId, "2026-06-04T12:03:00.000Z");
+    const newerMail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:newer-urgent",
+      evidenceRef: "visual_evidence:newer-urgent",
+      summaryText: "Newer visual summary reports fire damage and a sword visible on screen.",
+      createdAt: "2026-06-04T12:03:18.000Z",
+    });
+    const newerWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [newerMail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [newerMail.mailId, ...newerMail.evidenceRefs],
+      now: "2026-06-04T12:03:19.000Z",
+    });
+    expect(newerWake?.status).toBe("queued");
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:03:25.000Z",
+      askTurnRunner: async ({ wakeRequest }) => ({
+        turn_id: "ask:wake-newer-after-entry-stale",
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: `stage_play_live_source_mail_decision:${wakeRequest.wakeRequestId}`,
+                mailIds: wakeRequest.mailIds,
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-newer-after-entry-stale",
+      wakeRequestId: newerWake?.wakeRequestId,
+    });
+    const firstWakeAfter = listStagePlayLiveSourceMailWakeRequests({ threadId })
+      .find((wake) => wake.wakeRequestId === firstWake.wakeRequestId);
+    expect(firstWakeAfter).toMatchObject({
+      status: "failed_retryable",
+      failureReason: "ask_launch_stale_without_turn_id",
+      nextRetryAt: "2026-06-04T12:03:55.000Z",
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wakeRequestId: firstWake.wakeRequestId,
+        status: "failed_retryable",
+        failedReason: "ask_launch_stale_without_turn_id",
+      }),
+      expect.objectContaining({
+        wakeRequestId: newerWake?.wakeRequestId,
+        status: "completed",
+        askTurnId: "ask:wake-newer-after-entry-stale",
+      }),
+    ]));
   });
 
   it("server admission cycle releases a stale running wake before dispatching Ask", async () => {

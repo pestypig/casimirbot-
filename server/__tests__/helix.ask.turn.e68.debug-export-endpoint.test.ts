@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { recordStagePlayMailWakeResult } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -61,6 +62,72 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(response.body?.ok).toBe(false);
     expect(response.body?.terminal_error_code).toBe("debug_export_turn_not_found");
   });
+
+  it("reconciles cached debug export from a completed mailbox wake result", async () => {
+    const app = createApp();
+    const turn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Review the latest Stage Play live-source mailbox finding.",
+        mode: "read",
+        debug: true,
+        sessionId: `e68-debug-export-mailbox-wake-${Date.now()}`,
+      })
+      .expect(200);
+
+    const turnId = turn.body?.turn_id;
+    expect(turnId).toBeTruthy();
+    const wakeRequestId = `stage_play_live_source_mail_wake:e68-${Date.now()}`;
+    const decisionId = `stage_play_live_source_mail_decision:e68-${Date.now()}`;
+    const voiceReceiptRef = `helix_interim_voice_callout_receipt:e68-${Date.now()}`;
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId,
+      threadId: "helix-ask:desktop",
+      status: "completed",
+      askTurnId: turnId,
+      decisionIds: [decisionId],
+      evidenceRefs: [
+        "stage_play_live_source_voice_delivery_receipt:e68",
+        voiceReceiptRef,
+      ],
+      createdAt: "2026-06-04T12:00:00.000Z",
+    });
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+      .expect(200);
+
+    expect(debugExport.body?.payload?.mailbox_wake_result_projection).toMatchObject({
+      schema: "stage_play_live_source_mail_wake_result_projection/v1",
+      wake_result_id: wakeResult.wakeResultId,
+      wake_request_id: wakeRequestId,
+      status: "completed",
+      decision_ids: [decisionId],
+      voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
+    });
+    expect(debugExport.body?.payload?.selected_final_answer).toContain("The live-source mailbox wake completed");
+    expect(debugExport.body?.payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
+    expect(debugExport.body?.payload?.resolved_turn_summary).toMatchObject({
+      final_status: "final_answer",
+      resolved_route_label: "live_source_mailbox",
+      terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
+      terminal_error_code: null,
+    });
+    expect(debugExport.body?.payload?.terminal_answer_authority).toMatchObject({
+      final_answer_source: "stage_play_mailbox_wake_result",
+      terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
+      terminal_artifact_ref: wakeResult.wakeResultId,
+      debug_export_synchronized: true,
+    });
+    expect(debugExport.body?.payload?.stage_play_live_source_mailbox_debug).toMatchObject({
+      route: "live_source_mailbox",
+      route_selected: "live_source_mailbox",
+      wake_request_id: wakeRequestId,
+      wake_result_id: wakeResult.wakeResultId,
+      decision_ids: [decisionId],
+      voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
+    });
+  }, 60000);
 
   it("returns replay-safe reasoning battle stage beats for a completed turn", async () => {
     const app = createApp();

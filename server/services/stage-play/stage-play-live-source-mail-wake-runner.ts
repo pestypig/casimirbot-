@@ -68,6 +68,7 @@ import {
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
   latestStagePlayLiveSourceMailWakeResult,
+  releaseStaleRunningStagePlayMailWakeRequests,
   splitStagePlayLiveSourceMailWakeRequestForAsk,
   attachLiveSourceBudgetStateToWakeResult,
   expireStaleStagePlayLiveSourceMailWakeRequests,
@@ -131,6 +132,13 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+const normalizeAskWakeFailureReason = (error: unknown): string => {
+  const raw = error instanceof Error ? error.message : String(error);
+  const timeoutMatch = /^mail_wake_ask_turn_timeout:(\d+)/i.exec(raw);
+  if (timeoutMatch) return `ask_launch_no_response_timeout:${timeoutMatch[1]}`;
+  return raw;
+};
+
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
@@ -138,6 +146,8 @@ const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
 const STALE_RUNNING_WAKE_MS = 90_000;
+const ASK_ENTRY_STALE_WAKE_MS = 20_000;
+const ASK_ENTRY_STALE_RETRY_DELAY_MS = 30_000;
 const PRIOR_DECISION_LIMIT = 6;
 
 const readPositiveIntEnv = (name: string, fallback: number): number => {
@@ -167,6 +177,12 @@ const defaultAskBaseUrl = (): string =>
 
 const wakeAskTurnTimeoutMs = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ASK_TIMEOUT_MS", 120_000);
+
+const wakeAskEntryStaleMs = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ENTRY_STALE_MS", ASK_ENTRY_STALE_WAKE_MS);
+
+const wakeAskEntryStaleRetryDelayMs = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_ENTRY_STALE_RETRY_DELAY_MS", ASK_ENTRY_STALE_RETRY_DELAY_MS);
 
 const wakeAskBatchLimit = (): number =>
   readPositiveIntEnv(
@@ -1607,14 +1623,22 @@ const buildNonTerminalWakeTranscriptRows = (input: {
 }): DurableWakeTranscriptRow[] => {
   const rows: DurableWakeTranscriptRow[] = [];
   const failureReason = input.wakeResult.failedReason ?? input.wakeResult.skippedReason ?? "wake did not complete";
-  const blockedTitle = /^mail_wake_ask_turn_timeout:/i.test(failureReason)
+  const blockedTitle = /^ask_launch_no_response_timeout:/i.test(failureReason)
+    ? "Wake Ask launch timed out"
+    : failureReason === "ask_launch_stale_without_turn_id"
+      ? "Wake Ask launch stale"
+      : /^mail_wake_ask_turn_timeout:/i.test(failureReason)
     ? "Wake Ask timed out"
     : /^wake_preflight_blocked:/i.test(failureReason)
       ? "Wake preflight blocked"
       : failureReason === "mail_wake_decision_missing"
         ? "Wake decision missing"
         : "Wake blocked";
-  const blockedBody = /^mail_wake_ask_turn_timeout:/i.test(failureReason)
+  const blockedBody = /^ask_launch_no_response_timeout:/i.test(failureReason)
+    ? `${failureReason}. Ask did not return a turn id or mailbox decision before the launch timeout; the batch was retained for retry.`
+    : failureReason === "ask_launch_stale_without_turn_id"
+      ? "The wake was running without an Ask turn id long enough to block the mailbox lane. It was released for retry so newer live-source wakes can proceed."
+      : /^mail_wake_ask_turn_timeout:/i.test(failureReason)
     ? `${failureReason}. The bounded mail batch was retained for retry; no model-reviewed decision was recorded.`
     : /^wake_preflight_blocked:/i.test(failureReason)
       ? `${failureReason}. Ask was not called; the bounded mail batch was retained for retry.`
@@ -1875,7 +1899,7 @@ const buildWakePrompt = (input: {
     "",
     "The mail is perturbation evidence for this continuing job.",
     "Use the processed mail packet as the primary compact evidence packet. Use raw mail summaries below only to audit or clarify the packet.",
-    "Use live_env.read_processed_live_source_mail first. Fall back to live_env.read_live_source_mail only if no processed packet exists, then record the decision with live_env.record_live_source_mail_decision.",
+    "Use the processed-mail evidence path first. Fall back to raw mail only if no processed packet exists, then record the mailbox decision receipt.",
     "Read only the mail refs listed below for this wake request; do not widen to newer mailbox items in this turn.",
     "Treat the listed mail refs as one chronological observation window from the same live source.",
     "Do not claim visual evidence is unavailable when the unread mail refs or compact summaries below exist.",
@@ -1897,12 +1921,12 @@ const buildWakePrompt = (input: {
     "- only_salient: wait unless salience, risk, opportunity, or user-target criteria match.",
     "- voice_only_salient: text/narrative may update internally, but voice callouts require salience and voice permission.",
     "- manual_only: record state without user-facing output unless the user explicitly asks.",
-    "- If current task is immediate_prediction_check: use live_env.compare_live_source_prediction when prior prediction exists; otherwise use live_env.predict_live_source_immediate.",
-    "- If current task is prediction_error_review: use live_env.compare_live_source_prediction before deciding whether to wait, interpret, draft text, or request a callout.",
-    "- If current task is mail_batch_interpretation: use live_env.project_live_source_narrative and record_interpretation.",
+    "- If current task is immediate_prediction_check: compare the current observation against the prior prediction when one exists; otherwise create a fresh immediate prediction.",
+    "- If current task is prediction_error_review: compare prediction evidence before deciding whether to wait, interpret, draft text, or request a callout.",
+    "- If current task is mail_batch_interpretation: project the live-source narrative and record_interpretation.",
     "- If current task is voice_callout_candidate: confirm salience and voice policy before requesting voice callout; if confirmationRequired is true, draft only.",
     "- If current task is voice_callout_candidate: the trigger is live-source salience, not final-answer timing. Decide between request_voice_callout, draft_text_answer, and wait_for_next_summary.",
-    "- If current task is long_horizon_projection: use live_env.project_live_source_narrative unless an active user prompt or urgent voice candidate has priority.",
+    "- If current task is long_horizon_projection: project the live-source narrative unless an active user prompt or urgent voice candidate has priority.",
     "- If active user prompt context is true: answer the user first, and merge or recheck held callouts instead of speaking an older warning separately.",
     "- Use draft_text_answer when the standing policy or current prompt asks what the latest mail shows or asks for a one-sentence scene answer.",
     "- Use record_interpretation when the task asks what is happening, what changed, what should be watched next, or when the mail should update the continuing story without a direct answer.",
@@ -2007,9 +2031,9 @@ const formatCompactMicroReasonerFinding = (
     `- ${run.runId}`,
     `  role: ${run.role}`,
     run.selectedDecision ? `  selected_decision: ${run.selectedDecision}` : null,
-    run.recommendedNextTool ? `  next_tool: ${run.recommendedNextTool}` : null,
+    run.recommendedNextTool ? "  next_phase: structured route metadata controls the required tool" : null,
     run.salienceLevel ? `  salience: ${run.salienceLevel}${run.voiceCandidate ? " (voice candidate)" : ""}` : null,
-    run.outputPreview ? `  finding: ${clipPromptText(run.outputPreview, 220)}` : null,
+    run.outputPreview ? `  finding: ${clipPromptText(run.outputPreview.replace(/\blive_env\.[A-Za-z0-9_]+\b/g, "structured route action"), 220)}` : null,
   ].filter(Boolean).join("\n")).join("\n");
 };
 
@@ -2030,10 +2054,10 @@ const buildCompactWakePrompt = (input: {
   const latestDecision = input.priorDecisions.at(-1) ?? null;
   const phaseRequirement =
     input.processedPacket.recommendedNext === "request_voice_callout"
-      ? "phase requirement: record live_env.record_live_source_mail_decision first; then request live_env.request_interim_voice_callout; do not terminal-answer until voice receipt/hold/block exists."
+      ? "phase requirement: record the mailbox decision first; then request voice delivery; do not terminal-answer until voice receipt/hold/block exists."
       : input.processedPacket.recommendedNext === "wait_for_next_summary"
         ? "phase requirement: do not wake Ask for routine mail; record/keep wait_for_next_summary and retain observer backlog."
-        : "phase requirement: record live_env.record_live_source_mail_decision before terminal synthesis.";
+        : "phase requirement: record the mailbox decision before terminal synthesis.";
   return [
     "Continuing live-source watch job compact Ask handoff:",
     input.policy?.objectiveText ?? "Watch the active visual source through micro-reasoner findings.",
@@ -2411,6 +2435,34 @@ export async function runNextMailWakeRequest(input: {
     jobId: input.jobId ?? null,
     limit: 250,
   });
+  const entryStaleRetryAt = addMs(now, wakeAskEntryStaleRetryDelayMs());
+  const askEntryReleased = releaseStaleRunningStagePlayMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now,
+    staleAfterMs: wakeAskEntryStaleMs(),
+    failureReason: "ask_launch_stale_without_turn_id",
+    nextRetryAt: entryStaleRetryAt,
+    requireMissingAskTurnId: true,
+    limit: 250,
+  }).filter((wake) => !wake.askTurnId && wakeMatchesScope(wake, input));
+  for (const wake of askEntryReleased) {
+    recordStagePlayMailWakeResult({
+      wakeRequestId: wake.wakeRequestId,
+      threadId: wake.threadId,
+      roomId: wake.roomId ?? null,
+      environmentId: wake.environmentId ?? null,
+      status: "failed_retryable",
+      failedReason: "ask_launch_stale_without_turn_id",
+      evidenceRefs: uniqueStrings([
+        ...wake.evidenceRefs,
+        "stage_play_wake_ask_entry_stale",
+      ]),
+      createdAt: now,
+    });
+  }
   const activeRunning = scopedWakes.filter((wake) =>
     wake.status === "running" &&
     wakeMatchesScope(wake, input)
@@ -2418,7 +2470,7 @@ export async function runNextMailWakeRequest(input: {
   for (const wake of activeRunning) {
     const lastAttemptMs = Date.parse(wake.lastAttemptAt ?? wake.updatedAt);
     const stale = Number.isFinite(lastAttemptMs) && Date.parse(now) - lastAttemptMs > STALE_RUNNING_WAKE_MS;
-    if (stale && !wake.askTurnId) {
+    if (stale && !wake.askTurnId && !askEntryReleased.some((released) => released.wakeRequestId === wake.wakeRequestId)) {
       markStagePlayMailWakeRetryable({
         wakeRequestId: wake.wakeRequestId,
         failureReason: "stale_running_wake",
@@ -3086,9 +3138,16 @@ export async function runNextMailWakeRequest(input: {
         createdAt: wakeResult.createdAt,
       });
     }
+    const failedReason = normalizeAskWakeFailureReason(err);
+    const failureEvidenceRefs = uniqueStrings([
+      ...evidenceRefs,
+      failedReason.startsWith("ask_launch_no_response_timeout:")
+        ? "stage_play_wake_ask_launch_no_response_timeout"
+        : null,
+    ]);
     markStagePlayMailWakeRetryable({
       wakeRequestId: running.wakeRequestId,
-      failureReason: err instanceof Error ? err.message : String(err),
+      failureReason: failedReason,
       nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount)),
       now: failedAt,
     });
@@ -3098,8 +3157,8 @@ export async function runNextMailWakeRequest(input: {
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
       status: "failed_retryable",
-      failedReason: err instanceof Error ? err.message : String(err),
-      evidenceRefs,
+      failedReason,
+      evidenceRefs: failureEvidenceRefs,
       createdAt: failedAt,
     });
     return recordNonTerminalWakeTranscript({
@@ -3109,7 +3168,7 @@ export async function runNextMailWakeRequest(input: {
       fastLayer,
       action: "deferred",
       retainedMailCount,
-      evidenceRefs,
+      evidenceRefs: failureEvidenceRefs,
       createdAt: wakeResult.createdAt,
     });
   } finally {

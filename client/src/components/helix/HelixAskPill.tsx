@@ -23103,6 +23103,20 @@ export function HelixAskPill({
         }
         return clipped;
       });
+      const activeTurnId = activeAskTurnIdRef.current?.trim() ?? "";
+      if (activeTurnId) {
+        setAskReplies((prev) =>
+          prev.map((reply) => {
+            if (resolveHelixAskReplyCanonicalKey(reply) !== activeTurnId) return reply;
+            const existing = Array.isArray(reply.liveEvents) ? reply.liveEvents : [];
+            if (existing.some((liveEvent) => liveEvent.id === entry.id)) return reply;
+            return {
+              ...reply,
+              liveEvents: [...existing, entry].slice(-HELIX_ASK_LIVE_EVENT_LIMIT),
+            };
+          }),
+        );
+      }
     },
     [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
   );
@@ -30759,7 +30773,7 @@ export function HelixAskPill({
           }
           updateMoodFromText(responseText);
           requestMoodHint(responseText, { force: true });
-          const replyId = crypto.randomUUID();
+          const replyId = traceId;
           const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
             events: liveEventsSnapshot,
@@ -30771,6 +30785,7 @@ export function HelixAskPill({
               prev,
               {
                 id: replyId,
+                turn_id: traceId,
                 createdAtMs: Date.now(),
                 content: responseText,
                 question: questionText || "Previous request",
@@ -31434,6 +31449,36 @@ export function HelixAskPill({
       activeAskStartedAtMsRef.current = startedAtMs;
       setAskElapsedMs(0);
       setAskActiveQuestion(trimmed);
+      setAskReplies((prev) =>
+        appendHelixAskReplyChronologically(
+          prev,
+          {
+            id: runAskTurnId,
+            turn_id: runAskTurnId,
+            createdAtMs: startedAtMs,
+            content: "Reasoning in progress...",
+            question: trimmed,
+            mode: inferredMode,
+            liveEvents: [
+              {
+                id: `turn-start:${runAskTurnId}`,
+                text: "Turn started.",
+                tool: "helix.ask.client",
+                ts: new Date(startedAtMs).toISOString(),
+                tsMs: startedAtMs,
+                meta: {
+                  kind: "client_optimistic_turn_start",
+                  turn_id: runAskTurnId,
+                  route_metadata_source:
+                    typeof options?.routeMetadata?.source === "string" ? options.routeMetadata.source : null,
+                  assistant_answer: false,
+                },
+              },
+            ],
+          },
+          HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT,
+        ),
+      );
       if (askInputRef.current) {
         askInputRef.current.value = "";
         resizeTextarea();
@@ -32345,13 +32390,14 @@ export function HelixAskPill({
               },
             });
           } else {
-            const replyId = crypto.randomUUID();
+            const replyId = traceId;
             directReplyIdForAutoSpeak = replyId;
             setAskReplies((prev) =>
               appendHelixAskReplyChronologically(
                 prev,
                 {
                   id: replyId,
+                  turn_id: traceId,
                   createdAtMs: Date.now(),
                   content: responseText,
                   question: trimmed,

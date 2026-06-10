@@ -55,6 +55,9 @@ const decisionRequiresVoiceCheckpoint = (decision: StagePlayLiveSourceMailDecisi
 const isVoiceCheckpointRef = (ref: string): boolean =>
   /(?:^|:)(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt)/i.test(ref);
 
+const voiceCheckpointRefsFromEvidence = (refs: string[]): string[] =>
+  uniqueStrings(refs.filter(isVoiceCheckpointRef));
+
 const refIncludesVoiceStatus = (ref: string, statuses: string[]): boolean => {
   const normalized = ref.toLowerCase().replace(/[-\s]+/g, "_");
   return statuses.some((status) => normalized.includes(status));
@@ -461,6 +464,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
   staleAfterMs: number;
   failureReason?: string;
   nextRetryAt?: string | null;
+  requireMissingAskTurnId?: boolean;
   limit?: number;
 }): StagePlayLiveSourceMailWakeRequestV1[] {
   const now = input.now ?? new Date().toISOString();
@@ -475,6 +479,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
     status: "running",
     limit: input.limit ?? 250,
   })) {
+    if (input.requireMissingAskTurnId && wake.askTurnId) continue;
     const anchorMs = Date.parse(wake.lastAttemptAt ?? wake.updatedAt);
     if (!Number.isFinite(anchorMs)) continue;
     if (nowMs - anchorMs <= input.staleAfterMs) continue;
@@ -703,6 +708,7 @@ export function recordStagePlayMailWakeResult(input: {
   const wake = wakeById.get(input.wakeRequestId) ?? null;
   const decisionIds = uniqueStrings(input.decisionIds ?? []);
   const evidenceRefs = uniqueStrings([input.wakeRequestId, input.askTurnId, ...decisionIds, ...(input.evidenceRefs ?? [])]);
+  const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
   const wakeResultId = `stage_play_live_source_mail_wake_result:${hashShort([
     input.wakeRequestId,
     input.status,
@@ -720,6 +726,7 @@ export function recordStagePlayMailWakeResult(input: {
     status: input.status,
     askTurnId: input.askTurnId ?? null,
     decisionIds,
+    voiceCheckpointRefs,
     budgetStateRef: null,
     skippedReason: input.skippedReason ?? null,
     failedReason: input.failedReason ?? null,
@@ -765,6 +772,7 @@ export function attachLiveSourceBudgetStateToWakeResult(input: {
     ...existing,
     budgetStateRef: input.budgetStateId,
     evidenceRefs: uniqueStrings([...existing.evidenceRefs, input.budgetStateId]),
+    voiceCheckpointRefs: voiceCheckpointRefsFromEvidence(uniqueStrings([...existing.evidenceRefs, input.budgetStateId])),
     causalTrace: mergeLiveSourceCausalTraces([existing.causalTrace], {
       parentRefs: [existing.wakeResultId],
       producedRefs: [input.budgetStateId],
