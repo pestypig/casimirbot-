@@ -141,8 +141,24 @@ const readPositiveIntEnv = (name: string, fallback: number): number => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 };
 
+let rememberedAskBaseUrl: string | null = null;
+
+const normalizeAskBaseUrl = (value: string | null | undefined): string | null => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed ? trimmed.replace(/\/+$/, "") : null;
+};
+
+export function rememberStagePlayMailWakeAskBaseUrl(value: string | null | undefined): void {
+  const normalized = normalizeAskBaseUrl(value);
+  if (normalized) rememberedAskBaseUrl = normalized;
+}
+
 const defaultAskBaseUrl = (): string =>
-  process.env.HELIX_ASK_BASE_URL ??
+  rememberedAskBaseUrl ??
+  normalizeAskBaseUrl(process.env.HELIX_ASK_WAKE_BASE_URL) ??
+  normalizeAskBaseUrl(process.env.HELIX_ASK_BASE_URL) ??
+  normalizeAskBaseUrl(process.env.API_PROXY_TARGET) ??
+  normalizeAskBaseUrl(process.env.CASIMIR_PUBLIC_BASE_URL) ??
   `http://127.0.0.1:${process.env.PORT || process.env.SERVER_PORT || "5050"}`;
 
 const wakeAskTurnTimeoutMs = (): number =>
@@ -2040,7 +2056,7 @@ const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     let response: Response;
     try {
-      response = await fetch(`${baseUrl ?? defaultAskBaseUrl()}/api/agi/ask/turn`, {
+      response = await fetch(`${normalizeAskBaseUrl(baseUrl) ?? defaultAskBaseUrl()}/api/agi/ask/turn`, {
         method: "POST",
         headers: {
           Accept: "application/json",

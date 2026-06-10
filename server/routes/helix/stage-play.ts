@@ -72,6 +72,7 @@ import {
 } from "../../services/stage-play/stage-play-visual-summary-mail-ingest";
 import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../../services/stage-play/stage-play-live-source-watch-policy-defaults";
 import {
+  rememberStagePlayMailWakeAskBaseUrl,
   queueMailWakeForUnreadItems,
   runNextMailWakeRequest,
 } from "../../services/stage-play/stage-play-live-source-mail-wake-runner";
@@ -92,6 +93,27 @@ const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+};
+
+const readHeaderValue = (value: string | string[] | undefined): string | null => {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const trimmed = typeof raw === "string" ? raw.trim() : "";
+  return trimmed || null;
+};
+
+const requestBaseUrl = (req: Request): string | null => {
+  const forwardedProto = readHeaderValue(req.headers["x-forwarded-proto"]);
+  const forwardedHost = readHeaderValue(req.headers["x-forwarded-host"]);
+  const host = forwardedHost ?? readHeaderValue(req.headers.host);
+  if (!host) return null;
+  const protocol = forwardedProto ?? req.protocol ?? "http";
+  return `${protocol}://${host}`.replace(/\/+$/, "");
+};
+
+const rememberStagePlayRequestBaseUrl = (req: Request): string | null => {
+  const baseUrl = requestBaseUrl(req);
+  rememberStagePlayMailWakeAskBaseUrl(baseUrl);
+  return baseUrl;
 };
 
 type StagePlayRouteContextRole =
@@ -741,6 +763,7 @@ helixStagePlayRouter.post("/checkpoint-queue/action", (req: Request, res: Respon
 helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  rememberStagePlayRequestBaseUrl(req);
 
   try {
     const requestedThreadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
@@ -1408,6 +1431,7 @@ helixStagePlayRouter.post("/live-source-mail/wake", (req: Request, res: Response
 helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  const routeBaseUrl = rememberStagePlayRequestBaseUrl(req);
 
   try {
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
@@ -1424,7 +1448,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
-      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: true,
     });
     return res.json({
@@ -1450,6 +1474,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
 helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
+  const routeBaseUrl = rememberStagePlayRequestBaseUrl(req);
 
   try {
     const body = readStagePlayJsonBody(req, res, "tool_evidence");
@@ -1466,7 +1491,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
-      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url),
+      baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: resolveStagePlayWakeManualRunForRoute(body, req.query as Record<string, unknown>),
     });
     return res.json({

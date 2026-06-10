@@ -1,0 +1,41 @@
+{
+    "ok":  true,
+    "schema":  "stage_play_live_source_mail_wake_cycle_response/v1",
+    "cycle":  {
+                  "schema":  "stage_play_live_source_mail_wake_admission_cycle/v1",
+                  "now":  "2026-06-10T13:53:04.401Z",
+                  "queuedWakeIds":  [
+
+                                    ],
+                  "runnableWakeIds":  [
+                                          "stage_play_live_source_mail_wake:1b231a18eb7f0dfabf",
+                                          "stage_play_live_source_mail_wake:b25413a189e00d24b2"
+                                      ],
+                  "runningWakeIds":  [
+                                         "stage_play_live_source_mail_wake:8de1e865a2c344e833"
+                                     ],
+                  "deferredWakeIds":  [
+                                          "stage_play_live_source_mail_wake:1b231a18eb7f0dfabf",
+                                          "stage_play_live_source_mail_wake:b25413a189e00d24b2"
+                                      ],
+                  "result":  null,
+                  "status":  "running",
+                  "reason":  "wake_cycle_already_running",
+                  "continuation":  {
+                                       "scheduled":  false,
+                                       "reason":  "no_runnable_wake_remaining",
+                                       "runnableWakeIds":  [
+
+                                                           ]
+                                   },
+                  "runtimeAdmission":  null,
+                  "assistant_answer":  false,
+                  "terminal_eligible":  false,
+                  "context_role":  "tool_evidence",
+                  "raw_content_included":  false
+              },
+    "assistant_answer":  false,
+    "terminal_eligible":  false,
+    "context_role":  "tool_evidence",
+    "raw_content_included":  false
+}

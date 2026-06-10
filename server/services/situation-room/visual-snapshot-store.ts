@@ -24,6 +24,7 @@ import {
 import type { HelixVisualEventAlignment } from "@shared/helix-visual-event-alignment";
 import { HELIX_VISUAL_EVENT_ALIGNMENT_SCHEMA } from "@shared/helix-visual-event-alignment";
 import { enqueueStagePlayLiveSourceMailItem } from "../stage-play/stage-play-live-source-mailbox-store";
+import { getLiveSourceProducer } from "./live-source-chunk-buffer";
 
 const sourcesById = new Map<string, HelixVisualSnapshotSource>();
 const framesByThread = new Map<string, HelixVisualFrameRecord[]>();
@@ -330,6 +331,13 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
   evidenceByThread.set(frame.thread_id, [...existing.filter((entry) => entry.evidence_id !== evidence.evidence_id), evidence].slice(-500));
   touchVisualSnapshotSource({ sourceId: frame.source_id, status: "active", ts: evidence.ts });
   const source = sourcesById.get(evidence.source_id) ?? null;
+  const liveSourceProducer = getLiveSourceProducer(evidence.source_id);
+  const captureIntervalMs =
+    source?.capture_mode === "interval" && source.cadence_ms
+      ? source.cadence_ms
+      : liveSourceProducer?.capture_mode === "interval" && liveSourceProducer.cadence_ms
+        ? liveSourceProducer.cadence_ms
+        : null;
   enqueueStagePlayLiveSourceMailItem({
     threadId: evidence.thread_id,
     roomId: frame.room_id ?? null,
@@ -347,7 +355,7 @@ export function analyzeVisualFrame(input: Record<string, unknown>): HelixVisualF
       evidence.visual_observer_profile_id,
       evidence.visual_prompt_hash ? `visual_prompt_hash:${evidence.visual_prompt_hash}` : null,
     ].filter((ref): ref is string => Boolean(ref)),
-    captureIntervalMs: source?.capture_mode === "interval" ? source.cadence_ms : null,
+    captureIntervalMs,
     createdAt: evidence.ts,
   });
   return evidence;

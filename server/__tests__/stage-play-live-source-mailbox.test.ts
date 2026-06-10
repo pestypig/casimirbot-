@@ -69,6 +69,10 @@ import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-
 import { buildStagePlayLiveSourceWatchJobPolicyDefaults } from "../services/stage-play/stage-play-live-source-watch-policy-defaults";
 import { runtimeMemoryGovernor, type RuntimeMemoryReader } from "../services/runtime/runtime-memory-governor";
 import {
+  resetLiveSourceChunkBufferForTest,
+  upsertLiveSourceProducer,
+} from "../services/situation-room/live-source-chunk-buffer";
+import {
   analyzeVisualFrame,
   recordVisualFrame,
   resetVisualSnapshotStoreForTest,
@@ -101,6 +105,7 @@ beforeEach(() => {
   resetStagePlayHeldCalloutStoreForTest();
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
+  resetLiveSourceChunkBufferForTest();
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_PRESSURE_BYPASS;
   delete process.env.STAGE_PLAY_MAIL_WAKE_LOCAL_BYPASS_MAX_HEAP_MB;
@@ -2919,6 +2924,41 @@ describe("Stage Play live-source mailbox", () => {
     const autoArmJob = listStagePlayLiveSourceJobStates({ threadId, roomId })
       .find((entry) => entry.jobId === "stage_play_live_source_job:auto-arm");
     expect(autoArmJob?.watchJobPolicyRef).toBe(policy?.policyId);
+  });
+
+  it("uses live-source producer cadence when visual snapshot source cadence is unavailable", () => {
+    const liveProducerSourceId = "visual_source:producer-cadence";
+    upsertLiveSourceProducer({
+      sourceId: liveProducerSourceId,
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      captureMode: "interval",
+      cadenceMs: 10_000,
+      now: "2026-06-04T12:03:00.000Z",
+    });
+    recordVisualFrame({
+      thread_id: threadId,
+      room_id: roomId,
+      source_id: liveProducerSourceId,
+      frame_id: "visual_frame:producer-cadence",
+      ts: "2026-06-04T12:03:01.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: "visual_frame:producer-cadence",
+      summary: "Minecraft cave frame with a useful interval cadence.",
+      ts: "2026-06-04T12:03:02.000Z",
+    });
+
+    const job = listStagePlayLiveSourceJobStates({ threadId }).find((entry) =>
+      entry.sourceIds.includes(liveProducerSourceId)
+    );
+    expect(job?.nextWakePolicy).toMatchObject({
+      sourceKind: "visual_frame",
+      afterMs: 10_000,
+      maxConsecutiveReads: 3,
+    });
   });
 
   it("auto-arms policy and runs local wake when stage-play refresh pressure is deferrable but within local caps", async () => {

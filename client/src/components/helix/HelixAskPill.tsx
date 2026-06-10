@@ -9348,6 +9348,17 @@ function sortHelixAskSteeringQueueItems(items: HelixAskSteeringQueueItem[]): Hel
   });
 }
 
+function shouldAutoWakeHelixMailboxQueueItem(item: HelixAskSteeringQueueItem | null | undefined): boolean {
+  if (!item) return false;
+  if (item.status === "held" || item.status === "completed" || item.status === "running") return false;
+  return (
+    item.key.startsWith("processed-finding:") ||
+    item.key.startsWith("micro-decision:") ||
+    item.key.startsWith("wake:") ||
+    item.key.startsWith("continuation:")
+  );
+}
+
 export function buildHelixAskSteeringQueueItems(input: {
   activeTurnStreamRows?: HelixContinuousTurnStreamRow[];
   latestReply?: HelixAskReply | null;
@@ -17472,6 +17483,7 @@ export function HelixAskPill({
   const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<string[]>([]);
   const [steeringQueueExpanded, setSteeringQueueExpanded] = useState<boolean>(false);
+  const liveSourceMailAutoWakeKeyRef = useRef<string | null>(null);
   const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
   const askContextChooserRef = useRef<AskContextChooserState | null>(null);
   const [askContextChooserCountdownSec, setAskContextChooserCountdownSec] = useState<number | null>(null);
@@ -30054,6 +30066,57 @@ export function HelixAskPill({
     [activeTurnStreamRows, latestAskReply, liveSourceMailState],
   );
   const activeSteeringQueueCount = steeringQueueItems.filter((item) => item.status !== "completed").length;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (askBusy) return;
+    const nextAutoWake = steeringQueueItems.find(shouldAutoWakeHelixMailboxQueueItem) ?? null;
+    if (!nextAutoWake) return;
+    const autoWakeKey = `${nextAutoWake.key}:${nextAutoWake.status}:${nextAutoWake.evidenceRefs.slice(0, 6).join("|")}`;
+    if (liveSourceMailAutoWakeKeyRef.current === autoWakeKey) return;
+    liveSourceMailAutoWakeKeyRef.current = autoWakeKey;
+    let cancelled = false;
+    const runAutoWake = async () => {
+      setAskStatus(`Auto-waking Helix Ask from ${nextAutoWake.label.toLowerCase()}.`);
+      try {
+        const response = await fetch("/api/helix/stage-play/live-source-mail/wake/cycle", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            reason: "helix_ask_steering_queue_auto_wake",
+            evidence_refs: nextAutoWake.evidenceRefs,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error(`mail_wake_cycle_failed:${response.status}`);
+        }
+        if (cancelled) return;
+        setLiveSourceMailStateRefreshSeq((current) => current + 1);
+        setLiveSourceMailTranscriptRefreshSeq((current) => current + 1);
+        window.dispatchEvent(new CustomEvent(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, {
+          detail: {
+            threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            reason: "helix_ask_steering_queue_auto_wake",
+            artifactMarkers: nextAutoWake.evidenceRefs,
+          },
+        }));
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("[HelixAskPill] mailbox queue auto-wake failed", error);
+          setAskStatus("Mailbox wake is queued but could not auto-run yet.");
+        }
+      }
+    };
+    void runAutoWake();
+    return () => {
+      cancelled = true;
+    };
+  }, [askBusy, steeringQueueItems]);
   const activeTurnStreamTail = activeTurnStreamRows.length
     ? activeTurnStreamRows[activeTurnStreamRows.length - 1]
     : null;
@@ -34632,7 +34695,7 @@ export function HelixAskPill({
               </span>
             </button>
             {steeringQueueExpanded ? (
-              <div id="helix-ask-steering-queue-items" className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
+              <div id="helix-ask-steering-queue-items" className="mt-2 max-h-[11rem] space-y-1.5 overflow-y-auto pr-1">
                 {steeringQueueItems.map((item, index) => {
                   const itemClass = readHelixSteeringQueueItemClass(item);
                   const dotClass = readHelixSteeringQueueDotClass(item);

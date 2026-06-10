@@ -1241,6 +1241,65 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
       canonical_goal: "live_source_processed_mail_interpretation",
       evidence_requirement: "processed_mail_packet",
       decision_requirement: "record_live_source_mail_decision",
+      authority_summary: expect.objectContaining({
+        artifactId: "live_source_mailbox_authority_summary",
+        schemaVersion: "helix.live_source_mailbox_authority_summary.v1",
+        routeFamily: "live_source_mailbox",
+        canonicalGoal: "live_source_processed_mail_interpretation",
+        genericPlannerTraceDisplayRole: "secondary_runtime_trace",
+        genericPlannerTraceSupersededBy: "live_source_mailbox_authority_summary",
+        debugNoiseSuppressed: expect.arrayContaining([
+          "planner_contract",
+          "single_capability_lifecycle_flattening",
+        ]),
+      }),
+    });
+    expect(response.body?.live_source_mailbox_authority_summary, debug).toMatchObject({
+      artifactId: "live_source_mailbox_authority_summary",
+      schemaVersion: "helix.live_source_mailbox_authority_summary.v1",
+      routeFamily: "live_source_mailbox",
+      canonicalGoal: "live_source_processed_mail_interpretation",
+      genericPlannerTraceDisplayRole: "secondary_runtime_trace",
+      phasedToolSequence: expect.arrayContaining([
+        expect.objectContaining({
+          tool_name: "live_env.read_processed_live_source_mail",
+        }),
+        expect.objectContaining({
+          tool_name: "live_env.record_live_source_mail_decision",
+        }),
+      ]),
+    });
+    expect(response.body?.generic_runtime_trace, debug).toMatchObject({
+      display_role: "secondary_runtime_trace",
+      superseded_by: "live_source_mailbox_authority_summary",
+    });
+    expect(response.body?.planner_contract, debug).toMatchObject({
+      display_role: "secondary_runtime_trace",
+      superseded_by: "live_source_mailbox_authority_summary",
+    });
+    const debugExport = await request(createApp())
+      .get(`/api/agi/ask/turn/${encodeURIComponent(response.body?.turn_id)}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.live_source_mailbox_authority_summary, debug).toMatchObject({
+      artifactId: "live_source_mailbox_authority_summary",
+      routeFamily: "live_source_mailbox",
+      genericPlannerTraceDisplayRole: "secondary_runtime_trace",
+      phasedToolSequence: expect.arrayContaining([
+        expect.objectContaining({
+          tool_name: "live_env.read_processed_live_source_mail",
+        }),
+        expect.objectContaining({
+          tool_name: "live_env.record_live_source_mail_decision",
+        }),
+      ]),
+    });
+    expect(debugExport.body?.payload?.tool_lifecycle_trace, debug).toMatchObject({
+      lifecycle_shape: "phased_tool_sequence",
+      phased_tool_sequence: expect.arrayContaining([
+        expect.objectContaining({
+          tool_name: "live_env.read_processed_live_source_mail",
+        }),
+      ]),
     });
     expect(response.body?.stage_play_live_source_mailbox_debug?.wake_continuation, debug).toMatchObject({
       checkpoint_state: "checkpoint_completed",
