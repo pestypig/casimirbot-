@@ -784,4 +784,76 @@ describe("Helix Ask tool admission acceptance matrix", () => {
     });
     expect(audit.violations).toEqual(expect.arrayContaining(["missing_tool_admission_decision", "retrieval_required_has_source_target"]));
   });
+
+  it("treats unknown-source discovery as an articulated retrieval state", () => {
+    const routeProductContract = buildRouteProductContract({
+      turnId: "ask:unknown-source-discovery-audit",
+      threadId: "thread:unknown-source-discovery-audit",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      promptText: "find NHM2 theory white paper",
+    });
+    const toolCallAdmissionDecision = buildToolCallAdmissionDecision({
+      turnId: "ask:unknown-source-discovery-audit",
+      sourceTargetIntent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "unknown",
+      },
+      routeProductContract,
+      promptText: "find NHM2 theory white paper",
+    });
+    const audit = auditToolAdmissionCoverage({
+      payload: {
+        ask_turn_preflight_context: {
+          retrieval_required_signal: {
+            required: true,
+          },
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          target_source: "unknown",
+        },
+        route_product_contract: routeProductContract,
+        tool_call_admission_decision: toolCallAdmissionDecision,
+        product_authority_guard: {
+          schema: "helix.product_authority_guard.v1",
+          allowed: true,
+          reason: "test",
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: "tool_evaluation",
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_artifact_kind: "tool_evaluation",
+        },
+      },
+    });
+
+    expect(routeProductContract.source_target).toBe("unknown");
+    expect(routeProductContract.precedence_reason).toBe("unknown_source_discovery_allows_bounded_readonly_evidence_products");
+    expect(routeProductContract.allowed_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining(["doc_location_result", "repo_code_evidence_answer", "tool_evaluation", "model_synthesized_answer"]),
+    );
+    expect(routeProductContract.forbidden_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining(["scholarly_research_answer", "internet_search_answer", "no_tool_direct", "model_only_concept"]),
+    );
+    expect(toolCallAdmissionDecision.source_target).toBe("unknown");
+    expect(toolCallAdmissionDecision.admission_mode).toBe("unknown_source_discovery");
+    expect(audit).toMatchObject({
+      schema: "helix.tool_admission_coverage_audit.v1",
+      ok: true,
+      retrieval_required: true,
+      source_target: "unknown",
+      violations: [],
+    });
+    expect(audit.checks.find((check) => check.check === "retrieval_required_has_source_target")).toMatchObject({
+      passed: true,
+      evidence: "unknown_source_discovery",
+    });
+  });
 });

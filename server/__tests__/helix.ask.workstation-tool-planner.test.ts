@@ -571,10 +571,57 @@ describe("Helix Ask workstation tool planner", () => {
           includeLocator: true,
           includeFruition: true,
           includeAdmissionArtifacts: true,
+          includeProceduralClassification: true,
         }),
       }),
     }));
     expect(plan.tool_plan?.steps.map((step) => step.panel_id)).not.toContain("scientific-calculator");
+  });
+
+  it("routes procedural inner-practice Zen classifier prompts through ZenGraph", () => {
+    const plan = planWorkstationToolUse(
+      "Use the procedural Zen classifier to reflect this conversation as inner-practice: rumination, information diet, identity-view, non-attachment, and right effort.",
+    );
+
+    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    expect(reflectStep).toEqual(
+      expect.objectContaining({
+        kind: "run_ask_tool",
+        tool_id: "helix_ask.reflect_ideology_context",
+        expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+        args: expect.objectContaining({
+          options: expect.objectContaining({
+            includeProceduralClassification: true,
+            includeLocator: true,
+            includeFruition: true,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("routes moral guilt and missing consideration prompts through ZenGraph", () => {
+    const plan = planWorkstationToolUse(
+      "Use the procedural Zen classifier to reflect moral guilt, ignorance is bliss, and what missing considerations or affected parties should be researched.",
+    );
+
+    expect(plan.intent).toBe("zen_graph_reflection");
+    expect(plan.should_use_tool).toBe(true);
+    const reflectStep = plan.tool_plan?.steps.find((step) => step.step_id === "reflect_zen_graph_context");
+    expect(reflectStep).toEqual(
+      expect.objectContaining({
+        kind: "run_ask_tool",
+        tool_id: "helix_ask.reflect_ideology_context",
+        expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
+        args: expect.objectContaining({
+          options: expect.objectContaining({
+            includeProceduralClassification: true,
+          }),
+        }),
+      }),
+    );
   });
 
   it("opens the Zen Badge Graph only when explicitly requested", () => {

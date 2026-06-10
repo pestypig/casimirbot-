@@ -2,12 +2,13 @@ export const THEORY_BIOME_LAYOUT_SCHEMA_VERSION = "theory_biome_layout/v1" as co
 
 export const THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 = {
   badgeSizePx: 44,
-  minBadgeGapXPx: 34,
-  minBadgeGapYPx: 28,
+  minBadgeGapXPx: 72,
+  minBadgeGapYPx: 56,
   labelReserveTopPx: 44,
   chunkLabelReservePx: 32,
   scaleBandWidthPx: 440,
-  chunkSizePx: 512,
+  chunkSizePx: 768,
+  badgesPerChunkTarget: 6,
 } as const;
 
 export type TheoryBiomeBand =
@@ -47,6 +48,8 @@ export type TheoryBiomeCoordinateV1 = {
   y: number;
   chunkX: number;
   chunkY: number;
+  renderChunkId: string;
+  semanticChunkId: string;
   lod: number;
   reasons: string[];
 };
@@ -67,6 +70,9 @@ export type TheoryBiomeChunkV1 = {
   dominantDomainKey: string;
   averageClaimPressure: number;
   averageFidelity: number;
+  capacityBadgeCount: number;
+  densityRatio: number;
+  semanticChunkIds: string[];
 };
 
 export type TheoryBiomeLayoutV1 = {

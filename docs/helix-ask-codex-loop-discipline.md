@@ -312,6 +312,47 @@ voice, and future tool families share the same loop boundary while preserving
 their own domain validators. The trace can recommend what to do next, but only
 terminal authority may publish the visible final answer.
 
+### Artifact Query Index
+
+Exact-turn debug export should expose one derived artifact lookup view:
+
+```txt
+artifact_query_index
+```
+
+`artifact_query_index` uses schema `helix.artifact_query_index.v1` and is built
+from existing records:
+
+```txt
+current_turn_artifact_ledger
+tool_lifecycle_trace
+tool_followup_decision
+tool_family_contract
+```
+
+The index is a read-only debug/query surface. Tool families should not write it
+directly and it must not become answer authority. It summarizes:
+
+```txt
+artifact_refs
+queryable_artifact_keys
+tool_family
+capability
+tool_family_contract
+required_observation_coverage
+missing_required_observation_kinds
+lifecycle_refs
+reentry_status
+assistant_answer=false
+raw_content_included=false
+```
+
+Use it when UI, tests, or backend probes need to ask, "what did this exact turn
+produce and can the required tool-family evidence be found?" Do not add broad
+raw `copied_or_parsed_inputs` fields unless a specific product requirement
+justifies the privacy and duplication cost. Prefer references, schema/kind
+keys, and lifecycle refs over raw copied content.
+
 ### Operational Constraints And Surface Satisfaction
 
 User constraints about tool families, browser surfaces, and local vocabulary are

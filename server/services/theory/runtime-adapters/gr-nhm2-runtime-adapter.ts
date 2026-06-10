@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import {
@@ -12,6 +11,7 @@ import type {
   TheoryRuntimeAdapter,
   TheoryRuntimeAdapterInput,
 } from "./theory-runtime-adapter-types";
+import { readJsonArtifactFile } from "./json-artifact-reader";
 
 export const GR_NHM2_RUNTIME_ADAPTER_ID = "gr_nhm2.artifact_reader" as const;
 export const GR_NHM2_LANE_ID = "warp_gr_nhm2" as const;
@@ -34,7 +34,6 @@ export const GR_NHM2_SUPPORTED_BADGE_IDS = [
 ] as const;
 
 export const GR_NHM2_ARTIFACT_ROOTS = [
-  "artifacts/research/full-solve",
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse",
   "docs/audits/research/selected-family/nhm2-shift-lapse",
 ] as const;
@@ -70,6 +69,9 @@ type ParsedArtifact = {
   relativePath: string;
   data: unknown;
 };
+
+let artifactCache: { projectRoot: string; artifacts: ParsedArtifact[] } | null = null;
+let artifactCachePromise: Promise<ParsedArtifact[]> | null = null;
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
@@ -209,6 +211,19 @@ function maximumTierForGates(gates: Record<string, TheoryRuntimeGateStatus>): "r
 }
 
 async function readJsonArtifacts(projectRoot: string): Promise<ParsedArtifact[]> {
+  if (artifactCache?.projectRoot === projectRoot) return artifactCache.artifacts;
+  if (artifactCachePromise) return artifactCachePromise;
+  artifactCachePromise = readJsonArtifactsUncached(projectRoot);
+  try {
+    const artifacts = await artifactCachePromise;
+    artifactCache = { projectRoot, artifacts };
+    return artifacts;
+  } finally {
+    artifactCachePromise = null;
+  }
+}
+
+async function readJsonArtifactsUncached(projectRoot: string): Promise<ParsedArtifact[]> {
   const patterns = GR_NHM2_ARTIFACT_ROOTS.map((root) => `${root.replace(/\\/g, "/")}/**/*.json`);
   const paths = await fg(patterns, {
     cwd: projectRoot,
@@ -219,10 +234,9 @@ async function readJsonArtifacts(projectRoot: string): Promise<ParsedArtifact[]>
   const artifacts: ParsedArtifact[] = [];
   for (const relativePath of paths) {
     const absolutePath = path.resolve(projectRoot, relativePath);
-    const raw = await fs.readFile(absolutePath, "utf8");
     artifacts.push({
       relativePath: normalizeRelativePath(relativePath),
-      data: JSON.parse(raw) as unknown,
+      data: await readJsonArtifactFile(absolutePath),
     });
   }
   return artifacts;

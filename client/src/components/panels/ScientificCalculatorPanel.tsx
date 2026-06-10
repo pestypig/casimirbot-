@@ -230,6 +230,7 @@ export default function ScientificCalculatorPanel() {
   const lastStoredLatexRef = useRef(currentLatex);
   const lastTheoryRunIdRef = useRef<string | null>(null);
   const lastTheoryLoadoutIdRef = useRef<string | null>(null);
+  const selectedTheoryRunRowElementRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (isLiveRegisterSummary(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY))) {
@@ -274,6 +275,19 @@ export default function ScientificCalculatorPanel() {
       setActiveSection("theory");
     }
   }, [activeTheoryRun, lastTheoryLoadout?.loadoutId]);
+
+  useEffect(() => {
+    if (activeSection !== "theory" || !selectedTheoryRunRowId) return;
+    const timeoutId = window.setTimeout(() => {
+      const selectedElement = selectedTheoryRunRowElementRef.current;
+      if (typeof selectedElement?.scrollIntoView !== "function") return;
+      selectedElement.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [activeSection, activeTheoryRun?.runId, selectedTheoryRunRowId]);
 
   useEffect(() => {
     const onPicked = (event: Event) => {
@@ -615,7 +629,10 @@ export default function ScientificCalculatorPanel() {
                 .map((row) => (
                   <button
                     key={row.id}
+                    ref={selectedTheoryRunRowId === row.id ? selectedTheoryRunRowElementRef : null}
                     type="button"
+                    data-theory-run-row-id={row.id}
+                    data-selected-theory-run-row={selectedTheoryRunRowId === row.id ? "true" : undefined}
                     onClick={() => selectTheoryRunRow(row.id)}
                     className={`w-full rounded border p-2 text-left text-xs ${theoryRunRowTone(row.kind, row.status)} ${
                       selectedTheoryRunRowId === row.id ? "ring-1 ring-cyan-300" : ""

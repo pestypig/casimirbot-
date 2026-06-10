@@ -12,6 +12,7 @@ export type ToolFamily =
   | "live_source_mail"
   | "live_source_decision"
   | "voice_delivery"
+  | "zen_graph_reflection"
   | "civilization_bounds";
 
 export interface ToolFamilyContract {
@@ -132,11 +133,44 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     toolFamily: "voice_delivery",
     authority: "control_receipt",
     mutating: true,
-    requiredObservationKinds: ["live_source_interim_voice_callout_receipt", "voice_receipt"],
-    allowedTerminalKinds: ["live_source_interim_voice_callout_receipt", "voice_receipt", ...evidenceOnlyTerminalKinds],
+    requiredObservationKinds: [
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+    ],
+    allowedTerminalKinds: [
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+      ...evidenceOnlyTerminalKinds,
+    ],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["voice_delivery", "voice_output", "request_interim_voice_callout"],
+  }),
+  zen_graph_reflection: contract({
+    toolName: "family:zen_graph_reflection",
+    toolFamily: "zen_graph_reflection",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: [
+      "ideology_context_reflection/v1",
+      "procedural_zen_classification/v1",
+      "helix_zen_graph_reflection_tool_result",
+      "workstation_tool_evaluation",
+    ],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "zen_graph_reflection",
+      "zen_graph",
+      "zengraph",
+      "helix_ask.reflect_ideology_context",
+      "procedural_zen_classification/v1",
+    ],
   }),
   civilization_bounds: contract({
     toolName: "family:civilization_bounds",
@@ -200,7 +234,12 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
         observationKind: "stage_play_live_source_mail_decision",
         predicateName: "voice_callout_requested",
         nextTool: "live_env.request_interim_voice_callout",
-        forbidTerminalUntil: ["live_source_interim_voice_callout_receipt", "voice_receipt"],
+        forbidTerminalUntil: [
+          "live_source_interim_voice_callout_receipt",
+          "voice_hold_receipt",
+          "voice_block_receipt",
+          "voice_receipt",
+        ],
       },
     ],
   }),
@@ -209,8 +248,20 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     toolFamily: "voice_delivery",
     authority: "control_receipt",
     mutating: true,
-    requiredObservationKinds: ["stage_play_live_source_mail_decision", "live_source_interim_voice_callout_receipt", "voice_receipt"],
-    allowedTerminalKinds: ["live_source_interim_voice_callout_receipt", "voice_receipt", ...evidenceOnlyTerminalKinds],
+    requiredObservationKinds: [
+      "stage_play_live_source_mail_decision",
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+    ],
+    allowedTerminalKinds: [
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+      ...evidenceOnlyTerminalKinds,
+    ],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
   }),
@@ -313,6 +364,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail/.test(normalized)) return "live_source_mail";
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
+  if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";
   if (/civilization[-.:]?bounds|civilization[-.:]?scenario|civilization[-.:]?roadmap|reflect-civilization-bounds/.test(normalized)) return "civilization_bounds";
   return null;
 };

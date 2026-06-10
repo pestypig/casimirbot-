@@ -201,7 +201,7 @@ const isAcceptedObservationPacket = (artifact: ArtifactLike): boolean => {
   return (
     artifactMatchesObservationKind(artifact, /stage_play_processed_mail_packet/i) ||
     artifactMatchesObservationKind(artifact, /stage_play_live_source_mail_decision/i) ||
-    artifactMatchesObservationKind(artifact, /helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_receipt/i)
+    artifactMatchesObservationKind(artifact, /helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt/i)
   );
 };
 

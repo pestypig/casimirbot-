@@ -62,6 +62,7 @@ export type TheoryContextReflectionOverlayV1 = {
   exactBadgeIds: string[];
   likelyBadgeIds: string[];
   suggestedBiomeChunkIds?: string[];
+  suggestedSemanticChunkIds?: string[];
   suggestedScaleBands?: TheoryBiomeBand[];
   softRegion: {
     id: string;
@@ -235,6 +236,9 @@ function validateOverlay(value: unknown, issues: string[]): void {
 
   if (value.suggestedBiomeChunkIds !== undefined && !isStringArray(value.suggestedBiomeChunkIds)) {
     issues.push("overlay.suggestedBiomeChunkIds must be an array of strings");
+  }
+  if (value.suggestedSemanticChunkIds !== undefined && !isStringArray(value.suggestedSemanticChunkIds)) {
+    issues.push("overlay.suggestedSemanticChunkIds must be an array of strings");
   }
   if (value.suggestedScaleBands !== undefined) {
     if (!isStringArray(value.suggestedScaleBands)) {

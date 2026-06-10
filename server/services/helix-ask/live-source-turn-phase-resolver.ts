@@ -111,7 +111,12 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
       "final_answer",
     ],
     requiredEvidence: ["stage_play_live_source_mail_decision"],
-    completionEvidence: ["live_source_interim_voice_callout_receipt", "voice_receipt"],
+    completionEvidence: [
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+    ],
     next: "terminal_checkpoint",
     terminalAllowed: false,
   },
@@ -306,9 +311,43 @@ const hasMailDecisionReceipt = (receipts: RecordLike[]): boolean =>
 const hasVoiceCalloutDecisionReceipt = (receipts: RecordLike[]): boolean =>
   receipts.some((receipt) => {
     const observation = receiptObservation(receipt);
+    const isDecisionReceipt =
+      receiptToolName(receipt) === "live_env.record_live_source_mail_decision" ||
+      readString(receipt.kind) === "stage_play_live_source_mail_decision" ||
+      readString(observation?.artifactId) === "stage_play_live_source_mail_decision" ||
+      readString(observation?.schemaVersion) === "stage_play_live_source_mail_decision/v1";
     return (
-      receiptToolName(receipt) === "live_env.record_live_source_mail_decision" &&
+      isDecisionReceipt &&
       readString(observation?.decision) === "request_voice_callout"
+    );
+  });
+
+const hasVoiceCalloutCompletionReceipt = (receipts: RecordLike[]): boolean =>
+  receipts.some((receipt) => {
+    const observation = receiptObservation(receipt);
+    const receiptRecord = readRecord(observation?.receipt);
+    const receiptStatus = readString(receiptRecord?.status);
+    const artifactId = readString(observation?.artifactId ?? observation?.artifact_id);
+    const schema = readString(observation?.schema ?? observation?.schemaVersion);
+    const kind = readString(observation?.kind);
+    return (
+      schema === "helix.interim_voice_callout_tool_result.v1" ||
+      artifactId === "live_source_interim_voice_callout_receipt" ||
+      artifactId === "voice_hold_receipt" ||
+      artifactId === "voice_block_receipt" ||
+      kind === "live_source_interim_voice_callout_receipt" ||
+      kind === "voice_hold_receipt" ||
+      kind === "voice_block_receipt" ||
+      Boolean(receiptStatus && [
+        "awaiting_client_playback",
+        "queued",
+        "queued_for_retry",
+        "delivered",
+        "expired",
+        "blocked_capacity",
+        "blocked_policy",
+        "blocked_missing_text",
+      ].includes(receiptStatus))
     );
   });
 
@@ -561,6 +600,33 @@ export const resolveLiveSourceTurnPhase = (
     selectedCapability === "live_env.process_live_source_mail" ||
     hasProcessedMailCue(prompt);
 
+  if (hasVoiceCalloutDecisionReceipt(receipts) && !hasVoiceCalloutCompletionReceipt(receipts)) {
+    return makeResolution({
+      phase: "request_voice_after_decision",
+      reason: "Recorded live-source mail decision requests a voice callout; request the voice/hold/block receipt before terminal synthesis.",
+      canonicalGoal: "processed_mail_voice_decision",
+      allowedTools: ["live_env.request_interim_voice_callout"],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "final_answer",
+      ],
+      requiredEvidence: ["stage_play_live_source_mail_decision"],
+      completionEvidence: [
+        "live_source_interim_voice_callout_receipt",
+        "voice_hold_receipt",
+        "voice_block_receipt",
+        "voice_receipt",
+      ],
+      nextPhase: "terminal_checkpoint",
+      locked: true,
+      lockReason: "Recorded request_voice_callout decision requires live_env.request_interim_voice_callout before terminal output.",
+      evidenceRefs,
+    });
+  }
+
   if (
     processedMailSelected &&
     processFallbackPacketExists &&
@@ -617,7 +683,12 @@ export const resolveLiveSourceTurnPhase = (
         "final_answer",
       ],
       requiredEvidence: ["stage_play_live_source_mail_decision"],
-      completionEvidence: ["live_source_interim_voice_callout_receipt", "voice_receipt"],
+      completionEvidence: [
+        "live_source_interim_voice_callout_receipt",
+        "voice_hold_receipt",
+        "voice_block_receipt",
+        "voice_receipt",
+      ],
       nextPhase: "terminal_checkpoint",
       locked: true,
       lockReason: "Voice output is only allowed after a recorded request_voice_callout decision.",

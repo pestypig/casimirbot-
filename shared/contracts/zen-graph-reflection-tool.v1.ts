@@ -9,6 +9,10 @@ import {
   type HelixRecommendedActionAdmissionV1,
   validateHelixRecommendedActionAdmissionV1,
 } from "./helix-recommended-action-admission.v1";
+import {
+  type ProceduralZenClassificationV1,
+  validateProceduralZenClassificationV1,
+} from "./procedural-zen-classification.v1";
 import { type ZenObjectiveBindingV1, validateZenObjectiveBindingV1 } from "./zen-objective-binding.v1";
 
 export const ZEN_GRAPH_REFLECTION_TOOL_REQUEST_SCHEMA_VERSION = "zen_graph_reflection_tool_request/v1" as const;
@@ -36,6 +40,7 @@ export type ZenGraphReflectionToolOptionsV1 = {
   includeTrace?: boolean;
   includeRecommendedActions?: boolean;
   includeAdmissions?: boolean;
+  includeProceduralClassification?: boolean;
 };
 
 export type ZenGraphReflectionToolRequestV1 = {
@@ -65,6 +70,7 @@ export type ZenGraphReflectionProvenanceV1 = {
 export type ZenGraphReflectionToolResponseV1 = {
   provenance: ZenGraphReflectionProvenanceV1;
   reflection: IdeologyContextReflectionV1;
+  proceduralClassification?: ProceduralZenClassificationV1;
   objectiveBinding: ZenObjectiveBindingV1;
   presetOverlays?: ZenObjectiveBindingV1[];
   recommendedActions: ZenGraphRecommendedAction[];
@@ -102,6 +108,7 @@ function validateOptions(value: unknown, issues: string[]): void {
     "includeTrace",
     "includeRecommendedActions",
     "includeAdmissions",
+    "includeProceduralClassification",
   ] as const) {
     if (value[field] !== undefined && typeof value[field] !== "boolean") {
       issues.push(`options.${field} must be boolean`);
@@ -219,6 +226,13 @@ export function validateZenGraphReflectionToolResponseV1(value: unknown): string
 
   validateProvenance(value.provenance, issues);
   issues.push(...validateIdeologyContextReflectionV1(value.reflection).map((issue) => `reflection.${issue}`));
+  if (value.proceduralClassification !== undefined) {
+    issues.push(
+      ...validateProceduralZenClassificationV1(value.proceduralClassification).map(
+        (issue) => `proceduralClassification.${issue}`,
+      ),
+    );
+  }
   issues.push(...validateZenObjectiveBindingV1(value.objectiveBinding).map((issue) => `objectiveBinding.${issue}`));
 
   if (Array.isArray(value.presetOverlays)) {

@@ -14,11 +14,11 @@ The repository already contains:
 
 - a sector-strobed Casimir source proxy with cycle-average timing semantics,
 - a Natario/NHM2 metric adapter with shift+lapse family support,
-- observer-robust stress-energy audits,
+- a stricter diagnostic closure ledger for same-chart tensor, wall source, observer, QEI, Casimir receipt, and Natario invariant evidence,
 - BSSN-based GR evolution diagnostics,
 - and a policy-gated promotion path.
 
-What remains open is explicit source closure between the tile-effective stress tensor and the stress tensor required by the solved metric, followed by successful Stage 3 certificate issuance and integrity verification.
+What remains open is completion of that ledger with non-proxy source evidence, observer scope beyond a single friendly frame, worldline-level QEI evidence, material Casimir receipts, Natario-adjacent invariant diagnostics, and successful Stage 3 certificate issuance and integrity verification.
 
 ## Current Claim Tier
 
@@ -71,6 +71,21 @@ In practice, the current NHM2 branch is best described as:
 
 For NHM2 specifically, the GR brick can already seed voxelwise lapse from the metric adapter `lapseSummary`, so the repo has a real shift+lapse diagnostic seam rather than only a prose concept.
 
+### Diagnostic Closure Ledger
+
+The current NHM2 review lane should be read as a closure ledger, not as a viability certificate. The newer artifact surfaces make missing evidence explicit instead of letting absent values disappear into a global residual or a favorable frame.
+
+The closure stack is:
+
+- `sameChartFullTensor`: records component status and provenance for `T00`, `T0i` / momentum density `J_i`, diagonal spatial stresses, off-diagonal spatial stresses, ADM fields, and chart metadata. Missing tensor components are blockers, not zeros.
+- `wallSourceClosure`: compares metric-required wall `T00` against tile-effective or material-receipted wall `T00`. Wall failure is the front-door blocker; global source residuals are only secondary context.
+- `observerRobustEnergyConditions`: records which observer families were checked. Eulerian-only evidence is a restricted-frame diagnostic, not an observer-robust pass.
+- `qeiWorldlineDossier`: records worldline provenance, sampling function, sampled density, bound provenance, tau consistency, and regional margins. Scalar `qei_margin` remains badge replay or proxy evidence by itself.
+- `casimirMaterialReceipt`: distinguishes ideal perfect-conductor scalar formulas from material-receipted Lifshitz, geometry, roughness, temperature, and environment evidence.
+- `natarioInvariantAudit`: separates zero-expansion status from curvature invariants, momentum density, tidal behavior, blueshift, convergence, and other safety-relevant diagnostics.
+
+These artifacts improve falsifiability. They do not promote NHM2 to physical propulsion or certified transport viability.
+
 ### Promotion Logic
 
 [`tools/warpViability.ts`](../tools/warpViability.ts) already encodes the promotion ladder. It only promotes to `certified` when:
@@ -86,48 +101,97 @@ This is why NHM2 should be described as a closed-loop blueprint with evidence, n
 
 ## Open Gaps Before Certification
 
-### 1. Source Closure
+### 1. Same-Chart And Wall Source Closure
 
-The missing bridge is an explicit closure surface between the metric-required stress tensor and the tile-effective source tensor. The target statement is:
+The closure bridge begins with a full same-chart stress tensor. The target statement remains:
 
 `G_ab[g_NHM2] = 8*pi*T_ab_tile_effective`
 
 within declared residual tolerances.
 
-The repo needs a first-class artifact that makes this comparison visible rather than implied.
+The important change is that the comparison must be local before it is global. The wall-region `T00` residual is the first blocker because global source residuals can average away the mismatch that matters most.
 
 Recommended fields:
 
-- `T_ab_metric`
-- `T_ab_tile_effective`
-- `sourceClosureResidualRms`
-- `sourceClosureResidualMax`
-- `sourceClosureResidualByRegion`
+- `sameChartFullTensor.components[]`
+- `sameChartFullTensor.completeness.missingComponentIds`
+- `wallSourceClosure.required.T00_SI`
+- `wallSourceClosure.available.T00_SI`
+- `wallSourceClosure.residual.absolute`
+- `wallSourceClosure.residual.relative`
+- `wallSourceClosure.blockers[]`
 
-### 2. Dual-Tensor Energy-Condition Auditing
+Missing `T0i` or off-diagonal `Tij` blocks full-tensor completeness. Missing or failing wall closure blocks stronger source-closure language even if a global residual looks favorable.
 
-The existing observer audit should run on both:
+### 2. Observer-Robust Energy-Condition Auditing
+
+The existing observer audit should continue to identify the tensor under test, but the language must name the observer family that actually ran. It is not enough to say that energy conditions pass in the Eulerian frame.
+
+The audit should run on the available tensor evidence, including:
 
 - `T_ab_metric`
 - `T_ab_tile_effective`
 
 This is a natural extension of the current `stress-energy-brick` machinery, not a new theoretical layer.
 
+Recommended fields:
+
+- `observerFamilies[].familyId`
+- `observerFamilies[].status`
+- `observerFamilies[].worstCase.condition`
+- `summary.eulerianOnly`
+- `summary.robustCheckComplete`
+- `summary.anyViolation`
+
+Eulerian-only artifacts remain useful, but they must be labeled as restricted-frame diagnostics. A robust pass requires an explicitly completed robust observer family such as a bounded boosted timelike grid, null-direction grid, or algebraic Type I analysis.
+
 ### 3. QI/QEI Dossier
 
-The current guardrail logic already reasons about metric rho provenance, applicability, curvature windows, and timing selections. NHM2 still needs a worldline-oriented artifact that makes those assumptions reviewable as a package.
+The current guardrail logic already reasons about metric rho provenance, applicability, curvature windows, and timing selections. NHM2 still needs the worldline-oriented dossier to be complete before QEI language can move beyond scalar replay.
 
 Recommended fields:
 
-- `qeiMarginMin`
-- `qeiWorstWorldline`
-- `samplingTimes`
-- `stateAssumptions`
-- `dutyCyclePass`
-- `lightCrossingConsistencyStatus`
-- `cycleAverageClosureStatus`
+- `worldlines[].worldlineId`
+- `worldlines[].regionId`
+- `worldlines[].samplingFunction`
+- `worldlines[].sampledRho`
+- `worldlines[].bound`
+- `worldlines[].margin`
+- `worldlines[].consistency`
+- `summary.hasWallWorldline`
+- `summary.dossierComplete`
 
-### 4. Stage 3 Promotion
+Missing a wall worldline blocks dossier completeness. A scalar `qei_margin = qei_bound - qei_sample` is still useful as calculator replay, but it cannot substitute for a dossier.
+
+### 4. Casimir Receipts And Natario Invariants
+
+Casimir rows must distinguish ideal scalar formulas from material evidence. Perfect-conductor parallel-plate math remains available as a canonical diagnostic formula, but it is not evidence that a tile batch supplies the required wall source unless a material receipt exists.
+
+Recommended Casimir fields:
+
+- `geometry.gapMetrologyStatus`
+- `geometry.beyondPfaValidity`
+- `material.modelKind`
+- `material.dielectricResponseRef`
+- `environment.vacuumSealEvidence`
+- `correctionFactors`
+- `status`
+
+Natario-adjacent NHM2 rows must likewise keep zero expansion separate from invariant and safety diagnostics. A passing `thetaFlatnessStatus` is not a curvature audit, Petrov classification, momentum-density check, tidal check, blueshift check, convergence check, or passenger-safety certificate.
+
+Recommended Natario fields:
+
+- `expansion.thetaMaxAbs`
+- `invariants.ricciScalar`
+- `invariants.kretschmannScalar`
+- `invariants.weylScalarProxy`
+- `invariants.petrovClass`
+- `momentumDensity`
+- `stability.tidalMax`
+- `stability.blueshiftMax`
+- `stability.convergenceStatus`
+
+### 5. Stage 3 Promotion
 
 Stage 2 diagnostics are not enough. The lane still needs:
 
@@ -140,11 +204,27 @@ Until those are present, the repo should continue to fail closed on stronger tra
 
 ## Promotion Checklist
 
-1. Emit a source-closure artifact for metric-vs-tile stress residuals.
-2. Run the observer-robust energy-condition audit on both tensors.
-3. Emit a worldline-oriented QI/QEI dossier with applicability and timing evidence.
-4. Surface GR diagnostics, solver health, and source-closure residuals together on the NHM2 review lane.
-5. Pass HARD constraints, reach `ADMISSIBLE`, issue a certificate, and verify certificate integrity.
+1. Emit a same-chart full-tensor artifact and mark missing components explicitly.
+2. Compare wall-region metric-required `T00` against available tile or material `T00` before using global source residuals.
+3. Label energy-condition results by observer family and keep Eulerian-only checks restricted.
+4. Emit a worldline-oriented QI/QEI dossier with wall coverage, sampling, bound provenance, and timing consistency.
+5. Attach Casimir material receipts before treating tile rows as material source evidence.
+6. Attach Natario invariant and stability diagnostics before treating zero expansion as more than a geometry property.
+7. Surface GR diagnostics, solver health, and closure-stack blockers together on the NHM2 review lane.
+8. Pass HARD constraints, reach `ADMISSIBLE`, issue a certificate, and verify certificate integrity.
+
+## Current Implementation Status
+
+As of the June 2026 closure-stack patch, the repo has contract and solve-state surfaces for the diagnostic closure ledger listed above. Focused tests cover missing tensor components, wall-first closure readiness, Eulerian-only observer scope, QEI dossier completeness, Casimir ideal-scalar status, Natario invariant boundaries, theory-badge claim boundaries, and proof-panel copy restrictions.
+
+The verification result from that patch was:
+
+- focused Vitest closure stack: `72` tests passed across `9` files,
+- Casimir verification gate: `PASS`,
+- certificate hash: `6e84f965957f63aad452981d2ede72e62f706d32e0a5b6b469899884e12a4e45`,
+- certificate integrity: `true`.
+
+The remaining operational issue is client production-build memory pressure during the Vite gzip-size phase. That is a build-resource problem, not physical validation and not a reason to strengthen NHM2 claims.
 
 ## Narrative Contract
 
@@ -154,7 +234,14 @@ Prefer these phrases:
 - `lapse-extended selected-family lane`
 - `diagnostic or reduced-order until certified`
 - `Natario-style zero-expansion base`
-- `pending source closure`
+- `diagnostic closure ledger`
+- `same-chart tensor completeness`
+- `wall closure remains the front-door blocker`
+- `observer scope: Eulerian only`
+- `observer scope: robust grid`
+- `observer scope: algebraic Type I`
+- `ideal Casimir scalar budget is not material-receipted`
+- `zero expansion is not a safety certificate`
 - `policy-gated promotion`
 
 Retire these phrases unless the Stage 3 gate actually passes:
@@ -163,7 +250,13 @@ Retire these phrases unless the Stage 3 gate actually passes:
 - `closed-loop solved transport result`
 - `physically solved warp bubble`
 - `the base Natario implementation already proves lapse-driven mission time`
+- `NHM2 proves viability`
+- `energy conditions pass`
+- `Casimir tiles provide the required source`
+- `zero expansion solves safety`
+
+When energy-condition, Casimir, QEI, source, or Natario statements are needed, bind them to the artifact and scope that actually exists. For example, say `Eulerian observer WEC diagnostic is present`, `wall T00 closure is missing`, or `ideal Casimir scalar replay is available but not material-receipted`.
 
 ## Guiding Sentence
 
-The repo already owns the wind tunnel; NHM2 now needs source closure, dual-tensor auditing, and policy-gated promotion before it can be described as a certified closed-loop transport result.
+The repo now owns a stricter falsification ledger; NHM2 still needs complete same-chart tensors, wall source closure, robust observer/QEI/material/invariant evidence, and policy-gated certification before it can be described as a certified closed-loop transport result.

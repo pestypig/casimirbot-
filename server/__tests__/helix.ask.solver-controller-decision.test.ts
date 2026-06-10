@@ -1106,7 +1106,12 @@ describe("helix ask solver controller decision", () => {
         fallbackTools: [],
         forbiddenTools: ["live_env.record_live_source_mail_decision", "final_answer"],
         requiredEvidence: ["stage_play_live_source_mail_decision"],
-        completionEvidence: ["live_source_interim_voice_callout_receipt"],
+        completionEvidence: [
+          "live_source_interim_voice_callout_receipt",
+          "voice_hold_receipt",
+          "voice_block_receipt",
+          "voice_receipt",
+        ],
         phaseLock: {
           locked: true,
           reason: "Voice output is only allowed after a recorded request_voice_callout decision.",

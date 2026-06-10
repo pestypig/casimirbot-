@@ -58,6 +58,8 @@ Policy note:
 ## Strong-Claim Upgrade Objective
 Move from internal reduced-order closure to externally defensible scientific-claim strength via independent reproducibility, explicit operator semantics closure against literature, and externally benchmarked uncertainty and validity domains.
 
+Post-pin NHM2 closure-stack objective: stronger claim language must also clear the diagnostic ledger introduced after the commit-pinned March evidence set. The ledger covers same-chart tensor completeness, wall-region source closure, observer-family energy-condition scope, QEI worldline dossiers, Casimir material receipts, and Natario invariant/stability diagnostics. Missing or proxy ledger rows keep the paper in reduced-order diagnostic language even when older aggregate gates pass.
+
 ## Upgrade Specs (External Closure)
 
 ## Spec H: Independent Reproduction
@@ -129,32 +131,67 @@ Fail condition:
 ## Spec M: Materials/Device Constraint Closure
 Requirement:
 - Replace UNKNOWN rows in materials-bounds table with numeric constraints or explicit blocked evidence pathways.
+- Replace idealized Casimir scalar source claims with material-receipted source evidence before using tile rows as material support for wall closure.
 
 Target rows to close:
 1. Thermal envelope (dissipation/cooling limits)
 2. Structural envelope (stress/strain limits)
 3. Control jitter bounds and hardware timing limits
+4. Casimir material receipt status, including geometry metrology, dielectric/material model, finite-conductivity/temperature/roughness corrections, environment evidence, and beyond-PFA validity.
 
 Acceptance:
 1. Each row has numeric value, margin, and evidence path at commit pin.
 2. Missing values are explicitly marked blocked with a closure plan.
+3. `casimir_material_receipt/v1` is present and `status=material_receipted` before tile-effective wall source evidence is described as material-receipted.
 
 Fail condition:
 - Narrative-only statements without numeric constraints.
+- Perfect-conductor or parallel-plate scalar formulas are used as material source evidence without a receipt artifact.
 
 ## Spec N: Claim-Governance Publication Gate
 Requirement:
 - Enforce publication-time policy checks that reject claim-tier violations automatically.
+- Reject publication language that treats diagnostic closure-stack artifacts as physical viability, propulsion, safety, or certified transport evidence.
 
 Acceptance:
 1. CI/publication bundle fails on tier-collapsing language.
 2. Boundary statement is validated verbatim.
 3. Paper outputs include falsifier matrix and non-goals sections.
+4. Paper outputs avoid unqualified phrases such as `NHM2 proves viability`, `energy conditions pass`, `Casimir tiles provide the required source`, and `zero expansion solves safety`.
 
 Fail condition:
 - Ability to publish stronger claim language without evidence-tier support.
 
-## VVUQ/Standards Alignment Matrix (H-N)
+## Spec O: NHM2 Closure-Stack Completion
+
+Requirement:
+- Complete the NHM2 diagnostic closure stack before using full-solve, observer-robust, QEI-closed, material-source, or Natario-safe wording.
+
+Required artifact rows:
+1. `nhm2_same_chart_full_tensor/v1`
+2. `nhm2_wall_source_closure/v1`
+3. `nhm2_observer_robust_energy_conditions/v1`
+4. `nhm2_qei_worldline_dossier/v1`
+5. `casimir_material_receipt/v1`
+6. `nhm2_natario_invariant_audit/v1`
+
+Acceptance:
+1. Same-chart tensor artifact records all `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij` components as computed, derived same chart, or explicitly missing/blocked.
+2. Wall `T00` residual passes before global source residuals are used as context.
+3. Energy-condition results name observer families and distinguish Eulerian-only checks from robust observer-family completion.
+4. QEI dossier includes a wall worldline, sampling function, sampled density, bound provenance, margin, and tau consistency.
+5. Casimir tile rows used as source evidence are material-receipted, not merely `ideal_scalar_only`.
+6. Natario audit records invariant and stability diagnostics separately from theta flatness.
+
+Fail condition:
+- Missing `T0i` or off-diagonal `Tij` is treated as zero.
+- Global source residuals are allowed to mask a wall-region failure.
+- Eulerian-only energy-condition evidence is described as observer-robust.
+- Scalar `qei_margin` substitutes for a worldline dossier.
+- Ideal Casimir scalar math is used as material evidence.
+- `thetaFlatnessStatus: pass` is treated as invariant, stability, or safety closure.
+
+## VVUQ/Standards Alignment Matrix (H-O)
 
 | Alignment item | Closure spec mapping | Acceptance criterion | Deterministic falsifier | Evidence artifact path | Confidence tier |
 |---|---|---|---|---|---|
@@ -194,6 +231,11 @@ Fail condition:
 | Foundry RFQ governance lock | N | process substitutions and change-control policy are explicit and enforceable | silent process drift accepted without requalification | `docs/specs/casimir-tile-rfq-pack-v1.md` | high |
 | Provenance attestation schema closure (in-toto lane) | N | promotion artifacts include verifiable in-toto layout/link continuity and statement schema checks (`_type`,`subject`,`predicateType`) | promotion accepted without verifiable attestation chain or required statement fields | `docs/specs/casimir-tile-equation-provenance-contract-v1.md`, `docs/specs/casimir-tile-experimental-parameter-registry-2026-03-04.md` | high |
 | Evidence-governance ledger enforcement | N | every promotion/claim delta has artifact, owner, status, and commit pin | claim promoted without ledger-backed artifact path | `docs/audits/research/warp-standards-alignment-ledger-2026-03-04.md` | high |
+| NHM2 same-chart tensor completion | O | full tensor artifact records `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij` with computed/derived/missing/blocked status | missing components omitted or treated as zero | `shared/contracts/nhm2-same-chart-full-tensor.v1.ts`, `docs/nhm2-closed-loop.md` | high |
+| NHM2 wall-first source closure | O | wall `T00` required-vs-available residual is present and controls readiness before global residual context | wall closure missing/failing while global source residual is used to pass | `shared/contracts/nhm2-wall-source-closure.v1.ts`, `docs/nhm2-audit-checklist.md` | high |
+| NHM2 observer-family energy-condition scope | O, N | WEC/NEC/DEC/SEC language names observer family and does not label Eulerian-only evidence robust | unqualified `energy conditions pass` claim or Eulerian-only robust claim | `shared/contracts/nhm2-observer-robust-energy-conditions.v1.ts` | high |
+| NHM2 QEI worldline dossier gate | O | wall worldline, sampling, sampled density, bound provenance, margin, and tau consistency are present | scalar `qei_margin` used as final QEI proof | `shared/contracts/nhm2-qei-worldline-dossier.v1.ts` | high |
+| NHM2 Natario invariant boundary | O, N | zero-expansion status is separate from invariant, momentum-density, tidal, blueshift, and convergence diagnostics | theta flatness treated as safety or invariant closure | `shared/contracts/nhm2-natario-invariant-audit.v1.ts` | high |
 
 PCS/QMU policy in this phase:
 - Included as exploratory robustness overlays.
@@ -204,7 +246,8 @@ PCS/QMU policy in this phase:
 1. Phase 1: Independent reproduction pack (H)
 2. Phase 2: External theory adjudication (I, J, K)
 3. Phase 3: Uncertainty and materials closure (L, M)
-4. Phase 4: Publication policy hard gate (N)
+4. Phase 4: NHM2 closure-stack completion (O)
+5. Phase 5: Publication policy hard gate (N)
 
 ## Deliverables
 - `docs/audits/research/warp-external-reproduction-audit-<date>.md`
@@ -213,6 +256,7 @@ PCS/QMU policy in this phase:
 - `docs/audits/research/warp-applicability-domain-validation-<date>.md`
 - `docs/audits/research/warp-uncertainty-program-upgrade-<date>.md`
 - `docs/audits/research/warp-materials-bounds-closure-<date>.md`
+- `docs/audits/research/warp-nhm2-closure-stack-completion-<date>.md`
 - `docs/audits/research/warp-publication-claim-governance-gate-<date>.md`
 
 ## Deterministic Falsifiers
@@ -225,6 +269,12 @@ PCS/QMU policy in this phase:
 | Applicability drift | independent domain classification differs | fail closed on applicability |
 | Uncertainty instability | pass/fail flips under modeled uncertainty | block robust-pass claim |
 | Materials unknowns | critical constraint rows remain UNKNOWN | block external-feasibility framing |
+| Same-chart tensor incomplete | missing `T0i` or off-diagonal `Tij` is absent, blocked, or treated as zero | block full-tensor and source-closed framing |
+| Wall source closure missing/failing | wall `T00` required-vs-available residual missing or above tolerance | block local source-closure framing |
+| Observer-family scope incomplete | Eulerian-only artifact is used as robust observer result | block observer-robust framing |
+| QEI dossier incomplete | scalar margin exists without complete worldline dossier and wall coverage | block QEI-closed framing |
+| Casimir material receipt missing | tile source row remains ideal scalar only | block material-source framing |
+| Natario invariant audit incomplete | theta flatness exists without invariant/stability diagnostics | block invariant, stability, and safety framing |
 | Tier-credibility mismatch | claim tier published without mapped credibility requirement | block standards-aligned governance claim |
 | Citation admissibility failure | normative claim lacks at least one primary/standard source | mark recommendation non-compliant |
 
@@ -232,6 +282,9 @@ PCS/QMU policy in this phase:
 - No full-system physical-feasibility claim from this campaign lane alone.
 - No canonical override from exploratory outputs.
 - No threshold weakening or pass relabeling.
+- No replacement of missing tensor components with zero.
+- No global residual override of wall-region source failure.
+- No Eulerian-only, scalar-QEI, ideal-Casimir, or zero-expansion shortcut to strong NHM2 claims.
 
 ## Exit Criteria for This Upgrade Spec
-All specs H-N are satisfied with commit-pinned artifacts, and publication outputs pass policy checks without tier violations.
+All specs H-O are satisfied with commit-pinned artifacts, and publication outputs pass policy checks without tier violations.

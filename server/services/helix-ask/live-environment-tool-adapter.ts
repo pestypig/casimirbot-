@@ -4032,6 +4032,7 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.record_live_source_mail_decision") {
+    const hasExplicitDecision = Object.prototype.hasOwnProperty.call(args, "decision");
     const decisionRaw = readString(args.decision) ?? "wait_for_next_summary";
     const allowedDecisions = new Set([
       "wait_for_next_summary",
@@ -4045,15 +4046,18 @@ export function executeLiveEnvironmentTool(
     let decision = allowedDecisions.has(decisionRaw)
       ? decisionRaw as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"]
       : "wait_for_next_summary";
+    const hasExplicitMailIds =
+      Object.prototype.hasOwnProperty.call(args, "mail_ids") ||
+      Object.prototype.hasOwnProperty.call(args, "mailIds");
     const suppliedMailIds = readStringArray(args.mail_ids ?? args.mailIds);
     const activeJobStatesForDecision = listStagePlayLiveSourceJobStates({ threadId: input.thread_id, limit: 100 });
     const activeJobIdsForDecision = new Set(activeJobStatesForDecision.map((state) => state.jobId));
-    const recentProcessedPacketsForDecision = suppliedMailIds.length > 0
+    const recentProcessedPacketsForDecision = hasExplicitMailIds || suppliedMailIds.length > 0
       ? []
       : listStagePlayProcessedMailPackets({ limit: 25 });
     const activeJobMatchedProcessedPacketsForDecision = recentProcessedPacketsForDecision
       .filter((packet) => activeJobIdsForDecision.size === 0 || activeJobIdsForDecision.has(packet.jobId));
-    const recoveredProcessedPacketsForDecision = suppliedMailIds.length > 0
+    const recoveredProcessedPacketsForDecision = hasExplicitMailIds || suppliedMailIds.length > 0
       ? []
       : (activeJobMatchedProcessedPacketsForDecision.length > 0
           ? activeJobMatchedProcessedPacketsForDecision
@@ -4121,7 +4125,7 @@ export function executeLiveEnvironmentTool(
         !processedPolicyRequiresConfirmation &&
         (outputIntentWantsVoiceCallout || processedPolicyAllowsVoice)
       );
-    if (mailIds.length > 0 && processedPacketsForMailIds.length > 0) {
+    if (!hasExplicitDecision && mailIds.length > 0 && processedPacketsForMailIds.length > 0) {
       if (decision === "request_voice_callout" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
         decision = "record_interpretation";
       } else if (decision === "wait_for_next_summary" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {

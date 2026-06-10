@@ -14,7 +14,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 import { speakVoice } from "@/lib/agi/api";
-import { DOC_MANIFEST, findDocEntry, type DocManifestEntry } from "@/lib/docs/docManifest";
+import {
+  DOC_MANIFEST,
+  filterDocManifestEntries,
+  findDocEntry,
+  type DocManifestEntry,
+} from "@/lib/docs/docManifest";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -551,8 +556,7 @@ export function DocViewerPanel() {
 
   const queryValue = query.trim().toLowerCase();
   const filteredEntries = React.useMemo(() => {
-    if (!queryValue) return DOC_MANIFEST;
-    return DOC_MANIFEST.filter((entry) => entry.searchText.includes(queryValue));
+    return filterDocManifestEntries(queryValue);
   }, [queryValue]);
   const grouped = React.useMemo(() => groupByFolder(filteredEntries), [filteredEntries]);
   const handleDocMathClick = React.useCallback(

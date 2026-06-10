@@ -4,6 +4,7 @@ import {
   HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
   type HelixToolCallAdmissionDecision,
   type HelixToolCallAdmissionFamily,
+  type HelixToolCallAdmissionMode,
 } from "@shared/helix-tool-call-admission";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { buildToolUseRestatement } from "./internet-search-intent";
@@ -45,6 +46,21 @@ const HARD_SOURCE_TARGETS = new Set([
   "workspace_action",
   "calculator_stream",
 ]);
+
+export const hasUnknownSourceArtifactDiscoveryIntent = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  const retrievalAction =
+    /\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b/i.test(prompt);
+  const artifactCue =
+    /\b(?:white\s*paper|whitepaper|paper|doc(?:ument)?|file|report|memo|artifact|source|note|path|where)\b/i.test(prompt);
+  const namedSubjectCue =
+    /\b[A-Z][A-Z0-9-]{2,}\b/.test(prompt) ||
+    /\b[A-Z][A-Za-z0-9-]{2,}\s+(?:theory|spec|design|paper|doc|report|memo|file)\b/.test(prompt);
+  const explicitExternalScope =
+    /\b(?:arxiv|doi|journal|peer[-\s]?reviewed|pubmed|openalex|semantic\s+scholar|crossref|citations?|bibliograph(?:y|ies)|published|web|internet|online|google|bing|scholarly\s+(?:paper|article|source)|research\s+papers?)\b/i.test(prompt);
+  return retrievalAction && (artifactCue || namedSubjectCue) && !explicitExternalScope;
+};
 
 export function buildToolCallAdmissionDecision(input: {
   turnId: string;
@@ -115,6 +131,10 @@ export function buildToolCallAdmissionDecision(input: {
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];
   let extraForbiddenTerminalKinds: string[] = [];
   let extraForbiddenRoutes: string[] = [];
+  let extraForbiddenTools: string[] = [];
+  let extraForbiddenToolFamilies: string[] = [];
+  let admissionMode: HelixToolCallAdmissionMode = "direct";
+  let discoveryPolicy: HelixToolCallAdmissionDecision["discovery_policy"] | undefined;
   let reason = "source_target_requires_evidence_path";
   const isStagePlayLiveEnvironmentPrompt =
     sourceTarget === "live_environment" &&
@@ -185,15 +205,41 @@ export function buildToolCallAdmissionDecision(input: {
       "no_tool_direct",
     ];
     reason = "internet_search_requires_external_web_evidence_path";
-  } else if (
-    sourceTarget === "unknown" &&
-    /\b(?:open|show|pull\s+up|bring\s+up)\b[\s\S]{0,120}\b(?:docs?|docks|document|white\s*paper|whitepaper|paper)\b/i.test(promptText)
-  ) {
+  } else if (sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText)) {
     required = true;
-    admittedToolFamilies = ["docs_viewer"];
-    extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_card_projection", "no_tool_direct", "model_only_concept"];
-    extraForbiddenRoutes = ["situation_context_question", "visual_deictic"];
-    reason = "document_open_prompt_requires_docs_viewer_path";
+    admittedToolFamilies = ["docs_viewer", "repo_code", "runtime_evidence"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "situation_context_pack",
+      "visual_context_pack",
+      "live_card_projection",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "scholarly_research_answer",
+      "internet_search_answer",
+      "no_tool_direct",
+      "model_only_concept",
+    ];
+    extraForbiddenRoutes = [
+      "situation_context_question",
+      "visual_deictic",
+      "scholarly_research_lookup",
+      "internet_search_lookup",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    extraForbiddenTools = ["docs-viewer.open", "docs-viewer.open_doc_by_path"];
+    extraForbiddenToolFamilies = ["scholarly_research", "internet_search"];
+    admissionMode = "unknown_source_discovery";
+    discoveryPolicy = {
+      state: "bounded_readonly",
+      first_pass_tool_families: ["docs_viewer", "repo_code", "runtime_evidence"],
+      forbidden_external_tool_families: ["scholarly_research", "internet_search"],
+      on_not_found: "ask_or_explain_searched_scope",
+    };
+    reason = "unknown_source_artifact_request_requires_bounded_readonly_discovery";
   } else if (sourceTarget === "workspace_diagnostic" || isWorkspaceOsStatusPrompt(promptText)) {
     required = true;
     admittedToolFamilies = ["workspace_diagnostic"];
@@ -313,6 +359,8 @@ export function buildToolCallAdmissionDecision(input: {
     schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
     turn_id: input.turnId,
     source_target: effectiveSourceTarget,
+    ...(admissionMode !== "direct" ? { admission_mode: admissionMode } : {}),
+    ...(discoveryPolicy ? { discovery_policy: discoveryPolicy } : {}),
     required,
     admitted_tool_families: unique(admittedToolFamilies),
     forbidden_terminal_artifact_kinds: unique([
@@ -325,7 +373,16 @@ export function buildToolCallAdmissionDecision(input: {
       ...extraForbiddenRoutes,
       ...(required ? ["model_only_concept", "no_tool_direct"] : []),
     ]),
-    ...operationalFields,
+    operational_constraints_ref: operationalFields.operational_constraints_ref,
+    forbidden_tools: unique([
+      ...operationalFields.forbidden_tools,
+      ...extraForbiddenTools,
+    ]),
+    forbidden_tool_families: unique([
+      ...operationalFields.forbidden_tool_families,
+      ...extraForbiddenToolFamilies,
+    ]),
+    required_surface: operationalFields.required_surface,
     reason,
     assistant_answer: false,
     raw_content_included: false,

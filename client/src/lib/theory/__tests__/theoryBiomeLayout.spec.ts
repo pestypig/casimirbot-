@@ -41,10 +41,29 @@ describe("layoutTheoryBiomeMap", () => {
   it("creates non-empty chunks with dominant scale bands", () => {
     const graph = buildNhm2TheoryBadgeGraphV1();
     const layout = layoutTheoryBiomeMap(graph);
+    const chunkCapacity = THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgesPerChunkTarget ** 2;
 
     expect(layout.biome.chunks.length).toBeGreaterThan(0);
     expect(layout.biome.chunks.every((chunk) => chunk.badgeIds.length > 0)).toBe(true);
     expect(layout.biome.chunks.every((chunk) => chunk.dominantScaleBand.length > 0)).toBe(true);
+    expect(layout.biome.chunks.every((chunk) => chunk.capacityBadgeCount === chunkCapacity)).toBe(true);
+    expect(layout.biome.chunks.every((chunk) => chunk.densityRatio > 0)).toBe(true);
+    expect(layout.biome.chunks.every((chunk) => chunk.semanticChunkIds.length > 0)).toBe(true);
+  });
+
+  it("keeps render and semantic chunk ids available for locator overlays", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const layout = layoutTheoryBiomeMap(graph);
+
+    expect(THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.chunkSizePx).toBeGreaterThanOrEqual(768);
+    expect(THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgesPerChunkTarget).toBeGreaterThanOrEqual(6);
+    expect(
+      layout.biome.coordinates.every(
+        (coordinate) => coordinate.renderChunkId === `${coordinate.chunkX}:${coordinate.chunkY}`,
+      ),
+    ).toBe(true);
+    expect(layout.biome.coordinates.every((coordinate) => coordinate.semanticChunkId.length > 0)).toBe(true);
+    expect(layout.nodes.every((node) => node.renderChunkId && node.semanticChunkId)).toBe(true);
   });
 
   it("keeps rendered badge boxes separated by the spacing contract", () => {

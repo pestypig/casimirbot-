@@ -509,7 +509,10 @@ export function buildTheoryContextReflection(
     .map((badgeId) => biomeCoordinateByBadgeId.get(badgeId))
     .filter((coordinate): coordinate is NonNullable<typeof coordinate> => Boolean(coordinate));
   const suggestedBiomeChunkIds = unique(
-    biomeFocusCoordinates.map((coordinate) => `${coordinate.chunkX}:${coordinate.chunkY}`),
+    biomeFocusCoordinates.map((coordinate) => coordinate.renderChunkId),
+  ).slice(0, 8);
+  const suggestedSemanticChunkIds = unique(
+    biomeFocusCoordinates.map((coordinate) => coordinate.semanticChunkId),
   ).slice(0, 8);
   const suggestedScaleBands = unique(biomeFocusCoordinates.map((coordinate) => coordinate.scaleBand)).slice(
     0,
@@ -554,6 +557,7 @@ export function buildTheoryContextReflection(
       exactBadgeIds,
       likelyBadgeIds,
       suggestedBiomeChunkIds,
+      suggestedSemanticChunkIds,
       suggestedScaleBands,
       softRegion: allowSoftRegion
         ? {

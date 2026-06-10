@@ -563,6 +563,21 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     });
   });
 
+  it("loads the Warp / GR / NHM2 diagnostic preset as an artifact-backed theory run", async () => {
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Warp / GR / NHM2 atlas lens" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Select Diagnostic Path" }));
+
+    await waitFor(() => {
+      const run = useTheoryCompoundRunStore.getState().activeTheoryRun;
+      expect(run?.targetBadgeIds).toContain("nhm2.tensor.same_chart_full_tensor");
+      expect(run?.targetBadgeIds).toContain("nhm2.closure.wall_t00_source_residual");
+      expect(run?.targetBadgeIds).toContain("nhm2.qei.worldline_dossier");
+      expect(run?.summary.rowCount).toBeGreaterThan(0);
+    });
+  });
+
   it("uses the Warp / GR / NHM2 lens to load object-bound diagnostic rows", async () => {
     renderPanel();
 
@@ -585,6 +600,12 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
         "nhm2_diagnostic_object",
       );
       expect(useScientificCalculatorStore.getState().currentLatex).toBe("t_proper = 1 + 0.1");
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.targetBadgeIds).toContain(
+        "nhm2.tensor.same_chart_full_tensor",
+      );
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.targetBadgeIds).toContain(
+        "nhm2.energy_condition.observer_robust_gate",
+      );
     });
   });
 

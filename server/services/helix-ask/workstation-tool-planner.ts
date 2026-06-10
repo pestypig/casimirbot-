@@ -956,6 +956,7 @@ function makeZenGraphReflectionAskToolStep(prompt: string): HelixWorkstationTool
         includeAdmissionArtifacts: true,
         includeLocator: true,
         includeFruition: true,
+        includeProceduralClassification: true,
       },
     },
     expected_receipt_kind: "helix_zen_graph_reflection_tool_result",
@@ -1128,7 +1129,7 @@ function userExplicitlyRequestsFruitionPanel(prompt: string): boolean {
 }
 
 function hasZenGraphPromptCue(prompt: string): boolean {
-  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|procedural\s+(?:language|expression|action)|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
+  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|procedural\s+(?:zen|language|expression|action|classifier|classification)|inner[-\s]?practice|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|right\s+effort|middle\s+way|mindful\s+consumption|information\s+diet|identity[-\s]?view|non[-\s]?attachment|rumination|spiritual\s+friendship|equanimity|ignorance\s+is\s+bliss|moral\s+guilt|consideration\s+(?:debt|gap)|unconsidered\s+harm|affected\s+part(?:y|ies)|due\s+care|repair\s+readiness|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
     prompt,
   );
 }
@@ -1170,7 +1171,7 @@ function isZenGraphReflectionPrompt(prompt: string): boolean {
   if (!prompt || isWorkstationToolDiagnosticPrompt(prompt)) return false;
   if (userExplicitlyDisallowsPanelsOrTools(prompt) || userExplicitlyDisallowsZenGraphTools(prompt)) return false;
   if (!hasZenGraphPromptCue(prompt)) return false;
-  return /\b(?:use|through|with|plot|map|reflect|compare|locate|show|calculate|solve|assemble|derive|trace|badge|fruition|lens|lenses|procedural)\b/i.test(
+  return /\b(?:use|through|with|plot|map|reflect|compare|classify|locate|show|calculate|solve|assemble|derive|trace|badge|fruition|lens|lenses|procedural)\b/i.test(
     prompt,
   );
 }

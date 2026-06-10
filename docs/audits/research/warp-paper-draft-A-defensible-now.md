@@ -59,6 +59,8 @@ State-of-record rule:
 ## Abstract
 This draft reports the current reduced-order campaign state using commit-tracked repository evidence at one pin. Canonical adjudication is `REDUCED_ORDER_ADMISSIBLE` with gate counts `PASS=8`, `FAIL=0`, `UNKNOWN=0`, `NOT_READY=0`, `NOT_APPLICABLE=1`. The work is scientifically useful as a reproducible reduced-order closure with explicit falsifiers and a standards-aligned upgrade path; it is not, by itself, a full-system physical feasibility claim.
 
+Post-pin NHM2 closure-stack note: later repository work adds stricter diagnostic artifact surfaces for same-chart tensor completeness, wall-region source closure, observer-family-scoped energy-condition checks, QEI worldline dossiers, Casimir material receipts, and Natario-adjacent invariant audits. These surfaces increase falsifiability and reduce narrative ambiguity, but they do not retroactively upgrade the commit-pinned reduced-order result to a physical feasibility claim.
+
 ## Methods
 1. Parse the commit-pinned evidence snapshot and required sub-artifacts.
 2. Enforce tier separation from the authoring contract:
@@ -72,6 +74,13 @@ This draft reports the current reduced-order campaign state using commit-tracked
    - decision ledger
    - governance matrix
    - then summary packs.
+6. For post-pin NHM2 discussion, treat closure-stack artifacts as diagnostic claim-boundary ledgers:
+   - missing tensor components remain missing or blocked, not zero-valued;
+   - wall-region source closure takes precedence over global source residuals;
+   - Eulerian-only energy-condition checks are restricted-observer diagnostics;
+   - scalar `qei_margin` is badge replay unless a worldline dossier is complete;
+   - ideal Casimir formulas are not material source receipts;
+   - Natario zero-expansion status is separate from invariant and stability diagnostics.
 
 ## Results
 
@@ -136,6 +145,26 @@ Source:
 UNKNOWN handling rule:
 - Unknown values remain `UNKNOWN` unless a commit-tracked numeric artifact exists.
 - Unresolved RSET semantics and stress-tensor fluctuation thresholds are not collapsed into PASS claims.
+- Ideal Casimir scalar rows remain diagnostic until a `casimir_material_receipt/v1` artifact supplies geometry, material, environment, correction-factor, and provenance evidence.
+
+## NHM2 Diagnostic Closure Stack Addendum (Post-Pin)
+
+The current NHM2 theory draft should cite the closure stack as a diagnostic ledger for falsification, not as a new feasibility result. The affected theory sections are source closure, energy-condition interpretation, QEI timing, material-source evidence, Natario low-expansion interpretation, and publication claim governance.
+
+Recommended paper language:
+
+- Same-chart tensor closure: report `nhm2_same_chart_full_tensor/v1` component status for `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`. Missing `T0i` or off-diagonal spatial stress components block full-tensor completeness.
+- Wall-first source closure: report `nhm2_wall_source_closure/v1` before global source residuals. A missing or failing wall `T00` comparison blocks local source-closure language even when an aggregate residual looks favorable.
+- Observer scope: report WEC/NEC/DEC/SEC statements with the observer family that was actually tested. Eulerian-only artifacts should be described as restricted-frame diagnostics, not observer-robust passes.
+- QEI scope: report `nhm2_qei_worldline_dossier/v1` completeness, including wall worldlines, sampling functions, sampled density, bound provenance, margins, and tau consistency. A scalar margin alone remains proxy replay.
+- Casimir source evidence: distinguish `ideal_scalar_only` from `material_receipted`. Perfect-conductor parallel-plate formulas remain useful diagnostics but do not validate tile material source evidence.
+- Natario interpretation: keep zero expansion separate from Ricci/Weyl/Kretschmann/Petrov, momentum-density, tidal, blueshift, and convergence diagnostics.
+
+Paper effect:
+
+- This addendum strengthens the falsifier matrix and makes future negative results easier to locate.
+- It does not change the commit-pinned canonical status reported above.
+- It does not authorize language such as `NHM2 proves viability`, `energy conditions pass`, `Casimir tiles provide the required source`, or `zero expansion solves safety`.
 
 ## Falsifier Matrix
 
@@ -146,6 +175,12 @@ UNKNOWN handling rule:
 | Applicability falsifier | curvature applicability audit blocked/not-pass | Any claim that applicability domain is satisfied |
 | Uncertainty falsifier | uncertainty audit blocked or decision band unresolved | Any robust-pass claim |
 | Reproducibility falsifier | snapshot blocked, provenance mismatch, or trace integrity failure | Any reproducibility claim |
+| Same-chart tensor falsifier | `nhm2_same_chart_full_tensor/v1` missing required components or marks them blocked | Any full same-chart tensor or full-source-closure claim |
+| Wall-source falsifier | `nhm2_wall_source_closure/v1` missing/failing wall `T00` residual | Any local wall source-closure claim |
+| Observer-scope falsifier | observer artifact is Eulerian-only or missing robust-family evidence | Any observer-robust energy-condition claim |
+| QEI-dossier falsifier | wall worldline, sampling, bound provenance, or tau consistency missing | Any dossier-level QEI closure claim |
+| Casimir-receipt falsifier | tile row remains `ideal_scalar_only` or material receipt is missing | Any material-source evidence claim from Casimir tiles |
+| Natario-invariant falsifier | theta flatness passes but invariant/stability audit is missing | Any invariant, stability, or safety claim from zero expansion |
 
 ## Casimir Sign-Control Compatibility Envelope (Non-Blocking)
 This lane is explicitly `reference_only` and does not alter canonical campaign decisions.
@@ -387,15 +422,18 @@ Interpretation rule:
 4. Adds per-lane envelope mapping for `casimir_sign_control`, `q_spoiling`, `nanogap`, `timing`, and `sem_ellipsometry` with deterministic two-pass sweep artifacts and congruence reason codes.
 5. Strengthens closure planning by mapping unresolved items to falsifier-driven upgrade steps.
 6. Adds a manufacturing-spec package (`docs/specs/*`) that converts tile novelty claims into measurable requirements, acceptance gates, and falsifiers.
+7. Adds post-pin NHM2 closure-stack requirements that prevent diagonal-only tensor evidence, global residuals, Eulerian-only observer checks, scalar QEI replay, ideal Casimir math, or zero-expansion status from being promoted beyond their diagnostic scope.
 
 ## What Remains Unresolved
 Semantic blockers:
 1. Cross-disciplinary consensus for renormalized stress-energy semantics in this reduced-order context.
 2. Standardized stress-tensor fluctuation thresholds suitable for campaign-level hard gating.
+3. Observer-robust energy-condition interpretation remains claim-scoped until robust observer-family artifacts are complete.
 
 Methodological blockers:
 1. External adjudication package for operator mapping, kernel provenance, and applicability parity is not yet independently reproduced.
 2. Materials-bounds closure still contains `UNKNOWN` rows for thermal/structural limits in commit-tracked evidence.
+3. Same-chart full tensor completeness, wall-first source closure, QEI worldline dossier completeness, Casimir material receipts, and Natario invariant audits must remain explicit blockers when missing or proxy-only.
 
 Reproducibility blockers:
 1. Fully commit-tracked trace payloads can still be absent when runtime artifacts are ignored by git.
@@ -405,6 +443,9 @@ Reproducibility blockers:
 - No full-system physical-feasibility claim from this campaign alone.
 - No canonical override from promoted-candidate or exploratory lanes.
 - No threshold or policy weakening.
+- No replacement of missing stress-tensor components with zero.
+- No use of global source residuals to override wall-region failure.
+- No use of Eulerian-only energy-condition checks, scalar QEI margins, ideal Casimir formulas, or Natario zero-expansion status as standalone proof of viability.
 
 ## Conclusion
-At this commit pin, the repository supports a defensible reduced-order evidence claim set with canonical admissibility, promotion readiness/stability true, strong-claim closure specs A-G passing in the snapshot, and PASS certification traces with integrity OK. This is scientifically valuable because it narrows viable parameter space under deterministic gates and provides a reproducible path for stronger external closure; it does not, by itself, authorize a full-system physical feasibility claim.
+At this commit pin, the repository supports a defensible reduced-order evidence claim set with canonical admissibility, promotion readiness/stability true, strong-claim closure specs A-G passing in the snapshot, and PASS certification traces with integrity OK. The post-pin NHM2 closure stack sharpens the paper's falsification ledger by making same-chart tensor completeness, wall source closure, observer scope, QEI dossier completeness, Casimir material receipts, and Natario invariant audits first-class blockers. This is scientifically valuable because it narrows the admissible claim space under deterministic gates and provides a reproducible path for stronger external closure; it does not, by itself, authorize a full-system physical feasibility claim.

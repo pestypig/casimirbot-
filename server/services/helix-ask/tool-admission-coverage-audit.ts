@@ -65,6 +65,11 @@ export function auditToolAdmissionCoverage(input: ToolAdmissionCoverageAuditInpu
     readString(routeProductContract?.source_target) ??
     readString(toolCallAdmissionDecision?.source_target) ??
     "unknown";
+  const admissionMode = readString(toolCallAdmissionDecision?.admission_mode);
+  const unknownSourceDiscoveryAdmitted =
+    sourceTarget === "unknown" &&
+    admissionMode === "unknown_source_discovery" &&
+    readBoolean(toolCallAdmissionDecision?.required);
   const retrievalRequired = readRetrievalRequired(payload);
   const toolAdmissionRequired =
     REQUIRED_TOOL_ADMISSION_SOURCES.has(sourceTarget) ||
@@ -108,8 +113,8 @@ export function auditToolAdmissionCoverage(input: ToolAdmissionCoverageAuditInpu
     },
     {
       check: "retrieval_required_has_source_target",
-      passed: !retrievalRequired || (sourceTarget !== "unknown" && sourceTarget !== "model_only"),
-      evidence: sourceTarget,
+      passed: !retrievalRequired || unknownSourceDiscoveryAdmitted || (sourceTarget !== "unknown" && sourceTarget !== "model_only"),
+      evidence: unknownSourceDiscoveryAdmitted ? "unknown_source_discovery" : sourceTarget,
     },
   ];
   const violations = checks

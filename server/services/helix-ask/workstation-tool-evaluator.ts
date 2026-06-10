@@ -7,6 +7,7 @@ import { validateHelixRecommendedActionAdmissionV1 } from "../../../shared/contr
 import { validateIdeologyContextReflectionV1 } from "../../../shared/ideology-context-reflection";
 import { validateZenBadgeLocatorV1 } from "../../../shared/zen-badge-locator";
 import { validateFruitionProcedureExpressionV1 } from "../../../shared/fruition-procedure-expression";
+import { validateProceduralZenClassificationV1 } from "../../../shared/procedural-zen-classification";
 import { validateTheoryIdeologyBridgeV1 } from "../../../shared/theory-ideology-bridge";
 import { validateCivilizationBoundsRoadmapV1 } from "../../../shared/civilization-bounds-roadmap";
 import { validateCivilizationScenarioFrameV1 } from "../../../shared/civilization-scenario-frame";
@@ -129,6 +130,7 @@ function isRecommendedActionAdmissionKind(kind: string | null, artifact: Record<
 
 function isZenGraphReflectionToolKind(kind: string | null, artifact: Record<string, unknown> | null): boolean {
   const reflection = asRecord(artifact?.reflection);
+  const proceduralClassification = asRecord(artifact?.proceduralClassification);
   const locator = asRecord(artifact?.locator);
   const fruition = asRecord(artifact?.fruition);
   return (
@@ -138,6 +140,8 @@ function isZenGraphReflectionToolKind(kind: string | null, artifact: Record<stri
     artifact?.tool_id === "helix_ask.calculate_fruition" ||
     reflection?.artifactId === "ideology_context_reflection" ||
     reflection?.schemaVersion === "ideology_context_reflection/v1" ||
+    proceduralClassification?.artifactId === "procedural_zen_classification" ||
+    proceduralClassification?.schemaVersion === "procedural_zen_classification/v1" ||
     locator?.artifactId === "zen_badge_locator" ||
     locator?.schemaVersion === "zen_badge_locator/v1" ||
     fruition?.artifactId === "fruition_procedure_expression" ||
@@ -192,6 +196,14 @@ function validateZenGraphReflectionToolResult(artifact: Record<string, unknown>)
   const issues: string[] = [];
   const reflection = asRecord(artifact.reflection) ?? artifact;
   issues.push(...validateIdeologyContextReflectionV1(reflection));
+  const proceduralClassification = asRecord(artifact.proceduralClassification);
+  if (proceduralClassification) {
+    issues.push(
+      ...validateProceduralZenClassificationV1(proceduralClassification).map(
+        (issue) => `proceduralClassification.${issue}`,
+      ),
+    );
+  }
   const locator = asRecord(artifact.locator);
   if (locator) {
     issues.push(...validateZenBadgeLocatorV1(locator).map((issue) => `locator.${issue}`));
@@ -327,6 +339,7 @@ export function evaluateWorkstationToolReceipt(input: EvaluateWorkstationToolRec
       result = "supports_subgoal";
       summary = [
         "ZenGraph reflection produced evidence-only ideology lenses",
+        asRecord(zenArtifact.proceduralClassification) ? "procedural next-move classification" : null,
         asRecord(zenArtifact.locator) ? "badge locator paths" : null,
         asRecord(zenArtifact.fruition) ? "Fruition procedure expression" : null,
         "missing checks, and admissions.",

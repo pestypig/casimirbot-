@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import type { FruitionProcedureExpressionV1 } from "@shared/fruition-procedure-expression";
 import type { HelixRecommendedActionAdmissionV1 } from "@shared/contracts/helix-recommended-action-admission.v1";
+import type { ProceduralZenClassificationV1 } from "@shared/procedural-zen-classification";
 import type {
   IdeologyContextReflectionInputKindV1,
   IdeologyContextReflectionV1,
@@ -12,6 +13,7 @@ import { reflectIdeologyContext } from "@shared/zen-graph/reflect-ideology-conte
 import { mapIdeologyReflectionToRecommendedActionAdmission } from "@shared/zen-graph/map-ideology-recommendations-to-admission";
 import { locateZenBadges } from "@shared/zen-graph/locate-zen-badges";
 import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
+import { classifyProceduralZenContext } from "@shared/zen-graph/classify-procedural-zen-context";
 
 export const HELIX_ASK_ZEN_GRAPH_REFLECTION_TOOL_NAME = "helix_ask.reflect_ideology_context" as const;
 
@@ -38,6 +40,7 @@ const ZenGraphToolInputSchema = z.object({
       includeAdmissionArtifacts: z.boolean().optional(),
       includeLocator: z.boolean().optional(),
       includeFruition: z.boolean().optional(),
+      includeProceduralClassification: z.boolean().optional(),
     })
     .optional(),
 });
@@ -52,11 +55,13 @@ export type HelixAskZenGraphReflectionToolInput = {
     includeAdmissionArtifacts?: boolean;
     includeLocator?: boolean;
     includeFruition?: boolean;
+    includeProceduralClassification?: boolean;
   };
 };
 
 export type HelixAskZenGraphReflectionToolOutput = {
   reflection: IdeologyContextReflectionV1;
+  proceduralClassification?: ProceduralZenClassificationV1;
   locator?: ZenBadgeLocatorV1;
   fruition?: FruitionProcedureExpressionV1;
   admissions: HelixRecommendedActionAdmissionV1[];
@@ -104,6 +109,13 @@ export async function runHelixAskZenGraphReflectionTool(
         refs: input.refs,
         reflection,
       });
+  const proceduralClassification = input.options?.includeProceduralClassification === false
+    ? undefined
+    : classifyProceduralZenContext({
+        graph,
+        reflection,
+        text: input.text,
+      });
   const fruition = input.options?.includeFruition
     ? calculateFruitionFromReflection({
         reflection,
@@ -114,6 +126,7 @@ export async function runHelixAskZenGraphReflectionTool(
 
   return {
     reflection,
+    ...(proceduralClassification ? { proceduralClassification } : {}),
     ...(locator ? { locator } : {}),
     ...(fruition ? { fruition } : {}),
     admissions,
@@ -137,6 +150,7 @@ export const zenGraphReflectionSpec: ToolSpecShape = {
           includeAdmissionArtifacts: { type: "boolean" },
           includeLocator: { type: "boolean" },
           includeFruition: { type: "boolean" },
+          includeProceduralClassification: { type: "boolean" },
         },
       },
     },
@@ -146,6 +160,7 @@ export const zenGraphReflectionSpec: ToolSpecShape = {
     type: "object",
     properties: {
       reflection: { type: "object" },
+      proceduralClassification: { type: "object" },
       locator: { type: "object" },
       fruition: { type: "object" },
       admissions: { type: "array", items: { type: "object" } },

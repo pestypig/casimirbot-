@@ -11,7 +11,7 @@ import type {
   TheoryBadgeUnitV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
-import { isTheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
+import { isTheoryCompoundRunV1, type TheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
 import type {
   TheoryBadgePlaybackArtifactV1,
   TheoryBadgePlaybackStepV1,
@@ -108,6 +108,15 @@ const LEVEL_ORDER = [
 ] as const satisfies readonly TheoryBadgeLevel[];
 
 type TheoryGraphMapMode = "concept" | "execution" | "evidence";
+type TheoryCompoundRunMode = "selected_badges" | "dependency_path" | "locator_matches";
+
+type ArtifactRunExpectation = {
+  selectedBadgeId?: string;
+  activeAtlasLensId?: TheoryAtlasLensId;
+  selectedCasimirGroupId?: string;
+  selectedWarpGroupId?: string;
+  selectedQeiGroupId?: string;
+};
 
 const RUNTIME_REFERENCE_OPERATOR_KINDS = [
   "tensor_component",
@@ -639,6 +648,7 @@ export default function TheoryBadgeGraphPanel() {
   const selectedCurvatureObjectBindingId = useTheoryBadgeGraphPanelStore(
     (state) => state.selectedCurvatureCollapseObjectBindingId,
   );
+  const activeTheoryRun = useTheoryCompoundRunStore((state) => state.activeTheoryRun);
   const setSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeId);
   const setSelectedBadgeIds = useTheoryBadgeGraphPanelStore((state) => state.setSelectedBadgeIds);
   const toggleSelectedBadgeId = useTheoryBadgeGraphPanelStore((state) => state.toggleSelectedBadgeId);
@@ -1202,17 +1212,87 @@ export default function TheoryBadgeGraphPanel() {
     playbackStore.activeTargetBadgeId === selectedBadge?.id || playbackStore.activeTargetBadgeId
       ? playbackStore.activeRun
       : null;
-  const playbackBadgeIds = activePlayback?.steps.map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
-  const solvedBadgeIds =
-    activePlayback?.steps
-      .filter((step: TheoryBadgePlaybackStepV1) => step.status === "solved")
-      .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
-  const failedBadgeIds =
-    activePlayback?.steps
-      .filter((step: TheoryBadgePlaybackStepV1) => step.status === "failed")
-      .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? [];
+  const playbackBadgeIds = Array.from(
+    new Set([
+      ...(activePlayback?.steps.map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? []),
+      ...(activeTheoryRun?.rows.map((row) => row.badgeId) ?? []),
+    ]),
+  );
+  const solvedBadgeIds = Array.from(
+    new Set([
+      ...(activePlayback?.steps
+        .filter((step: TheoryBadgePlaybackStepV1) => step.status === "solved")
+        .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? []),
+      ...(activeTheoryRun?.rows
+        .filter((row) => row.status === "computed" || row.status === "solved")
+        .map((row) => row.badgeId) ?? []),
+    ]),
+  );
+  const failedBadgeIds = Array.from(
+    new Set([
+      ...(activePlayback?.steps
+        .filter((step: TheoryBadgePlaybackStepV1) => step.status === "failed")
+        .map((step: TheoryBadgePlaybackStepV1) => step.badgeId) ?? []),
+      ...(activeTheoryRun?.rows
+        .filter((row) => row.status === "blocked" || row.status === "failed")
+        .map((row) => row.badgeId) ?? []),
+    ]),
+  );
 
-  const loadArtifactBackedTheoryRun = async (badgeIds: string[], expectedSelectedBadgeId?: string) => {
+  const shouldAcceptArtifactRun = (expected?: ArtifactRunExpectation): boolean => {
+    if (!expected) return true;
+    const state = useTheoryBadgeGraphPanelStore.getState();
+    if (expected.selectedBadgeId && state.selectedBadgeId !== expected.selectedBadgeId) return false;
+    if (expected.activeAtlasLensId && state.activeAtlasLensId !== expected.activeAtlasLensId) return false;
+    if (expected.selectedCasimirGroupId && state.selectedCasimirCavityGroupId !== expected.selectedCasimirGroupId) {
+      return false;
+    }
+    if (expected.selectedWarpGroupId && state.selectedWarpGrNhm2GroupId !== expected.selectedWarpGroupId) return false;
+    if (expected.selectedQeiGroupId && state.selectedQeiStressEnergyGroupId !== expected.selectedQeiGroupId) return false;
+    return true;
+  };
+
+  const selectEvidenceRunRow = (run: TheoryCompoundRunV1, preferredBadgeId?: string) => {
+    const runStore = useTheoryCompoundRunStore.getState();
+    const preferredRow = preferredBadgeId
+      ? run.rows.find(
+          (row) =>
+            row.badgeId === preferredBadgeId &&
+            (row.runtimeReceiptV1 || row.runtimeMathTraceV1 || row.kind === "gate" || row.kind === "evidence"),
+        )
+      : null;
+    const row =
+      preferredRow ??
+      run.rows.find((candidate) => candidate.runtimeReceiptV1) ??
+      run.rows.find((candidate) => candidate.runtimeMathTraceV1) ??
+      run.rows.find((candidate) => candidate.kind === "gate" || candidate.kind === "evidence") ??
+      run.rows[0];
+    if (row) runStore.selectTheoryRunRow(row.id);
+  };
+
+  const preferredEvidenceBadgeId = (badgeIds: string[]): string | undefined =>
+    [
+      "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.closure.wall_t00_source_residual",
+      "nhm2.energy_condition.observer_robust_gate",
+      "nhm2.qei.worldline_dossier",
+      "casimir.material.lifshitz_receipt",
+      "casimir.geometry.beyond_pfa_validity",
+      "nhm2.natario.invariant_audit",
+      "physics.gr.einstein_field_equation",
+    ].find((badgeId) => badgeIds.includes(badgeId)) ?? badgeIds[0];
+
+  const loadArtifactBackedTheoryRun = async ({
+    badgeIds,
+    mode = "dependency_path",
+    expected,
+    preferredBadgeId,
+  }: {
+    badgeIds: string[];
+    mode?: TheoryCompoundRunMode;
+    expected?: ArtifactRunExpectation;
+    preferredBadgeId?: string;
+  }) => {
     if (badgeIds.length === 0) return;
     try {
       const response = await fetch("/api/helix/theory/compound-run", {
@@ -1220,7 +1300,7 @@ export default function TheoryBadgeGraphPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           badgeIds,
-          mode: "dependency_path",
+          mode,
           source: "theory_badge_graph",
           includeScalar: true,
           includeRuntime: true,
@@ -1233,21 +1313,48 @@ export default function TheoryBadgeGraphPanel() {
       const payload = await response.json() as { artifact_v1?: unknown };
       const artifact = payload.artifact_v1;
       if (!isTheoryCompoundRunV1(artifact)) return;
-      if (
-        expectedSelectedBadgeId &&
-        useTheoryBadgeGraphPanelStore.getState().selectedBadgeId !== expectedSelectedBadgeId
-      ) {
-        return;
-      }
+      if (!shouldAcceptArtifactRun(expected)) return;
       const runStore = useTheoryCompoundRunStore.getState();
       runStore.loadTheoryRun(artifact);
-      const runtimeRow =
-        artifact.rows.find((row) => row.badgeId === expectedSelectedBadgeId && row.runtimeMathTraceV1) ??
-        artifact.rows.find((row) => row.runtimeMathTraceV1);
-      if (runtimeRow) runStore.selectTheoryRunRow(runtimeRow.id);
+      selectEvidenceRunRow(artifact, preferredBadgeId ?? preferredEvidenceBadgeId(badgeIds));
     } catch {
       // Static/reference run remains loaded when server-side artifact enrichment is unavailable.
     }
+  };
+
+  const loadTheoryRunEvidence = ({
+    badgeIds,
+    mode = "dependency_path",
+    expected,
+    preferredBadgeId,
+    openWorkbench = false,
+  }: {
+    badgeIds: string[];
+    mode?: TheoryCompoundRunMode;
+    expected?: ArtifactRunExpectation;
+    preferredBadgeId?: string;
+    openWorkbench?: boolean;
+  }) => {
+    if (!graph || badgeIds.length === 0) return;
+    const run = buildTheoryCompoundRun({
+      graph,
+      badgeIds,
+      mode,
+      source: "theory_badge_graph",
+      includeScalar: true,
+      includeRuntime: true,
+      includeEvidence: true,
+      includeBoundaries: true,
+    });
+    useTheoryCompoundRunStore.getState().loadTheoryRun(run);
+    selectEvidenceRunRow(run, preferredBadgeId ?? preferredEvidenceBadgeId(badgeIds));
+    void loadArtifactBackedTheoryRun({
+      badgeIds,
+      mode,
+      expected,
+      preferredBadgeId: preferredBadgeId ?? preferredEvidenceBadgeId(badgeIds),
+    });
+    if (openWorkbench) useWorkstationLayoutStore.getState().openPanelInActiveGroup("scientific-calculator");
   };
 
   const selectBadge = (badgeId: string) => {
@@ -1275,23 +1382,12 @@ export default function TheoryBadgeGraphPanel() {
     useScientificCalculatorStore.getState().setTheoryLoadout(null);
     const shouldLoadRuntimeRun = graph && badge && badge.calculatorPayloads.length === 0 && hasRuntimeReferenceEquation(badge);
     if (shouldLoadRuntimeRun) {
-      const run = buildTheoryCompoundRun({
-        graph,
+      loadTheoryRunEvidence({
         badgeIds: [badge.id],
         mode: "dependency_path",
-        source: "theory_badge_graph",
-        includeScalar: true,
-        includeRuntime: true,
-        includeEvidence: true,
-        includeBoundaries: true,
+        expected: { selectedBadgeId: badge.id },
+        preferredBadgeId: badge.id,
       });
-      const runStore = useTheoryCompoundRunStore.getState();
-      runStore.loadTheoryRun(run);
-      const runtimeRow =
-        run.rows.find((row) => row.badgeId === badge.id && row.runtimeMathTraceV1) ??
-        run.rows.find((row) => row.runtimeMathTraceV1);
-      if (runtimeRow) runStore.selectTheoryRunRow(runtimeRow.id);
-      void loadArtifactBackedTheoryRun([badge.id], badge.id);
     } else {
       useTheoryCompoundRunStore.getState().clearTheoryRun();
     }
@@ -1308,7 +1404,6 @@ export default function TheoryBadgeGraphPanel() {
     );
     if (!badge || !payload) return;
     if (graph) {
-      useTheoryCompoundRunStore.getState().clearTheoryRun();
       const loadout = buildTheoryCalculatorLoadout({
         graph,
         badgeIds: [badge.id],
@@ -1629,6 +1724,15 @@ export default function TheoryBadgeGraphPanel() {
         (badgeId: string) => `${badgeId}: Casimir source-context row; diagnostic only.`,
       ),
     });
+    loadTheoryRunEvidence({
+      badgeIds: groupBadgeIds,
+      mode: "dependency_path",
+      expected: {
+        activeAtlasLensId: "casimir_cavity_modes",
+        selectedCasimirGroupId: group.id,
+      },
+      preferredBadgeId: preferredEvidenceBadgeId(groupBadgeIds),
+    });
   };
 
   const selectCasimirObjectBinding = (group: CasimirCavityGroup, bindingId: string) => {
@@ -1706,6 +1810,15 @@ export default function TheoryBadgeGraphPanel() {
         (badgeId: string) => `${badgeId}: NHM2 diagnostic-only boundary.`,
       ),
     });
+    loadTheoryRunEvidence({
+      badgeIds: groupBadgeIds,
+      mode: "dependency_path",
+      expected: {
+        activeAtlasLensId: "warp_gr_nhm2",
+        selectedWarpGroupId: group.id,
+      },
+      preferredBadgeId: preferredEvidenceBadgeId(groupBadgeIds),
+    });
   };
 
   const selectWarpObjectBinding = (group: WarpGrNhm2Group, bindingId: string) => {
@@ -1782,6 +1895,15 @@ export default function TheoryBadgeGraphPanel() {
       claimBoundaryNotes: group.claimBoundaryBadgeIds.map(
         (badgeId: string) => `${badgeId}: QEI/stress diagnostic-only boundary.`,
       ),
+    });
+    loadTheoryRunEvidence({
+      badgeIds: groupBadgeIds,
+      mode: "dependency_path",
+      expected: {
+        activeAtlasLensId: "qei_stress_energy",
+        selectedQeiGroupId: group.id,
+      },
+      preferredBadgeId: preferredEvidenceBadgeId(groupBadgeIds),
     });
   };
 
@@ -2094,20 +2216,12 @@ export default function TheoryBadgeGraphPanel() {
   };
 
   const loadTheoryRunForBadgeIds = (badgeIds: string[]) => {
-    if (!graph || badgeIds.length === 0) return;
-    const run = buildTheoryCompoundRun({
-      graph,
+    loadTheoryRunEvidence({
       badgeIds,
       mode: "dependency_path",
-      source: "theory_badge_graph",
-      includeScalar: true,
-      includeRuntime: true,
-      includeEvidence: true,
-      includeBoundaries: true,
+      preferredBadgeId: preferredEvidenceBadgeId(badgeIds),
+      openWorkbench: true,
     });
-    useTheoryCompoundRunStore.getState().loadTheoryRun(run);
-    void loadArtifactBackedTheoryRun(badgeIds);
-    useWorkstationLayoutStore.getState().openPanelInActiveGroup("scientific-calculator");
   };
 
   const loadSelectedTheoryRun = () => {
@@ -2118,10 +2232,12 @@ export default function TheoryBadgeGraphPanel() {
   const selectAtlasLens = (lensId: TheoryAtlasLensId) => {
     if (activeLensId === lensId) {
       setActiveAtlasLensId(null);
+      useTheoryCompoundRunStore.getState().clearTheoryRun();
       return;
     }
     const shouldRestoreCollapsedLens = activeLensId === null && hasSavedLensSelection(lensId);
     setActiveAtlasLensId(lensId);
+    useTheoryCompoundRunStore.getState().clearTheoryRun();
     if (!shouldRestoreCollapsedLens) {
       setSelectedBadgeId(null);
       setSelectedBadgeIds([]);
@@ -2362,7 +2478,7 @@ export default function TheoryBadgeGraphPanel() {
           <div>
             <h2 className="text-xl font-semibold">Theory Badge Graph</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Physics theory badges, unit signatures, assumptions, and calculator loadouts.
+              Physics theory badges, unit signatures, assumptions, artifact-backed runs, and scalar loadouts.
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">

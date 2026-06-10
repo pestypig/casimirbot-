@@ -275,8 +275,7 @@ describe("theory context reflector", () => {
     expect(isTheoryContextReflectionV1(reflection)).toBe(true);
     expect(reflection.overlay.highlightedBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
     expect(reflection.overlay.suggestedScaleBands).toEqual(expect.arrayContaining(["molecular", "stellar"]));
-    expect(reflection.overlay.suggestedBiomeChunkIds).toContain(
-      `${c60Coordinate.chunkX}:${c60Coordinate.chunkY}`,
-    );
+    expect(reflection.overlay.suggestedBiomeChunkIds).toContain(c60Coordinate.renderChunkId);
+    expect(reflection.overlay.suggestedSemanticChunkIds).toContain(c60Coordinate.semanticChunkId);
   });
 });

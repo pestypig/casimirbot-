@@ -42,6 +42,14 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(debugExport.body?.payload).toHaveProperty("terminal_candidate_rejections");
     expect(debugExport.body?.payload).toHaveProperty("evidence_reentry_proof");
     expect(debugExport.body?.payload).toHaveProperty("terminal_authority_single_writer");
+    expect(debugExport.body?.payload?.artifact_query_index).toMatchObject({
+      schema: "helix.artifact_query_index.v1",
+      turn_id: turnId,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.artifact_refs)).toBe(true);
+    expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.queryable_artifact_keys)).toBe(true);
   }, 60000);
 
   it("returns a typed debug failure for missing turn ids", async () => {

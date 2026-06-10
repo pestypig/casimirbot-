@@ -33,6 +33,7 @@ const BADGE_STEP_X =
 const BADGE_STEP_Y =
   THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgeSizePx +
   THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.minBadgeGapYPx;
+const CHUNK_CAPACITY_BADGE_COUNT = THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.badgesPerChunkTarget ** 2;
 
 const LEVEL_DEPTH: Record<TheoryBadgeLevel, number> = {
   first_principle: 0,
@@ -180,6 +181,28 @@ function chunkFor(x: number, y: number): { chunkX: number; chunkY: number } {
   };
 }
 
+function claimBucket(claimPressure: number): string {
+  if (claimPressure >= 0.95) return "claim_high";
+  if (claimPressure >= 0.65) return "claim_medium";
+  return "claim_low";
+}
+
+function fidelityBucket(fidelity: TheoryBiomeFidelity): string {
+  if (fidelity === "canonical" || fidelity === "derived") return "formal";
+  if (fidelity === "runtime_artifact" || fidelity === "simulation_proxy") return "artifact";
+  if (fidelity === "claim_boundary") return "boundary";
+  return "diagnostic";
+}
+
+function semanticChunkId(args: {
+  domainKey: string;
+  scaleBand: TheoryBiomeBand;
+  fidelity: TheoryBiomeFidelity;
+  claimPressure: number;
+}): string {
+  return `${args.domainKey}:${args.scaleBand}:${fidelityBucket(args.fidelity)}:${claimBucket(args.claimPressure)}`;
+}
+
 function hasReadableCollision(x: number, y: number, placed: Array<{ x: number; y: number }>): boolean {
   return placed.some((node) => Math.abs(node.x - x) < BADGE_STEP_X && Math.abs(node.y - y) < BADGE_STEP_Y);
 }
@@ -289,6 +312,11 @@ function buildChunks(coordinates: TheoryBiomeCoordinateV1[]): TheoryBiomeChunkV1
         dominantDomainKey: dominant(chunkCoordinates.map((coordinate) => coordinate.domainKey)),
         averageClaimPressure,
         averageFidelity,
+        capacityBadgeCount: CHUNK_CAPACITY_BADGE_COUNT,
+        densityRatio: chunkCoordinates.length / CHUNK_CAPACITY_BADGE_COUNT,
+        semanticChunkIds: Array.from(
+          new Set(chunkCoordinates.map((coordinate) => coordinate.semanticChunkId)),
+        ).sort(),
       };
     })
     .sort((a, b) => a.chunkY - b.chunkY || a.chunkX - b.chunkX);
@@ -315,6 +343,13 @@ export function buildTheoryBiomeLayoutV1(graph: TheoryBadgeGraphV1): TheoryBiome
 
     const claimPressure = claimPressureFor(badge, inferred.scaleBand);
     const { chunkX, chunkY } = chunkFor(resolved.x, resolved.y);
+    const renderChunkId = `${chunkX}:${chunkY}`;
+    const coordinateSemanticChunkId = semanticChunkId({
+      domainKey: inferred.domainKey,
+      scaleBand: inferred.scaleBand,
+      fidelity: inferred.fidelity,
+      claimPressure,
+    });
     return {
       badgeId: badge.id,
       scaleLog10M: inferred.scaleLog10M,
@@ -329,6 +364,8 @@ export function buildTheoryBiomeLayoutV1(graph: TheoryBadgeGraphV1): TheoryBiome
       y: resolved.y,
       chunkX,
       chunkY,
+      renderChunkId,
+      semanticChunkId: coordinateSemanticChunkId,
       lod: claimPressure > 0.8 ? 3 : 2,
       reasons:
         resolved.spacingAttempts > 0

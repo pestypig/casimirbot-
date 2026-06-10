@@ -35,7 +35,12 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.request_voice_after_decision).toMatchObject({
       allowedTools: ["live_env.request_interim_voice_callout"],
       requiredEvidence: ["stage_play_live_source_mail_decision"],
-      completionEvidence: ["live_source_interim_voice_callout_receipt", "voice_receipt"],
+      completionEvidence: [
+        "live_source_interim_voice_callout_receipt",
+        "voice_hold_receipt",
+        "voice_block_receipt",
+        "voice_receipt",
+      ],
       next: "terminal_checkpoint",
     });
   });
@@ -332,10 +337,51 @@ describe("resolveLiveSourceTurnPhase", () => {
       "final_answer",
     ]));
     expect(phase.requiredEvidence).toEqual(["stage_play_live_source_mail_decision"]);
-    expect(phase.completionEvidence).toEqual(["live_source_interim_voice_callout_receipt", "voice_receipt"]);
+    expect(phase.completionEvidence).toEqual([
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+    ]);
     expect(phase.nextPhase).toBe("terminal_checkpoint");
     expect(phase.phaseLock.locked).toBe(true);
     expect(phase.terminal_eligible).toBe(false);
+  });
+
+  it("locks to interim voice after a recorded request_voice_callout decision even without re-derived packet voice candidacy", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Continue the active Stage Play live-source mailbox flow after the recorded decision.",
+      selectedTargetSource: "live_source_mailbox",
+      latestToolReceipts: [{
+        tool_name: "live_env.record_live_source_mail_decision",
+        observation: {
+          artifactId: "stage_play_live_source_mail_decision",
+          schemaVersion: "stage_play_live_source_mail_decision/v1",
+          decisionId: "stage_play_live_source_mail_decision:voice-2",
+          decision: "request_voice_callout",
+          voiceCalloutDraft: {
+            text: "Lava is nearby; keep distance.",
+            voiceEligible: true,
+            requiresConfirmation: false,
+          },
+        },
+      }],
+    });
+
+    expect(phase.phase).toBe("request_voice_after_decision");
+    expect(phase.allowedTools).toEqual(["live_env.request_interim_voice_callout"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "final_answer",
+    ]));
+    expect(phase.completionEvidence).toEqual([
+      "live_source_interim_voice_callout_receipt",
+      "voice_hold_receipt",
+      "voice_block_receipt",
+      "voice_receipt",
+    ]);
+    expect(phase.phaseLock.locked).toBe(true);
   });
 
   it("routes processed-mail interpretation prompts to read processed mail with process fallback", () => {

@@ -58,6 +58,15 @@
         "interdependence-yin-yang-balance",
         "falsifiability-and-truth-convergence",
         "right-speech-and-accurate-formulation",
+        "identity-view-and-non-attachment",
+        "right-effort-loop",
+        "middle-way",
+        "mindful-consumption",
+        "rumination-to-practice",
+        "spiritual-friendship-mirror",
+        "comparison-pressure-and-equanimity",
+        "small-experiment-vow",
+        "ignorance-and-consideration",
         "non-harm-and-compassionate-constraint",
         "fairness-due-process-and-justification",
         "skillful-action-under-uncertainty",
@@ -537,6 +546,788 @@
           "tolerance",
           "environment"
         ]
+      }
+    },
+    {
+      "id": "identity-view-and-non-attachment",
+      "slug": "identity-view-and-non-attachment",
+      "title": "Identity View and Non-Attachment",
+      "excerpt": "Treat identity language as a provisional lens, not a fixed verdict.",
+      "bodyMD": "Identity view becomes useful when it is restated as observations, choices, and practice conditions. Non-attachment does not erase selfhood; it prevents a stale self-story from becoming final authority.\n\nAnti-pattern: turning essence language into a permanent verdict about a person.\n\nMinimal artifact: Identity-to-Observation Note, separating current evidence, inherited story, and chosen practice.",
+      "tags": [
+        "first_principle",
+        "inner_practice",
+        "identity",
+        "non-attachment",
+        "self",
+        "observation"
+      ],
+      "aliases": [
+        "identity view",
+        "self story",
+        "non attachment",
+        "essence"
+      ],
+      "children": [
+        "rumination-to-practice",
+        "spiritual-friendship-mirror",
+        "comparison-pressure-and-equanimity"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "worldview-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "direct-observation-before-claim"
+        }
+      ],
+      "summary": "Treat identity language as a provisional lens, not a fixed verdict.",
+      "proceduralLanguage": {
+        "pattern": "A person or relationship is described through essence, private myth, or fixed self-story.",
+        "move": "Restate the claim as observations, choices, and present practice conditions.",
+        "missingCheck": "What current observable behavior supports or revises this identity language?",
+        "antiPattern": "Treating identity language as a final character verdict."
+      }
+    },
+    {
+      "id": "right-effort-loop",
+      "slug": "right-effort-loop",
+      "title": "Right Effort Loop",
+      "excerpt": "Practice is a repeatable loop: prevent, abandon, cultivate, and maintain.",
+      "bodyMD": "Right effort turns values into practice. It asks what unhelpful pattern should be prevented or abandoned, what helpful condition should be cultivated, and what should be maintained after it appears.\n\nAnti-pattern: treating insight as complete without a practice loop.\n\nMinimal artifact: Practice Loop Card, naming one prevent/abandon/cultivate/maintain cycle and its review trigger.",
+      "tags": [
+        "first_principle",
+        "inner_practice",
+        "right_effort",
+        "practice",
+        "experiment",
+        "discipline"
+      ],
+      "aliases": [
+        "right effort",
+        "practice loop",
+        "bounded experiment"
+      ],
+      "children": [
+        "rumination-to-practice",
+        "small-experiment-vow"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "falsifiability-and-truth-convergence"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        }
+      ],
+      "summary": "Practice is a repeatable loop: prevent, abandon, cultivate, and maintain.",
+      "proceduralLanguage": {
+        "pattern": "A reflection names a desired change but has no bounded practice.",
+        "move": "Choose one small experiment and define the review trigger.",
+        "missingCheck": "What would show that the practice helped, failed, or needs revision?",
+        "antiPattern": "Mistaking repeated reflection for completed understanding."
+      }
+    },
+    {
+      "id": "middle-way",
+      "slug": "middle-way",
+      "title": "Middle Way",
+      "excerpt": "Avoid both indulgence and denial; choose the disciplined path that preserves agency.",
+      "bodyMD": "The middle way refuses the false binary between consuming everything and shutting out reality. It looks for a constrained path where attention, evidence, and agency can remain intact.\n\nAnti-pattern: solving overload by either flooding attention or refusing all outside signal.\n\nMinimal artifact: Middle-Way Tradeoff Note, naming the two extremes and the bounded practice between them.",
+      "tags": [
+        "first_principle",
+        "inner_practice",
+        "middle_way",
+        "balance",
+        "attention",
+        "agency"
+      ],
+      "aliases": [
+        "middle way",
+        "balanced path",
+        "not too much not too little"
+      ],
+      "children": [
+        "mindful-consumption",
+        "comparison-pressure-and-equanimity"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "interdependence-yin-yang-balance"
+        },
+        {
+          "rel": "see-also",
+          "to": "skillful-action-under-uncertainty"
+        }
+      ],
+      "summary": "Avoid both indulgence and denial; choose the disciplined path that preserves agency.",
+      "proceduralLanguage": {
+        "pattern": "The situation swings between too much intake and too much closure.",
+        "move": "Name both extremes, then choose a bounded intake or action rhythm.",
+        "missingCheck": "Which boundary preserves clarity without blocking necessary evidence?",
+        "antiPattern": "Confusing withdrawal or overexposure with wisdom."
+      }
+    },
+    {
+      "id": "mindful-consumption",
+      "slug": "mindful-consumption",
+      "title": "Mindful Consumption",
+      "excerpt": "Treat information, art, media, and generated text as inputs that condition attention.",
+      "bodyMD": "Consumption is not only food. Information, music, images, and generated text can clarify attention or reinforce stale loops. A mindful intake practice tracks what nourishes discernment and what dysregulates the lens.\n\nAnti-pattern: treating every signal as equally nourishing or every outside signal as contamination.\n\nMinimal artifact: Intake Ledger, classifying inputs as clarifying, destabilizing, neutral, or stale-loop reinforcing.",
+      "tags": [
+        "first_principle",
+        "inner_practice",
+        "mindful_consumption",
+        "information_diet",
+        "attention",
+        "discernment"
+      ],
+      "aliases": [
+        "mindful consumption",
+        "information diet",
+        "media diet",
+        "input hygiene"
+      ],
+      "children": [
+        "middle-way-information-diet",
+        "art-as-skillful-means"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "feedback-loop-hygiene"
+        },
+        {
+          "rel": "see-also",
+          "to": "voice-integrity"
+        }
+      ],
+      "summary": "Treat information, art, media, and generated text as inputs that condition attention.",
+      "proceduralLanguage": {
+        "pattern": "A person feels shaped, overwhelmed, or clarified by repeated inputs.",
+        "move": "Classify inputs by effect and reduce stale-loop reinforcement.",
+        "missingCheck": "Which inputs clarify, which destabilize, and which merely repeat an old story?",
+        "antiPattern": "Mistaking selective intake for proof that the closed loop is true."
+      }
+    },
+    {
+      "id": "rumination-to-practice",
+      "slug": "rumination-to-practice",
+      "title": "Rumination to Practice",
+      "excerpt": "Reflection becomes useful when it produces a bounded practice, test, or repair step.",
+      "bodyMD": "Rumination repeats interpretation without changing contact with reality. Practice converts the loop into a testable move: name the loop, choose one small action, review the result, and revise without shame.\n\nAnti-pattern: treating repeated reflection as understanding.\n\nMinimal artifact: One-Step Practice Note with a review time and falsification hook.",
+      "tags": [
+        "inner_practice",
+        "rumination",
+        "practice",
+        "right_effort",
+        "revision",
+        "experiment"
+      ],
+      "aliases": [
+        "rumination",
+        "thought loop",
+        "reflection loop",
+        "non growth"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "parent",
+          "to": "right-effort-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "feedback-loop-hygiene"
+        },
+        {
+          "rel": "see-also",
+          "to": "small-experiment-vow"
+        }
+      ],
+      "summary": "Reflection becomes useful when it produces a bounded practice, test, or repair step.",
+      "proceduralLanguage": {
+        "pattern": "A thought loop repeats without changing observable behavior.",
+        "move": "Name the loop, choose one small experiment, and review the result.",
+        "missingCheck": "What concrete action would show whether the reflection is helping?",
+        "antiPattern": "Treating repeated reflection as understanding."
+      }
+    },
+    {
+      "id": "middle-way-information-diet",
+      "slug": "middle-way-information-diet",
+      "title": "Middle-Way Information Diet",
+      "excerpt": "Stay open enough to learn and selective enough to preserve a clear lens.",
+      "bodyMD": "Information practice needs both openness and selectivity. The middle-way diet asks what sources are needed for reality contact, what sources overload attention, and what cadence keeps interpretation fresh.\n\nAnti-pattern: flooding the mind or sealing it into a self-confirming chamber.\n\nMinimal artifact: Source Cadence Plan with open, limited, paused, and review categories.",
+      "tags": [
+        "inner_practice",
+        "information_diet",
+        "middle_way",
+        "discernment",
+        "overload",
+        "attention"
+      ],
+      "aliases": [
+        "too much information",
+        "overwhelmed",
+        "dysregulated lens",
+        "closed off"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "mindful-consumption"
+        },
+        {
+          "rel": "parent",
+          "to": "middle-way"
+        },
+        {
+          "rel": "see-also",
+          "to": "phoenix-averaging"
+        },
+        {
+          "rel": "see-also",
+          "to": "feedback-loop-hygiene"
+        }
+      ],
+      "summary": "Stay open enough to learn and selective enough to preserve a clear lens.",
+      "proceduralLanguage": {
+        "pattern": "A person feels overwhelmed by intake or over-protected by closed intake.",
+        "move": "Set source cadence and review which inputs clarify or dysregulate.",
+        "missingCheck": "What source is needed for reality contact, and what source is stale-loop noise?",
+        "antiPattern": "Treating either total exposure or total closure as wisdom."
+      }
+    },
+    {
+      "id": "spiritual-friendship-mirror",
+      "slug": "spiritual-friendship-mirror",
+      "title": "Spiritual Friendship Mirror",
+      "excerpt": "Use close friendship as a mirror for practice, not a closed identity myth.",
+      "bodyMD": "A trusted relationship can hold truth-telling, aspiration, memory, and repair. It becomes procedural when both people can revise the story, name evidence, and preserve agency.\n\nAnti-pattern: private language that protects a fixed myth from present observation.\n\nMinimal artifact: Friendship Mirror Check naming what the bond helps test, what it protects, and what it may be hiding.",
+      "tags": [
+        "inner_practice",
+        "sangha",
+        "friendship",
+        "mirror",
+        "private_language",
+        "truth"
+      ],
+      "aliases": [
+        "spiritual friendship",
+        "sangha mirror",
+        "private language",
+        "brothers"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "sangha-architecture"
+        },
+        {
+          "rel": "see-also",
+          "to": "voice-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "worldview-integrity"
+        }
+      ],
+      "summary": "Use close friendship as a mirror for practice, not a closed identity myth.",
+      "proceduralLanguage": {
+        "pattern": "A relationship carries a strong private language or shared origin story.",
+        "move": "Use the bond to test present truth, not to lock either person into an old role.",
+        "missingCheck": "What does this mirror reveal now, and where could it preserve a closed myth?",
+        "antiPattern": "Mistaking shared language for present evidence."
+      }
+    },
+    {
+      "id": "comparison-pressure-and-equanimity",
+      "slug": "comparison-pressure-and-equanimity",
+      "title": "Comparison Pressure and Equanimity",
+      "excerpt": "Feeling behind is a signal to re-check the frame, not proof of failure.",
+      "bodyMD": "Comparison pressure narrows attention around an imagined timeline. Equanimity does not deny urgency; it keeps the nervous system from turning another person's pace into a verdict.\n\nAnti-pattern: using cultural momentum or past self-image as the measuring stick for worth.\n\nMinimal artifact: Timeline Reframe Note separating facts, imagined deadlines, and the next practice.",
+      "tags": [
+        "inner_practice",
+        "equanimity",
+        "comparison",
+        "behind",
+        "fear",
+        "impermanence"
+      ],
+      "aliases": [
+        "feeling behind",
+        "lost taste",
+        "world moved on",
+        "comparison pressure"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "parent",
+          "to": "middle-way"
+        },
+        {
+          "rel": "see-also",
+          "to": "impermanence-entropy-and-revision"
+        },
+        {
+          "rel": "see-also",
+          "to": "beginners-mind"
+        }
+      ],
+      "summary": "Feeling behind is a signal to re-check the frame, not proof of failure.",
+      "proceduralLanguage": {
+        "pattern": "A person compares present self to past self, others, or a cultural timeline.",
+        "move": "Separate observable delay from fear-based verdict, then choose the next practice.",
+        "missingCheck": "What is actually late, and what is only an inherited timeline?",
+        "antiPattern": "Treating fear of being behind as evidence of failure."
+      }
+    },
+    {
+      "id": "small-experiment-vow",
+      "slug": "small-experiment-vow",
+      "title": "Small Experiment Vow",
+      "excerpt": "A large aspiration becomes real through a small testable vow.",
+      "bodyMD": "The vow is not a grand identity claim. It is the smallest sincere practice that can be done, observed, and revised. This lets ambition stay alive without pretending the whole life has to resolve at once.\n\nAnti-pattern: collapsing into either total transformation language or no action.\n\nMinimal artifact: Small Experiment Vow with action, timeframe, evidence, and revision condition.",
+      "tags": [
+        "inner_practice",
+        "vow",
+        "experiment",
+        "aspiration",
+        "practice",
+        "falsifiability"
+      ],
+      "aliases": [
+        "small experiment",
+        "bounded practice",
+        "practice vow",
+        "next small step"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "right-effort-loop"
+        },
+        {
+          "rel": "see-also",
+          "to": "falsifiability-and-truth-convergence"
+        },
+        {
+          "rel": "see-also",
+          "to": "dream-integrity"
+        }
+      ],
+      "summary": "A large aspiration becomes real through a small testable vow.",
+      "proceduralLanguage": {
+        "pattern": "A large ideal needs a present action that can be observed and revised.",
+        "move": "Define one small vow, the evidence it will produce, and when to review it.",
+        "missingCheck": "What is the smallest action that would make the ideal more real this week?",
+        "antiPattern": "Waiting for total clarity before beginning practice."
+      }
+    },
+    {
+      "id": "art-as-skillful-means",
+      "slug": "art-as-skillful-means",
+      "title": "Art as Skillful Means",
+      "excerpt": "Art can warn, heal, teach, or trap; classify the function before accepting the mood.",
+      "bodyMD": "Music and art are powerful carriers of feeling and memory. Skillful use asks what the work is doing now: warning, healing, repeating loss, opening compassion, or fixing identity around pain.\n\nAnti-pattern: letting an aesthetic mood become the whole worldview.\n\nMinimal artifact: Art Function Note naming warning, healing, expression, or loop reinforcement.",
+      "tags": [
+        "inner_practice",
+        "art",
+        "music",
+        "skillful_means",
+        "expression",
+        "healing"
+      ],
+      "aliases": [
+        "music",
+        "blues",
+        "songs",
+        "creative expression",
+        "world stage"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "mindful-consumption"
+        },
+        {
+          "rel": "see-also",
+          "to": "values-over-images"
+        },
+        {
+          "rel": "see-also",
+          "to": "voice-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "feedback-loop-hygiene"
+        }
+      ],
+      "summary": "Art can warn, heal, teach, or trap; classify the function before accepting the mood.",
+      "proceduralLanguage": {
+        "pattern": "Creative expression carries warning, healing, memory, or loop reinforcement.",
+        "move": "Name what the art is doing and choose whether to carry it forward.",
+        "missingCheck": "Does this expression clarify, heal, warn, or repeat a fixed pain-state?",
+        "antiPattern": "Treating an aesthetic mood as permanent truth."
+      }
+    },
+    {
+      "id": "shadow-without-identification",
+      "slug": "shadow-without-identification",
+      "title": "Shadow Without Identification",
+      "excerpt": "The past can be witnessed without becoming the person's final name.",
+      "bodyMD": "Shadow work is useful when it reveals conditions and repair paths. It becomes harmful when the shadow becomes identity. Hold difficult material as evidence for practice, not as final self-description.\n\nAnti-pattern: turning pain, betrayal, or loss into the permanent center of the self.\n\nMinimal artifact: Shadow Witness Note separating event, interpretation, body signal, repair need, and current practice.",
+      "tags": [
+        "inner_practice",
+        "shadow",
+        "healing",
+        "non-attachment",
+        "repair",
+        "identity"
+      ],
+      "aliases": [
+        "shadow",
+        "past self",
+        "betrayal of the self",
+        "healing first"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "restorative-harm-repair"
+        },
+        {
+          "rel": "see-also",
+          "to": "identity-view-and-non-attachment"
+        }
+      ],
+      "summary": "The past can be witnessed without becoming the person's final name.",
+      "proceduralLanguage": {
+        "pattern": "Past pain or shadow material is present in the reflection.",
+        "move": "Witness the material, name the repair need, and avoid identifying with the wound.",
+        "missingCheck": "What repair or practice step follows from witnessing this material?",
+        "antiPattern": "Making the wound into a fixed identity."
+      }
+    },
+    {
+      "id": "ignorance-and-consideration",
+      "slug": "ignorance-and-consideration",
+      "title": "Ignorance and Consideration",
+      "excerpt": "Ignorance is not final innocence or final blame; once a gap is noticed, inquiry becomes the next practice.",
+      "bodyMD": "Ignorance can reduce felt guilt without resolving responsibility. The wise move is not to issue a verdict. It is to ask what was known, what was reasonably knowable, who may be affected, and what inquiry or repair becomes required after awareness appears.\n\nAnti-pattern: using ignorance as permission, or using guilt as a final identity judgment.\n\nMinimal artifact: Consideration Boundary Note, listing known facts, reasonably knowable facts, affected parties, missing research, and repair readiness.",
+      "tags": [
+        "first_principle",
+        "inner_practice",
+        "ignorance",
+        "consideration",
+        "guilt",
+        "responsibility",
+        "due_care"
+      ],
+      "aliases": [
+        "ignorance is bliss",
+        "moral guilt",
+        "consideration gap",
+        "not considering",
+        "unconsidered harm"
+      ],
+      "children": [
+        "consideration-debt",
+        "unseen-harm-inquiry",
+        "due-care-before-judgment",
+        "guilt-to-repair",
+        "moral-residue-after-awareness"
+      ],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "wisdom-first-principles"
+        },
+        {
+          "rel": "see-also",
+          "to": "direct-observation-before-claim"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-and-accurate-formulation"
+        }
+      ],
+      "summary": "Ignorance is not final innocence or final blame; once a gap is noticed, inquiry becomes the next practice.",
+      "proceduralLanguage": {
+        "pattern": "A possible harm, dependency, or affected perspective is outside the current frame.",
+        "move": "Identify what is not being considered, research consequences, and update responsibility without character verdict.",
+        "missingCheck": "What affected party, consequence, evidence source, or dependency is currently outside the frame?",
+        "antiPattern": "Using ignorance as permission or using guilt as final identity judgment."
+      }
+    },
+    {
+      "id": "consideration-debt",
+      "slug": "consideration-debt",
+      "title": "Consideration Debt",
+      "excerpt": "A missing consideration becomes a debt of inquiry once it is visible.",
+      "bodyMD": "Consideration debt appears when the frame omits affected parties, downstream effects, dependency chains, or evidence that a careful person would need before acting. The debt is procedural: pause, research, ask, and update.\n\nAnti-pattern: treating lack of felt guilt as proof that no inquiry is needed.\n\nMinimal artifact: Consideration Debt List with missing stakeholders, missing consequences, and research questions.",
+      "tags": [
+        "inner_practice",
+        "consideration_debt",
+        "missing_evidence",
+        "responsibility",
+        "inquiry"
+      ],
+      "aliases": [
+        "consideration debt",
+        "not considered",
+        "missing consideration",
+        "blind spot"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "verification-checklist"
+        },
+        {
+          "rel": "see-also",
+          "to": "data-dignity"
+        }
+      ],
+      "summary": "A missing consideration becomes a debt of inquiry once it is visible.",
+      "proceduralLanguage": {
+        "pattern": "A decision may have omitted affected perspectives or downstream effects.",
+        "move": "Name the missing consideration and turn it into a research or listening question.",
+        "missingCheck": "Who or what is affected but not represented in the current frame?",
+        "antiPattern": "Letting absent guilt replace due care."
+      }
+    },
+    {
+      "id": "unseen-harm-inquiry",
+      "slug": "unseen-harm-inquiry",
+      "title": "Unseen Harm Inquiry",
+      "excerpt": "When possible harm is not yet visible, search for affected consequences before strengthening the claim.",
+      "bodyMD": "Unseen harm inquiry asks whether well-being, agency, dignity, or safety may be affected in ways the current speaker has not considered. It routes the next step to research, testimony, affected-party context, or domain evidence.\n\nAnti-pattern: deciding that nothing is wrong because nothing feels wrong from the current viewpoint.\n\nMinimal artifact: Unseen Harm Inquiry with candidate affected parties, likely consequence classes, evidence sources, and uncertainty.",
+      "tags": [
+        "inner_practice",
+        "unseen_harm",
+        "non-harm",
+        "research",
+        "affected_parties",
+        "wellbeing"
+      ],
+      "aliases": [
+        "unseen harm",
+        "affected parties",
+        "what is not being considered",
+        "well being impact"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "civic-signal-loop"
+        }
+      ],
+      "summary": "When possible harm is not yet visible, search for affected consequences before strengthening the claim.",
+      "proceduralLanguage": {
+        "pattern": "A possible well-being effect is outside current awareness.",
+        "move": "Research affected consequences and seek evidence before making a moral claim stronger.",
+        "missingCheck": "What source would reveal whether anyone's agency, dignity, safety, or well-being is affected?",
+        "antiPattern": "Mistaking absence of visible harm for evidence of no harm."
+      }
+    },
+    {
+      "id": "due-care-before-judgment",
+      "slug": "due-care-before-judgment",
+      "title": "Due Care Before Judgment",
+      "excerpt": "Ask what was reasonably knowable before assigning responsibility strength.",
+      "bodyMD": "Due care distinguishes unknown unknowns from reasonably knowable gaps and from avoidance after warning signs. It calibrates responsibility without turning it into a character verdict.\n\nAnti-pattern: collapsing every mistake into guilt, or every ignorance claim into innocence.\n\nMinimal artifact: Due-Care Ladder with unknown, signaled, reasonably knowable, avoidance risk, and repair-required tiers.",
+      "tags": [
+        "inner_practice",
+        "due_care",
+        "responsibility",
+        "knowability",
+        "judgment",
+        "fairness"
+      ],
+      "aliases": [
+        "reasonably knowable",
+        "due care",
+        "moral responsibility",
+        "willful avoidance"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "fairness-due-process-and-justification"
+        },
+        {
+          "rel": "see-also",
+          "to": "right-speech-and-accurate-formulation"
+        }
+      ],
+      "summary": "Ask what was reasonably knowable before assigning responsibility strength.",
+      "proceduralLanguage": {
+        "pattern": "The prompt asks how ignorance, awareness, and blame relate.",
+        "move": "Separate unknown, signaled, reasonably knowable, avoidance-risk, and repair-required tiers.",
+        "missingCheck": "What warning signs or accessible evidence existed before the action?",
+        "antiPattern": "Equating ignorance with innocence or guilt with identity."
+      }
+    },
+    {
+      "id": "guilt-to-repair",
+      "slug": "guilt-to-repair",
+      "title": "Guilt to Repair",
+      "excerpt": "Guilt is useful when it becomes inquiry, restraint, repair, or changed practice.",
+      "bodyMD": "Guilt can signal a newly visible boundary or harm. The procedural move is to separate the feeling from the verdict, then ask what repair, restraint, confession, apology, research, or practice update is warranted.\n\nAnti-pattern: using guilt as self-punishment or using absence of guilt as permission.\n\nMinimal artifact: Guilt-to-Repair Note with feeling, evidence, affected party, repair option, and future practice.",
+      "tags": [
+        "inner_practice",
+        "guilt",
+        "repair",
+        "accountability",
+        "responsibility",
+        "practice"
+      ],
+      "aliases": [
+        "moral guilt",
+        "guilt signal",
+        "repair question",
+        "accountability"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "restorative-harm-repair"
+        },
+        {
+          "rel": "see-also",
+          "to": "shadow-without-identification"
+        }
+      ],
+      "summary": "Guilt is useful when it becomes inquiry, restraint, repair, or changed practice.",
+      "proceduralLanguage": {
+        "pattern": "Guilt appears after awareness of a possible wrong or missing consideration.",
+        "move": "Convert guilt into a repair question without turning it into a self-verdict.",
+        "missingCheck": "What repair or changed practice would address the affected consequence?",
+        "antiPattern": "Treating guilt as either final condemnation or something to bypass."
+      }
+    },
+    {
+      "id": "moral-residue-after-awareness",
+      "slug": "moral-residue-after-awareness",
+      "title": "Moral Residue After Awareness",
+      "excerpt": "After a gap becomes visible, responsibility shifts toward inquiry, restraint, and repair-readiness.",
+      "bodyMD": "Moral residue is what remains after new awareness changes the frame. It does not prove a person is bad. It means the prior action now needs inquiry, update, possible repair, and future guardrails.\n\nAnti-pattern: continuing as before after a meaningful consideration gap is known.\n\nMinimal artifact: Awareness Update Note with new evidence, stale assumption, responsibility tier, and next repair or restraint step.",
+      "tags": [
+        "inner_practice",
+        "awareness",
+        "moral_residue",
+        "repair_readiness",
+        "revision",
+        "responsibility"
+      ],
+      "aliases": [
+        "after awareness",
+        "moral residue",
+        "repair readiness",
+        "responsibility tier"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "ignorance-and-consideration"
+        },
+        {
+          "rel": "see-also",
+          "to": "impermanence-entropy-and-revision"
+        },
+        {
+          "rel": "see-also",
+          "to": "integrity-protocols"
+        }
+      ],
+      "summary": "After a gap becomes visible, responsibility shifts toward inquiry, restraint, and repair-readiness.",
+      "proceduralLanguage": {
+        "pattern": "A previously unseen factor is now visible and changes the responsibility frame.",
+        "move": "Update the responsibility tier and choose inquiry, restraint, or repair-readiness.",
+        "missingCheck": "What changed after awareness, and what must be done differently now?",
+        "antiPattern": "Ignoring new awareness because the old action felt innocent."
       }
     },
     {

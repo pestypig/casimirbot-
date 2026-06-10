@@ -374,6 +374,12 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
     toolOutput?.reflection && typeof toolOutput.reflection === "object" && !Array.isArray(toolOutput.reflection)
       ? (toolOutput.reflection as Record<string, unknown>)
       : null;
+  const proceduralClassification =
+    toolOutput?.proceduralClassification &&
+    typeof toolOutput.proceduralClassification === "object" &&
+    !Array.isArray(toolOutput.proceduralClassification)
+      ? (toolOutput.proceduralClassification as Record<string, unknown>)
+      : null;
   const matches =
     reflection?.matches && typeof reflection.matches === "object" && !Array.isArray(reflection.matches)
       ? (reflection.matches as Record<string, unknown>)
@@ -391,6 +397,38 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
       : "";
     return reasons ? `- ${label}: ${reasons}` : `- ${label}`;
   });
+  const proceduralEntries = Array.isArray(proceduralClassification?.classifications)
+    ? proceduralClassification.classifications
+        .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        .slice(0, 5)
+    : [];
+  const proceduralLines = proceduralEntries.map((entry) => {
+    const pattern = String(entry.observedPattern ?? "unclear_evidence").replace(/_/g, " ");
+    const root = typeof entry.zenRootLabel === "string" && entry.zenRootLabel.trim()
+      ? entry.zenRootLabel.trim()
+      : String(entry.zenRootId ?? "Zen root");
+    const move = String(entry.proceduralMove ?? "preserve_uncertainty").replace(/_/g, " ");
+    const explanation = typeof entry.explanation === "string" && entry.explanation.trim()
+      ? entry.explanation.trim()
+      : "Use this as diagnostic procedure evidence, not as a verdict.";
+    return `- ${pattern} -> ${root} -> ${move}: ${explanation}`;
+  });
+  const recommendedProceduralMoves = Array.isArray(proceduralClassification?.recommendedNextMoves)
+    ? proceduralClassification.recommendedNextMoves
+        .map((entry) => (entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null))
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        .slice(0, 4)
+        .map((entry) => {
+          const label = typeof entry.label === "string" && entry.label.trim()
+            ? entry.label.trim()
+            : "Ask for a concrete next practice.";
+          const description = typeof entry.description === "string" && entry.description.trim()
+            ? entry.description.trim()
+            : "Keep the reflection diagnostic and user-confirmable.";
+          return `- ${label}: ${description}`;
+        })
+    : [];
   const firstPath = activated
     .map((entry) => Array.isArray(entry.pathToRoot) ? entry.pathToRoot.map((item) => String(item ?? "").trim()).filter(Boolean) : [])
     .find((path) => path.length > 1) ?? [];
@@ -446,9 +484,15 @@ function synthesizeZenGraphReflectionAnswer(input: SynthesizeWorkstationAnswerIn
     activatedLines.length > 0
       ? ["Activated lenses:", ...activatedLines].join("\n")
       : `Activated lenses: ${summary || "the receipt did not expose named matches."}`,
+    proceduralLines.length > 0
+      ? ["Procedural classification:", ...proceduralLines].join("\n")
+      : "Procedural classification: no procedural classification receipt was exposed, so the safe posture is to ask for concrete observations and preserve uncertainty.",
     appliedLines.length > 0
       ? ["Applied to the prompt:", ...appliedLines].join("\n")
       : "Applied to the prompt: use the graph receipt as evidence for a careful next question, not as a final moral classification.",
+    recommendedProceduralMoves.length > 0
+      ? ["Recommended next moves:", ...recommendedProceduralMoves].join("\n")
+      : "Recommended next moves: ask for one concrete observation, one missing check, and one small practice before strengthening the interpretation.",
     pathLine,
     includesFruition
       ? "Fruition binding: represent the situation as badge-combination evidence, then keep the output diagnostic until review/evidence gates are satisfied."

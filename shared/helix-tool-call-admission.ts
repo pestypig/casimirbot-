@@ -20,10 +20,21 @@ export type HelixToolCallAdmissionFamily =
   | "workstation_action"
   | "model_only";
 
+export type HelixToolCallAdmissionMode =
+  | "direct"
+  | "unknown_source_discovery";
+
 export type HelixToolCallAdmissionDecision = {
   schema: typeof HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA;
   turn_id: string;
   source_target: string;
+  admission_mode?: HelixToolCallAdmissionMode;
+  discovery_policy?: {
+    state: "bounded_readonly";
+    first_pass_tool_families: HelixToolCallAdmissionFamily[];
+    forbidden_external_tool_families: HelixToolCallAdmissionFamily[];
+    on_not_found: "ask_or_explain_searched_scope";
+  };
   required: boolean;
   admitted_tool_families: HelixToolCallAdmissionFamily[];
   forbidden_terminal_artifact_kinds: string[];

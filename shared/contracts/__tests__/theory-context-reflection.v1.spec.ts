@@ -65,6 +65,7 @@ function baseReflection(
       exactBadgeIds: ["nhm2.qei.sampling_window"],
       likelyBadgeIds: ["nhm2.closure.source_residual"],
       suggestedBiomeChunkIds: ["7:2"],
+      suggestedSemanticChunkIds: ["warp_gr_nhm2:human_engineering:diagnostic:claim_medium"],
       suggestedScaleBands: ["human_engineering"],
       softRegion: {
         id: "discussion-zone:test",
@@ -107,6 +108,9 @@ describe("theory context reflection v1", () => {
     expect(reflection.ask_context_policy).toBe("evidence_only");
     expect(reflection.deterministic_content_role).toBe("observation_not_assistant_answer");
     expect(reflection.overlay.suggestedBiomeChunkIds).toEqual(["7:2"]);
+    expect(reflection.overlay.suggestedSemanticChunkIds).toEqual([
+      "warp_gr_nhm2:human_engineering:diagnostic:claim_medium",
+    ]);
     expect(reflection.overlay.suggestedScaleBands).toEqual(["human_engineering"]);
   });
 
@@ -199,6 +203,21 @@ describe("theory context reflection v1", () => {
 
     expect(validateTheoryContextReflectionV1(invalid)).toContain(
       "overlay.suggestedScaleBands contains invalid scale band: invalid_band",
+    );
+  });
+
+  it("rejects invalid suggested semantic chunk ids", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      overlay: {
+        ...reflection.overlay,
+        suggestedSemanticChunkIds: ["valid:chunk:id", 123],
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "overlay.suggestedSemanticChunkIds must be an array of strings",
     );
   });
 

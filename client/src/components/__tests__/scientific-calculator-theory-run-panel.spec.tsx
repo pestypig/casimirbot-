@@ -204,6 +204,40 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(within(theorySection).getByRole("button", { name: "Solve Available" })).toBeInTheDocument();
   });
 
+  it("scrolls the selected theory run row into view", async () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const run = buildMixedTheoryRun();
+    const targetRow = run.rows[run.rows.length - 1];
+    useTheoryCompoundRunStore.getState().loadTheoryRun(run);
+    useTheoryCompoundRunStore.getState().selectTheoryRunRow(targetRow.id);
+
+    try {
+      render(<ScientificCalculatorPanel />);
+
+      await waitFor(() => {
+        const selectedRow = document.querySelector('[data-selected-theory-run-row="true"]');
+        expect(selectedRow).toHaveAttribute("data-theory-run-row-id", targetRow.id);
+      });
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+      });
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as Partial<Pick<HTMLElement, "scrollIntoView">>).scrollIntoView;
+      }
+    }
+  });
+
   it("organizes a badge calculator loadout under the Theory Run section", async () => {
     const loadout = buildTheoryCalculatorLoadout({
       graph,

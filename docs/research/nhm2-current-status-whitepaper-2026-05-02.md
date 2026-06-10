@@ -12,6 +12,8 @@ The same update also adds a quantum-spacetime proxy lane for entropy stretch, co
 
 The representation-space boundary patch adds a navigation layer for the broader category distinction behind this paper: projective quantum prediction space is not ADM dimensional metric space, but both teach the same discipline about representatives versus physical claims. The new category map treats the projective/Born-rule insight as a navigation analogy and routes NHM2 claims through same-chart tensor, source-independence, proxy-non-promotion, and bounded-contract invariants. This is a rhyme in the machinery room, not a derivation bridge.
 
+The June closure-stack update makes this document the canonical narrative surface for the current NHM2 full solve. The implementation now records six diagnostic ledgers alongside the older source and observer surfaces: same-chart full tensor component status, wall-region `T00` source closure, observer-family energy-condition scope, QEI worldline dossier completeness, Casimir material receipt status, and Natario-adjacent invariant audit status. These ledgers are stricter falsification surfaces, not stronger viability claims. Missing `T0i`, missing off-diagonal `Tij`, Eulerian-only observer checks, scalar-only QEI margins, ideal Casimir plate formulas, and zero-expansion-only Natario evidence remain explicit blockers or proxy states.
+
 ## Executive scientific claim boundary
 
 NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or lower-alpha profile promotion. Repository artifacts define which NHM2 rows are pass-level under a named contract, review-level, diagnostic, runtime-blocked, or unsupported.
@@ -28,6 +30,8 @@ The new quantum-spacetime congruence contract should be read even more conservat
 
 The new representation-space navigation contract should be read as a map, not a gate promotion. It records four boundaries: projective quantum state space to ADM dimensional metric space, QST proxy to ADM metric lane, source mechanism to metric-required stress-energy, and bounded output to route/speed claim. All four boundaries keep `promotionAllowed = false`, `physicalMechanismClaimAllowed = false`, and `validationClaimAllowed = false`.
 
+The closure-stack contracts should be read with the same discipline. `nhm2_same_chart_full_tensor/v1`, `nhm2_wall_source_closure/v1`, `nhm2_observer_robust_energy_conditions/v1`, `nhm2_qei_worldline_dossier/v1`, `casimir_material_receipt/v1`, and `nhm2_natario_invariant_audit/v1` make the full solve more falsifiable by naming the missing or proxy evidence that blocks promotion. They do not certify transport, do not treat missing tensor components as zero, do not let global residuals override wall-region failure, do not turn Eulerian-only energy-condition checks into observer-robust claims, do not let scalar `qei_margin` substitute for a worldline dossier, and do not treat zero expansion as a safety certificate.
+
 ## 1. Motivation and problem statement
 
 The scientific problem addressed here is narrower than a flight-ready warp-drive claim. NHM2 asks whether a bounded lapse-shift profile can be represented, evaluated, and audited in one declared chart with enough mathematical discipline that observer quantities, energy-condition surfaces, and centerline proper-time targets are not confused with coordinate artifacts or mechanism-side assumptions.
@@ -43,6 +47,8 @@ The quantum-spacetime proxy lane adds a sixth failure mode: a suggestive quantum
 The implementation records calculations through repository artifacts. Those artifacts are not the theory itself; they are the evidence surfaces used to determine which NHM2 rows are admitted, review-level, diagnostic, runtime-blocked, or unsupported.
 
 The representation-space navigation patch adds a seventh failure mode: a useful cross-domain analogy can be mistaken for a derivation. The projective quantum state-space lesson is that physical prediction is not identical to a chosen vector representative. NHM2's dimensional counterpart is that metric, source, proxy, and contract claims are not identical to their convenient data representatives. The patch gives this distinction names so code and paper can point at the same boundary.
+
+The closure-stack patch adds an eighth failure mode: a ledger can look complete because it omitted hard components or collapsed regional and observer detail into a scalar. The canonical full solve now treats omitted same-chart tensor components, omitted wall closure, observer-family gaps, missing QEI worldlines, unreceipted Casimir materials, and Natario invariant gaps as named evidence states. This improves auditability by making absence visible rather than by changing the underlying physics.
 
 ## 2. Accepted mathematical background
 
@@ -258,6 +264,8 @@ E_{\rm tile}= -\frac{\pi^2\hbar c}{720a^3}A.
 
 This is a source-model baseline, not a GR-coupled proof of macroscopic stress-energy realization. Material corrections, finite geometry, drive response, and dynamic effects are mechanism-side model choices unless and until they are admitted into a solver-authoritative stress-energy route.
 
+The current material-receipt boundary is stricter than this scalar formula. A perfect-conductor parallel-plate replay remains available as a diagnostic Casimir budget, but it is `ideal_scalar_only` unless a `casimir_material_receipt/v1` artifact records gap metrology, material response, finite-conductivity / temperature / roughness treatment, geometry validity, and environmental evidence. A tile-effective wall source cannot be described as `material_receipted` without that receipt.
+
 ### 4.2 Hull-wide tile inventory and sectorization
 
 A hull-wide model aggregates many tiles. If `N` tiles are modeled with comparable static budget, a simple static aggregate has the schematic form:
@@ -297,6 +305,8 @@ The Casimir source model is mechanism-side and not an experimentally grounded ma
 ### 4.5 Source closure: global diagonal tightness and regional diagnostic limits
 
 Source closure is numerically tight on the global diagonal comparison in the current evidence stack, including a reported `relLInf = 4.6143808140791624e-10`. That number should not be promoted by itself. Source closure remains review-level because regional direct `T00` comparison is diagnostic-only, the metric side expects a `tile_effective_counterpart`, and the tile side currently resolves through a `gr_matter_channel_observation` path rather than an authoritative same-basis counterpart. The current regional residuals are also not small under that diagnostic comparison: hull is about `0.977`, wall is about `14.95`, and exterior shell is about `2.02`. The safe conclusion is: global diagonal agreement is tight under the current comparison, while regional direct source closure is not yet an authoritative physical source proof.
+
+The full-solve closure stack therefore promotes the wall-region comparison to the front-door blocker. The wall artifact `nhm2_wall_source_closure/v1` compares metric-required wall `T00` against tile-effective or material-receipted wall `T00` and records absolute residual, relative residual, tolerance, blockers, and claim boundary. A global residual may remain useful secondary context, but it cannot mask a failing wall residual; missing wall closure leaves full-loop readiness at review, and failing wall closure blocks readiness.
 
 ### 4.6 Divergence surface: where new physics or a source-model correction must enter
 
@@ -359,6 +369,8 @@ nhm2_tile_counterpart_conservation/v1
 ```
 
 does not prove physical realizability. It records whether `div T`, continuity, and momentum residual diagnostics have been emitted on the same chart and region masks. Missing conservation remains a blocker before residual tuning should be interpreted as source-closure evidence.
+
+The newer wall-closure and material-receipt surfaces tighten this source chain. A future ledger may show a tile-effective full tensor candidate and a conservation diagnostic while still remaining blocked if the wall `T00` residual fails, if the wall source is only proxy evidence, or if the Casimir row is still ideal scalar math rather than a material-receipted source. That is the intended result: source closure advances only when the regional, material, and tensor-authority surfaces advance together.
 
 ### 4.8 Current frozen ledger state
 
@@ -556,15 +568,21 @@ T_{\mu\nu}^{\rm geom}=\frac{1}{8\pi}G_{\mu\nu}.
 
 The route then projects the computed same-chart tensor into `E`, `J_i`, and `S_ij`, and evaluates observer energy-condition gates. In current artifact language, this selected metric observer path is identified by `einstein_tensor_geometry_fd4_v1` and same-chart derivability for `T0i` and off-diagonal `Tij`. Nevertheless, the overall full-loop state remains review-level because provenance and policy gates block blanket promotion.
 
+The same-chart full-tensor artifact, `nhm2_same_chart_full_tensor/v1`, is now the canonical ledger for this route. It lists `T00`, `T0x`, `T0y`, `T0z`, `Txx`, `Txy`, `Txz`, `Tyy`, `Tyz`, and `Tzz` with value, unit, status, provenance, assumptions, and blockers. The important rule is negative: absent momentum-density entries or absent off-diagonal spatial stresses are not silently zero. They are `missing` or `blocked`, and `fullTensorComplete` remains false.
+
 ### 5.5 Observer energy-condition gates
 
 The observer audit checks energy-condition surfaces from the full tensor, not from a lone coordinate entry. A clean observer pass would mean the selected route satisfied the implemented observer-surface checks under the declared artifact semantics. It would not mean physical viability, experimental validation, or robustness for arbitrary external fields.
 
 The present red-team status is stricter than the older summary wording. A full-loop observer section that reports `pass` cannot override a detailed observer artifact from a nearby run that reports `status = fail`, `observer_condition_failed`, `surrogate_model_limited`, or robust DEC failure. In the current evidence stack, the dated observer artifact reports robust DEC failure with a worst value on the order of `-5.8267450e7` on both metric and tile surfaces. That does not by itself refute the geometry-first tensor route; it means observer closure must be regenerated from one frozen run and reconciled before any clean observer-pass language is allowed.
 
+The observer-robust artifact, `nhm2_observer_robust_energy_conditions/v1`, separates Eulerian-frame checks from stronger observer-family checks. An Eulerian-only artifact must say `eulerianOnly = true`; it may be useful, but it is not an observer-robust pass. Robust language requires at least one non-Eulerian observer-family route, such as a bounded boosted timelike grid, null-direction grid, algebraic Type I analysis, or a real continuous optimizer when implemented. If continuous optimization has not been implemented, the artifact must record `not_run` rather than implying it.
+
 ### 5.6 What this closure does and does not prove
 
 This closure demonstrates an auditable same-chart tensor evaluation path inside the repository evidence stack. The red-team baseline now treats it as an admitted metric-required diagnostic route, not as a completed observer-safe physical mechanism. It does not prove the physical source is realizable, that a lower-alpha profile passes, that a route ETA exists, or that any strong-field environment is safe.
+
+QEI evidence now has the same diagnostic discipline. A scalar badge replay of `qei_margin = qei_bound - qei_sample` is not a final QEI proof. The canonical runtime surface is `nhm2_qei_worldline_dossier/v1`, which records worldlines, region coverage, sampling function, sampled density, bound provenance, margins, and tau / duty / light-crossing consistency. Missing wall worldline coverage keeps the dossier incomplete.
 
 ## 6. Centerline-lapse clocking calculation
 
@@ -699,11 +717,15 @@ Reproducibility depends on artifact freshness, deterministic output paths, sourc
 
 The red-team reference-run contract strengthens this requirement: validation claims cannot depend on `latest` aliases, mismatched profile IDs, null convergence fields, null boundary or smoothing sensitivity, missing independent reproduction, or artifact hash mismatch. These fields may remain null for diagnostic research, but they must be explicit blockers for any future validation or certified-language update.
 
-### 7.3 0p7000 runtime frontier
+### 7.3 Natario invariant audit boundary
+
+Natario zero expansion remains a useful morphology constraint, but it is not a safety certificate. The invariant audit surface, `nhm2_natario_invariant_audit/v1`, records expansion flatness separately from Ricci / Kretschmann / Weyl proxy status, Petrov classification status, momentum-density status, tidal behavior, blueshift diagnostics, and convergence status. A row may have `thetaFlatnessStatus = pass` and still have an incomplete invariant audit. The canonical interpretation is therefore: zero expansion narrows one geometric property; it does not close curvature, stability, observer, or safety claims.
+
+### 7.4 0p7000 runtime frontier
 
 `stage1_centerline_alpha_0p7000_v1` is the current operational frontier target. Its expected subjective efficiency is `1.428571429x`, but its current state is runtime-blocked at selected transport. The correct interpretation is operational: recover selected-transport completion before interpreting physics gates.
 
-### 7.4 Frontier bisection strategy
+### 7.5 Frontier bisection strategy
 
 If `0p7300` is confirmed and `0p7000` remains blocked or failing after runtime hardening, the rational search is bisection:
 
@@ -724,9 +746,13 @@ The NHM2 calculation does not solve an experimentally realized Casimir material 
 The following remain outside the current claim:
 
 - physical source realization of the required stress-energy tensor
+- complete same-chart tensor ledger for `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`
+- wall-region `T00` closure as the front-door source-closure blocker
 - same-basis regional `T_ab_tile_effective_counterpart` closure against `T_ab_metric_required`
-- single-frozen-run observer audit reconciliation
-- QEI/QFT dossier with state assumptions, sampling worldlines, renormalization convention, and light-crossing / duty-cycle consistency
+- single-frozen-run observer audit reconciliation, including non-Eulerian observer-family scope where claimed
+- QEI/QFT dossier with state assumptions, sampling worldlines, wall coverage, renormalization convention, and light-crossing / duty-cycle consistency
+- Casimir material and geometry receipts before tile rows can be treated as material source evidence
+- Natario invariant and stability diagnostics beyond zero-expansion status
 - convergence, boundary-condition sensitivity, smoothing-kernel sensitivity, and independent reproduction evidence
 - experimental validation of Casimir-tile amplification as a macroscopic GR source
 - arbitrary route dynamics
@@ -749,6 +775,8 @@ The current novel contribution is not a claim of physical transport. It is the e
 ```text
 NHM2 Reference Solve v1 supplies a frozen reduced-order same-chart source-to-geometry closure result: regional metric-required tensors and independently defined tile-effective counterpart tensors close within declared tolerance, observer artifacts agree from one run, QEI/QFT bounds are explicit, and convergence/reproduction evidence is emitted.
 ```
+
+Under the June closure-stack policy, that future claim would also need a complete same-chart full-tensor ledger, passing or review-cleared wall `T00` source closure, explicit observer-family energy-condition scope, a complete QEI worldline dossier, material-receipted Casimir rows where source evidence is invoked, and an invariant audit for Natario-adjacent rows. Without those surfaces, the stronger sentence should remain unpublished even if one scalar badge or global residual looks favorable.
 
 That would still not automatically imply experimental propulsion, ambient causality violation, or full quantum-gravity validation. It would be a defensible reduced-order GR result with a specific source-mechanism dossier. The reason to update this whitepaper now is to define the exact evidence bridge before trying to cross it.
 
@@ -779,6 +807,12 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | ledger primaryBlockerClass | `tile_counterpart` | next blocker is semantic/source-side counterpart authority |
 | tile-effective full-tensor source producer | implemented as `nhm2_tile_effective_full_tensor_source/v1` | source-side candidate path; does not itself retire source closure |
 | tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
+| same-chart full tensor ledger | implemented as `nhm2_same_chart_full_tensor/v1` | records `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`; missing components are blockers, not zeros |
+| wall source closure | implemented as `nhm2_wall_source_closure/v1` | wall `T00` residual is the front-door source-closure blocker; global residual cannot override wall failure |
+| observer-robust energy conditions | implemented as `nhm2_observer_robust_energy_conditions/v1` | Eulerian-only checks are labeled restricted and do not become observer-robust passes |
+| QEI worldline dossier | implemented as `nhm2_qei_worldline_dossier/v1` | scalar `qei_margin` is badge replay/proxy unless worldline, sampling, bound, and consistency evidence are present |
+| Casimir material receipt | implemented as `casimir_material_receipt/v1` | perfect-conductor plate math remains `ideal_scalar_only` until material and geometry receipts exist |
+| Natario invariant audit | implemented as `nhm2_natario_invariant_audit/v1` | zero expansion does not imply invariant, curvature, stability, or safety closure |
 | quantum-spacetime proxy contract | implemented as `QST_PROXY` / `shared/quantum-spacetime-congruence.ts` | Stage 0 diagnostic only; `spacetimeCL = proxy_only`, `mayPromoteToCL4 = false` |
 | holographic entropy graph edge | `edgeType = holographic_entropy_proxy` | treated as proxy-only by strict graph walks; no CL0-CL4 promotion |
 | representation-space navigation | implemented as `shared/nhm2-representation-space-navigation.ts` | navigation only; projective quantum analogy and NHM2 dimensional metric claims remain separate |
@@ -831,6 +865,8 @@ This chain may end in `fail` or `review`. That is acceptable when the ledger ide
 
 The representation-space navigation patch adds no run-free validation command. It is a static claim-boundary map. The relevant review action is to verify that code paths using `QST_PROXY`, tile-effective source tensors, and bounded contracts expose the correct boundary id and do not treat the boundary id as a promotion token.
 
+The June closure-stack contracts add placeholder-safe runtime artifacts rather than a new numerical relativity solver. Their builders are allowed to emit `missing`, `blocked`, `not_run`, `proxy`, or `ideal_scalar_only` when the current runtime lacks a component. That behavior is part of the reproducibility boundary: an incomplete artifact is still useful because it preserves the blocker instead of omitting it.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -841,8 +877,14 @@ The representation-space navigation patch adds no run-free validation command. I
 | `T_ij`, `T_0i`, `T_00` reconstruction | reconstruct coordinate tensor components | prevents diagonal-only proxy promotion | valid only from same-chart projected quantities |
 | `G_mu_nu=8piT_mu_nu` | Einstein tensor route | geometry-first stress-energy evaluation | repo-internal evaluator, not experimental validation |
 | `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
+| `R_wall_T00 = T00_wall_required - T00_wall_available` | wall-region source residual | front-door wall closure badge / audit row | global residual cannot override wall failure |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
+| `nhm2_same_chart_full_tensor/v1` | full metric-required tensor component ledger | records complete, missing, or blocked `T00`, `T0i`, and `Tij` surfaces | noncomputable runtime reference; no scalar replay |
+| `nhm2_observer_robust_energy_conditions/v1` | observer-family energy-condition scope | separates Eulerian-only checks from robust-family checks | no continuous-optimizer claim unless implemented |
+| `nhm2_qei_worldline_dossier/v1` | QEI worldline evidence dossier | supersedes scalar-only QEI margin for runtime claims | missing wall worldline blocks dossier completeness |
+| `casimir_material_receipt/v1` | material and geometry source receipt | distinguishes `ideal_scalar_only` from `material_receipted` | ideal Casimir formula is not material evidence |
+| `nhm2_natario_invariant_audit/v1` | invariant and stability diagnostic ledger | separates zero expansion from curvature, momentum, tidal, blueshift, and convergence status | zero expansion is not a safety certificate |
 | `lambda_S = exp(Delta S_eff)` | entropy-stretch bookkeeping | quantum-visibility diagnostic in `QST_PROXY` | does not physically change `hbar` |
 | `hbar_eff / hbar = 1 / lambda_S` | high-entropy quantum-visibility ratio | demotes quantum-structure claims unless separately justified | epistemic diagnostic, not local force |
 | `A_info = 4 l_P^2 S_ent` and `erDensityProxy = A_info / A_R` | holographic area proxy | ER=EPR / RT-inspired comparison lane | not wormhole inventory |
@@ -879,6 +921,6 @@ The representation-space navigation patch adds no run-free validation command. I
 
 ## Final conclusion
 
-NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, and the centerline-lapse law computes expected timing targets.
+NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, the closure stack records missing or proxy evidence explicitly, and the centerline-lapse law computes expected timing targets.
 
-The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, attach a QEI/QFT dossier, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. The representation-space navigation patch is the naming layer for the broader perspective: projective quantum rays and ADM metric tensors both warn us not to mistake representatives for physics, while keeping the lanes separate. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.
+The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, make wall closure the front-door source blocker, attach a complete QEI/QFT worldline dossier, distinguish ideal Casimir scalar budgets from material receipts, audit Natario-adjacent invariants, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The June closure stack is progress because it makes missing tensor, wall, observer, QEI, material, and invariant evidence impossible to hide. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. The representation-space navigation patch is the naming layer for the broader perspective: projective quantum rays and ADM metric tensors both warn us not to mistake representatives for physics, while keeping the lanes separate. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.

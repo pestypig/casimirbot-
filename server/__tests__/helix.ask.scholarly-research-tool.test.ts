@@ -3,6 +3,7 @@ import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
+import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
@@ -117,6 +118,236 @@ describe("Helix scholarly research tool admission", () => {
       },
     });
     expect(selectedPaperFetch.validation.valid).toBe(true);
+  });
+
+  it("rejects runtime tool calls outside the admitted tool family", () => {
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:runtime-admission-gate",
+      tool_admission_suppressed: false,
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: "docs-viewer.locate_in_doc",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+    } as any;
+    const docsOnlyAdmission = {
+      schema: "helix.tool_call_admission_decision.v1",
+      turn_id: "ask:runtime-admission-gate",
+      source_target: "docs_viewer",
+      required: true,
+      admitted_tool_families: ["docs_viewer"],
+      forbidden_terminal_artifact_kinds: [],
+      forbidden_routes: [],
+      reason: "docs_viewer_requires_document_tool_path",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const rejectedScholarlyLookup = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: docsOnlyAdmission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:runtime-admission-gate",
+        call_id: "call:scholarly-under-docs-policy",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(rejectedScholarlyLookup.validation.valid).toBe(false);
+    expect(rejectedScholarlyLookup.validation.errors).toContain(
+      `runtime_capability_not_admitted_by_tool_policy:${HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY}:scholarly_research`,
+    );
+
+    const admittedDocsLocate = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: docsOnlyAdmission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:runtime-admission-gate",
+        call_id: "call:docs-under-docs-policy",
+        capability_key: "docs-viewer.locate_in_doc",
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(admittedDocsLocate.validation.valid).toBe(true);
+  });
+
+  it("admits unknown artifact requests to bounded read-only discovery without external research tools", () => {
+    const unknownIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: "ask:unknown-source-discovery",
+      target_source: "unknown",
+      target_kind: "unknown",
+      requested_outputs: [],
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: "low",
+      precedence_reason: "ambiguous_source_target",
+      reasons: ["test"],
+      suppressed_routes: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:unknown-source-discovery",
+      promptText: "find NHM2 theory white paper",
+      sourceTargetIntent: unknownIntent,
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "unknown",
+      admission_mode: "unknown_source_discovery",
+      required: true,
+      reason: "unknown_source_artifact_request_requires_bounded_readonly_discovery",
+    });
+    expect(admission.admitted_tool_families).toEqual(
+      expect.arrayContaining(["docs_viewer", "repo_code", "runtime_evidence"]),
+    );
+    expect(admission.forbidden_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "internet_search"]),
+    );
+    expect(admission.discovery_policy).toMatchObject({
+      state: "bounded_readonly",
+      on_not_found: "ask_or_explain_searched_scope",
+    });
+
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:unknown-source-discovery",
+      tool_admission_suppressed: false,
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: HELIX_INTERNET_SEARCH_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: "docs-viewer.search_docs",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: "docs-viewer.open_doc_by_path",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
+          capability_key: "repo-code.search_concept",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+    } as any;
+
+    const admittedDocsSearch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:docs-search",
+        capability_key: "docs-viewer.search_docs",
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(admittedDocsSearch.validation.valid).toBe(true);
+
+    const rejectedDocOpen = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:docs-open",
+        capability_key: "docs-viewer.open_doc_by_path",
+        args: { path: "docs/research/nhm2-current-status-whitepaper-2026-05-02.md" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(rejectedDocOpen.validation.valid).toBe(false);
+    expect(rejectedDocOpen.validation.errors).toContain(
+      "runtime_tool_forbidden_by_tool_policy:docs-viewer.open_doc_by_path",
+    );
+
+    const admittedRepoSearch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:repo-search",
+        capability_key: "repo-code.search_concept",
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(admittedRepoSearch.validation.valid).toBe(true);
+
+    const rejectedScholarlyLookup = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:scholarly-search",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(rejectedScholarlyLookup.validation.valid).toBe(false);
+    expect(rejectedScholarlyLookup.validation.errors).toContain(
+      `runtime_capability_family_forbidden_by_tool_policy:${HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY}:scholarly_research`,
+    );
+
+    const rejectedInternetSearch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:internet-search",
+        capability_key: HELIX_INTERNET_SEARCH_CAPABILITY,
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(rejectedInternetSearch.validation.valid).toBe(false);
+    expect(rejectedInternetSearch.validation.errors).toContain(
+      `runtime_capability_family_forbidden_by_tool_policy:${HELIX_INTERNET_SEARCH_CAPABILITY}:internet_search`,
+    );
   });
 
   it("re-enters rejected scholarly args as compact repair hints for the model step", () => {

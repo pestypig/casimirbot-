@@ -5,6 +5,7 @@ import {
   buildToolLifecycleTrace,
   refreshToolLifecycleRecords,
 } from "../services/helix-ask/tool-lifecycle-trace";
+import { buildArtifactQueryIndex } from "../services/helix-ask/artifact-query-index";
 
 describe("Helix Ask tool lifecycle trace", () => {
   it("keeps pending multi-step tools in poll mode instead of terminalizing", () => {
@@ -183,6 +184,132 @@ describe("Helix Ask tool lifecycle trace", () => {
       evidence_reentered: true,
       assistant_answer: false,
     });
+  });
+
+  it("indexes queryable artifacts against the tool-family contract without creating answer authority", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:calculator-index",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:calculator-index",
+        capability_plan_id: "plan:calculator-index",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:1"],
+        evidence_refs: ["calculator_validation:1"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      operational_satisfaction_evaluation: {
+        schema: "helix.operational_satisfaction_evaluation.v1",
+        turn_id: "ask:test:calculator-index",
+        requested_surface_satisfied: true,
+        next_decision: "allow_terminal",
+        evidence_refs: ["calculator_validation:1"],
+      },
+      capability_lifecycle_ledger: {
+        schema: "helix.capability_lifecycle_ledger.v1",
+        turn_id: "ask:test:calculator-index",
+        ok: true,
+        failure_codes: [],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "calculator_receipt:1",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "calculation_trace:1",
+          kind: "calculation_trace",
+          payload: {
+            schema: "helix.calculation_trace.v1",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "calculator_validation:1",
+          kind: "calculator_validation",
+          payload: {
+            schema: "helix.calculator_validation.v1",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:calculator-index", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-index", payload });
+
+    expect(index).toMatchObject({
+      schema: "helix.artifact_query_index.v1",
+      tool_family: "calculator",
+      capability: "scientific-calculator.solve_expression",
+      artifact_count: 3,
+      assistant_answer: false,
+      raw_content_included: false,
+      reentry_status: {
+        evidence_reentered: true,
+        followup_next_action: "terminal_answer",
+        terminal_use_allowed: true,
+      },
+    });
+    expect(index.missing_required_observation_kinds).toEqual([]);
+    expect(index.queryable_artifact_keys).toEqual(
+      expect.arrayContaining(["calculator_receipt:1", "calculation_trace:1", "calculator_validation:1"]),
+    );
+  });
+
+  it("reports missing contract observations for incomplete tool evidence", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:calculator-index-missing",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "calculator_receipt:only",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:calculator-index-missing", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-index-missing", payload });
+
+    expect(index.missing_required_observation_kinds).toEqual(
+      expect.arrayContaining(["calculation_trace", "calculator_validation"]),
+    );
+    expect(index.reentry_status).toMatchObject({
+      evidence_reentered: false,
+      terminal_use_allowed: false,
+    });
+    expect(index.assistant_answer).toBe(false);
   });
 
   it("keeps contextual tool mentions as follow-up reasoning, not execution", () => {

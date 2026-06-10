@@ -6,6 +6,7 @@ import {
 } from "@shared/helix-route-product-contract";
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
+import { hasUnknownSourceArtifactDiscoveryIntent } from "./tool-call-admission";
 
 export const CORE_TERMINAL_PRODUCTS = [
   "situation_context_pack",
@@ -238,9 +239,10 @@ export function buildRouteProductContract(input: {
     targetKind === "visual_scene_memory";
   const zenGraphReflectionTarget =
     requestedOutputs.includes("ideology_context_reflection/v1") ||
+    requestedOutputs.includes("procedural_zen_classification/v1") ||
     requestedOutputs.includes("zen_badge_locator/v1") ||
     requestedOutputs.includes("fruition_procedure_expression/v1") ||
-    /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
+    /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|procedural\s+zen|inner[-\s]?practice|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map))\b/i.test(promptText);
 
   if (zenGraphReflectionTarget && sourceTarget === "workstation_panel") {
     return makeContract({
@@ -263,6 +265,7 @@ export function buildRouteProductContract(input: {
       ],
       sideArtifactKindsAllowed: [
         "ideology_context_reflection/v1",
+        "procedural_zen_classification/v1",
         "zen_badge_locator/v1",
         "fruition_procedure_expression/v1",
         "helix_recommended_action_admission/v1",
@@ -280,6 +283,43 @@ export function buildRouteProductContract(input: {
       allowedExtra: ["active_doc_identity", "doc_open_receipt", "doc_location_matches", "doc_evidence_location", "doc_summary", "docs_viewer_receipt", "workspace_action_receipt", "source_binding_status", "source_binding_repair_candidate", "tool_evaluation", "workstation_tool_evaluation", "model_synthesized_answer"],
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
+    });
+  }
+
+  if (sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "unknown",
+      allowedCore: ["doc_location_result", "repo_code_evidence_answer"],
+      allowedExtra: [
+        "source_binding_status",
+        "source_binding_repair_candidate",
+        "tool_evaluation",
+        "workstation_tool_evaluation",
+        "model_synthesized_answer",
+      ],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "scholarly_research_answer",
+        "internet_search_answer",
+        "docs_viewer_receipt",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "client_projection",
+        "panel_generated_answer",
+        "no_tool_direct",
+        "model_only_concept",
+      ],
+      precedenceReason: "unknown_source_discovery_allows_bounded_readonly_evidence_products",
+      sideArtifactKindsAllowed: [
+        "doc_search_results",
+        "doc_candidate_validation",
+        "doc_location_result",
+        "repo_code_evidence_observation",
+        "repo_evidence_synthesis_attempt",
+        "helix.agent_step_observation_packet",
+      ],
     });
   }
 

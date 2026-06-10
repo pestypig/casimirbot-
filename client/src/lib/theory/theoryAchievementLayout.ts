@@ -21,6 +21,8 @@ export type TheoryAchievementLayoutNode = {
   domainKey?: string;
   chunkX?: number;
   chunkY?: number;
+  renderChunkId?: string;
+  semanticChunkId?: string;
   claimPressure?: number;
 };
 

@@ -59,6 +59,8 @@ export function layoutTheoryBiomeMap(graph: TheoryBadgeGraphV1): TheoryBiomeAchi
     domainKey: coordinate.domainKey,
     chunkX: coordinate.chunkX,
     chunkY: coordinate.chunkY,
+    renderChunkId: coordinate.renderChunkId,
+    semanticChunkId: coordinate.semanticChunkId,
     claimPressure: coordinate.claimPressure,
   }));
 

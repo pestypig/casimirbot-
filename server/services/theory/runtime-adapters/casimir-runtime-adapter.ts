@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
 import {
@@ -13,6 +12,7 @@ import type {
   TheoryRuntimeAdapter,
   TheoryRuntimeAdapterInput,
 } from "./theory-runtime-adapter-types";
+import { readJsonArtifactFile, readJsonlArtifactFile } from "./json-artifact-reader";
 
 export const CASIMIR_RUNTIME_ADAPTER_ID = "casimir.artifact_reader" as const;
 export const CASIMIR_LANE_ID = "casimir_cavity_modes" as const;
@@ -38,12 +38,10 @@ export const CASIMIR_SUPPORTED_BADGE_IDS = [
 
 export const CASIMIR_ARTIFACT_PATTERNS = [
   "artifacts/casimir/**/*.json",
+  "artifacts/casimir/**/*.jsonl",
   "artifacts/training-trace.jsonl",
   "artifacts/training-trace*.jsonl",
-  "artifacts/**/*casimir*telemetry*.json",
-  "artifacts/**/telemetry/**/*casimir*.json",
-  "artifacts/**/energy-pipeline/**/*.json",
-  "artifacts/**/*energy*pipeline*.json",
+  "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/*source-closure*-latest.json",
 ] as const;
 
 const SCALAR_KEYS = [
@@ -70,6 +68,9 @@ type ParsedArtifact = {
   data: unknown;
   kind: "json" | "jsonl";
 };
+
+let artifactCache: { projectRoot: string; artifacts: ParsedArtifact[] } | null = null;
+let artifactCachePromise: Promise<ParsedArtifact[]> | null = null;
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
@@ -119,23 +120,30 @@ function gateStatusFromValue(value: unknown): TheoryRuntimeGateStatus {
 
 async function readArtifact(relativePath: string, projectRoot: string): Promise<ParsedArtifact> {
   const absolutePath = path.resolve(projectRoot, relativePath);
-  const raw = await fs.readFile(absolutePath, "utf8");
   if (/\.jsonl$/i.test(relativePath)) {
-    const rows = raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as unknown);
-    return { relativePath: normalizeRelativePath(relativePath), data: rows, kind: "jsonl" };
+    return { relativePath: normalizeRelativePath(relativePath), data: await readJsonlArtifactFile(absolutePath), kind: "jsonl" };
   }
   return {
     relativePath: normalizeRelativePath(relativePath),
-    data: JSON.parse(raw) as unknown,
+    data: await readJsonArtifactFile(absolutePath),
     kind: "json",
   };
 }
 
 async function readArtifacts(projectRoot: string): Promise<ParsedArtifact[]> {
+  if (artifactCache?.projectRoot === projectRoot) return artifactCache.artifacts;
+  if (artifactCachePromise) return artifactCachePromise;
+  artifactCachePromise = readArtifactsUncached(projectRoot);
+  try {
+    const artifacts = await artifactCachePromise;
+    artifactCache = { projectRoot, artifacts };
+    return artifacts;
+  } finally {
+    artifactCachePromise = null;
+  }
+}
+
+async function readArtifactsUncached(projectRoot: string): Promise<ParsedArtifact[]> {
   const paths = await fg([...CASIMIR_ARTIFACT_PATTERNS], {
     cwd: projectRoot,
     onlyFiles: true,

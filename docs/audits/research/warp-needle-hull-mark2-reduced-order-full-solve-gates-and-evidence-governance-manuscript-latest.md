@@ -16,6 +16,8 @@ Separately, the repo maintains a **promotion-readiness** layer that is explicitl
 
 A third layer is the repo’s **external work comparison overlay**, which is explicitly a non-canonical “reference-only” overlay (it does not block or override canonical decisions). fileciteturn54file0L1-L1 fileciteturn56file0L1-L1 In the latest external comparison matrix (2026‑03‑18), 14 works are summarized as **7 compatible, 5 partial, 2 inconclusive, 0 stale**, with “partial/inconclusive” predominantly attributed to `non_comparable_or_unknown` reason codes. fileciteturn61file0L1-L1
 
+Post-June closure-stack update: the current repo now carries a stricter NHM2 diagnostic closure ledger. That ledger adds first-class rows for same-chart full tensor completeness, wall-region source closure, observer-family-scoped energy-condition checks, QEI worldline dossiers, Casimir material receipts, and Natario invariant/stability audits. These rows sharpen falsifiability and claim discipline; they do not retroactively convert the March state-of-record into a physical feasibility, propulsion, safety, or certified transport claim.
+
 ### Key terms defined once
 
 **Canonical-authoritative (canonical):** the highest-precedence internal decision artifacts (e.g., the campaign execution report and its canonical chain), and the tier in which decision labels and gate scoreboards may be stated without being overridden by lower tiers. fileciteturn54file0L1-L1 fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
@@ -74,6 +76,18 @@ The conceptual guide emphasizes a critical separation: **mathematical solve pass
 
 Why this matters: NHM2’s central scientific contribution *in the state-of-record artifacts* is not a new physical claim; it is a **structured, falsifiable governance architecture** that keeps GR baselines, external overlays, hard-constraint gates, and experimental evidence separated and auditable. fileciteturn54file0L1-L1 fileciteturn64file0L1-L1
 
+### Diagnostic closure ledger added after the state-of-record snapshot
+
+The June NHM2 patch adds a stricter diagnostic closure ledger to the framework. The ledger does not replace the canonical March authority chain; it adds explicit missing, proxy, and blocker surfaces that future manuscript language must respect.
+
+The ledger rows are:
+- `nhm2_same_chart_full_tensor/v1`: records component status and provenance for `T00`, `T0i` / momentum density, diagonal spatial stresses, off-diagonal spatial stresses, ADM fields, and chart metadata. Missing components are blockers, not zeros.
+- `nhm2_wall_source_closure/v1`: compares wall-region metric-required `T00` against tile-effective or material-receipted wall `T00`. Wall closure is the front-door source blocker; global residuals are secondary context.
+- `nhm2_observer_robust_energy_conditions/v1`: records which observer families were checked. Eulerian-only checks are restricted-frame diagnostics, not observer-robust proof.
+- `nhm2_qei_worldline_dossier/v1`: records worldline provenance, sampling function, sampled density, bound provenance, tau consistency, and margins. Scalar `qei_margin` alone remains badge replay or proxy evidence.
+- `casimir_material_receipt/v1`: distinguishes ideal perfect-conductor scalar formulas from material-receipted Lifshitz, material, geometry, and environment evidence.
+- `nhm2_natario_invariant_audit/v1`: separates zero-expansion status from Ricci, Weyl, Kretschmann, Petrov, momentum-density, tidal, blueshift, and convergence diagnostics.
+
 ## Current status
 
 This section reports what the **committed state-of-record artifacts** explicitly support, what is partial, and what is blocked—without inferring missing content and without making feasibility claims. fileciteturn56file0L1-L1 fileciteturn64file0L1-L1
@@ -89,6 +103,26 @@ The integrity parity suite supports that integrity parity is presently **PASS** 
 Promotion readiness is partial: the promotion readiness suite explicitly records **final_readiness_verdict: PARTIAL** and `readiness_gate_pass: false`. fileciteturn60file0L1-L1 It also supports that `q_spoiling` and `timing` are `reportable_ready: true` in the readiness view, meaning those lanes are treated as reportable-ready under this suite’s policy. fileciteturn60file0L1-L1
 
 External comparisons are also “partial” in the specific technical sense used by the repo: the external work comparison matrix reports a mixture of compatible/partial/inconclusive results, with partialness dominated by explicit `non_comparable_or_unknown` reason codes. fileciteturn61file0L1-L1 The proof index posture supports that these remain overlays rather than canonical decision overrides. fileciteturn56file0L1-L1
+
+### What the closure-stack patch changes
+
+The closure-stack patch moves several previously implicit or diagonal-heavy NHM2 questions into explicit artifact rows. In the current manuscript, this should be reported as improved diagnostic falsifiability, not as a stronger physics result.
+
+Supported wording:
+- "The repo can now expose whether the same-chart tensor is complete or which components are missing."
+- "Wall-region `T00` closure is the local source-closure front door."
+- "Energy-condition statements must name the observer family under test."
+- "QEI closure requires a worldline dossier; scalar margin replay is not enough."
+- "Casimir source rows must distinguish `ideal_scalar_only` from `material_receipted`."
+- "Natario zero expansion is tracked separately from invariant and stability diagnostics."
+
+Blocked wording:
+- "Missing `T0i` or off-diagonal `Tij` components are zero."
+- "A favorable global source residual overrides wall failure."
+- "Eulerian-frame checks prove observer-robust energy-condition passage."
+- "Scalar `qei_margin` is a final QEI proof."
+- "Ideal Casimir plate math validates the material wall source."
+- "Zero expansion solves safety."
 
 ### What is blocked and why
 
@@ -151,6 +185,8 @@ It is admissible to report that integrity parity tests currently pass (per the i
 
 It is admissible to discuss external-literature lineage **as a referenced overlay** by using the repo’s SRC identifiers (e.g., Core‑4: `SRC-071..SRC-074`; GR tests: `SRC-075..SRC-084`; QI/QEI: `SRC-007`, `SRC-008`, `SRC-051..SRC-056`), because that mapping is explicitly provided in the conceptual guide and citation pack. fileciteturn54file0L1-L1 fileciteturn62file0L1-L1
 
+It is admissible to say that the post-June repo now has stricter diagnostic closure artifacts for NHM2 tensor completeness, wall source closure, observer scope, QEI dossier completeness, Casimir material receipts, and Natario invariant/stability review. That statement must remain diagnostic and artifact-scoped.
+
 ### What cannot be said now
 
 The repo does not authorize a physical feasibility claim in these artifacts. The boundary statement is explicit, and the authoring contract requires an explicit “non-goals” section that includes “no physical-feasibility claim unless strong-claim closure criteria are met,” and disallows canonical override from promoted/exploratory lanes. fileciteturn64file0L1-L1 fileciteturn55file0L1-L1
@@ -161,9 +197,17 @@ Any claim that would require missing artifacts, missing numeric bounds, or missi
 
 Why this matters: claim discipline is the mechanism that keeps NHM2 “physics-literate but safe” by ensuring the narrative cannot outrun the committed evidence. fileciteturn64file0L1-L1 fileciteturn65file0L1-L1
 
+The closure stack adds additional prohibited shortcuts. The manuscript should not say `energy conditions pass` without naming observer scope, should not treat missing tensor components as zero, should not let global residuals override wall-region source failure, should not let scalar `qei_margin` substitute for a worldline dossier, should not treat ideal Casimir formulas as material evidence, and should not treat Natario zero expansion as a safety or invariant certificate.
+
 ## Next-steps closure plan with falsifiers
 
 This plan is presented as **falsifiable closure steps** consistent with the authoring contract’s requirement to include deterministic falsifiers (operator mapping, sampling/normalization, applicability, uncertainty, reproducibility). fileciteturn64file0L1-L1 It is not a feasibility argument. fileciteturn55file0L1-L1
+
+### Complete the NHM2 diagnostic closure stack
+
+The next manuscript-grade NHM2 update should cite the closure-stack artifacts directly and report their statuses before using stronger local-source, observer-robust, QEI-closed, material-source, or Natario-invariant language.
+
+Falsifier: **If** the same-chart full tensor is incomplete, wall source closure is missing/failing, observer checks are Eulerian-only, the QEI worldline dossier lacks wall coverage or tau consistency, Casimir rows remain `ideal_scalar_only`, or the Natario invariant audit is missing, **then** the manuscript must keep the affected claim diagnostic, partial, missing, or blocked rather than promotable.
 
 ### Close the SEM+ellipsometry promotion-readiness blocker
 
