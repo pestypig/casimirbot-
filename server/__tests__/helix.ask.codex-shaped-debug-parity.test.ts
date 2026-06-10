@@ -325,15 +325,25 @@ describe("Helix Ask Codex-shaped debug parity", () => {
       admission_mode: "unknown_source_discovery",
     });
     const validations = artifactPayloads(debug, "runtime_tool_call_validation");
-    expect(validations.some((validation) =>
+    const scholarlyRuntimeRejected = validations.some((validation) =>
       validation.capability_key === "scholarly-research.lookup_papers" &&
       validation.valid === false &&
       validation.errors?.some((error: string) => /runtime_capability_(?:family_forbidden|not_admitted)_by_tool_policy/.test(error))
-    )).toBe(true);
+    );
     const repairs = artifactPayloads(debug, "unknown_source_discovery_continuation_repair");
-    expect(repairs.some((repair) => repair.repaired_to === "docs-viewer.search_docs")).toBe(true);
+    expect(
+      scholarlyRuntimeRejected ||
+      repairs.some((repair) => repair.repaired_to === "workspace-directory.resolve")
+    ).toBe(true);
+    expect(repairs.some((repair) => repair.repaired_to === "workspace-directory.resolve")).toBe(true);
+    expect(repairs.some((repair) => repair.repaired_to === "model.direct_answer")).toBe(true);
+    expect(repairs.some((repair) => repair.repaired_to === "docs-viewer.locate_in_doc")).toBe(false);
+    const workspaceDirectoryResolution = findArtifactPayload(debug, "workspace_directory_resolution");
+    expect(workspaceDirectoryResolution?.selected_doc_path).toBe("docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
+    expect(JSON.stringify(debug)).toContain("workspace://workspace/docs/research/nhm2-current-status-whitepaper-2026-05-02.md");
     const loop = findArtifactPayload(debug, "agent_runtime_loop");
-    expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "workspace-directory.resolve")).toBe(true);
+    expect(loop?.iterations?.some((iteration: any) => iteration.chosen_capability === "docs-viewer.locate_in_doc")).toBe(false);
     expect(loop?.iterations?.filter((iteration: any) => iteration.chosen_capability === "repo-code.search_concept").length ?? 0).toBeLessThanOrEqual(1);
   }, 90000);
 

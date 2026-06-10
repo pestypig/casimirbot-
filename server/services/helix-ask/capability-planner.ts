@@ -19,6 +19,7 @@ import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
   isWorkspaceOsStatusPrompt,
 } from "./workspace-os-status-intent";
+import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "./workspace-directory-resolver";
 
 type RecordLike = Record<string, unknown>;
 
@@ -62,6 +63,13 @@ const classifySourceFamily = (input: {
     isWorkspaceOsStatusPrompt(input.promptText)
   ) {
     return "workspace_diagnostic";
+  }
+  if (
+    input.sourceTarget === "unknown" &&
+    input.admittedFamilies.includes("workspace_directory") &&
+    /\b(?:find|locate|look\s+for|search\s+for|retrieve|get|pull\s+up|open|show|bring\s+up|read)\b/i.test(input.promptText)
+  ) {
+    return "workspace_directory";
   }
   if (/\b(?:why|debug|diagnos|explain)\b/.test(prompt) && /\b(?:set_rate|tool call|last turn|debug export|authority|failure|failed)\b/.test(prompt)) {
     return "debug_export";
@@ -139,6 +147,7 @@ const requestedActionFor = (
     if (/\b(?:set|change|interval|rate|cadence|start|stop)\b/.test(prompt)) return "control_live_source";
     return "inspect_live_source";
   }
+  if (family === "workspace_directory") return HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY;
   if (family === "live_environment") {
     if (sourceTarget === "live_source_mailbox") {
       if (/\b(?:source\s+quality|live\s+source\s+quality|fresh|stale|degraded|cadence|backlog|under\s+pressure)\b/.test(prompt)) {
@@ -193,6 +202,7 @@ const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: st
 
 const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFamilies: string[]): boolean => {
   if (admittedFamilies.length === 0) return true;
+  if (family === "workspace_directory") return admittedFamilies.includes("workspace_directory");
   if (family === "docs") return admittedFamilies.includes("docs_viewer");
   if (family === "workstation_action") {
     return admittedFamilies.includes("workstation_action") ||
@@ -255,6 +265,7 @@ const admissionFor = (input: {
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
     input.family === "workspace_diagnostic" ||
+    input.family === "workspace_directory" ||
     input.family === "live_environment" ||
     input.family === "scholarly_research" ||
     input.family === "internet_search" ||

@@ -2,6 +2,7 @@ export const HELIX_CAPABILITY_PLAN_SCHEMA = "helix.capability_plan.v1" as const;
 
 export type HelixCapabilityFamily =
   | "docs"
+  | "workspace_directory"
   | "workstation_action"
   | "live_source"
   | "live_environment"

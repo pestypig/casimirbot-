@@ -8608,6 +8608,7 @@ type StagePlayLiveSourceMailStateResponse = {
   watchJobPolicies?: unknown[];
   interpreterProfiles?: unknown[];
   processedMailPackets?: unknown[];
+  microReasonerRuns?: unknown[];
   decisions?: unknown[];
   wakeRequests?: unknown[];
   wakeResults?: unknown[];
@@ -9024,6 +9025,39 @@ const readHelixSteeringCreatedAtMs = (record: Record<string, unknown> | null | u
   return fallback;
 };
 
+const readHelixQueueRecordArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[]
+    : [];
+
+const intersectsHelixQueueRefs = (left: unknown, right: unknown): boolean => {
+  const leftRefs = new Set(readHelixSteeringQueueRefs(left));
+  if (leftRefs.size === 0) return false;
+  return readHelixSteeringQueueRefs(right).some((ref) => leftRefs.has(ref));
+};
+
+const statusForHelixProcessedFinding = (input: {
+  packet: Record<string, unknown>;
+  wakeRequests: Record<string, unknown>[];
+  decisions: Record<string, unknown>[];
+}): HelixAskSteeringQueueStatus => {
+  const packetMailIds = readHelixSteeringQueueRefs(input.packet.mailIds, input.packet.mail_ids);
+  const matchingWake = input.wakeRequests
+    .filter((wake) => intersectsHelixQueueRefs(packetMailIds, wake.mailIds))
+    .at(-1) ?? null;
+  const wakeStatus = coerceText(matchingWake?.status).trim();
+  if (wakeStatus === "running") return "running";
+  if (wakeStatus === "queued" || wakeStatus === "failed_retryable") return "queued";
+  if (wakeStatus === "deferred_for_pressure") return "deferred";
+  if (wakeStatus === "completed") return "completed";
+  const matchingDecision = input.decisions
+    .filter((decision) => intersectsHelixQueueRefs(packetMailIds, decision.mailIds))
+    .at(-1) ?? null;
+  if (matchingDecision) return "completed";
+  const recommendedNext = coerceText(input.packet.recommendedNext ?? input.packet.recommended_next).trim();
+  return recommendedNext && recommendedNext !== "wait_for_next_summary" ? "next" : "held";
+};
+
 const toneForHelixSteeringQueueStatus = (status: HelixAskSteeringQueueStatus): HelixAskSteeringQueueTone => {
   if (status === "running" || status === "next") return "cyan";
   if (status === "queued" || status === "held" || status === "deferred") return "amber";
@@ -9098,7 +9132,7 @@ function buildHelixSteeringQueueMailboxItems(
 ): HelixAskSteeringQueueItem[] {
   if (!mailbox || mailbox.ok === false) return [];
   const items: HelixAskSteeringQueueItem[] = [];
-  const mailItems = (mailbox.mailItems ?? []).map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[];
+  const mailItems = readHelixQueueRecordArray(mailbox.mailItems);
   const unread = mailItems.filter((mail) => coerceText(mail.status).trim() === "unread");
   if (unread.length > 0) {
     const latestUnread = unread.at(-1) ?? null;
@@ -9106,17 +9140,73 @@ function buildHelixSteeringQueueMailboxItems(
     const preview = coerceText(summary?.preview ?? summary?.text).trim();
     items.push({
       key: `mailbox:unread:${unread.map((mail) => coerceText(mail.mailId)).join(":")}`,
-      label: "Unread mail waiting",
-      detail: preview ? `${unread.length} unread | ${clipText(preview, 170)}` : `${unread.length} unread live-source mail item${unread.length === 1 ? "" : "s"}.`,
-      meta: `mailbox ${mailbox.mailboxThreadId ?? HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID}`,
-      status: "queued",
+      label: "Observer backlog",
+      detail: preview
+        ? `${unread.length} raw visual summary${unread.length === 1 ? "" : " summaries"} awaiting micro-reasoner processing | ${clipText(preview, 150)}`
+        : `${unread.length} raw live-source mail item${unread.length === 1 ? "" : "s"} awaiting micro-reasoner processing.`,
+      meta: `not Ask-ready | mailbox ${mailbox.mailboxThreadId ?? HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID}`,
+      status: "held",
       tone: "amber",
       evidenceRefs: readHelixSteeringQueueRefs(unread.map((mail) => mail.mailId), unread.flatMap((mail) => Array.isArray(mail.evidenceRefs) ? mail.evidenceRefs : [])),
       createdAtMs: readHelixSteeringCreatedAtMs(latestUnread, fallbackCreatedAtMs),
     });
   }
 
-  const wakeRequests = (mailbox.wakeRequests ?? []).map(readAgentLoopAuditRecord).filter(Boolean) as Record<string, unknown>[];
+  const wakeRequests = readHelixQueueRecordArray(mailbox.wakeRequests);
+  const decisions = readHelixQueueRecordArray(mailbox.decisions);
+  const processedPackets = readHelixQueueRecordArray(mailbox.processedMailPackets);
+  processedPackets.slice(-4).forEach((packet, index) => {
+    const recommendedNext = coerceText(packet.recommendedNext ?? packet.recommended_next).trim();
+    const salience = readAgentLoopAuditRecord(packet.salience);
+    const salienceLevel = coerceText(salience?.level).trim();
+    const voiceCandidate = salience?.voiceCandidate === true || salience?.voice_candidate === true;
+    const packetId = coerceText(packet.packetId ?? packet.packet_id).trim();
+    const status = statusForHelixProcessedFinding({ packet, wakeRequests, decisions });
+    if (status === "held" && recommendedNext === "wait_for_next_summary") return;
+    const changedFacts = readHelixSteeringQueueRefs(packet.changedFacts, packet.changed_facts);
+    const riskMatches = readHelixSteeringQueueRefs(packet.riskMatches, packet.risk_matches);
+    items.push({
+      key: `processed-finding:${packetId || index}:${recommendedNext}:${status}`,
+      label: status === "completed" ? "Processed finding handled" : "Micro-reasoner finding",
+      detail: [
+        recommendedNext ? `recommended ${recommendedNext}` : "recommendation pending",
+        salienceLevel ? `salience ${salienceLevel}${voiceCandidate ? " voice candidate" : ""}` : null,
+        changedFacts.length > 0 ? `changed: ${clipText(changedFacts.slice(0, 2).join("; "), 150)}` : null,
+        riskMatches.length > 0 ? `risk: ${clipText(riskMatches.slice(0, 2).join("; "), 120)}` : null,
+      ].filter(Boolean).join(" | "),
+      meta: packetId || "processed mail packet",
+      status,
+      tone: toneForHelixSteeringQueueStatus(status),
+      evidenceRefs: readHelixSteeringQueueRefs(packetId, packet.mailIds, packet.evidenceRefs, packet.microReasonerRunRefs),
+      createdAtMs: readHelixSteeringCreatedAtMs(packet, fallbackCreatedAtMs + 5 + index),
+    });
+  });
+
+  const microReasonerRuns = readHelixQueueRecordArray(mailbox.microReasonerRuns);
+  const latestDecisionRun = microReasonerRuns
+    .filter((run) => coerceText(run.role).trim() === "decision_selector")
+    .at(-1) ?? null;
+  if (latestDecisionRun && processedPackets.length === 0) {
+    const selectedDecision = coerceText(latestDecisionRun.selectedDecision ?? latestDecisionRun.selected_decision).trim();
+    const nextTool = coerceText(latestDecisionRun.recommendedNextTool ?? latestDecisionRun.recommended_next_tool).trim();
+    const status: HelixAskSteeringQueueStatus =
+      selectedDecision && selectedDecision !== "wait_for_next_summary" ? "next" : "held";
+    items.push({
+      key: `micro-decision:${coerceText(latestDecisionRun.runId).trim()}:${selectedDecision}`,
+      label: "Micro-reasoner decision",
+      detail: [
+        selectedDecision ? `selected ${selectedDecision}` : "decision pending",
+        nextTool ? `next tool ${nextTool}` : null,
+        coerceText(latestDecisionRun.outputPreview).trim() || null,
+      ].filter(Boolean).join(" | "),
+      meta: coerceText(latestDecisionRun.runId).trim() || "decision_selector",
+      status,
+      tone: toneForHelixSteeringQueueStatus(status),
+      evidenceRefs: readHelixSteeringQueueRefs(latestDecisionRun.runId, latestDecisionRun.inputRefs, latestDecisionRun.outputRefs),
+      createdAtMs: readHelixSteeringCreatedAtMs(latestDecisionRun, fallbackCreatedAtMs + 7),
+    });
+  }
+
   wakeRequests.slice(-5).forEach((wake, index) => {
     const rawStatus = coerceText(wake.status).trim();
     const status: HelixAskSteeringQueueStatus =
@@ -9133,10 +9223,11 @@ function buildHelixSteeringQueueMailboxItems(
     const mailIds = Array.isArray(wake.mailIds) ? wake.mailIds : [];
     items.push({
       key: `wake:${coerceText(wake.wakeRequestId).trim() || index}:${rawStatus}`,
-      label: status === "deferred" ? "Wake deferred" : status === "running" ? "Wake running" : status === "queued" ? "Wake queued" : "Wake completed",
+      label: status === "deferred" ? "Ask wake deferred" : status === "running" ? "Ask wake running" : status === "queued" ? "Ask wake queued" : "Ask wake completed",
       detail: [
-        mailIds.length > 0 ? `${mailIds.length} mail item${mailIds.length === 1 ? "" : "s"}` : null,
+        mailIds.length > 0 ? `${mailIds.length} processed finding input${mailIds.length === 1 ? "" : "s"}` : null,
         coerceText(wake.failureReason ?? wake.reason).trim() || null,
+        coerceText(wake.askTurnId).trim() ? `ask ${coerceText(wake.askTurnId).trim()}` : null,
       ].filter(Boolean).join(" | ") || "Backend wake queue item.",
       meta: coerceText(wake.wakeRequestId).trim() || "wake request",
       status,

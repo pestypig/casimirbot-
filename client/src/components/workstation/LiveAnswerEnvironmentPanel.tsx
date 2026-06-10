@@ -5,6 +5,8 @@ import {
   useLiveAnswerEnvironmentStore,
   type LiveAnswerEnvironmentState,
 } from "@/store/useLiveAnswerEnvironmentStore";
+import { useDocEquationContextStore } from "@/store/useDocEquationContextStore";
+import type { DocEquationContextArtifactV1 } from "@shared/contracts/doc-equation-context.v1";
 import type { WorkstationLiveSource, WorkstationLiveSourceEvent, LiveSourceWindowSummary } from "@shared/helix-workstation-live-source";
 import type { LiveAnswerEnvironmentDelta, LiveAnswerLineState } from "@shared/helix-live-answer-environment";
 import type {
@@ -392,6 +394,12 @@ const sourceCoverageSummary = (coverage?: HelixLiveCardLineSourceCoverage): stri
   return entries;
 };
 
+const docEquationScopeLabel = (artifact: DocEquationContextArtifactV1): string => {
+  if (artifact.commentaryHints.scope === "scalar_replay") return "Scalar replay";
+  if (artifact.commentaryHints.scope === "runtime_artifact") return "Runtime artifact";
+  return "Theory orientation";
+};
+
 const liveLineText = (lines: LiveAnswerLineState[], key: string): string =>
   String(lines.find((line: LiveAnswerLineState) => line.key === key)?.value ?? "").trim().toLowerCase();
 
@@ -495,6 +503,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const latestReadResponse = useLiveAnswerEnvironmentStore(
     (state: LiveAnswerEnvironmentState) => state.latestReadByThread[threadId] ?? null,
   );
+  const latestDocEquationContext = useDocEquationContextStore((state) => state.latestContext);
   const sourceDescriptors = Array.isArray(latestReadResponse?.source_descriptors)
     ? latestReadResponse.source_descriptors
     : [];
@@ -1249,6 +1258,42 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
           {lastActionStatus}
         </p>
+      ) : null}
+      {latestDocEquationContext ? (
+        <div
+          className="mt-2 rounded border border-cyan-300/20 bg-cyan-950/15 p-2"
+          data-testid="live-answer-doc-equation-context"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+              Doc Equation Context
+            </p>
+            <span className="rounded border border-cyan-300/25 px-2 py-0.5 text-[10px] text-cyan-100">
+              {docEquationScopeLabel(latestDocEquationContext)}
+            </span>
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-100">{latestDocEquationContext.equationLabel}</p>
+          <p className="mt-1 truncate text-[11px] text-slate-300">
+            {latestDocEquationContext.docPath}
+            {latestDocEquationContext.sectionAnchor ? `#${latestDocEquationContext.sectionAnchor}` : ""}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="rounded border border-white/10 px-2 py-1 text-[10px] text-slate-300">
+              badge {latestDocEquationContext.preferredBadgeId ?? latestDocEquationContext.badgeIds[0] ?? "none"}
+            </span>
+            <span className="rounded border border-white/10 px-2 py-1 text-[10px] text-slate-300">
+              action {latestDocEquationContext.actionKind}
+            </span>
+            <span className="rounded border border-white/10 px-2 py-1 text-[10px] text-slate-300">
+              observation only
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-slate-400">
+            {latestDocEquationContext.actionClaimBoundaryNote ??
+              latestDocEquationContext.claimBoundaryNotes[0] ??
+              "Diagnostic context only."}
+          </p>
+        </div>
       ) : null}
       <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

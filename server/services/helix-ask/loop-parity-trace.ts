@@ -81,6 +81,7 @@ const inferToolFamily = (toolId: string): string => {
   if (/^live_env\./i.test(toolId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
+  if (/workspace[-_.]?directory/i.test(toolId)) return "workspace_directory";
   if (/situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding)/i.test(toolId)) return "situation_run";
   if (/^docs-viewer\.|doc[_-]?viewer|docs_viewer/i.test(toolId)) return "docs_viewer";
   if (/calculator/i.test(toolId)) return "calculator";

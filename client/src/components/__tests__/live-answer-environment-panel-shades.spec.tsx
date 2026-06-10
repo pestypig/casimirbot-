@@ -9,6 +9,15 @@ const panelSource = () =>
   );
 
 describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
+  it("surfaces doc equation context as observation-only context", () => {
+    const source = panelSource();
+
+    expect(source).toContain('data-testid="live-answer-doc-equation-context"');
+    expect(source).toContain("Doc Equation Context");
+    expect(source).toContain("observation only");
+    expect(source).toContain("docEquationScopeLabel");
+  });
+
   it("exposes explicit apply controls in the visual capture panel", () => {
     const source = panelSource();
 

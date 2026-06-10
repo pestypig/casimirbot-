@@ -24,4 +24,15 @@ describe("HelixAskPill steering queue collapse", () => {
     expect(source).not.toContain(">Steering Queue<");
     expect(source).not.toContain("Next up at top. Completed steering remains below in chronological order.");
   });
+
+  it("separates raw observer backlog from Ask-ready micro-reasoner findings", () => {
+    const source = helixAskPillSource();
+
+    expect(source).not.toContain('label: "Unread mail waiting"');
+    expect(source).toContain('label: "Observer backlog"');
+    expect(source).toContain("not Ask-ready");
+    expect(source).toContain('label: status === "completed" ? "Processed finding handled" : "Micro-reasoner finding"');
+    expect(source).toContain('statusForHelixProcessedFinding');
+    expect(source).toContain('label: status === "deferred" ? "Ask wake deferred"');
+  });
 });

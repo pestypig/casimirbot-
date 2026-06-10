@@ -34,6 +34,7 @@ const HARD_SOURCE_TARGETS = new Set([
   "runtime_evidence",
   "workspace_diagnostic",
   "docs_viewer",
+  "workspace_directory",
   "active_doc",
   "process_graph",
   "live_pipeline",
@@ -207,7 +208,7 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "internet_search_requires_external_web_evidence_path";
   } else if (sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText)) {
     required = true;
-    admittedToolFamilies = ["docs_viewer", "repo_code", "runtime_evidence"];
+    admittedToolFamilies = ["workspace_directory", "docs_viewer", "repo_code", "runtime_evidence"];
     extraForbiddenTerminalKinds = [
       "direct_answer_text",
       "situation_context_pack",
@@ -235,7 +236,7 @@ export function buildToolCallAdmissionDecision(input: {
     admissionMode = "unknown_source_discovery";
     discoveryPolicy = {
       state: "bounded_readonly",
-      first_pass_tool_families: ["docs_viewer", "repo_code", "runtime_evidence"],
+      first_pass_tool_families: ["workspace_directory", "docs_viewer", "repo_code", "runtime_evidence"],
       forbidden_external_tool_families: ["scholarly_research", "internet_search"],
       on_not_found: "ask_or_explain_searched_scope",
     };

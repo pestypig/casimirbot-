@@ -4,7 +4,12 @@ import {
   type DocEquationActionManifestV1,
   type DocEquationActionV1,
 } from "@shared/contracts/doc-equation-action-manifest.v1";
+import type {
+  DocEquationContextArtifactV1,
+  DocEquationContextScopeV1,
+} from "@shared/contracts/doc-equation-context.v1";
 import { isTheoryCompoundRunV1, type TheoryCompoundRunV1 } from "@shared/contracts/theory-compound-run.v1";
+import { emitDocEquationContextArtifact } from "@/lib/docs/docEquationContextEvents";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
@@ -33,7 +38,27 @@ export type ExecuteDocEquationActionArgs = {
   actionId: string;
   latex: string;
   fetchImpl?: typeof fetch;
+  emitContextArtifact?: (artifact: DocEquationContextArtifactV1) => void;
 };
+
+const NHM2_DIAGNOSTIC_PROHIBITED_CLAIMS = [
+  "validated",
+  "viable",
+  "certified transport",
+  "NHM2 proves viability",
+  "energy conditions pass",
+  "Casimir source proven",
+] as const;
+
+const RUNTIME_ARTIFACT_BADGE_IDS = new Set([
+  "nhm2.tensor.same_chart_full_tensor",
+  "nhm2.closure.wall_t00_source_residual",
+  "nhm2.energy_condition.observer_robust_gate",
+  "nhm2.qei.worldline_dossier",
+  "casimir.material.lifshitz_receipt",
+  "casimir.geometry.beyond_pfa_validity",
+  "nhm2.natario.invariant_audit",
+]);
 
 export function getDocEquationActionManifest(docPath?: string | null): DocEquationActionManifestV1 | null {
   if (!docPath) return null;
@@ -66,12 +91,21 @@ export async function executeDocEquationAction(args: ExecuteDocEquationActionArg
   if (!entry || !action) return;
 
   if (action.kind === "calculator_ingest") {
+    const openedPanels = action.openPanels ?? ["scientific-calculator"];
     dispatchScientificCalculatorMathPicked({
       latex: args.latex,
       sourcePath: args.currentPath ?? null,
       anchor: args.anchor ?? entry.equationId,
     });
-    openDocEquationPanels(action.openPanels ?? ["scientific-calculator"]);
+    openDocEquationPanels(openedPanels);
+    emitActionContext({
+      currentPath: args.currentPath,
+      latex: args.latex,
+      entry,
+      action,
+      openedPanels,
+      emitContextArtifact: args.emitContextArtifact,
+    });
     return;
   }
 
@@ -83,8 +117,17 @@ export async function executeDocEquationAction(args: ExecuteDocEquationActionArg
     });
   }
 
-  openDocEquationPanels(action.openPanels ?? ["theory-badge-graph", "scientific-calculator"]);
+  const openedPanels = action.openPanels ?? ["theory-badge-graph", "scientific-calculator"];
+  openDocEquationPanels(openedPanels);
   applyTheoryGraphOrientation(action);
+  emitActionContext({
+    currentPath: args.currentPath,
+    latex: args.latex,
+    entry,
+    action,
+    openedPanels,
+    emitContextArtifact: args.emitContextArtifact,
+  });
 
   const badgeIds = action.badgeIds ?? [];
   if (badgeIds.length === 0) return;
@@ -101,6 +144,106 @@ export async function executeDocEquationAction(args: ExecuteDocEquationActionArg
     preferredBadgeId: action.preferredBadgeId,
     fetchImpl: args.fetchImpl ?? fetch,
   });
+}
+
+export function buildDocEquationContextArtifact(args: {
+  currentPath?: string | null;
+  latex: string;
+  entry: DocEquationActionEntryV1;
+  action: DocEquationActionV1;
+  openedPanels: string[];
+  generatedAt?: string;
+}): DocEquationContextArtifactV1 {
+  const badgeIds = args.action.badgeIds?.length
+    ? args.action.badgeIds
+    : args.action.calculatorPayloadRef
+      ? [args.action.calculatorPayloadRef.badgeId]
+      : [];
+  const scope = classifyActionScope(args.action);
+  return {
+    contractVersion: "doc_equation_context/v1",
+    generatedAt: args.generatedAt ?? new Date().toISOString(),
+    docPath: normalizeDocPath(args.currentPath ?? "docs/unknown.md"),
+    equationId: args.entry.equationId,
+    equationLabel: args.entry.label,
+    ...(args.entry.sectionAnchor ? { sectionAnchor: args.entry.sectionAnchor } : {}),
+    latex: args.latex.trim() || args.entry.latex,
+    actionId: args.action.actionId,
+    actionKind: args.action.kind,
+    badgeIds,
+    ...(args.action.preferredBadgeId ? { preferredBadgeId: args.action.preferredBadgeId } : {}),
+    ...(args.action.calculatorPayloadRef ? { calculatorPayloadRef: args.action.calculatorPayloadRef } : {}),
+    ...(args.action.atlasLensId ? { atlasLensId: args.action.atlasLensId } : {}),
+    ...(args.action.atlasGroupId ? { atlasGroupId: args.action.atlasGroupId } : {}),
+    openedPanels: Array.from(new Set(args.openedPanels.filter(Boolean))),
+    claimBoundaryNotes: [...args.entry.claimBoundaryNotes],
+    ...(args.action.claimBoundaryNote ? { actionClaimBoundaryNote: args.action.claimBoundaryNote } : {}),
+    commentaryHints: {
+      summary: buildContextSummary(args.entry, args.action, scope),
+      scope,
+      prohibitedClaims: [...NHM2_DIAGNOSTIC_PROHIBITED_CLAIMS],
+      suggestedExplanationFocus: buildSuggestedExplanationFocus(args.entry, args.action, scope),
+    },
+  };
+}
+
+function emitActionContext(args: {
+  currentPath?: string | null;
+  latex: string;
+  entry: DocEquationActionEntryV1;
+  action: DocEquationActionV1;
+  openedPanels: string[];
+  emitContextArtifact?: (artifact: DocEquationContextArtifactV1) => void;
+}): void {
+  const artifact = buildDocEquationContextArtifact(args);
+  if (args.emitContextArtifact) {
+    args.emitContextArtifact(artifact);
+    return;
+  }
+  emitDocEquationContextArtifact(artifact);
+}
+
+function classifyActionScope(action: DocEquationActionV1): DocEquationContextScopeV1 {
+  if (action.kind === "calculator_ingest") return "scalar_replay";
+  const ids = [action.preferredBadgeId, ...(action.badgeIds ?? [])].filter((id): id is string => Boolean(id));
+  return ids.some((id) => RUNTIME_ARTIFACT_BADGE_IDS.has(id)) ? "runtime_artifact" : "theory_orientation";
+}
+
+function buildContextSummary(
+  entry: DocEquationActionEntryV1,
+  action: DocEquationActionV1,
+  scope: DocEquationContextScopeV1,
+): string {
+  const target = action.preferredBadgeId ?? action.calculatorPayloadRef?.badgeId ?? action.badgeIds?.[0] ?? "theory graph";
+  if (scope === "scalar_replay") {
+    return `${entry.label} loads a scalar calculator replay for ${target}; it is not a final proof surface.`;
+  }
+  if (scope === "runtime_artifact") {
+    return `${entry.label} opens runtime evidence for ${target}; artifact status and blockers remain authoritative.`;
+  }
+  return `${entry.label} orients the theory graph around ${target}; this is context, not validation.`;
+}
+
+function buildSuggestedExplanationFocus(
+  entry: DocEquationActionEntryV1,
+  action: DocEquationActionV1,
+  scope: DocEquationContextScopeV1,
+): string[] {
+  const focus = new Set<string>();
+  if (scope === "scalar_replay") {
+    focus.add("scalar calculator replay");
+    focus.add("limits of badge replay");
+  } else if (scope === "runtime_artifact") {
+    focus.add("runtime artifact status");
+    focus.add("missing or proxy blockers");
+  } else {
+    focus.add("theory graph orientation");
+    focus.add("first-principles context");
+  }
+  if (action.preferredBadgeId) focus.add(`preferred badge ${action.preferredBadgeId}`);
+  for (const note of entry.claimBoundaryNotes.slice(0, 2)) focus.add(note);
+  if (action.claimBoundaryNote) focus.add(action.claimBoundaryNote);
+  return Array.from(focus);
 }
 
 export function normalizeLatexForDocAction(value: string): string {

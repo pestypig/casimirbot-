@@ -72,6 +72,8 @@ const DOC_MARKED_OPTIONS: MarkedOptions & { mangle?: boolean; headerIds?: boolea
   mangle: false,
 };
 
+let activeMarkedDocPath: string | null = null;
+
 marked.setOptions(DOC_MARKED_OPTIONS);
 marked.use({
   extensions: [
@@ -105,7 +107,7 @@ marked.use({
         return undefined;
       },
       renderer(token: { text?: string }) {
-        return renderDocMath(token.text ?? "", true);
+        return renderDocMath(token.text ?? "", true, activeMarkedDocPath);
       },
     },
     {
@@ -124,7 +126,7 @@ marked.use({
         };
       },
       renderer(token: { text?: string }) {
-        return renderDocMath(token.text ?? "", false);
+        return renderDocMath(token.text ?? "", false, activeMarkedDocPath);
       },
     },
   ],
@@ -232,7 +234,13 @@ export function DocViewerPanel() {
       .then((raw) => {
         if (canceled) return;
         setRawMarkdown(raw);
-        const rendered = marked.parse(renderMathMarkdown(raw, currentEntry.relativePath));
+        let rendered: string | Promise<string>;
+        try {
+          activeMarkedDocPath = currentEntry.relativePath;
+          rendered = marked.parse(renderMathMarkdown(raw, currentEntry.relativePath));
+        } finally {
+          activeMarkedDocPath = null;
+        }
         const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
         setHtml(renderMathInRenderedHtml(renderedHtml, currentEntry.relativePath));
         setLoadedDocId(currentEntry.id);

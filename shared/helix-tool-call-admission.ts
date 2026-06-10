@@ -6,6 +6,7 @@ export type HelixToolCallAdmissionFamily =
   | "procedure_memory"
   | "visual_scene_memory"
   | "docs_viewer"
+  | "workspace_directory"
   | "repo_code"
   | "scholarly_research"
   | "internet_search"

@@ -314,6 +314,7 @@ export function buildRouteProductContract(input: {
       precedenceReason: "unknown_source_discovery_allows_bounded_readonly_evidence_products",
       sideArtifactKindsAllowed: [
         "doc_search_results",
+        "workspace_directory_resolution",
         "doc_candidate_validation",
         "doc_location_result",
         "repo_code_evidence_observation",

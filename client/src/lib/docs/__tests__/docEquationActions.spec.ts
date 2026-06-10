@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildDocEquationContextArtifact,
   executeDocEquationAction,
   getDocEquationActionEntryForLatex,
   getDocEquationTheoryActions,
@@ -54,5 +55,58 @@ describe("doc equation actions", () => {
       "/api/helix/theory/compound-run",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("emits same-chart full tensor as runtime artifact context without calculator payload overreach", async () => {
+    const contexts: Parameters<NonNullable<Parameters<typeof executeDocEquationAction>[0]["emitContextArtifact"]>>[0][] = [];
+
+    await executeDocEquationAction({
+      currentPath: NHM2_WHITEPAPER,
+      actionId: "open-same-chart-full-tensor-artifact",
+      latex: "\\mathcal{T}^{\\rm same-chart}_{\\rm full}=\\{T_{00},T_{0i},T_{ii},T_{ij,\\ i\\ne j}\\}",
+      fetchImpl: vi.fn(async () => ({ ok: false }) as Response),
+      emitContextArtifact: (artifact) => contexts.push(artifact),
+    });
+
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]).toMatchObject({
+      contractVersion: "doc_equation_context/v1",
+      equationId: "nhm2-same-chart-full-tensor-ledger",
+      actionId: "open-same-chart-full-tensor-artifact",
+      actionKind: "artifact_backed_theory_run",
+      preferredBadgeId: "nhm2.tensor.same_chart_full_tensor",
+      commentaryHints: {
+        scope: "runtime_artifact",
+      },
+    });
+    expect(contexts[0]?.calculatorPayloadRef).toBeUndefined();
+    expect(contexts[0]?.commentaryHints.prohibitedClaims).toEqual(
+      expect.arrayContaining(["validated", "viable", "certified transport"]),
+    );
+  });
+
+  it("emits wall residual calculator action as scalar replay context", async () => {
+    const contexts: ReturnType<typeof buildDocEquationContextArtifact>[] = [];
+
+    await executeDocEquationAction({
+      currentPath: NHM2_WHITEPAPER,
+      actionId: "load-wall-t00-source-residual-calculator",
+      latex: "R_{{\\rm wall},T00}=T00_{{\\rm wall},{\\rm required}}-T00_{{\\rm wall},{\\rm available}}.",
+      emitContextArtifact: (artifact) => contexts.push(artifact),
+    });
+
+    expect(contexts).toHaveLength(1);
+    expect(contexts[0]).toMatchObject({
+      equationId: "nhm2-wall-t00-source-residual",
+      actionKind: "calculator_ingest",
+      calculatorPayloadRef: {
+        badgeId: "nhm2.closure.wall_t00_source_residual",
+        payloadId: "wall_t00_source_residual_payload",
+      },
+      commentaryHints: {
+        scope: "scalar_replay",
+      },
+    });
+    expect(contexts[0]?.openedPanels).toEqual(["scientific-calculator"]);
   });
 });

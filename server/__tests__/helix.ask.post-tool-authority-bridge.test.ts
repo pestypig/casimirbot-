@@ -185,6 +185,11 @@ describe("Helix Ask post-tool authority bridge", () => {
       terminal_error_code: "terminal_boundary_ineligible",
       canonical_goal_frame: { goal_kind: "live_source_processed_mail_interpretation" },
       source_target_intent: { target_source: "live_source_mailbox" },
+      phase_controller_trajectory: {
+        current_phase: "terminal_checkpoint",
+        canonical_goal: "processed_mail_voice_decision",
+        mandatory_next_tool: null,
+      },
       goal_satisfaction_evaluation: {
         schema: "helix.goal_satisfaction_evaluation.v1",
         satisfaction: "partially_satisfied",
@@ -200,10 +205,10 @@ describe("Helix Ask post-tool authority bridge", () => {
             tool_name: "live_env.read_processed_live_source_mail",
             observation: {
               packets: [{
-                artifactId: "stage_play_processed_mail_packet",
                 packetId: "stage_play_processed_mail_packet:synthetic-urgent",
                 observedFacts: ["Synthetic source shows a high-salience hazard cue."],
                 changedFacts: ["The source moved from stable to hazardous state."],
+                riskCues: ["fire", "damage"],
                 recommendedNext: "request_voice_callout",
                 salience: {
                   level: "urgent",
@@ -224,6 +229,18 @@ describe("Helix Ask post-tool authority bridge", () => {
               artifactId: "stage_play_live_source_mail_decision",
               schemaVersion: "stage_play_live_source_mail_decision/v1",
               decision: "request_voice_callout",
+              rationalePreview: "Processed mail packet salience urgent recommends request_voice_callout.",
+              voiceCalloutDraft: {
+                text: "risk/voice criteria matched: fire, damage",
+                voiceEligible: true,
+                requiresConfirmation: false,
+              },
+              voicePolicy: {
+                reason: "minecraft_fire_or_damage_cue,minecraft_visible_danger_cue",
+              },
+              requestedTool: {
+                toolName: "live_env.request_interim_voice_callout",
+              },
             },
           },
         },
@@ -252,11 +269,122 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect(bridge.reason).toBe("live_source_mailbox_receipts_support_synthesized_answer");
     expect(bridge.observation_support_status).toBe("supports_answer");
     expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
-    expect(String(payload.selected_final_answer)).toMatch(/live-source mailbox path completed/i);
+    expect(String(payload.selected_final_answer)).toMatch(/live-source mailbox route completed/i);
     expect(String(payload.selected_final_answer)).toMatch(/request_voice_callout/i);
+    expect(String(payload.selected_final_answer)).toMatch(/fire, damage/i);
+    expect(String(payload.selected_final_answer)).toMatch(/awaiting_client_playback/i);
     expect(String(payload.selected_final_answer)).not.toMatch(/doc_summary/i);
+    expect(payload.post_tool_authority_bridge).toMatchObject({
+      route_family: "live_source_mailbox",
+      observation_support_status: "supports_answer",
+    });
+    expect(payload.terminal_authority_single_writer).toMatchObject({
+      selectedArtifactKind: "model_synthesized_answer",
+      selected_terminal_artifact_kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      audit: {
+        selectedArtifactKind: "model_synthesized_answer",
+        wroteVisibleFields: expect.arrayContaining([
+          "payload.text",
+          "payload.answer",
+          "payload.selected_final_answer",
+          "terminal_presentation.concise_text",
+        ]),
+      },
+    });
     expect(payload.terminal_error_code).toBeUndefined();
     expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
+  });
+
+  it("keeps mailbox route precedence over generic voice delivery when a completed mailbox voice receipt exists", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Read the processed Minecraft mailbox and handle the urgent voice callout.",
+      selected_final_answer:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      answer:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      text:
+        "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.",
+      },
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      source_target_intent: { target_source: "live_source_mailbox" },
+      evidence_target_arbitration: { selected_target_source: "live_source_mailbox" },
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      phase_controller_trajectory: {
+        current_phase: "terminal_checkpoint",
+        canonical_goal: "processed_mail_voice_decision",
+        mandatory_next_tool: null,
+      },
+      agent_step_decision: { chosen_capability: "live_env.request_interim_voice_callout" },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:packet`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.read_processed_live_source_mail",
+            observation: {
+              packets: [{
+                packetId: "stage_play_processed_mail_packet:real-shape",
+                changedFacts: ["Synthetic player entered a high-risk state."],
+                riskCues: ["fire", "damage"],
+                recommendedNext: "request_voice_callout",
+                salience: { level: "urgent", voiceCandidate: true },
+              }],
+            },
+          },
+        },
+        {
+          artifact_id: `${turnId}:decision`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.record_live_source_mail_decision",
+            observation: {
+              artifactId: "stage_play_live_source_mail_decision",
+              decision: "request_voice_callout",
+              voiceCalloutDraft: { text: "risk/voice criteria matched: fire, damage" },
+            },
+          },
+        },
+        {
+          artifact_id: `${turnId}:voice`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.request_interim_voice_callout",
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              receipt: { status: "awaiting_client_playback", assistant_answer: false, raw_content_included: false },
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
+    expect(bridge.route_family).toBe("live_source_mailbox");
+    expect(bridge.reason).toBe("live_source_mailbox_receipts_support_synthesized_answer");
+    expect(String(payload.selected_final_answer)).toMatch(/read processed mailbox packets/i);
+    expect(String(payload.selected_final_answer)).toMatch(/recorded decision was request_voice_callout/i);
+    expect(String(payload.selected_final_answer)).not.toBe("The interim voice callout was accepted for client playback handoff; browser playback confirmation is still pending.");
+    expect(payload.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "model_synthesized_answer",
+      concise_text: expect.stringMatching(/live-source mailbox route completed/i),
+    });
   });
 
   it("catches visible policy inversion about receipts and final answers", () => {

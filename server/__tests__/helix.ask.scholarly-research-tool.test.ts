@@ -217,7 +217,7 @@ describe("Helix scholarly research tool admission", () => {
       reason: "unknown_source_artifact_request_requires_bounded_readonly_discovery",
     });
     expect(admission.admitted_tool_families).toEqual(
-      expect.arrayContaining(["docs_viewer", "repo_code", "runtime_evidence"]),
+      expect.arrayContaining(["workspace_directory", "docs_viewer", "repo_code", "runtime_evidence"]),
     );
     expect(admission.forbidden_tool_families).toEqual(
       expect.arrayContaining(["scholarly_research", "internet_search"]),
@@ -245,6 +245,12 @@ describe("Helix scholarly research tool admission", () => {
           goal_fit: "primary",
         },
         {
+          capability_key: "workspace-directory.resolve",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+        {
           capability_key: "docs-viewer.search_docs",
           requires_action: true,
           availability: "available",
@@ -264,6 +270,21 @@ describe("Helix scholarly research tool admission", () => {
         },
       ],
     } as any;
+
+    const admittedWorkspaceDirectoryResolve = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:unknown-source-discovery",
+        call_id: "call:workspace-directory",
+        capability_key: "workspace-directory.resolve",
+        args: { query: "NHM2 theory white paper" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(admittedWorkspaceDirectoryResolve.validation.valid).toBe(true);
 
     const admittedDocsSearch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
       availableCapabilities,

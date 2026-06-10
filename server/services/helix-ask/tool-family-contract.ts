@@ -8,6 +8,7 @@ export type ToolFamily =
   | "internet_search"
   | "repo_code"
   | "docs_viewer"
+  | "workspace_directory"
   | "workstation"
   | "live_source_mail"
   | "live_source_decision"
@@ -94,6 +95,17 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["docs", "docs_viewer", "active_doc", "docs-viewer"],
+  }),
+  workspace_directory: contract({
+    toolName: "family:workspace_directory",
+    toolFamily: "workspace_directory",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["workspace_directory_resolution"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["workspace_directory", "workspace-directory", "workspace_directory_resolution"],
   }),
   workstation: contract({
     toolName: "family:workstation",
@@ -307,6 +319,16 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiresGoalSatisfaction: true,
   }),
   contract({
+    toolName: "workspace-directory.resolve",
+    toolFamily: "workspace_directory",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["workspace_directory_resolution"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+  }),
+  contract({
     toolName: "workstation-notes.append_to_note",
     toolFamily: "workstation",
     authority: "control_receipt",
@@ -359,6 +381,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/(^|[-.:])calculator($|[-.:])|scientific-calculator|calculator-stream/.test(normalized)) return "calculator";
   if (/internet[-.:]?search|web[-.:]?research|web\.search/.test(normalized)) return "internet_search";
   if (/repo[-.:]?code|repo[-.:]?evidence|repo-code/.test(normalized)) return "repo_code";
+  if (/workspace[-.:]?directory|workspace-directory\.resolve|workspace[-.:]?directory[-.:]?resolution/.test(normalized)) return "workspace_directory";
   if (/docs?[-.:]?viewer|active[-.:]?doc|document/.test(normalized)) return "docs_viewer";
   if (/workstation|workspace[-.:]?action|workspace[-.:]?panel|panel-control|click-or-activate-control/.test(normalized)) return "workstation";
   if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail/.test(normalized)) return "live_source_mail";

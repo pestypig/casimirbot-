@@ -337,6 +337,7 @@ const toolFamilyMutating = (family: string): boolean =>
 const inferToolFamily = (toolId: string): string => {
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
+  if (/workspace[-_.]?directory/i.test(toolId)) return "workspace_directory";
   if (/click|open|close|panel|workspace-action|workspace_action/i.test(toolId)) return "workstation_action";
   if (/workstation-notes|note/i.test(toolId)) return "notes";
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";
