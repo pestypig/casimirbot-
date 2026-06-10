@@ -5,6 +5,12 @@ import type { IdeologyContextReflectionV1, IdeologyNodeMatchV1 } from "@shared/i
 import type { ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
 import { calculateFruitionFromReflection } from "@shared/zen-graph/calculate-fruition";
 import { ZEN_WISDOM_PRINCIPLES, ZEN_WISDOM_ROOT_ID } from "@shared/zen-graph/wisdom-principles";
+import {
+  zenRenderChunkForLocation,
+  zenRenderChunkForNode,
+  zenSemanticChunkForLocation,
+  zenSemanticChunkForNode,
+} from "@shared/zen-graph/zen-probability-chunks";
 import type { FruitionProcedureExpressionV1, FruitionProcedureTermV1 } from "@shared/fruition-procedure-expression";
 import { Badge } from "@/components/ui/badge";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
@@ -46,6 +52,21 @@ type ZenGraphEdge = {
 };
 
 type ZenObjectiveLensId = "wisdom" | "character" | "answer";
+
+type ZenGraphTerrainNode = ZenGraphNode & {
+  renderChunkId: string;
+  semanticChunkId: string;
+};
+
+type ZenGraphTerrainChunk = {
+  id: string;
+  bounds: {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+  };
+};
 
 const ZEN_OBJECTIVE_LENSES: Array<{
   id: ZenObjectiveLensId;
@@ -152,6 +173,72 @@ function nodeGlyph(node: ZenGraphNode): string {
   if (node.tone === "objective") return "B";
   if (node.tone === "character") return "C";
   return "A";
+}
+
+function buildLocatorChunkMap(locator: ZenBadgeLocatorV1 | undefined, rootId: string) {
+  const chunksByNodeId = new Map<string, { renderChunkId: string; semanticChunkId: string }>();
+  if (!locator) return chunksByNodeId;
+  const locations = [
+    ...locator.locatedBadges.exact,
+    ...locator.locatedBadges.likely,
+    ...locator.locatedBadges.inferred,
+  ];
+  for (const location of locations) {
+    chunksByNodeId.set(location.nodeId, {
+      renderChunkId: zenRenderChunkForLocation({ rootId, location }),
+      semanticChunkId: zenSemanticChunkForLocation(location),
+    });
+  }
+  return chunksByNodeId;
+}
+
+function buildZenTerrainNodes(args: {
+  nodes: ZenGraphNode[];
+  locator?: ZenBadgeLocatorV1;
+  rootId: string;
+}): ZenGraphTerrainNode[] {
+  const locatorChunks = buildLocatorChunkMap(args.locator, args.rootId);
+  return args.nodes.map((node) => {
+    const located = locatorChunks.get(node.id);
+    return {
+      ...node,
+      renderChunkId:
+        located?.renderChunkId ??
+        zenRenderChunkForNode({
+          rootId: args.rootId,
+          node,
+        }),
+      semanticChunkId: located?.semanticChunkId ?? zenSemanticChunkForNode(node),
+    };
+  });
+}
+
+function buildZenTerrainChunks(nodes: ZenGraphTerrainNode[]): ZenGraphTerrainChunk[] {
+  const groups = new Map<string, ZenGraphTerrainNode[]>();
+  for (const node of nodes) {
+    const current = groups.get(node.renderChunkId) ?? [];
+    current.push(node);
+    groups.set(node.renderChunkId, current);
+  }
+
+  return [...groups.entries()]
+    .map(([id, chunkNodes]) => {
+      const padding = Math.max(76, 34 + chunkNodes.length * 8);
+      const x0 = Math.min(...chunkNodes.map((node) => node.x)) - padding;
+      const y0 = Math.min(...chunkNodes.map((node) => node.y)) - padding;
+      const x1 = Math.max(...chunkNodes.map((node) => node.x + (node.width ?? 48))) + padding;
+      const y1 = Math.max(...chunkNodes.map((node) => node.y + (node.height ?? 48))) + padding;
+      return {
+        id,
+        bounds: {
+          x0: Math.max(0, x0),
+          y0: Math.max(0, y0),
+          x1,
+          y1,
+        },
+      };
+    })
+    .sort((left, right) => left.id.localeCompare(right.id));
 }
 
 function matchLabel(match: IdeologyNodeMatchV1): string {
@@ -954,6 +1041,16 @@ export function ZenGraphPanel({
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
   const loadFruitionLocatorSeed = useFruitionCalculatorStore((store) => store.loadLocatorSeed);
   const probabilityTerrain = locator?.probabilityTerrain;
+  const terrainNodes = useMemo(
+    () =>
+      buildZenTerrainNodes({
+        nodes: graph.nodes,
+        locator,
+        rootId: reflection.graph.rootId,
+      }),
+    [graph.nodes, locator, reflection.graph.rootId],
+  );
+  const terrainChunks = useMemo(() => buildZenTerrainChunks(terrainNodes), [terrainNodes]);
   const locatorSeedNodeIds =
     locator?.comparisonSeed.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)) ?? [];
   const initialSelectedNodeId = locatorSeedNodeIds[0] ?? reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
@@ -1070,14 +1167,16 @@ export function ZenGraphPanel({
               <div className="pointer-events-none absolute inset-x-0 top-[70px] h-10 bg-[linear-gradient(135deg,transparent_0_16px,rgba(39,39,42,0.9)_17px_32px,transparent_33px_48px)] bg-[length:96px_40px]" />
               <ProbabilityTerrainOverlay
                 terrain={probabilityTerrain}
-                nodes={graph.nodes.map((node) => ({
+                nodes={terrainNodes.map((node) => ({
                   id: node.id,
                   x: node.x,
                   y: node.y,
                   width: node.width ?? 48,
                   height: node.height ?? 48,
-                  semanticChunkId: `zen:${node.tone}:${node.procedureOperator ?? node.proceduralRole ?? "context"}`,
+                  renderChunkId: node.renderChunkId,
+                  semanticChunkId: node.semanticChunkId,
                 }))}
+                chunks={terrainChunks}
                 width={graph.width}
                 height={graph.height}
                 seed={`${reflection.reflectionId}:zen-probability-terrain`}

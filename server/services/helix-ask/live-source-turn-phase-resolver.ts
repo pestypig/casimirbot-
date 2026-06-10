@@ -481,6 +481,8 @@ export const resolveLiveSourceTurnPhase = (
         readString(observation?.policyId ?? observation?.policy_id),
         readString(observation?.watchJobPolicyRef ?? observation?.watch_job_policy_ref),
         readString(observation?.decisionId ?? observation?.decision_id),
+        readString(observation?.artifactId ?? observation?.artifact_id),
+        readString(readRecord(observation?.receipt)?.receiptId ?? readRecord(observation?.receipt)?.receipt_id),
       ];
     }),
     ...packets.map(packetId),
@@ -623,6 +625,30 @@ export const resolveLiveSourceTurnPhase = (
       nextPhase: "terminal_checkpoint",
       locked: true,
       lockReason: "Recorded request_voice_callout decision requires live_env.request_interim_voice_callout before terminal output.",
+      evidenceRefs,
+    });
+  }
+
+  if (hasVoiceCalloutDecisionReceipt(receipts) && hasVoiceCalloutCompletionReceipt(receipts)) {
+    return makeResolution({
+      phase: "terminal_checkpoint",
+      reason: "Voice callout decision and voice/hold/block receipt both exist; synthesize from mailbox evidence without repeating voice.",
+      canonicalGoal: "processed_mail_voice_decision",
+      allowedTools: [],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+      ],
+      requiredEvidence: [
+        ...(latestPacket ? ["stage_play_processed_mail_packet"] : []),
+        "stage_play_live_source_mail_decision",
+        "live_source_interim_voice_callout_receipt",
+      ],
+      completionEvidence: ["model_synthesized_answer"],
+      nextPhase: null,
       evidenceRefs,
     });
   }

@@ -174,6 +174,91 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect(bridge.pending_requirements.map((requirement) => requirement.code)).toContain("missing_post_tool_answer_draft");
   });
 
+  it("repairs live-source mailbox completion from packet, decision, and voice receipt instead of stale doc fallback", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Read the processed live-source mailbox and handle any urgent callout.",
+      selected_final_answer: "The turn stopped before required artifacts were satisfied: doc_summary.",
+      answer: "The turn stopped before required artifacts were satisfied: doc_summary.",
+      text: "The turn stopped before required artifacts were satisfied: doc_summary.",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "terminal_boundary_ineligible",
+      canonical_goal_frame: { goal_kind: "live_source_processed_mail_interpretation" },
+      source_target_intent: { target_source: "live_source_mailbox" },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:packet`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.read_processed_live_source_mail",
+            observation: {
+              packets: [{
+                artifactId: "stage_play_processed_mail_packet",
+                packetId: "stage_play_processed_mail_packet:synthetic-urgent",
+                observedFacts: ["Synthetic source shows a high-salience hazard cue."],
+                changedFacts: ["The source moved from stable to hazardous state."],
+                recommendedNext: "request_voice_callout",
+                salience: {
+                  level: "urgent",
+                  voiceCandidate: true,
+                },
+              }],
+            },
+          },
+        },
+        {
+          artifact_id: `${turnId}:decision`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.record_live_source_mail_decision",
+            observation: {
+              artifactId: "stage_play_live_source_mail_decision",
+              schemaVersion: "stage_play_live_source_mail_decision/v1",
+              decision: "request_voice_callout",
+            },
+          },
+        },
+        {
+          artifact_id: `${turnId}:voice`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.request_interim_voice_callout",
+            observation: {
+              schema: "helix.interim_voice_callout_tool_result.v1",
+              receipt: {
+                status: "awaiting_client_playback",
+                assistant_answer: false,
+                raw_content_included: false,
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
+    expect(bridge.route_family).toBe("live_source_mailbox");
+    expect(bridge.reason).toBe("live_source_mailbox_receipts_support_synthesized_answer");
+    expect(bridge.observation_support_status).toBe("supports_answer");
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(String(payload.selected_final_answer)).toMatch(/live-source mailbox path completed/i);
+    expect(String(payload.selected_final_answer)).toMatch(/request_voice_callout/i);
+    expect(String(payload.selected_final_answer)).not.toMatch(/doc_summary/i);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
+  });
+
   it("catches visible policy inversion about receipts and final answers", () => {
     const gate = evaluateVisibleAnswerPolicyFaithfulnessGate({
       turnId,

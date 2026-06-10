@@ -384,6 +384,61 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(phase.phaseLock.locked).toBe(true);
   });
 
+  it("terminalizes after a voice decision has a voice receipt instead of repeating the callout tool", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Read the processed Minecraft mail and call out if danger appears.",
+      selectedTargetSource: "live_source_mailbox",
+      processedPackets: [{
+        artifactId: "stage_play_processed_mail_packet",
+        packetId: "stage_play_processed_mail_packet:voice-complete",
+        observedFacts: ["The player is taking fire damage."],
+        recommendedNext: "request_voice_callout",
+        salience: {
+          level: "urgent",
+          voiceCandidate: true,
+          calloutDraft: "You are taking fire damage.",
+        },
+      }],
+      latestToolReceipts: [
+        {
+          tool_name: "live_env.record_live_source_mail_decision",
+          observation: {
+            artifactId: "stage_play_live_source_mail_decision",
+            schemaVersion: "stage_play_live_source_mail_decision/v1",
+            decisionId: "stage_play_live_source_mail_decision:voice-complete",
+            decision: "request_voice_callout",
+          },
+        },
+        {
+          tool_name: "live_env.request_interim_voice_callout",
+          observation: {
+            schema: "helix.interim_voice_callout_tool_result.v1",
+            receipt: {
+              status: "awaiting_client_playback",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        },
+      ],
+    });
+
+    expect(phase.phase).toBe("terminal_checkpoint");
+    expect(phase.canonicalGoal).toBe("processed_mail_voice_decision");
+    expect(phase.allowedTools).toEqual([]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.request_interim_voice_callout",
+      "live_env.record_live_source_mail_decision",
+    ]));
+    expect(phase.requiredEvidence).toEqual([
+      "stage_play_processed_mail_packet",
+      "stage_play_live_source_mail_decision",
+      "live_source_interim_voice_callout_receipt",
+    ]);
+    expect(phase.completionEvidence).toEqual(["model_synthesized_answer"]);
+    expect(phase.nextPhase).toBe(null);
+  });
+
   it("routes processed-mail interpretation prompts to read processed mail with process fallback", () => {
     const phase = resolveLiveSourceTurnPhase({
       prompt: "Read the visual mail and interpret what is happening. Predict what should be watched next.",

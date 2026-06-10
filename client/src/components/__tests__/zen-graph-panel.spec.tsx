@@ -359,8 +359,12 @@ describe("ZenGraphPanel", () => {
     openObjectiveBindings();
 
     expect(screen.getByTestId("zen-graph-probability-terrain")).toBeTruthy();
-    expect(screen.getByTestId("zen-graph-probability-terrain-field")).toBeTruthy();
+    const terrainField = screen.getByTestId("zen-graph-probability-terrain-field");
+    expect(terrainField).toBeTruthy();
+    expect(terrainField.getAttribute("data-sample-resolution")).toBe("coarse");
     expect(screen.getAllByTestId("probability-terrain-contour").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("probability-terrain-chunk").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("probability-terrain-bridge").length).toBeGreaterThan(0);
     expect(screen.getByText("Probability Terrain")).toBeTruthy();
     expect(screen.getByText(/Placement certainty/i)).toBeTruthy();
     expect(screen.queryByText("Located comparison")).toBeNull();

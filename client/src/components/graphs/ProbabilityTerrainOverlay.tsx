@@ -36,6 +36,20 @@ type TerrainNode = ProbabilityTerrainOverlayNode & {
   probability: number;
 };
 
+type TerrainResolution = {
+  label: "fine" | "medium" | "coarse";
+  bridgeLimit: number;
+  nodeLimit: number;
+  contourStrokeWidth: number;
+};
+
+type TerrainBridge = {
+  id: string;
+  from: TerrainNode;
+  to: TerrainNode;
+  probability: number;
+};
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -57,6 +71,31 @@ function uncertaintySpread(terrain: ProbabilityTerrainV1): number {
         ? 112
         : 156;
   return base + entropyRatio * 64;
+}
+
+function resolutionForTerrain(terrain: ProbabilityTerrainV1): TerrainResolution {
+  if (terrain.uncertaintyMode === "focused" || terrain.placementCertainty >= 0.62) {
+    return {
+      label: "fine",
+      bridgeLimit: 5,
+      nodeLimit: 16,
+      contourStrokeWidth: 2.4,
+    };
+  }
+  if (terrain.uncertaintyMode === "ambiguous" || terrain.placementCertainty >= 0.28) {
+    return {
+      label: "medium",
+      bridgeLimit: 8,
+      nodeLimit: 24,
+      contourStrokeWidth: 2,
+    };
+  }
+  return {
+    label: "coarse",
+    bridgeLimit: 12,
+    nodeLimit: 32,
+    contourStrokeWidth: 1.6,
+  };
 }
 
 function graphTone(terrain: ProbabilityTerrainV1): {
@@ -96,12 +135,68 @@ function chunkProbability(terrain: ProbabilityTerrainV1, chunk: ProbabilityTerra
   return terrain.renderChunkProbabilityById[chunk.id] ?? terrain.semanticChunkProbabilityById[chunk.id] ?? 0;
 }
 
-function topNodes(terrain: ProbabilityTerrainV1, nodes: ProbabilityTerrainOverlayNode[]): TerrainNode[] {
+function topNodes(
+  terrain: ProbabilityTerrainV1,
+  nodes: ProbabilityTerrainOverlayNode[],
+  limit: number,
+): TerrainNode[] {
   return nodes
     .map((node) => ({ ...node, probability: probabilityForNode(terrain, node) }))
     .filter((node) => node.probability > 0)
     .sort((left, right) => right.probability - left.probability || left.id.localeCompare(right.id))
-    .slice(0, 28);
+    .slice(0, limit);
+}
+
+function sameProbabilityNeighborhood(left: TerrainNode, right: TerrainNode): boolean {
+  return Boolean(
+    (left.renderChunkId && left.renderChunkId === right.renderChunkId) ||
+      (left.semanticChunkId && left.semanticChunkId === right.semanticChunkId),
+  );
+}
+
+function terrainBridges(
+  terrain: ProbabilityTerrainV1,
+  nodes: TerrainNode[],
+  limit: number,
+): TerrainBridge[] {
+  const pairs: TerrainBridge[] = [];
+  for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+      const left = nodes[leftIndex];
+      const right = nodes[rightIndex];
+      if (terrain.uncertaintyMode !== "broad" && !sameProbabilityNeighborhood(left, right)) continue;
+      pairs.push({
+        id: `${left.id}->${right.id}`,
+        from: left,
+        to: right,
+        probability: Math.min(left.probability, right.probability),
+      });
+    }
+  }
+  return pairs
+    .sort((left, right) => right.probability - left.probability || left.id.localeCompare(right.id))
+    .slice(0, limit);
+}
+
+function bridgePath(args: {
+  bridge: TerrainBridge;
+  seed: string;
+  spread: number;
+}): string {
+  const from = center(args.bridge.from);
+  const to = center(args.bridge.to);
+  const midX = (from.x + to.x) / 2;
+  const midY = (from.y + to.y) / 2;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const normalX = -dy / length;
+  const normalY = dx / length;
+  const noise = probabilityTerrainNoise2D(args.seed, midX / 360, midY / 360, 3);
+  const bend = (noise - 0.5) * Math.min(120, args.spread * 0.48);
+  const cx = midX + normalX * bend;
+  const cy = midY + normalY * bend;
+  return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`;
 }
 
 export default function ProbabilityTerrainOverlay({
@@ -114,21 +209,28 @@ export default function ProbabilityTerrainOverlay({
   testId = "probability-terrain-field",
 }: ProbabilityTerrainOverlayProps) {
   const tone = terrain ? graphTone(terrain) : null;
-  const activeNodes = useMemo(() => (terrain ? topNodes(terrain, nodes) : []), [nodes, terrain]);
+  const resolution = terrain ? resolutionForTerrain(terrain) : null;
+  const activeNodes = useMemo(
+    () => (terrain && resolution ? topNodes(terrain, nodes, resolution.nodeLimit) : []),
+    [nodes, resolution, terrain],
+  );
 
-  if (!terrain || !tone || activeNodes.length === 0) return null;
+  if (!terrain || !tone || !resolution || activeNodes.length === 0) return null;
 
   const spread = uncertaintySpread(terrain);
   const posteriorRatio =
     terrain.priorEntropyBits > 0 ? clamp01(terrain.posteriorEntropyBits / terrain.priorEntropyBits) : 0;
   const contourOpacity = 0.1 + posteriorRatio * 0.16;
   const terrainSeed = `${seed}:${terrain.graphKind}:${terrain.dominantSemanticChunkId ?? "terrain"}`;
+  const bridges = terrainBridges(terrain, activeNodes, resolution.bridgeLimit);
 
   return (
     <svg
       aria-label="Probability terrain overlay"
       className="pointer-events-none absolute inset-0"
       data-testid={testId}
+      data-uncertainty-mode={terrain.uncertaintyMode}
+      data-sample-resolution={resolution.label}
       width={width}
       height={height}
     >
@@ -146,6 +248,7 @@ export default function ProbabilityTerrainOverlay({
           return (
             <rect
               key={chunk.id}
+              data-testid="probability-terrain-chunk"
               x={chunk.bounds.x0}
               y={chunk.bounds.y0}
               width={chunk.bounds.x1 - chunk.bounds.x0}
@@ -158,19 +261,33 @@ export default function ProbabilityTerrainOverlay({
             />
           );
         })}
+      {bridges.map((bridge) => {
+        const noise = probabilityTerrainNoise2D(`${terrainSeed}:bridge`, bridge.probability * 7, bridge.id.length, 3);
+        return (
+          <path
+            key={bridge.id}
+            d={bridgePath({ bridge, seed: `${terrainSeed}:bridge:${bridge.id}`, spread })}
+            data-testid="probability-terrain-bridge"
+            fill="none"
+            stroke={tone.stroke}
+            strokeLinecap="round"
+            strokeOpacity={Math.min(0.36, 0.08 + bridge.probability * 0.22 + noise * 0.05)}
+            strokeWidth={Math.max(5, spread * 0.035 * (0.7 + bridge.probability))}
+            strokeDasharray={terrain.uncertaintyMode === "focused" ? "8 10" : undefined}
+          />
+        );
+      })}
       {activeNodes.map((node, index) => {
         const nodeCenter = center(node);
         const noise = probabilityTerrainNoise2D(terrainSeed, nodeCenter.x / 260, nodeCenter.y / 260, 4);
-        const jitterX = (noise - 0.5) * 38;
-        const jitterY = (probabilityTerrainNoise2D(`${terrainSeed}:y`, nodeCenter.x / 260, nodeCenter.y / 260, 4) - 0.5) * 38;
-        const radius = spread * (0.62 + node.probability * 1.25 + noise * 0.34);
+        const radius = spread * (0.62 + node.probability * 1.25 + (noise - 0.5) * 0.22);
         const outerOpacity = Math.min(0.34, 0.08 + node.probability * 0.26);
         const innerOpacity = Math.min(0.42, 0.1 + node.probability * 0.36);
         return (
           <g key={`${node.id}:${index}`} data-testid="probability-terrain-contour">
             <ellipse
-              cx={nodeCenter.x + jitterX}
-              cy={nodeCenter.y + jitterY}
+              cx={nodeCenter.x}
+              cy={nodeCenter.y}
               rx={radius * 1.18}
               ry={radius * (0.74 + noise * 0.34)}
               fill={tone.fill}
@@ -185,7 +302,7 @@ export default function ProbabilityTerrainOverlay({
               fill="none"
               stroke={tone.stroke}
               strokeOpacity={innerOpacity}
-              strokeWidth={2}
+              strokeWidth={resolution.contourStrokeWidth}
               strokeDasharray={terrain.uncertaintyMode === "focused" ? undefined : "10 8"}
             />
           </g>

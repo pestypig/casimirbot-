@@ -1519,6 +1519,10 @@ const buildNonTerminalWakeTranscriptRows = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
+  immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   budgetState?: LiveSourceBudgetStateV1 | null;
   evidenceRefs: string[];
   createdAt: string;
@@ -1551,11 +1555,74 @@ const buildNonTerminalWakeTranscriptRows = (input: {
       createdAt: input.createdAt,
     }));
   }
+  if (input.immersionState) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_immersion_update:${hashShort(input.immersionState.immersionStateId)}`,
+      rowKind: "interpretation_state",
+      title: "Immersion state",
+      body: [
+        `Identity: ${input.immersionState.sourceIdentity.label} (${Math.round(input.immersionState.sourceIdentity.confidence * 100)}%).`,
+        `Activity: ${input.immersionState.currentActivity}. Salience: ${input.immersionState.salience.level}.`,
+        input.immersionState.changedFacts.length > 0
+          ? `Deltas: ${input.immersionState.changedFacts.slice(0, 4).join("; ")}.`
+          : "Deltas: no new heuristic deltas.",
+      ].join("\n"),
+      toolName: "live_env.update_live_source_immersion_state",
+      artifactId: input.immersionState.immersionStateId,
+      artifactKind: input.immersionState.artifactId,
+      evidenceRefs: input.immersionState.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  if (input.predictionValidation) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_prediction_validation:${hashShort(input.predictionValidation.validationId)}`,
+      rowKind: "prediction_check",
+      title: "Prediction validation",
+      body: [
+        `${input.predictionValidation.result}; recommended next ${input.predictionValidation.recommendedNext}.`,
+        input.predictionValidation.newSignals.length > 0
+          ? `New: ${input.predictionValidation.newSignals.slice(0, 4).join("; ")}.`
+          : null,
+      ].filter(Boolean).join("\n"),
+      toolName: "live_env.validate_live_source_prediction",
+      artifactId: input.predictionValidation.validationId,
+      artifactKind: input.predictionValidation.artifactId,
+      evidenceRefs: input.predictionValidation.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  if (input.processedPacket) {
+    rows.push(makeWakeTranscriptRow({
+      rowId: `wake_processed_packet:${hashShort(input.processedPacket.packetId)}`,
+      rowKind: "processed_mail_packet",
+      title: "Processed mail packet",
+      body: [
+        `${input.processedPacket.resolutionState}; recommended ${input.processedPacket.recommendedNext}.`,
+        `Salience: ${input.processedPacket.salience.level}${input.processedPacket.salience.voiceCandidate ? " (voice candidate)" : ""}.`,
+        input.processedPacket.observedFacts.length > 0
+          ? `Observed: ${input.processedPacket.observedFacts.slice(0, 3).map((fact) => clipPromptText(fact, 120)).join("; ")}.`
+          : null,
+      ].filter(Boolean).join("\n"),
+      toolName: "live_env.process_live_source_mail_packet",
+      artifactId: input.processedPacket.packetId,
+      artifactKind: input.processedPacket.artifactId,
+      evidenceRefs: input.processedPacket.evidenceRefs,
+      createdAt: input.createdAt,
+    }));
+  }
+  rows.push(...buildWakeMicroReasonerTranscriptRows({
+    microReasonerRuns: input.microReasonerRuns,
+    createdAt: input.createdAt,
+  }));
   rows.push(makeWakeTranscriptRow({
     rowId: `wake_requested:${hashShort(input.wake.wakeRequestId)}`,
     rowKind: "mail_wake_requested",
     title: "Wake requested",
-    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake.`,
+    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake because ${microReasonerWakeReason({
+      processedPacket: input.processedPacket,
+      microReasonerRuns: input.microReasonerRuns,
+    })}.`,
     artifactId: input.wake.wakeRequestId,
     artifactKind: input.wake.artifactId,
     evidenceRefs: input.evidenceRefs,
@@ -1616,6 +1683,12 @@ const recordNonTerminalWakeTranscript = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
   mailBatch: StagePlayLiveSourceMailItemV1[];
+  fastLayer?: {
+    immersionState: StagePlayLiveSourceImmersionStateV1;
+    predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+    processedPacket: StagePlayProcessedMailPacketV1;
+    microReasonerRuns: StagePlayMicroReasonerRunV1[];
+  } | null;
   action?: LiveSourceBudgetActionV1;
   retainedMailCount?: number | null;
   evidenceRefs: string[];
@@ -1643,6 +1716,10 @@ const recordNonTerminalWakeTranscript = (input: {
     rows: buildNonTerminalWakeTranscriptRows({
       ...input,
       wakeResult: budgetReceipt.wakeResult,
+      immersionState: input.fastLayer?.immersionState ?? null,
+      predictionValidation: input.fastLayer?.predictionValidation ?? null,
+      processedPacket: input.fastLayer?.processedPacket ?? null,
+      microReasonerRuns: input.fastLayer?.microReasonerRuns ?? [],
       budgetState: budgetReceipt.budgetState,
       evidenceRefs: uniqueStrings([...input.evidenceRefs, budgetReceipt.budgetState.budgetStateId]),
     }),
@@ -2280,6 +2357,7 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      fastLayer,
       action: "deferred",
       retainedMailCount,
       evidenceRefs,
@@ -2327,6 +2405,7 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      fastLayer,
       action: "deferred",
       retainedMailCount,
       evidenceRefs,
@@ -2378,6 +2457,7 @@ export async function runNextMailWakeRequest(input: {
       wake: running,
       wakeResult,
       mailBatch,
+      fastLayer,
       action: "pressure_blocked",
       retainedMailCount,
       evidenceRefs,
@@ -2416,6 +2496,7 @@ export async function runNextMailWakeRequest(input: {
         wake: running,
         wakeResult,
         mailBatch,
+        fastLayer,
         action: "deferred",
         retainedMailCount,
         evidenceRefs: wakeResult.evidenceRefs,
@@ -2547,6 +2628,7 @@ export async function runNextMailWakeRequest(input: {
         wake: runningAttempt,
         wakeResult,
         mailBatch,
+        fastLayer,
         action: "pressure_blocked",
         retainedMailCount,
         evidenceRefs,
@@ -2573,6 +2655,7 @@ export async function runNextMailWakeRequest(input: {
       wake: runningAttempt,
       wakeResult,
       mailBatch,
+      fastLayer,
       action: "deferred",
       retainedMailCount,
       evidenceRefs,

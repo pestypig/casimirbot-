@@ -2121,10 +2121,18 @@ describe("Stage Play live-source mailbox", () => {
     const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
     expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
       "mail_received",
+      "processed_mail_packet",
+      "micro_reasoner_run",
       "mail_wake_requested",
       "mail_wake_deferred",
       "loop_state",
     ]));
+    expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
+      "Processed mail packet",
+      "Decision selected",
+    ]));
+    expect(transcriptEntries.find((entry) => entry.row.title === "Wake requested")?.row.body)
+      .toContain("decision_selector selected");
     expect(transcriptEntries.every((entry) => entry.wakeResultId === result?.wakeResultId)).toBe(true);
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
@@ -2153,9 +2161,16 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
     const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
     expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
+      "Processed mail packet",
+      "Decision selected",
       "Wake Ask timed out",
       "Loop state",
     ]));
+    expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
+      "micro_reasoner_run",
+    ]));
+    expect(transcriptEntries.find((entry) => entry.row.title === "Wake requested")?.row.body)
+      .toContain("decision_selector selected");
     expect(transcriptEntries.map((entry) => entry.row.body).join("\n")).toContain(
       "no model-reviewed decision was recorded",
     );
@@ -2314,10 +2329,18 @@ describe("Stage Play live-source mailbox", () => {
     const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
     expect(transcriptEntries.map((entry) => entry.row.rowKind)).toEqual(expect.arrayContaining([
       "mail_received",
+      "processed_mail_packet",
+      "micro_reasoner_run",
       "mail_wake_requested",
       "mail_wake_deferred",
       "loop_state",
     ]));
+    expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
+      "Processed mail packet",
+      "Decision selected",
+    ]));
+    expect(transcriptEntries.find((entry) => entry.row.title === "Wake requested")?.row.body)
+      .toContain("decision_selector selected");
     expect(transcriptEntries.every((entry) => entry.wakeResultId === result?.wakeResultId)).toBe(true);
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });

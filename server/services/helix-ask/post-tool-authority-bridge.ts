@@ -18,6 +18,7 @@ export type HelixPostToolAuthorityBridge = {
   route_family:
     | "docs_panel"
     | "calculator"
+    | "live_source_mailbox"
     | "situation_room_setup"
     | "voice_delivery"
     | "repo_docs"
@@ -115,6 +116,118 @@ const selectedVisibleAnswerText = (payload: RecordLike): string =>
   readString(payload.answer) ||
   readString(payload.text);
 
+const clip = (value: string, max = 180): string =>
+  value.length > max ? `${value.slice(0, max - 1).trimEnd()}...` : value;
+
+const artifactLedger = (payload: RecordLike): RecordLike[] =>
+  readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is RecordLike => Boolean(artifact));
+
+const artifactPayload = (artifact: RecordLike): RecordLike | null => readRecord(artifact.payload);
+
+const artifactObservation = (artifact: RecordLike): RecordLike | null =>
+  readRecord(artifactPayload(artifact)?.observation) ?? readRecord(artifact.observation);
+
+const artifactToolName = (artifact: RecordLike): string =>
+  readString(artifactPayload(artifact)?.tool_name) ||
+  readString(artifactPayload(artifact)?.toolName) ||
+  readString(artifact.tool_name) ||
+  readString(artifact.toolName);
+
+const collectLiveSourceProcessedPackets = (payload: RecordLike): RecordLike[] =>
+  artifactLedger(payload).flatMap((artifact) => {
+    const directPayload = artifactPayload(artifact);
+    const observation = artifactObservation(artifact);
+    return [
+      directPayload,
+      ...readArray(directPayload?.packets),
+      ...readArray(observation?.packets),
+    ].map(readRecord).filter((entry): entry is RecordLike => {
+      const marker = [
+        readString(entry.artifactId),
+        readString(entry.artifact_id),
+        readString(entry.schema),
+        readString(entry.schemaVersion),
+        readString(entry.kind),
+      ].join(" ");
+      return /stage_play_processed_mail_packet|processed_mail_packet/i.test(marker);
+    });
+  });
+
+const latestLiveSourceMailDecision = (payload: RecordLike): RecordLike | null => {
+  for (const artifact of [...artifactLedger(payload)].reverse()) {
+    const haystack = [
+      readString(artifact.kind),
+      readString(artifact.artifact_id),
+      readString(artifactPayload(artifact)?.schema),
+      readString(artifactObservation(artifact)?.artifactId),
+      readString(artifactObservation(artifact)?.schemaVersion),
+      artifactToolName(artifact),
+    ].join(" ");
+    if (/stage_play_live_source_mail_decision|record_live_source_mail_decision/i.test(haystack)) {
+      return artifactObservation(artifact) ?? artifactPayload(artifact);
+    }
+  }
+  return null;
+};
+
+const latestLiveSourceVoiceReceipt = (payload: RecordLike): RecordLike | null => {
+  for (const artifact of [...artifactLedger(payload)].reverse()) {
+    const observation = artifactObservation(artifact);
+    const receipt = readRecord(observation?.receipt) ?? readRecord(artifactPayload(artifact)?.receipt);
+    const haystack = [
+      readString(artifact.kind),
+      readString(artifact.artifact_id),
+      readString(artifactPayload(artifact)?.schema),
+      readString(observation?.schema),
+      readString(observation?.artifactId),
+      readString(observation?.kind),
+      artifactToolName(artifact),
+      readString(receipt?.status),
+    ].join(" ");
+    if (/request_interim_voice_callout|interim_voice_callout|voice_hold_receipt|voice_block_receipt|voice_receipt|awaiting_client_playback|queued_for_retry|blocked_capacity|blocked_policy|blocked_missing_text|delivered|expired/i.test(haystack)) {
+      return receipt ?? observation ?? artifactPayload(artifact);
+    }
+  }
+  return null;
+};
+
+const readStringItems = (value: unknown): string[] =>
+  readArray(value).map((entry) => {
+    if (typeof entry === "string") return entry.trim();
+    const record = readRecord(entry);
+    return readString(record?.text) || readString(record?.summary) || readString(record?.label);
+  }).filter(Boolean);
+
+const liveSourceMailboxSynthesisText = (payload: RecordLike): string => {
+  const packet = collectLiveSourceProcessedPackets(payload).at(-1) ?? null;
+  const decision = latestLiveSourceMailDecision(payload);
+  const voiceReceipt = latestLiveSourceVoiceReceipt(payload);
+  if (!packet || !decision || !voiceReceipt) return "";
+
+  const recommendedNext = readString(packet.recommendedNext) || readString(packet.recommended_next);
+  const salience = readRecord(packet.salience);
+  const salienceLevel = readString(salience?.level);
+  const decisionValue = readString(decision.decision) || readString(decision.selectedDecision) || readString(decision.selected_decision);
+  const receiptStatus = readString(voiceReceipt.status) || readString(voiceReceipt.receipt_status);
+  const observedFacts = readStringItems(packet.observedFacts ?? packet.observed_facts ?? packet.facts).slice(0, 2);
+  const changedFacts = readStringItems(packet.changedFacts ?? packet.changed_facts).slice(0, 2);
+
+  const details = [
+    recommendedNext ? `processed packet recommended ${recommendedNext}` : "",
+    salienceLevel ? `salience was ${salienceLevel}` : "",
+  ].filter(Boolean).join("; ");
+
+  const evidence = [...observedFacts, ...changedFacts].slice(0, 3).map((entry) => clip(entry, 150));
+  return [
+    `The live-source mailbox path completed its required tool phases${details ? `: ${details}` : "."}`,
+    decisionValue ? `The recorded decision was ${decisionValue}.` : "A live-source mail decision receipt is present.",
+    receiptStatus ? `The voice phase has a receipt with status ${receiptStatus}, so another interim voice callout is not required before synthesis.` : "A voice, hold, or block receipt is present, so another interim voice callout is not required before synthesis.",
+    evidence.length ? `Evidence used: ${evidence.join(" | ")}` : "",
+  ].filter(Boolean).join(" ");
+};
+
 const isCompoundInterimVoiceCalloutPrompt = (payload: RecordLike): boolean => {
   const prompt = [
     readString(payload.active_prompt),
@@ -160,8 +273,11 @@ const selectedCapability = (payload: RecordLike): string =>
 const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToolAuthorityBridge["route_family"] => {
   const sourceTarget = readString(readRecord(payload.route_product_contract)?.source_target);
   const goalKind = readString(readRecord(payload.canonical_goal_frame)?.goal_kind);
+  const targetSource = readString(readRecord(payload.source_target_intent)?.target_source) ||
+    readString(readRecord(payload.evidence_target_arbitration)?.selected_target_source);
   const prompt = readString(payload.active_prompt) || readString(payload.prompt) || readString(payload.question);
-  const haystack = `${sourceTarget} ${goalKind} ${capability} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
+  const haystack = `${sourceTarget} ${targetSource} ${goalKind} ${capability} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
+  if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_processed_mail_packet|record_live_source_mail_decision|read_processed_live_source_mail/i.test(haystack)) return "live_source_mailbox";
   if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
   if (/internet_search|internet-search|search_web|google_custom_search|web_search/i.test(haystack)) return "internet_search";
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
@@ -181,6 +297,7 @@ export function buildPostToolAuthorityBridge(input: {
   const routeFamily = inferRouteFamily(input.payload, capability);
   const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
   const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer/);
+  const liveSourceSynthesis = liveSourceMailboxSynthesisText(input.payload);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });
   if (calculatorSupport.supports_goal) {
     return {
@@ -196,6 +313,24 @@ export function buildPostToolAuthorityBridge(input: {
       terminal_repair_action: "materialize_model_synthesized_answer",
       pending_requirements: [],
       reason: "calculator_result_and_answer_draft_support_goal",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (routeFamily === "live_source_mailbox" && liveSourceSynthesis) {
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: true,
+      selected_capability: capability || undefined,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: "supports_answer",
+      route_family: "live_source_mailbox",
+      required_terminal_kind: "model_synthesized_answer",
+      terminal_repair_action: "materialize_model_synthesized_answer",
+      pending_requirements: [],
+      reason: "live_source_mailbox_receipts_support_synthesized_answer",
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -373,6 +508,7 @@ export function applyPostToolAuthorityBridgeRepair(input: {
 
   if (bridge.observation_support_status === "supports_answer" && bridge.required_terminal_kind === "model_synthesized_answer") {
     const text =
+      (bridge.route_family === "live_source_mailbox" ? liveSourceMailboxSynthesisText(input.payload) : "") ||
       finalDraftText(input.payload) ||
       (bridge.selected_capability === "live_env.request_interim_voice_callout" ? selectedVisibleAnswerText(input.payload) : "");
     if (text) {
