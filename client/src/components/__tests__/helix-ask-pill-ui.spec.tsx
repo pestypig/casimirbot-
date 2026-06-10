@@ -341,7 +341,9 @@ describe("HelixAskPill mic-first surface contract", () => {
   });
 
   it("does not hydrate incomplete mail wake transcript groups as saved console turns", () => {
-    const buildEntry = (rowKind: string, overrides: Record<string, any> = {}) => ({
+    const buildEntry = (rowKind: string, overrides: Record<string, any> = {}) => {
+      const { row: rowOverrides, ...entryOverrides } = overrides;
+      return ({
       artifactId: "stage_play_live_source_mail_transcript_entry",
       schemaVersion: "stage_play_live_source_mail_transcript_entry/v1",
       entryId: `entry:${rowKind}`,
@@ -364,7 +366,7 @@ describe("HelixAskPill mic-first surface contract", () => {
         assistantAnswer: false,
         terminalEligible: false,
         createdAt: "2026-06-10T15:20:00.000Z",
-        ...(overrides.row ?? {}),
+        ...(rowOverrides ?? {}),
       },
       evidenceRefs: [],
       createdAt: "2026-06-10T15:20:00.000Z",
@@ -372,8 +374,9 @@ describe("HelixAskPill mic-first surface contract", () => {
       terminal_eligible: false,
       context_role: "tool_evidence",
       raw_content_included: false,
-      ...overrides,
-    }) as any;
+      ...entryOverrides,
+      }) as any;
+    };
 
     expect(isDurableHelixAskMailTranscriptGroup([
       buildEntry("mail_wake_requested"),
