@@ -22,6 +22,22 @@ describe("stage play visual observer profile store", () => {
 
     expect(profiles.some((profile) => profile.profileId === "stage_play_visual_observer_profile:minecraft-gameplay:v1")).toBe(true);
     expect(profiles.some((profile) => profile.profileId === "stage_play_visual_observer_profile:generic:v1")).toBe(true);
+    expect(profiles.some((profile) => profile.profileId === "stage_play_visual_observer_profile:solar-sdo-aia-193:v1")).toBe(true);
+  });
+
+  it("seeds the SDO AIA 193 solar activity shade under the science subject", () => {
+    const profiles = listStagePlayVisualObserverProfiles({
+      domain: "science",
+      includePresets: true,
+      limit: 25,
+    });
+    const profile = profiles.find((entry) => entry.profileId === "stage_play_visual_observer_profile:solar-sdo-aia-193:v1");
+
+    expect(profile?.subjectCategory).toBe("Science");
+    expect(profile?.subject).toContain("SDO AIA 193");
+    expect(profile?.prompt).toContain("coronal-hole placement");
+    expect(profile?.prompt).toContain("do not over-claim visible-light sunspot classes from AIA 193 alone");
+    expect(profile?.expectedSchema?.requiredFields).toContain("sunspot_proxy_assessment");
   });
 
   it("does not treat global presets as source-applied active profiles before apply", () => {

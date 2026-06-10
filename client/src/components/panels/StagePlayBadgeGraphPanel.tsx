@@ -339,6 +339,28 @@ type StagePlayMailLoopNode = {
   } | null;
 };
 
+type StagePlayJourneyState = "done" | "active" | "blocked" | "pending" | "missing";
+
+type StagePlayMailJourneyStation = {
+  key: string;
+  title: string;
+  status: string;
+  body: string;
+  meta: string;
+  state: StagePlayJourneyState;
+};
+
+type StagePlayMailJourneyReasonerRow = {
+  role: StagePlayMicroReasonerRoleV1;
+  run: StagePlayMicroReasonerRunV1 | null;
+  prompt: StagePlayMicroReasonerPromptV1 | null;
+  display: {
+    title: string;
+    subtitle: string;
+    missingPreview: string;
+  };
+};
+
 const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
   request.status === "queued" || request.status === "running";
 
@@ -512,8 +534,6 @@ async function fetchStagePlayLiveSourceMail(input: {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
   if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
-  if (input.roomId) params.set("roomId", input.roomId);
-  if (input.environmentId) params.set("environmentId", input.environmentId);
   params.set("limit", "20");
   const response = await fetch(`/api/helix/stage-play/live-source-mail?${params.toString()}`, {
     headers: { Accept: "application/json" },
@@ -533,8 +553,6 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
   if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
-  if (input.roomId) params.set("roomId", input.roomId);
-  if (input.environmentId) params.set("environmentId", input.environmentId);
   params.set("limit", "80");
   const response = await fetch(`/api/helix/stage-play/live-source-mail/transcript?${params.toString()}`, {
     headers: { Accept: "application/json" },
@@ -1605,15 +1623,232 @@ const stagePlayWakeLifecycleSummary = (input: {
   return `${labelize(stage)}${input.failureReason ? `; ${input.failureReason}` : ""}`;
 };
 
-const stagePlayOperatorStepTone = (
-  state: "done" | "active" | "blocked" | "pending" | "missing",
-): string => {
-  if (state === "done") return "border-emerald-700 bg-emerald-950/30 text-emerald-100";
-  if (state === "active") return "border-cyan-700 bg-cyan-950/30 text-cyan-100";
-  if (state === "blocked") return "border-rose-700 bg-rose-950/30 text-rose-100";
-  if (state === "pending") return "border-amber-700 bg-amber-950/30 text-amber-100";
+const stagePlayJourneyDotTone = (state: StagePlayJourneyState): string => {
+  if (state === "done") return "border-emerald-400 bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.45)]";
+  if (state === "active") return "border-cyan-300 bg-cyan-300 shadow-[0_0_22px_rgba(34,211,238,0.65)]";
+  if (state === "blocked") return "border-rose-300 bg-rose-400 shadow-[0_0_22px_rgba(251,113,133,0.55)]";
+  if (state === "pending") return "border-amber-300 bg-amber-300 shadow-[0_0_18px_rgba(251,191,36,0.45)]";
+  return "border-slate-600 bg-slate-800";
+};
+
+const stagePlayJourneyStationTone = (state: StagePlayJourneyState): string => {
+  if (state === "done") return "border-emerald-800/70 bg-emerald-950/20 text-emerald-100";
+  if (state === "active") return "border-cyan-500/80 bg-cyan-950/35 text-cyan-50 shadow-[0_16px_42px_rgba(34,211,238,0.14)]";
+  if (state === "blocked") return "border-rose-700/80 bg-rose-950/30 text-rose-100";
+  if (state === "pending") return "border-amber-700/70 bg-amber-950/25 text-amber-100";
   return "border-slate-800 bg-slate-950/70 text-slate-400";
 };
+
+const activeStagePlayJourneyIndex = (stations: StagePlayMailJourneyStation[]): number => {
+  const blocked = stations.findIndex((station) => station.state === "blocked");
+  if (blocked >= 0) return blocked;
+  const active = stations.findIndex((station) => station.state === "active");
+  if (active >= 0) return active;
+  const pending = stations.findIndex((station) => station.state === "pending");
+  if (pending >= 0) return pending;
+  const lastDone = stations.map((station) => station.state).lastIndexOf("done");
+  return Math.max(0, lastDone);
+};
+
+function StagePlayMailPacketBox({
+  station,
+  latestSummary,
+  mailAgeMs,
+  payloadChars,
+  packetChars,
+  deckLatencyMs,
+}: {
+  station: StagePlayMailJourneyStation;
+  latestSummary: string;
+  mailAgeMs: number | null;
+  payloadChars: number;
+  packetChars: number;
+  deckLatencyMs: number;
+}) {
+  return (
+    <div
+      className={`rounded-md border p-3 ${stagePlayJourneyStationTone(station.state)}`}
+      data-testid="stage-play-mail-journey-packet"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Moving mail payload</div>
+          <div className="mt-1 text-sm font-semibold">{station.title}</div>
+          <div className="mt-0.5 font-mono text-[10px] opacity-70">{station.status}</div>
+        </div>
+        <div className="rounded border border-current/25 px-2 py-1 font-mono text-[10px] opacity-80">
+          {labelize(station.state)}
+        </div>
+      </div>
+      <div className="mt-3 rounded border border-current/15 bg-black/25 p-3 text-sm leading-relaxed">
+        {compactStagePlayText(latestSummary, "The next visual-source observation will appear here before it is transformed.", 560)}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
+        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+          <div className="uppercase tracking-wide opacity-60">mail age</div>
+          <div className="mt-0.5 font-mono">{formatStagePlayMs(mailAgeMs)}</div>
+        </div>
+        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+          <div className="uppercase tracking-wide opacity-60">mail chars</div>
+          <div className="mt-0.5 font-mono">{formatStagePlayCount(payloadChars)}</div>
+        </div>
+        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+          <div className="uppercase tracking-wide opacity-60">packet chars</div>
+          <div className="mt-0.5 font-mono">{formatStagePlayCount(packetChars)}</div>
+        </div>
+        <div className="rounded border border-current/15 bg-black/20 px-2 py-1.5">
+          <div className="uppercase tracking-wide opacity-60">deck time</div>
+          <div className="mt-0.5 font-mono">{formatStagePlayMs(deckLatencyMs)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StagePlayMicroReasonerDeckColumn({
+  rows,
+  deckRuntimeLabel,
+  combinedRuntimeTone,
+}: {
+  rows: StagePlayMailJourneyReasonerRow[];
+  deckRuntimeLabel: string;
+  combinedRuntimeTone: "good" | "warn" | "blocked" | "default";
+}) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/70 p-3" data-testid="stage-play-mail-journey-micro-deck">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Micro-reasoner deck</div>
+          <div className="mt-0.5 text-xs text-slate-400">parallel checks bound into one packet verdict</div>
+        </div>
+        <span
+          className={`rounded border px-2 py-1 font-mono text-[10px] ${
+            combinedRuntimeTone === "blocked"
+              ? "border-rose-800 text-rose-100"
+              : combinedRuntimeTone === "warn"
+                ? "border-amber-800 text-amber-100"
+                : "border-slate-700 text-slate-300"
+          }`}
+        >
+          {deckRuntimeLabel}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-1">
+        {rows.map(({ role, run, display }) => (
+          <div
+            key={role}
+            className={`rounded border px-2.5 py-2 ${
+              run?.status === "completed"
+                ? "border-emerald-900/70 bg-emerald-950/15"
+                : run?.status === "failed"
+                  ? "border-rose-900/70 bg-rose-950/20"
+                  : "border-slate-800 bg-black/20"
+            }`}
+            data-testid="stage-play-mail-journey-reasoner"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="truncate text-[11px] font-semibold text-slate-100">{display.title}</div>
+              <div className="font-mono text-[9px] text-slate-500">{formatStagePlayMs(run?.latencyMs)}</div>
+            </div>
+            <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
+              {run?.outputPreview ?? display.missingPreview}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StagePlayMailJourneyRail({
+  stations,
+  deckRows,
+  latestSummary,
+  mailAgeMs,
+  payloadChars,
+  packetChars,
+  deckLatencyMs,
+  deckRuntimeLabel,
+  combinedRuntimeTone,
+}: {
+  stations: StagePlayMailJourneyStation[];
+  deckRows: StagePlayMailJourneyReasonerRow[];
+  latestSummary: string;
+  mailAgeMs: number | null;
+  payloadChars: number;
+  packetChars: number;
+  deckLatencyMs: number;
+  deckRuntimeLabel: string;
+  combinedRuntimeTone: "good" | "warn" | "blocked" | "default";
+}) {
+  const activeIndex = activeStagePlayJourneyIndex(stations);
+  const activeStation = stations[activeIndex] ?? stations[0];
+  const progressLeft = stations.length > 1 ? `${(activeIndex / (stations.length - 1)) * 100}%` : "0%";
+  return (
+    <div
+      className="rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3"
+      data-testid="stage-play-mail-journey-rail"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail journey</div>
+          <div className="mt-0.5 text-xs text-cyan-100/70">One payload travels through each station before Helix Ask can act.</div>
+        </div>
+        <div className="font-mono text-[10px] text-cyan-100/60">{stations.length} stations</div>
+      </div>
+      <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)_minmax(260px,320px)]">
+        <StagePlayMailPacketBox
+          station={activeStation}
+          latestSummary={latestSummary}
+          mailAgeMs={mailAgeMs}
+          payloadChars={payloadChars}
+          packetChars={packetChars}
+          deckLatencyMs={deckLatencyMs}
+        />
+        <div className="min-w-0 rounded-md border border-slate-800 bg-black/20 p-3">
+          <div className="relative h-10">
+            <div className="absolute left-4 right-4 top-1/2 h-px -translate-y-1/2 bg-slate-800" />
+            <div
+              className="absolute left-4 top-1/2 h-px -translate-y-1/2 bg-cyan-400 transition-all duration-500"
+              style={{ width: `calc(${progressLeft} - 1rem)` }}
+            />
+            <div
+              className="absolute top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border border-cyan-300 bg-cyan-950 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.55)] transition-all duration-500"
+              style={{ left: progressLeft }}
+              data-testid="stage-play-mail-journey-moving-box"
+              title={`Current station: ${activeStation?.title ?? "unknown"}`}
+            >
+              <Waypoints className="h-4 w-4" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-4" data-testid="stage-play-mail-journey-stations">
+            {stations.map((station, index) => (
+              <div
+                key={station.key}
+                className={`relative rounded-md border p-2.5 ${stagePlayJourneyStationTone(station.state)}`}
+                data-testid="stage-play-mail-journey-station"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full border ${stagePlayJourneyDotTone(station.state)}`} />
+                  <span className="font-mono text-[9px] opacity-70">{String(index + 1).padStart(2, "0")}</span>
+                </div>
+                <div className="mt-2 truncate text-[11px] font-semibold">{station.title}</div>
+                <div className="mt-0.5 truncate font-mono text-[9px] opacity-70">{station.status}</div>
+                <div className="mt-2 line-clamp-3 text-[10px] leading-snug opacity-85">{station.body}</div>
+                <div className="mt-2 truncate border-t border-current/15 pt-1.5 font-mono text-[9px] opacity-65">{station.meta}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <StagePlayMicroReasonerDeckColumn
+          rows={deckRows}
+          deckRuntimeLabel={deckRuntimeLabel}
+          combinedRuntimeTone={combinedRuntimeTone}
+        />
+      </div>
+    </div>
+  );
+}
 
 function resolveActiveWatchPolicy(input: {
   jobStates: StagePlayLiveSourceJobStateV1[];
@@ -3429,71 +3664,6 @@ function StagePlayMailLoopLiveOverview({
     nextRetryAt: currentWakeForOperator?.nextRetryAt ?? null,
     failureReason: currentWakeFailure,
   });
-  const routeOutcomeSteps: Array<{
-    key: string;
-    label: string;
-    detail: string;
-    state: "done" | "active" | "blocked" | "pending" | "missing";
-  }> = [
-    {
-      key: "mail",
-      label: "mail",
-      detail: latestMail ? formatStagePlayClock(latestMail.createdAt) : "none",
-      state: latestMail ? "done" : "missing",
-    },
-    {
-      key: "packet",
-      label: "packet",
-      detail: latestPacket?.recommendedNext ? labelize(latestPacket.recommendedNext) : "none",
-      state: latestPacket ? "done" : latestMail ? "pending" : "missing",
-    },
-    {
-      key: "wake",
-      label: "wake",
-      detail: currentWakeForOperator ? labelize(currentWakeStatus) : "none",
-      state: blockedBeforeAsk
-        ? "blocked"
-        : currentWakeForOperator
-          ? currentAskTurnId
-            ? "done"
-            : "active"
-          : latestPacket?.arbiter?.wakeAsk
-            ? "pending"
-            : "missing",
-    },
-    {
-      key: "ask",
-      label: "Ask",
-      detail: currentAskTurnId ? "entered" : blockedBeforeAsk ? "not started" : "waiting",
-      state: currentAskTurnId ? "done" : blockedBeforeAsk ? "blocked" : currentWakeForOperator ? "pending" : "missing",
-    },
-    {
-      key: "decision",
-      label: "decision",
-      detail: latestWakeDecision?.decision ? labelize(latestWakeDecision.decision) : "none",
-      state: latestWakeDecision ? "done" : currentAskTurnId ? "pending" : blockedBeforeAsk ? "blocked" : "missing",
-    },
-    {
-      key: "voice",
-      label: "voice",
-      detail: voiceStatusLabel,
-      state: currentWakeStage === "voice_delivered" || currentWakeStage === "voice_held" || currentWakeStage === "voice_blocked"
-        ? "done"
-        : currentWakeStage === "voice_queued_retry" || currentWakeStage === "voice_unknown" || voiceCheckpointRefs.length > 0
-          ? "pending"
-        : voiceRequested
-          ? blockedBeforeAsk
-            ? "blocked"
-            : "pending"
-          : "missing",
-    },
-    {
-      key: "final",
-      label: "final",
-      detail: currentWakeResultForOperator?.status === "completed" ? "checkpoint reached" : currentAskTurnId ? "debug possible" : "no Ask debug",
-      state: currentWakeResultForOperator?.status === "completed" ? "done" : currentAskTurnId ? "pending" : blockedBeforeAsk ? "blocked" : "missing",
-    },
-  ];
   const mailTransformSteps: Array<{
     key: string;
     title: string;
@@ -3519,6 +3689,14 @@ function StagePlayMailLoopLiveOverview({
       state: latestMail ? "done" : "missing",
     },
     {
+      key: "micro-deck",
+      title: "Micro-reasoner deck",
+      status: latestPacket?.arbiter?.recommendedNext ? labelize(latestPacket.arbiter.recommendedNext) : "binding",
+      body: compactStagePlayText(latestPacket?.arbiter?.reason, "Deck outputs are still binding into an arbiter verdict.", 190),
+      meta: `${latestPacketRuns.length || runs.length} runs | ${formatStagePlayMs(deckLatencyMs)} | ${formatStagePlayCount(runChars)} chars`,
+      state: latestPacket?.arbiter ? "done" : latestPacket ? "active" : "missing",
+    },
+    {
       key: "processed-packet",
       title: "Processed packet",
       status: latestPacket?.recommendedNext ? labelize(latestPacket.recommendedNext) : "not processed",
@@ -3527,14 +3705,6 @@ function StagePlayMailLoopLiveOverview({
         : "Micro-reasoner packet has not been composed yet.",
       meta: latestPacket ? `${formatStagePlayCount(packetChars)} chars | ${formatStagePlayClock(latestPacket.createdAt)}` : "packet pending",
       state: latestPacket ? "done" : latestMail ? "pending" : "missing",
-    },
-    {
-      key: "micro-deck",
-      title: "Micro-reasoner deck",
-      status: latestPacket?.arbiter?.recommendedNext ? labelize(latestPacket.arbiter.recommendedNext) : "binding",
-      body: compactStagePlayText(latestPacket?.arbiter?.reason, "Deck outputs are still binding into an arbiter verdict.", 190),
-      meta: `${latestPacketRuns.length || runs.length} runs | ${formatStagePlayMs(deckLatencyMs)} | ${formatStagePlayCount(runChars)} chars`,
-      state: latestPacket?.arbiter ? "done" : latestPacket ? "active" : "missing",
     },
     {
       key: "wake",
@@ -3744,82 +3914,22 @@ function StagePlayMailLoopLiveOverview({
         </div>
       </div>
 
-      <div
-        className="grid gap-4 rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3 lg:grid-cols-[320px_minmax(0,1fr)]"
-        data-testid="stage-play-mail-transform-rail"
-      >
-        <div className="rounded-md border border-cyan-800/50 bg-black/25 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Mail box</div>
-              <div className="mt-1 text-sm font-semibold text-slate-50">
-                {latestMail ? "Observation payload moving through loop" : "Waiting for observation"}
-              </div>
-            </div>
-            <Waypoints className="h-4 w-4 text-cyan-300" aria-hidden="true" />
-          </div>
-          <div className="mt-3 min-h-[128px] rounded border border-cyan-900/50 bg-slate-950 p-3 text-sm leading-relaxed text-cyan-50">
-            {compactStagePlayText(latestSummary, "The next visual-source observation will appear here before it is transformed.", 560)}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
-            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
-              <div className="uppercase tracking-wide text-slate-500">mail age</div>
-              <div className="mt-0.5 font-mono text-slate-200">{formatStagePlayMs(mailAgeMs)}</div>
-            </div>
-            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
-              <div className="uppercase tracking-wide text-slate-500">payload</div>
-              <div className="mt-0.5 font-mono text-slate-200">{formatStagePlayCount(latestMail?.summary.text.length ?? 0)}</div>
-            </div>
-          </div>
-        </div>
-        <div className="min-w-0">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Transformation route</div>
-              <div className="mt-0.5 text-xs text-cyan-100/70">Each stop rewrites the same mail payload into the next artifact; the final box hands off to Helix Ask.</div>
-            </div>
-            <div className="font-mono text-[10px] text-cyan-100/60">{mailTransformSteps.length} stops</div>
-          </div>
-          <div className="grid gap-3 xl:grid-cols-7" data-testid="stage-play-mail-transform-steps">
-            {mailTransformSteps.map((step, index) => {
-              const isAskHandoff = step.key === "ask-handoff";
-              return (
-                <div
-                  key={step.key}
-                  className={`relative min-h-[168px] rounded-md border p-3 ${stagePlayOperatorStepTone(step.state)} ${
-                    isAskHandoff ? "shadow-[12px_0_32px_rgba(34,211,238,0.18)]" : ""
-                  }`}
-                  data-testid="stage-play-mail-transform-step"
-                >
-                  {index < mailTransformSteps.length - 1 ? (
-                    <div className="pointer-events-none absolute -right-3 top-1/2 hidden h-px w-3 bg-cyan-500/60 xl:block" />
-                  ) : (
-                    <div className="pointer-events-none absolute -right-6 top-1/2 hidden h-px w-6 bg-gradient-to-r from-cyan-400/70 to-transparent xl:block" />
-                  )}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold">{step.title}</div>
-                      <div className="mt-0.5 truncate font-mono text-[10px] opacity-70">{step.status}</div>
-                    </div>
-                    <span className="rounded border border-current/30 px-1.5 py-0.5 font-mono text-[9px] opacity-80">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                  <div className="mt-3 line-clamp-4 text-[11px] leading-snug opacity-90">{step.body}</div>
-                  <div className="absolute bottom-3 left-3 right-3 truncate border-t border-current/15 pt-2 font-mono text-[9px] opacity-70">
-                    {step.meta}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <StagePlayMailJourneyRail
+        stations={mailTransformSteps}
+        deckRows={deckRows}
+        latestSummary={latestSummary}
+        mailAgeMs={mailAgeMs}
+        payloadChars={latestMail?.summary.text.length ?? 0}
+        packetChars={packetChars}
+        deckLatencyMs={deckLatencyMs}
+        deckRuntimeLabel={deckRuntimeLabel}
+        combinedRuntimeTone={combinedRuntimeTone}
+      />
 
       <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-summary">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Route outcome</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ask handoff status</div>
             <div className="mt-1 text-sm font-semibold text-slate-100">
               {blockedBeforeAsk
                 ? "Blocked before Ask"
@@ -3847,18 +3957,6 @@ function StagePlayMailLoopLiveOverview({
               <div className="mt-0.5 truncate font-mono text-slate-200">{runtimePressureLabel}</div>
             </div>
           </div>
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-7" data-testid="stage-play-mail-loop-route-outcome-strip">
-          {routeOutcomeSteps.map((step) => (
-            <div
-              key={step.key}
-              className={`rounded-md border px-2.5 py-2 ${stagePlayOperatorStepTone(step.state)}`}
-              data-testid="stage-play-mail-loop-route-step"
-            >
-              <div className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{step.label}</div>
-              <div className="mt-1 truncate font-mono text-[11px]">{step.detail}</div>
-            </div>
-          ))}
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <div className={`rounded-md border p-3 ${

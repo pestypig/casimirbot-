@@ -21,6 +21,7 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 const normalizeDomain = (value: unknown): StagePlayVisualObserverProfileDomainV1 => {
   if (
     value === "minecraft_gameplay" ||
+    value === "science" ||
     value === "browser_workflow" ||
     value === "video_scene" ||
     value === "desktop_app" ||
@@ -74,6 +75,36 @@ const minecraftGameplayObserverPrompt = [
   "}",
 ].join("\n");
 
+const solarSdoAia193ObserverPrompt = [
+  "You are observing real NASA/SDO AIA solar imagery in the 193 angstrom passband.",
+  "",
+  "Use this shade to classify solar activity through coronal-hole placement, active-region structure, and solar-atmosphere morphology.",
+  "AIA 193 A primarily shows Fe XII coronal plasma near 1.5 MK and can show very hot Fe XXIV emission during strong flares.",
+  "",
+  "Focus on:",
+  "- coronal holes: dark, broad, persistent low-emission regions; note polar/equatorial placement, boundaries, extension toward disk center, and whether they could be confused with filaments or limb darkening",
+  "- active regions and sunspot proxies: bright compact loop systems, loop footpoints, moss, plage-like EUV brightening, magnetic complexity proxies, and whether true umbra/penumbra classification needs HMI continuum or magnetogram support",
+  "- solar activity cues: flares, saturated pixels, compact brightenings, jets, post-eruption arcades, EUV waves, coronal dimming, CME launch signatures, and new/emerging bright loops",
+  "- corona and atmosphere features: loop arcades, fan loops, transequatorial loops, streamers near the limb, polar plumes, bright points, filaments/prominences seen as dark absorption, and off-limb emission",
+  "- wavelength-specific uncertainty: do not over-claim visible-light sunspot classes from AIA 193 alone; say when another wavelength is needed",
+  "",
+  "Return semi-structured JSON:",
+  "{",
+  '  "wavelength_angstrom": 193,',
+  '  "passband": "SDO AIA 193",',
+  '  "solar_disk_orientation": "...",',
+  '  "coronal_holes": [],',
+  '  "active_regions": [],',
+  '  "sunspot_proxy_assessment": "...",',
+  '  "activity_cues": [],',
+  '  "atmospheric_features": [],',
+  '  "flare_or_cme_cues": [],',
+  '  "classification": "...",',
+  '  "uncertainty_notes": [],',
+  '  "confidence": 0.0',
+  "}",
+].join("\n");
+
 const defaultPromptFor = (title: string): string =>
   `Summarize this permission-bound live frame as compact evidence for ${title}. Focus on visible scene, activity, objects, UI context, changes, and uncertainty.`;
 
@@ -83,6 +114,8 @@ const defaultProfiles = (): StagePlayVisualObserverProfileV1[] => {
     id: string;
     title: string;
     domain: StagePlayVisualObserverProfileDomainV1;
+    subjectCategory?: string | null;
+    subject?: string | null;
     prompt?: string;
     outputMode?: StagePlayVisualObserverProfileOutputModeV1;
     fields?: string[];
@@ -95,6 +128,8 @@ const defaultProfiles = (): StagePlayVisualObserverProfileV1[] => {
       profileId: `stage_play_visual_observer_profile:${input.id}`,
       title: input.title,
       domain: input.domain,
+      subjectCategory: input.subjectCategory ?? null,
+      subject: input.subject ?? null,
       sourceIds: [],
       prompt,
       outputMode: input.outputMode ?? "semi_structured_json",
@@ -123,6 +158,8 @@ const defaultProfiles = (): StagePlayVisualObserverProfileV1[] => {
       id: "minecraft-gameplay:v1",
       title: "Minecraft Gameplay Observer",
       domain: "minecraft_gameplay",
+      subjectCategory: "Gaming",
+      subject: "Minecraft gameplay",
       prompt: minecraftGameplayObserverPrompt,
       fields: [
         "scene",
@@ -138,6 +175,38 @@ const defaultProfiles = (): StagePlayVisualObserverProfileV1[] => {
         "confidence",
       ],
       requiredFields: ["scene", "current_action", "changed_since_last_frame", "risk_cues", "next_10s_prediction"],
+    }),
+    seed({
+      id: "solar-sdo-aia-193:v1",
+      title: "SDO AIA 193 Solar Activity Observer",
+      domain: "science",
+      subjectCategory: "Science",
+      subject: "Solar activity / SDO AIA 193 angstrom",
+      prompt: solarSdoAia193ObserverPrompt,
+      fields: [
+        "wavelength_angstrom",
+        "passband",
+        "solar_disk_orientation",
+        "coronal_holes",
+        "active_regions",
+        "sunspot_proxy_assessment",
+        "activity_cues",
+        "atmospheric_features",
+        "flare_or_cme_cues",
+        "classification",
+        "uncertainty_notes",
+        "confidence",
+      ],
+      requiredFields: [
+        "wavelength_angstrom",
+        "passband",
+        "coronal_holes",
+        "active_regions",
+        "sunspot_proxy_assessment",
+        "activity_cues",
+        "uncertainty_notes",
+        "confidence",
+      ],
     }),
     seed({ id: "browser-workflow:v1", title: "Browser Workflow Observer", domain: "browser_workflow" }),
     seed({ id: "video-scene:v1", title: "Video Scene Observer", domain: "video_scene" }),
@@ -156,6 +225,8 @@ export function ensureDefaultStagePlayVisualObserverProfiles(): StagePlayVisualO
 export function recordStagePlayVisualObserverProfile(input: {
   title?: string | null;
   domain?: StagePlayVisualObserverProfileDomainV1 | string | null;
+  subjectCategory?: string | null;
+  subject?: string | null;
   sourceIds?: string[];
   prompt: string;
   outputMode?: StagePlayVisualObserverProfileOutputModeV1 | string | null;
@@ -177,6 +248,8 @@ export function recordStagePlayVisualObserverProfile(input: {
     profileId: `stage_play_visual_observer_profile:${hashShort([title, input.domain ?? null, prompt, now])}`,
     title,
     domain: normalizeDomain(input.domain),
+    subjectCategory: input.subjectCategory ?? null,
+    subject: input.subject ?? null,
     sourceIds: uniqueStrings(input.sourceIds ?? []),
     prompt,
     outputMode: normalizeOutputMode(input.outputMode),

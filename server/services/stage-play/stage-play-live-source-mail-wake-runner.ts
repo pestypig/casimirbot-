@@ -225,6 +225,55 @@ const manualPressureOverrideEnabled = (): boolean =>
 const isManualPressureOverrideReason = (reason: string | null | undefined): boolean =>
   manualPressureOverrideEnabled() && /(?:^|:)(?:runtime_memory_queue_deferrable|queue_deferrable)$/i.test(String(reason ?? ""));
 
+type StagePlayMailWakePriority = "urgent_voice" | "ask_wake" | "local_observer";
+
+const isDeferrablePressureReason = (reason: string | null | undefined): boolean =>
+  /(?:^|:)(?:runtime_memory_queue_deferrable|queue_deferrable)$/i.test(String(reason ?? ""));
+
+const classifyWakePriority = (input: {
+  processedPacket: StagePlayProcessedMailPacketV1;
+  immersionState: StagePlayLiveSourceImmersionStateV1;
+  predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+}): {
+  priority: StagePlayMailWakePriority;
+  reason: string;
+} => {
+  const packet = input.processedPacket;
+  const salience = input.immersionState.salience;
+  const arbiterRequestsVoice =
+    packet.arbiter?.recommendedNext === "request_voice_callout" &&
+    (packet.arbiter.voiceCandidate === true || packet.arbiter.wakeAsk === true);
+  const packetRequestsVoice =
+    packet.recommendedNext === "request_voice_callout" ||
+    input.predictionValidation.recommendedNext === "request_voice_callout";
+  if (
+    packetRequestsVoice &&
+    salience.level === "urgent" &&
+    (salience.voiceCandidate === true || arbiterRequestsVoice)
+  ) {
+    return {
+      priority: "urgent_voice",
+      reason: "processed_packet_urgent_voice_candidate",
+    };
+  }
+  if (
+    packet.arbiter?.wakeAsk === true ||
+    packet.recommendedNext !== "wait_for_next_summary" ||
+    input.predictionValidation.recommendedNext !== "wait_for_next_summary"
+  ) {
+    return {
+      priority: "ask_wake",
+      reason: packet.arbiter?.wakeAsk === true
+        ? "processed_packet_arbiter_wake"
+        : `processed_packet_${packet.recommendedNext}`,
+    };
+  }
+  return {
+    priority: "local_observer",
+    reason: "processed_packet_wait_for_next_summary",
+  };
+};
+
 const clipPromptText = (value: string | null | undefined, max = 420): string => {
   const trimmed = String(value ?? "").trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
@@ -2142,6 +2191,92 @@ const extractDecisionIds = (response: AskWakeTurnResponse): string[] => {
   return uniqueStrings(ids);
 };
 
+const recordMandatoryWakeDecisionFallback = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  processedPacket: StagePlayProcessedMailPacketV1;
+  askTurnId: string | null;
+  evidenceRefs: string[];
+  voicePolicy: StagePlayLiveSourceVoicePolicyV1;
+  now: string;
+}): StagePlayLiveSourceMailDecisionV1 | null => {
+  const recommended = input.processedPacket.recommendedNext;
+  if (recommended !== "request_voice_callout") return null;
+  if (input.processedPacket.mailIds.length === 0) return null;
+  const voiceDraft =
+    input.processedPacket.salience.calloutDraft ??
+    input.processedPacket.arbiter?.calloutDraft ??
+    input.processedPacket.observedFacts.find((fact) => /\b(?:fire|damage|hostile|mob|lava|combat|danger|sword)\b/i.test(fact)) ??
+    input.processedPacket.changedFacts.find((fact) => /\b(?:fire|damage|hostile|mob|lava|combat|danger|sword)\b/i.test(fact)) ??
+    null;
+  const requestedTool =
+    recommended === "request_voice_callout" && voiceDraft && input.voicePolicy.allowedNow
+      ? {
+          toolName: "live_env.request_interim_voice_callout",
+          args: {
+            kind: "tool_result",
+            text: voiceDraft,
+            max_chars: 140,
+            evidence_refs: uniqueStrings([
+              ...input.evidenceRefs,
+              input.processedPacket.packetId,
+              ...(input.askTurnId ? [input.askTurnId] : []),
+            ]),
+            reason_codes: uniqueStrings([
+              ...input.processedPacket.salience.reasons,
+              "mandatory_mailbox_decision_fallback",
+              "processed_packet_voice_candidate",
+            ]),
+          },
+        } as StagePlayLiveSourceMailDecisionV1["requestedTool"]
+      : null;
+  return recordLiveSourceMailDecisionForAsk({
+    threadId: input.wake.threadId,
+    roomId: input.wake.roomId ?? null,
+    environmentId: input.wake.environmentId ?? null,
+    mailIds: input.processedPacket.mailIds,
+    decision: recommended,
+    rationalePreview: [
+      "Mandatory mailbox decision fallback recorded after Ask returned without stage_play_live_source_mail_decision.",
+      `Processed packet ${input.processedPacket.packetId} recommended ${recommended}.`,
+      input.processedPacket.arbiter?.reason ?? null,
+    ].filter(Boolean).join(" "),
+    textAnswerDraft: recommended === "draft_text_answer"
+      ? uniqueStrings([
+          ...input.processedPacket.observedFacts,
+          ...input.processedPacket.changedFacts,
+        ]).slice(0, 3).join("; ") || null
+      : null,
+    voiceCalloutDraft: recommended === "request_voice_callout" ? voiceDraft : null,
+    voiceEnabled: input.voicePolicy.voiceEnabled,
+    voiceRequiresConfirmation: input.voicePolicy.requiresConfirmation,
+    voiceAllowedNow: input.voicePolicy.allowedNow,
+    voicePolicyReason: input.voicePolicy.reason ?? "mandatory_mailbox_decision_fallback",
+    requestedTool,
+    nextLoopState: recommended === "fail_closed" ? "blocked_tool_error" : "armed_for_next_summary",
+    observedFacts: input.processedPacket.observedFacts,
+    inferredMeaning: uniqueStrings([
+      ...input.processedPacket.inferredFacts,
+      ...input.processedPacket.changedFacts,
+    ]),
+    mailCoverage: {
+      readMailIds: input.processedPacket.mailIds,
+      interpretedMailIds: input.processedPacket.mailIds,
+      compressedMailIds: input.processedPacket.mailIds.length > 1 ? input.processedPacket.mailIds : [],
+      skippedMailIds: [],
+      mode: input.processedPacket.mailIds.length > 1 ? "micro_batch" : "latest_only",
+      reason: "Mandatory fallback preserved processed-packet coverage after Ask omitted the decision receipt.",
+    },
+    evidenceRefs: uniqueStrings([
+      ...input.evidenceRefs,
+      input.processedPacket.packetId,
+      ...(input.askTurnId ? [input.askTurnId] : []),
+      "stage_play_mail_wake_decision_fallback:ask_missing_decision",
+    ]),
+    modelReviewed: false,
+    now: input.now,
+  });
+};
+
 const askWakeDebugInconsistencyRefs = (response: AskWakeTurnResponse): string[] => {
   const solver = readRecord(response.solver_controller_summary);
   const reentry = readRecord(response.evidence_reentry_proof);
@@ -2421,6 +2556,17 @@ export async function runNextMailWakeRequest(input: {
     ...(fastLayer.predictionValidation.evidenceRefs ?? []),
     ...(fastLayer.processedPacket.evidenceRefs ?? []),
   ]);
+  const wakePriority = classifyWakePriority({
+    processedPacket: fastLayer.processedPacket,
+    immersionState: fastLayer.immersionState,
+    predictionValidation: fastLayer.predictionValidation,
+  });
+  evidenceRefs = uniqueStrings([
+    ...evidenceRefs,
+    `stage_play_wake_priority:${wakePriority.priority}`,
+    `stage_play_wake_priority_reason:${wakePriority.reason}`,
+    `stage_play_wake_priority_authority:${fastLayer.processedPacket.packetId}`,
+  ]);
   const taskNeedsSlowAsk = Boolean(activeTaskKindFromSnapshot(taskQueueSnapshot));
   if (!fastLayer.shouldRunSlowAsk && !taskNeedsSlowAsk) {
     const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
@@ -2637,19 +2783,31 @@ export async function runNextMailWakeRequest(input: {
     wakeRequest: runningAttempt,
     now,
   }) ?? null;
+  const urgentVoicePressureBypass =
+    wakePriority.priority === "urgent_voice" &&
+    pressure?.deferred === true &&
+    isDeferrablePressureReason(pressure.reason);
   const manualPressureOverride = input.manualRun && pressure?.deferred === true && isManualPressureOverrideReason(pressure.reason);
+  if (urgentVoicePressureBypass) {
+    evidenceRefs = uniqueStrings([
+      ...evidenceRefs,
+      `stage_play_wake_pressure_bypass:urgent_voice:${pressure?.reason ?? "runtime_memory_pressure"}`,
+    ]);
+  }
   let admissionReleased = false;
   const releaseAdmission = (outcome: "completed" | "failed" | "rejected" | "aborted") => {
     if (admissionReleased) return;
     admissionReleased = true;
     pressure?.release?.(outcome);
   };
-  if (pressure?.deferred && !manualPressureOverride) {
+  if (pressure?.deferred && !manualPressureOverride && !urgentVoicePressureBypass) {
     const nextRetryAt = addMs(now, wakeAttemptBackoffMs(runningAttempt.attemptCount));
     const rawReason = pressure.reason ?? "runtime_memory_pressure";
-    const reason = input.manualRun && !rawReason.startsWith("manual_wake_deferred_for_pressure")
-      ? `manual_wake_deferred_for_pressure:${rawReason}`
-      : rawReason;
+    const reason = wakePriority.priority === "urgent_voice"
+      ? `urgent_pressure_blocked:${rawReason}`
+      : input.manualRun && !rawReason.startsWith("manual_wake_deferred_for_pressure")
+        ? `manual_wake_deferred_for_pressure:${rawReason}`
+        : rawReason;
     markStagePlayMailWakeRetryable({
       wakeRequestId: running.wakeRequestId,
       status: "deferred_for_pressure",
@@ -2668,14 +2826,17 @@ export async function runNextMailWakeRequest(input: {
       threadId: running.threadId,
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
-      status: "deferred_for_pressure",
-      failedReason: reason,
-      evidenceRefs,
-      createdAt: now,
-    });
-    return recordNonTerminalWakeTranscript({
-      wake: running,
-      wakeResult,
+        status: "deferred_for_pressure",
+        failedReason: reason,
+        evidenceRefs: uniqueStrings([
+          ...evidenceRefs,
+          wakePriority.priority === "urgent_voice" ? `stage_play_wake_pressure_blocked:${rawReason}` : null,
+        ]),
+        createdAt: now,
+      });
+      return recordNonTerminalWakeTranscript({
+        wake: running,
+        wakeResult,
       mailBatch,
       fastLayer,
       action: "pressure_blocked",
@@ -2693,7 +2854,29 @@ export async function runNextMailWakeRequest(input: {
     });
     const askDebugInconsistencyRefs = askWakeDebugInconsistencyRefs(response);
     const askTurnId = extractAskTurnId(response);
-    const decisionIds = extractDecisionIds(response);
+    let decisionIds = extractDecisionIds(response);
+    if (decisionIds.length === 0) {
+      const fallbackDecision = recordMandatoryWakeDecisionFallback({
+        wake: running,
+        processedPacket: fastLayer.processedPacket,
+        askTurnId,
+        evidenceRefs: uniqueStrings([
+          ...evidenceRefs,
+          ...(askTurnId ? [askTurnId] : []),
+          ...askDebugInconsistencyRefs,
+        ]),
+        voicePolicy,
+        now: new Date().toISOString(),
+      });
+      if (fallbackDecision) {
+        decisionIds = [fallbackDecision.decisionId];
+        evidenceRefs = uniqueStrings([
+          ...evidenceRefs,
+          fallbackDecision.decisionId,
+          "stage_play_mail_wake_decision_fallback:ask_missing_decision",
+        ]);
+      }
+    }
     if (decisionIds.length === 0) {
       const failedReason = "mail_wake_decision_missing";
       markStagePlayMailWakeTerminalFailed({

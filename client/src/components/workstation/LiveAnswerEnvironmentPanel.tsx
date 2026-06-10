@@ -396,6 +396,27 @@ const sourceCoverageSummary = (coverage?: HelixLiveCardLineSourceCoverage): stri
   return entries;
 };
 
+const visualShadeSubjectCategory = (profile: StagePlayVisualObserverProfileV1): string => {
+  if (profile.subjectCategory?.trim()) return profile.subjectCategory.trim();
+  if (profile.domain === "science") return "Science";
+  if (profile.domain === "minecraft_gameplay") return "Gaming";
+  if (profile.domain === "browser_workflow" || profile.domain === "desktop_app") return "Workflows";
+  if (profile.domain === "video_scene") return "Media";
+  if (profile.domain === "document") return "Documents";
+  return "General";
+};
+
+const visualShadeOptionLabel = (profile: StagePlayVisualObserverProfileV1): string =>
+  profile.subject?.trim() ? `${profile.title} - ${profile.subject.trim()}` : profile.title;
+
+const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV1[], activeProfile?: StagePlayVisualObserverProfileV1 | null): string => {
+  if (activeProfile && profiles.some((profile) => profile.profileId === activeProfile.profileId)) return activeProfile.profileId;
+  return profiles.find((profile) => profile.profileId === "stage_play_visual_observer_profile:solar-sdo-aia-193:v1")?.profileId ??
+    profiles.find((profile) => profile.profileId === "stage_play_visual_observer_profile:generic:v1")?.profileId ??
+    profiles[0]?.profileId ??
+    "";
+};
+
 const docEquationScopeLabel = (artifact: DocEquationContextArtifactV1): string => {
   if (artifact.commentaryHints.scope === "scalar_replay") return "Scalar replay";
   if (artifact.commentaryHints.scope === "runtime_artifact") return "Runtime artifact";
@@ -476,6 +497,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [visualObserverProfiles, setVisualObserverProfiles] = useState<StagePlayVisualObserverProfileV1[]>([]);
   const [activeVisualObserverProfile, setActiveVisualObserverProfile] = useState<StagePlayVisualObserverProfileV1 | null>(null);
+  const [selectedVisualObserverProfileId, setSelectedVisualObserverProfileId] = useState<string>("");
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -630,32 +652,38 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     [sourceHealthEntries],
   );
   const visualEvidenceHealth = visualLatest?.visual_evidence_health ?? null;
-  const minecraftVisualObserverProfile = useMemo(
-    () => visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === "stage_play_visual_observer_profile:minecraft-gameplay:v1") ??
-      visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.domain === "minecraft_gameplay") ??
-      null,
+  const visualShadeProfiles = useMemo(
+    () => visualObserverProfiles.filter((profile: StagePlayVisualObserverProfileV1) => profile.status === "active"),
     [visualObserverProfiles],
   );
-  const genericVisualObserverProfile = useMemo(
-    () => visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === "stage_play_visual_observer_profile:generic:v1") ??
-      visualObserverProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.title === "Generic Visual Observer") ??
+  const selectedVisualObserverProfile = useMemo(
+    () => visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === selectedVisualObserverProfileId) ??
+      visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === preferredVisualShadeProfileId(visualShadeProfiles, activeVisualObserverProfile)) ??
       null,
-    [visualObserverProfiles],
+    [activeVisualObserverProfile, selectedVisualObserverProfileId, visualShadeProfiles],
   );
+  const visualShadeGroups = useMemo(() => {
+    const groups = new Map<string, StagePlayVisualObserverProfileV1[]>();
+    for (const profile of visualShadeProfiles) {
+      const category = visualShadeSubjectCategory(profile);
+      groups.set(category, [...(groups.get(category) ?? []), profile]);
+    }
+    return Array.from(groups.entries())
+      .map(([category, profiles]) => ({
+        category,
+        profiles: profiles.sort((left, right) => left.title.localeCompare(right.title)),
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category));
+  }, [visualShadeProfiles]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     return sourceId ? state.producers[sourceId] ?? null : null;
   });
   const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
-  const minecraftShadeApplied = Boolean(
+  const selectedShadeApplied = Boolean(
     activeVisualObserverProfile &&
-      minecraftVisualObserverProfile &&
-      activeVisualObserverProfile.profileId === minecraftVisualObserverProfile.profileId,
-  );
-  const genericShadeApplied = Boolean(
-    activeVisualObserverProfile &&
-      genericVisualObserverProfile &&
-      activeVisualObserverProfile.profileId === genericVisualObserverProfile.profileId,
+      selectedVisualObserverProfile &&
+      activeVisualObserverProfile.profileId === selectedVisualObserverProfile.profileId,
   );
   const visualShadeStatus = activeVisualObserverProfile
     ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
@@ -826,6 +854,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const interval = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(interval);
   }, [threadId]);
+
+  useEffect(() => {
+    const selectionStillAvailable = visualShadeProfiles.some(
+      (profile: StagePlayVisualObserverProfileV1) => profile.profileId === selectedVisualObserverProfileId,
+    );
+    if (selectionStillAvailable) return;
+    const preferred = preferredVisualShadeProfileId(visualShadeProfiles, activeVisualObserverProfile);
+    if (preferred) setSelectedVisualObserverProfileId(preferred);
+  }, [activeVisualObserverProfile, selectedVisualObserverProfileId, visualShadeProfiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1584,31 +1621,43 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
+              <label className="sr-only" htmlFor="visual-observer-shade-select">
+                Visual observer shade subject
+              </label>
+              <select
+                id="visual-observer-shade-select"
+                aria-label="Visual observer shade subject"
+                value={selectedVisualObserverProfile?.profileId ?? ""}
+                onChange={(event) => setSelectedVisualObserverProfileId(event.currentTarget.value)}
+                disabled={visualShadeProfiles.length === 0}
+                className="min-w-[18rem] rounded border border-violet-300/30 bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-violet-100 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {visualShadeGroups.length === 0 ? (
+                  <option value="">No shade presets loaded</option>
+                ) : (
+                  visualShadeGroups.map((group) => (
+                    <optgroup key={group.category} label={`${group.category} subject`}>
+                      {group.profiles.map((profile) => (
+                        <option key={profile.profileId} value={profile.profileId}>
+                          {visualShadeOptionLabel(profile)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                )}
+              </select>
               <button
                 type="button"
-                aria-label="Apply Minecraft visual observer shade"
-                onClick={() => void applyVisualObserverProfile(minecraftVisualObserverProfile)}
-                disabled={!minecraftVisualObserverProfile}
+                aria-label="Apply selected visual observer shade"
+                onClick={() => void applyVisualObserverProfile(selectedVisualObserverProfile)}
+                disabled={!selectedVisualObserverProfile}
                 className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
-                  minecraftShadeApplied
+                  selectedShadeApplied
                     ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
                     : "border-violet-300/30 text-violet-100 hover:bg-violet-400/10"
                 }`}
               >
-                {minecraftShadeApplied ? "Minecraft applied" : "Apply Minecraft shade"}
-              </button>
-              <button
-                type="button"
-                aria-label="Apply generic visual observer shade"
-                onClick={() => void applyVisualObserverProfile(genericVisualObserverProfile)}
-                disabled={!genericVisualObserverProfile}
-                className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
-                  genericShadeApplied
-                    ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
-                    : "border-white/15 text-slate-200 hover:bg-white/10"
-                }`}
-              >
-                {genericShadeApplied ? "Generic applied" : "Apply Generic shade"}
+                {selectedShadeApplied ? "Selected shade applied" : "Apply selected shade"}
               </button>
               <button
                 type="button"
@@ -1620,9 +1669,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </button>
             </div>
           </div>
-          {!minecraftVisualObserverProfile || !genericVisualObserverProfile ? (
+          {visualShadeProfiles.length === 0 ? (
             <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1.5 text-[11px] text-amber-100">
               Shade presets are still loading. Refresh shades if the server was just restarted.
+            </p>
+          ) : null}
+          {selectedVisualObserverProfile?.subject ? (
+            <p className="mt-2 rounded border border-violet-300/15 bg-black/20 px-2 py-1.5 text-[11px] text-violet-100">
+              Selected subject: {visualShadeSubjectCategory(selectedVisualObserverProfile)} / {selectedVisualObserverProfile.subject}
             </p>
           ) : null}
           {activeVisualObserverProfile?.prompt ? (

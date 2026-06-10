@@ -9,6 +9,7 @@ export const STAGE_PLAY_VISUAL_OBSERVER_PROFILE_TEST_RESULT_SCHEMA =
 
 export type StagePlayVisualObserverProfileDomainV1 =
   | "minecraft_gameplay"
+  | "science"
   | "browser_workflow"
   | "video_scene"
   | "desktop_app"
@@ -31,6 +32,8 @@ export type StagePlayVisualObserverProfileV1 = {
   profileId: string;
   title: string;
   domain: StagePlayVisualObserverProfileDomainV1;
+  subjectCategory?: string | null;
+  subject?: string | null;
   sourceIds: string[];
   prompt: string;
   outputMode: StagePlayVisualObserverProfileOutputModeV1;

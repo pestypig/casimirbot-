@@ -2631,6 +2631,256 @@ describe("Stage Play live-source mailbox", () => {
     expect(result?.evidenceRefs).toEqual(expect.arrayContaining(transcriptEntries.map((entry) => entry.entryId)));
   });
 
+  it("lets urgent voice wakes bypass deferrable runtime pressure using processed-packet authority", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft source and call out immediate combat or hazard risk.",
+      decisionPolicyPrompt: "Request a voice callout when fire, lava, damage, hostile mobs, or combat risk appears.",
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      importanceCriteria: ["fire, lava, damage, hostile mobs, and combat risk are urgent."],
+      suppressCriteria: ["routine safe movement is not user-facing."],
+      now: "2026-06-04T12:01:20.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:urgent-pressure-bypass",
+      evidenceRef: "visual_evidence:urgent-pressure-bypass",
+      summaryText: "Minecraft player is on fire with a sword visible and damage risk near hostile mobs.",
+      createdAt: "2026-06-04T12:01:21.000Z",
+    });
+    queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      sourceId,
+      now: "2026-06-04T12:01:22.000Z",
+    });
+    let askCalls = 0;
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_queue_deferrable",
+      }),
+      askTurnRunner: async ({ wakeRequest }) => {
+        askCalls += 1;
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId: wakeRequest.threadId,
+          roomId: wakeRequest.roomId,
+          environmentId: wakeRequest.environmentId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "Urgent fire and damage cues should bypass deferrable pressure and request voice.",
+          voiceCalloutDraft: "Fire and damage risk visible.",
+          voiceEnabled: true,
+          voiceAllowedNow: true,
+          voiceRequiresConfirmation: false,
+          voicePolicyReason: "urgent_voice_allowed",
+          now: "2026-06-04T12:01:31.000Z",
+        });
+        return {
+          turn_id: "ask:urgent-pressure-bypass",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: decision,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(askCalls).toBe(1);
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:urgent-pressure-bypass",
+    });
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_wake_priority:urgent_voice",
+      expect.stringMatching(/^stage_play_wake_pressure_bypass:urgent_voice:runtime_memory_queue_deferrable$/),
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:urgent-pressure-bypass",
+      mailIds: expect.arrayContaining([mail.mailId]),
+      failureReason: null,
+    });
+    const packet = getLatestStagePlayProcessedMailPacket({
+      sourceId,
+      mailId: mail.mailId,
+    });
+    expect(packet).toMatchObject({
+      recommendedNext: "request_voice_callout",
+      salience: expect.objectContaining({
+        level: "urgent",
+        voiceCandidate: true,
+      }),
+    });
+  });
+
+  it("keeps urgent voice wakes blocked under hard pressure with an explicit urgent reason", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft source and call out immediate combat or hazard risk.",
+      decisionPolicyPrompt: "Request a voice callout when fire, lava, damage, hostile mobs, or combat risk appears.",
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      importanceCriteria: ["fire, lava, damage, hostile mobs, and combat risk are urgent."],
+      suppressCriteria: ["routine safe movement is not user-facing."],
+      now: "2026-06-04T12:01:20.000Z",
+    });
+    enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:urgent-pressure-blocked",
+      evidenceRef: "visual_evidence:urgent-pressure-blocked",
+      summaryText: "Minecraft player is on fire with visible damage risk near hostile mobs.",
+      createdAt: "2026-06-04T12:01:21.000Z",
+    });
+    queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      sourceId,
+      now: "2026-06-04T12:01:22.000Z",
+    });
+    let askCalls = 0;
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      pressureCheck: () => ({
+        deferred: true,
+        reason: "runtime_memory_host_memory_limit",
+      }),
+      askTurnRunner: async () => {
+        askCalls += 1;
+        throw new Error("should_not_call_ask_under_hard_pressure");
+      },
+    });
+
+    expect(askCalls).toBe(0);
+    expect(result).toMatchObject({
+      status: "deferred_for_pressure",
+      failedReason: "urgent_pressure_blocked:runtime_memory_host_memory_limit",
+      decisionIds: [],
+    });
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_wake_priority:urgent_voice",
+      "stage_play_wake_pressure_blocked:runtime_memory_host_memory_limit",
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "deferred_for_pressure",
+      failureReason: "urgent_pressure_blocked:runtime_memory_host_memory_limit",
+    });
+  });
+
+  it("records a mandatory fallback decision when an urgent voice Ask wake omits the mail decision receipt", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft source and call out immediate combat or hazard risk.",
+      decisionPolicyPrompt: "Request a voice callout when fire, lava, damage, hostile mobs, or combat risk appears.",
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      importanceCriteria: ["fire, lava, damage, hostile mobs, and combat risk are urgent."],
+      suppressCriteria: ["routine safe movement is not user-facing."],
+      now: "2026-06-04T12:01:20.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:urgent-missing-decision",
+      evidenceRef: "visual_evidence:urgent-missing-decision",
+      summaryText: "Minecraft player is on fire with a sword visible and damage risk near hostile mobs.",
+      createdAt: "2026-06-04T12:01:21.000Z",
+    });
+    queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      sourceId,
+      now: "2026-06-04T12:01:22.000Z",
+    });
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:30.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async () => ({
+        turn_id: "ask:urgent-missing-decision",
+        current_turn_artifact_ledger: [
+          {
+            kind: "agent_step_decision",
+            payload: {
+              decision_id: "ask:urgent-missing-decision:agent_step_decision",
+              chosen_capability: "model.direct_answer",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:urgent-missing-decision",
+    });
+    expect(result?.decisionIds).toHaveLength(1);
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_mail_wake_decision_fallback:ask_missing_decision",
+      expect.stringMatching(/^stage_play_live_source_voice_delivery_receipt:/),
+      expect.stringMatching(/^helix_interim_voice_callout_receipt:/),
+    ]));
+    const decision = listStagePlayMailDecisions({ threadId })[0];
+    expect(decision).toMatchObject({
+      decision: "request_voice_callout",
+      modelReviewed: false,
+      mailIds: expect.arrayContaining([mail.mailId]),
+      requestedTool: expect.objectContaining({
+        toolName: "live_env.request_interim_voice_callout",
+      }),
+    });
+    expect(decision.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_mail_wake_decision_fallback:ask_missing_decision",
+      "ask:urgent-missing-decision",
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:urgent-missing-decision",
+      decisionIds: [decision.decisionId],
+    });
+  });
+
   it("labels manual pressure deferrals without reading or deciding mail", async () => {
     seedVisualEvidence();
     let askCalls = 0;
