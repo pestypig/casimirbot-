@@ -233,6 +233,24 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(appended.at(-1)?.content).toBe("Latest final answer");
   });
 
+  it("keeps a durable transcript window instead of pruning completed chat to the active queue size", () => {
+    const replies = Array.from({ length: 12 }, (_, index) => ({
+      id: `reply-${index}`,
+      createdAtMs: 1_000 + index,
+      question: `question ${index}`,
+      content: `answer ${index}`,
+      debug: { turn_id: `turn-${index}` },
+    })) as any[];
+
+    const appended = appendHelixAskReplyChronologically(
+      replies.slice(0, 11),
+      replies[11],
+    );
+
+    expect(appended).toHaveLength(12);
+    expect(appended.map((reply: any) => reply.id)).toEqual(replies.map((reply) => reply.id));
+  });
+
   it("hides the active stream once the same turn has a durable reply", () => {
     const durableActiveReply = {
       id: "reply-final",
@@ -376,6 +394,12 @@ describe("HelixAskPill mic-first surface contract", () => {
     ])).toBe(true);
     expect(isDurableHelixAskMailTranscriptGroup([
       buildEntry("text_answer", { row: { terminalEligible: true } }),
+    ])).toBe(true);
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("typed_failure", { row: { body: "solver authority failed" } }),
+    ])).toBe(true);
+    expect(isDurableHelixAskMailTranscriptGroup([
+      buildEntry("final_answer", { row: { body: "Completed mailbox answer." } }),
     ])).toBe(true);
   });
 
@@ -1154,7 +1178,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("setAskReplies((prev) =>");
     expect(source).toContain('question: ""');
     expect(source).toContain("durableById.get(reply.id) ?? reply");
-    expect(source).toContain("limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], 8)");
+    expect(source).toContain("limitHelixAskRepliesChronologically([...merged, ...nextDurableReplies], HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT)");
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("appendHelixAskReplyChronologically");
     expect(source).toContain("chronologicalAskRepliesForState");

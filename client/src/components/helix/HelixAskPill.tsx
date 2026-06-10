@@ -8690,7 +8690,6 @@ export function isDurableHelixAskMailTranscriptGroup(
       case "checkpoint_summary":
       case "final_answer":
       case "terminal_answer":
-      case "text_answer":
       case "typed_failure":
       case "wait_for_next_summary":
       case "voice_receipt":
