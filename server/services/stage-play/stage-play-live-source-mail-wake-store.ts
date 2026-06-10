@@ -318,6 +318,43 @@ export function listRunnableStagePlayLiveSourceMailWakeRequests(input: {
   });
 }
 
+export function releaseStaleRunningStagePlayMailWakeRequests(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  now?: string;
+  staleAfterMs: number;
+  failureReason?: string;
+  nextRetryAt?: string | null;
+  limit?: number;
+}): StagePlayLiveSourceMailWakeRequestV1[] {
+  const now = input.now ?? new Date().toISOString();
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs) || !Number.isFinite(input.staleAfterMs) || input.staleAfterMs <= 0) return [];
+  const released: StagePlayLiveSourceMailWakeRequestV1[] = [];
+  for (const wake of listStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    status: "running",
+    limit: input.limit ?? 250,
+  })) {
+    const anchorMs = Date.parse(wake.lastAttemptAt ?? wake.updatedAt);
+    if (!Number.isFinite(anchorMs)) continue;
+    if (nowMs - anchorMs <= input.staleAfterMs) continue;
+    const updated = markStagePlayMailWakeRetryable({
+      wakeRequestId: wake.wakeRequestId,
+      failureReason: input.failureReason ?? "wake_cycle_stale_released",
+      nextRetryAt: input.nextRetryAt ?? now,
+      now,
+    });
+    if (updated) released.push(updated);
+  }
+  return released;
+}
+
 const updateWake = (
   wakeRequestId: string,
   patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "evidenceRefs" | "updatedAt">>,

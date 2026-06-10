@@ -16,6 +16,8 @@ import {
 import {
   listRunnableStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeRequests,
+  recordStagePlayMailWakeResult,
+  releaseStaleRunningStagePlayMailWakeRequests,
 } from "./stage-play-live-source-mail-wake-store";
 import type {
   StagePlayLiveSourceMailWakeResultV1,
@@ -28,6 +30,16 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
   runnableWakeIds: string[];
   runningWakeIds: string[];
   deferredWakeIds: string[];
+  lockState: {
+    cycleRunning: boolean;
+    cycleStartedAt: string | null;
+    runningWakeIdsBeforeRelease: string[];
+    runningWakeIdsAfterRelease: string[];
+    releasedStaleWakeIds: string[];
+    staleAfterMs: number;
+    status: "free" | "held" | "released_stale_wakes";
+    reason: string;
+  };
   result: StagePlayLiveSourceMailWakeResultV1 | null;
   status: "idle" | "queued" | "running" | "completed" | "deferred_for_pressure" | "failed_retryable" | "failed_terminal" | "failed";
   reason: string;
@@ -66,6 +78,7 @@ const WAKE_SERVICE_RUNTIME_TASK_ID = "stage_play_live_source_mail_wake_service";
 let serviceTimer: ReturnType<typeof setInterval> | null = null;
 let immediateRunTimer: ReturnType<typeof setTimeout> | null = null;
 let cycleRunning = false;
+let cycleStartedAt: string | null = null;
 let servicePaused = false;
 let unsubscribeMailEnqueued: (() => void) | null = null;
 
@@ -105,6 +118,9 @@ const wakeRuntimePressureCheck = (runtimeAdmissionSink?: (decision: RuntimeAdmis
 
 const immediateRunDelayMs = (): number =>
   readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_IMMEDIATE_DELAY_MS", 250);
+
+const staleRunningWakeMs = (): number =>
+  readPositiveIntEnv("STAGE_PLAY_MAIL_WAKE_STALE_RUNNING_MS", 130_000);
 
 const readPositiveNumberEnv = (name: string, fallback: number): number => {
   const parsed = Number(process.env[name]);
@@ -205,6 +221,7 @@ const summarizeWakeState = (input: {
   runtimeAdmission: RuntimeAdmissionDecision | null;
   reason?: string;
   continuation?: StagePlayLiveSourceMailWakeAdmissionCycleResultV1["continuation"] | null;
+  lockState?: Partial<StagePlayLiveSourceMailWakeAdmissionCycleResultV1["lockState"]> | null;
 }): StagePlayLiveSourceMailWakeAdmissionCycleResultV1 => {
   const wakes = listStagePlayLiveSourceMailWakeRequests({ limit: 250 });
   const runnable = listRunnableStagePlayLiveSourceMailWakeRequests({ now: input.now, limit: 250 });
@@ -224,6 +241,16 @@ const summarizeWakeState = (input: {
     runnableWakeIds: runnable.map((wake) => wake.wakeRequestId),
     runningWakeIds: running.map((wake) => wake.wakeRequestId),
     deferredWakeIds: deferred.map((wake) => wake.wakeRequestId),
+    lockState: {
+      cycleRunning,
+      cycleStartedAt,
+      runningWakeIdsBeforeRelease: input.lockState?.runningWakeIdsBeforeRelease ?? running.map((wake) => wake.wakeRequestId),
+      runningWakeIdsAfterRelease: input.lockState?.runningWakeIdsAfterRelease ?? running.map((wake) => wake.wakeRequestId),
+      releasedStaleWakeIds: input.lockState?.releasedStaleWakeIds ?? [],
+      staleAfterMs: input.lockState?.staleAfterMs ?? staleRunningWakeMs(),
+      status: input.lockState?.status ?? (cycleRunning || running.length > 0 ? "held" : "free"),
+      reason: input.lockState?.reason ?? (cycleRunning ? "wake_cycle_mutex_running" : running.length > 0 ? "wake_request_running" : "no_wake_lock"),
+    },
     result: input.result,
     status,
     reason: input.reason ?? (input.result ? "wake_result_recorded" : "no_runnable_wake"),
@@ -396,18 +423,79 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
   pressureCheck?: StagePlayMailWakePressureCheck | null;
   manualRun?: boolean;
 } = {}): Promise<StagePlayLiveSourceMailWakeAdmissionCycleResultV1> {
+  const now = input.now ?? new Date().toISOString();
   if (cycleRunning) {
     return summarizeWakeState({
-      now: input.now ?? new Date().toISOString(),
+      now,
       result: null,
       runtimeAdmission: null,
       reason: "wake_cycle_already_running",
+      lockState: {
+        cycleRunning: true,
+        cycleStartedAt,
+        status: "held",
+        reason: "wake_cycle_mutex_running",
+      },
     });
   }
   cycleRunning = true;
-  const now = input.now ?? new Date().toISOString();
+  cycleStartedAt = now;
   let runtimeAdmission: RuntimeAdmissionDecision | null = null;
   try {
+    const runningWakeIdsBeforeRelease = listStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId ?? null,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      status: "running",
+      limit: 250,
+    }).map((wake) => wake.wakeRequestId);
+    const staleAfterMs = staleRunningWakeMs();
+    const releasedStaleWakes = releaseStaleRunningStagePlayMailWakeRequests({
+      threadId: input.threadId ?? null,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      now,
+      staleAfterMs,
+      failureReason: "wake_cycle_stale_released",
+      nextRetryAt: now,
+      limit: 250,
+    });
+    for (const wake of releasedStaleWakes) {
+      recordStagePlayMailWakeResult({
+        wakeRequestId: wake.wakeRequestId,
+        threadId: wake.threadId,
+        roomId: wake.roomId ?? null,
+        environmentId: wake.environmentId ?? null,
+        status: "failed_retryable",
+        failedReason: "wake_cycle_stale_released",
+        evidenceRefs: wake.evidenceRefs,
+        createdAt: now,
+      });
+    }
+    const runningWakeIdsAfterRelease = listStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId ?? null,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      status: "running",
+      limit: 250,
+    }).map((wake) => wake.wakeRequestId);
+    const lockState: Partial<StagePlayLiveSourceMailWakeAdmissionCycleResultV1["lockState"]> = {
+      cycleRunning: false,
+      cycleStartedAt: now,
+      runningWakeIdsBeforeRelease,
+      runningWakeIdsAfterRelease,
+      releasedStaleWakeIds: releasedStaleWakes.map((wake) => wake.wakeRequestId),
+      staleAfterMs,
+      status: runningWakeIdsAfterRelease.length > 0 ? "held" : releasedStaleWakes.length > 0 ? "released_stale_wakes" : "free",
+      reason: runningWakeIdsAfterRelease.length > 0
+        ? "wake_request_running"
+        : releasedStaleWakes.length > 0
+          ? "wake_cycle_stale_released"
+          : "no_stale_wake_lock",
+    };
     const jobs = listStagePlayLiveSourceJobStates({
       threadId: input.threadId ?? null,
       roomId: input.roomId ?? null,
@@ -463,9 +551,11 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       runtimeAdmission,
       reason: result ? "wake_admitted" : "no_runnable_wake",
       continuation,
+      lockState,
     });
   } finally {
     cycleRunning = false;
+    cycleStartedAt = null;
   }
 }
 
@@ -512,6 +602,7 @@ export function stopStagePlayLiveSourceMailWakeServiceForTest(): void {
   immediateRunTimer = null;
   serviceTimer = null;
   cycleRunning = false;
+  cycleStartedAt = null;
   servicePaused = false;
   runtimeMemoryGovernor.unregisterPausableRuntimeTask(WAKE_SERVICE_RUNTIME_TASK_ID);
 }

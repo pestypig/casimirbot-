@@ -3486,6 +3486,95 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("server admission cycle releases a stale running wake before dispatching Ask", async () => {
+    seedVisualEvidence();
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z");
+
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:05:20.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async ({ wakeRequest }) => ({
+        turn_id: "ask:wake-cycle-stale-release",
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: "stage_play_live_source_mail_decision:wake-cycle-stale-release",
+                mailIds: wakeRequest.mailIds,
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(cycle).toMatchObject({
+      status: "completed",
+      reason: "wake_admitted",
+      lockState: {
+        runningWakeIdsBeforeRelease: [wake.wakeRequestId],
+        runningWakeIdsAfterRelease: [],
+        releasedStaleWakeIds: [wake.wakeRequestId],
+        status: "released_stale_wakes",
+        reason: "wake_cycle_stale_released",
+      },
+      result: {
+        status: "completed",
+        askTurnId: "ask:wake-cycle-stale-release",
+        decisionIds: ["stage_play_live_source_mail_decision:wake-cycle-stale-release"],
+      },
+    });
+    const wakeResults = listStagePlayLiveSourceMailWakeResults({ threadId });
+    expect(wakeResults.some((result) =>
+      result.status === "failed_retryable" &&
+      result.failedReason === "wake_cycle_stale_released" &&
+      result.wakeRequestId === wake.wakeRequestId
+    )).toBe(true);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      attemptCount: 2,
+    });
+  });
+
+  it("server admission cycle keeps a fresh running wake locked and does not call Ask", async () => {
+    seedVisualEvidence();
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:05:00.000Z");
+
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:05:20.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async () => {
+        throw new Error("should_not_run_while_fresh_wake_running");
+      },
+    });
+
+    expect(cycle).toMatchObject({
+      status: "running",
+      reason: "no_runnable_wake",
+      lockState: {
+        runningWakeIdsBeforeRelease: [wake.wakeRequestId],
+        runningWakeIdsAfterRelease: [wake.wakeRequestId],
+        releasedStaleWakeIds: [],
+        status: "held",
+        reason: "wake_request_running",
+      },
+      result: null,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "running",
+      attemptCount: 1,
+    });
+  });
+
   it("does not inject unrelated live-source mail context without an explicitly armed watch job", () => {
     const mail = enqueueStagePlayLiveSourceMailItem({
       threadId,
