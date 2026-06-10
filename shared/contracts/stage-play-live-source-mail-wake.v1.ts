@@ -27,8 +27,10 @@ export type StagePlayLiveSourceMailWakeLifecycleStageV1 =
   | "decision_recorded"
   | "voice_pending"
   | "voice_delivered"
+  | "voice_queued_retry"
   | "voice_held"
   | "voice_blocked"
+  | "voice_unknown"
   | "completed"
   | "expired"
   | "failed";

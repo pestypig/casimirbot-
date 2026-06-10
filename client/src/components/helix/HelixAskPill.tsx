@@ -55,6 +55,7 @@ import {
   clearPendingHelixAskPrompt,
   consumePendingHelixAskPrompt,
   type HelixAskAnswerContract,
+  type HelixAskRouteMetadata,
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
 import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
@@ -5818,6 +5819,7 @@ type RunAskOptions = {
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
+  routeMetadata?: HelixAskRouteMetadata;
   contextMode?: "attached" | "isolated";
   skipContextChooser?: boolean;
   visualCapability?: Record<string, unknown>;
@@ -31657,6 +31659,7 @@ export function HelixAskPill({
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
+              routeMetadata: options?.routeMetadata,
             };
             try {
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
@@ -31719,6 +31722,7 @@ export function HelixAskPill({
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
+              routeMetadata: options?.routeMetadata,
             });
             localResponse = askResult.response;
             downgradedFromMode = askResult.downgradedFromMode;
@@ -32748,6 +32752,7 @@ export function HelixAskPill({
       const forceReasoningDispatch = pending?.forceReasoningDispatch === true;
       const suppressWorkstationPayloadActions = pending?.suppressWorkstationPayloadActions === true;
       const answerContract = pending?.answerContract;
+      const routeMetadata = pending?.routeMetadata;
       const externalTurnId =
         String(pending?.traceId ?? "").trim() || `external:${claimId}`;
       clearPendingHelixAskPrompt();
@@ -32776,6 +32781,7 @@ export function HelixAskPill({
         forceReasoningDispatch,
         suppressWorkstationPayloadActions,
         answerContract,
+        routeMetadata,
         skipContextChooser: true,
       });
     },

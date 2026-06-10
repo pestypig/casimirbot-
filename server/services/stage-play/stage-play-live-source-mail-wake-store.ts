@@ -55,10 +55,36 @@ const decisionRequiresVoiceCheckpoint = (decision: StagePlayLiveSourceMailDecisi
 const isVoiceCheckpointRef = (ref: string): boolean =>
   /(?:^|:)(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt)/i.test(ref);
 
+const refIncludesVoiceStatus = (ref: string, statuses: string[]): boolean => {
+  const normalized = ref.toLowerCase().replace(/[-\s]+/g, "_");
+  return statuses.some((status) => normalized.includes(status));
+};
+
 const voiceCheckpointLifecycleStage = (refs: string[]): StagePlayLiveSourceMailWakeLifecycleStageV1 | null => {
   if (refs.some((ref) => /(?:^|:)voice_hold_receipt:/i.test(ref))) return "voice_held";
   if (refs.some((ref) => /(?:^|:)voice_block_receipt:/i.test(ref))) return "voice_blocked";
-  return refs.some(isVoiceCheckpointRef) ? "voice_delivered" : null;
+  if (refs.some((ref) => refIncludesVoiceStatus(ref, [
+    "blocked_voice_disabled",
+    "blocked_voice_not_allowed",
+    "blocked_missing_callout_draft",
+    "blocked_missing_voice_tool",
+    "blocked_policy",
+    "blocked_missing_text",
+  ]))) return "voice_blocked";
+  if (refs.some((ref) => refIncludesVoiceStatus(ref, [
+    "held_user_speaking",
+    "held_manual_prompt_active",
+    "confirmation_required",
+    "voice_hold",
+  ]))) return "voice_held";
+  if (refs.some((ref) => refIncludesVoiceStatus(ref, [
+    "queued_for_retry",
+    "awaiting_client_playback",
+    "blocked_capacity",
+    "queued",
+  ]))) return "voice_queued_retry";
+  if (refs.some((ref) => refIncludesVoiceStatus(ref, ["delivered"]))) return "voice_delivered";
+  return refs.some(isVoiceCheckpointRef) ? "voice_unknown" : null;
 };
 
 const resolveWakeLifecycleStage = (input: {

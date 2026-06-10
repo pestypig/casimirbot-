@@ -2018,7 +2018,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Unread retained: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Runnable wakes: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Last completed").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/voice delivered; 1 voice checkpoint; ask ask:completed-ui; 1 decision/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/voice checkpoint status unknown; 1 voice checkpoint; ask ask:completed-ui; 1 decision/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Current pending").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/queued; 1 mail/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Watch policy: batch_interpretation; mail latest_only; cadence every_batch; continuation scheduled/i).length).toBeGreaterThan(0);
@@ -2156,6 +2156,24 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText("rss ram")).toBeTruthy();
     expect(screen.getAllByText("90%").length).toBeGreaterThan(0);
     expect(screen.getAllByText("89%").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("stage-play-mail-loop-operator-summary")).toBeTruthy();
+    expect(screen.getByText("Route outcome")).toBeTruthy();
+    expect(screen.getAllByText("Blocked before Ask").length).toBeGreaterThan(0);
+    expect(screen.getByText("Ask turn")).toBeTruthy();
+    expect(screen.getAllByText("none").length).toBeGreaterThan(0);
+    expect(screen.getByText("debug export")).toBeTruthy();
+    expect(screen.getAllByText("no Ask debug").length).toBeGreaterThan(0);
+    expect(screen.getByText("Blocking reason")).toBeTruthy();
+    expect(screen.getByText(/Ask turn was not started/i)).toBeTruthy();
+    expect(screen.getByText("Pressure admission")).toBeTruthy();
+    expect(screen.getByText(/local bypass:/i)).toBeTruthy();
+    expect(screen.getByText("Voice checkpoint")).toBeTruthy();
+    expect(screen.getByText(/latest packet did not request a voice callout/i)).toBeTruthy();
+    const routeSteps = screen.getAllByTestId("stage-play-mail-loop-route-step");
+    expect(routeSteps.length).toBe(7);
+    expect(screen.getByText("mail")).toBeTruthy();
+    expect(screen.getByText("packet")).toBeTruthy();
+    expect(screen.getByText("Ask")).toBeTruthy();
     const bridgeButton = await screen.findByTestId("stage-play-open-wake-in-ask");
     expect(bridgeButton).toBeEnabled();
     expect(bridgeButton).toHaveTextContent("Open pressure-deferred wake in Helix Ask");
@@ -2170,11 +2188,75 @@ describe("StagePlayBadgeGraphPanel", () => {
       forceReasoningDispatch: true,
       suppressWorkstationPayloadActions: true,
     });
-    expect(question).toContain("Use live_env.read_live_source_mail");
-    expect(question).toContain("live_env.record_live_source_mail_decision");
-    expect(question).toContain("This is a constrained mailbox wake turn, not a generic workspace/docs turn.");
-    expect(question).toContain("Wake request: stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui");
-    expect(question).toContain("UI bridge reason: backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override");
+    expect(promptEvents[0]?.detail?.routeMetadata).toMatchObject({
+      schema: "helix.ask.route_metadata.v1",
+      source: "stage_play_mail_wake",
+      wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+      requiredPhase: "read_mailbox",
+      requiredToolFamily: "live_source_mail",
+      source_target_intent: expect.objectContaining({
+        target_source: "live_source_mailbox",
+        strength: "hard",
+        wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+        mandatoryNextTool: "live_env.read_live_source_mail",
+      }),
+      mandatory_next_tool: expect.objectContaining({
+        tool_name: "live_env.read_live_source_mail",
+        terminal_forbidden: true,
+      }),
+    });
+    expect(question).not.toContain("Use live_env.read_live_source_mail");
+    expect(question).not.toContain("live_env.record_live_source_mail_decision");
+    expect(question).not.toContain("This is a constrained mailbox wake turn, not a generic workspace/docs turn.");
+    expect(question).not.toContain("Wake request: stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui");
+    expect(question).not.toContain("UI bridge reason: backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override");
+    expect(question).toContain("Review the latest Stage Play live-source mailbox finding.");
+    expect(question).toContain("Use the structured mailbox route metadata attached to this turn");
+  });
+
+  it("copies a unified mail-loop trace for paths that never reach final answers", async () => {
+    const writeText = vi.fn(async (_value: string) => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    renderPanel();
+
+    expect(await screen.findByTestId("stage-play-mail-loop-live-overview")).toBeTruthy();
+    fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-unified-trace"));
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copied = JSON.parse(String(writeText.mock.calls[0]?.[0] ?? "{}")) as Record<string, any>;
+    expect(copied).toMatchObject({
+      schema: "helix.stage_play.mail_loop_unified_trace.v1",
+      authority: {
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      },
+      latest: {
+        wakeFailureReason: "runtime_memory_queue_deferrable",
+        wakeAskTurnId: null,
+      },
+      pressure: {
+        admissionReason: "runtime_pressure",
+        runtimeAdmission: expect.objectContaining({
+          reason: "runtime_memory_queue_deferrable",
+        }),
+      },
+    });
+    expect(copied.counts.wakeRequests).toBeGreaterThan(0);
+    expect(copied.terminalCoverage.some((entry: any) =>
+      entry.status === "deferred_for_pressure" &&
+      entry.reachedAsk === false &&
+      entry.failure === "runtime_memory_queue_deferrable"
+    )).toBe(true);
+    expect(copied.events.some((entry: any) =>
+      entry.stage === "wake_result" &&
+      entry.status === "deferred_for_pressure" &&
+      entry.askTurnId === null
+    )).toBe(true);
+    expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("unified trace copied");
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {

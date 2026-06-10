@@ -43,6 +43,7 @@ import {
   listStagePlayLiveSourceNarrativeStates,
 } from "../../services/stage-play/stage-play-live-source-narrative-store";
 import {
+  expireStaleStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeResults,
   reconcileStagePlayMailWakeRequestsWithDecisions,
@@ -782,6 +783,13 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       roomId,
       environmentId,
       limit: 20,
+    });
+    expireStaleStagePlayLiveSourceMailWakeRequests({
+      threadId,
+      roomId,
+      environmentId,
+      ttlMs: 30_000,
+      limit: 50,
     });
     reconcileStagePlayMailWakeRequestsWithDecisions({
       threadId,

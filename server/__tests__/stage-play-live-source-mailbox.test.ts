@@ -2497,7 +2497,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
       wakeRequestId: wake?.wakeRequestId,
       status: "completed",
-      lifecycleStage: "voice_delivered",
+      lifecycleStage: "voice_queued_retry",
       askTurnId: "ask:ui-bridge-mailbox-turn",
       decisionIds: [decision.decisionId],
       evidenceRefs: expect.arrayContaining([
@@ -2509,7 +2509,7 @@ describe("Stage Play live-source mailbox", () => {
       expect.objectContaining({
         wakeRequestId: wake?.wakeRequestId,
         status: "completed",
-        lifecycleStage: "voice_delivered",
+        lifecycleStage: "voice_queued_retry",
         askTurnId: "ask:ui-bridge-mailbox-turn",
         decisionIds: [decision.decisionId],
         evidenceRefs: expect.arrayContaining([

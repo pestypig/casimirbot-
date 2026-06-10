@@ -9,6 +9,7 @@ import type { PromptSpec } from "@shared/prompt-spec";
 import type { ChatSession } from "@shared/agi-chat";
 import type { AgiRefineryRequest } from "@shared/agi-refinery";
 import type { HelixAskResponseEnvelope } from "@shared/helix-ask-envelope";
+import type { HelixAskRouteMetadata } from "@/lib/helix/ask-prompt-launch";
 import type { HelixTurnInputItem } from "@shared/helix-turn-input-item";
 import type { SituationContextPack } from "@shared/helix-situation-context-pack";
 import type { LiveSituationArtifact } from "@shared/helix-live-situation-artifact";
@@ -542,6 +543,7 @@ type RunAskTurnPayload = {
   debug?: boolean;
   capsuleIds?: string[];
   answerContract?: HelixAskAnswerContract;
+  routeMetadata?: HelixAskRouteMetadata;
   signal?: AbortSignal;
 };
 
@@ -1764,6 +1766,21 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
+  if (payload.routeMetadata) {
+    body.route_metadata = payload.routeMetadata;
+    if (payload.routeMetadata.source_target_intent) {
+      body.source_target_intent = payload.routeMetadata.source_target_intent;
+    }
+    if (payload.routeMetadata.stage_play_live_source_mailbox_debug) {
+      body.stage_play_live_source_mailbox_debug = payload.routeMetadata.stage_play_live_source_mailbox_debug;
+    }
+    if (payload.routeMetadata.live_source_mailbox_authority_summary) {
+      body.live_source_mailbox_authority_summary = payload.routeMetadata.live_source_mailbox_authority_summary;
+    }
+    if (payload.routeMetadata.mandatory_next_tool) {
+      body.mandatory_next_tool = payload.routeMetadata.mandatory_next_tool;
+    }
+  }
   return body;
 };
 
@@ -2383,6 +2400,7 @@ export async function askLocal(
     allowTools?: string[];
     requiredEvidence?: string[];
     answerContract?: HelixAskAnswerContract;
+    routeMetadata?: HelixAskRouteMetadata;
     verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
     place?: HaloBankPlace;
     timestamp?: string | number;
@@ -2481,6 +2499,21 @@ export async function askLocal(
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
   if (options?.answerContract) body.answer_contract = options.answerContract;
+  if (options?.routeMetadata) {
+    body.route_metadata = options.routeMetadata;
+    if (options.routeMetadata.source_target_intent) {
+      body.source_target_intent = options.routeMetadata.source_target_intent;
+    }
+    if (options.routeMetadata.stage_play_live_source_mailbox_debug) {
+      body.stage_play_live_source_mailbox_debug = options.routeMetadata.stage_play_live_source_mailbox_debug;
+    }
+    if (options.routeMetadata.live_source_mailbox_authority_summary) {
+      body.live_source_mailbox_authority_summary = options.routeMetadata.live_source_mailbox_authority_summary;
+    }
+    if (options.routeMetadata.mandatory_next_tool) {
+      body.mandatory_next_tool = options.routeMetadata.mandatory_next_tool;
+    }
+  }
   if (options?.verify) body.verify = options.verify;
   if (options?.place) body.place = options.place;
   if (options?.timestamp !== undefined) body.timestamp = options.timestamp;

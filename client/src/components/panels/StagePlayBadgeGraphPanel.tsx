@@ -1147,6 +1147,12 @@ function copyStagePlayRefs(refs: string[]): void {
   void navigator.clipboard?.writeText(refs.join("\n")).catch(() => undefined);
 }
 
+function copyStagePlayText(value: string): void {
+  const text = String(value ?? "").trim();
+  if (!text) return;
+  void navigator.clipboard?.writeText(text).catch(() => undefined);
+}
+
 function CopyStagePlayRefsButton({ refs, label = "Copy refs" }: { refs: string[]; label?: string }) {
   if (refs.length === 0) return null;
   return (
@@ -1164,6 +1170,156 @@ function CopyStagePlayRefsButton({ refs, label = "Copy refs" }: { refs: string[]
       <Copy className="h-3 w-3" aria-hidden="true" />
     </button>
   );
+}
+
+function buildStagePlayMailLoopUnifiedTrace(input: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+}) {
+  const mailbox = input.mailbox ?? null;
+  const mailItems = mailbox?.mailItems ?? [];
+  const packets = mailbox?.processedMailPackets ?? [];
+  const wakeRequests = mailbox?.wakeRequests ?? [];
+  const wakeResults = mailbox?.wakeResults ?? [];
+  const decisions = mailbox?.decisions ?? [];
+  const runs = mailbox?.microReasonerRuns ?? [];
+  const latestMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
+  const latestPacket = latestStagePlayPacketForMail(packets, latestMail?.mailId);
+  const latestWake =
+    latestStagePlayMailWakeRequest(wakeRequests, latestMail?.mailId) ??
+    latestStagePlayMailWakeRequest(wakeRequests);
+  const latestWakeResult =
+    latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
+    latestStagePlayMailWakeResult(wakeResults);
+  const events = [
+    ...mailItems.map((mail) => ({
+      ts: mail.createdAt,
+      stage: "mail_received",
+      artifactId: mail.mailId,
+      status: mail.status,
+      sourceId: mail.sourceId,
+      preview: compactStagePlayText(mail.summary.preview || mail.summary.text, "", 220),
+      evidenceRefs: mail.evidenceRefs.slice(0, 12),
+    })),
+    ...packets.map((packet) => ({
+      ts: packet.createdAt,
+      stage: "processed_packet",
+      artifactId: packet.packetId,
+      status: packet.recommendedNext,
+      mailIds: packet.mailIds,
+      effort: packet.effortEstimate?.currentEffort ?? null,
+      wakeAsk: packet.arbiter?.wakeAsk ?? null,
+      arbiter: packet.arbiter ? {
+        recommendedNext: packet.arbiter.recommendedNext,
+        reason: packet.arbiter.reason,
+        confidence: packet.arbiter.confidence,
+        voiceCandidate: packet.arbiter.voiceCandidate,
+        selectedHypothesis: packet.arbiter.selectedHypothesis ?? null,
+      } : null,
+      evidenceRefs: packet.evidenceRefs.slice(0, 12),
+    })),
+    ...wakeRequests.map((wake) => ({
+      ts: wake.updatedAt || wake.queuedAt,
+      stage: "wake_request",
+      artifactId: wake.wakeRequestId,
+      status: wake.status,
+      lifecycleStage: wake.lifecycleStage ?? null,
+      reason: wake.reason,
+      failureReason: wake.failureReason ?? null,
+      askTurnId: wake.askTurnId ?? null,
+      decisionIds: wake.decisionIds,
+      nextRetryAt: wake.nextRetryAt ?? null,
+      mailIds: wake.mailIds,
+      evidenceRefs: wake.evidenceRefs.slice(0, 12),
+    })),
+    ...wakeResults.map((result) => ({
+      ts: result.createdAt,
+      stage: "wake_result",
+      artifactId: result.wakeResultId,
+      wakeRequestId: result.wakeRequestId,
+      status: result.status,
+      lifecycleStage: result.lifecycleStage ?? null,
+      failedReason: result.failedReason ?? null,
+      skippedReason: result.skippedReason ?? null,
+      askTurnId: result.askTurnId ?? null,
+      decisionIds: result.decisionIds,
+      budgetStateRef: result.budgetStateRef ?? null,
+      evidenceRefs: result.evidenceRefs.slice(0, 12),
+    })),
+    ...decisions.map((decision) => ({
+      ts: decision.createdAt,
+      stage: "mail_decision",
+      artifactId: decision.decisionId,
+      status: decision.decision,
+      requestedTool: decision.requestedTool ?? null,
+      nextLoopState: decision.nextLoopState,
+      voiceAllowed: decision.voicePolicy?.allowedNow ?? null,
+      modelReviewed: decision.modelReviewed,
+      mailIds: decision.mailIds,
+      evidenceRefs: decision.evidenceRefs.slice(0, 12),
+    })),
+  ].sort((left, right) => String(left.ts ?? "").localeCompare(String(right.ts ?? "")));
+  const terminalCoverage = wakeResults.map((result) => ({
+    wakeRequestId: result.wakeRequestId,
+    resultId: result.wakeResultId,
+    reachedAsk: Boolean(result.askTurnId),
+    reachedDecision: result.decisionIds.length > 0,
+    reachedTerminalCheckpoint:
+      result.status === "completed" ||
+      result.lifecycleStage === "voice_completed" ||
+      result.lifecycleStage === "terminal_checkpoint",
+    status: result.status,
+    lifecycleStage: result.lifecycleStage ?? null,
+    failure: result.failedReason ?? result.skippedReason ?? null,
+  }));
+  return {
+    schema: "helix.stage_play.mail_loop_unified_trace.v1",
+    exportedAt: new Date().toISOString(),
+    graphId: input.graph.graphId,
+    requestedThreadId: mailbox?.requestedThreadId ?? null,
+    mailboxThreadId: mailbox?.mailboxThreadId ?? null,
+    counts: {
+      mail: mailItems.length,
+      processedPackets: packets.length,
+      microReasonerRuns: runs.length,
+      wakeRequests: wakeRequests.length,
+      wakeResults: wakeResults.length,
+      decisions: decisions.length,
+    },
+    latest: {
+      mailId: latestMail?.mailId ?? null,
+      packetId: latestPacket?.packetId ?? null,
+      packetRecommendedNext: latestPacket?.recommendedNext ?? null,
+      effort: latestPacket?.effortEstimate?.currentEffort ?? null,
+      arbiterRecommendedNext: latestPacket?.arbiter?.recommendedNext ?? null,
+      arbiterWakeAsk: latestPacket?.arbiter?.wakeAsk ?? null,
+      wakeRequestId: latestWake?.wakeRequestId ?? null,
+      wakeStatus: latestWake?.status ?? null,
+      wakeLifecycleStage: latestWake?.lifecycleStage ?? null,
+      wakeFailureReason: latestWake?.failureReason ?? null,
+      wakeAskTurnId: latestWake?.askTurnId ?? null,
+      wakeResultId: latestWakeResult?.wakeResultId ?? null,
+      wakeResultStatus: latestWakeResult?.status ?? null,
+      wakeResultFailure: latestWakeResult?.failedReason ?? null,
+      wakeResultAskTurnId: latestWakeResult?.askTurnId ?? null,
+    },
+    pressure: {
+      admissionStatus: mailbox?.wakeAdmissionCycle?.status ?? null,
+      admissionReason: mailbox?.wakeAdmissionCycle?.reason ?? null,
+      deferredWakeIds: mailbox?.wakeAdmissionCycle?.deferredWakeIds ?? [],
+      runtimeAdmission: mailbox?.wakeAdmissionCycle?.runtimeAdmission ?? null,
+      continuation: mailbox?.wakeAdmissionCycle?.continuation ?? null,
+    },
+    terminalCoverage,
+    events,
+    authority: {
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+      note: "Mailbox trace covers pre-Ask paths; final-answer debug export only exists when an Ask turn id is present.",
+    },
+  };
 }
 
 function firstLiveBindingSummary(badge: StagePlayBadgeV1): string | null {
@@ -1405,7 +1561,7 @@ const stagePlayWakeLifecycleTone = (
   fallbackStatus?: string | null,
 ): "good" | "warn" | "blocked" | "default" => {
   if (lifecycleStage === "voice_delivered" || lifecycleStage === "voice_held" || lifecycleStage === "voice_blocked" || lifecycleStage === "completed") return "good";
-  if (lifecycleStage === "voice_pending" || lifecycleStage === "pressure_deferred" || lifecycleStage === "ask_entered" || lifecycleStage === "decision_recorded") return "warn";
+  if (lifecycleStage === "voice_queued_retry" || lifecycleStage === "voice_unknown" || lifecycleStage === "voice_pending" || lifecycleStage === "pressure_deferred" || lifecycleStage === "ask_entered" || lifecycleStage === "decision_recorded") return "warn";
   if (lifecycleStage === "failed" || lifecycleStage === "expired") return "blocked";
   if (fallbackStatus === "completed") return "good";
   if (fallbackStatus === "deferred_for_pressure" || fallbackStatus === "failed_retryable") return "warn";
@@ -1423,7 +1579,7 @@ const stagePlayWakeLifecycleSummary = (input: {
   failureReason?: string | null;
 }): string => {
   const voiceCount = input.voiceRefs?.length ?? 0;
-  const stage = input.lifecycleStage ?? (voiceCount > 0 ? "voice_delivered" : null) ?? input.status ?? "missing";
+  const stage = input.lifecycleStage ?? (voiceCount > 0 ? "voice_unknown" : null) ?? input.status ?? "missing";
   const decisionCount = input.decisionIds?.length ?? 0;
   if (stage === "pressure_deferred" || input.status === "deferred_for_pressure") {
     return `pressure deferred before Ask${input.nextRetryAt ? `; next retry ${formatStagePlayClock(input.nextRetryAt)}` : ""}${input.failureReason ? `; ${input.failureReason}` : ""}`;
@@ -1434,6 +1590,12 @@ const stagePlayWakeLifecycleSummary = (input: {
   if (stage === "voice_delivered" || stage === "voice_held" || stage === "voice_blocked") {
     return `${labelize(stage)}; ${voiceCount} voice checkpoint${voiceCount === 1 ? "" : "s"}${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
   }
+  if (stage === "voice_queued_retry") {
+    return `voice queued/retry; ${voiceCount} voice checkpoint${voiceCount === 1 ? "" : "s"}${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
+  }
+  if (stage === "voice_unknown") {
+    return `voice checkpoint status unknown; ${voiceCount} voice checkpoint${voiceCount === 1 ? "" : "s"}${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
+  }
   if (stage === "decision_recorded") {
     return `decision recorded${input.askTurnId ? `; ask ${input.askTurnId}` : ""}`;
   }
@@ -1441,6 +1603,16 @@ const stagePlayWakeLifecycleSummary = (input: {
     return `Ask entered${input.askTurnId ? `; ${input.askTurnId}` : ""}`;
   }
   return `${labelize(stage)}${input.failureReason ? `; ${input.failureReason}` : ""}`;
+};
+
+const stagePlayOperatorStepTone = (
+  state: "done" | "active" | "blocked" | "pending" | "missing",
+): string => {
+  if (state === "done") return "border-emerald-700 bg-emerald-950/30 text-emerald-100";
+  if (state === "active") return "border-cyan-700 bg-cyan-950/30 text-cyan-100";
+  if (state === "blocked") return "border-rose-700 bg-rose-950/30 text-rose-100";
+  if (state === "pending") return "border-amber-700 bg-amber-950/30 text-amber-100";
+  return "border-slate-800 bg-slate-950/70 text-slate-400";
 };
 
 function resolveActiveWatchPolicy(input: {
@@ -3038,12 +3210,15 @@ function StagePlayMailLoopLiveOverview({
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
 }) {
+  const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "full">("idle");
+  const debugCopyResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const mailItems = mailbox?.mailItems ?? [];
   const packets = mailbox?.processedMailPackets ?? [];
   const runs = mailbox?.microReasonerRuns ?? [];
   const prompts = mailbox?.microReasonerPrompts ?? [];
   const wakeRequests = mailbox?.wakeRequests ?? [];
   const wakeResults = mailbox?.wakeResults ?? [];
+  const decisions = mailbox?.decisions ?? [];
   const latestMail = latestStagePlayMailItem(mailItems, (item) => item.sourceKind === "visual_frame") ?? latestStagePlayMailItem(mailItems);
   const latestPacket = latestStagePlayPacketForMail(packets, latestMail?.mailId);
   const latestPacketRuns = runs.filter((run) => latestPacket?.microReasonerRunRefs.includes(run.runId));
@@ -3067,6 +3242,11 @@ function StagePlayMailLoopLiveOverview({
   const liveOverviewPendingWakeResult = liveOverviewPendingWake
     ? latestStagePlayMailWakeResult(wakeResults, liveOverviewPendingWake.wakeRequestId)
     : null;
+  const liveOverviewCompletedWakeResult =
+    latestStagePlayMailWakeResult(wakeResults.filter((result) => result.status === "completed")) ?? null;
+  const liveOverviewCompletedWake = liveOverviewCompletedWakeResult
+    ? wakeRequests.find((wake) => wake.wakeRequestId === liveOverviewCompletedWakeResult.wakeRequestId) ?? null
+    : wakeRequests.filter((wake) => wake.status === "completed").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ?? null;
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
@@ -3180,6 +3360,140 @@ function StagePlayMailLoopLiveOverview({
     ? Math.max(heapRamPercent ?? 0, rssRamPercent ?? 0)
     : null;
   const combinedRuntimeTone = stagePlayRuntimeTone(combinedRuntimePercent, runtimePressureLevel);
+  const currentWakeForOperator = liveOverviewPendingWake ?? latestWake;
+  const currentWakeResultForOperator =
+    (currentWakeForOperator
+      ? latestStagePlayMailWakeResult(wakeResults, currentWakeForOperator.wakeRequestId)
+      : null) ??
+    latestWakeResult;
+  const currentDecisionIds = new Set([
+    ...(currentWakeForOperator?.decisionIds ?? []),
+    ...(currentWakeResultForOperator?.decisionIds ?? []),
+  ]);
+  const latestWakeDecision =
+    decisions.filter((decision) => currentDecisionIds.has(decision.decisionId)).at(-1) ??
+    decisions.at(-1) ??
+    null;
+  const currentAskTurnId =
+    currentWakeForOperator?.askTurnId ??
+    currentWakeResultForOperator?.askTurnId ??
+    null;
+  const currentWakeFailure =
+    currentWakeResultForOperator?.failedReason ??
+    currentWakeResultForOperator?.skippedReason ??
+    currentWakeForOperator?.failureReason ??
+    null;
+  const currentWakeStatus =
+    currentWakeResultForOperator?.status ??
+    currentWakeForOperator?.status ??
+    "none";
+  const currentWakeStage =
+    currentWakeResultForOperator?.lifecycleStage ??
+    currentWakeForOperator?.lifecycleStage ??
+    null;
+  const blockedBeforeAsk =
+    !currentAskTurnId &&
+    (
+      currentWakeStatus === "deferred_for_pressure" ||
+      currentWakeStage === "pressure_deferred" ||
+      /(?:pressure|runtime_memory|queue_deferrable|503)/i.test(currentWakeFailure ?? "")
+    );
+  const voiceCheckpointRefs = (currentWakeResultForOperator?.evidenceRefs ?? []).filter((ref) =>
+    /^(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt):/i.test(ref)
+  );
+  const voiceRequested =
+    latestPacket?.recommendedNext === "request_voice_callout" ||
+    latestPacket?.arbiter?.recommendedNext === "request_voice_callout" ||
+    latestWakeDecision?.decision === "request_voice_callout";
+  const voiceStatusLabel = !voiceRequested
+    ? "not requested"
+    : currentWakeStage === "voice_delivered"
+      ? "voice delivered"
+      : currentWakeStage === "voice_queued_retry"
+        ? "voice queued/retry"
+        : currentWakeStage === "voice_unknown" || voiceCheckpointRefs.length > 0
+          ? "voice checkpoint status unknown"
+      : currentWakeStage === "voice_held"
+        ? "voice held"
+        : currentWakeStage === "voice_blocked"
+          ? "voice blocked"
+          : latestWakeDecision?.decision === "request_voice_callout"
+            ? "voice request pending"
+            : "voice decision missing";
+  const routeOutcomeSteps: Array<{
+    key: string;
+    label: string;
+    detail: string;
+    state: "done" | "active" | "blocked" | "pending" | "missing";
+  }> = [
+    {
+      key: "mail",
+      label: "mail",
+      detail: latestMail ? formatStagePlayClock(latestMail.createdAt) : "none",
+      state: latestMail ? "done" : "missing",
+    },
+    {
+      key: "packet",
+      label: "packet",
+      detail: latestPacket?.recommendedNext ? labelize(latestPacket.recommendedNext) : "none",
+      state: latestPacket ? "done" : latestMail ? "pending" : "missing",
+    },
+    {
+      key: "wake",
+      label: "wake",
+      detail: currentWakeForOperator ? labelize(currentWakeStatus) : "none",
+      state: blockedBeforeAsk
+        ? "blocked"
+        : currentWakeForOperator
+          ? currentAskTurnId
+            ? "done"
+            : "active"
+          : latestPacket?.arbiter?.wakeAsk
+            ? "pending"
+            : "missing",
+    },
+    {
+      key: "ask",
+      label: "Ask",
+      detail: currentAskTurnId ? "entered" : blockedBeforeAsk ? "not started" : "waiting",
+      state: currentAskTurnId ? "done" : blockedBeforeAsk ? "blocked" : currentWakeForOperator ? "pending" : "missing",
+    },
+    {
+      key: "decision",
+      label: "decision",
+      detail: latestWakeDecision?.decision ? labelize(latestWakeDecision.decision) : "none",
+      state: latestWakeDecision ? "done" : currentAskTurnId ? "pending" : blockedBeforeAsk ? "blocked" : "missing",
+    },
+    {
+      key: "voice",
+      label: "voice",
+      detail: voiceStatusLabel,
+      state: currentWakeStage === "voice_delivered" || currentWakeStage === "voice_held" || currentWakeStage === "voice_blocked"
+        ? "done"
+        : currentWakeStage === "voice_queued_retry" || currentWakeStage === "voice_unknown" || voiceCheckpointRefs.length > 0
+          ? "pending"
+        : voiceRequested
+          ? blockedBeforeAsk
+            ? "blocked"
+            : "pending"
+          : "missing",
+    },
+    {
+      key: "final",
+      label: "final",
+      detail: currentWakeResultForOperator?.status === "completed" ? "checkpoint reached" : currentAskTurnId ? "debug possible" : "no Ask debug",
+      state: currentWakeResultForOperator?.status === "completed" ? "done" : currentAskTurnId ? "pending" : blockedBeforeAsk ? "blocked" : "missing",
+    },
+  ];
+  const currentWakeSummary = stagePlayWakeLifecycleSummary({
+    lifecycleStage: currentWakeStage,
+    status: currentWakeStatus,
+    askTurnId: currentAskTurnId,
+    decisionIds: [...currentDecisionIds],
+    voiceRefs: voiceCheckpointRefs,
+    nextRetryAt: currentWakeForOperator?.nextRetryAt ?? null,
+    failureReason: currentWakeFailure,
+  });
   const recentPackets = packets.slice(-6);
   const deckRows = STAGE_PLAY_DECK_ROLES.map((role) => {
     const run = latestStagePlayRunForPacket(runs, role, latestPacket);
@@ -3191,6 +3505,31 @@ function StagePlayMailLoopLiveOverview({
       display: MICRO_REASONER_DISPLAY[role],
     };
   });
+  const unifiedTrace = useMemo(
+    () => buildStagePlayMailLoopUnifiedTrace({ graph, mailbox }),
+    [graph, mailbox],
+  );
+  const handleCopyUnifiedTrace = () => {
+    copyStagePlayText(JSON.stringify(unifiedTrace, null, 2));
+    setDebugCopyState("trace");
+    if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
+    debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
+  };
+  const handleCopyFullMailbox = () => {
+    copyStagePlayText(JSON.stringify({
+      schema: "helix.stage_play.mail_loop_full_mailbox_capture.v1",
+      exportedAt: new Date().toISOString(),
+      graphId: graph.graphId,
+      mailbox,
+    }, null, 2));
+    setDebugCopyState("full");
+    if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
+    debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
+  };
+
+  useEffect(() => () => {
+    if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!wakeBridgeEligible || !latestWake) return;
@@ -3267,6 +3606,35 @@ function StagePlayMailLoopLiveOverview({
               </span>
             </div>
           ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCopyUnifiedTrace}
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+              data-testid="stage-play-copy-mail-loop-unified-trace"
+              title="Copy compact mailbox traffic trace, including paths that never reached Helix Ask."
+            >
+              <Copy className="h-3 w-3" aria-hidden="true" />
+              Copy unified trace
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyFullMailbox}
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
+              data-testid="stage-play-copy-mail-loop-full-state"
+              title="Copy the full mailbox API projection for deep debugging."
+            >
+              <Copy className="h-3 w-3" aria-hidden="true" />
+              Copy full state
+            </button>
+            <span className="text-[10px] text-slate-500" data-testid="stage-play-mail-loop-debug-copy-state">
+              {debugCopyState === "trace"
+                ? "unified trace copied"
+                : debugCopyState === "full"
+                  ? "full mailbox copied"
+                  : "debug covers pre-Ask and final-answer paths"}
+            </span>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <StagePlayMetricPill label="source" value={captureStateLabel} tone={captureStateTone} />
@@ -3286,6 +3654,131 @@ function StagePlayMailLoopLiveOverview({
             value={labelize(wakeLifecycleStage ?? wakeStatus)}
             tone={stagePlayWakeLifecycleTone(wakeLifecycleStage, wakeStatus)}
           />
+        </div>
+      </div>
+
+      <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-summary">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Route outcome</div>
+            <div className="mt-1 text-sm font-semibold text-slate-100">
+              {blockedBeforeAsk
+                ? "Blocked before Ask"
+                : currentAskTurnId
+                  ? "Ask route entered"
+                  : "Waiting for route entry"}
+            </div>
+            <div className="mt-1 text-xs leading-relaxed text-slate-400">{currentWakeSummary}</div>
+          </div>
+          <div className="grid min-w-[280px] grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">Ask turn</div>
+              <div className="mt-0.5 truncate font-mono text-slate-200">{currentAskTurnId ?? "none"}</div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">debug export</div>
+              <div className="mt-0.5 font-mono text-slate-200">{currentAskTurnId ? "available by turn id" : "no Ask debug"}</div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">voice</div>
+              <div className="mt-0.5 truncate font-mono text-slate-200">{voiceStatusLabel}</div>
+            </div>
+            <div className="rounded border border-slate-800 bg-slate-950/70 px-2 py-1.5">
+              <div className="uppercase tracking-wide text-slate-500">pressure</div>
+              <div className="mt-0.5 truncate font-mono text-slate-200">{runtimePressureLabel}</div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-7" data-testid="stage-play-mail-loop-route-outcome-strip">
+          {routeOutcomeSteps.map((step) => (
+            <div
+              key={step.key}
+              className={`rounded-md border px-2.5 py-2 ${stagePlayOperatorStepTone(step.state)}`}
+              data-testid="stage-play-mail-loop-route-step"
+            >
+              <div className="text-[9px] font-semibold uppercase tracking-wide opacity-70">{step.label}</div>
+              <div className="mt-1 truncate font-mono text-[11px]">{step.detail}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className={`rounded-md border p-3 ${
+            blockedBeforeAsk
+              ? "border-rose-800 bg-rose-950/20"
+              : currentAskTurnId
+                ? "border-emerald-800 bg-emerald-950/15"
+                : "border-slate-800 bg-slate-950/50"
+          }`}>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Blocking reason</div>
+            <div className="mt-1 text-sm font-semibold text-slate-100">
+              {blockedBeforeAsk ? "Blocked before Ask" : currentWakeFailure ? labelize(currentWakeFailure) : "No active blocker"}
+            </div>
+            <div className="mt-1 text-xs leading-relaxed text-slate-400">
+              {blockedBeforeAsk
+                ? `Reason: ${currentWakeFailure ?? runtimePressureLabel}. Ask turn was not started.`
+                : currentAskTurnId
+                  ? "Ask has an id, so final-answer debug export can be collected from the Ask turn."
+                  : "No pressure blocker is visible for the current route state."}
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950/50 p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pressure admission</div>
+            <div className="mt-1 text-sm font-semibold text-slate-100">
+              {labelize(runtimeAdmission?.action ?? mailbox?.wakeAdmissionCycle?.status ?? "not sampled")}
+            </div>
+            <div className="mt-1 space-y-0.5 font-mono text-[10px] text-slate-400">
+              <div>reason: {runtimeAdmission?.reason ?? mailbox?.wakeAdmissionCycle?.reason ?? "n/a"}</div>
+              <div>heap: {heapRamLabel} ({Math.round(runtimeAdmission?.memory?.heapUsedMiB ?? 0)}MiB / {Math.round(runtimeAdmission?.limits?.maxHeapUsedMiB ?? 0)}MiB)</div>
+              <div>rss: {rssRamLabel} ({Math.round(runtimeAdmission?.memory?.rssMiB ?? 0)}MiB / {Math.round(runtimeAdmission?.limits?.maxRssMiB ?? 0)}MiB)</div>
+              <div>local bypass: {runtimeAdmission?.localBypass?.applied ? "applied" : runtimeAdmission?.localBypass?.reason ?? "not applied"}</div>
+            </div>
+          </div>
+          <div className="rounded-md border border-slate-800 bg-slate-950/50 p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Voice checkpoint</div>
+            <div className="mt-1 text-sm font-semibold text-slate-100">{voiceStatusLabel}</div>
+            <div className="mt-1 text-xs leading-relaxed text-slate-400">
+              {voiceCheckpointRefs.length > 0
+                ? `${voiceCheckpointRefs.length} voice/hold/block receipt reference(s) recorded.`
+                : voiceRequested
+                  ? "The packet requested voice, but no voice/hold/block receipt is visible for this wake."
+                  : "The latest packet did not request a voice callout."}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-emerald-900/60 bg-emerald-950/15 p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Last completed wake</div>
+          <div className="mt-1 text-sm font-semibold text-emerald-50">
+            {liveOverviewCompletedWake
+              ? labelize(liveOverviewCompletedWakeResult?.lifecycleStage ?? liveOverviewCompletedWake.lifecycleStage ?? liveOverviewCompletedWakeResult?.status ?? liveOverviewCompletedWake.status)
+              : "none yet"}
+          </div>
+          <div className="mt-1 font-mono text-[10px] text-emerald-200/70">
+            {liveOverviewCompletedWake?.wakeRequestId ?? "no completed wake receipt"}
+          </div>
+          <div className="mt-2 text-xs leading-relaxed text-emerald-100/80">
+            {liveOverviewCompletedWake
+              ? `Ask ${liveOverviewCompletedWakeResult?.askTurnId ?? liveOverviewCompletedWake.askTurnId ?? "not recorded"}; decisions ${(liveOverviewCompletedWakeResult?.decisionIds ?? liveOverviewCompletedWake.decisionIds).length}; evidence ${(liveOverviewCompletedWakeResult?.evidenceRefs ?? liveOverviewCompletedWake.evidenceRefs).length}.`
+              : "No wake has completed with a decision/voice/hold/block checkpoint in this mailbox view."}
+          </div>
+        </div>
+        <div className="rounded-md border border-amber-900/60 bg-amber-950/15 p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred wake</div>
+          <div className="mt-1 text-sm font-semibold text-amber-50">
+            {liveOverviewPendingWake
+              ? labelize(liveOverviewPendingWakeResult?.lifecycleStage ?? liveOverviewPendingWake.lifecycleStage ?? liveOverviewPendingWakeResult?.status ?? liveOverviewPendingWake.status)
+              : "clear"}
+          </div>
+          <div className="mt-1 font-mono text-[10px] text-amber-200/70">
+            {liveOverviewPendingWake?.wakeRequestId ?? "no unresolved wake"}
+          </div>
+          <div className="mt-2 text-xs leading-relaxed text-amber-100/80">
+            {liveOverviewPendingWake
+              ? `${labelize(liveOverviewPendingWakeResult?.status ?? liveOverviewPendingWake.status)}${liveOverviewPendingWakeResult?.failedReason || liveOverviewPendingWake.failureReason ? `; ${liveOverviewPendingWakeResult?.failedReason ?? liveOverviewPendingWake.failureReason}` : ""}${liveOverviewPendingWake.nextRetryAt ? `; retry ${formatStagePlayClock(liveOverviewPendingWake.nextRetryAt)}` : ""}.`
+              : "No queued, running, retryable, or pressure-deferred wake is currently blocking the lane."}
+          </div>
         </div>
       </div>
 
@@ -3855,35 +4348,118 @@ function buildStagePlayCheckpointAskQuestion(input: {
 
 function buildStagePlayMailWakeAskQuestion(input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+}): string {
+  const packet = input.processedPacket ?? null;
+  const effort = packet?.effortEstimate?.currentEffort ? labelize(packet.effortEstimate.currentEffort) : "the latest live-source finding";
+  const recommendation = labelize(packet?.arbiter?.recommendedNext ?? packet?.recommendedNext ?? "review_required");
+  return [
+    "Review the latest Stage Play live-source mailbox finding.",
+    `Current effort: ${effort}.`,
+    `Micro-reasoner recommendation: ${recommendation}.`,
+    "Use the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
+  ].filter(Boolean).join("\n");
+}
+
+function buildStagePlayMailWakeRouteMetadata(input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
   mailItems?: StagePlayLiveSourceMailItemV1[];
   processedPacket?: StagePlayProcessedMailPacketV1 | null;
   wakeResult?: StagePlayLiveSourceMailWakeResultV1 | null;
   bridgeReason?: string | null;
-}): string {
+}) {
+  const packet = input.processedPacket ?? null;
+  const recommendedNext = packet?.arbiter?.recommendedNext ?? packet?.recommendedNext ?? null;
+  const requiredPhase = recommendedNext === "request_voice_callout" ? "record_decision" : "read_mailbox";
+  const mandatoryTool =
+    requiredPhase === "record_decision"
+      ? "live_env.record_live_source_mail_decision"
+      : "live_env.read_live_source_mail";
   const mailPreviews = (input.mailItems ?? [])
     .filter((item) => input.wake.mailIds.includes(item.mailId))
-    .map((item) => `${item.mailId}: ${item.summary.preview}`)
-    .slice(0, 3);
-  const packet = input.processedPacket ?? null;
-  return [
-    "Use live_env.read_live_source_mail for the active Stage Play live-source mailbox.",
-    "Read the latest unread source update, then record a model-reviewed decision with live_env.record_live_source_mail_decision.",
-    "This is a constrained mailbox wake turn, not a generic workspace/docs turn.",
-    "If there is no user-facing change, record wait_for_next_summary.",
-    "If there is a meaningful user-facing change, draft a concise text answer.",
-    "If voice is allowed and the update is urgent, request a voice callout.",
-    `Wake request: ${input.wake.wakeRequestId}.`,
-    input.bridgeReason ? `UI bridge reason: ${input.bridgeReason}.` : "",
-    input.wakeResult?.wakeResultId ? `Wake result: ${input.wakeResult.wakeResultId}.` : "",
-    input.wakeResult?.status ? `Wake status: ${input.wakeResult.status}${input.wakeResult.failedReason ? ` (${input.wakeResult.failedReason})` : ""}.` : "",
-    input.wake.mailIds.length > 0 ? `Mail refs: ${input.wake.mailIds.join(", ")}.` : "",
-    input.wake.sourceIds.length > 0 ? `Source refs: ${input.wake.sourceIds.join(", ")}.` : "",
-    packet ? `Processed packet: ${packet.packetId}.` : "",
-    packet?.recommendedNext ? `Micro-reasoner recommended next: ${packet.recommendedNext}.` : "",
-    packet?.effortEstimate?.currentEffort ? `Current effort: ${packet.effortEstimate.currentEffort}.` : "",
-    packet?.arbiter ? `Hypothesis arbiter: ${packet.arbiter.recommendedNext}; wake ${packet.arbiter.wakeAsk ? "yes" : "no"}; ${packet.arbiter.reason}.` : "",
-    mailPreviews.length > 0 ? `Mail previews:\n${mailPreviews.join("\n")}` : "",
-  ].filter(Boolean).join("\n");
+    .map((item) => ({
+      mailId: item.mailId,
+      preview: compactStagePlayText(item.summary.preview, "", 260),
+      createdAt: item.createdAt,
+    }))
+    .slice(0, 4);
+  return {
+    schema: "helix.ask.route_metadata.v1" as const,
+    source: "stage_play_mail_wake",
+    wakeRequestId: input.wake.wakeRequestId,
+    requiredPhase,
+    requiredToolFamily: "live_source_mail",
+    source_target_intent: {
+      schema: "helix.ask_source_target_intent.v1",
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+      targetSource: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
+      strength: "hard",
+      source: "stage_play_mail_wake_route_metadata",
+      wakeRequestId: input.wake.wakeRequestId,
+      stage_play_live_source_mail_wake_request_id: input.wake.wakeRequestId,
+      processedPacketId: packet?.packetId ?? null,
+      requiredPhase,
+      mandatoryNextTool: mandatoryTool,
+      reasons: [
+        "structured_stage_play_mail_wake_handoff",
+        recommendedNext === "request_voice_callout"
+          ? "micro_reasoner_requested_voice_callout"
+          : "micro_reasoner_requested_mailbox_review",
+      ],
+    },
+    stage_play_live_source_mailbox_debug: {
+      schema: "stage_play.live_source_mailbox_debug.v1",
+      source: "stage_play_mail_wake_route_metadata",
+      route_selected: "live_source_mailbox",
+      wake_request_id: input.wake.wakeRequestId,
+      wake_request_ids: [input.wake.wakeRequestId],
+      processed_packet_id: packet?.packetId ?? null,
+      mail_ids: input.wake.mailIds,
+      source_ids: input.wake.sourceIds,
+      recommended_next: recommendedNext,
+      required_phase: requiredPhase,
+      mandatory_next_tool: mandatoryTool,
+      bridge_reason: input.bridgeReason ?? null,
+      wake_result_id: input.wakeResult?.wakeResultId ?? null,
+      wake_status: input.wakeResult?.status ?? input.wake.status,
+    },
+    live_source_mailbox_authority_summary: {
+      artifactId: "live_source_mailbox_authority_summary",
+      schemaVersion: "helix.live_source_mailbox_authority_summary.v1",
+      routeFamily: "live_source_mailbox",
+      wakeRequestId: input.wake.wakeRequestId,
+      processedPacketId: packet?.packetId ?? null,
+      recommendedNext,
+      requiredPhase,
+      mandatoryNextTool: {
+        tool_name: mandatoryTool,
+        reason: "structured_stage_play_mail_wake_handoff",
+        terminal_forbidden: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+    },
+    mandatory_next_tool: {
+      tool_name: mandatoryTool,
+      reason: "structured_stage_play_mail_wake_handoff",
+      canonical_goal: "live_source_mailbox_wake_decision",
+      terminal_forbidden: true,
+      wake_request_id: input.wake.wakeRequestId,
+      processed_packet_id: packet?.packetId ?? null,
+    },
+    compact_context: {
+      mailPreviews,
+      packetSummary: packet ? {
+        packetId: packet.packetId,
+        recommendedNext: packet.recommendedNext,
+        salience: packet.salience,
+        currentEffort: packet.effortEstimate?.currentEffort ?? null,
+        arbiter: packet.arbiter ?? null,
+      } : null,
+    },
+  };
 }
 
 function readStagePlayWakeBridgeMemory(): StagePlayWakeBridgeMemory {
@@ -3991,15 +4567,19 @@ function launchStagePlayWakeInHelixAsk(input: {
   launchHelixAskPrompt({
     question: buildStagePlayMailWakeAskQuestion({
       wake: input.wake,
-      mailItems: input.mailItems,
       processedPacket: input.processedPacket,
-      wakeResult: input.wakeResult,
-      bridgeReason: input.bridgeReason,
     }),
     autoSubmit: true,
     panelId: "stage-play-badge-graph",
     forceReasoningDispatch: true,
     suppressWorkstationPayloadActions: true,
+    routeMetadata: buildStagePlayMailWakeRouteMetadata({
+      wake: input.wake,
+      mailItems: input.mailItems,
+      processedPacket: input.processedPacket,
+      wakeResult: input.wakeResult,
+      bridgeReason: input.bridgeReason,
+    }),
   });
 }
 

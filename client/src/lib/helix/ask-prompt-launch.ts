@@ -19,6 +19,19 @@ export type HelixAskAnswerContract = {
   min_tokens?: number;
 };
 
+export type HelixAskRouteMetadata = {
+  schema: "helix.ask.route_metadata.v1";
+  source: "stage_play_mail_wake" | string;
+  source_target_intent?: Record<string, unknown>;
+  stage_play_live_source_mailbox_debug?: Record<string, unknown>;
+  live_source_mailbox_authority_summary?: Record<string, unknown>;
+  mandatory_next_tool?: Record<string, unknown>;
+  wakeRequestId?: string | null;
+  requiredPhase?: string | null;
+  requiredToolFamily?: string | null;
+  compact_context?: Record<string, unknown>;
+};
+
 export type PendingHelixAskPrompt = {
   promptId: string;
   question: string;
@@ -29,6 +42,7 @@ export type PendingHelixAskPrompt = {
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
+  routeMetadata?: HelixAskRouteMetadata;
   createdAt: number;
 };
 
@@ -72,6 +86,12 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
         !Array.isArray(parsed.answerContract)
           ? (parsed.answerContract as HelixAskAnswerContract)
           : undefined,
+      routeMetadata:
+        parsed.routeMetadata &&
+        typeof parsed.routeMetadata === "object" &&
+        !Array.isArray(parsed.routeMetadata)
+          ? (parsed.routeMetadata as HelixAskRouteMetadata)
+          : undefined,
       createdAt:
         typeof parsed.createdAt === "number" && Number.isFinite(parsed.createdAt)
           ? parsed.createdAt
@@ -92,6 +112,7 @@ export function launchHelixAskPrompt(args: {
   forceReasoningDispatch?: boolean;
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
+  routeMetadata?: HelixAskRouteMetadata;
 }) {
   if (typeof window === "undefined") return;
   const question = args.question.trim();
@@ -107,6 +128,7 @@ export function launchHelixAskPrompt(args: {
     forceReasoningDispatch: args.forceReasoningDispatch === true,
     suppressWorkstationPayloadActions: args.suppressWorkstationPayloadActions === true,
     answerContract: args.answerContract,
+    routeMetadata: args.routeMetadata,
     createdAt: Date.now(),
   };
 

@@ -134,6 +134,9 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
 const readArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : [];
 
+const readBoolean = (value: unknown): boolean | null =>
+  typeof value === "boolean" ? value : null;
+
 const STALE_RUNNING_WAKE_MS = 90_000;
 const PRIOR_DECISION_LIMIT = 6;
 
@@ -2139,6 +2142,22 @@ const extractDecisionIds = (response: AskWakeTurnResponse): string[] => {
   return uniqueStrings(ids);
 };
 
+const askWakeDebugInconsistencyRefs = (response: AskWakeTurnResponse): string[] => {
+  const solver = readRecord(response.solver_controller_summary);
+  const reentry = readRecord(response.evidence_reentry_proof);
+  const reentryGate = readRecord(reentry?.evidence_reentry_gate);
+  const writer = readRecord(response.terminal_authority_single_writer);
+  const selectedRef = readString(writer?.selectedArtifactRef) ?? readString(writer?.selected_terminal_artifact_ref);
+  const selectedKind = readString(writer?.selectedArtifactKind) ?? readString(writer?.selected_terminal_artifact_kind);
+  const refs: string[] = [];
+  if (readString(solver?.decision) === "fail_closed") refs.push("ask_debug_inconsistency:solver_fail_closed");
+  if (readBoolean(reentryGate?.completed) === false) refs.push("ask_debug_inconsistency:evidence_reentry_incomplete");
+  if (selectedKind === "model_synthesized_answer" && selectedRef?.startsWith("typed_failure:")) {
+    refs.push("ask_debug_inconsistency:model_answer_ref_points_to_typed_failure");
+  }
+  return refs;
+};
+
 const wakeAttemptBackoffMs = (attemptCount: number): number => {
   if (attemptCount <= 1) return 15_000;
   if (attemptCount === 2) return 30_000;
@@ -2148,6 +2167,16 @@ const wakeAttemptBackoffMs = (attemptCount: number): number => {
 
 const addMs = (iso: string, ms: number): string =>
   new Date(Date.parse(iso) + ms).toISOString();
+
+const voiceReceiptStatusRefs = (receipt: StagePlayLiveSourceVoiceDeliveryReceiptV1): string[] =>
+  uniqueStrings([
+    receipt.receiptId,
+    `stage_play_voice_receipt_status:${receipt.decisionId}:${receipt.status}`,
+    receipt.delivery?.artifactRef
+      ? `stage_play_voice_receipt_delivery_ref:${receipt.decisionId}:${receipt.delivery.artifactRef}`
+      : null,
+    ...receipt.evidenceRefs,
+  ]);
 
 const isPressure503 = (err: unknown): boolean =>
   /\b(?:mail_wake_ask_turn_failed:503|503)\b/i.test(err instanceof Error ? err.message : String(err));
@@ -2662,6 +2691,7 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs,
       wakeRequest: runningAttempt,
     });
+    const askDebugInconsistencyRefs = askWakeDebugInconsistencyRefs(response);
     const askTurnId = extractAskTurnId(response);
     const decisionIds = extractDecisionIds(response);
     if (decisionIds.length === 0) {
@@ -2731,7 +2761,7 @@ export async function runNextMailWakeRequest(input: {
         askTurnId,
         decisionIds,
         failedReason,
-        evidenceRefs: uniqueStrings([...evidenceRefs, ...(askTurnId ? [askTurnId] : []), ...decisionIds]),
+        evidenceRefs: uniqueStrings([...evidenceRefs, ...(askTurnId ? [askTurnId] : []), ...decisionIds, ...askDebugInconsistencyRefs]),
         createdAt: completionAt,
       });
       return recordNonTerminalWakeTranscript({
@@ -2745,12 +2775,13 @@ export async function runNextMailWakeRequest(input: {
         createdAt: wakeResult.createdAt,
       });
     }
-    const voiceReceiptRefs = voiceReceipts.flatMap((receipt) => [receipt.receiptId, ...receipt.evidenceRefs]);
+    const voiceReceiptRefs = voiceReceipts.flatMap(voiceReceiptStatusRefs);
     const completionEvidenceRefs = uniqueStrings([
       ...evidenceRefs,
       ...(askTurnId ? [askTurnId] : []),
       ...decisionIds,
       ...voiceReceiptRefs,
+      ...askDebugInconsistencyRefs,
     ]);
     const completed = markStagePlayMailWakeCompleted({
       wakeRequestId: running.wakeRequestId,
@@ -2797,7 +2828,7 @@ export async function runNextMailWakeRequest(input: {
         ...(budgetReceipt.wakeResult.evidenceRefs ?? completed?.evidenceRefs ?? evidenceRefs),
         budgetReceipt.budgetState.budgetStateId,
         fastLayer.processedPacket.packetId,
-        ...voiceReceipts.flatMap((receipt) => receipt.evidenceRefs),
+        ...voiceReceipts.flatMap(voiceReceiptStatusRefs),
       ]),
       createdAt: budgetReceipt.wakeResult.createdAt,
     });
@@ -2815,7 +2846,7 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: uniqueStrings([
         ...budgetReceipt.wakeResult.evidenceRefs,
         budgetReceipt.budgetState.budgetStateId,
-        ...voiceReceipts.flatMap((receipt) => [receipt.receiptId, ...receipt.evidenceRefs]),
+        ...voiceReceipts.flatMap(voiceReceiptStatusRefs),
       ]),
       causalTrace: budgetReceipt.wakeResult.causalTrace ?? budgetReceipt.budgetState.causalTrace ?? completed?.causalTrace ?? running.causalTrace,
       createdAt: budgetReceipt.wakeResult.createdAt,
