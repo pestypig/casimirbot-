@@ -1,4 +1,18 @@
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import {
+  buildWorkstationPathRef as buildSharedWorkstationPathRef,
+  buildWorkstationPanelPathRef as buildSharedWorkstationPanelPathRef,
+  coerceWorkstationViewState as coerceSharedWorkstationViewState,
+  coerceWorkstationViewStateFromPathInput as coerceSharedWorkstationViewStateFromPathInput,
+  encodeWorkstationViewStateSearch as encodeSharedWorkstationViewStateSearch,
+  normalizeWorkspaceRelativePath as normalizeSharedWorkspaceRelativePath,
+  normalizeWorkstationDocPath as normalizeSharedWorkstationDocPath,
+  normalizeWorkstationPathInput as normalizeSharedWorkstationPathInput,
+  type WorkstationPathRef,
+  type WorkstationViewState,
+} from "@shared/workstation-view-state";
+
+export type { WorkstationPathRef, WorkstationViewState } from "@shared/workstation-view-state";
 
 const PANEL_ALIAS_TO_ID: Record<string, string> = {
   essence: "agi-essence-console",
@@ -20,22 +34,6 @@ const PANEL_ID_TO_ALIAS = Object.entries(PANEL_ALIAS_TO_ID).reduce<Record<string
   },
   {},
 );
-
-export type WorkstationPathRef = {
-  root: "workspace";
-  relativePath: string;
-  displaySegments: string[];
-  virtualUri: string;
-};
-
-export type WorkstationViewState = {
-  projectSlug?: string;
-  panels: string[];
-  focusPanel?: string;
-  activeDocPath?: string;
-  anchor?: string;
-  pathRef?: WorkstationPathRef;
-};
 
 type ParseInput = string | URL | {
   pathname?: string;
@@ -71,76 +69,20 @@ function parsePanelList(value: string | null): string[] {
   );
 }
 
-function isRawAbsolutePath(value: string): boolean {
-  return /^[a-z]:[\\/]/i.test(value) || /^\\\\/.test(value) || value.startsWith("//");
-}
-
-function splitAnchor(value: string): { path: string; anchor?: string } {
-  const hashIndex = value.indexOf("#");
-  if (hashIndex < 0) return { path: value };
-  const path = value.slice(0, hashIndex);
-  const anchor = value.slice(hashIndex + 1).trim();
-  return {
-    path,
-    ...(anchor ? { anchor } : {}),
-  };
-}
-
-function decodePathSegments(path: string): string {
-  return path
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => {
-      try {
-        return decodeURIComponent(segment);
-      } catch {
-        return segment;
-      }
-    })
-    .join("/");
-}
-
 export function normalizeWorkspaceRelativePath(value: string | null | undefined): string | null {
-  const raw = value?.trim();
-  if (!raw || isRawAbsolutePath(raw)) return null;
-  const normalized = raw.replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/{2,}/g, "/");
-  return normalized || null;
+  return normalizeSharedWorkspaceRelativePath(value);
 }
 
 export function normalizeWorkstationPathInput(value: string | null | undefined): string | null {
-  const raw = value?.trim();
-  if (!raw) return null;
-  if (/^workspace:\/\//i.test(raw)) {
-    try {
-      const parsed = new URL(raw);
-      if (parsed.protocol !== "workspace:" || parsed.hostname !== "workspace") return null;
-      return normalizeWorkspaceRelativePath(decodePathSegments(parsed.pathname));
-    } catch {
-      return null;
-    }
-  }
-  const withoutRoot = raw.replace(/^workspace[\\/]+/i, "");
-  return normalizeWorkspaceRelativePath(withoutRoot);
+  return normalizeSharedWorkstationPathInput(value);
 }
 
 export function normalizeWorkstationDocPath(value: string | null | undefined): string | null {
-  const normalized = normalizeWorkspaceRelativePath(value);
-  if (!normalized) return null;
-  const withoutLeadingDocs = normalized.replace(/^docs\/?/i, "");
-  const docPath = `docs/${withoutLeadingDocs}`.replace(/\/{2,}/g, "/");
-  return docPath.length > "docs/".length ? docPath : null;
+  return normalizeSharedWorkstationDocPath(value);
 }
 
 export function buildWorkstationPathRef(path: string | null | undefined): WorkstationPathRef | null {
-  const relativePath = normalizeWorkspaceRelativePath(path);
-  if (!relativePath) return null;
-  const segments = relativePath.split("/").filter(Boolean);
-  return {
-    root: "workspace",
-    relativePath,
-    displaySegments: ["Workspace", ...segments],
-    virtualUri: `workspace://workspace/${segments.map(encodeURIComponent).join("/")}`,
-  };
+  return buildSharedWorkstationPathRef(path);
 }
 
 export function buildWorkstationPanelPathRef(panelId: string | null | undefined): WorkstationPathRef | null {
@@ -148,41 +90,14 @@ export function buildWorkstationPanelPathRef(panelId: string | null | undefined)
   if (!id) return null;
   const panelDef = getPanelDef(id);
   if (!panelDef) return null;
-  return {
-    root: "workspace",
-    relativePath: `panels/${id}`,
-    displaySegments: ["Workspace", "Panels", panelDef.title],
-    virtualUri: `workspace://workspace/panels/${encodeURIComponent(id)}`,
-  };
+  return buildSharedWorkstationPanelPathRef(id, panelDef.title);
 }
 
 export function coerceWorkstationViewStateFromPathInput(value: string | null | undefined): WorkstationViewState | null {
-  const raw = value?.trim();
-  if (!raw) return null;
-  const { path, anchor } = splitAnchor(raw);
-  const relativePath = normalizeWorkstationPathInput(path);
-  if (!relativePath) return null;
-  const panelPathMatch = relativePath.match(/^panels\/([^/]+)$/i);
-  const directPanelId = readPanelId(panelPathMatch?.[1] ?? relativePath);
-  if (directPanelId) {
-    return {
-      panels: [directPanelId],
-      focusPanel: directPanelId,
-      pathRef: buildWorkstationPanelPathRef(directPanelId) ?? undefined,
-    };
-  }
-  if (/^docs(?:\/|$)/i.test(relativePath)) {
-    const activeDocPath = normalizeWorkstationDocPath(relativePath) ?? undefined;
-    const pathRef = buildWorkstationPathRef(activeDocPath) ?? undefined;
-    return {
-      panels: ["docs-viewer"],
-      focusPanel: "docs-viewer",
-      ...(activeDocPath ? { activeDocPath } : {}),
-      ...(anchor ? { anchor } : {}),
-      ...(pathRef ? { pathRef } : {}),
-    };
-  }
-  return null;
+  return coerceSharedWorkstationViewStateFromPathInput(value, {
+    resolvePanelId: readPanelId,
+    resolvePanelTitle: (panelId) => getPanelDef(panelId)?.title ?? panelId,
+  });
 }
 
 function readParams(params: URLSearchParams): WorkstationViewState {
@@ -247,61 +162,17 @@ export function mergeWorkstationViewStates(
 }
 
 export function coerceWorkstationViewState(value: unknown): WorkstationViewState | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  const panelsRaw = Array.isArray(record.panels)
-    ? record.panels
-    : Array.isArray(record.openPanels)
-      ? record.openPanels
-      : [];
-  const panels = resolveWorkstationPanelIds(
-    panelsRaw.map((entry) => (typeof entry === "string" ? entry : "")).filter(Boolean),
-  );
-  const focusPanel =
-    readPanelId(
-      typeof record.focusPanel === "string"
-        ? record.focusPanel
-        : typeof record.focus === "string"
-          ? record.focus
-          : null,
-    ) ?? undefined;
-  const activeDocPath = normalizeWorkstationDocPath(
-    typeof record.activeDocPath === "string"
-      ? record.activeDocPath
-      : typeof record.doc === "string"
-        ? record.doc
-        : null,
-  ) ?? undefined;
-  const anchor = typeof record.anchor === "string" && record.anchor.trim() ? record.anchor.trim() : undefined;
-  const pathRef = buildWorkstationPathRef(activeDocPath) ?? undefined;
-  const normalizedPanels = activeDocPath && !panels.includes("docs-viewer") ? [...panels, "docs-viewer"] : panels;
-  if (normalizedPanels.length === 0 && !focusPanel && !activeDocPath) return null;
-  return {
-    panels: normalizedPanels,
-    ...(focusPanel ? { focusPanel } : activeDocPath ? { focusPanel: "docs-viewer" } : {}),
-    ...(activeDocPath ? { activeDocPath } : {}),
-    ...(anchor ? { anchor } : {}),
-    ...(pathRef ? { pathRef } : {}),
-  };
+  return coerceSharedWorkstationViewState(value, {
+    resolvePanelId: readPanelId,
+    resolvePanelTitle: (panelId) => getPanelDef(panelId)?.title ?? panelId,
+  });
 }
 
 export function encodeWorkstationViewStateSearch(
   state: WorkstationViewState,
   currentSearch = "",
 ): string {
-  const params = new URLSearchParams(currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch);
-  params.delete("panels");
-  params.delete("focus");
-  params.delete("doc");
-  params.delete("anchor");
-  const panels = resolveWorkstationPanelIds(state.panels);
-  if (panels.length > 0) params.set("panels", panels.join(","));
-  if (state.focusPanel && getPanelDef(state.focusPanel)) params.set("focus", state.focusPanel);
-  const activeDocPath = normalizeWorkstationDocPath(state.activeDocPath);
-  if (activeDocPath) params.set("doc", activeDocPath);
-  if (state.anchor) params.set("anchor", state.anchor);
-  const query = params.toString();
-  return query ? `?${query}` : "";
+  return encodeSharedWorkstationViewStateSearch(state, currentSearch, { resolvePanelId: readPanelId });
 }
 
 export function encodeLegacyLayoutHash(state: Pick<WorkstationViewState, "projectSlug" | "panels">): string {

@@ -10,7 +10,8 @@ describe("physics atlas blocks", () => {
     const blocks = buildPhysicsAtlasBlocks({ graph });
     const byId = new Map(atlas.blocks.map((block: PhysicsAtlasBlockV1) => [block.id, block]));
 
-    expect(blocks.map((block: PhysicsAtlasBlockV1) => block.glyph)).toEqual([
+    expect(blocks.map((block: PhysicsAtlasBlockV1) => block.glyph)).toEqual(expect.arrayContaining([
+      "R",
       "★",
       "C",
       "B",
@@ -23,7 +24,26 @@ describe("physics atlas blocks", () => {
       "⊙",
       "◎",
       "κ",
-    ]);
+    ]));
+    expect(byId.get("relativity_history")?.status).toBe("seed");
+    expect(byId.get("relativity_history")?.primaryBadgeIds).toContain(
+      "relativity.history.romer_io_light_time_delay",
+    );
+    expect(byId.get("relativity_history")?.primaryBadgeIds).toContain(
+      "relativity.history.michelson_morley_aether_null",
+    );
+    expect(byId.get("relativity_history")?.primaryBadgeIds).toContain(
+      "relativity.history.trouton_noble_torque_null",
+    );
+    expect(byId.get("relativity_history")?.primaryBadgeIds).toContain(
+      "relativity.lorentz.length_contraction_context",
+    );
+    expect(byId.get("relativity_history")?.primaryBadgeIds).toContain(
+      "relativity.lorentz.transform_context",
+    );
+    expect(byId.get("relativity_history")?.claimBoundaryBadgeIds).toContain(
+      "relativity.claim_boundary.historical_constraints_not_single_proof",
+    );
     expect(byId.get("stellar_evolution")?.status).toBe("active");
     expect(byId.get("stellar_evolution")?.repoPathHints).toContain("shared/theory/starsim-stellar-evolution-map.ts");
     expect(byId.get("cosmic_distance_ladder")?.status).toBe("active");

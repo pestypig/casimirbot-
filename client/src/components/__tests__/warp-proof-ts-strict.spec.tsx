@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const useProofPackMock = vi.fn();
 const useMathStageGateMock = vi.fn();
 const useGrConstraintContractMock = vi.fn();
+const useNhm2SolveStateMock = vi.fn();
 
 vi.mock("@/hooks/useProofPack", () => ({
   useProofPack: (...args: unknown[]) => useProofPackMock(...args),
@@ -17,6 +18,10 @@ vi.mock("@/hooks/useMathStageGate", () => ({
 
 vi.mock("@/hooks/useGrConstraintContract", () => ({
   useGrConstraintContract: (...args: unknown[]) => useGrConstraintContractMock(...args),
+}));
+
+vi.mock("@/hooks/useNhm2SolveState", () => ({
+  useNhm2SolveState: (...args: unknown[]) => useNhm2SolveStateMock(...args),
 }));
 
 import { FrontProofsLedger } from "@/components/FrontProofsLedger";
@@ -82,6 +87,83 @@ const makeProofPack = () =>
     },
   }) as any;
 
+const makeNhm2SolveState = () =>
+  ({
+    state: {
+      closureStack: {
+        sameChartFullTensor: {
+          available: true,
+          fullTensorComplete: false,
+          missingComponentIds: ["T0x", "Txy"],
+        },
+        wallSourceClosure: {
+          available: true,
+          pass: false,
+          relativeResidual: 0.12,
+          blockers: ["wall residual outside tolerance"],
+        },
+        observerRobustEnergyConditions: {
+          available: true,
+          robustCheckComplete: false,
+          eulerianOnly: true,
+          anyViolation: false,
+        },
+        qeiWorldlineDossier: {
+          available: true,
+          dossierComplete: false,
+          hasWallWorldline: false,
+          anyProxy: true,
+        },
+        casimirMaterialReceipt: {
+          available: true,
+          status: "ideal_scalar_only",
+          idealScalarOnly: true,
+        },
+        natarioInvariantAudit: {
+          available: true,
+          status: "review",
+          thetaFlatnessStatus: "pass",
+          invariantStatus: "missing",
+        },
+      },
+    },
+    pipelineQuery: {
+      data: {
+        nhm2SameChartFullTensor: {
+          contractVersion: "nhm2_same_chart_full_tensor/v1",
+        },
+        nhm2WallSourceClosure: {
+          contractVersion: "nhm2_wall_source_closure/v1",
+          required: { tensorRef: "metric-required-wall-t00" },
+        },
+        nhm2ObserverRobustEnergyConditions: {
+          contractVersion: "nhm2_observer_robust_energy_conditions/v1",
+          tensorRef: "same-chart-full-tensor",
+          observerFamilies: [{ familyId: "eulerian", status: "proxy" }],
+          summary: { eulerianOnly: true },
+        },
+        nhm2QeiWorldlineDossier: {
+          contractVersion: "nhm2_qei_worldline_dossier/v1",
+          worldlines: [
+            {
+              sampledRho: { provenanceRef: "qei-rho-sample" },
+              bound: { provenanceRef: "ford-roman-bound" },
+            },
+          ],
+        },
+        casimirMaterialReceipt: {
+          contractVersion: "casimir_material_receipt/v1",
+          tileBatchId: "tile-batch-proxy",
+          status: "ideal_scalar_only",
+        },
+        nhm2NatarioInvariantAudit: {
+          contractVersion: "nhm2_natario_invariant_audit/v1",
+          stability: { convergenceStatus: "not_run" },
+        },
+      },
+    },
+  }) as any;
+
 describe("TS strict proof-pack rendering", () => {
   beforeEach(() => {
     useProofPackMock.mockReturnValue({
@@ -101,6 +183,7 @@ describe("TS strict proof-pack rendering", () => {
       isFetching: false,
       isError: false,
     });
+    useNhm2SolveStateMock.mockReturnValue(makeNhm2SolveState());
   });
 
   afterEach(() => {
@@ -108,6 +191,7 @@ describe("TS strict proof-pack rendering", () => {
     useProofPackMock.mockReset();
     useMathStageGateMock.mockReset();
     useGrConstraintContractMock.mockReset();
+    useNhm2SolveStateMock.mockReset();
   });
 
   it("shows ts strict row in FrontProofsLedger", () => {
@@ -121,6 +205,23 @@ describe("TS strict proof-pack rendering", () => {
     render(<WarpProofPanel />);
     expect(screen.getByText("ts_metric_source")).toBeDefined();
     expect(screen.getAllByText("warp.metricAdapter+clocking").length).toBeGreaterThan(0);
+  });
+
+  it("shows NHM2 closure stack rows with diagnostic claim-boundary copy", () => {
+    render(<WarpProofPanel />);
+
+    expect(screen.getByText("Closure Stack")).toBeDefined();
+    expect(screen.getByText("Same-chart full tensor")).toBeDefined();
+    expect(screen.getByText("Wall T00 closure")).toBeDefined();
+    expect(screen.getByText("Observer-robust energy conditions")).toBeDefined();
+    expect(screen.getByText("QEI worldline dossier")).toBeDefined();
+    expect(screen.getByText("Casimir material receipt")).toBeDefined();
+    expect(screen.getByText(/Nat.rio invariant audit/i)).toBeDefined();
+    expect(screen.getByText("missing components: T0x, Txy")).toBeDefined();
+    expect(screen.getByText("wall residual outside tolerance")).toBeDefined();
+    expect(screen.getByText("Observer scope: Eulerian only.")).toBeDefined();
+    expect(screen.getByText("Ideal Casimir scalar budget is not material-receipted.")).toBeDefined();
+    expect(screen.getByText("Zero expansion is separate from curvature, stability, and safety diagnostics.")).toBeDefined();
   });
 
   it("shows ts strict row in NeedleCavityBubblePanel", () => {

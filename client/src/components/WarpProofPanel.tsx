@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { FrontProofsLedger } from "@/components/FrontProofsLedger";
 import { useProofPack } from "@/hooks/useProofPack";
+import { useNhm2SolveState } from "@/hooks/useNhm2SolveState";
 import { useMathStageGate } from "@/hooks/useMathStageGate";
 import { useGrConstraintContract } from "@/hooks/useGrConstraintContract";
 import { apiRequest } from "@/lib/queryClient";
@@ -20,6 +21,80 @@ import { fmtSci } from "@/lib/warp-proof-math";
 import CongruenceLegend from "@/components/common/CongruenceLegend";
 
 type ContractGuardrailStatus = "ok" | "fail" | "proxy" | "missing";
+type ClosureStackStatus = "pass" | "review" | "missing" | "fail" | "proxy";
+
+type PanelRecord = Record<string, unknown>;
+
+const asPanelRecord = (value: unknown): PanelRecord | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as PanelRecord) : null;
+
+const readPanelText = (record: PanelRecord | null | undefined, key: string): string | null => {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+};
+
+const readPanelBoolean = (record: PanelRecord | null | undefined, key: string): boolean | null => {
+  const value = record?.[key];
+  return typeof value === "boolean" ? value : null;
+};
+
+const readPanelRecord = (record: PanelRecord | null | undefined, key: string): PanelRecord | null =>
+  asPanelRecord(record?.[key]);
+
+const readFirstArtifactRecord = (
+  records: Array<PanelRecord | null | undefined>,
+  keys: string[],
+): PanelRecord | null => {
+  for (const record of records) {
+    for (const key of keys) {
+      const candidate = readPanelRecord(record, key);
+      if (candidate) return candidate;
+    }
+  }
+  return null;
+};
+
+const firstPanelText = (...values: Array<string | null | undefined>): string | null =>
+  values.find((value): value is string => typeof value === "string" && value.trim().length > 0) ?? null;
+
+const artifactRefFrom = (
+  artifact: PanelRecord | null,
+  fallback: string,
+  ...keys: string[]
+): string | null => {
+  if (!artifact) return null;
+  for (const key of keys) {
+    const direct = readPanelText(artifact, key);
+    if (direct) return direct;
+  }
+  return readPanelText(artifact, "contractVersion") ?? fallback;
+};
+
+const statusBadgeClass = (status: ClosureStackStatus): string => {
+  if (status === "pass") return "border-emerald-500/60 bg-emerald-500/10 text-emerald-100";
+  if (status === "fail") return "border-rose-500/60 bg-rose-500/10 text-rose-100";
+  if (status === "proxy") return "border-amber-500/60 bg-amber-500/10 text-amber-100";
+  if (status === "missing") return "border-slate-600/60 bg-slate-800/50 text-slate-300";
+  return "border-cyan-500/50 bg-cyan-500/10 text-cyan-100";
+};
+
+const observerScopeNote = (artifact: PanelRecord | null, eulerianOnly: boolean | null): string => {
+  const families = Array.isArray(artifact?.observerFamilies)
+    ? artifact.observerFamilies
+        .map((entry) => readPanelText(asPanelRecord(entry), "familyId"))
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+  const scopes: string[] = [];
+  if (eulerianOnly === true || (families.includes("eulerian") && families.length === 1)) {
+    scopes.push("Eulerian only");
+  }
+  if (families.some((family) => family === "boosted_timelike_grid" || family === "null_direction_grid")) {
+    scopes.push("robust grid");
+  }
+  if (families.includes("algebraic_type_i")) scopes.push("algebraic Type I");
+  if (families.includes("continuous_optimizer")) scopes.push("continuous optimizer");
+  return `Observer scope: ${scopes.length > 0 ? scopes.join(" / ") : "not available"}.`;
+};
 
 const contractSummaryClass = (statuses: ContractGuardrailStatus[] | null) => {
   if (!statuses) return "border-slate-600 bg-slate-900/70 text-slate-200";
@@ -44,6 +119,220 @@ export function WarpProofPanel() {
     ? "STAGE..."
     : STAGE_LABELS[stageGate.stage];
   const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
+  const nhm2Solve = useNhm2SolveState();
+  const closureStack = nhm2Solve.state.closureStack;
+  const pipelineRecord = asPanelRecord(nhm2Solve.pipelineQuery.data);
+  const natarioPipelineRecord = readPanelRecord(pipelineRecord, "natario");
+  const sameChartTensorArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2SameChartFullTensor", "nhm2_same_chart_full_tensor"],
+  );
+  const wallClosureArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2WallSourceClosure", "nhm2_wall_source_closure"],
+  );
+  const observerRobustArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2ObserverRobustEnergyConditions", "nhm2_observer_robust_energy_conditions"],
+  );
+  const qeiDossierArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2QeiWorldlineDossier", "nhm2_qei_worldline_dossier"],
+  );
+  const casimirReceiptArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["casimirMaterialReceipt", "casimir_material_receipt"],
+  );
+  const natarioInvariantArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2NatarioInvariantAudit", "nhm2_natario_invariant_audit"],
+  );
+  const wallRequiredRecord = readPanelRecord(wallClosureArtifact, "required");
+  const wallAvailableRecord = readPanelRecord(wallClosureArtifact, "available");
+  const observerSummaryRecord = readPanelRecord(observerRobustArtifact, "summary");
+  const casimirStatus =
+    closureStack.casimirMaterialReceipt.status ??
+    readPanelText(casimirReceiptArtifact, "status");
+  const qeiWorldlines = Array.isArray(qeiDossierArtifact?.worldlines)
+    ? qeiDossierArtifact.worldlines
+    : [];
+  const firstQeiWorldline = asPanelRecord(qeiWorldlines[0]);
+  const firstQeiSampledRho = readPanelRecord(firstQeiWorldline, "sampledRho");
+  const firstQeiBound = readPanelRecord(firstQeiWorldline, "bound");
+  const natarioStabilityRecord = readPanelRecord(natarioInvariantArtifact, "stability");
+  const sameChartStatus: ClosureStackStatus = !closureStack.sameChartFullTensor.available
+    ? "missing"
+    : closureStack.sameChartFullTensor.fullTensorComplete === true
+      ? "pass"
+      : "review";
+  const wallClosureStatus: ClosureStackStatus = !closureStack.wallSourceClosure.available
+    ? "missing"
+    : closureStack.wallSourceClosure.pass === true
+      ? "pass"
+      : closureStack.wallSourceClosure.pass === false
+        ? "fail"
+        : "review";
+  const observerStatus: ClosureStackStatus = !closureStack.observerRobustEnergyConditions.available
+    ? "missing"
+    : closureStack.observerRobustEnergyConditions.anyViolation === true
+      ? "fail"
+      : closureStack.observerRobustEnergyConditions.eulerianOnly === true
+        ? "proxy"
+        : closureStack.observerRobustEnergyConditions.robustCheckComplete === true
+          ? "pass"
+          : "review";
+  const qeiDossierStatus: ClosureStackStatus = !closureStack.qeiWorldlineDossier.available
+    ? "missing"
+    : closureStack.qeiWorldlineDossier.anyProxy === true
+      ? "proxy"
+      : closureStack.qeiWorldlineDossier.dossierComplete === true
+        ? "pass"
+        : "review";
+  const casimirReceiptStatus: ClosureStackStatus = !closureStack.casimirMaterialReceipt.available
+    ? "missing"
+    : casimirStatus === "blocked"
+      ? "fail"
+      : closureStack.casimirMaterialReceipt.idealScalarOnly === true ||
+          casimirStatus === "ideal_scalar_only" ||
+          casimirStatus === "proxy"
+        ? "proxy"
+        : casimirStatus === "material_receipted"
+          ? "pass"
+          : "review";
+  const natarioAuditStatus: ClosureStackStatus = !closureStack.natarioInvariantAudit.available
+    ? "missing"
+    : closureStack.natarioInvariantAudit.status === "fail" ||
+        closureStack.natarioInvariantAudit.thetaFlatnessStatus === "fail"
+      ? "fail"
+      : closureStack.natarioInvariantAudit.status === "pass" &&
+          closureStack.natarioInvariantAudit.invariantStatus === "computed"
+        ? "pass"
+        : "review";
+  const closureRows = [
+    {
+      id: "same-chart-full-tensor",
+      label: "Same-chart full tensor",
+      status: sameChartStatus,
+      blocker:
+        closureStack.sameChartFullTensor.missingComponentIds.length > 0
+          ? `missing components: ${closureStack.sameChartFullTensor.missingComponentIds.slice(0, 4).join(", ")}`
+          : sameChartStatus === "missing"
+            ? "same-chart tensor artifact missing"
+            : "none",
+      artifactRef: artifactRefFrom(
+        sameChartTensorArtifact,
+        "nhm2SameChartFullTensor",
+        "artifactRef",
+      ),
+      note: "Diagnostic closure artifact available; missing tensor components are not zero.",
+    },
+    {
+      id: "wall-t00-closure",
+      label: "Wall T00 closure",
+      status: wallClosureStatus,
+      blocker:
+        closureStack.wallSourceClosure.blockers[0] ??
+        (wallClosureStatus === "missing"
+          ? "wall source closure artifact missing"
+          : wallClosureStatus === "fail"
+            ? "wall residual outside tolerance"
+            : wallClosureStatus === "review"
+              ? "wall closure unresolved"
+              : "none"),
+      artifactRef: firstPanelText(
+        readPanelText(wallRequiredRecord, "tensorRef"),
+        readPanelText(wallAvailableRecord, "tensorRef"),
+        artifactRefFrom(wallClosureArtifact, "nhm2WallSourceClosure"),
+      ),
+      note: "Wall closure remains the front-door blocker.",
+    },
+    {
+      id: "observer-robust-energy-conditions",
+      label: "Observer-robust energy conditions",
+      status: observerStatus,
+      blocker:
+        observerStatus === "missing"
+          ? "observer-robust energy-condition artifact missing"
+          : closureStack.observerRobustEnergyConditions.anyViolation === true
+            ? "observer-family energy-condition violation"
+            : closureStack.observerRobustEnergyConditions.eulerianOnly === true
+              ? "restricted to Eulerian observer frame"
+              : closureStack.observerRobustEnergyConditions.robustCheckComplete !== true
+                ? "observer-robust check incomplete"
+                : "none",
+      artifactRef: firstPanelText(
+        readPanelText(observerRobustArtifact, "tensorRef"),
+        artifactRefFrom(observerRobustArtifact, "nhm2ObserverRobustEnergyConditions"),
+      ),
+      note: observerScopeNote(
+        observerRobustArtifact,
+        closureStack.observerRobustEnergyConditions.eulerianOnly ??
+          readPanelBoolean(observerSummaryRecord, "eulerianOnly"),
+      ),
+    },
+    {
+      id: "qei-worldline-dossier",
+      label: "QEI worldline dossier",
+      status: qeiDossierStatus,
+      blocker:
+        qeiDossierStatus === "missing"
+          ? "QEI worldline dossier missing"
+          : closureStack.qeiWorldlineDossier.hasWallWorldline === false
+            ? "wall worldline missing"
+            : closureStack.qeiWorldlineDossier.anyProxy === true
+              ? "dossier includes proxy values"
+              : closureStack.qeiWorldlineDossier.dossierComplete !== true
+                ? "QEI dossier incomplete"
+                : "none",
+      artifactRef: firstPanelText(
+        readPanelText(firstQeiSampledRho, "provenanceRef"),
+        readPanelText(firstQeiBound, "provenanceRef"),
+        artifactRefFrom(qeiDossierArtifact, "nhm2QeiWorldlineDossier"),
+      ),
+      note: "Scalar QEI remains badge replay until the worldline dossier is complete.",
+    },
+    {
+      id: "casimir-material-receipt",
+      label: "Casimir material receipt",
+      status: casimirReceiptStatus,
+      blocker:
+        casimirReceiptStatus === "missing"
+          ? "Casimir material receipt missing"
+          : closureStack.casimirMaterialReceipt.idealScalarOnly === true || casimirStatus === "ideal_scalar_only"
+            ? "ideal scalar budget only"
+            : casimirStatus === "blocked"
+              ? "material receipt blocked"
+              : "none",
+      artifactRef: artifactRefFrom(casimirReceiptArtifact, "casimirMaterialReceipt", "tileBatchId"),
+      note:
+        closureStack.casimirMaterialReceipt.idealScalarOnly === true || casimirStatus === "ideal_scalar_only"
+          ? "Ideal Casimir scalar budget is not material-receipted."
+          : "Material receipt remains diagnostic source context.",
+    },
+    {
+      id: "natario-invariant-audit",
+      label: "Natário invariant audit",
+      status: natarioAuditStatus,
+      blocker:
+        natarioAuditStatus === "missing"
+          ? "Natário invariant audit missing"
+          : closureStack.natarioInvariantAudit.invariantStatus !== "computed"
+            ? `invariantStatus=${closureStack.natarioInvariantAudit.invariantStatus ?? "missing"}`
+            : readPanelText(natarioStabilityRecord, "convergenceStatus") &&
+                readPanelText(natarioStabilityRecord, "convergenceStatus") !== "pass"
+              ? `convergenceStatus=${readPanelText(natarioStabilityRecord, "convergenceStatus")}`
+              : "none",
+      artifactRef: artifactRefFrom(natarioInvariantArtifact, "nhm2NatarioInvariantAudit"),
+      note: "Zero expansion is separate from curvature, stability, and safety diagnostics.",
+    },
+  ] satisfies Array<{
+    id: string;
+    label: string;
+    status: ClosureStackStatus;
+    blocker: string;
+    artifactRef: string | null;
+    note: string;
+  }>;
   const contractGuardrails = contractQuery.data?.guardrails ?? null;
   const contractStatuses: ContractGuardrailStatus[] | null = contractGuardrails
     ? [
@@ -609,6 +898,43 @@ export function WarpProofPanel() {
             </div>
           )}
         </div>
+
+        <section className="md:col-span-3 rounded-xl border border-white/10 bg-black/40 p-3 text-[12px]">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                Closure Stack
+              </h2>
+              <p className="mt-1 text-[11px] text-slate-300">
+                Diagnostic closure artifacts are shown as blockers and review gates, not viability claims.
+              </p>
+            </div>
+            <Badge className="border border-cyan-500/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-100">
+              diagnostic only
+            </Badge>
+          </div>
+
+          <div className="grid gap-2 lg:grid-cols-2">
+            {closureRows.map((row) => (
+              <div
+                key={row.id}
+                className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[12px] font-semibold text-slate-100">{row.label}</div>
+                  <Badge className={cn("border px-2 py-0.5 text-[10px]", statusBadgeClass(row.status))}>
+                    {`status: ${row.status}`}
+                  </Badge>
+                </div>
+                <dl className="mt-2 space-y-1 text-[11px]">
+                  <Row label="primary blocker">{row.blocker}</Row>
+                  <Row label="artifact ref">{row.artifactRef ?? "not available"}</Row>
+                </dl>
+                <p className="mt-2 text-[11px] text-slate-400">{row.note}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Hull + pocket guard */}
         <section className="rounded-xl border border-white/10 bg-black/40 p-3 text-[12px]">

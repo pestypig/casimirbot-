@@ -31,6 +31,9 @@ import {
   buildEvolutionaryBiophysicsTheoryBadgesV1,
 } from "./evolutionary-biophysics-theory-badges";
 import {
+  buildRelativityHistoryTheoryBadgesV1,
+} from "./relativity-history-theory-badges";
+import {
   buildNhm2FullSolveTheoryBadgesV1,
 } from "./nhm2-full-solve-theory-badges";
 import {
@@ -903,6 +906,7 @@ const edges: TheoryBadgeEdgeV1[] = [
 ];
 
 export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
+  const relativityHistory = buildRelativityHistoryTheoryBadgesV1();
   const nhm2FullSolve = buildNhm2FullSolveTheoryBadgesV1();
   const solar = buildSolarSpectrumTheoryBadgesV1();
   const solarStellar = buildSolarStellarReferenceTheoryBadgesV1();
@@ -920,9 +924,10 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     graphId: "nhm2-theory-badge-graph",
     title: "Helix Theory Badge Graph",
     description:
-      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
+      "Diagnostic physics theory badges, scalar calculator loadouts, unit signatures, runtime references, NHM2 full-solve tensor/observer/closure provenance, and claim boundaries for relativity history, NHM2, StarSim, cosmic distance ladder, solar spectrum, solar/stellar reference, stellar spectroscopy, astrochemistry/prebiotic, evolutionary biophysics, Casimir cavity, tokamak plasma, galactic dynamics, and curvature/collapse contexts.",
     badges: [
       ...FIRST_PRINCIPLES_THEORY_BADGES,
+      ...relativityHistory.badges,
       ...badges,
       ...nhm2FullSolve.badges,
       ...STARSIM_THEORY_BADGES,
@@ -941,6 +946,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
+      ...relativityHistory.edges,
       ...edges,
       ...nhm2FullSolve.edges,
       ...STARSIM_THEORY_EDGES,

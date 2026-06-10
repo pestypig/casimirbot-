@@ -38,6 +38,7 @@ export const THEORY_BIOME_BAND_ORDER: TheoryBiomeBand[] = [
 
 export const THEORY_BIOME_DOMAIN_ORDER = [
   "foundation",
+  "relativity_history",
   "quantum",
   "atomic_spectroscopy",
   "astrochemistry",
@@ -90,6 +91,23 @@ function hasAny(tokens: Set<string>, values: string[]): boolean {
 
 function inferDomainKey(tokens: Set<string>, badge: TheoryBadgeV1): string {
   if (badge.level === "claim_boundary" || hasAny(tokens, ["claim_boundary", "boundary"])) return "claim_boundary";
+  if (
+    hasAny(tokens, [
+      "relativity_history",
+      "romer",
+      "bradley",
+      "fizeau",
+      "foucault",
+      "michelson_morley",
+      "trouton_noble",
+      "aether_drift",
+      "stellar_aberration",
+      "length_contraction",
+      "lorentz_transform",
+    ])
+  ) {
+    return "relativity_history";
+  }
   if (hasAny(tokens, ["nhm2", "warp"])) return "nhm2";
   if (hasAny(tokens, ["qei", "stress_energy", "energy_conditions"])) return "qei_stress_energy";
   if (hasAny(tokens, ["casimir", "cavity", "tile"])) return "casimir";
@@ -176,6 +194,16 @@ export function inferTheoryBiomeCoordinateSeed(badge: TheoryBadgeV1): {
     };
   }
 
+  if (hasAny(tokens, ["lorentz_transform", "length_contraction", "relativity_history_claim_boundary"])) {
+    return {
+      scaleLog10M: null,
+      scaleBand: "abstract_formal",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "formal relativity-history endpoint"],
+    };
+  }
+
   if (hasAny(tokens, ["galactic", "cosmic_distance", "hubble_law", "rotation_curve", "dark_matter"])) {
     return {
       scaleLog10M: 20,
@@ -183,6 +211,38 @@ export function inferTheoryBiomeCoordinateSeed(badge: TheoryBadgeV1): {
       domainKey,
       fidelity,
       reasons: [...reasons, "galactic/cosmic metadata"],
+    };
+  }
+
+  if (hasAny(tokens, ["romer", "io_eclipse", "jupiter", "bradley", "stellar_aberration", "earth_orbit"])) {
+    return {
+      scaleLog10M: 7,
+      scaleBand: "planetary",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "astronomical relativity-history metadata"],
+    };
+  }
+
+  if (
+    hasAny(tokens, [
+      "fizeau",
+      "foucault",
+      "toothed_wheel",
+      "rotating_mirror",
+      "flowing_water",
+      "michelson_morley",
+      "trouton_noble",
+      "interferometer",
+      "aether_drift",
+    ])
+  ) {
+    return {
+      scaleLog10M: -1,
+      scaleBand: "device_laboratory",
+      domainKey,
+      fidelity,
+      reasons: [...reasons, "laboratory relativity-history metadata"],
     };
   }
 

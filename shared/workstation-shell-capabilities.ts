@@ -1,3 +1,5 @@
+import { WORKSTATION_VIEW_STATE_CONTRACT_VERSION } from "./workstation-view-state";
+
 export type WorkstationShellCapabilityId =
   | "workstation.deep_link_state"
   | "workstation.restore_view_state";
@@ -15,6 +17,7 @@ export type WorkstationShellCapabilityDefinition = {
   workspace_os_status_executes: false;
   fallbacks: string[];
   evidence_ref: string;
+  view_state_contract_version: typeof WORKSTATION_VIEW_STATE_CONTRACT_VERSION;
 };
 
 export const WORKSTATION_SHELL_CAPABILITY_CONTRACT_VERSION =
@@ -33,6 +36,7 @@ export const WORKSTATION_SHELL_CAPABILITIES: WorkstationShellCapabilityDefinitio
     workspace_os_status_executes: false,
     fallbacks: ["workstation.panel_focus", "workstation.restore_view_state"],
     evidence_ref: "workstation_deep_link_contract",
+    view_state_contract_version: WORKSTATION_VIEW_STATE_CONTRACT_VERSION,
   },
   {
     capability_id: "workstation.restore_view_state",
@@ -48,6 +52,7 @@ export const WORKSTATION_SHELL_CAPABILITIES: WorkstationShellCapabilityDefinitio
     workspace_os_status_executes: false,
     fallbacks: ["workstation.panel_focus", "docs-viewer.open_doc_by_path"],
     evidence_ref: "workstation_restore_view_state_contract",
+    view_state_contract_version: WORKSTATION_VIEW_STATE_CONTRACT_VERSION,
   },
 ];
 
