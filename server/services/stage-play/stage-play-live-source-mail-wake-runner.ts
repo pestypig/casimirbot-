@@ -723,10 +723,14 @@ const policyWantsEveryBatch = (policy: StagePlayLiveSourceWatchJobPolicyV1 | nul
   policy?.outputCadence === "every_batch";
 
 const salienceNeedsSlowAsk = (salience: StagePlayLiveSourceImmersionStateV1["salience"]): boolean =>
-  salience.level === "high" || salience.level === "urgent" || salience.voiceCandidate;
+  salience.level === "urgent" || salience.voiceCandidate;
 
-const validationNeedsSlowAsk = (validation: StagePlayLiveSourcePredictionValidationV1): boolean =>
-  validation.result === "contradicted" || validation.result === "partially_supported";
+const processedPacketNeedsSlowAsk = (packet: StagePlayProcessedMailPacketV1): boolean =>
+  packet.arbiter?.wakeAsk === true ||
+  packet.recommendedNext === "request_voice_callout" ||
+  packet.recommendedNext === "request_more_evidence" ||
+  packet.recommendedNext === "request_stage_play_checkpoint" ||
+  packet.recommendedNext === "draft_text_answer";
 
 const policyCriteriaNeedsSlowAsk = (input: {
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
@@ -867,27 +871,28 @@ const buildWakeFastLayer = (input: {
     input.manualRun === true ||
     !input.policy ||
     policyWantsEveryBatch(input.policy) ||
+    processedPacketNeedsSlowAsk(processedPacket) ||
     salienceNeedsSlowAsk(immersionState.salience) ||
-    processedPacket.recommendedNext === "request_voice_callout" ||
     policyCriteriaNeedsSlowAsk({
       policy: input.policy,
       mailBatch: input.mailBatch,
-    }) ||
-    validationNeedsSlowAsk(predictionValidation);
+    });
   const slowAskReason = input.manualRun === true
     ? "manual_or_explicit_checkpoint"
     : !input.policy
       ? "missing_policy_requires_model_decision"
       : policyWantsEveryBatch(input.policy)
         ? "policy_output_cadence_every_batch"
-        : salienceNeedsSlowAsk(immersionState.salience)
-          ? `salience_${immersionState.salience.level}`
-          : processedPacket.recommendedNext === "request_voice_callout"
+        : processedPacketNeedsSlowAsk(processedPacket)
+          ? processedPacket.recommendedNext === "request_voice_callout"
             ? "processed_packet_voice_candidate"
+            : `processed_packet_${processedPacket.recommendedNext}`
+          : salienceNeedsSlowAsk(immersionState.salience)
+            ? `salience_${immersionState.salience.level}`
           : policyCriteriaNeedsSlowAsk({ policy: input.policy, mailBatch: input.mailBatch })
             ? "policy_criteria_matched"
-          : validationNeedsSlowAsk(predictionValidation)
-            ? `prediction_validation_${predictionValidation.result}`
+          : predictionValidation.result === "contradicted" || predictionValidation.result === "partially_supported"
+            ? `fast_layer_local_interpretation_${predictionValidation.result}`
             : "fast_layer_wait";
   return {
     priorImmersionState,
@@ -2681,12 +2686,70 @@ export async function runNextMailWakeRequest(input: {
         createdAt: wakeResult.createdAt,
       });
     }
+    const completionAt = new Date().toISOString();
+    const storedDecisions = decisionIds
+      .map((decisionId) => getStagePlayMailDecision(decisionId))
+      .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
+    const voiceReceipts: StagePlayLiveSourceVoiceDeliveryReceiptV1[] = [];
+    for (const decision of storedDecisions) {
+      const receipt = await maybeRunStagePlayLiveSourceVoiceDelivery({
+        decision,
+        runner: input.voiceDeliveryRunner ?? null,
+        now: completionAt,
+      });
+      if (receipt) voiceReceipts.push(receipt);
+    }
+    const voiceDecisionIds = storedDecisions
+      .filter((decision) => decision.decision === "request_voice_callout")
+      .map((decision) => decision.decisionId);
+    const missingVoiceReceipt = voiceDecisionIds.some((decisionId) =>
+      !voiceReceipts.some((receipt) => receipt.decisionId === decisionId)
+    );
+    if (missingVoiceReceipt) {
+      const failedReason = "missing_required_voice_checkpoint";
+      markStagePlayMailWakeRetryable({
+        wakeRequestId: running.wakeRequestId,
+        failureReason: failedReason,
+        nextRetryAt: addMs(completionAt, wakeAttemptBackoffMs(runningAttempt.attemptCount)),
+        now: completionAt,
+      });
+      releaseAdmission("failed");
+      const wakeResult = recordStagePlayMailWakeResult({
+        wakeRequestId: running.wakeRequestId,
+        threadId: running.threadId,
+        roomId: running.roomId ?? null,
+        environmentId: running.environmentId ?? null,
+        status: "failed_retryable",
+        askTurnId,
+        decisionIds,
+        failedReason,
+        evidenceRefs: uniqueStrings([...evidenceRefs, ...(askTurnId ? [askTurnId] : []), ...decisionIds]),
+        createdAt: completionAt,
+      });
+      return recordNonTerminalWakeTranscript({
+        wake: runningAttempt,
+        wakeResult,
+        mailBatch,
+        fastLayer,
+        action: "deferred",
+        retainedMailCount,
+        evidenceRefs: wakeResult.evidenceRefs,
+        createdAt: wakeResult.createdAt,
+      });
+    }
+    const voiceReceiptRefs = voiceReceipts.flatMap((receipt) => [receipt.receiptId, ...receipt.evidenceRefs]);
+    const completionEvidenceRefs = uniqueStrings([
+      ...evidenceRefs,
+      ...(askTurnId ? [askTurnId] : []),
+      ...decisionIds,
+      ...voiceReceiptRefs,
+    ]);
     const completed = markStagePlayMailWakeCompleted({
       wakeRequestId: running.wakeRequestId,
       askTurnId,
       decisionIds,
-      evidenceRefs,
-      now: new Date().toISOString(),
+      evidenceRefs: completionEvidenceRefs,
+      now: completionAt,
     });
     const wakeResult = recordStagePlayMailWakeResult({
       wakeRequestId: running.wakeRequestId,
@@ -2696,8 +2759,8 @@ export async function runNextMailWakeRequest(input: {
       status: "completed",
       askTurnId: completed?.askTurnId ?? askTurnId,
       decisionIds: completed?.decisionIds ?? decisionIds,
-      evidenceRefs: completed?.evidenceRefs ?? evidenceRefs,
-      createdAt: new Date().toISOString(),
+      evidenceRefs: completed?.evidenceRefs ?? completionEvidenceRefs,
+      createdAt: completionAt,
     });
     const budgetReceipt = recordWakeBudgetReceipt({
       wake: completed ?? running,
@@ -2709,18 +2772,6 @@ export async function runNextMailWakeRequest(input: {
       evidenceRefs: wakeResult.evidenceRefs,
       createdAt: wakeResult.createdAt,
     });
-    const storedDecisions = (completed?.decisionIds ?? decisionIds)
-      .map((decisionId) => getStagePlayMailDecision(decisionId))
-      .filter((decision): decision is StagePlayLiveSourceMailDecisionV1 => Boolean(decision));
-    const voiceReceipts: StagePlayLiveSourceVoiceDeliveryReceiptV1[] = [];
-    for (const decision of storedDecisions) {
-      const receipt = await maybeRunStagePlayLiveSourceVoiceDelivery({
-        decision,
-        runner: input.voiceDeliveryRunner ?? null,
-        now: budgetReceipt.wakeResult.createdAt,
-      });
-      if (receipt) voiceReceipts.push(receipt);
-    }
     const transcriptRows = buildDurableWakeTranscriptRows({
       wake: completed ?? running,
       wakeResult: budgetReceipt.wakeResult,

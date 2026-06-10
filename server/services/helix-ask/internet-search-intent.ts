@@ -132,8 +132,18 @@ const isComplexCurrentAffairsAnalysis = (promptText: string): boolean =>
     /\b(?:analysis|analyze|assess|evaluate|true|prediction|decision\s+makers?|should\s+we|would\s+it\s+matter|factor|proof|capacity|resources?|infrastructure|trade[-\s]?off|margin|marginal|scenario)\b/i.test(promptText)
   );
 
+const isCompactLiveSourceMailboxHandoff = (promptText: string): boolean =>
+  (
+    /\bContinuing\s+live[-\s]?source\s+watch\s+job\s+compact\s+Ask\s+handoff\b/i.test(promptText) ||
+    /\bUI\s+bridge\s+reason\b[\s\S]{0,120}\bHelix\s+Ask\s+wake\b/i.test(promptText)
+  ) &&
+  /\bWake\s+request:\s*stage_play_live_source_mail_wake:/i.test(promptText) &&
+  /\bProcessed\s+packet:\s*stage_play_processed_mail_packet:/i.test(promptText) &&
+  /\blive_env\.record_live_source_mail_decision\b/i.test(promptText);
+
 export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV1 => {
   const prompt = promptText.trim();
+  const compactLiveSourceMailboxHandoff = isCompactLiveSourceMailboxHandoff(prompt);
   const explicitProviderCue = hasExplicitWebProviderCue(prompt);
   const searchAction = hasSearchActionCue(prompt);
   const currentWebCue = hasCurrentWebCue(prompt);
@@ -142,7 +152,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const recencyDays = extractRecencyDays(prompt) ?? (currentAffairsCue ? 30 : null);
   const negativeConstraints = extractNegativeConstraints(prompt);
   const quotedOrContextualMentions = extractQuotedOrContextualMentions(prompt);
-  const suppressed = negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
+  const suppressed = compactLiveSourceMailboxHandoff || negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
   const freshnessRequired = !suppressed && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
   const currentAffairsRequired = !suppressed && currentAffairsCue;
   const localSourceScope = hasLocalWorkspaceScopeCue(prompt) || hasLocalObservationScopeCue(prompt);

@@ -1386,6 +1386,14 @@ const isStagePlayMailWakeAskAttemptResult = (
     !isStagePlayMailWakePressureResult(result)
   );
 
+const isStagePlayMailWakeVoiceCheckpointResult = (
+  result: StagePlayLiveSourceMailWakeResultV1,
+): boolean =>
+  result.status === "completed" &&
+  result.evidenceRefs.some((ref) =>
+    /^(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt):/i.test(ref)
+  );
+
 function resolveActiveWatchPolicy(input: {
   jobStates: StagePlayLiveSourceJobStateV1[];
   policies: StagePlayLiveSourceWatchJobPolicyV1[];
@@ -1819,6 +1827,25 @@ function buildObserverMailLoopNodes(input: {
     latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
     latestStagePlayMailWakeResult(wakeResults);
   const wakeById = new Map(wakeRequests.map((wake) => [wake.wakeRequestId, wake]));
+  const latestCompletedWakeResult =
+    latestStagePlayMailWakeResult(wakeResults.filter((result) => result.status === "completed" && isStagePlayMailWakeVoiceCheckpointResult(result))) ??
+    latestStagePlayMailWakeResult(wakeResults.filter((result) => result.status === "completed" && isStagePlayMailWakeAskAttemptResult(result)));
+  const latestCompletedWake = latestCompletedWakeResult
+    ? wakeById.get(latestCompletedWakeResult.wakeRequestId) ?? null
+    : wakeRequests.filter((wake) => wake.status === "completed").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ?? null;
+  const pendingWakeRequests = wakeRequests.filter((wake) =>
+    wake.status === "queued" ||
+    wake.status === "running" ||
+    wake.status === "failed_retryable" ||
+    wake.status === "deferred_for_pressure"
+  );
+  const latestPendingWake =
+    pendingWakeRequests.filter((wake) => wake.status === "deferred_for_pressure").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
+    pendingWakeRequests.sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ??
+    null;
+  const latestPendingWakeResult = latestPendingWake
+    ? latestStagePlayMailWakeResult(wakeResults, latestPendingWake.wakeRequestId)
+    : null;
   const displayWake = latestWakeResult
     ? wakeById.get(latestWakeResult.wakeRequestId) ?? latestWake
     : latestWake;
@@ -1829,6 +1856,14 @@ function buildObserverMailLoopNodes(input: {
   const latestWakeFailureReason = latestWakeResult?.failedReason ?? displayWake?.failureReason ?? null;
   const latestWakeAskTurnId = latestWakeResult?.askTurnId ?? displayWake?.askTurnId ?? null;
   const latestWakeDecisionIds = latestWakeResult?.decisionIds ?? displayWake?.decisionIds ?? [];
+  const completedWakeAskTurnId = latestCompletedWakeResult?.askTurnId ?? latestCompletedWake?.askTurnId ?? null;
+  const completedWakeDecisionIds = latestCompletedWakeResult?.decisionIds ?? latestCompletedWake?.decisionIds ?? [];
+  const completedWakeVoiceRefs = uniqueSorted([
+    ...(latestCompletedWakeResult?.evidenceRefs ?? []),
+    ...(latestCompletedWake?.evidenceRefs ?? []),
+  ].filter((ref) => /(?:live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_receipt|stage_play_live_source_voice_delivery_receipt)/i.test(ref)));
+  const pendingWakeStatus = latestPendingWakeResult?.status ?? latestPendingWake?.status ?? null;
+  const pendingWakeFailureReason = latestPendingWakeResult?.failedReason ?? latestPendingWake?.failureReason ?? null;
   const hasWatchPolicy = Boolean(latestPolicy);
   const manualCheckpointWithoutPolicy = Boolean(
     latestDecision &&
@@ -2523,6 +2558,9 @@ function buildObserverMailLoopNodes(input: {
         : `${queuedRunningText}; waiting for mail`,
       statusChips: [
         manualCheckpointWithoutPolicy ? "policy missing" : null,
+        latestCompletedWakeResult ? "last wake completed" : null,
+        completedWakeVoiceRefs.length > 0 ? "voice checkpoint" : null,
+        latestPendingWake ? "current wake pending" : null,
         wakeContinuationActive ? "continuation armed" : null,
         queuedWakeMailCount > 0 ? `${queuedWakeMailCount} queued mail` : null,
         runningWakeMailCount > 0 ? `${runningWakeMailCount} running mail` : null,
@@ -2532,6 +2570,22 @@ function buildObserverMailLoopNodes(input: {
       ].filter((entry): entry is string => Boolean(entry)),
       statusBand: wakePressureBand ?? wakeContinuationBand,
       payloadRows: [
+        {
+          label: "Last completed",
+          value: latestCompletedWakeResult
+            ? `${latestCompletedWakeResult.status}; ${completedWakeAskTurnId ?? "Ask turn unknown"}; ${completedWakeDecisionIds.length} decision${completedWakeDecisionIds.length === 1 ? "" : "s"}; ${completedWakeVoiceRefs.length > 0 ? "voice checkpoint reached" : "voice checkpoint not shown"}`
+            : "No completed Ask wake yet.",
+          tone: latestCompletedWakeResult ? "good" : "default",
+        },
+        {
+          label: "Current pending",
+          value: latestPendingWake
+            ? `${pendingWakeStatus ?? latestPendingWake.status}${pendingWakeFailureReason ? `; ${pendingWakeFailureReason}` : ""}; ${latestPendingWake.mailIds.length} mail; ${latestPendingWake.nextRetryAt ? `next retry ${formatStagePlayClock(latestPendingWake.nextRetryAt)}` : "retry not scheduled"}`
+            : "No current pending/deferred wake.",
+          tone: latestPendingWake
+            ? latestPendingWake.status === "deferred_for_pressure" || latestPendingWake.status === "failed_retryable" ? "warn" : "good"
+            : "default",
+        },
         {
           label: "Tool",
           value: `live_env.read_live_source_mail${latestWakeAskTurnId ? ` -> ${latestWakeAskTurnId}` : ""}`,
@@ -2577,6 +2631,8 @@ function buildObserverMailLoopNodes(input: {
         ...latestWakeDecisionIds,
         ...displayWake.evidenceRefs,
         ...(latestWakeResult?.evidenceRefs ?? []),
+        ...(latestCompletedWakeResult?.evidenceRefs ?? []),
+        ...completedWakeVoiceRefs,
       ].filter(Boolean)) : [],
       outputPreview: latestWakeStatus
         ? manualCheckpointWithoutPolicy

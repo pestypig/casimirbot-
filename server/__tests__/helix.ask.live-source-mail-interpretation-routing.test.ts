@@ -804,6 +804,50 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     });
   });
 
+  it("treats compact UI wake handoffs as hard processed-mail mailbox turns", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceId,
+      objective: "Watch the active visual source and wake Ask only for salient findings.",
+    });
+    seedVisualMail("The Minecraft scene shows an urgent combat cue while the player holds a sword.");
+
+    const compactWakePrompt = [
+      "Continuing live-source watch job compact Ask handoff:",
+      "Wake request: stage_play_live_source_mail_wake:ui-compact.",
+      "phase requirement: record live_env.record_live_source_mail_decision first; then request live_env.request_interim_voice_callout; do not terminal-answer until voice receipt/hold/block exists.",
+      "Processed packet: stage_play_processed_mail_packet:ui-compact.",
+      "Micro-reasoner recommended next: request_voice_callout.",
+      "Current effort: combat_or_recovery.",
+      "Hypothesis arbiter: request_voice_callout; wake yes.",
+    ].join("\n");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(compactWakePrompt);
+
+    expect(response.body?.canonical_goal_frame, debug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      classifier_reasons: expect.arrayContaining([
+        "live_source_mailbox_intent",
+        "processed_mail_interpretation_goal",
+        "forbid_visual_capture_describe_goal",
+      ]),
+    });
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.source_target_intent?.suppressed_routes, debug).toEqual(
+      expect.arrayContaining([
+        "visual_capture_describe",
+        "no_tool_direct",
+      ]),
+    );
+    expect(response.body?.planner_contract?.selected_action, debug).toBeNull();
+    expect(response.body?.tool_use_restatement?.requiredToolFamilies, debug).not.toContain("internet_search");
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.read_processed_live_source_mail");
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.record_live_source_mail_decision");
+    expect(liveEnvironmentToolNames, debug).not.toContain("situation-room.describe_visual_capture");
+    expect(response.body?.canonical_goal_frame?.goal_kind, debug).not.toBe("visual_capture_describe");
+  }, 60_000);
+
   it("requires a decision receipt when processed mail recommends interpretation", () => {
     const prompt =
       "Read the visual mail and interpret what is happening. Predict what happens next and say what should be watched next.";

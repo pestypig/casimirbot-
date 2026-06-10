@@ -2255,6 +2255,78 @@ describe("Stage Play live-source mailbox", () => {
     ]);
   });
 
+  it("does not complete a voice wake from a decision receipt without a voice checkpoint", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:voice-reconcile-no-checkpoint",
+      evidenceRef: "visual_evidence:voice-reconcile-no-checkpoint",
+      summaryText: "A visual summary produced a voice candidate.",
+      createdAt: "2026-06-04T12:01:16.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:17.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+
+    const decision = recordStagePlayMailDecision({
+      mailIds: [mail.mailId],
+      threadId,
+      roomId,
+      decision: "request_voice_callout",
+      rationalePreview: "Direct Ask recorded a voice callout decision.",
+      voiceCalloutDraft: "Damage cue detected; create distance.",
+      voiceEligible: true,
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: { text: "Damage cue detected; create distance." },
+      },
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [mail.mailId, "ask:voice-decision-without-checkpoint"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:18.000Z",
+    });
+
+    const reconciled = reconcileStagePlayMailWakeRequestsWithDecisions({
+      threadId,
+      roomId,
+      decisions: [decision],
+      now: "2026-06-04T12:01:19.000Z",
+    });
+
+    expect(reconciled).toEqual([]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "queued",
+      decisionIds: [],
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([]);
+
+    const uiReconciliation = reconcileStagePlayMailWakeRequestFromAskTurn({
+      wakeRequestIds: [wake!.wakeRequestId],
+      askTurnId: "ask:voice-decision-without-checkpoint",
+      decisionIds: [decision.decisionId],
+      requiresVoiceCheckpoint: true,
+      mailIds: [mail.mailId],
+      now: "2026-06-04T12:01:20.000Z",
+    });
+    expect(uiReconciliation.reconciledWakeIds).toEqual([]);
+    expect(uiReconciliation.skippedWakeIds).toEqual([
+      {
+        wakeRequestId: wake?.wakeRequestId,
+        reason: "missing_decision_or_voice_receipt",
+      },
+    ]);
+  });
+
   it("reconciles a UI-bridged Ask wake by wake id after decision and voice receipt evidence", () => {
     const mail = enqueueStagePlayLiveSourceMailItem({
       threadId,
@@ -3971,6 +4043,18 @@ describe("Stage Play live-source mailbox", () => {
     expect(result).toMatchObject({
       status: "completed",
       askTurnId: "ask:wake-voice-allowed",
+    });
+    expect(result.evidenceRefs).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^stage_play_live_source_voice_delivery_receipt:/),
+      expect.stringMatching(/^helix_interim_voice_callout_receipt:/),
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-voice-allowed",
+      evidenceRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_live_source_voice_delivery_receipt:/),
+        expect.stringMatching(/^helix_interim_voice_callout_receipt:/),
+      ]),
     });
     expect(wakePrompt).toContain("Current task: voice_callout_candidate");
     expect(wakePrompt).toContain("Voice candidate receipt:");

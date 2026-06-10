@@ -35,6 +35,30 @@ const ACTIVE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
   "deferred_for_pressure",
 ]);
 
+const decisionRequiresVoiceCheckpoint = (decision: StagePlayLiveSourceMailDecisionV1): boolean =>
+  decision.decision === "request_voice_callout";
+
+const isVoiceCheckpointRef = (ref: string): boolean =>
+  /(?:^|:)(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt)/i.test(ref);
+
+const decisionsRequireVoiceCheckpoint = (decisions: StagePlayLiveSourceMailDecisionV1[]): boolean =>
+  decisions.some(decisionRequiresVoiceCheckpoint);
+
+const hasVoiceCheckpointForDecisions = (
+  decisions: StagePlayLiveSourceMailDecisionV1[],
+  refs: string[],
+): boolean => {
+  const voiceDecisionIds = decisions
+    .filter(decisionRequiresVoiceCheckpoint)
+    .map((decision) => decision.decisionId);
+  if (voiceDecisionIds.length === 0) return true;
+  const voiceRefs = refs.filter(isVoiceCheckpointRef);
+  return voiceRefs.length > 0 && voiceDecisionIds.every((decisionId) =>
+    voiceRefs.some((ref) => ref.includes(decisionId)) ||
+    refs.some((ref) => ref.includes(decisionId) && isVoiceCheckpointRef(ref))
+  );
+};
+
 const listThreadWakes = (threadId: string): StagePlayLiveSourceMailWakeRequestV1[] =>
   Array.from(wakeById.values())
     .filter((wake) => wake.threadId === threadId)
@@ -570,6 +594,12 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
       ...decisions,
       ...matchingDecisionRecords.flatMap((decision) => decision.evidenceRefs),
     ]);
+    if (
+      decisionsRequireVoiceCheckpoint(matchingDecisionRecords) &&
+      !hasVoiceCheckpointForDecisions(matchingDecisionRecords, evidenceRefs)
+    ) {
+      continue;
+    }
     const updated = markStagePlayMailWakeCompleted({
       wakeRequestId: wake.wakeRequestId,
       askTurnId,
@@ -605,6 +635,7 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
   wakeRequestIds: string[];
   askTurnId?: string | null;
   decisionIds?: string[];
+  requiresVoiceCheckpoint?: boolean;
   voiceReceiptRefs?: string[];
   mailIds?: string[];
   evidenceRefs?: string[];
@@ -656,6 +687,10 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
       continue;
     }
     if (decisionIds.length === 0 && voiceReceiptRefs.length === 0) {
+      skippedWakeIds.push({ wakeRequestId, reason: "missing_decision_or_voice_receipt" });
+      continue;
+    }
+    if (input.requiresVoiceCheckpoint === true && voiceReceiptRefs.length === 0) {
       skippedWakeIds.push({ wakeRequestId, reason: "missing_decision_or_voice_receipt" });
       continue;
     }

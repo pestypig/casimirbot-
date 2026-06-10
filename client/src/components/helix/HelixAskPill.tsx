@@ -9609,15 +9609,7 @@ function mergeHelixAskRepliesByCanonicalTurn(
 }
 
 function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
-  return mergeHelixAskRepliesByCanonicalTurn(replies)
-    .map((reply, index) => ({ reply, index, ts: resolveHelixAskReplyOrderMs(reply) }))
-    .sort((left, right) => {
-      if (left.ts !== null && right.ts !== null && left.ts !== right.ts) return left.ts - right.ts;
-      if (left.ts !== null && right.ts === null) return -1;
-      if (left.ts === null && right.ts !== null) return 1;
-      return left.index - right.index;
-    })
-    .map((entry) => entry.reply);
+  return mergeHelixAskRepliesByCanonicalTurn(replies);
 }
 
 function limitHelixAskRepliesChronologically(

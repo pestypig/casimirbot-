@@ -1956,7 +1956,10 @@ describe("StagePlayBadgeGraphPanel", () => {
           status: "completed",
           askTurnId: "ask:completed-ui",
           decisionIds: ["stage_play_live_source_mail_decision:ui"],
-          evidenceRefs: ["stage_play_live_source_mail:first-ui"],
+          evidenceRefs: [
+            "stage_play_live_source_mail:first-ui",
+            "helix_interim_voice_callout_receipt:completed-ui",
+          ],
           createdAt: "2026-06-02T00:01:03.000Z",
           assistant_answer: false,
           terminal_eligible: false,
@@ -2006,6 +2009,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/Loop state: armed_for_next_summary/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Unread retained: 1/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Runnable wakes: 1/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Last completed").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/completed; ask:completed-ui; 1 decision; voice checkpoint reached/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Current pending").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/queued; 1 mail/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Watch policy: batch_interpretation; mail latest_only; cadence every_batch; continuation scheduled/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("No watch policy.")).toBeNull();
     expect(screen.getAllByText(/job armed/i).length).toBeGreaterThan(0);

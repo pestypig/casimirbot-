@@ -982,7 +982,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");
     expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
     expect(source).toContain("left.sequence - right.sequence");
-    expect(source).toContain("return left.index - right.index");
+    expect(source).toContain("return mergeHelixAskRepliesByCanonicalTurn(replies);");
     expect(source).toContain("const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now()");
   });
 

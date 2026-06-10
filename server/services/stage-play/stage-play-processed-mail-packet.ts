@@ -469,9 +469,14 @@ const arbitrateHypotheses = (input: {
       : input.validation.result === "contradicted" || input.validation.result === "partially_supported"
         ? `prediction ${input.validation.result}; record interpretation to update the continuing effort`
         : `${input.effort.currentEffort} evidence supports ${recommendation}`;
+  const wakeAsk =
+    urgentVoice ||
+    recommendation === "request_more_evidence" ||
+    recommendation === "request_stage_play_checkpoint" ||
+    recommendation === "draft_text_answer";
   return {
     recommendedNext: recommendation,
-    wakeAsk: recommendation !== "wait_for_next_summary",
+    wakeAsk,
     reason,
     confidence: urgentVoice || missingEvidence.length === 0 ? "high" : missingEvidence.length <= 2 ? "medium" : "low",
     selectedHypothesis,
