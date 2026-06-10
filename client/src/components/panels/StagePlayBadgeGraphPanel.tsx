@@ -81,6 +81,11 @@ const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
 } as const;
 const STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY = "stage-play:mail-wake-ui-bridge:v1";
 const STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS = 30_000;
+type StagePlayWakeBridgeMemory = {
+  launchedWakeIds: string[];
+  launchedWakeAtById: Record<string, number>;
+  lastLaunchedAt: number;
+};
 
 const STAGE_PLAY_VISUAL_CADENCE_OPTIONS = [5_000, 10_000, 15_000, 30_000] as const;
 
@@ -1992,9 +1997,9 @@ function buildObserverMailLoopNodes(input: {
           pressureNextRetryAt ? `Next retry: ${formatStagePlayClock(pressureNextRetryAt)}` : null,
           runtimePressureLevel ? `Pressure: ${labelize(runtimePressureLevel)}` : null,
           runtimePressureReason ? `Reason: ${labelize(runtimePressureReason)}` : null,
+          pressureContinuationText,
           runtimeMemoryText,
           localBypassText,
-          pressureContinuationText,
         ].filter((line): line is string => Boolean(line)),
         tone: "pressure" as const,
       }
@@ -2835,6 +2840,49 @@ function formatStagePlayCount(value: number): string {
   return new Intl.NumberFormat().format(value);
 }
 
+function stagePlayRuntimePercent(used: number | null | undefined, limit: number | null | undefined): number | null {
+  if (
+    typeof used !== "number" ||
+    typeof limit !== "number" ||
+    !Number.isFinite(used) ||
+    !Number.isFinite(limit) ||
+    limit <= 0
+  ) {
+    return null;
+  }
+  return Math.max(0, Math.min(999, (used / limit) * 100));
+}
+
+function formatStagePlayRuntimePercent(percent: number | null): string {
+  if (percent == null || !Number.isFinite(percent)) return "n/a";
+  return `${Math.round(percent)}%`;
+}
+
+function formatStagePlayRuntimeMiB(
+  used: number | null | undefined,
+  limit: number | null | undefined,
+  percent: number | null,
+): string {
+  if (percent != null) return formatStagePlayRuntimePercent(percent);
+  if (typeof used === "number" && Number.isFinite(used)) {
+    return `${Math.round(used)}MiB`;
+  }
+  if (typeof limit === "number" && Number.isFinite(limit)) {
+    return `limit ${Math.round(limit)}MiB`;
+  }
+  return "n/a";
+}
+
+function stagePlayRuntimeTone(percent: number | null, pressureLevel?: string | null): "default" | "good" | "warn" | "blocked" {
+  const normalizedPressure = (pressureLevel ?? "").toLowerCase();
+  if (normalizedPressure.includes("hard") || normalizedPressure.includes("blocked")) return "blocked";
+  if (normalizedPressure.includes("soft") || normalizedPressure.includes("pressure")) return "warn";
+  if (percent == null) return "default";
+  if (percent >= 90) return "blocked";
+  if (percent >= 75) return "warn";
+  return "good";
+}
+
 function ageMsFromIso(value: string | null | undefined): number | null {
   if (!value) return null;
   const parsed = Date.parse(value);
@@ -2931,10 +2979,20 @@ function StagePlayMailLoopLiveOverview({
     packet: latestPacket,
   });
   const wakeBridgeReason = wakeStatus === "deferred_for_pressure"
-    ? "backend wake admission deferred for pressure, opening visible Helix Ask wake"
+    ? "backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override"
     : wakeStatus === "failed_retryable"
       ? "backend wake attempt failed retryably, opening visible Helix Ask wake"
       : "micro-reasoner wake candidate ready for Helix Ask";
+  const wakeBridgeButtonLabel = wakeStatus === "deferred_for_pressure"
+    ? "Open pressure-deferred wake in Helix Ask"
+    : wakeStatus === "failed_retryable"
+      ? "Retry wake in Helix Ask"
+      : "Open queued wake in Helix Ask";
+  const wakeBridgeButtonTitle = wakeBridgeEligible
+    ? wakeStatus === "deferred_for_pressure"
+      ? "Open and auto-submit this pressure-deferred mailbox wake in Helix Ask as a visible manual override."
+      : "Open and auto-submit this constrained mailbox wake in Helix Ask."
+    : "No eligible unresolved wake candidate is ready.";
   const packetChars = latestPacket ? jsonCharCount(latestPacket) : 0;
   const runChars = jsonCharCount(latestPacketRuns.length > 0 ? latestPacketRuns : runs);
   const compactPacketChars = latestPacket ? jsonCharCount({
@@ -2957,6 +3015,37 @@ function StagePlayMailLoopLiveOverview({
     recommendedNext: latestPacket.recommendedNext,
     evidenceRefs: latestPacket.evidenceRefs.slice(0, 10),
   }) : 0;
+  const deckLatencyMs = latestPacketRuns.reduce((sum, run) => sum + (run.latencyMs ?? 0), 0);
+  const runtimeAdmission = mailbox?.wakeAdmissionCycle?.runtimeAdmission ?? null;
+  const runtimePressureLevel = runtimeAdmission?.pressureLevel ?? mailbox?.wakeAdmissionCycle?.reason ?? null;
+  const heapRamPercent = stagePlayRuntimePercent(
+    runtimeAdmission?.memory?.heapUsedMiB,
+    runtimeAdmission?.limits?.maxHeapUsedMiB,
+  );
+  const rssRamPercent = stagePlayRuntimePercent(
+    runtimeAdmission?.memory?.rssMiB,
+    runtimeAdmission?.limits?.maxRssMiB,
+  );
+  const heapRamLabel = formatStagePlayRuntimeMiB(
+    runtimeAdmission?.memory?.heapUsedMiB,
+    runtimeAdmission?.limits?.maxHeapUsedMiB,
+    heapRamPercent,
+  );
+  const rssRamLabel = formatStagePlayRuntimeMiB(
+    runtimeAdmission?.memory?.rssMiB,
+    runtimeAdmission?.limits?.maxRssMiB,
+    rssRamPercent,
+  );
+  const runtimePressureLabel = runtimePressureLevel ? labelize(runtimePressureLevel) : "n/a";
+  const deckRuntimeLabel = heapRamPercent != null
+    ? `heap ${formatStagePlayRuntimePercent(heapRamPercent)}`
+    : rssRamPercent != null
+      ? `rss ${formatStagePlayRuntimePercent(rssRamPercent)}`
+      : "ram n/a";
+  const combinedRuntimePercent = heapRamPercent != null || rssRamPercent != null
+    ? Math.max(heapRamPercent ?? 0, rssRamPercent ?? 0)
+    : null;
+  const combinedRuntimeTone = stagePlayRuntimeTone(combinedRuntimePercent, runtimePressureLevel);
   const recentPackets = packets.slice(-6);
   const deckRows = STAGE_PLAY_DECK_ROLES.map((role) => {
     const run = latestStagePlayRunForPacket(runs, role, latestPacket);
@@ -2972,8 +3061,12 @@ function StagePlayMailLoopLiveOverview({
   useEffect(() => {
     if (!wakeBridgeEligible || !latestWake) return;
     const memory = readStagePlayWakeBridgeMemory();
-    if (memory.launchedWakeIds.includes(latestWake.wakeRequestId)) return;
-    if (Date.now() - memory.lastLaunchedAt < STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS) return;
+    const now = Date.now();
+    if (!shouldAutoLaunchStagePlayWakeBridge({
+      wake: latestWake,
+      memory,
+      now,
+    })) return;
     launchStagePlayWakeInHelixAsk({
       wake: latestWake,
       mailItems,
@@ -2981,14 +3074,12 @@ function StagePlayMailLoopLiveOverview({
       wakeResult: latestWakeResult,
       bridgeReason: wakeBridgeReason,
     });
-    writeStagePlayWakeBridgeMemory({
-      launchedWakeIds: [...memory.launchedWakeIds, latestWake.wakeRequestId],
-      lastLaunchedAt: Date.now(),
-    });
+    writeStagePlayWakeBridgeMemory(markStagePlayWakeBridgeLaunched(memory, latestWake.wakeRequestId, now));
   }, [
     latestPacket?.packetId,
     latestWake?.wakeRequestId,
     latestWakeResult?.wakeResultId,
+    latestWakeResult?.status,
     mailItems,
     wakeBridgeEligible,
     wakeBridgeReason,
@@ -3004,10 +3095,7 @@ function StagePlayMailLoopLiveOverview({
       bridgeReason: "operator opened queued wake from Stage Play mail-loop UI",
     });
     const memory = readStagePlayWakeBridgeMemory();
-    writeStagePlayWakeBridgeMemory({
-      launchedWakeIds: [...memory.launchedWakeIds, latestWake.wakeRequestId],
-      lastLaunchedAt: Date.now(),
-    });
+    writeStagePlayWakeBridgeMemory(markStagePlayWakeBridgeLaunched(memory, latestWake.wakeRequestId, Date.now()));
   };
 
   return (
@@ -3036,9 +3124,9 @@ function StagePlayMailLoopLiveOverview({
                     : "border-slate-800 bg-slate-950 text-slate-500"
                 }`}
                 data-testid="stage-play-open-wake-in-ask"
-                title={wakeBridgeEligible ? "Open and auto-submit this constrained mailbox wake in Helix Ask." : "No eligible unresolved wake candidate is ready."}
+                title={wakeBridgeButtonTitle}
               >
-                Open queued wake in Helix Ask
+                {wakeBridgeButtonLabel}
               </button>
               <span className="font-mono text-[10px] text-slate-500">
                 {latestWake.wakeRequestId}
@@ -3077,6 +3165,10 @@ function StagePlayMailLoopLiveOverview({
           <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
           <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
           <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
+          <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
+          <StagePlayMetricPill label="heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
           <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
         </div>
       </div>
@@ -3169,10 +3261,22 @@ function StagePlayMailLoopLiveOverview({
                   {run?.status ?? "ready"}
                 </span>
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-1 text-[9px]">
+              <div className="mt-2 grid grid-cols-4 gap-1 text-[9px]">
                 <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
                 <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
                 <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount((run?.outputPreview ?? "").length)} out</span>
+                <span
+                  className={`rounded border px-1.5 py-1 ${
+                    combinedRuntimeTone === "blocked"
+                      ? "border-rose-800 text-rose-100"
+                      : combinedRuntimeTone === "warn"
+                        ? "border-amber-800 text-amber-100"
+                        : "border-slate-800 text-slate-400"
+                  }`}
+                  title="Runtime RAM pressure is sampled for the shared server process that runs this micro-reasoner deck."
+                >
+                  {deckRuntimeLabel}
+                </span>
               </div>
               <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
                 <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Output</div>
@@ -3633,35 +3737,81 @@ function buildStagePlayMailWakeAskQuestion(input: {
   ].filter(Boolean).join("\n");
 }
 
-function readStagePlayWakeBridgeMemory(): { launchedWakeIds: string[]; lastLaunchedAt: number } {
-  if (typeof window === "undefined") return { launchedWakeIds: [], lastLaunchedAt: 0 };
+function readStagePlayWakeBridgeMemory(): StagePlayWakeBridgeMemory {
+  if (typeof window === "undefined") return { launchedWakeIds: [], launchedWakeAtById: {}, lastLaunchedAt: 0 };
   try {
     const raw = window.sessionStorage.getItem(STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY);
-    if (!raw) return { launchedWakeIds: [], lastLaunchedAt: 0 };
-    const parsed = JSON.parse(raw) as Partial<{ launchedWakeIds: unknown; lastLaunchedAt: unknown }>;
+    if (!raw) return { launchedWakeIds: [], launchedWakeAtById: {}, lastLaunchedAt: 0 };
+    const parsed = JSON.parse(raw) as Partial<{
+      launchedWakeIds: unknown;
+      launchedWakeAtById: unknown;
+      lastLaunchedAt: unknown;
+    }>;
+    const launchedWakeIds = Array.isArray(parsed.launchedWakeIds)
+      ? parsed.launchedWakeIds.filter((id): id is string => typeof id === "string")
+      : [];
+    const launchedWakeAtById = parsed.launchedWakeAtById && typeof parsed.launchedWakeAtById === "object" && !Array.isArray(parsed.launchedWakeAtById)
+      ? Object.fromEntries(
+          Object.entries(parsed.launchedWakeAtById as Record<string, unknown>)
+            .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])),
+        )
+      : Object.fromEntries(launchedWakeIds.map((id) => [id, 0]));
     return {
-      launchedWakeIds: Array.isArray(parsed.launchedWakeIds)
-        ? parsed.launchedWakeIds.filter((id): id is string => typeof id === "string")
-        : [],
+      launchedWakeIds,
+      launchedWakeAtById,
       lastLaunchedAt: typeof parsed.lastLaunchedAt === "number" && Number.isFinite(parsed.lastLaunchedAt)
         ? parsed.lastLaunchedAt
         : 0,
     };
   } catch {
-    return { launchedWakeIds: [], lastLaunchedAt: 0 };
+    return { launchedWakeIds: [], launchedWakeAtById: {}, lastLaunchedAt: 0 };
   }
 }
 
-function writeStagePlayWakeBridgeMemory(next: { launchedWakeIds: string[]; lastLaunchedAt: number }) {
+function writeStagePlayWakeBridgeMemory(next: StagePlayWakeBridgeMemory) {
   if (typeof window === "undefined") return;
   try {
+    const launchedWakeIds = next.launchedWakeIds.slice(-25);
+    const launchedWakeAtById = Object.fromEntries(
+      launchedWakeIds.map((id) => [id, next.launchedWakeAtById[id] ?? next.lastLaunchedAt]),
+    );
     window.sessionStorage.setItem(STAGE_PLAY_UI_WAKE_BRIDGE_STORAGE_KEY, JSON.stringify({
-      launchedWakeIds: next.launchedWakeIds.slice(-25),
+      launchedWakeIds,
+      launchedWakeAtById,
       lastLaunchedAt: next.lastLaunchedAt,
     }));
   } catch {
     // session storage is best-effort; the visible button still works without it
   }
+}
+
+function shouldAutoLaunchStagePlayWakeBridge(input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  memory: StagePlayWakeBridgeMemory;
+  now: number;
+}): boolean {
+  if (input.now - input.memory.lastLaunchedAt < STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS) return false;
+  const lastWakeLaunchAt = input.memory.launchedWakeAtById[input.wake.wakeRequestId] ?? 0;
+  if (lastWakeLaunchAt <= 0) return true;
+  if (input.wake.status === "deferred_for_pressure" || input.wake.status === "failed_retryable") {
+    return input.now - lastWakeLaunchAt >= STAGE_PLAY_UI_WAKE_BRIDGE_COOLDOWN_MS;
+  }
+  return false;
+}
+
+function markStagePlayWakeBridgeLaunched(
+  memory: StagePlayWakeBridgeMemory,
+  wakeRequestId: string,
+  now: number,
+): StagePlayWakeBridgeMemory {
+  return {
+    launchedWakeIds: [...memory.launchedWakeIds.filter((id) => id !== wakeRequestId), wakeRequestId],
+    launchedWakeAtById: {
+      ...memory.launchedWakeAtById,
+      [wakeRequestId]: now,
+    },
+    lastLaunchedAt: now,
+  };
 }
 
 function shouldBridgeStagePlayWakeToAsk(input: {

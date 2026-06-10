@@ -15,6 +15,8 @@ export type StagePlayLiveSourceMailWakeStatusV1 =
   | "failed_retryable"
   | "failed_terminal"
   | "deferred_for_pressure"
+  | "expired_stale"
+  | "expired_superseded"
   | "skipped"
   | "failed";
 
@@ -36,6 +38,8 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   lastAttemptAt?: string | null;
   nextRetryAt?: string | null;
   failureReason?: string | null;
+  expiresAt?: string | null;
+  supersededByWakeRequestId?: string | null;
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   queuedAt: string;
@@ -54,7 +58,15 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
-  status: "completed" | "skipped" | "failed" | "failed_retryable" | "failed_terminal" | "deferred_for_pressure";
+  status:
+    | "completed"
+    | "skipped"
+    | "failed"
+    | "failed_retryable"
+    | "failed_terminal"
+    | "deferred_for_pressure"
+    | "expired_stale"
+    | "expired_superseded";
   askTurnId?: string | null;
   decisionIds: string[];
   budgetStateRef?: string | null;

@@ -878,6 +878,14 @@ function renderPanel(options: {
             action: "defer",
             reason: "runtime_memory_queue_deferrable",
             pressureLevel: "soft_pressure",
+            memory: {
+              heapUsedMiB: 720,
+              rssMiB: 1430,
+            },
+            limits: {
+              maxHeapUsedMiB: 800,
+              maxRssMiB: 1600,
+            },
           },
           assistant_answer: false,
           terminal_eligible: false,
@@ -2144,8 +2152,13 @@ describe("StagePlayBadgeGraphPanel", () => {
     renderPanel();
 
     expect(await screen.findByTestId("stage-play-mail-loop-live-overview")).toBeTruthy();
+    expect(screen.getByText("heap ram")).toBeTruthy();
+    expect(screen.getByText("rss ram")).toBeTruthy();
+    expect(screen.getAllByText("90%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("89%").length).toBeGreaterThan(0);
     const bridgeButton = await screen.findByTestId("stage-play-open-wake-in-ask");
     expect(bridgeButton).toBeEnabled();
+    expect(bridgeButton).toHaveTextContent("Open pressure-deferred wake in Helix Ask");
 
     await waitFor(() => {
       expect(promptEvents.length).toBeGreaterThan(0);
@@ -2161,7 +2174,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(question).toContain("live_env.record_live_source_mail_decision");
     expect(question).toContain("This is a constrained mailbox wake turn, not a generic workspace/docs turn.");
     expect(question).toContain("Wake request: stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui");
-    expect(question).toContain("UI bridge reason: backend wake admission deferred for pressure");
+    expect(question).toContain("UI bridge reason: backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override");
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {
