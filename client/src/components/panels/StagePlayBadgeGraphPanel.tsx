@@ -3420,6 +3420,15 @@ function StagePlayMailLoopLiveOverview({
           : latestWakeDecision?.decision === "request_voice_callout"
             ? "voice request pending"
             : "voice decision missing";
+  const currentWakeSummary = stagePlayWakeLifecycleSummary({
+    lifecycleStage: currentWakeStage,
+    status: currentWakeStatus,
+    askTurnId: currentAskTurnId,
+    decisionIds: [...currentDecisionIds],
+    voiceRefs: voiceCheckpointRefs,
+    nextRetryAt: currentWakeForOperator?.nextRetryAt ?? null,
+    failureReason: currentWakeFailure,
+  });
   const routeOutcomeSteps: Array<{
     key: string;
     label: string;
@@ -3485,15 +3494,93 @@ function StagePlayMailLoopLiveOverview({
       state: currentWakeResultForOperator?.status === "completed" ? "done" : currentAskTurnId ? "pending" : blockedBeforeAsk ? "blocked" : "missing",
     },
   ];
-  const currentWakeSummary = stagePlayWakeLifecycleSummary({
-    lifecycleStage: currentWakeStage,
-    status: currentWakeStatus,
-    askTurnId: currentAskTurnId,
-    decisionIds: [...currentDecisionIds],
-    voiceRefs: voiceCheckpointRefs,
-    nextRetryAt: currentWakeForOperator?.nextRetryAt ?? null,
-    failureReason: currentWakeFailure,
-  });
+  const mailTransformSteps: Array<{
+    key: string;
+    title: string;
+    status: string;
+    body: string;
+    meta: string;
+    state: "done" | "active" | "blocked" | "pending" | "missing";
+  }> = [
+    {
+      key: "observation",
+      title: "Original observation",
+      status: latestMail ? "captured" : "waiting",
+      body: compactStagePlayText(latestMail?.summary.text, "Waiting for visual source mail.", 190),
+      meta: latestMail ? `${formatStagePlayClock(latestMail.createdAt)} | ${formatStagePlayCount(latestMail.summary.text.length)} chars` : captureStateLabel,
+      state: latestMail ? "done" : "missing",
+    },
+    {
+      key: "shade-mail",
+      title: "Minecraft shade mail",
+      status: latestMail?.status ? labelize(latestMail.status) : "not built",
+      body: compactStagePlayText(latestMail?.summary.preview, latestSummary, 190),
+      meta: latestMail?.mailId ?? "no mail id",
+      state: latestMail ? "done" : "missing",
+    },
+    {
+      key: "processed-packet",
+      title: "Processed packet",
+      status: latestPacket?.recommendedNext ? labelize(latestPacket.recommendedNext) : "not processed",
+      body: latestPacket
+        ? compactStagePlayText(formatStagePlayDeckVerdictForOverview(latestPacket), "Packet verdict pending.", 190)
+        : "Micro-reasoner packet has not been composed yet.",
+      meta: latestPacket ? `${formatStagePlayCount(packetChars)} chars | ${formatStagePlayClock(latestPacket.createdAt)}` : "packet pending",
+      state: latestPacket ? "done" : latestMail ? "pending" : "missing",
+    },
+    {
+      key: "micro-deck",
+      title: "Micro-reasoner deck",
+      status: latestPacket?.arbiter?.recommendedNext ? labelize(latestPacket.arbiter.recommendedNext) : "binding",
+      body: compactStagePlayText(latestPacket?.arbiter?.reason, "Deck outputs are still binding into an arbiter verdict.", 190),
+      meta: `${latestPacketRuns.length || runs.length} runs | ${formatStagePlayMs(deckLatencyMs)} | ${formatStagePlayCount(runChars)} chars`,
+      state: latestPacket?.arbiter ? "done" : latestPacket ? "active" : "missing",
+    },
+    {
+      key: "wake",
+      title: "Wake request",
+      status: currentWakeForOperator ? labelize(currentWakeStatus) : "not queued",
+      body: currentWakeSummary,
+      meta: currentWakeForOperator?.wakeRequestId ?? "no wake request",
+      state: blockedBeforeAsk
+        ? "blocked"
+        : currentWakeForOperator
+          ? currentAskTurnId
+            ? "done"
+            : "active"
+          : latestPacket?.arbiter?.wakeAsk
+            ? "pending"
+            : "missing",
+    },
+    {
+      key: "ask-handoff",
+      title: "Helix Ask handoff",
+      status: currentAskTurnId ? "entered Ask" : blockedBeforeAsk ? "blocked" : "waiting",
+      body: currentAskTurnId
+        ? "Structured mailbox route metadata is attached to the Ask turn."
+        : blockedBeforeAsk
+          ? `Not sent to Ask: ${currentWakeFailure ?? runtimePressureLabel}.`
+          : "If the arbiter wakes Ask, this box is auto-sent into the Helix Ask lane.",
+      meta: currentAskTurnId ?? "no Ask turn id",
+      state: currentAskTurnId ? "done" : blockedBeforeAsk ? "blocked" : currentWakeForOperator ? "pending" : "missing",
+    },
+    {
+      key: "checkpoint",
+      title: "Decision / voice / final",
+      status: currentWakeResultForOperator?.status === "completed" ? "checkpoint reached" : voiceStatusLabel,
+      body: voiceRequested
+        ? `${voiceStatusLabel}. ${voiceCheckpointRefs.length} voice checkpoint ref${voiceCheckpointRefs.length === 1 ? "" : "s"}.`
+        : "No voice callout requested by the current packet.",
+      meta: currentWakeResultForOperator?.wakeResultId ?? "wake result pending",
+      state: currentWakeResultForOperator?.status === "completed"
+        ? "done"
+        : currentAskTurnId
+          ? "pending"
+          : blockedBeforeAsk
+            ? "blocked"
+            : "missing",
+    },
+  ];
   const recentPackets = packets.slice(-6);
   const deckRows = STAGE_PLAY_DECK_ROLES.map((role) => {
     const run = latestStagePlayRunForPacket(runs, role, latestPacket);
