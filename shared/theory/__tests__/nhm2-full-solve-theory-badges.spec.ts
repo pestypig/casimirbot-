@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { isTheoryBadgeGraphV1, type TheoryBadgeV1 } from "../../contracts/theory-badge-graph.v1";
+import { isTheoryBadgeGraphV1, validateTheoryBadgeGraphV1, type TheoryBadgeV1 } from "../../contracts/theory-badge-graph.v1";
 import { buildHelixTheoryBadgeGraphV1 } from "../helix-theory-badge-graph";
 import { buildNhm2FullSolveTheoryBadgesV1 } from "../nhm2-full-solve-theory-badges";
 
 describe("NHM2 full-solve theory badges", () => {
+  const newClosureStackBadgeIds = [
+    "nhm2.tensor.same_chart_full_tensor",
+    "nhm2.closure.wall_t00_source_residual",
+    "nhm2.energy_condition.observer_robust_gate",
+    "nhm2.qei.worldline_dossier",
+    "casimir.material.lifshitz_receipt",
+    "casimir.geometry.beyond_pfa_validity",
+    "nhm2.natario.invariant_audit",
+  ];
+
   it("builds NHM2 full-solve badges with no validation or promotion boundary", () => {
     const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
 
@@ -135,6 +145,7 @@ describe("NHM2 full-solve theory badges", () => {
     const ids = graph.badges.map((badge: TheoryBadgeV1) => badge.id);
 
     expect(isTheoryBadgeGraphV1(graph)).toBe(true);
+    expect(validateTheoryBadgeGraphV1(graph)).toEqual([]);
     expect(ids).toEqual(
       expect.arrayContaining([
         "nhm2.observer.eulerian_normal",
@@ -156,6 +167,103 @@ describe("NHM2 full-solve theory badges", () => {
     );
     expect(wallClosure?.calculatorPayloads.map((payload) => payload.expression)).toContain(
       "R_wall_T00 = T00_wall_required - T00_wall_available",
+    );
+  });
+
+  it("keeps new closure-stack badges diagnostic and noncomputable except scalar replay rows", () => {
+    const graph = buildHelixTheoryBadgeGraphV1();
+    const byId = new Map(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+
+    for (const badgeId of newClosureStackBadgeIds) {
+      const badge = byId.get(badgeId);
+      expect(badge, badgeId).toBeDefined();
+      expect(badge?.claimBoundary).toMatchObject({
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      });
+    }
+
+    for (const badgeId of [
+      "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.energy_condition.observer_robust_gate",
+      "nhm2.qei.worldline_dossier",
+      "nhm2.natario.invariant_audit",
+      "casimir.material.lifshitz_receipt",
+      "casimir.geometry.beyond_pfa_validity",
+    ]) {
+      const badge = byId.get(badgeId);
+      expect(badge?.calculatorPayloads).toEqual([]);
+      expect(badge?.equations.every((equation) => equation.computableExpression == null)).toBe(true);
+      expect(
+        badge?.equations.every((equation) =>
+          ["gate_status", "noncomputable_reference"].includes(equation.operatorKind),
+        ),
+      ).toBe(true);
+    }
+
+    expect(
+      byId.get("nhm2.closure.wall_t00_source_residual")?.calculatorPayloads.map(
+        (payload) => payload.expression,
+      ),
+    ).toEqual(["R_wall_T00 = T00_wall_required - T00_wall_available"]);
+    expect(
+      byId.get("nhm2.qei.sampling_window")?.calculatorPayloads.map(
+        (payload) => payload.expression,
+      ),
+    ).toContain("qei_margin = qei_bound - qei_sample");
+    expect(
+      byId.get("casimir.cavity.mass_equivalent_proxy")?.calculatorPayloads.map(
+        (payload) => payload.expression,
+      ),
+    ).toEqual(["M_proxy = E_out/c^2"]);
+    expect(
+      byId.get("nhm2.tile.duty_cycle_average")?.calculatorPayloads.map(
+        (payload) => payload.expression,
+      ),
+    ).toEqual(["P_avg = E_cycle / T_cycle"]);
+  });
+
+  it("wires the requested full-solve closure graph edges", () => {
+    const graph = buildHelixTheoryBadgeGraphV1();
+
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "physics.gr.3p1_decomposition",
+          to: "nhm2.tensor.same_chart_full_tensor",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.closure.wall_t00_source_residual",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.energy_condition.observer_robust_gate",
+        }),
+        expect.objectContaining({
+          from: "nhm2.closure.wall_t00_source_residual",
+          to: "nhm2.qei.worldline_dossier",
+        }),
+        expect.objectContaining({
+          from: "casimir.material.lifshitz_receipt",
+          to: "nhm2.closure.wall_t00_source_residual",
+        }),
+        expect.objectContaining({
+          from: "casimir.geometry.beyond_pfa_validity",
+          to: "casimir.material.lifshitz_receipt",
+        }),
+        expect.objectContaining({
+          from: "nhm2.natario.invariant_audit",
+          to: "nhm2.energy_condition.observer_robust_gate",
+        }),
+        expect.objectContaining({
+          from: "nhm2.energy_condition.observer_robust_gate",
+          to: "nhm2.claim_boundary.diagnostic_only",
+        }),
+      ]),
     );
   });
 
