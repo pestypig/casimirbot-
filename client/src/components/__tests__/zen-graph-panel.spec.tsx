@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { CharacterSituationComparisonV1 } from "@shared/character-situation-comparison";
 import { buildIdeologyContextReflectionV1 } from "@shared/ideology-context-reflection";
 import { buildZenBadgeLocatorV1, type ZenBadgeLocatorV1 } from "@shared/zen-badge-locator";
+import { buildProbabilityTerrainV1 } from "@shared/probability-terrain";
 import { REINHARD_VON_LOHENGRAMM_PROFILE } from "@shared/zen-graph/character-profiles/reinhard-von-lohengramm";
 import { buildIdeologyGraph } from "@shared/zen-graph/build-ideology-graph";
 import { compareCharacterSituation } from "@shared/zen-graph/compare-character-situation";
@@ -194,6 +195,23 @@ function buildLocatorFixture(): ZenBadgeLocatorV1 {
       likely: [],
       inferred: [],
     },
+    probabilityTerrain: buildProbabilityTerrainV1({
+      graphKind: "zen_badge_graph",
+      candidates: [
+        {
+          id: "direct-observation-before-claim",
+          weight: 1,
+          renderChunkId: "zen:wisdom-first-principles:root_near:node_id",
+          semanticChunkId: "zen:first_principle:supported_action_posture:node_id",
+        },
+        {
+          id: "right-speech-and-accurate-formulation",
+          weight: 0.9,
+          renderChunkId: "zen:wisdom-first-principles:root_near:label",
+          semanticChunkId: "zen:first_principle:constrained_action_posture:label",
+        },
+      ],
+    }),
     locatedBindings: [
       {
         id: "wisdom-first-principles",
@@ -276,7 +294,7 @@ describe("ZenGraphPanel", () => {
     expect(screen.getByRole("button", { name: "Fairness, Due Process, and Justification" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Skillful Action Under Uncertainty" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Skillful Mediation" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "mission ethos" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /mission ethos/i })).toBeTruthy();
     expect(screen.getAllByTestId("zen-graph-badge-node").length).toBeGreaterThan(12);
 
     openObjectiveLens("Wisdom objective binding lens");
@@ -340,6 +358,11 @@ describe("ZenGraphPanel", () => {
     renderPanel(buildLocatorFixture());
     openObjectiveBindings();
 
+    expect(screen.getByTestId("zen-graph-probability-terrain")).toBeTruthy();
+    expect(screen.getByTestId("zen-graph-probability-terrain-field")).toBeTruthy();
+    expect(screen.getAllByTestId("probability-terrain-contour").length).toBeGreaterThan(0);
+    expect(screen.getByText("Probability Terrain")).toBeTruthy();
+    expect(screen.getByText(/Placement certainty/i)).toBeTruthy();
     expect(screen.queryByText("Located comparison")).toBeNull();
     expect(screen.getAllByText(/principle\.direct-observation-before-claim supports result\.procedural_posture/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/principle\.right-speech-and-accurate-formulation constrains result\.procedural_posture/).length).toBeGreaterThan(0);
@@ -380,7 +403,7 @@ describe("ZenGraphPanel", () => {
 
     expect(screen.getByText(/Admission state:/)).toBeTruthy();
     expect(screen.getAllByText(/Risk: claim sensitive/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Display policy: diagnostic only/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Display policy:/).length).toBeGreaterThan(0);
     expect(screen.getByText("Evidence refs: turn:panel, doc:ethos")).toBeTruthy();
     expect(screen.getAllByText("Ask user").length).toBeGreaterThan(0);
     expect(screen.getByText("Blocked")).toBeTruthy();

@@ -1306,6 +1306,7 @@ describe("Stage Play live-source mailbox", () => {
       "Immersion state",
       "Prediction validation",
       "Processed mail packet",
+      "Decision selected",
       "Prediction check",
       "Immediate prediction",
       "Agent decision",
@@ -1363,8 +1364,14 @@ describe("Stage Play live-source mailbox", () => {
       context_role: "micro_reasoner_evidence",
     });
     expect(daylightRuns.every((run) => run.promptId)).toBe(true);
+    expect(daylightRows.map((row) => row.rowKind)).toEqual(expect.arrayContaining([
+      "micro_reasoner_run",
+    ]));
     expect(daylightRows.find((row) => row.title === "Observation mail")?.body).toBe("Forest daylight scene; player visible.");
     expect(daylightRows.find((row) => row.title === "Processed mail packet")?.body).toContain("processed_packet_ready");
+    expect(daylightRows.find((row) => row.title === "Decision selected")?.body).toContain("Decision: record_interpretation");
+    expect(daylightRows.find((row) => row.title === "Decision selected")?.body).toContain("Recommended next tool: live_env.record_live_source_mail_decision");
+    expect(daylightRows.find((row) => row.title === "Wake requested")?.body).toContain("decision_selector selected record_interpretation");
     expect(daylightRows.find((row) => row.title === "Prediction check")?.body).toBe("No prior prediction.");
     expect(daylightRows.find((row) => row.title === "Immediate prediction")?.body).toContain("Likely next: gathering wood or scanning resources.");
     expect(daylightRows.find((row) => row.title === "Agent decision")?.body).toContain("wait_for_next_summary");

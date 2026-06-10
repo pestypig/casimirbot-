@@ -4,11 +4,13 @@ import type {
   TheoryBadgeGraphV1,
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
+import type { ProbabilityTerrainV1 } from "@shared/contracts/probability-terrain.v1";
 import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "@shared/contracts/physics-atlas.v1";
 import type { TheoryBiomeBand, TheoryBiomeChunkV1 } from "@shared/contracts/theory-biome-layout.v1";
 import { THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 } from "@shared/contracts/theory-biome-layout.v1";
 import { THEORY_BIOME_BAND_ORDER } from "@shared/theory/theory-biome-scale-taxonomy";
 import { PHYSICS_ATLAS_BLOCKS } from "@shared/theory/physics-atlas-blocks";
+import ProbabilityTerrainOverlay from "@/components/graphs/ProbabilityTerrainOverlay";
 import {
   layoutTheoryAchievementMap,
   type TheoryAchievementLayoutEdge,
@@ -37,6 +39,7 @@ type TheoryAchievementMapProps = {
   failedBadgeIds: string[];
   rippleBadgeIds: string[];
   heatByBadgeId: Record<string, number>;
+  probabilityTerrain?: ProbabilityTerrainV1;
   routeBadgeLabels?: Record<string, {
     label: string;
     tone: "cyan" | "emerald" | "amber" | "rose" | "slate";
@@ -283,6 +286,7 @@ export default function TheoryAchievementMap({
   failedBadgeIds,
   rippleBadgeIds,
   heatByBadgeId,
+  probabilityTerrain,
   routeBadgeLabels = {},
   activeAtlasLensId,
   onSelectBadge,
@@ -432,6 +436,28 @@ export default function TheoryAchievementMap({
             <rect width={layout.width} height={layout.height} fill="url(#theory-biome-grid)" opacity={0.74} />
           </svg>
         ) : null}
+        <ProbabilityTerrainOverlay
+          terrain={probabilityTerrain}
+          nodes={layout.nodes.map((node: TheoryAchievementLayoutNode) => ({
+            id: node.badgeId,
+            x: node.x,
+            y: node.y,
+            width: 44,
+            height: 44,
+            renderChunkId: node.renderChunkId,
+            semanticChunkId: node.semanticChunkId,
+          }))}
+          chunks={
+            layout.biome?.chunks.map((chunk: TheoryBiomeChunkV1) => ({
+              id: chunk.id,
+              bounds: chunk.bounds,
+            })) ?? []
+          }
+          width={layout.width}
+          height={layout.height}
+          seed={layout.biome?.seed ?? graph.graphId}
+          testId="theory-probability-terrain-field"
+        />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(255,255,255,0.08),transparent_36%),radial-gradient(circle_at_50%_82%,rgba(0,0,0,0.48),transparent_42%)]" />
         <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height}>
           <defs>

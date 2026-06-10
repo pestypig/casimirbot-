@@ -178,6 +178,7 @@ export function reflectWithZenGraphToolV1(
   return {
     provenance,
     reflection,
+    locator,
     objectiveBinding,
     ...(presetOverlays.length > 0 ? { presetOverlays } : {}),
     recommendedActions:

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useFruitionCalculatorStore } from "@/store/useFruitionCalculatorStore";
 import { useZenGraphCurrentAnswerStore } from "@/store/useZenGraphCurrentAnswerStore";
 import type { ZenGraphCurrentAnswerBlock } from "@/lib/zen-graph/currentAnswerBlock";
+import ProbabilityTerrainOverlay from "@/components/graphs/ProbabilityTerrainOverlay";
 
 type ZenGraphNodeTone = "root" | "principle" | "lens" | "trait" | "safeguard" | "boundary" | "action" | "objective" | "character";
 
@@ -952,6 +953,7 @@ export function ZenGraphPanel({
   const currentAnswer = useZenGraphCurrentAnswerStore((store) => store.currentAnswerBlock);
   const loadFruitionExpression = useFruitionCalculatorStore((store) => store.loadExpression);
   const loadFruitionLocatorSeed = useFruitionCalculatorStore((store) => store.loadLocatorSeed);
+  const probabilityTerrain = locator?.probabilityTerrain;
   const locatorSeedNodeIds =
     locator?.comparisonSeed.selectedNodeIds.filter((id) => graph.nodes.some((node) => node.id === id)) ?? [];
   const initialSelectedNodeId = locatorSeedNodeIds[0] ?? reflection.overlay?.highlightedNodeIds[0] ?? reflection.graph.rootId;
@@ -971,6 +973,7 @@ export function ZenGraphPanel({
     ...(reflection.overlay?.highlightedNodeIds ?? []),
     ...(characterComparison?.activatedProfileWeights.map((entry) => entry.nodeId) ?? []),
     ...(characterComparison ? [`character:${characterComparison.characterId}`] : []),
+    ...(probabilityTerrain?.dominantCandidateId ? [probabilityTerrain.dominantCandidateId] : []),
     ...(objectiveBindingsOpen && activeObjectiveLensId === "answer" ? currentAnswer?.activatedNodeIds ?? [] : []),
     ...(selectedNode?.tone === "root" ? [] : [reflection.graph.rootId]),
   ]);
@@ -1065,6 +1068,42 @@ export function ZenGraphPanel({
               }}
             >
               <div className="pointer-events-none absolute inset-x-0 top-[70px] h-10 bg-[linear-gradient(135deg,transparent_0_16px,rgba(39,39,42,0.9)_17px_32px,transparent_33px_48px)] bg-[length:96px_40px]" />
+              <ProbabilityTerrainOverlay
+                terrain={probabilityTerrain}
+                nodes={graph.nodes.map((node) => ({
+                  id: node.id,
+                  x: node.x,
+                  y: node.y,
+                  width: node.width ?? 48,
+                  height: node.height ?? 48,
+                  semanticChunkId: `zen:${node.tone}:${node.procedureOperator ?? node.proceduralRole ?? "context"}`,
+                }))}
+                width={graph.width}
+                height={graph.height}
+                seed={`${reflection.reflectionId}:zen-probability-terrain`}
+                testId="zen-graph-probability-terrain-field"
+              />
+              {probabilityTerrain ? (
+                <div
+                  data-testid="zen-graph-probability-terrain"
+                  className="pointer-events-none absolute right-4 top-4 z-30 max-w-[300px] border border-cyan-400/40 bg-zinc-950/90 p-3 text-xs text-cyan-50 shadow-2xl shadow-cyan-950/30"
+                >
+                  <div className="font-semibold uppercase tracking-[0.12em] text-cyan-200">Probability Terrain</div>
+                  <div className="mt-1 text-zinc-300">
+                    Placement certainty {(probabilityTerrain.placementCertainty * 100).toFixed(1)}% /{" "}
+                    {labelize(probabilityTerrain.uncertaintyMode)}
+                  </div>
+                  <div className="mt-1 font-mono text-[10px] text-zinc-400">
+                    H(post)={probabilityTerrain.posteriorEntropyBits.toFixed(3)} bits / gain=
+                    {probabilityTerrain.informationGainBits.toFixed(3)} bits
+                  </div>
+                  {probabilityTerrain.dominantSemanticChunkId ? (
+                    <div className="mt-1 truncate text-[10px] text-zinc-500">
+                      {labelize(probabilityTerrain.dominantSemanticChunkId)}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <svg className="pointer-events-none absolute inset-0" width={graph.width} height={graph.height}>
                 <defs>
                   <marker id="zen-graph-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
@@ -1096,13 +1135,21 @@ export function ZenGraphPanel({
                 const selected = selectedNodeIds.includes(node.id);
                 const highlightedNode = highlighted.has(node.id);
                 const dimmed = hasFocus && !highlightedNode;
+                const placementProbability = probabilityTerrain?.candidateProbabilityById[node.id] ?? 0;
                 return (
                   <button
                     key={node.id}
                     type="button"
                     className={nodeClasses({ node, selected, highlighted: highlightedNode, dimmed })}
                     data-testid="zen-graph-badge-node"
-                    style={{ left: node.x, top: node.y }}
+                    style={{
+                      left: node.x,
+                      top: node.y,
+                      boxShadow:
+                        placementProbability > 0
+                          ? `0 0 0 ${Math.max(2, Math.round(placementProbability * 9))}px rgba(34,211,238,0.28)`
+                          : undefined,
+                    }}
                     aria-label={node.label}
                     onMouseEnter={() => setHoveredNodeId(node.id)}
                     onMouseLeave={() => setHoveredNodeId((current) => (current === node.id ? null : current))}

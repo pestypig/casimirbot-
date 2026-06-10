@@ -61,6 +61,9 @@ describe("ZenGraph reflection tool contract", () => {
       confirmationEligible: true,
     });
     expect(response.reflection.artifactId).toBe("ideology_context_reflection");
+    expect(response.locator?.artifactId).toBe("zen_badge_locator");
+    expect(response.locator?.probabilityTerrain?.graphKind).toBe("zen_badge_graph");
+    expect(response.locator?.probabilityTerrain?.normalizedMass).toBeCloseTo(1, 5);
     expect(response.objectiveBinding.artifact).toBe("zen_objective_binding");
     expect(response.presetOverlays?.map((overlay) => overlay.subject.kind)).toEqual([
       "wisdom_preset",

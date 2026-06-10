@@ -14,6 +14,7 @@ import {
   validateProceduralZenClassificationV1,
 } from "./procedural-zen-classification.v1";
 import { type ZenObjectiveBindingV1, validateZenObjectiveBindingV1 } from "./zen-objective-binding.v1";
+import { type ZenBadgeLocatorV1, validateZenBadgeLocatorV1 } from "./zen-badge-locator.v1";
 
 export const ZEN_GRAPH_REFLECTION_TOOL_REQUEST_SCHEMA_VERSION = "zen_graph_reflection_tool_request/v1" as const;
 export const ZEN_GRAPH_REFLECTION_TOOL_RESPONSE_SCHEMA_VERSION = "zen_graph_reflection_tool_response/v1" as const;
@@ -71,6 +72,7 @@ export type ZenGraphReflectionToolResponseV1 = {
   provenance: ZenGraphReflectionProvenanceV1;
   reflection: IdeologyContextReflectionV1;
   proceduralClassification?: ProceduralZenClassificationV1;
+  locator?: ZenBadgeLocatorV1;
   objectiveBinding: ZenObjectiveBindingV1;
   presetOverlays?: ZenObjectiveBindingV1[];
   recommendedActions: ZenGraphRecommendedAction[];
@@ -232,6 +234,9 @@ export function validateZenGraphReflectionToolResponseV1(value: unknown): string
         (issue) => `proceduralClassification.${issue}`,
       ),
     );
+  }
+  if (value.locator !== undefined) {
+    issues.push(...validateZenBadgeLocatorV1(value.locator).map((issue) => `locator.${issue}`));
   }
   issues.push(...validateZenObjectiveBindingV1(value.objectiveBinding).map((issue) => `objectiveBinding.${issue}`));
 

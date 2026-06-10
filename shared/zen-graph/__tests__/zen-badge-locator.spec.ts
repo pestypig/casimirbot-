@@ -73,6 +73,9 @@ describe("Zen badge locator", () => {
     const locator = locate("right-speech-and-accurate-formulation should guide this prompt.");
 
     expect(validateZenBadgeLocatorV1(locator)).toEqual([]);
+    expect(locator.probabilityTerrain?.graphKind).toBe("zen_badge_graph");
+    expect(locator.probabilityTerrain?.normalizedMass).toBe(1);
+    expect(locator.probabilityTerrain?.interpretation).toBe("placement_probability_not_truth_claim");
     expect(locator.authority).toMatchObject({
       assistant_answer: false,
       raw_content_included: false,
@@ -159,5 +162,7 @@ describe("Zen badge locator", () => {
     expect(locator.comparisonSeed.selectedNodeIds).toEqual(
       expect.arrayContaining(["restraint", "wisdom-first-principles"]),
     );
+    expect(locator.probabilityTerrain?.candidateProbabilityById.restraint).toBeGreaterThan(0);
+    expect(locator.probabilityTerrain?.dominantSemanticChunkId).toMatch(/^zen:/);
   });
 });

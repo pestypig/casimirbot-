@@ -6,6 +6,7 @@ import type {
   StagePlayLiveSourceNarrativeStateV1,
   StagePlayLiveSourcePredictionValidationV1,
   StagePlayProcessedMailPacketV1,
+  StagePlayMicroReasonerRunV1,
   StagePlayLiveSourceVoiceDeliveryReceiptV1,
   StagePlayLiveSourceVoicePolicyV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -743,6 +744,7 @@ const buildWakeFastLayer = (input: {
   immersionState: StagePlayLiveSourceImmersionStateV1;
   predictionValidation: StagePlayLiveSourcePredictionValidationV1;
   processedPacket: StagePlayProcessedMailPacketV1;
+  microReasonerRuns: StagePlayMicroReasonerRunV1[];
   shouldRunSlowAsk: boolean;
   slowAskReason: string;
 } => {
@@ -830,7 +832,7 @@ const buildWakeFastLayer = (input: {
     causalTrace: input.wake.causalTrace,
     createdAt: input.now,
   });
-  const { packet: processedPacket } = buildStagePlayProcessedMailPacket({
+  const { packet: processedPacket, microReasonerRuns } = buildStagePlayProcessedMailPacket({
     jobId,
     sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "unknown_source",
     mailItems: input.mailBatch,
@@ -872,6 +874,7 @@ const buildWakeFastLayer = (input: {
     immersionState,
     predictionValidation,
     processedPacket,
+    microReasonerRuns,
     shouldRunSlowAsk,
     slowAskReason,
   };
@@ -1023,6 +1026,85 @@ const buildBudgetTranscriptRow = (budgetState: LiveSourceBudgetStateV1, createdA
     createdAt,
   });
 
+const microReasonerTranscriptTitle = (role: StagePlayMicroReasonerRunV1["role"]): string => {
+  switch (role) {
+    case "claim_extractor":
+      return "Claims extracted";
+    case "observation_classifier":
+      return "Observation classified";
+    case "profile_comparator":
+      return "Profile compared";
+    case "delta_extractor":
+      return "Delta extracted";
+    case "prediction_validator":
+      return "Prediction micro-check";
+    case "salience_scorer":
+      return "Salience scored";
+    case "decision_selector":
+      return "Decision selected";
+    case "voice_callout_drafter":
+      return "Voice draft prepared";
+    case "packet_composer":
+      return "Packet composed";
+    default:
+      return "Micro-reasoner run";
+  }
+};
+
+const microReasonerWakeReason = (input: {
+  processedPacket?: StagePlayProcessedMailPacketV1 | null;
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
+}): string => {
+  const decisionRun = (input.microReasonerRuns ?? [])
+    .filter((run) => run.role === "decision_selector")
+    .at(-1) ?? null;
+  const selectedDecision = decisionRun?.selectedDecision ?? input.processedPacket?.recommendedNext ?? null;
+  const nextTool = decisionRun?.recommendedNextTool ?? (
+    selectedDecision && selectedDecision !== "wait_for_next_summary"
+      ? "live_env.record_live_source_mail_decision"
+      : null
+  );
+  if (decisionRun && selectedDecision) {
+    return [
+      `decision_selector selected ${selectedDecision}`,
+      nextTool ? `next tool ${nextTool}` : null,
+    ].filter(Boolean).join("; ");
+  }
+  if (input.processedPacket?.recommendedNext) {
+    return `processed packet recommended ${input.processedPacket.recommendedNext}`;
+  }
+  return "live-source wake policy admitted the mail batch";
+};
+
+const buildWakeMicroReasonerTranscriptRows = (input: {
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
+  createdAt: string;
+}): DurableWakeTranscriptRow[] =>
+  (input.microReasonerRuns ?? []).slice(0, 16).map((run) => makeWakeTranscriptRow({
+    rowId: `wake_micro_reasoner:${hashShort(run.runId)}`,
+    rowKind: "micro_reasoner_run",
+    title: microReasonerTranscriptTitle(run.role),
+    body: [
+      `Role: ${run.role}.`,
+      `Mode: ${run.reasoningMode}; model: ${run.modelUsed}; latency: ${run.latencyMs}ms.`,
+      run.selectedDecision ? `Decision: ${run.selectedDecision}.` : null,
+      run.recommendedNextTool ? `Recommended next tool: ${run.recommendedNextTool}.` : null,
+      run.salienceLevel ? `Salience: ${run.salienceLevel}${run.voiceCandidate ? " (voice candidate)" : ""}.` : null,
+      typeof run.confidence === "number" ? `Confidence: ${Math.round(run.confidence * 100)}%.` : null,
+      run.outputPreview ? `Output: ${clipPromptText(run.outputPreview, 260)}` : null,
+      run.missingEvidence.length > 0
+        ? `Missing evidence: ${run.missingEvidence.slice(0, 5).join("; ")}.`
+        : null,
+    ].filter(Boolean).join("\n"),
+    toolName: "live_env.process_live_source_mail_packet",
+    artifactId: run.runId,
+    artifactKind: run.artifactId,
+    evidenceRefs: uniqueStrings([run.runId, ...run.inputRefs, ...run.outputRefs]),
+    authority: "tool_evidence",
+    terminalEligible: false,
+    createdAt: input.createdAt,
+  }));
+
 const buildDurableWakeTranscriptRows = (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   wakeResult: StagePlayLiveSourceMailWakeResultV1;
@@ -1031,6 +1113,7 @@ const buildDurableWakeTranscriptRows = (input: {
   immersionState?: StagePlayLiveSourceImmersionStateV1 | null;
   predictionValidation?: StagePlayLiveSourcePredictionValidationV1 | null;
   processedPacket?: StagePlayProcessedMailPacketV1 | null;
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   slowAskRan?: boolean;
   decisionIds: string[];
   budgetState?: LiveSourceBudgetStateV1 | null;
@@ -1122,6 +1205,10 @@ const buildDurableWakeTranscriptRows = (input: {
       createdAt: input.createdAt,
     }));
   }
+  rows.push(...buildWakeMicroReasonerTranscriptRows({
+    microReasonerRuns: input.microReasonerRuns,
+    createdAt: input.createdAt,
+  }));
   rows.push(makeWakeTranscriptRow({
     rowId: `wake_prediction_check:${hashShort(input.wake.wakeRequestId)}`,
     rowKind: "prediction_check",
@@ -1154,7 +1241,10 @@ const buildDurableWakeTranscriptRows = (input: {
     rowId: `wake_requested:${hashShort(input.wake.wakeRequestId)}`,
     rowKind: "mail_wake_requested",
     title: "Wake requested",
-    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake.`,
+    body: `${input.wake.mailIds.length} live-source mail item(s) queued for Helix Ask wake because ${microReasonerWakeReason({
+      processedPacket: input.processedPacket,
+      microReasonerRuns: input.microReasonerRuns,
+    })}.`,
     artifactId: input.wake.wakeRequestId,
     artifactKind: input.wake.artifactId,
     evidenceRefs: input.evidenceRefs,
@@ -2129,6 +2219,7 @@ export async function runNextMailWakeRequest(input: {
       immersionState: fastLayer.immersionState,
       predictionValidation: fastLayer.predictionValidation,
       processedPacket: fastLayer.processedPacket,
+      microReasonerRuns: fastLayer.microReasonerRuns,
       slowAskRan: false,
       decisionIds: [decision.decisionId],
       budgetState: budgetReceipt.budgetState,
@@ -2379,6 +2470,7 @@ export async function runNextMailWakeRequest(input: {
       immersionState: fastLayer.immersionState,
       predictionValidation: fastLayer.predictionValidation,
       processedPacket: fastLayer.processedPacket,
+      microReasonerRuns: fastLayer.microReasonerRuns,
       slowAskRan: true,
       decisionIds: completed?.decisionIds ?? decisionIds,
       budgetState: budgetReceipt.budgetState,

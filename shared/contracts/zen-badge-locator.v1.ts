@@ -4,6 +4,10 @@ import {
   type IdeologyContextReflectionAuthorityV1,
   type IdeologyContextReflectionInputKindV1,
 } from "../ideology-context-reflection";
+import {
+  validateProbabilityTerrainV1,
+  type ProbabilityTerrainV1,
+} from "./probability-terrain.v1";
 
 export const ZEN_BADGE_LOCATOR_ARTIFACT_ID = "zen_badge_locator" as const;
 export const ZEN_BADGE_LOCATOR_SCHEMA_VERSION = "zen_badge_locator/v1" as const;
@@ -80,6 +84,7 @@ export type ZenBadgeLocatorV1 = {
     likely: ZenBadgeLocationV1[];
     inferred: ZenBadgeLocationV1[];
   };
+  probabilityTerrain?: ProbabilityTerrainV1;
   locatedBindings: ZenBadgeLocatedBindingV1[];
   comparisonSeed: ZenBadgeComparisonSeedV1;
   authority: IdeologyContextReflectionAuthorityV1;
@@ -215,6 +220,7 @@ export function buildZenBadgeLocatorV1(input: BuildZenBadgeLocatorInput): ZenBad
     input: input.input,
     graph: input.graph,
     locatedBadges: input.locatedBadges,
+    ...(input.probabilityTerrain ? { probabilityTerrain: input.probabilityTerrain } : {}),
     locatedBindings: input.locatedBindings,
     comparisonSeed: input.comparisonSeed,
     authority: { ...AUTHORITY },
@@ -260,6 +266,14 @@ export function validateZenBadgeLocatorV1(value: unknown): string[] {
     validateLocationArray("locatedBadges.exact", value.locatedBadges.exact, issues);
     validateLocationArray("locatedBadges.likely", value.locatedBadges.likely, issues);
     validateLocationArray("locatedBadges.inferred", value.locatedBadges.inferred, issues);
+  }
+  if (value.probabilityTerrain !== undefined) {
+    issues.push(
+      ...validateProbabilityTerrainV1(value.probabilityTerrain).map((issue) => `probabilityTerrain.${issue}`),
+    );
+    if (isRecord(value.probabilityTerrain) && value.probabilityTerrain.graphKind !== "zen_badge_graph") {
+      issues.push("probabilityTerrain.graphKind must be zen_badge_graph");
+    }
   }
 
   if (!Array.isArray(value.locatedBindings)) {

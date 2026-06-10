@@ -11,6 +11,7 @@ import {
   type ZenBadgeLocatorV1,
 } from "../zen-badge-locator";
 import type { IdeologyGraph } from "./ideology-graph-types";
+import { buildProbabilityTerrainV1 } from "../probability-terrain";
 import { buildZenBadgeComparisonSeed } from "./build-zen-badge-comparison-seed";
 import { matchIdeologyLenses } from "./match-ideology-lenses";
 import { getIdeologyNodeById, getIdeologyPathToRoot } from "./traverse-ideology-graph";
@@ -143,6 +144,42 @@ function uniqueByNodeId(locations: ZenBadgeLocationV1[]): ZenBadgeLocationV1[] {
   return [...best.values()].sort((a, b) => b.confidence - a.confidence || a.nodeId.localeCompare(b.nodeId));
 }
 
+function postureForLocation(location: ZenBadgeLocationV1): string {
+  const expression = location.proceduralExpression.toLowerCase();
+  const tags = (location.tags ?? []).map((tag) => tag.toLowerCase());
+  if (expression.includes("blocks")) return "blocked_or_missing_check";
+  if (
+    expression.includes("requires") ||
+    location.matchType === "gate_term" ||
+    tags.some((tag) => tag === "covered-action" || tag === "legal-key" || tag === "ethos-key")
+  ) {
+    return "requires_check";
+  }
+  if (expression.includes("constrains") || expression.includes("balances")) {
+    return "constrained_action_posture";
+  }
+  return "supported_action_posture";
+}
+
+function proceduralBucketForLocation(location: ZenBadgeLocationV1): string {
+  const tags = (location.tags ?? []).map((tag) => tag.toLowerCase());
+  if (tags.some((tag) => tag === "first_principle" || tag === "objective_binding")) return "first_principle";
+  if (tags.some((tag) => tag === "covered-action" || tag === "legal-key" || tag === "ethos-key")) return "safeguard";
+  if (tags.some((tag) => tag === "trait" || tag === "outer_edge")) return "outer_edge";
+  if (location.matchType === "gate_term") return "safeguard";
+  return "lens";
+}
+
+function renderChunkForLocation(graph: IdeologyGraph, location: ZenBadgeLocationV1): string {
+  const rootId = location.pathToBinding[location.pathToBinding.length - 1] ?? graph.rootId;
+  const depthBucket = location.pathToBinding.length <= 2 ? "root_near" : "path_deep";
+  return `zen:${rootId}:${depthBucket}:${location.matchType}`;
+}
+
+function semanticChunkForLocation(location: ZenBadgeLocationV1): string {
+  return `zen:${proceduralBucketForLocation(location)}:${postureForLocation(location)}:${location.matchType}`;
+}
+
 export function locateZenBadges(graph: IdeologyGraph, input: LocateZenBadgesInput): ZenBadgeLocatorV1 {
   const summary = summarizeInput(input);
   const matches = matchIdeologyLenses(graph, summary);
@@ -151,6 +188,15 @@ export function locateZenBadges(graph: IdeologyGraph, input: LocateZenBadgesInpu
   const inferred = uniqueByNodeId(matches.inferred_lenses.map((match) => toLocation(graph, match, "outer_edge_inference")));
   const allLocations = uniqueByNodeId([...exact, ...likely, ...inferred]);
   const locatedBindings = buildLocatedBindings(graph, allLocations);
+  const probabilityTerrain = buildProbabilityTerrainV1({
+    graphKind: "zen_badge_graph",
+    candidates: allLocations.map((location) => ({
+      id: location.nodeId,
+      weight: location.confidence,
+      renderChunkId: renderChunkForLocation(graph, location),
+      semanticChunkId: semanticChunkForLocation(location),
+    })),
+  });
 
   return buildZenBadgeLocatorV1({
     generatedAt: input.generatedAt,
@@ -166,6 +212,7 @@ export function locateZenBadges(graph: IdeologyGraph, input: LocateZenBadgesInpu
       source: IDEOLOGY_CONTEXT_REFLECTION_GRAPH_SOURCE,
     },
     locatedBadges: { exact, likely, inferred },
+    probabilityTerrain,
     locatedBindings,
     comparisonSeed: buildZenBadgeComparisonSeed({ locations: allLocations, locatedBindings }),
   });

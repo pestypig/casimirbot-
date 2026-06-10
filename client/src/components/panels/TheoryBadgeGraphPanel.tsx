@@ -16,6 +16,11 @@ import type {
   TheoryBadgePlaybackArtifactV1,
   TheoryBadgePlaybackStepV1,
 } from "@shared/contracts/theory-badge-playback.v1";
+import {
+  PROBABILITY_TERRAIN_SCHEMA_VERSION,
+  type ProbabilityTerrainV1,
+} from "@shared/contracts/probability-terrain.v1";
+import type { TheoryContextReflectionV1 } from "@shared/contracts/theory-context-reflection.v1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -206,6 +211,46 @@ function routeBadgeLabelsForMode(
     },
     {},
   );
+}
+
+function dominantProbabilityId(probabilities: Record<string, number>): string | null {
+  const entries = Object.entries(probabilities);
+  if (entries.length === 0) return null;
+  return entries.sort(([leftId, leftProbability], [rightId, rightProbability]) => {
+    const delta = rightProbability - leftProbability;
+    return delta !== 0 ? delta : leftId.localeCompare(rightId);
+  })[0][0];
+}
+
+function placementCertaintyFromReflection(
+  reflection: TheoryContextReflectionV1 | null,
+): ProbabilityTerrainV1 | undefined {
+  const uncertainty = reflection?.overlay.uncertainty;
+  if (!uncertainty) return undefined;
+  const placementCertainty =
+    uncertainty.priorEntropyBits > 0
+      ? Math.max(0, Math.min(1, uncertainty.informationGainBits / uncertainty.priorEntropyBits))
+      : Object.keys(uncertainty.badgeProbabilityById).length === 1
+        ? 1
+        : 0;
+
+  return {
+    schemaVersion: PROBABILITY_TERRAIN_SCHEMA_VERSION,
+    graphKind: "theory_badge_graph",
+    candidateProbabilityById: uncertainty.badgeProbabilityById,
+    renderChunkProbabilityById: uncertainty.renderChunkProbabilityById,
+    semanticChunkProbabilityById: uncertainty.semanticChunkProbabilityById,
+    priorEntropyBits: uncertainty.priorEntropyBits,
+    posteriorEntropyBits: uncertainty.posteriorEntropyBits,
+    informationGainBits: uncertainty.informationGainBits,
+    normalizedMass: uncertainty.normalizedMass,
+    placementCertainty: Number(placementCertainty.toFixed(6)),
+    uncertaintyMode: uncertainty.uncertaintyMode,
+    dominantCandidateId: dominantProbabilityId(uncertainty.badgeProbabilityById),
+    dominantRenderChunkId: dominantProbabilityId(uncertainty.renderChunkProbabilityById),
+    dominantSemanticChunkId: dominantProbabilityId(uncertainty.semanticChunkProbabilityById),
+    interpretation: "placement_probability_not_truth_claim",
+  };
 }
 
 function SelectFilter({
@@ -721,6 +766,13 @@ export default function TheoryBadgeGraphPanel() {
   const setLocatorOverlay = useTheoryMapOverlayStore((state) => state.setLocatorOverlay);
   const restoreLiveAnswerContextOverlay = useTheoryMapOverlayStore((state) => state.restoreLiveAnswerContextOverlay);
   const setSelectionOverlay = useTheoryMapOverlayStore((state) => state.setSelectionOverlay);
+  const theoryProbabilityTerrain = useMemo(
+    () =>
+      mapOverlay.source === "discussion_reflection"
+        ? placementCertaintyFromReflection(mapOverlay.reflectionOverlay)
+        : undefined,
+    [mapOverlay.reflectionOverlay, mapOverlay.source],
+  );
   const playbackStore = useTheoryBadgePlaybackStore();
   const calculatorLatex = useScientificCalculatorStore((state) => state.currentLatex);
   const calculatorArtifact = useScientificCalculatorStore((state) => state.lastArtifactV1);
@@ -2450,6 +2502,7 @@ export default function TheoryBadgeGraphPanel() {
                   failedBadgeIds={failedBadgeIds}
                   rippleBadgeIds={mapOverlay.rippleBadgeIds}
                   heatByBadgeId={mapOverlay.heatByBadgeId}
+                  probabilityTerrain={theoryProbabilityTerrain}
                   routeBadgeLabels={routeBadgeLabels}
                   activeAtlasLensId={rememberedAtlasLensId}
                   onSelectBadge={selectBadge}

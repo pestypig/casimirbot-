@@ -120,6 +120,64 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(useTheoryMapOverlayStore.getState().lastReflectionArtifact).toBe(artifact);
   });
 
+  it("renders theory probability terrain for live reflection uncertainty", async () => {
+    const artifact = buildTheoryContextReflectionV1({
+      generatedAt: "2026-05-31T00:00:00.000Z",
+      reflectionId: "reflection:probability-terrain-test",
+      graphId: "nhm2-theory-badge-graph",
+      input: {
+        prompt: "Where do photon energy and solar spectrum belong?",
+        conversationContext: null,
+        mentionedEquations: ["E = h*f"],
+        mentionedSymbols: ["E", "h", "f"],
+        mentionedDomains: ["solar_surface_spectrum"],
+        source: "helix_ask",
+        confidenceMode: "soft_locator",
+      },
+      exactMatches: [],
+      likelyMatches: [],
+      inferredDomains: [],
+      overlay: {
+        centerBadgeIds: ["solar.spectrum.photon_energy"],
+        highlightedBadgeIds: ["solar.spectrum.photon_energy"],
+        highlightedEdgeIds: [],
+        heatByBadgeId: { "solar.spectrum.photon_energy": 1 },
+        exactBadgeIds: ["solar.spectrum.photon_energy"],
+        likelyBadgeIds: [],
+        uncertainty: {
+          badgeProbabilityById: { "solar.spectrum.photon_energy": 1 },
+          renderChunkProbabilityById: { "theory:0:0": 1 },
+          semanticChunkProbabilityById: { "theory:abstract_formal:solar:canonical": 1 },
+          priorEntropyBits: 0,
+          posteriorEntropyBits: 0,
+          informationGainBits: 0,
+          normalizedMass: 1,
+          uncertaintyMode: "focused",
+        },
+        softRegion: {
+          id: "discussion-zone:probability-terrain-test",
+          label: "Current discussion zone",
+          badgeIds: ["solar.spectrum.photon_energy"],
+          confidence: 0.9,
+          tone: "green",
+          meaning: "discussion_context_not_proof",
+        },
+      },
+      evidenceForAsk: {
+        summary: "The discussion appears near photon energy.",
+        claimBoundaries: [],
+        recommendedNextActions: [],
+      },
+    });
+    useTheoryMapOverlayStore.getState().setReflectionOverlay(artifact);
+
+    renderPanel();
+
+    expect(await screen.findByTestId("theory-probability-terrain-field")).toBeTruthy();
+    expect(screen.getAllByTestId("probability-terrain-contour").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("discussion-soft-region")).toBeNull();
+  });
+
   it("lets atlas lenses change the map without losing the live answer context", async () => {
     const artifact = buildTheoryContextReflectionV1({
       generatedAt: "2026-05-31T00:00:00.000Z",
