@@ -9520,6 +9520,7 @@ function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
   const record = readAgentLoopAuditRecord(reply);
   const debug = readAgentLoopAuditRecord(reply.debug);
   const candidates = [
+    reply.createdAtMs,
     record?.created_at_ms,
     record?.createdAtMs,
     record?.created_at,
@@ -9608,8 +9609,18 @@ function mergeHelixAskRepliesByCanonicalTurn(
   return merged;
 }
 
-function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
-  return mergeHelixAskRepliesByCanonicalTurn(replies);
+export function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
+  return mergeHelixAskRepliesByCanonicalTurn(replies)
+    .map((reply, index) => ({ reply, index, orderMs: resolveHelixAskReplyOrderMs(reply) }))
+    .sort((left, right) => {
+      if (left.orderMs !== null && right.orderMs !== null && left.orderMs !== right.orderMs) {
+        return left.orderMs - right.orderMs;
+      }
+      if (left.orderMs !== null && right.orderMs === null) return -1;
+      if (left.orderMs === null && right.orderMs !== null) return 1;
+      return left.index - right.index;
+    })
+    .map((entry) => entry.reply);
 }
 
 function limitHelixAskRepliesChronologically(
@@ -9619,7 +9630,7 @@ function limitHelixAskRepliesChronologically(
   return sortHelixAskRepliesChronologically(replies).slice(-limit);
 }
 
-function appendHelixAskReplyChronologically(
+export function appendHelixAskReplyChronologically(
   replies: HelixAskReply[],
   reply: HelixAskReply,
   limit = 8,
@@ -19657,7 +19668,7 @@ export function HelixAskPill({
       const extensionCitations = normalizeCitations(extension?.citations);
       const extensionAvailable = Boolean(extension?.available && extensionBody);
       const extensionOpen = Boolean(askExtensionOpenByReply[reply.id]);
-      const expanded = askExpandedByReply[reply.id] ?? reply.id === latestAskReplyId;
+      const expanded = reply.id === latestAskReplyId || Boolean(askExpandedByReply[reply.id]);
       const answerText = clipForDisplay(
         coerceText(envelopeAnswer || fallbackAnswer),
         HELIX_ASK_MAX_RENDER_CHARS,
@@ -34908,7 +34919,7 @@ export function HelixAskPill({
               : [];
             const replyConvergence = resolveReplyConvergenceSnapshot(reply, replyEvents);
             const isLatestReply = reply.id === transcriptLatestAskReplyId;
-            const expanded = askExpandedByReply[reply.id] ?? isLatestReply;
+            const expanded = isLatestReply || Boolean(askExpandedByReply[reply.id]);
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
             const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
               reply,

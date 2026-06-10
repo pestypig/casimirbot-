@@ -70,6 +70,7 @@ import {
   latestStagePlayLiveSourceMailWakeResult,
   splitStagePlayLiveSourceMailWakeRequestForAsk,
   attachLiveSourceBudgetStateToWakeResult,
+  expireStaleStagePlayLiveSourceMailWakeRequests,
 } from "./stage-play-live-source-mail-wake-store";
 import type {
   LiveSourceBudgetActionV1,
@@ -2271,6 +2272,13 @@ export async function runNextMailWakeRequest(input: {
     limit: 250,
   }).find((wake) => wakeMatchesScope(wake, input));
   if (stillRunning) return null;
+  expireStaleStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now,
+  });
   const selectedWake = (
     input.manualRun
       ? listStagePlayLiveSourceMailWakeRequests({

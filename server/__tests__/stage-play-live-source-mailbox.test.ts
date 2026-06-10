@@ -30,6 +30,7 @@ import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environme
 import {
   listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
+  expireStaleStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
   queueStagePlayLiveSourceMailWakeRequest,
   reconcileStagePlayMailWakeRequestFromAskTurn,
@@ -1154,6 +1155,97 @@ describe("Stage Play live-source mailbox", () => {
     });
 
     expect(wake).toBeNull();
+  });
+
+  it("expires stale fast-lane wake requests instead of keeping old predictions active", () => {
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:stale-wake"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:stale-wake"],
+      now: "2026-06-04T12:00:21.000Z",
+      expiresAfterMs: 1_000,
+    });
+
+    expect(wake).toMatchObject({
+      status: "queued",
+      expiresAt: "2026-06-04T12:00:22.000Z",
+    });
+
+    const expired = expireStaleStagePlayLiveSourceMailWakeRequests({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:00:23.000Z",
+    });
+
+    expect(expired.map((entry) => entry.wakeRequestId)).toEqual([wake?.wakeRequestId]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "queued" })).toHaveLength(0);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "expired_stale" })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      failureReason: "wake_relevance_ttl_expired",
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "expired_stale",
+      failedReason: "wake_relevance_ttl_expired",
+    });
+  });
+
+  it("supersedes older same-source wakes when a newer visual packet arrives", () => {
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:first-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:first-present"],
+      now: "2026-06-04T12:00:31.000Z",
+      expiresAfterMs: 30_000,
+    });
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:second-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:second-present"],
+      now: "2026-06-04T12:00:36.000Z",
+      expiresAfterMs: 30_000,
+    });
+
+    expect(secondWake?.wakeRequestId).not.toBe(firstWake?.wakeRequestId);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "queued" }).map((entry) => entry.wakeRequestId)).toEqual([
+      secondWake?.wakeRequestId,
+    ]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "expired_superseded" })[0]).toMatchObject({
+      wakeRequestId: firstWake?.wakeRequestId,
+      supersededByWakeRequestId: secondWake?.wakeRequestId,
+      failureReason: "wake_superseded_by_newer_source_packet",
+    });
+  });
+
+  it("does not expire phase-locked running wakes before decision and voice reconciliation", () => {
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:phase-locked"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:phase-locked"],
+      now: "2026-06-04T12:00:41.000Z",
+      expiresAfterMs: 1_000,
+    });
+    markStagePlayMailWakeRunning(wake?.wakeRequestId ?? "", "2026-06-04T12:00:41.500Z");
+
+    const expired = expireStaleStagePlayLiveSourceMailWakeRequests({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:00:45.000Z",
+    });
+
+    expect(expired).toHaveLength(0);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "running",
+    });
   });
 
   it("runs the next queued wake through the Ask turn runner and records completion", async () => {

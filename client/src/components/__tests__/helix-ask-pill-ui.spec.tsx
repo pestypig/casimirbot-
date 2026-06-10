@@ -92,6 +92,8 @@ let buildLiveAnswerTurnBridgeState: typeof import("@/components/helix/HelixAskPi
 let resolveHelixAskFinalAnswerPresentation: typeof import("@/components/helix/HelixAskPill").resolveHelixAskFinalAnswerPresentation;
 let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixAskPill").readHelixAskFinalAnswerSourceLabel;
 let readReasoningTheaterHardFailureSignals: typeof import("@/components/helix/HelixAskPill").readReasoningTheaterHardFailureSignals;
+let sortHelixAskRepliesChronologically: typeof import("@/components/helix/HelixAskPill").sortHelixAskRepliesChronologically;
+let appendHelixAskReplyChronologically: typeof import("@/components/helix/HelixAskPill").appendHelixAskReplyChronologically;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
 let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
@@ -188,6 +190,8 @@ beforeAll(async () => {
     resolveHelixAskFinalAnswerPresentation,
     readHelixAskFinalAnswerSourceLabel,
     readReasoningTheaterHardFailureSignals,
+    sortHelixAskRepliesChronologically,
+    appendHelixAskReplyChronologically,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
     evaluateVoiceAutoDispatchGovernance,
@@ -197,6 +201,32 @@ beforeAll(async () => {
 const pillPath = path.resolve(process.cwd(), "client/src/components/helix/HelixAskPill.tsx");
 
 describe("HelixAskPill mic-first surface contract", () => {
+  it("keeps completed Ask answers in timestamp order after stale active rows arrive", () => {
+    const olderActive = {
+      id: "reply-active-old",
+      createdAtMs: 1_000,
+      question: "older unfinished reasoning",
+      content: "Still working...",
+      debug: { turn_id: "turn-active-old" },
+    } as any;
+    const newerFinal = {
+      id: "reply-final-new",
+      createdAtMs: 2_000,
+      question: "newer completed wake",
+      content: "Latest final answer",
+      debug: { turn_id: "turn-final-new" },
+    } as any;
+
+    expect(sortHelixAskRepliesChronologically([newerFinal, olderActive]).map((reply: any) => reply.id)).toEqual([
+      "reply-active-old",
+      "reply-final-new",
+    ]);
+
+    const appended = appendHelixAskReplyChronologically([newerFinal], olderActive, 8);
+    expect(appended.map((reply: any) => reply.id)).toEqual(["reply-active-old", "reply-final-new"]);
+    expect(appended.at(-1)?.content).toBe("Latest final answer");
+  });
+
   it("keeps voice turns ordered behind unified Ask by default", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG).toBe(true);
@@ -982,7 +1012,9 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");
     expect(source).toContain("left.createdAt.localeCompare(right.createdAt)");
     expect(source).toContain("left.sequence - right.sequence");
-    expect(source).toContain("return mergeHelixAskRepliesByCanonicalTurn(replies);");
+    expect(source).toContain(".sort((left, right) => {");
+    expect(source).toContain("return left.orderMs - right.orderMs;");
+    expect(source).toContain("reply.createdAtMs");
     expect(source).toContain("const createdAtMs = parsedEntryTimes.length > 0 ? Math.min(...parsedEntryTimes) : Date.now()");
   });
 

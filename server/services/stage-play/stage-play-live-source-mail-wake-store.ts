@@ -19,6 +19,7 @@ const wakeById = new Map<string, StagePlayLiveSourceMailWakeRequestV1>();
 const resultById = new Map<string, StagePlayLiveSourceMailWakeResultV1>();
 const MAX_WAKE_REQUESTS_PER_THREAD = 250;
 export const MAX_MAIL_IDS_PER_WAKE_BATCH = 12;
+const DEFAULT_WAKE_RELEVANCE_TTL_MS = 30_000;
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -28,9 +29,21 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 
 const sortedKey = (values: string[]): string => uniqueStrings(values).sort().join("|");
 
+const addMsIso = (value: string, ms: number): string | null => {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed) || !Number.isFinite(ms) || ms <= 0) return null;
+  return new Date(parsed + ms).toISOString();
+};
+
 const ACTIVE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
   "queued",
   "running",
+  "failed_retryable",
+  "deferred_for_pressure",
+]);
+
+const EXPIRABLE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
+  "queued",
   "failed_retryable",
   "deferred_for_pressure",
 ]);
@@ -59,6 +72,14 @@ const hasVoiceCheckpointForDecisions = (
   );
 };
 
+const wakeIsPhaseLocked = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
+  wake.status === "running" ||
+  Boolean(wake.askTurnId) ||
+  wake.decisionIds.length > 0;
+
+const wakeCanBeExpired = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
+  EXPIRABLE_WAKE_STATUSES.has(wake.status) && !wakeIsPhaseLocked(wake);
+
 const listThreadWakes = (threadId: string): StagePlayLiveSourceMailWakeRequestV1[] =>
   Array.from(wakeById.values())
     .filter((wake) => wake.threadId === threadId)
@@ -83,10 +104,19 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   evidenceRefs?: string[];
   causalTraces?: Array<LiveSourceCausalTraceV1 | null | undefined>;
   now?: string;
+  expiresAfterMs?: number | null;
 }): StagePlayLiveSourceMailWakeRequestV1 | null {
   const mailIds = uniqueStrings(input.mailIds);
   if (mailIds.length === 0) return null;
   const sourceIds = uniqueStrings(input.sourceIds);
+  const now = input.now ?? new Date().toISOString();
+  expireStaleStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now,
+  });
   const key = sortedKey(mailIds);
   const existing = Array.from(wakeById.values()).find((wake) =>
     wake.threadId === input.threadId &&
@@ -96,7 +126,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     ACTIVE_WAKE_STATUSES.has(wake.status)
   );
   if (existing) return existing;
-  const queuedSameSource = sourceIds.length > 0
+  const queuedSameSource = input.expiresAfterMs == null && sourceIds.length > 0
     ? Array.from(wakeById.values()).find((wake) =>
         wake.threadId === input.threadId &&
         wake.roomId === (input.roomId ?? null) &&
@@ -112,7 +142,6 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     const remaining = Math.max(0, MAX_MAIL_IDS_PER_WAKE_BATCH - queuedSameSource.mailIds.length);
     const appendMailIds = mailIds.filter((mailId) => !queuedSameSource.mailIds.includes(mailId)).slice(0, remaining);
     if (appendMailIds.length > 0) {
-      const now = input.now ?? new Date().toISOString();
       const merged: StagePlayLiveSourceMailWakeRequestV1 = {
         ...queuedSameSource,
         mailIds: uniqueStrings([...queuedSameSource.mailIds, ...appendMailIds]),
@@ -143,7 +172,6 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     }
     return queuedSameSource;
   }
-  const now = input.now ?? new Date().toISOString();
   const boundedMailIds = mailIds.slice(0, MAX_MAIL_IDS_PER_WAKE_BATCH);
   const wakeRequestId = `stage_play_live_source_mail_wake:${hashShort([
     input.threadId,
@@ -153,6 +181,20 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     boundedMailIds,
     now,
   ])}`;
+  if (input.expiresAfterMs != null && sourceIds.length > 0) {
+    supersedeActiveStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      sourceIds,
+      replacementWakeRequestId: wakeRequestId,
+      now,
+    });
+  }
+  const ttlMs = typeof input.expiresAfterMs === "number" && Number.isFinite(input.expiresAfterMs) && input.expiresAfterMs > 0
+    ? input.expiresAfterMs
+    : null;
   const wake: StagePlayLiveSourceMailWakeRequestV1 = {
     artifactId: "stage_play_live_source_mail_wake_request",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA,
@@ -171,6 +213,8 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     lastAttemptAt: null,
     nextRetryAt: null,
     failureReason: null,
+    expiresAt: ttlMs ? addMsIso(now, ttlMs) : null,
+    supersededByWakeRequestId: null,
     evidenceRefs: uniqueStrings([...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
     causalTrace: mergeLiveSourceCausalTraces(input.causalTraces ?? [], {
       parentRefs: boundedMailIds,
@@ -279,6 +323,8 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
     lastAttemptAt: null,
     nextRetryAt: null,
     failureReason: null,
+    expiresAt: null,
+    supersededByWakeRequestId: null,
     evidenceRefs: uniqueStrings([
       ...retainedMailIds,
       ...existing.sourceIds,
@@ -328,6 +374,13 @@ export function listRunnableStagePlayLiveSourceMailWakeRequests(input: {
   limit?: number;
 } = {}): StagePlayLiveSourceMailWakeRequestV1[] {
   const nowMs = Date.parse(input.now ?? new Date().toISOString());
+  expireStaleStagePlayLiveSourceMailWakeRequests({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    jobId: input.jobId ?? null,
+    now: input.now,
+  });
   return listStagePlayLiveSourceMailWakeRequests({
     threadId: input.threadId ?? null,
     roomId: input.roomId ?? null,
@@ -381,7 +434,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -423,6 +476,7 @@ export const markStagePlayMailWakeCompleted = (input: {
     evidenceRefs: input.evidenceRefs,
     nextRetryAt: null,
     failureReason: null,
+    expiresAt: null,
     updatedAt: input.now,
   });
 
@@ -443,6 +497,7 @@ export const markStagePlayMailWakeRetryable = (input: {
     status: input.status ?? "failed_retryable",
     failureReason: input.failureReason,
     nextRetryAt: input.nextRetryAt ?? null,
+    expiresAt: addMsIso(input.nextRetryAt ?? input.now ?? new Date().toISOString(), DEFAULT_WAKE_RELEVANCE_TTL_MS),
     updatedAt: input.now,
   });
 
@@ -455,15 +510,112 @@ export const markStagePlayMailWakeTerminalFailed = (input: {
     status: "failed_terminal",
     failureReason: input.failureReason,
     nextRetryAt: null,
+    expiresAt: null,
     updatedAt: input.now,
   });
+
+export function expireStaleStagePlayLiveSourceMailWakeRequests(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  now?: string;
+  ttlMs?: number;
+  limit?: number;
+} = {}): StagePlayLiveSourceMailWakeRequestV1[] {
+  const now = input.now ?? new Date().toISOString();
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) return [];
+  const ttlMs = typeof input.ttlMs === "number" && Number.isFinite(input.ttlMs) && input.ttlMs > 0
+    ? input.ttlMs
+    : null;
+  const expired: StagePlayLiveSourceMailWakeRequestV1[] = [];
+  for (const wake of Array.from(wakeById.values())) {
+    if (input.threadId && wake.threadId !== input.threadId) continue;
+    if (input.roomId && wake.roomId !== input.roomId) continue;
+    if (input.environmentId && wake.environmentId !== input.environmentId) continue;
+    if (input.jobId && wake.jobId !== input.jobId) continue;
+    if (!wakeCanBeExpired(wake)) continue;
+    const expiresAtMs = Date.parse(wake.expiresAt ?? "");
+    const staleByExpiresAt = Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs;
+    const queuedAtMs = Date.parse(wake.queuedAt);
+    const staleByQueuedAt = ttlMs != null && Number.isFinite(queuedAtMs) && nowMs - queuedAtMs >= ttlMs;
+    if (!staleByExpiresAt && !staleByQueuedAt) continue;
+    const updated = updateWake(wake.wakeRequestId, {
+      status: "expired_stale",
+      failureReason: "wake_relevance_ttl_expired",
+      nextRetryAt: null,
+      expiresAt: wake.expiresAt ?? (ttlMs ? addMsIso(wake.queuedAt, ttlMs) : now),
+      updatedAt: now,
+    });
+    if (!updated) continue;
+    recordStagePlayMailWakeResult({
+      wakeRequestId: updated.wakeRequestId,
+      threadId: updated.threadId,
+      roomId: updated.roomId ?? null,
+      environmentId: updated.environmentId ?? null,
+      status: "expired_stale",
+      failedReason: "wake_relevance_ttl_expired",
+      evidenceRefs: updated.evidenceRefs,
+      createdAt: now,
+    });
+    expired.push(updated);
+    if (expired.length >= (input.limit ?? 250)) break;
+  }
+  return expired;
+}
+
+export function supersedeActiveStagePlayLiveSourceMailWakeRequests(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  sourceIds: string[];
+  replacementWakeRequestId: string;
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1[] {
+  const now = input.now ?? new Date().toISOString();
+  const sourceKey = sortedKey(input.sourceIds);
+  if (!sourceKey) return [];
+  const superseded: StagePlayLiveSourceMailWakeRequestV1[] = [];
+  for (const wake of Array.from(wakeById.values())) {
+    if (wake.threadId !== input.threadId) continue;
+    if (wake.roomId !== (input.roomId ?? null)) continue;
+    if (wake.environmentId !== (input.environmentId ?? null)) continue;
+    if (wake.jobId !== (input.jobId ?? null)) continue;
+    if (wake.wakeRequestId === input.replacementWakeRequestId) continue;
+    if (sortedKey(wake.sourceIds) !== sourceKey) continue;
+    if (!wakeCanBeExpired(wake)) continue;
+    const updated = updateWake(wake.wakeRequestId, {
+      status: "expired_superseded",
+      failureReason: "wake_superseded_by_newer_source_packet",
+      supersededByWakeRequestId: input.replacementWakeRequestId,
+      nextRetryAt: null,
+      expiresAt: now,
+      updatedAt: now,
+    });
+    if (!updated) continue;
+    recordStagePlayMailWakeResult({
+      wakeRequestId: updated.wakeRequestId,
+      threadId: updated.threadId,
+      roomId: updated.roomId ?? null,
+      environmentId: updated.environmentId ?? null,
+      status: "expired_superseded",
+      failedReason: "wake_superseded_by_newer_source_packet",
+      evidenceRefs: uniqueStrings([...updated.evidenceRefs, input.replacementWakeRequestId]),
+      createdAt: now,
+    });
+    superseded.push(updated);
+  }
+  return superseded;
+}
 
 export function recordStagePlayMailWakeResult(input: {
   wakeRequestId: string;
   threadId: string;
   roomId?: string | null;
   environmentId?: string | null;
-  status: "completed" | "skipped" | "failed" | "failed_retryable" | "failed_terminal" | "deferred_for_pressure";
+  status: StagePlayLiveSourceMailWakeResultV1["status"];
   askTurnId?: string | null;
   decisionIds?: string[];
   skippedReason?: string | null;
