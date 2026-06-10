@@ -166,6 +166,8 @@ describe("Helix terminal authority single writer", () => {
 
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(result.source).toBe("final_answer_draft");
+    expect(result.selected_terminal_artifact_ref).not.toMatch(/^typed_failure:/);
+    expect(result.audit?.selectedArtifactRef).not.toMatch(/^typed_failure:/);
     expect(result.visible_text).toBe(synthesizedText);
     expect(result.visible_text).not.toBe(staleFailureText);
     expect(result.rejected_candidates).toEqual(expect.arrayContaining([

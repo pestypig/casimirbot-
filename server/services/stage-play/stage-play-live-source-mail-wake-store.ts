@@ -601,6 +601,124 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
   return reconciled;
 }
 
+export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
+  wakeRequestIds: string[];
+  askTurnId?: string | null;
+  decisionIds?: string[];
+  voiceReceiptRefs?: string[];
+  mailIds?: string[];
+  evidenceRefs?: string[];
+  now?: string;
+}): {
+  schema: "stage_play_live_source_mail_wake_reconciliation/v1";
+  reconciledWakeIds: string[];
+  skippedWakeIds: Array<{
+    wakeRequestId: string;
+    reason: "wake_not_found" | "wake_not_active" | "missing_decision_or_voice_receipt" | "mail_batch_not_covered";
+  }>;
+  wakeResultIds: string[];
+  askTurnId: string | null;
+  decisionIds: string[];
+  voiceReceiptRefs: string[];
+  reason: "ui_bridge_ask_turn_reconciled";
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const wakeRequestIds = uniqueStrings(input.wakeRequestIds);
+  const decisionIds = uniqueStrings(input.decisionIds ?? []);
+  const voiceReceiptRefs = uniqueStrings(input.voiceReceiptRefs ?? []);
+  const mailIds = uniqueStrings(input.mailIds ?? []);
+  const evidenceRefs = uniqueStrings([
+    input.askTurnId ?? null,
+    ...decisionIds,
+    ...voiceReceiptRefs,
+    ...mailIds,
+    ...(input.evidenceRefs ?? []),
+  ]);
+  const reconciledWakeIds: string[] = [];
+  const wakeResultIds: string[] = [];
+  const skippedWakeIds: Array<{
+    wakeRequestId: string;
+    reason: "wake_not_found" | "wake_not_active" | "missing_decision_or_voice_receipt" | "mail_batch_not_covered";
+  }> = [];
+
+  for (const wakeRequestId of wakeRequestIds) {
+    const wake = wakeById.get(wakeRequestId);
+    if (!wake) {
+      skippedWakeIds.push({ wakeRequestId, reason: "wake_not_found" });
+      continue;
+    }
+    if (!ACTIVE_WAKE_STATUSES.has(wake.status)) {
+      skippedWakeIds.push({ wakeRequestId, reason: "wake_not_active" });
+      continue;
+    }
+    if (decisionIds.length === 0 && voiceReceiptRefs.length === 0) {
+      skippedWakeIds.push({ wakeRequestId, reason: "missing_decision_or_voice_receipt" });
+      continue;
+    }
+    const mailCoverageKnown = mailIds.length > 0;
+    if (mailCoverageKnown && !wake.mailIds.every((mailId) => mailIds.includes(mailId))) {
+      skippedWakeIds.push({ wakeRequestId, reason: "mail_batch_not_covered" });
+      continue;
+    }
+
+    const completed = markStagePlayMailWakeCompleted({
+      wakeRequestId,
+      askTurnId: input.askTurnId ?? null,
+      decisionIds,
+      evidenceRefs: uniqueStrings([...wake.evidenceRefs, ...evidenceRefs]),
+      now,
+    });
+    if (!completed) {
+      skippedWakeIds.push({ wakeRequestId, reason: "wake_not_found" });
+      continue;
+    }
+
+    const latestResult = latestStagePlayLiveSourceMailWakeResult(wakeRequestId);
+    const latestResultCoversAskTurn =
+      latestResult?.status === "completed" &&
+      (!input.askTurnId || latestResult.askTurnId === input.askTurnId) &&
+      decisionIds.every((decisionId) => latestResult.decisionIds.includes(decisionId)) &&
+      voiceReceiptRefs.every((voiceRef) => latestResult.evidenceRefs.includes(voiceRef));
+    const wakeResult = latestResultCoversAskTurn
+      ? latestResult
+      : recordStagePlayMailWakeResult({
+          wakeRequestId,
+          threadId: completed.threadId,
+          roomId: completed.roomId ?? null,
+          environmentId: completed.environmentId ?? null,
+          status: "completed",
+          askTurnId: input.askTurnId ?? null,
+          decisionIds,
+          evidenceRefs: uniqueStrings([
+            ...evidenceRefs,
+            "ui_bridge_ask_turn_reconciled",
+          ]),
+          createdAt: now,
+        });
+    reconciledWakeIds.push(wakeRequestId);
+    wakeResultIds.push(wakeResult.wakeResultId);
+  }
+
+  return {
+    schema: "stage_play_live_source_mail_wake_reconciliation/v1",
+    reconciledWakeIds,
+    skippedWakeIds,
+    wakeResultIds,
+    askTurnId: input.askTurnId ?? null,
+    decisionIds,
+    voiceReceiptRefs,
+    reason: "ui_bridge_ask_turn_reconciled",
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+}
+
 export function resetStagePlayLiveSourceMailWakeStoreForTest(): void {
   wakeById.clear();
   resultById.clear();

@@ -9548,8 +9548,68 @@ function resolveHelixAskReplyOrderMs(reply: HelixAskReply): number | null {
   return events.length > 0 ? Math.min(...events) : null;
 }
 
+function resolveHelixAskReplyCanonicalKey(reply: HelixAskReply): string {
+  const replyRecord = readAgentLoopAuditRecord(reply);
+  const debugRecord = readAgentLoopAuditRecord(reply.debug);
+  const candidates = [
+    reply.turn_id,
+    replyRecord?.turn_id,
+    replyRecord?.turnId,
+    debugRecord?.turn_id,
+    debugRecord?.turnId,
+    debugRecord?.active_turn_id,
+    debugRecord?.activeTurnId,
+    reply.id,
+  ];
+  for (const value of candidates) {
+    const normalized = coerceText(value).trim();
+    if (normalized) return normalized;
+  }
+  return reply.id;
+}
+
+function mergeHelixAskReplyPreservingOrder(
+  existing: HelixAskReply,
+  incoming: HelixAskReply,
+): HelixAskReply {
+  const existingOrderMs = resolveHelixAskReplyOrderMs(existing);
+  const incomingOrderMs = resolveHelixAskReplyOrderMs(incoming);
+  const createdAtMs =
+    typeof existing.createdAtMs === "number" && Number.isFinite(existing.createdAtMs)
+      ? existing.createdAtMs
+      : existingOrderMs !== null
+        ? existingOrderMs
+        : typeof incoming.createdAtMs === "number" && Number.isFinite(incoming.createdAtMs)
+          ? incoming.createdAtMs
+          : incomingOrderMs ?? undefined;
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id || incoming.id,
+    createdAtMs,
+  };
+}
+
+function mergeHelixAskRepliesByCanonicalTurn(
+  replies: HelixAskReply[],
+): HelixAskReply[] {
+  const merged: HelixAskReply[] = [];
+  const indexByKey = new Map<string, number>();
+  for (const reply of replies) {
+    const key = resolveHelixAskReplyCanonicalKey(reply);
+    const existingIndex = indexByKey.get(key);
+    if (existingIndex === undefined) {
+      indexByKey.set(key, merged.length);
+      merged.push(reply);
+      continue;
+    }
+    merged[existingIndex] = mergeHelixAskReplyPreservingOrder(merged[existingIndex], reply);
+  }
+  return merged;
+}
+
 function sortHelixAskRepliesChronologically(replies: HelixAskReply[]): HelixAskReply[] {
-  return replies
+  return mergeHelixAskRepliesByCanonicalTurn(replies)
     .map((reply, index) => ({ reply, index, ts: resolveHelixAskReplyOrderMs(reply) }))
     .sort((left, right) => {
       if (left.ts !== null && right.ts !== null && left.ts !== right.ts) return left.ts - right.ts;
@@ -9572,7 +9632,15 @@ function appendHelixAskReplyChronologically(
   reply: HelixAskReply,
   limit = 8,
 ): HelixAskReply[] {
-  return limitHelixAskRepliesChronologically([...replies, reply], limit);
+  const incomingKey = resolveHelixAskReplyCanonicalKey(reply);
+  const next = [...replies];
+  const existingIndex = next.findIndex((existing) => resolveHelixAskReplyCanonicalKey(existing) === incomingKey);
+  if (existingIndex >= 0) {
+    next[existingIndex] = mergeHelixAskReplyPreservingOrder(next[existingIndex], reply);
+  } else {
+    next.push(reply);
+  }
+  return limitHelixAskRepliesChronologically(next, limit);
 }
 
 function readHelixContinuousTurnStreamRowClass(tone: HelixContinuousTurnStreamTone): string {

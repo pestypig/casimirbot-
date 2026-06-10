@@ -32,6 +32,7 @@ import {
   listStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeRunning,
   queueStagePlayLiveSourceMailWakeRequest,
+  reconcileStagePlayMailWakeRequestFromAskTurn,
   reconcileStagePlayMailWakeRequestsWithDecisions,
   resetStagePlayLiveSourceMailWakeStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-store";
@@ -2250,6 +2251,93 @@ describe("Stage Play live-source mailbox", () => {
         status: "completed",
         askTurnId: "ask:direct-mailbox-turn",
         decisionIds: [decision.decisionId],
+      }),
+    ]);
+  });
+
+  it("reconciles a UI-bridged Ask wake by wake id after decision and voice receipt evidence", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:ui-bridge-reconcile",
+      evidenceRef: "visual_evidence:ui-bridge-reconcile",
+      summaryText: "A live Minecraft packet produced a voice candidate.",
+      createdAt: "2026-06-04T12:01:20.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:21.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+
+    const decision = recordStagePlayMailDecision({
+      mailIds: [mail.mailId],
+      threadId,
+      roomId,
+      decision: "request_voice_callout",
+      rationalePreview: "UI-bridged Ask recorded the voice callout decision.",
+      voiceCalloutDraft: "Damage cue detected; create distance.",
+      voiceEligible: true,
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: {
+          text: "Damage cue detected; create distance.",
+        },
+      },
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [mail.mailId, "ask:ui-bridge-mailbox-turn"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:22.000Z",
+    });
+
+    const reconciliation = reconcileStagePlayMailWakeRequestFromAskTurn({
+      wakeRequestIds: [wake!.wakeRequestId],
+      askTurnId: "ask:ui-bridge-mailbox-turn",
+      decisionIds: [decision.decisionId],
+      voiceReceiptRefs: ["helix_interim_voice_callout_receipt:queued-for-retry"],
+      mailIds: [mail.mailId],
+      evidenceRefs: ["stage_play_processed_mail_packet:ui-bridge"],
+      now: "2026-06-04T12:01:23.000Z",
+    });
+
+    expect(reconciliation).toMatchObject({
+      schema: "stage_play_live_source_mail_wake_reconciliation/v1",
+      reconciledWakeIds: [wake?.wakeRequestId],
+      wakeResultIds: [expect.stringMatching(/^stage_play_live_source_mail_wake_result:/)],
+      askTurnId: "ask:ui-bridge-mailbox-turn",
+      decisionIds: [decision.decisionId],
+      voiceReceiptRefs: ["helix_interim_voice_callout_receipt:queued-for-retry"],
+      reason: "ui_bridge_ask_turn_reconciled",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "completed",
+      askTurnId: "ask:ui-bridge-mailbox-turn",
+      decisionIds: [decision.decisionId],
+      evidenceRefs: expect.arrayContaining([
+        "helix_interim_voice_callout_receipt:queued-for-retry",
+        "stage_play_processed_mail_packet:ui-bridge",
+      ]),
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([
+      expect.objectContaining({
+        wakeRequestId: wake?.wakeRequestId,
+        status: "completed",
+        askTurnId: "ask:ui-bridge-mailbox-turn",
+        decisionIds: [decision.decisionId],
+        evidenceRefs: expect.arrayContaining([
+          "ui_bridge_ask_turn_reconciled",
+          "helix_interim_voice_callout_receipt:queued-for-retry",
+        ]),
       }),
     ]);
   });

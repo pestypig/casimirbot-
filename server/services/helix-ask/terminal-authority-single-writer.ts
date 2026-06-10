@@ -1051,6 +1051,12 @@ export function applyHelixTerminalAuthoritySingleWriter(
           ? "direct_answer_text"
           : null
   );
+  const selectedArtifactRefForResult =
+    selectedTerminalArtifactKind &&
+    selectedTerminalArtifactKind !== "typed_failure" &&
+    /^typed_failure:/i.test(selectedArtifactRef ?? "")
+      ? `${selectedTerminalArtifactKind}:${textHash(`${input.turnId}:${visibleText}`)}`
+      : selectedArtifactRef;
   const auditRejectedCandidates = rejectedCandidates.map((candidate) => ({
     artifactKind: candidate.kind,
     artifactRef: candidate.ref,
@@ -1060,7 +1066,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     artifactId: "terminal_authority_single_writer" as const,
     schemaVersion: "helix.terminal_authority_single_writer.v1" as const,
     selectedArtifactKind: selectedTerminalArtifactKind,
-    selectedArtifactRef: selectedArtifactRef,
+    selectedArtifactRef: selectedArtifactRefForResult,
     rejectedCandidates: auditRejectedCandidates,
     wroteVisibleFields,
     forbiddenPreAuthorityVisibleFields,
@@ -1071,8 +1077,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     schemaVersion: "helix.terminal_authority_single_writer.v1",
     turn_id: input.turnId,
     selectedArtifactKind: selectedTerminalArtifactKind,
-    selectedArtifactRef: selectedArtifactRef,
-    selected_terminal_artifact_ref: selectedArtifactRef,
+    selectedArtifactRef: selectedArtifactRefForResult,
+    selected_terminal_artifact_ref: selectedArtifactRefForResult,
     selected_terminal_artifact_kind: selectedTerminalArtifactKind,
     visible_text: visibleText,
     assistant_answer: false,
