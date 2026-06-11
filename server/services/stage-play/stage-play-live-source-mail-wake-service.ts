@@ -41,7 +41,7 @@ export type StagePlayLiveSourceMailWakeAdmissionCycleResultV1 = {
     reason: string;
   };
   result: StagePlayLiveSourceMailWakeResultV1 | null;
-  status: "idle" | "queued" | "running" | "completed" | "deferred_for_pressure" | "failed_retryable" | "failed_terminal" | "failed";
+  status: "idle" | "queued" | "waiting_for_ui_handoff" | "running" | "completed" | "deferred_for_pressure" | "failed_retryable" | "failed_terminal" | "failed";
   reason: string;
   continuation: {
     scheduled: boolean;
@@ -227,13 +227,15 @@ const summarizeWakeState = (input: {
   const runnable = listRunnableStagePlayLiveSourceMailWakeRequests({ now: input.now, limit: 250 });
   const running = wakes.filter((wake) => wake.status === "running");
   const deferred = wakes.filter((wake) => wake.status === "deferred_for_pressure");
-  const queued = wakes.filter((wake) => wake.status === "queued");
+  const uiHandoff = wakes.filter((wake) => wake.status === "waiting_for_ui_handoff");
+  const queued = wakes.filter((wake) => wake.status === "queued" || wake.status === "waiting_for_ui_handoff");
   const resultStatus = input.result?.status === "skipped" ? "queued" : input.result?.status;
   const status = resultStatus ??
     (running.length > 0 ? "running" :
       runnable.length > 0 ? "queued" :
         deferred.length > 0 ? "deferred_for_pressure" :
-          queued.length > 0 ? "queued" :
+          uiHandoff.length > 0 ? "waiting_for_ui_handoff" :
+            queued.length > 0 ? "queued" :
             "idle");
   return {
     schema: "stage_play_live_source_mail_wake_admission_cycle/v1",
@@ -548,6 +550,13 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       continuation,
       now,
     });
+    const hasUiHandoffWake = listStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId ?? null,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      limit: 250,
+    }).some((wake) => wake.status === "waiting_for_ui_handoff");
     return summarizeWakeState({
       now,
       result,
@@ -556,7 +565,9 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
         ? "wake_ui_handoff_required"
         : result
           ? "wake_admitted"
-          : "no_runnable_wake",
+          : hasUiHandoffWake
+            ? "wake_ui_handoff_required"
+            : "no_runnable_wake",
       continuation,
       lockState,
     });

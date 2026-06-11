@@ -677,12 +677,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const rawSolverContinuationPending =
     readRecord(input.payload.solver_continuation_observation)?.schema === "helix.solver_continuation_observation.v1" &&
     readString(readRecord(input.payload.solver_continuation_observation)?.required_next_step) !== "typed_failure";
-  const draftMaterialization = materializeFinalAnswerDraftTerminal({
-    turnId: input.turnId,
-    payload: input.payload,
-    artifactLedger: artifacts,
-    routeProductContract: readRecord(input.payload.route_product_contract),
-  });
+  const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate);
+  const compoundCoverageFailedClosed =
+    readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
+  const draftMaterialization = compoundCoverageFailedClosed
+    ? null
+    : materializeFinalAnswerDraftTerminal({
+        turnId: input.turnId,
+        payload: input.payload,
+        artifactLedger: artifacts,
+        routeProductContract: readRecord(input.payload.route_product_contract),
+      });
   const missingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
   const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
@@ -789,7 +794,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       reason: "stale_solver_continuation_superseded_by_stage_play_terminal",
     });
   }
-  const selectedDraftCandidate = findSelectedDraftAfterRequiredObservation(artifacts);
+  const selectedDraftCandidate = compoundCoverageFailedClosed ? null : findSelectedDraftAfterRequiredObservation(artifacts);
   const selectedDraftRejectedForStaleObservation =
     Boolean(selectedDraftCandidate && hasAcceptedObservation && isStaleModelOnlyNoObservationText(artifactText(selectedDraftCandidate.artifact)));
   if (selectedDraftCandidate && !itineraryObservationCriteriaSatisfied) {
@@ -914,7 +919,55 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (!solverContinuationPending && !itineraryObservationCriteriaSatisfied) {
+  if (compoundCoverageFailedClosed) {
+    const unresolved = readArray(compoundCoverageGate?.unresolved_requirement_ids)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry));
+    const failedClosed = readArray(compoundCoverageGate?.resolutions)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .filter((entry) => readString(entry.status) === "failed_closed")
+      .map((entry) => readString(entry.requirement_id))
+      .filter((entry): entry is string => Boolean(entry));
+    const missingRequirements = unresolved.length > 0 ? unresolved : failedClosed;
+    const terminalErrorCode = "compound_prompt_coverage_incomplete";
+    const terminalErrorText = missingRequirements.length > 0
+      ? `I could not complete this compound turn because required prompt items failed closed or remain unresolved: ${missingRequirements.join(", ")}.`
+      : "I could not complete this compound turn because required prompt coverage failed closed.";
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    if (latestDraft) {
+      rejectedCandidates.push({
+        ref: latestDraft.ref ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
+    input.payload.ok = false;
+    input.payload.response_type = "final_failure";
+    input.payload.final_status = "final_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
+      unresolved_requirement_ids: unresolved,
+      failed_closed_requirement_ids: failedClosed,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+  } else if (!solverContinuationPending && !itineraryObservationCriteriaSatisfied) {
     const terminalErrorCode = "capability_itinerary_observations_missing";
     const terminalErrorText = `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
     input.payload.terminal_artifact_kind = "typed_failure";

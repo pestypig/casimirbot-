@@ -116,6 +116,9 @@ import {
   summarizeStagePlayLiveSourceCurrentState,
 } from "../stage-play/stage-play-live-source-current-state";
 import {
+  requestVisualFrameActionReplay,
+} from "../situation-room/visual-frame-action-replay-store";
+import {
   extractStagePlayLiveSourceDelta,
 } from "../stage-play/stage-play-live-source-delta-extractor";
 import {
@@ -2460,7 +2463,8 @@ export function executeLiveEnvironmentTool(
     input.tool_name === "live_env.apply_visual_observer_profile" ||
     input.tool_name === "live_env.query_visual_observer_profiles" ||
     input.tool_name === "live_env.test_visual_observer_profile" ||
-    input.tool_name === "live_env.compare_visual_observer_profiles"
+    input.tool_name === "live_env.compare_visual_observer_profiles" ||
+    input.tool_name === "live_env.request_visual_action_replay"
   ) {
     ensureDefaultStagePlayVisualObserverProfiles();
     const sourceIds = uniqueStrings([
@@ -2571,6 +2575,75 @@ export function executeLiveEnvironmentTool(
           ask_context_policy: "evidence_only",
         },
         evidenceRefs: uniqueStrings([profile?.profileId, ...sourceIds]),
+      });
+    }
+
+    if (input.tool_name === "live_env.request_visual_action_replay") {
+      const shadeProfileIds = uniqueStrings([
+        ...readStringArray(args.shade_profile_ids ?? args.shadeProfileIds ?? args.profile_ids ?? args.profileIds),
+        profileId,
+      ]);
+      const frameHistoryIds = readStringArray(args.frame_history_ids ?? args.frameHistoryIds ?? args.history_ids ?? args.historyIds);
+      const frameIds = readStringArray(args.frame_ids ?? args.frameIds);
+      if (!sourceId || shadeProfileIds.length === 0) {
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: "Visual action replay request requires a visual source id and at least one shade profile id.",
+          observation: {
+            schema: "helix.visual_frame_action_replay_request_response.v1",
+            replay_request: null,
+            requested: false,
+            reason: "missing_source_or_shade_profile",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: uniqueStrings([sourceId, ...shadeProfileIds]),
+        });
+      }
+      const replay = requestVisualFrameActionReplay({
+        thread_id: input.thread_id,
+        room_id: roomId,
+        environment_id: environment?.environment_id ?? input.environment_id,
+        source_id: sourceId,
+        frame_history_ids: frameHistoryIds,
+        frame_ids: frameIds,
+        from_ts: readString(args.from_ts ?? args.fromTs),
+        to_ts: readString(args.to_ts ?? args.toTs),
+        summary_query: readString(args.summary_query ?? args.summaryQuery),
+        shade_profile_ids: shadeProfileIds,
+        max_frames: readOptionalNumber(args.max_frames ?? args.maxFrames),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: true,
+        summary: `Requested visual action replay for ${sourceId}; waiting for the browser panel to provide matching local frames.`,
+        observation: {
+          schema: "helix.visual_frame_action_replay_request_response.v1",
+          replay_request: replay,
+          requested: true,
+          client_mediated: true,
+          raw_frames_server_persisted: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([
+          replay.replay_request_id,
+          replay.source_id,
+          ...replay.requested_frame_history_ids,
+          ...replay.requested_frame_ids,
+          ...replay.shade_profile_ids,
+        ]),
       });
     }
 

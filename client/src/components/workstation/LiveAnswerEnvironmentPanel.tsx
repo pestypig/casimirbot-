@@ -32,6 +32,7 @@ import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@s
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
 import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
+import type { HelixVisualFrameActionReplayRequest } from "@shared/helix-visual-frame-action-replay";
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
 import type { HelixLiveWorkerRun } from "@shared/helix-live-worker-run";
 import {
@@ -288,6 +289,16 @@ type VisualLatestRead = {
   evidence?: { evidence_id: string; summary?: string | null; ts?: string | null } | null;
   alignment?: { alignment_id: string; summary?: string | null; confidence?: number | null } | null;
   visual_evidence_health?: HelixVisualEvidenceHealth | null;
+};
+
+type VisualFrameReplayResult = {
+  replayed_at: string;
+  source_frame_id: string | null;
+  replay_frame_id: string | null;
+  evidence_id: string | null;
+  shade_title: string;
+  visual_prompt_hash: string | null;
+  summary: string;
 };
 
 type VisualObserverProfileListRead = {
@@ -556,6 +567,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
+  const [visualFrameReplayRunning, setVisualFrameReplayRunning] = useState(false);
+  const [visualFrameReplayResult, setVisualFrameReplayResult] = useState<VisualFrameReplayResult | null>(null);
+  const visualReplayJobsInFlightRef = React.useRef<Set<string>>(new Set());
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -761,6 +775,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const baseIndex = selectedVisualFrameHistoryIndex >= 0 ? selectedVisualFrameHistoryIndex : visualFrameHistory.length - 1;
     const nextIndex = Math.max(0, Math.min(visualFrameHistory.length - 1, baseIndex + offset));
     setSelectedVisualFrameHistoryId(visualFrameHistory[nextIndex]?.history_id ?? null);
+  };
+  const visualReplayFramesForRequest = (request: HelixVisualFrameActionReplayRequest): VisualSourceCaptureFrameHistoryItem[] => {
+    const fromMs = request.from_ts ? Date.parse(request.from_ts) : null;
+    const toMs = request.to_ts ? Date.parse(request.to_ts) : null;
+    const summaryQuery = request.summary_query?.trim().toLowerCase() ?? "";
+    const requestedHistoryIds = new Set(request.requested_frame_history_ids);
+    const requestedFrameIds = new Set(request.requested_frame_ids);
+    return visualFrameHistory
+      .filter((item: VisualSourceCaptureFrameHistoryItem) => !request.source_id || item.source_id === request.source_id)
+      .filter((item: VisualSourceCaptureFrameHistoryItem) =>
+        requestedHistoryIds.size > 0 ? requestedHistoryIds.has(item.history_id) : true)
+      .filter((item: VisualSourceCaptureFrameHistoryItem) =>
+        requestedFrameIds.size > 0 && item.frame_id ? requestedFrameIds.has(item.frame_id) : requestedFrameIds.size === 0)
+      .filter((item: VisualSourceCaptureFrameHistoryItem) => {
+        const capturedMs = Date.parse(item.captured_at);
+        if (fromMs != null && Number.isFinite(fromMs) && capturedMs < fromMs) return false;
+        if (toMs != null && Number.isFinite(toMs) && capturedMs > toMs) return false;
+        return true;
+      })
+      .filter((item: VisualSourceCaptureFrameHistoryItem) =>
+        summaryQuery ? item.summary.toLowerCase().includes(summaryQuery) : true)
+      .slice(-(request.max_frames || 12));
   };
   const selectedShadeApplied = Boolean(
     activeVisualObserverProfile &&
@@ -1367,6 +1403,172 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
   };
 
+  const runVisualFrameActionReplayAnalysis = async (input: {
+    frame: VisualSourceCaptureFrameHistoryItem;
+    profile: StagePlayVisualObserverProfileV1;
+    replayRequestId?: string | null;
+  }): Promise<VisualFrameReplayResult> => {
+    const profileIsSessionOnly = input.profile.profileId.includes(":session-custom-");
+    const response = await postJson("/api/agi/situation/visual-frame/analyze", {
+      thread_id: threadId,
+      room_id: environment?.room_id ?? null,
+      source_id: input.frame.source_id || activeVisualSourceId,
+      environment_id: environment?.environment_id ?? null,
+      capture_mode: "manual",
+      image_data_url: input.frame.preview_data_url,
+      mime_type: "image/jpeg",
+      prompt: input.profile.prompt,
+      visual_observer_profile_id: profileIsSessionOnly ? undefined : input.profile.profileId,
+      related_event_refs: [
+        input.frame.frame_id,
+        input.frame.evidence_id,
+      ].filter((ref): ref is string => Boolean(ref)),
+      objective: `Action replay of ${input.frame.frame_id ?? "selected visual frame"} with ${input.profile.title}.`,
+    });
+    const evidence = response?.evidence && typeof response.evidence === "object"
+      ? response.evidence as Record<string, unknown>
+      : null;
+    const summary = typeof evidence?.summary === "string" && evidence.summary.trim()
+      ? evidence.summary.trim()
+      : "Action replay completed without a compact summary.";
+    const replayResult: VisualFrameReplayResult = {
+      replayed_at: new Date().toISOString(),
+      source_frame_id: input.frame.frame_id,
+      replay_frame_id: typeof evidence?.frame_id === "string" ? evidence.frame_id : null,
+      evidence_id: typeof evidence?.evidence_id === "string" ? evidence.evidence_id : null,
+      shade_title: input.profile.title,
+      visual_prompt_hash: typeof evidence?.visual_prompt_hash === "string" ? evidence.visual_prompt_hash : null,
+      summary,
+    };
+    if (input.replayRequestId) {
+      await postJson("/api/agi/situation/visual-frame/replay/result", {
+        replay_request_id: input.replayRequestId,
+        thread_id: threadId,
+        source_id: input.frame.source_id || activeVisualSourceId,
+        source_frame_history_id: input.frame.history_id,
+        source_frame_id: input.frame.frame_id,
+        replay_frame_id: replayResult.replay_frame_id,
+        evidence_id: replayResult.evidence_id,
+        shade_profile_id: input.profile.profileId,
+        shade_title: input.profile.title,
+        visual_prompt_hash: replayResult.visual_prompt_hash,
+        summary,
+        status: "completed",
+      });
+    }
+    return replayResult;
+  };
+
+  const replaySelectedVisualFrame = async () => {
+    if (!selectedVisualFrameHistory) {
+      setLastActionStatus("Select a captured frame before running action replay.");
+      return;
+    }
+    if (!selectedVisualObserverProfile) {
+      setLastActionStatus("Select a visual shade before running action replay.");
+      return;
+    }
+    const sourceId = selectedVisualFrameHistory.source_id || activeVisualSourceId;
+    if (!sourceId) {
+      setLastActionStatus("Action replay needs a visual source reference.");
+      return;
+    }
+    setVisualFrameReplayRunning(true);
+    try {
+      const replayResult = await runVisualFrameActionReplayAnalysis({
+        frame: selectedVisualFrameHistory,
+        profile: selectedVisualObserverProfile,
+      });
+      setVisualFrameReplayResult(replayResult);
+      setLastActionStatus(`Action replay analyzed selected frame with ${selectedVisualObserverProfile.title}. ${replayResult.summary}`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "visual_action_replay_failed");
+    } finally {
+      setVisualFrameReplayRunning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!activeVisualSourceId) return;
+    let cancelled = false;
+    const fulfillPendingReplayRequests = async () => {
+      const query = new URLSearchParams({
+        thread_id: threadId,
+        source_id: activeVisualSourceId,
+        limit: "10",
+      });
+      const response = await fetch(`/api/agi/situation/visual-frame/replay/pending?${query.toString()}`).catch(() => null);
+      if (!response?.ok) return;
+      const body = await response.json().catch(() => null) as { replay_requests?: HelixVisualFrameActionReplayRequest[] } | null;
+      const requests = Array.isArray(body?.replay_requests) ? body.replay_requests : [];
+      for (const request of requests) {
+        if (cancelled || visualReplayJobsInFlightRef.current.has(request.replay_request_id)) continue;
+        visualReplayJobsInFlightRef.current.add(request.replay_request_id);
+        try {
+          const frames = visualReplayFramesForRequest(request);
+          const shadeIds = request.shade_profile_ids.length
+            ? request.shade_profile_ids
+            : selectedVisualObserverProfile?.profileId
+              ? [selectedVisualObserverProfile.profileId]
+              : [];
+          const profiles = shadeIds
+            .map((profileId: string) => visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === profileId) ?? null)
+            .filter((profile): profile is StagePlayVisualObserverProfileV1 => Boolean(profile));
+          if (!frames.length || !profiles.length) {
+            const failedShadeIds = shadeIds.length ? shadeIds : ["missing_shade_profile"];
+            for (const shadeId of failedShadeIds) {
+              await postJson("/api/agi/situation/visual-frame/replay/result", {
+                replay_request_id: request.replay_request_id,
+                thread_id: threadId,
+                source_id: request.source_id,
+                shade_profile_id: shadeId,
+                summary: !frames.length
+                  ? "Visual action replay could not run because the requested frames are no longer in the local carousel."
+                  : "Visual action replay could not run because the requested shade profile is not loaded in the panel.",
+                status: "failed",
+                failure_reason: !frames.length ? "missing_client_frames" : "missing_shade_profile",
+              }).catch(() => null);
+            }
+            continue;
+          }
+          let lastReplayResult: VisualFrameReplayResult | null = null;
+          for (const frame of frames) {
+            for (const profile of profiles) {
+              if (cancelled) return;
+              lastReplayResult = await runVisualFrameActionReplayAnalysis({
+                frame,
+                profile,
+                replayRequestId: request.replay_request_id,
+              });
+            }
+          }
+          if (lastReplayResult && !cancelled) {
+            setVisualFrameReplayResult(lastReplayResult);
+            setLastActionStatus(`Completed requested visual action replay ${request.replay_request_id}. ${lastReplayResult.summary}`);
+          }
+        } catch (error) {
+          await postJson("/api/agi/situation/visual-frame/replay/result", {
+            replay_request_id: request.replay_request_id,
+            thread_id: threadId,
+            source_id: request.source_id,
+            summary: error instanceof Error ? error.message : "visual_action_replay_client_failed",
+            status: "failed",
+            failure_reason: "client_replay_failed",
+          }).catch(() => null);
+        } finally {
+          visualReplayJobsInFlightRef.current.delete(request.replay_request_id);
+        }
+      }
+    };
+    void fulfillPendingReplayRequests();
+    const interval = window.setInterval(() => void fulfillPendingReplayRequests(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeVisualSourceId, selectedVisualObserverProfile?.profileId, threadId, visualFrameHistory, visualShadeProfiles]);
+
   const planLineChecks = async () => {
     try {
       const response = await postJson("/api/agi/situation/live-line-tool-requests/plan", {
@@ -1817,6 +2019,72 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               ))}
             </div>
           ) : null}
+        </div>
+        <div className="mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2" data-testid="visual-frame-action-replay">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-violet-100">Action replay</p>
+              <p className="mt-0.5 text-[10px] leading-4 text-slate-500">
+                Re-analyze the selected review frame with the selected shade. Live capture can keep running.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Replay selected visual frame with selected shade"
+              onClick={() => void replaySelectedVisualFrame()}
+              disabled={!selectedVisualFrameHistory || !selectedVisualObserverProfile || visualFrameReplayRunning}
+              className="rounded border border-violet-300/30 px-2 py-1 text-[11px] text-violet-100 hover:bg-violet-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {visualFrameReplayRunning ? "Replaying..." : "Replay with selected shade"}
+            </button>
+          </div>
+          <div className="mt-2 grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
+            <div className="min-w-0">
+              <span className="uppercase text-slate-500">Frame</span>{" "}
+              <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory?.frame_id ?? "none selected"}</span>
+            </div>
+            <div className="min-w-0">
+              <span className="uppercase text-slate-500">Shade</span>{" "}
+              <span className="break-all font-mono text-slate-300">{selectedVisualObserverProfile?.title ?? "none selected"}</span>
+            </div>
+            <div className="min-w-0">
+              <span className="uppercase text-slate-500">Source</span>{" "}
+              <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory?.source_id ?? activeVisualSourceId ?? "none"}</span>
+            </div>
+            <div className="min-w-0">
+              <span className="uppercase text-slate-500">Mode</span>{" "}
+              <span className="break-all font-mono text-slate-300">manual replay / capture independent</span>
+            </div>
+          </div>
+          {visualFrameReplayResult ? (
+            <div className="mt-2 rounded border border-white/10 bg-black/20 p-2">
+              <div className="grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Replay evidence</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{visualFrameReplayResult.evidence_id ?? "none"}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Replay frame</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{visualFrameReplayResult.replay_frame_id ?? "none"}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Replay shade</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{visualFrameReplayResult.shade_title}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Prompt hash</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{visualFrameReplayResult.visual_prompt_hash ?? "none"}</span>
+                </div>
+              </div>
+              <p className="mt-2 max-h-20 overflow-y-auto pr-1 text-[11px] leading-5 text-slate-300">
+                {visualFrameReplayResult.summary}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              Replay results will appear here without replacing the live capture carousel.
+            </p>
+          )}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <button

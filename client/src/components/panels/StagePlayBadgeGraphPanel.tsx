@@ -2869,12 +2869,13 @@ function buildObserverMailLoopNodes(input: {
   const pressureWakeCount = wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
   const askWakeRequestCount = wakeRequests.filter((wake) =>
     wake.status === "queued" ||
+    wake.status === "waiting_for_ui_handoff" ||
     wake.status === "running" ||
     wake.status === "failed_retryable" ||
     wake.status === "deferred_for_pressure"
   ).length;
   const queuedWakeMailCount = wakeRequests
-    .filter((wake) => wake.status === "queued")
+    .filter((wake) => wake.status === "queued" || wake.status === "waiting_for_ui_handoff")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
   const runningWakeMailCount = wakeRequests
     .filter((wake) => wake.status === "running")
@@ -2914,6 +2915,7 @@ function buildObserverMailLoopNodes(input: {
     : wakeRequests.filter((wake) => wake.status === "completed").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ?? null;
   const pendingWakeRequests = wakeRequests.filter((wake) =>
     wake.status === "queued" ||
+    wake.status === "waiting_for_ui_handoff" ||
     wake.status === "running" ||
     wake.status === "failed_retryable" ||
     wake.status === "deferred_for_pressure"
@@ -4090,6 +4092,7 @@ function StagePlayMailLoopLiveOverview({
     latestStagePlayMailWakeResult(wakeResults);
   const liveOverviewPendingWakes = wakeRequests.filter((wake) =>
     wake.status === "queued" ||
+    wake.status === "waiting_for_ui_handoff" ||
     wake.status === "running" ||
     wake.status === "failed_retryable" ||
     wake.status === "deferred_for_pressure"
@@ -4325,16 +4328,16 @@ function StagePlayMailLoopLiveOverview({
     evidenceRefs: wake.evidenceRefs,
   }));
   const askHandoffPayloads: StagePlayMailJourneyPayload[] = wakeRequests
-    .filter((wake) => wake.askTurnId || wake.status === "running")
+    .filter((wake) => wake.askTurnId || wake.status === "running" || wake.status === "waiting_for_ui_handoff")
     .slice(-5)
     .reverse()
     .map((wake) => ({
       id: `${wake.wakeRequestId}:ask`,
       label: wake.askTurnId?.split(":").at(-1)?.slice(0, 8) ?? wake.wakeRequestId.split(":").at(-1)?.slice(0, 8) ?? "ask",
-      status: wake.askTurnId ? "Ask entered" : "launching",
-      preview: compactStagePlayText(wake.askTurnId ? "Structured mailbox route metadata attached to Ask." : "Waiting for Ask turn id.", "Ask handoff pending.", 120),
+      status: wake.askTurnId ? "Ask entered" : wake.status === "waiting_for_ui_handoff" ? "Waiting for UI handoff" : "launching",
+      preview: compactStagePlayText(wake.askTurnId ? "Structured mailbox route metadata attached to Ask." : wake.status === "waiting_for_ui_handoff" ? "Queued for the Helix Ask UI bridge." : "Waiting for Ask turn id.", "Ask handoff pending.", 120),
       meta: wake.askTurnId ? "turn" : formatStagePlayClock(wake.updatedAt),
-      state: wake.askTurnId ? "done" : "active",
+      state: wake.askTurnId ? "done" : wake.status === "waiting_for_ui_handoff" ? "pending" : "active",
       evidenceRefs: wake.evidenceRefs,
     }));
   const resultPayloads: StagePlayMailJourneyPayload[] = wakeResults.slice(-5).reverse().map((result) => ({
@@ -6226,7 +6229,7 @@ function shouldBridgeStagePlayWakeToAsk(input: {
   const uiHandoffRequired = input.wakeResult?.status === "skipped" &&
     input.wakeResult.skippedReason === "ui_handoff_required";
   const wakeStatus = uiHandoffRequired ? wake.status : input.wakeResult?.status ?? wake.status;
-  if (!["queued", "running", "failed_retryable", "deferred_for_pressure"].includes(wakeStatus)) return false;
+  if (!["queued", "waiting_for_ui_handoff", "running", "failed_retryable", "deferred_for_pressure"].includes(wakeStatus)) return false;
   const recommendedNext = input.packet?.arbiter?.recommendedNext ?? input.packet?.recommendedNext;
   if (!input.packet) return true;
   const wakeAsk = input.packet.arbiter?.wakeAsk === true || recommendedNext === "request_voice_callout";

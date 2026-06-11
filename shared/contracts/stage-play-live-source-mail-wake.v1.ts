@@ -10,6 +10,7 @@ export type StagePlayLiveSourceMailWakeReasonV1 =
 
 export type StagePlayLiveSourceMailWakeStatusV1 =
   | "queued"
+  | "waiting_for_ui_handoff"
   | "running"
   | "completed"
   | "failed_retryable"
@@ -22,6 +23,7 @@ export type StagePlayLiveSourceMailWakeStatusV1 =
 
 export type StagePlayLiveSourceMailWakeLifecycleStageV1 =
   | "queued"
+  | "waiting_for_ui_handoff"
   | "pressure_deferred"
   | "ask_entered"
   | "decision_recorded"

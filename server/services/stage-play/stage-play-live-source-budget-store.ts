@@ -88,7 +88,7 @@ export function recordLiveSourceBudgetState(input: {
     includeDelivered: true,
     limit: 250,
   });
-  const queuedWakeCount = wakes.filter((wake) => wake.status === "queued").length;
+  const queuedWakeCount = wakes.filter((wake) => wake.status === "queued" || wake.status === "waiting_for_ui_handoff").length;
   const runningWakeCount = wakes.filter((wake) => wake.status === "running").length;
   const deferredWakeCount = wakes.filter((wake) => wake.status === "deferred_for_pressure").length;
   const failedWakeCount = wakes.filter((wake) => /^failed/.test(wake.status)).length;

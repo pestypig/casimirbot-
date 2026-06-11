@@ -23,6 +23,8 @@ import { compareMailToInterpreterProfile } from "./stage-play-live-source-interp
 import { extractStagePlayLiveSourceDelta } from "./stage-play-live-source-delta-extractor";
 import {
   getActiveStagePlayMicroReasonerPromptForRole,
+  getStagePlayMicroReasonerRun,
+  getStagePlayProcessedMailPacket,
   recordStagePlayMicroReasonerRun,
   recordStagePlayProcessedMailPacket,
 } from "./stage-play-processed-mail-packet-store";
@@ -582,6 +584,27 @@ export function buildStagePlayProcessedMailPacket(input: {
   };
   const mailIds = input.mailItems.map((item) => item.mailId);
   const sourceId = input.sourceId || input.mailItems[0]?.sourceId || "unknown_source";
+  const packetId = `stage_play_processed_mail_packet:${hashShort([
+    input.jobId,
+    sourceId,
+    mailIds,
+    input.activeProfile?.profileId ?? null,
+    input.activeProfile?.updatedAt ?? null,
+  ])}`;
+  const existingPacket = getStagePlayProcessedMailPacket(packetId);
+  if (existingPacket) {
+    return {
+      packet: existingPacket,
+      comparison: null,
+      microReasonerRuns: existingPacket.microReasonerRunRefs
+        .map((runId) => getStagePlayMicroReasonerRun(runId))
+        .filter((run): run is StagePlayMicroReasonerRunV1 => Boolean(run)),
+      timing: [{
+        stage: "processed_packet_reused",
+        durationMs: 0,
+      }],
+    };
+  }
   const visualEvidenceRefs = uniqueStrings(input.mailItems.flatMap((item) => [
     item.sourceRefs.evidenceRef,
     item.sourceRefs.frameRef,
@@ -922,15 +945,6 @@ export function buildStagePlayProcessedMailPacket(input: {
       causalTrace: input.causalTrace,
     }));
   }
-  const packetId = `stage_play_processed_mail_packet:${hashShort([
-    input.jobId,
-    sourceId,
-    mailIds,
-    input.immersionState.immersionStateId,
-    input.predictionValidation.validationId,
-    comparison?.comparisonId ?? null,
-    now,
-  ])}`;
   const packet = timed("processed_packet_record", () => recordStagePlayProcessedMailPacket({
     artifactId: "stage_play_processed_mail_packet",
     schemaVersion: STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA,

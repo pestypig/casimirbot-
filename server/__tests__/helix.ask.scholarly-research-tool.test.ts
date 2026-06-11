@@ -95,6 +95,12 @@ describe("Helix scholarly research tool admission", () => {
         kind: "scholarly_research_observation",
       },
     });
+    if (response.body?.compound_prompt_coverage_gate?.decision === "FAIL_CLOSED") {
+      expect(response.body?.ok).toBe(false);
+      expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+      expect(response.body?.final_answer_source).toBe("typed_failure");
+      expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
+    }
   }, 60000);
 
   it("rejects empty scholarly runtime tool args instead of falling back to the full prompt", () => {

@@ -2501,6 +2501,7 @@ export function queueMailWakeForUnreadItems(input: {
     })
       .filter((wake) =>
         wake.status === "queued" ||
+        wake.status === "waiting_for_ui_handoff" ||
         wake.status === "running" ||
         wake.status === "failed_retryable" ||
         wake.status === "deferred_for_pressure"
@@ -2886,7 +2887,7 @@ export async function runNextMailWakeRequest(input: {
       processedPacket: fastLayer.processedPacket,
       evidenceRefs,
     });
-    const queuedForUi = markStagePlayMailWakeUiHandoffRequired({
+    markStagePlayMailWakeUiHandoffRequired({
       wakeRequestId: running.wakeRequestId,
       routeMetadata: wakeRouteMetadata,
       evidenceRefs: uniqueStrings([
@@ -2894,36 +2895,8 @@ export async function runNextMailWakeRequest(input: {
         "stage_play_wake_ui_handoff_required",
       ]),
       now,
-    }) ?? running;
-    const priorUiHandoff = latestStagePlayLiveSourceMailWakeResult(running.wakeRequestId);
-    const priorCoversCurrentBatch =
-      priorUiHandoff?.status === "skipped" &&
-      priorUiHandoff.skippedReason === "ui_handoff_required" &&
-      running.mailIds.every((mailId) => priorUiHandoff.evidenceRefs.includes(mailId));
-    if (priorCoversCurrentBatch) return priorUiHandoff;
-    const wakeResult = recordStagePlayMailWakeResult({
-      wakeRequestId: running.wakeRequestId,
-      threadId: running.threadId,
-      roomId: running.roomId ?? null,
-      environmentId: running.environmentId ?? null,
-      status: "skipped",
-      skippedReason: "ui_handoff_required",
-      evidenceRefs: uniqueStrings([
-        ...evidenceRefs,
-        "stage_play_wake_ui_handoff_required",
-      ]),
-      createdAt: now,
     });
-    return recordNonTerminalWakeTranscript({
-      wake: queuedForUi,
-      wakeResult,
-      mailBatch,
-      fastLayer,
-      action: "deferred",
-      retainedMailCount,
-      evidenceRefs: wakeResult.evidenceRefs,
-      createdAt: wakeResult.createdAt,
-    });
+    return null;
   }
   const fullPrompt = buildWakePrompt({
     wake: running,

@@ -188,6 +188,82 @@ describe("final_answer_draft terminal selection", () => {
     expect((payload.final_answer_draft_selection as Record<string, unknown>).selected_over_direct_answer_text).toBe(true);
   });
 
+  it("keeps fail-closed compound coverage from being re-promoted by a final draft", () => {
+    const turnId = "ask:test:compound-fail-closed-over-draft";
+    const draftText = "This draft looks complete, but the compound coverage gate has already failed closed.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Answer two required parts.",
+      route_product_contract: modelOnlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      compound_prompt_coverage_gate: {
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        applies: true,
+        passed: false,
+        decision: "FAIL_CLOSED",
+        unresolved_requirement_ids: ["R2"],
+        resolutions: [
+          {
+            requirement_id: "R1",
+            status: "answered",
+          },
+          {
+            requirement_id: "R2",
+            status: "failed_closed",
+          },
+        ],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        next_decision: "fail_closed",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(result.visible_text).toContain("compound");
+    expect(payload.ok).toBe(false);
+    expect(payload.final_status).toBe("final_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("compound_prompt_coverage_incomplete");
+    expect(payload.selected_final_answer).not.toBe(draftText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          reason: "missing_required_observation",
+        }),
+      ]),
+    );
+  });
+
   it("materializes a supported repo draft into repo_code_evidence_answer", () => {
     const turnId = "ask:test:repo-draft-materialized";
     const draftText = "Helix Ask treats receipts as observations, while final answers must be model-authored synthesis selected by terminal authority.";

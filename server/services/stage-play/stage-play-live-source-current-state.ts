@@ -112,7 +112,7 @@ const qualityFor = (input: {
   return input.freshness === "fresh" ? "good" : "degraded";
 };
 
-const activeWakeStatuses = new Set(["queued", "running", "failed_retryable", "deferred_for_pressure"]);
+const activeWakeStatuses = new Set(["queued", "waiting_for_ui_handoff", "running", "failed_retryable", "deferred_for_pressure"]);
 
 export function queryStagePlayLiveSourceQuality(input: {
   threadId: string;
@@ -177,7 +177,7 @@ export function queryStagePlayLiveSourceQuality(input: {
     (!input.sourceId || wake.sourceIds.includes(input.sourceId)) &&
     (!input.sourceKind || wake.mailIds.some((mailId) => mailItems.some((item) => item.mailId === mailId && item.sourceKind === input.sourceKind))),
   );
-  const queuedWakeCount = wakes.filter((wake) => wake.status === "queued").length;
+  const queuedWakeCount = wakes.filter((wake) => wake.status === "queued" || wake.status === "waiting_for_ui_handoff").length;
   const runningWakeCount = wakes.filter((wake) => wake.status === "running").length;
   const deferredWakeCount = wakes.filter((wake) => wake.status === "deferred_for_pressure").length;
   const failedWakeCount = wakes.filter((wake) => /^failed/.test(wake.status)).length;

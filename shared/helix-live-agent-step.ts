@@ -33,6 +33,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_visual_observer_profiles"
   | "live_env.test_visual_observer_profile"
   | "live_env.compare_visual_observer_profiles"
+  | "live_env.request_visual_action_replay"
   | "live_env.configure_live_source_watch_job"
   | "live_env.configure_interpreter_profile"
   | "live_env.compare_mail_to_interpreter_profile"

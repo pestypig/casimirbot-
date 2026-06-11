@@ -102,6 +102,34 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(producer).toContain("frame_history: pruneVisualFrameHistory");
   });
 
+  it("adds a separate action replay section for re-lensing captured frames", () => {
+    const source = panelSource();
+
+    expect(source).toContain('data-testid="visual-frame-action-replay"');
+    expect(source).toContain("Action replay");
+    expect(source).toContain("Live capture can keep running.");
+    expect(source).toContain('aria-label="Replay selected visual frame with selected shade"');
+    expect(source).toContain("replaySelectedVisualFrame");
+    expect(source).toContain("/api/agi/situation/visual-frame/analyze");
+    expect(source).toContain("image_data_url: input.frame.preview_data_url");
+    expect(source).toContain("visual_observer_profile_id: profileIsSessionOnly ? undefined : input.profile.profileId");
+    expect(source).toContain("Replay results will appear here without replacing the live capture carousel.");
+  });
+
+  it("adopts tool-requested visual action replay jobs from the local carousel", () => {
+    const source = panelSource();
+
+    expect(source).toContain("HelixVisualFrameActionReplayRequest");
+    expect(source).toContain("/api/agi/situation/visual-frame/replay/pending");
+    expect(source).toContain("/api/agi/situation/visual-frame/replay/result");
+    expect(source).toContain("visualReplayFramesForRequest");
+    expect(source).toContain("request.requested_frame_history_ids");
+    expect(source).toContain("request.summary_query");
+    expect(source).toContain("missing_client_frames");
+    expect(source).toContain("missing_shade_profile");
+    expect(source).toContain("runVisualFrameActionReplayAnalysis");
+  });
+
   it("does not mark a missing shade preset as applied", () => {
     const source = panelSource();
 

@@ -47,6 +47,7 @@ const addMsIso = (value: string, ms: number): string | null => {
 
 const ACTIVE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
   "queued",
+  "waiting_for_ui_handoff",
   "running",
   "failed_retryable",
   "deferred_for_pressure",
@@ -54,6 +55,7 @@ const ACTIVE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
 
 const EXPIRABLE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeStatusV1>([
   "queued",
+  "waiting_for_ui_handoff",
   "failed_retryable",
   "deferred_for_pressure",
 ]);
@@ -109,6 +111,7 @@ const resolveWakeLifecycleStage = (input: {
   const evidenceRefs = input.evidenceRefs ?? [];
   const voiceStage = voiceCheckpointLifecycleStage(evidenceRefs);
   if (voiceStage) return voiceStage;
+  if (input.status === "waiting_for_ui_handoff") return "waiting_for_ui_handoff";
   if (input.status === "deferred_for_pressure") return "pressure_deferred";
   if (input.status === "expired_stale" || input.status === "expired_superseded") return "expired";
   if (input.status === "failed" || input.status === "failed_retryable" || input.status === "failed_terminal") return "failed";
@@ -198,7 +201,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
         wake.environmentId === (input.environmentId ?? null) &&
         wake.jobId === (input.jobId ?? null) &&
         wake.reason === (input.reason ?? "unread_mail") &&
-        (wake.status === "queued" || wake.status === "deferred_for_pressure") &&
+        (wake.status === "queued" || wake.status === "waiting_for_ui_handoff" || wake.status === "deferred_for_pressure") &&
         sortedKey(wake.sourceIds) === sortedKey(sourceIds) &&
         wake.mailIds.length < MAX_MAIL_IDS_PER_WAKE_BATCH
       )
@@ -574,7 +577,7 @@ export const attachAskTurnToWakeRequest = (input: {
   if (!existing) return null;
   const updatedAt = input.now ?? new Date().toISOString();
   return updateWake(input.wakeRequestId, {
-    status: existing.status === "queued" ? "running" : existing.status,
+    status: existing.status === "queued" || existing.status === "waiting_for_ui_handoff" ? "running" : existing.status,
     askTurnId: input.askTurnId,
     askLaunchId: input.askLaunchId ?? existing.askLaunchId ?? makeAskLaunchId(input.wakeRequestId, updatedAt, existing.attemptCount),
     askLaunchStatus: "launched",
@@ -596,13 +599,13 @@ export const markStagePlayMailWakeUiHandoffRequired = (input: {
   const existing = wakeById.get(input.wakeRequestId);
   if (!existing) return null;
   return updateWake(input.wakeRequestId, {
-    status: "queued",
+    status: "waiting_for_ui_handoff",
     askTurnId: null,
     askLaunchStatus: "not_started",
     askLaunchStartedAt: null,
     askLaunchCompletedAt: null,
     askLaunchRouteMetadata: input.routeMetadata ?? existing.askLaunchRouteMetadata ?? null,
-    lifecycleStage: "queued",
+    lifecycleStage: "waiting_for_ui_handoff",
     lifecycleReason: "ui_handoff_required",
     nextRetryAt: null,
     failureReason: null,
@@ -626,7 +629,7 @@ export const markStagePlayMailWakeCompleted = (input: {
   if (input.requiresVoiceCheckpoint === true && voiceCheckpointRefsFromEvidence(evidenceRefs).length === 0) {
     const askTurnId = input.askTurnId ?? existing?.askTurnId ?? null;
     return updateWake(input.wakeRequestId, {
-      status: existing?.status === "queued" ? "running" : existing?.status ?? "running",
+      status: existing?.status === "queued" || existing?.status === "waiting_for_ui_handoff" ? "running" : existing?.status ?? "running",
       askTurnId,
       askLaunchStatus: askTurnId ? "launched" : existing?.askLaunchStatus ?? "not_started",
       askLaunchStartedAt: askTurnId ? existing?.askLaunchStartedAt ?? updatedAt : existing?.askLaunchStartedAt ?? null,
@@ -846,15 +849,19 @@ export function recordStagePlayMailWakeResult(input: {
 }): StagePlayLiveSourceMailWakeResultV1 {
   const createdAt = input.createdAt ?? new Date().toISOString();
   const wake = wakeById.get(input.wakeRequestId) ?? null;
-  const decisionIds = uniqueStrings(input.decisionIds ?? []);
-  const evidenceRefs = uniqueStrings([input.wakeRequestId, input.askTurnId, ...decisionIds, ...(input.evidenceRefs ?? [])]);
-  const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
+  const inputDecisionIds = uniqueStrings(input.decisionIds ?? []);
+  const inputEvidenceRefs = uniqueStrings([input.wakeRequestId, input.askTurnId, ...inputDecisionIds, ...(input.evidenceRefs ?? [])]);
   const wakeResultId = `stage_play_live_source_mail_wake_result:${hashShort([
     input.wakeRequestId,
     input.status,
     input.askTurnId ?? null,
-    createdAt,
+    input.skippedReason ?? null,
+    input.failedReason ?? null,
   ])}`;
+  const existing = resultById.get(wakeResultId) ?? null;
+  const decisionIds = uniqueStrings([...(existing?.decisionIds ?? []), ...inputDecisionIds]);
+  const evidenceRefs = uniqueStrings([...(existing?.evidenceRefs ?? []), ...inputEvidenceRefs]);
+  const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
   const result: StagePlayLiveSourceMailWakeResultV1 = {
     artifactId: "stage_play_live_source_mail_wake_result",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_RESULT_SCHEMA,
@@ -867,7 +874,7 @@ export function recordStagePlayMailWakeResult(input: {
     askTurnId: input.askTurnId ?? null,
     decisionIds,
     voiceCheckpointRefs,
-    budgetStateRef: null,
+    budgetStateRef: existing?.budgetStateRef ?? null,
     skippedReason: input.skippedReason ?? null,
     failedReason: input.failedReason ?? null,
     lifecycleStage: resolveWakeLifecycleStage({

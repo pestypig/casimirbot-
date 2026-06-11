@@ -40,6 +40,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.query_visual_observer_profiles", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.test_visual_observer_profile", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.compare_visual_observer_profiles", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.request_visual_action_replay", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.configure_live_source_watch_job", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.configure_interpreter_profile", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.compare_mail_to_interpreter_profile", requires_user_confirmation: false, can_run_automatically: true },

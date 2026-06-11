@@ -235,6 +235,7 @@ export async function runVisualFrameProducerOnce(input: {
   const existingProducerState = useVisualSourceCaptureStore.getState().producers[input.sourceId];
   const frameHistoryItem: VisualSourceCaptureFrameHistoryItem = {
     history_id: `${frameId ?? "pending"}:${frameHash}:${frameHistoryNowMs}`,
+    source_id: input.sourceId,
     frame_id: frameId,
     evidence_id: evidenceId,
     captured_at: frameAt,

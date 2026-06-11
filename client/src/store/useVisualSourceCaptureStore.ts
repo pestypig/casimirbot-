@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type VisualSourceCaptureFrameHistoryItem = {
   history_id: string;
+  source_id: string;
   frame_id: string | null;
   evidence_id: string | null;
   captured_at: string;

@@ -66,6 +66,7 @@ import {
   listStagePlayMicroReasonerPrompts,
   listStagePlayMicroReasonerRuns,
   getLatestStagePlayProcessedMailPacket,
+  listStagePlayProcessedMailPackets,
   resetStagePlayProcessedMailPacketStoreForTest,
 } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { runStagePlayLiveSourceMailWakeAdmissionCycle } from "../services/stage-play/stage-play-live-source-mail-wake-service";
@@ -4209,21 +4210,16 @@ describe("Stage Play live-source mailbox", () => {
     });
 
     expect(cycle).toMatchObject({
-      status: "queued",
+      status: "waiting_for_ui_handoff",
       reason: "wake_ui_handoff_required",
-      result: {
-        status: "skipped",
-        skippedReason: "ui_handoff_required",
-        askTurnId: null,
-        decisionIds: [],
-      },
+      result: null,
     });
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId, mailId: mail.mailId })[0];
     expect(wake).toMatchObject({
-      status: "queued",
+      status: "waiting_for_ui_handoff",
       askTurnId: null,
       askLaunchStatus: "not_started",
-      lifecycleStage: "queued",
+      lifecycleStage: "waiting_for_ui_handoff",
       lifecycleReason: "ui_handoff_required",
     });
     expect(wake.askLaunchRouteMetadata).toMatchObject({
@@ -4233,6 +4229,24 @@ describe("Stage Play live-source mailbox", () => {
       requiredCanonicalGoal: "processed_mail_voice_decision",
       mandatoryNextTool: "live_env.record_live_source_mail_decision",
     });
+    const packetCountAfterFirstCycle = listStagePlayProcessedMailPackets({ jobId: "stage_play_live_source_job:ui-handoff" }).length;
+    const resultCountAfterFirstCycle = listStagePlayLiveSourceMailWakeResults({ threadId }).length;
+    expect(resultCountAfterFirstCycle).toBe(0);
+
+    const secondCycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:46.000Z",
+      pressureCheck: () => ({ deferred: false }),
+    });
+
+    expect(secondCycle).toMatchObject({
+      status: "waiting_for_ui_handoff",
+      reason: "wake_ui_handoff_required",
+      result: null,
+    });
+    expect(listStagePlayProcessedMailPackets({ jobId: "stage_play_live_source_job:ui-handoff" })).toHaveLength(packetCountAfterFirstCycle);
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toHaveLength(resultCountAfterFirstCycle);
   });
 
   it("reports immediate continuation when a bounded wake leaves runnable retained mail", async () => {

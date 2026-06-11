@@ -9138,7 +9138,7 @@ const statusForHelixProcessedFinding = (input: {
     .at(-1) ?? null;
   const wakeStatus = coerceText(matchingWake?.status).trim();
   if (wakeStatus === "running") return "running";
-  if (wakeStatus === "queued" || wakeStatus === "failed_retryable") return "queued";
+  if (wakeStatus === "queued" || wakeStatus === "waiting_for_ui_handoff" || wakeStatus === "failed_retryable") return "queued";
   if (wakeStatus === "deferred_for_pressure") return "deferred";
   if (wakeStatus === "completed") return "completed";
   const matchingDecision = input.decisions
@@ -9303,7 +9303,7 @@ function buildHelixSteeringQueueMailboxItems(
     const status: HelixAskSteeringQueueStatus =
       rawStatus === "running"
         ? "running"
-        : rawStatus === "queued" || rawStatus === "runnable"
+        : rawStatus === "queued" || rawStatus === "waiting_for_ui_handoff" || rawStatus === "runnable"
           ? "queued"
           : rawStatus === "deferred_for_pressure"
             ? "deferred"
@@ -9314,7 +9314,9 @@ function buildHelixSteeringQueueMailboxItems(
     const mailIds = Array.isArray(wake.mailIds) ? wake.mailIds : [];
     items.push({
       key: `wake:${coerceText(wake.wakeRequestId).trim() || index}:${rawStatus}`,
-      label: status === "deferred" ? "Ask wake deferred" : status === "running" ? "Ask wake running" : status === "queued" ? "Ask wake queued" : "Ask wake completed",
+      label: rawStatus === "waiting_for_ui_handoff"
+        ? "Ask wake waiting for UI"
+        : status === "deferred" ? "Ask wake deferred" : status === "running" ? "Ask wake running" : status === "queued" ? "Ask wake queued" : "Ask wake completed",
       detail: [
         mailIds.length > 0 ? `${mailIds.length} processed finding input${mailIds.length === 1 ? "" : "s"}` : null,
         coerceText(wake.failureReason ?? wake.reason).trim() || null,
