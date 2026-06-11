@@ -178,6 +178,67 @@ describe("Helix Ask Stage Play routing", () => {
       .toMatch(/^live_env\./);
   }, 60_000);
 
+  it("does not let hard mailbox wake metadata skip execution behind stale pending input", async () => {
+    const app = createApp();
+    const sessionId = `${threadId}:hard-mailbox-pending-supersede`;
+    const pending = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "open the panel",
+        sessionId,
+        debug: true,
+      })
+      .expect(200);
+    expect(pending.body?.pending_server_request, JSON.stringify(pending.body, null, 2)).toBeTruthy();
+
+    const wakeRequestId = "stage_play_live_source_mail_wake:test-hard-route-pending";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Review the latest Stage Play live-source mailbox finding.",
+        sessionId,
+        debug: true,
+        route_metadata: {
+          invocationKind: "stage_play_mail_wake",
+          wakeRequestId,
+          mailboxThreadId: sessionId,
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_voice_decision",
+          requiredPhase: "record_decision",
+          allowedCapabilities: [
+            "live_env.record_live_source_mail_decision",
+          ],
+          forbiddenCapabilities: [
+            "workspace_os.status",
+            "internet-search.search_web",
+            "docs-viewer.open",
+          ],
+          evidenceRefs: ["stage_play_processed_mail_packet:test-hard-route-pending"],
+        },
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      canonical: response.body?.canonical_goal_frame,
+      phase: response.body?.live_source_turn_phase_resolution,
+      mandatory: response.body?.mandatory_next_tool,
+      admission: response.body?.agent_runtime_loop_admission,
+      loop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.source_target_intent?.target_source, routeDebug).toBe("live_source_mailbox");
+    expect(response.body?.agent_runtime_loop_admission, routeDebug).toMatchObject({
+      admitted: true,
+      mode: "execute_or_record",
+    });
+    expect(response.body?.agent_runtime_loop_admission?.reason, routeDebug).not.toBe("pending_user_input");
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("clarify:missing_args");
+    expect(response.body?.mandatory_next_tool?.tool_name, routeDebug).toBe("live_env.record_live_source_mail_decision");
+    expect(response.body?.agent_runtime_loop?.executed_tool_call_count ?? 0, routeDebug).toBeGreaterThan(0);
+  }, 60_000);
+
   it("routes visual watch prompts to watch-job policy configuration without reading mail", async () => {
     startVisualSnapshotSource({
       source_id: sourceId,
@@ -430,7 +491,8 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
     expect(response.body?.answer, routeDebug).not.toContain("latest unread source update");
     expect(response.body?.answer, routeDebug).not.toContain("wait_for_next_summary");
-    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed");
+    expect(response.body?.answer, routeDebug).toContain("No live-source mail was interpreted in this setup turn");
     expect(response.body?.answer, routeDebug).toContain(expectedObjective);
     expect(response.body?.answer, routeDebug).not.toContain("mailbox has been checked");
     expect(response.body?.answer, routeDebug).not.toContain("no new mail batches");
@@ -500,7 +562,8 @@ describe("Helix Ask Stage Play routing", () => {
         nextLoopState: "armed_for_next_summary",
       },
     });
-    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed");
+    expect(response.body?.answer, routeDebug).toContain("No live-source mail was interpreted in this setup turn");
     expect(response.body?.answer, routeDebug).not.toContain("Reviewed");
     expect(response.body?.answer, routeDebug).not.toContain("latest unread source update");
   }, 30_000);
@@ -583,7 +646,8 @@ describe("Helix Ask Stage Play routing", () => {
       .toEqual(["live_env.configure_live_source_watch_job"]);
     expect(response.body?.answer, routeDebug).not.toContain("Three unread live-source mail items");
     expect(response.body?.answer, routeDebug).not.toContain("decision is required");
-    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed");
+    expect(response.body?.answer, routeDebug).toContain("No live-source mail was interpreted in this setup turn");
     expect(response.body?.answer, routeDebug).not.toMatch(/\bno\s+(?:mail|live-source\s+updates?)\s+(?:was|were)?\s*(?:available|found)\b/i);
     expect(response.body?.solver_controller_decision?.decision, routeDebug).toBe("allow_terminal");
     expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).toEqual([]);
@@ -640,7 +704,8 @@ describe("Helix Ask Stage Play routing", () => {
       capability: "live_env.configure_live_source_watch_job",
       executed_capabilities_seen: expect.arrayContaining(["live_env.configure_live_source_watch_job"]),
     });
-    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed; no mail read yet.");
+    expect(response.body?.answer, routeDebug).toContain("Watch job configured and armed");
+    expect(response.body?.answer, routeDebug).toContain("No live-source mail was interpreted in this setup turn");
     expect(response.body?.answer, routeDebug).not.toMatch(/active_doc_path|missing artifact|Provide the missing artifact/i);
     expect(response.body?.solver_controller_decision?.decision, routeDebug).toBe("allow_terminal");
     expect(response.body?.solver_controller_decision?.blocking_reasons ?? [], routeDebug).toEqual([]);
@@ -709,7 +774,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toContain("prefer_read_live_source_mail");
     expect(response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability), routeDebug)
       .toEqual(expect.arrayContaining([
-        "live_env.read_live_source_mail",
+        "live_env.read_processed_live_source_mail",
         "live_env.record_live_source_mail_decision",
       ]));
     const liveToolArtifacts = response.body?.current_turn_artifact_ledger
@@ -726,7 +791,7 @@ describe("Helix Ask Stage Play routing", () => {
         status: "won",
         selected_target_source: "live_source_mailbox",
       }),
-      capability: "live_env.read_live_source_mail",
+      capability: "live_env.read_processed_live_source_mail",
       wake_request_id: "stage_play_live_source_mail_wake:test",
       wake_request_ids: expect.arrayContaining(["stage_play_live_source_mail_wake:test"]),
       mail_ids: expect.arrayContaining(["stage_play_live_source_mail:test"]),

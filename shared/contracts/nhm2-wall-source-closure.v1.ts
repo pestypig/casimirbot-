@@ -35,6 +35,8 @@ export type Nhm2WallSourceClosureArtifactV1 = {
     tensorRef?: string;
     materialReceiptRef?: string;
     materialReceiptStatus?: CasimirMaterialReceiptStatus;
+    sourceAuthorityRef?: string;
+    sourceAuthorityStatus?: string;
     T00_SI: number | null;
     componentStatus: string;
   };
@@ -68,6 +70,8 @@ export type BuildNhm2WallSourceClosureArtifactInput = {
     materialReceiptRef?: string | null;
     materialReceiptStatus?: CasimirMaterialReceiptStatus | null;
     materialReceipt?: CasimirMaterialReceiptV1 | null;
+    sourceAuthorityRef?: string | null;
+    sourceAuthorityStatus?: string | null;
     T00_SI?: number | null;
     componentStatus?: string | null;
   } | null;
@@ -99,6 +103,11 @@ type Nhm2WallSourceClosureRegionLike = {
     brickProxyMode?: string | null;
     pressureSource?: string | null;
   } | null;
+  comparisonBasisAuthorityStatus?: string | null;
+  regionalComparisonContractStatus?: string | null;
+  sourceSideSameBasisAuthorityStatus?: string | null;
+  sourceSideAuthorityRef?: string | null;
+  sourceSideFullTensorMissingComponentIds?: string[] | null;
   casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
   materialReceipt?: CasimirMaterialReceiptV1 | null;
 };
@@ -244,6 +253,8 @@ export const buildNhm2WallSourceClosureArtifact = (
     (materialReceipt != null
       ? `runtime://pipeline/casimirMaterialReceipt/${materialReceipt.tileBatchId}`
       : null);
+  const sourceAuthorityStatus = toText(input.available?.sourceAuthorityStatus);
+  const sourceAuthorityRef = toText(input.available?.sourceAuthorityRef);
   const resolvedSourceKind =
     sourceKind === "material_receipted" &&
     !isMaterialReceiptedCasimirMaterialReceipt(materialReceipt)
@@ -264,6 +275,12 @@ export const buildNhm2WallSourceClosureArtifact = (
   }
   if (materialReceiptStatus === "blocked") {
     blockers.push("casimir_material_receipt_blocked");
+  }
+  if (
+    sourceAuthorityStatus != null &&
+    sourceAuthorityStatus !== "authoritative_same_basis"
+  ) {
+    blockers.push("wall_source_side_same_basis_authority_missing");
   }
   if (resolvedSourceKind === "proxy") warnings.push("wall_available_source_is_proxy");
   if (materialReceiptStatus === "ideal_scalar_only") {
@@ -295,6 +312,8 @@ export const buildNhm2WallSourceClosureArtifact = (
         : {}),
       ...(materialReceiptRef != null ? { materialReceiptRef } : {}),
       ...(materialReceiptStatus != null ? { materialReceiptStatus } : {}),
+      ...(sourceAuthorityRef != null ? { sourceAuthorityRef } : {}),
+      ...(sourceAuthorityStatus != null ? { sourceAuthorityStatus } : {}),
       T00_SI: availableT00,
       componentStatus: statusFromT00(
         availableT00,
@@ -344,6 +363,18 @@ export const buildNhm2WallSourceClosureFromRegionComparison = (
   const materialReceipt =
     normalizeMaterialReceipt(region?.casimirMaterialReceipt) ??
     normalizeMaterialReceipt(region?.materialReceipt);
+  const sourceAuthorityStatus =
+    toText(region?.sourceSideSameBasisAuthorityStatus) ??
+    (toText(region?.comparisonBasisAuthorityStatus) === "authoritative_same_basis" &&
+    toText(region?.regionalComparisonContractStatus) === "same_basis_counterpart_available"
+      ? "diagnostic_only"
+      : toText(region?.comparisonBasisAuthorityStatus) ?? "missing");
+  const sourceAuthorityRef =
+    toText(region?.sourceSideAuthorityRef) ??
+    toText(region?.tileT00Diagnostics?.sourceRef) ??
+    toText(region?.tileT00Diagnostics?.trace?.valueRef) ??
+    toText(region?.tileT00Diagnostics?.trace?.tensorRef) ??
+    toText(region?.tileTensorRef);
   const sourceText = [
     region?.tileT00Diagnostics?.sourceRef,
     region?.tileT00Diagnostics?.trace?.valueRef,
@@ -383,6 +414,8 @@ export const buildNhm2WallSourceClosureFromRegionComparison = (
       sourceKind: inferAvailableSourceKind(region, availableT00),
       tensorRef: availableTensorRef,
       materialReceipt,
+      sourceAuthorityRef,
+      sourceAuthorityStatus,
       T00_SI: availableT00,
       componentStatus: statusFromT00(
         availableT00,
@@ -436,6 +469,10 @@ export const isNhm2WallSourceClosureArtifact = (
       toText(available.materialReceiptRef) != null) &&
     (available.materialReceiptStatus === undefined ||
       normalizeMaterialReceiptStatus(available.materialReceiptStatus) != null) &&
+    (available.sourceAuthorityRef === undefined ||
+      toText(available.sourceAuthorityRef) != null) &&
+    (available.sourceAuthorityStatus === undefined ||
+      toText(available.sourceAuthorityStatus) != null) &&
     (available.T00_SI === null || toFiniteOrNull(available.T00_SI) != null) &&
     toText(available.componentStatus) != null &&
     residual != null &&

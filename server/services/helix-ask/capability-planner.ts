@@ -11,6 +11,7 @@ import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
+import type { LiveSourceTurnPhaseResolutionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { detectRepoConcept } from "./repo-concept-detector";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
@@ -20,6 +21,7 @@ import {
   isWorkspaceOsStatusPrompt,
 } from "./workspace-os-status-intent";
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "./workspace-directory-resolver";
+import { mandatoryToolForPhase } from "./live-source-turn-phase-resolver";
 
 type RecordLike = Record<string, unknown>;
 
@@ -130,6 +132,25 @@ const classifySourceFamily = (input: {
   return "debug_export";
 };
 
+const routeMetadataSourceTarget = (routeMetadata?: RecordLike | null): string =>
+  readString(routeMetadata?.sourceTarget) || readString(routeMetadata?.source_target);
+
+const isHardLiveSourceMailboxRoute = (input: {
+  routeMetadata?: RecordLike | null;
+  mandatoryPhaseTool?: string | null;
+}): boolean =>
+  routeMetadataSourceTarget(input.routeMetadata) === "live_source_mailbox" ||
+  Boolean(input.mandatoryPhaseTool);
+
+const firstAllowedToolForPhase = (phaseResolution?: RecordLike | null): string => {
+  const phase = readRecord(phaseResolution);
+  const allowedTools = uniqueStrings([
+    ...readStringArray(phase?.allowedTools),
+    ...readStringArray(phase?.allowed_tools),
+  ]);
+  return allowedTools[0] ?? "";
+};
+
 const requestedActionFor = (
   family: HelixCapabilityFamily,
   promptText: string,
@@ -238,11 +259,12 @@ const applyLiveSourcePhaseCapabilityFilter = (input: {
   ]);
   const selectedCapability = liveSourceToolForRequestedAction(input.requestedAction);
   const phaseName = readString(phase?.phase) || null;
-  const locked = readRecord(phase?.phaseLock)?.locked === true || readRecord(phase?.phase_lock)?.locked === true;
+  const mandatoryTool = mandatoryToolForPhase(phase as LiveSourceTurnPhaseResolutionV1 | null);
+  const locked = Boolean(mandatoryTool);
   const selectedForbidden = forbiddenTools.includes(selectedCapability);
   const selectedOutsideLockedAllowlist =
     locked && allowedTools.length > 0 && !allowedTools.includes(selectedCapability);
-  const repairTarget = allowedTools[0] ?? "";
+  const repairTarget = mandatoryTool ?? allowedTools[0] ?? "";
   if ((selectedForbidden || selectedOutsideLockedAllowlist) && repairTarget) {
     return {
       requestedAction: repairTarget,
@@ -389,24 +411,38 @@ export const buildCapabilityPlan = (input: {
   canonicalGoalFrame?: RecordLike | null;
   instructionFrame?: RecordLike | null;
   liveSourceTurnPhaseResolution?: RecordLike | null;
+  routeMetadata?: RecordLike | null;
 }): HelixCapabilityPlan => {
   const sourceTargetIntent = readRecord(input.sourceTargetIntent);
   const routeProductContract = readRecord(input.routeProductContract);
   const toolCallAdmissionDecision = readRecord(input.toolCallAdmissionDecision);
   const canonicalGoalFrame = readRecord(input.canonicalGoalFrame);
   const instructionFrame = readRecord(input.instructionFrame);
+  const routeMetadata = readRecord(input.routeMetadata);
+  const mandatoryPhaseTool = mandatoryToolForPhase(input.liveSourceTurnPhaseResolution as LiveSourceTurnPhaseResolutionV1 | null);
+  const firstAllowedPhaseTool = firstAllowedToolForPhase(input.liveSourceTurnPhaseResolution);
+  const hardLiveSourceMailboxRoute = isHardLiveSourceMailboxRoute({
+    routeMetadata,
+    mandatoryPhaseTool,
+  });
   const contextualSuppression = detectContextualToolAdmissionSuppression(input.promptText);
   const toolUseRestatement = buildToolUseRestatement(input.promptText);
   const repoConceptDetection = detectRepoConcept(input.promptText);
-  const requiresRepoConceptEvidence = !contextualSuppression && repoConceptDetection.require_repo_evidence === true;
+  const requiresRepoConceptEvidence =
+    !hardLiveSourceMailboxRoute &&
+    !contextualSuppression &&
+    repoConceptDetection.require_repo_evidence === true;
   const requiresInternetEvidence =
+    !hardLiveSourceMailboxRoute &&
     !contextualSuppression &&
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const sourceTarget =
+    (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (contextualSuppression ? "model_only" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
+    routeMetadataSourceTarget(routeMetadata) ||
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||
@@ -420,7 +456,9 @@ export const buildCapabilityPlan = (input: {
     targetKind,
     admittedFamilies,
   });
-  const family: HelixCapabilityFamily = requiresRepoConceptEvidence
+  const family: HelixCapabilityFamily = hardLiveSourceMailboxRoute
+    ? "live_environment"
+    : requiresRepoConceptEvidence
     ? "repo_evidence"
     : requiresInternetEvidence
       ? "internet_search"
@@ -430,8 +468,10 @@ export const buildCapabilityPlan = (input: {
           ? "workstation_action"
           : classifiedFamily;
   const rules = instructionRules(instructionFrame);
-  const plannedRequestedAction = contextualSuppression
-    ? "suppressed_contextual_tool_reference"
+  const plannedRequestedAction = hardLiveSourceMailboxRoute
+    ? (mandatoryPhaseTool ?? firstAllowedPhaseTool) || "live_env.read_processed_live_source_mail"
+    : contextualSuppression
+      ? "suppressed_contextual_tool_reference"
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"

@@ -11,6 +11,7 @@ import {
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourcePredictionValidationRecommendedNextV1,
   type StagePlayLiveSourcePredictionValidationV1,
+  type StagePlayMicroReasonerRoleV1,
   type StagePlayMicroReasonerRunV1,
   type StagePlayProcessedMailPacketV1,
   type StagePlaySceneBeatHypothesisV1,
@@ -28,6 +29,7 @@ import {
   recordStagePlayMicroReasonerRun,
   recordStagePlayProcessedMailPacket,
 } from "./stage-play-processed-mail-packet-store";
+import { llmHttpHandler } from "../../skills/llm.http";
 
 const hashShort = (value: unknown, size = 18): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, size);
@@ -43,6 +45,212 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 const clipText = (value: string | null | undefined, limit = 260): string => {
   const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
+};
+
+const DEFAULT_PROMPTED_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
+  "claim_extractor",
+  "observation_classifier",
+  "salience_scorer",
+  "hypothesis_arbiter",
+  "decision_selector",
+];
+
+type PromptedMicroReasonerOutput = {
+  ok: boolean;
+  text: string;
+  json?: Record<string, unknown> | null;
+  model?: string | null;
+  latencyMs?: number | null;
+  tokenEstimateIn?: number | null;
+  tokenEstimateOut?: number | null;
+  error?: string | null;
+};
+
+export type StagePlayPromptedMicroReasonerExecutor = (input: {
+  role: StagePlayMicroReasonerRoleV1;
+  promptId: string;
+  promptTitle: string;
+  promptTemplate: string;
+  outputSchemaName: string;
+  inputPreview: string;
+  baselineOutputPreview: string;
+  packet: StagePlayProcessedMailPacketV1;
+  priorOutputs: Record<string, unknown>;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+}) => Promise<PromptedMicroReasonerOutput>;
+
+export type StagePlayPromptedMicroReasonerOptions = {
+  enabled?: boolean;
+  roles?: StagePlayMicroReasonerRoleV1[];
+  executor?: StagePlayPromptedMicroReasonerExecutor;
+};
+
+const readPromptedRoleList = (): StagePlayMicroReasonerRoleV1[] => {
+  const raw = process.env.STAGE_PLAY_MICRO_REASONER_LLM_ROLES?.trim();
+  if (!raw) return DEFAULT_PROMPTED_MICRO_REASONER_ROLES;
+  const allowed = new Set<StagePlayMicroReasonerRoleV1>([
+    "claim_extractor",
+    "observation_classifier",
+    "effort_estimator",
+    "axiom_extractor",
+    "hypothesis_generator",
+    "profile_comparator",
+    "delta_extractor",
+    "prediction_validator",
+    "salience_scorer",
+    "hypothesis_arbiter",
+    "packet_composer",
+    "decision_selector",
+    "voice_callout_drafter",
+  ]);
+  const parsed = raw.split(",")
+    .map((entry) => entry.trim())
+    .filter((entry): entry is StagePlayMicroReasonerRoleV1 => allowed.has(entry as StagePlayMicroReasonerRoleV1));
+  return parsed.length > 0 ? parsed : DEFAULT_PROMPTED_MICRO_REASONER_ROLES;
+};
+
+const promptedMicroReasonersEnabled = (options?: StagePlayPromptedMicroReasonerOptions): boolean => {
+  if (options?.enabled === false) return false;
+  if (options?.enabled === true) return true;
+  if (String(process.env.STAGE_PLAY_MICRO_REASONER_LLM_ENABLED ?? "1").trim() === "0") return false;
+  return Boolean(process.env.OPENAI_API_KEY?.trim());
+};
+
+const parseJsonObjectFromText = (text: string): Record<string, unknown> | null => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(trimmed.slice(start, end + 1));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+};
+
+const readStringArrayFromJson = (record: Record<string, unknown> | null | undefined, key: string): string[] => {
+  const value = record?.[key];
+  if (!Array.isArray(value)) return [];
+  return uniqueStrings(value.map((entry) => typeof entry === "string" ? entry : JSON.stringify(entry)));
+};
+
+const readStringFromJson = (record: Record<string, unknown> | null | undefined, key: string): string | null => {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const readBooleanFromJson = (record: Record<string, unknown> | null | undefined, key: string): boolean | null => {
+  const value = record?.[key];
+  return typeof value === "boolean" ? value : null;
+};
+
+const readConfidence = (value: unknown): StagePlayMicroReasonerRunV1["confidence"] => {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return null;
+};
+
+const isRecommendedNext = (value: unknown): value is StagePlayLiveSourcePredictionValidationRecommendedNextV1 =>
+  value === "wait_for_next_summary" ||
+  value === "record_interpretation" ||
+  value === "draft_text_answer" ||
+  value === "request_voice_callout" ||
+  value === "request_more_evidence" ||
+  value === "request_stage_play_checkpoint";
+
+const promptedOutputPreview = (role: StagePlayMicroReasonerRoleV1, json: Record<string, unknown> | null, fallback: string): string => {
+  if (!json) return fallback;
+  if (role === "claim_extractor") {
+    return clipText([
+      ...readStringArrayFromJson(json, "observedFacts").slice(0, 3),
+      ...readStringArrayFromJson(json, "uncertainties").slice(0, 2).map((entry) => `uncertain: ${entry}`),
+    ].join(" | ") || fallback, 320);
+  }
+  if (role === "observation_classifier") {
+    return clipText([
+      ...readStringArrayFromJson(json, "changedFacts").slice(0, 3),
+      ...readStringArrayFromJson(json, "contradictions").slice(0, 2).map((entry) => `contradiction: ${entry}`),
+    ].join(" | ") || fallback, 320);
+  }
+  if (role === "salience_scorer") {
+    return clipText(`${readStringFromJson(json, "salienceLevel") ?? "unknown"}; voice ${readBooleanFromJson(json, "voiceCandidate") ? "candidate" : "no"}; recommended ${readStringFromJson(json, "recommendedNext") ?? "none"}; ${readStringArrayFromJson(json, "reasons").slice(0, 3).join(" | ")}`, 320);
+  }
+  if (role === "hypothesis_arbiter") {
+    return clipText(`${readStringFromJson(json, "recommendedNext") ?? "unknown"}; wake ${readBooleanFromJson(json, "wakeAsk") ? "yes" : "no"}; ${readStringFromJson(json, "reason") ?? fallback}`, 320);
+  }
+  if (role === "decision_selector") {
+    return clipText(`${readStringFromJson(json, "selectedDecision") ?? "unknown"}; next tool ${readStringFromJson(json, "recommendedNextTool") ?? "none"}; ${readStringArrayFromJson(json, "reasons").slice(0, 3).join(" | ")}`, 320);
+  }
+  return clipText(JSON.stringify(json).replace(/\s+/g, " "), 320) || fallback;
+};
+
+const defaultPromptedMicroReasonerExecutor: StagePlayPromptedMicroReasonerExecutor = async (input) => {
+  const startedAt = performance.now();
+  const result = await llmHttpHandler({
+    model: process.env.STAGE_PLAY_MICRO_REASONER_LLM_MODEL ?? process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini",
+    temperature: Number(process.env.STAGE_PLAY_MICRO_REASONER_LLM_TEMPERATURE ?? 0.1),
+    max_tokens: Number(process.env.STAGE_PLAY_MICRO_REASONER_LLM_MAX_TOKENS ?? 420),
+    messages: [
+      {
+        role: "system",
+        content: [
+          input.promptTemplate,
+          "",
+          "You are a bounded Stage Play micro-reasoner, not the Ask agent.",
+          "Return JSON only. Use the requested schema and only the provided mail/packet evidence.",
+          "Do not answer the user, do not call tools, and do not claim voice output happened.",
+          "If the evidence is uncertain or contradicts the baseline, make that explicit.",
+        ].join("\n"),
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          role: input.role,
+          promptId: input.promptId,
+          outputSchemaName: input.outputSchemaName,
+          inputPreview: input.inputPreview,
+          baselineOutputPreview: input.baselineOutputPreview,
+          packet: {
+            packetId: input.packet.packetId,
+            mailIds: input.packet.mailIds,
+            observedFacts: input.packet.observedFacts,
+            inferredFacts: input.packet.inferredFacts,
+            uncertainties: input.packet.uncertainties,
+            changedFacts: input.packet.changedFacts,
+            salience: input.packet.salience,
+            recommendedNext: input.packet.recommendedNext,
+            predictionValidation: input.packet.predictionValidation,
+            arbiter: input.packet.arbiter,
+          },
+          priorMicroReasonerOutputs: input.priorOutputs,
+          mail: input.mailItems.map((item) => ({
+            mailId: item.mailId,
+            sourceId: item.sourceId,
+            sourceKind: item.sourceKind,
+            summary: item.summary,
+            evidenceRefs: item.evidenceRefs,
+          })),
+        }),
+      },
+    ],
+    traceId: `stage_play_micro_reasoner:${input.role}:${input.packet.packetId}`,
+  }, { personaId: "stage_play_micro_reasoner" }) as Record<string, unknown>;
+  const text = typeof result.text === "string" ? result.text : "";
+  return {
+    ok: Boolean(text.trim()),
+    text,
+    json: parseJsonObjectFromText(text),
+    model: typeof result.model === "string" ? result.model : "llm.http.generate",
+    latencyMs: typeof result.__llm_timeout_ms === "number"
+      ? Math.max(0, Math.round(performance.now() - startedAt))
+      : Math.max(0, Math.round(performance.now() - startedAt)),
+    tokenEstimateIn: typeof result.__llm_usage_prompt_tokens === "number"
+      ? result.__llm_usage_prompt_tokens
+      : typeof result.__llm_prompt_tokens_estimate === "number" ? result.__llm_prompt_tokens_estimate : null,
+    tokenEstimateOut: typeof result.__llm_usage_completion_tokens === "number" ? result.__llm_usage_completion_tokens : null,
+    error: null,
+  };
 };
 
 const tokenTags = (values: string[], terms: string[]): string[] => {
@@ -1027,6 +1235,305 @@ export function buildStagePlayProcessedMailPacket(input: {
     packet: finalPacket,
     comparison,
     microReasonerRuns: [...microReasonerRuns, composerRun],
+    timing,
+  };
+}
+
+const mergePromptedRun = (input: {
+  run: StagePlayMicroReasonerRunV1;
+  output: PromptedMicroReasonerOutput;
+  outputPreview: string;
+  outputRefs: string[];
+  selectedDecision?: StagePlayMicroReasonerRunV1["selectedDecision"] | null;
+  salienceLevel?: StagePlayMicroReasonerRunV1["salienceLevel"] | null;
+  voiceCandidate?: boolean | null;
+  recommendedNextTool?: string | null;
+  confidence?: StagePlayMicroReasonerRunV1["confidence"];
+  missingEvidence?: string[];
+  now: string;
+}): StagePlayMicroReasonerRunV1 => {
+  const updated: StagePlayMicroReasonerRunV1 = {
+    ...input.run,
+    outputRefs: uniqueStrings([...input.run.outputRefs, ...input.outputRefs]),
+    outputPreview: input.outputPreview,
+    selectedDecision: input.selectedDecision ?? input.run.selectedDecision ?? null,
+    salienceLevel: input.salienceLevel ?? input.run.salienceLevel ?? null,
+    voiceCandidate: input.voiceCandidate ?? input.run.voiceCandidate ?? null,
+    recommendedNextTool: input.recommendedNextTool !== undefined ? input.recommendedNextTool : input.run.recommendedNextTool ?? null,
+    confidence: input.confidence ?? input.run.confidence ?? null,
+    missingEvidence: uniqueStrings([...(input.run.missingEvidence ?? []), ...(input.missingEvidence ?? [])]),
+    modelUsed: input.output.model ?? input.run.modelUsed ?? "prompted_micro_reasoner",
+    latencyMs: input.output.latencyMs ?? input.run.latencyMs ?? null,
+    tokenEstimateIn: input.output.tokenEstimateIn ?? input.run.tokenEstimateIn ?? null,
+    tokenEstimateOut: input.output.tokenEstimateOut ?? input.run.tokenEstimateOut ?? null,
+    error: input.output.error ?? null,
+    completedAt: input.now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
+  };
+  return recordStagePlayMicroReasonerRun(updated);
+};
+
+const salienceLevelFromJson = (
+  json: Record<string, unknown> | null,
+  fallback: StagePlayProcessedMailPacketV1["salience"]["level"],
+): StagePlayProcessedMailPacketV1["salience"]["level"] => {
+  const value = readStringFromJson(json, "salienceLevel");
+  return value === "low" || value === "medium" || value === "high" || value === "urgent" ? value : fallback;
+};
+
+const applyPromptedMicroReasonerOutput = (input: {
+  packet: StagePlayProcessedMailPacketV1;
+  role: StagePlayMicroReasonerRoleV1;
+  json: Record<string, unknown> | null;
+}): StagePlayProcessedMailPacketV1 => {
+  const { packet, role, json } = input;
+  if (!json) return packet;
+  if (role === "claim_extractor") {
+    const observedFacts = readStringArrayFromJson(json, "observedFacts");
+    const inferredFacts = readStringArrayFromJson(json, "inferredFacts");
+    const uncertainties = readStringArrayFromJson(json, "uncertainties");
+    return {
+      ...packet,
+      observedFacts: observedFacts.length > 0 ? uniqueStrings([...observedFacts, ...packet.observedFacts]) : packet.observedFacts,
+      inferredFacts: inferredFacts.length > 0 ? uniqueStrings([...inferredFacts, ...packet.inferredFacts]) : packet.inferredFacts,
+      uncertainties: uncertainties.length > 0 ? uniqueStrings([...uncertainties, ...packet.uncertainties]) : packet.uncertainties,
+      sceneTags: uniqueStrings([...packet.sceneTags, ...readStringArrayFromJson(json, "sceneTags")]),
+      activityTags: uniqueStrings([...packet.activityTags, ...readStringArrayFromJson(json, "activityTags")]),
+      objectTags: uniqueStrings([...packet.objectTags, ...readStringArrayFromJson(json, "objectTags")]),
+      riskMatches: uniqueStrings([...packet.riskMatches, ...readStringArrayFromJson(json, "riskTags")]),
+      opportunityMatches: uniqueStrings([...packet.opportunityMatches, ...readStringArrayFromJson(json, "opportunityTags")]),
+    };
+  }
+  if (role === "observation_classifier") {
+    return {
+      ...packet,
+      stableFactsUsed: uniqueStrings([...packet.stableFactsUsed, ...readStringArrayFromJson(json, "stableFactsUsed")]),
+      changedFacts: uniqueStrings([...readStringArrayFromJson(json, "changedFacts"), ...packet.changedFacts]),
+      uncertainties: uniqueStrings([
+        ...packet.uncertainties,
+        ...readStringArrayFromJson(json, "uncertainties"),
+        ...readStringArrayFromJson(json, "contradictions").map((entry) => `Contradiction: ${entry}`),
+      ]),
+    };
+  }
+  if (role === "salience_scorer") {
+    const recommendedNext = readStringFromJson(json, "recommendedNext");
+    const calloutDraft = readStringFromJson(json, "calloutDraft");
+    return {
+      ...packet,
+      recommendedNext: isRecommendedNext(recommendedNext) ? recommendedNext : packet.recommendedNext,
+      salience: {
+        level: salienceLevelFromJson(json, packet.salience.level),
+        reasons: uniqueStrings([...readStringArrayFromJson(json, "reasons"), ...packet.salience.reasons]),
+        voiceCandidate: readBooleanFromJson(json, "voiceCandidate") ?? packet.salience.voiceCandidate,
+        calloutDraft: calloutDraft ?? packet.salience.calloutDraft ?? null,
+      },
+    };
+  }
+  if (role === "hypothesis_arbiter") {
+    const recommendedNext = readStringFromJson(json, "recommendedNext");
+    const next = isRecommendedNext(recommendedNext) ? recommendedNext : packet.recommendedNext;
+    return {
+      ...packet,
+      recommendedNext: next,
+      arbiter: {
+        recommendedNext: next,
+        wakeAsk: readBooleanFromJson(json, "wakeAsk") ?? packet.arbiter?.wakeAsk ?? next !== "wait_for_next_summary",
+        reason: readStringFromJson(json, "reason") ?? packet.arbiter?.reason ?? "Prompted micro-reasoner arbiter selected the next mail-loop action.",
+        confidence: readConfidence(json.confidence) ?? packet.arbiter?.confidence ?? "medium",
+        selectedHypothesis: readStringFromJson(json, "selectedHypothesis") ?? packet.arbiter?.selectedHypothesis ?? null,
+        voiceCandidate: readBooleanFromJson(json, "voiceCandidate") ?? packet.arbiter?.voiceCandidate ?? false,
+        calloutDraft: readStringFromJson(json, "calloutDraft") ?? packet.arbiter?.calloutDraft ?? null,
+        missingEvidence: uniqueStrings(readStringArrayFromJson(json, "missingEvidence")),
+      },
+    };
+  }
+  if (role === "decision_selector") {
+    const selectedDecision = readStringFromJson(json, "selectedDecision");
+    const next = isRecommendedNext(selectedDecision) ? selectedDecision : packet.recommendedNext;
+    return {
+      ...packet,
+      recommendedNext: next,
+      resolutionState: next === "request_voice_callout" ? "voice_candidate_prepared" : "processed_packet_ready",
+    };
+  }
+  return packet;
+};
+
+const outputRefsFromPromptedJson = (
+  role: StagePlayMicroReasonerRoleV1,
+  json: Record<string, unknown> | null,
+): string[] => {
+  if (!json) return [];
+  if (role === "claim_extractor") {
+    return uniqueStrings([
+      ...readStringArrayFromJson(json, "observedFacts"),
+      ...readStringArrayFromJson(json, "inferredFacts"),
+      ...readStringArrayFromJson(json, "uncertainties"),
+    ]).slice(0, 12);
+  }
+  if (role === "observation_classifier") {
+    return uniqueStrings([
+      ...readStringArrayFromJson(json, "stableFactsUsed"),
+      ...readStringArrayFromJson(json, "changedFacts"),
+      ...readStringArrayFromJson(json, "contradictions"),
+      ...readStringArrayFromJson(json, "uncertainties"),
+    ]).slice(0, 12);
+  }
+  if (role === "salience_scorer") {
+    return uniqueStrings([
+      readStringFromJson(json, "salienceLevel"),
+      readStringFromJson(json, "recommendedNext"),
+      readBooleanFromJson(json, "voiceCandidate") ? "voice_candidate" : "no_voice_candidate",
+      ...readStringArrayFromJson(json, "reasons"),
+    ]).slice(0, 12);
+  }
+  if (role === "hypothesis_arbiter") {
+    return uniqueStrings([
+      readStringFromJson(json, "recommendedNext"),
+      readBooleanFromJson(json, "wakeAsk") ? "wake_ask" : "local_wait",
+      readStringFromJson(json, "selectedHypothesis"),
+      ...readStringArrayFromJson(json, "missingEvidence"),
+    ]).slice(0, 12);
+  }
+  if (role === "decision_selector") {
+    return uniqueStrings([
+      readStringFromJson(json, "selectedDecision"),
+      readStringFromJson(json, "recommendedNextTool"),
+      ...readStringArrayFromJson(json, "missingEvidence"),
+    ]).slice(0, 12);
+  }
+  return uniqueStrings(Object.values(json).map((value) => typeof value === "string" ? value : JSON.stringify(value))).slice(0, 12);
+};
+
+export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(input: {
+  jobId: string;
+  sourceId: string;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  priorImmersionState?: StagePlayLiveSourceImmersionStateV1 | null;
+  immersionState: StagePlayLiveSourceImmersionStateV1;
+  predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+  activeProfile?: StagePlayLiveSourceInterpreterProfileV1 | null;
+  causalTrace?: LiveSourceCausalTraceV1;
+  now?: string;
+  promptedMicroReasoners?: StagePlayPromptedMicroReasonerOptions;
+}): Promise<{
+  packet: StagePlayProcessedMailPacketV1;
+  comparison: StagePlayLiveSourceInterpreterProfileComparisonV1 | null;
+  microReasonerRuns: StagePlayMicroReasonerRunV1[];
+  timing: StagePlayProcessedMailPacketTimingEntry[];
+}> {
+  const baseline = buildStagePlayProcessedMailPacket(input);
+  if (!promptedMicroReasonersEnabled(input.promptedMicroReasoners)) return baseline;
+
+  const now = input.now ?? new Date().toISOString();
+  const executor = input.promptedMicroReasoners?.executor ?? defaultPromptedMicroReasonerExecutor;
+  const requestedRoles = input.promptedMicroReasoners?.roles ?? readPromptedRoleList();
+  const runByRole = new Map(baseline.microReasonerRuns.map((run) => [run.role, run]));
+  const promptedOutputs: Record<string, unknown> = {};
+  let packet = baseline.packet;
+  const runs = baseline.microReasonerRuns.slice();
+  const timing = baseline.timing.slice();
+
+  for (const role of requestedRoles) {
+    const run = runByRole.get(role);
+    const prompt = getActiveStagePlayMicroReasonerPromptForRole(role);
+    if (!run || !prompt) continue;
+    const startedAt = performance.now();
+    let output: PromptedMicroReasonerOutput;
+    try {
+      output = await executor({
+        role,
+        promptId: prompt.promptId,
+        promptTitle: prompt.title,
+        promptTemplate: prompt.template,
+        outputSchemaName: prompt.outputSchemaName,
+        inputPreview: run.inputPreview,
+        baselineOutputPreview: run.outputPreview,
+        packet,
+        priorOutputs: promptedOutputs,
+        mailItems: input.mailItems,
+      });
+    } catch (error) {
+      output = {
+        ok: false,
+        text: "",
+        json: null,
+        model: run.modelUsed ?? "deterministic_fallback",
+        latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    } finally {
+      timing.push({
+        stage: `prompted_micro_reasoner:${role}`,
+        durationMs: performance.now() - startedAt,
+      });
+    }
+    const json = output.json ?? parseJsonObjectFromText(output.text);
+    if (!output.ok || !json) {
+      const fallbackRun = recordStagePlayMicroReasonerRun({
+        ...run,
+        modelUsed: output.model ?? run.modelUsed ?? "deterministic_fallback",
+        latencyMs: output.latencyMs ?? run.latencyMs ?? null,
+        error: output.error ?? "prompted_micro_reasoner_invalid_or_empty_json",
+        completedAt: now,
+      });
+      runs.splice(runs.findIndex((entry) => entry.runId === run.runId), 1, fallbackRun);
+      runByRole.set(role, fallbackRun);
+      continue;
+    }
+
+    packet = applyPromptedMicroReasonerOutput({ packet, role, json });
+    promptedOutputs[role] = json;
+    const selectedDecision = role === "decision_selector" && isRecommendedNext(readStringFromJson(json, "selectedDecision"))
+      ? readStringFromJson(json, "selectedDecision") as StagePlayLiveSourcePredictionValidationRecommendedNextV1
+      : role === "hypothesis_arbiter" && isRecommendedNext(readStringFromJson(json, "recommendedNext"))
+        ? readStringFromJson(json, "recommendedNext") as StagePlayLiveSourcePredictionValidationRecommendedNextV1
+        : run.selectedDecision ?? null;
+    const updatedRun = mergePromptedRun({
+      run,
+      output: {
+        ...output,
+        json,
+        model: output.model ?? prompt.modelPreference,
+        latencyMs: output.latencyMs ?? Math.max(0, Math.round(performance.now() - startedAt)),
+      },
+      outputPreview: promptedOutputPreview(role, json, run.outputPreview),
+      outputRefs: outputRefsFromPromptedJson(role, json),
+      selectedDecision,
+      salienceLevel: role === "salience_scorer" ? salienceLevelFromJson(json, packet.salience.level) : run.salienceLevel,
+      voiceCandidate: role === "salience_scorer" || role === "hypothesis_arbiter"
+        ? readBooleanFromJson(json, "voiceCandidate") ?? run.voiceCandidate ?? null
+        : run.voiceCandidate,
+      recommendedNextTool: role === "decision_selector"
+        ? readStringFromJson(json, "recommendedNextTool")
+        : readStringFromJson(json, "recommendedNextTool") ?? run.recommendedNextTool ?? null,
+      confidence: readConfidence(json.confidence) ?? run.confidence ?? null,
+      missingEvidence: readStringArrayFromJson(json, "missingEvidence"),
+      now,
+    });
+    runs.splice(runs.findIndex((entry) => entry.runId === run.runId), 1, updatedRun);
+    runByRole.set(role, updatedRun);
+  }
+
+  const finalPacket = recordStagePlayProcessedMailPacket({
+    ...packet,
+    microReasonerRunRefs: uniqueStrings(runs.map((run) => run.runId)),
+    evidenceRefs: uniqueStrings([
+      ...packet.evidenceRefs,
+      ...runs.map((run) => run.runId),
+      ...Object.keys(promptedOutputs).map((role) => `prompted_micro_reasoner:${role}`),
+    ]),
+    resolutionState: packet.recommendedNext === "request_voice_callout" ? "voice_candidate_prepared" : "processed_packet_ready",
+  });
+
+  return {
+    packet: finalPacket,
+    comparison: baseline.comparison,
+    microReasonerRuns: runs,
     timing,
   };
 }

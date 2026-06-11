@@ -82,21 +82,24 @@ import type {
 import { recordLiveSourceBudgetState } from "./stage-play-live-source-budget-store";
 import { extractStagePlayLiveSourceDelta } from "./stage-play-live-source-delta-extractor";
 import { validateStagePlayLiveSourcePredictionFromMail } from "./stage-play-live-source-prediction-validator";
-import { buildStagePlayProcessedMailPacket } from "./stage-play-processed-mail-packet";
+import { buildStagePlayProcessedMailPacketWithPromptedReasoners } from "./stage-play-processed-mail-packet";
 import { recordLiveSourceMailDecisionForAsk } from "./stage-play-visual-summary-mail-ingest";
 
-type AskWakeTurnResponse = Record<string, unknown> | AskWakeTurnLaunchResult;
+type AskWakeTurnResponse = Record<string, unknown> | AskWakeLaunchResult;
 
-export type AskWakeTurnLaunchResult = {
+export type AskWakeLaunchResult = {
   ok: boolean;
   askTurnId: string | null;
-  routeTarget: "live_source_mailbox";
+  selectedTargetSource?: "live_source_mailbox" | string | null;
   selectedCapability?: string | null;
+  routeMetadata?: Record<string, unknown>;
   debugRef?: string | null;
   response?: Record<string, unknown>;
   errorCode?: string | null;
   errorMessage?: string | null;
 };
+
+export type AskWakeTurnLaunchResult = AskWakeLaunchResult;
 
 export type AskWakeTurnRunner = (input: {
   prompt: string;
@@ -883,14 +886,14 @@ const policyCriteriaNeedsSlowAsk = (input: {
   );
 };
 
-const buildWakeFastLayer = (input: {
+const buildWakeFastLayer = async (input: {
   wake: StagePlayLiveSourceMailWakeRequestV1;
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
   activeInterpreterProfile: StagePlayLiveSourceInterpreterProfileV1 | null;
   mailBatch: StagePlayLiveSourceMailItemV1[];
   now: string;
   manualRun?: boolean;
-}): {
+}): Promise<{
   priorImmersionState: StagePlayLiveSourceImmersionStateV1 | null;
   immersionState: StagePlayLiveSourceImmersionStateV1;
   predictionValidation: StagePlayLiveSourcePredictionValidationV1;
@@ -898,7 +901,7 @@ const buildWakeFastLayer = (input: {
   microReasonerRuns: StagePlayMicroReasonerRunV1[];
   shouldRunSlowAsk: boolean;
   slowAskReason: string;
-} => {
+}> => {
   const jobId = input.policy?.jobId ?? input.wake.jobId ?? `stage_play_live_source_job:${hashShort([
     input.wake.threadId,
     input.wake.roomId ?? null,
@@ -975,7 +978,7 @@ const buildWakeFastLayer = (input: {
     prediction,
     lastValidation: {
       validationId: predictionValidation.validationId,
-      priorPredictionId: predictionValidation.priorPredictionId,
+      priorPredictionId: predictionValidation.priorPredictionId ?? "no_prior_prediction",
       result: predictionValidation.result,
       evidenceSummary: predictionValidation.newSignals.slice(0, 6).join("; ") || "No validation signals were available.",
     },
@@ -983,7 +986,7 @@ const buildWakeFastLayer = (input: {
     causalTrace: input.wake.causalTrace,
     createdAt: input.now,
   });
-  const { packet: processedPacket, microReasonerRuns } = buildStagePlayProcessedMailPacket({
+  const { packet: processedPacket, microReasonerRuns } = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
     jobId,
     sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "unknown_source",
     mailItems: input.mailBatch,
@@ -2256,22 +2259,29 @@ const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
       throw new Error(`mail_wake_ask_turn_failed:${response.status}`);
     }
     const payload = await response.json() as Record<string, unknown>;
-    const responseAskTurnId = extractAskTurnId(payload);
+    const responseAskTurnId = extractAskTurnId(payload) ?? resolvedAskTurnId;
     return {
       ok: Boolean(responseAskTurnId),
       askTurnId: responseAskTurnId,
-      routeTarget: "live_source_mailbox",
+      selectedTargetSource:
+        readString(payload.selected_target_source) ??
+        readString(payload.selectedTargetSource) ??
+        "live_source_mailbox",
       selectedCapability: readString(payload.selected_capability) ?? readString(payload.selectedCapability) ?? null,
+      routeMetadata: routeMetadata ?? wakeRequest.askLaunchRouteMetadata ?? undefined,
       debugRef: readString(payload.debug_export_ref) ?? readString(payload.debugExportRef) ?? null,
       response: payload,
       errorCode: responseAskTurnId ? null : "ask_launch_missing_ask_turn_id",
     };
   };
 
-const isAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): response is AskWakeTurnLaunchResult =>
+const isAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): response is AskWakeLaunchResult =>
   readRecord(response) !== null &&
-  typeof (response as AskWakeTurnLaunchResult).ok === "boolean" &&
-  (response as AskWakeTurnLaunchResult).routeTarget === "live_source_mailbox";
+  typeof (response as AskWakeLaunchResult).ok === "boolean" &&
+  (
+    (response as AskWakeLaunchResult).selectedTargetSource === "live_source_mailbox" ||
+    readString((response as unknown as Record<string, unknown>).routeTarget) === "live_source_mailbox"
+  );
 
 const extractAskTurnId = (response: Record<string, unknown>): string | null =>
   readString(response.turn_id) ??
@@ -2283,13 +2293,14 @@ const extractAskTurnId = (response: Record<string, unknown>): string | null =>
   readString(response.debug_export_turn_id) ??
   readString(response.id);
 
-const normalizeAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): AskWakeTurnLaunchResult => {
+const normalizeAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): AskWakeLaunchResult => {
   if (isAskWakeTurnLaunchResult(response)) {
     const payload = readRecord(response.response) ?? readRecord(response) ?? {};
     const askTurnId = response.askTurnId ?? extractAskTurnId(payload);
     return {
       ...response,
       askTurnId,
+      selectedTargetSource: response.selectedTargetSource ?? readString((response as unknown as Record<string, unknown>).routeTarget) ?? "live_source_mailbox",
       response: payload,
       errorCode: response.ok && askTurnId ? response.errorCode ?? null : response.errorCode ?? "ask_launch_missing_ask_turn_id",
     };
@@ -2299,7 +2310,7 @@ const normalizeAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): AskWak
   return {
     ok: Boolean(askTurnId),
     askTurnId,
-    routeTarget: "live_source_mailbox",
+    selectedTargetSource: "live_source_mailbox",
     response: payload,
     errorCode: askTurnId ? null : "ask_launch_missing_ask_turn_id",
   };
@@ -2705,7 +2716,7 @@ export async function runNextMailWakeRequest(input: {
     ...mailBatch.flatMap((item) => item.evidenceRefs),
     ...priorDecisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
   ]);
-  const fastLayer = buildWakeFastLayer({
+  const fastLayer = await buildWakeFastLayer({
     wake: running,
     policy,
     activeInterpreterProfile,
@@ -3037,7 +3048,23 @@ export async function runNextMailWakeRequest(input: {
   const preboundAskTurnId = input.askTurnRunner
     ? null
     : buildWakeAskTurnId(running.wakeRequestId, runningAttempt.attemptCount, now);
-  const wakeForAskLaunch = runningAttempt;
+  let wakeForAskLaunch = runningAttempt;
+  let attachedAskTurnIdBeforeWait: string | null = null;
+  if (preboundAskTurnId) {
+    attachedAskTurnIdBeforeWait = preboundAskTurnId;
+    wakeForAskLaunch = attachAskTurnToWakeRequest({
+      wakeRequestId: running.wakeRequestId,
+      askTurnId: preboundAskTurnId,
+      askLaunchId: runningAttempt.askLaunchId ?? null,
+      routeMetadata: {
+        ...wakeRouteMetadata,
+        routeTarget: "live_source_mailbox",
+        selectedTargetSource: "live_source_mailbox",
+        wakeRequestId: running.wakeRequestId,
+      },
+      now,
+    }) ?? runningAttempt;
+  }
   try {
     const launchResponse = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({
       prompt,
@@ -3049,7 +3076,7 @@ export async function runNextMailWakeRequest(input: {
     });
     const launch = normalizeAskWakeTurnLaunchResult(launchResponse);
     const response = launch.response ?? {};
-    const askTurnId = launch.askTurnId;
+    const askTurnId = launch.askTurnId ?? attachedAskTurnIdBeforeWait;
     if (!launch.ok || !askTurnId) {
       const failedAt = new Date().toISOString();
       const failedReason = launch.errorCode ?? "ask_launch_missing_ask_turn_id";
@@ -3094,9 +3121,11 @@ export async function runNextMailWakeRequest(input: {
       routeMetadata: {
         ...wakeRouteMetadata,
         routeTarget: "live_source_mailbox",
+        selectedTargetSource: launch.selectedTargetSource ?? "live_source_mailbox",
         wakeRequestId: running.wakeRequestId,
         selectedCapability: launch.selectedCapability ?? null,
         debugRef: launch.debugRef ?? null,
+        ...(launch.routeMetadata ?? {}),
       },
       now: new Date().toISOString(),
     });

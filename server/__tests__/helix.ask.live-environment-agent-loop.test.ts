@@ -674,6 +674,12 @@ describe("Helix Ask live environment agent loop", () => {
       selected_tool: "live_env.record_live_source_mail_decision",
       expected_evidence_kind: "stage_play_live_source_mail_decision",
     });
+    expect(loop.iterations[0]?.step_decision.tool_args).toMatchObject({
+      processed_packet_ids: ["stage_play_processed_mail_packet:voice"],
+      live_source_mail_output_intent: expect.objectContaining({
+        wantsVoiceCallout: true,
+      }),
+    });
     expect(loop.iterations[0]?.tool_observation?.tool_name).toBe("live_env.record_live_source_mail_decision");
     expect(loop.iterations[1]?.step_decision.next_step).toBe("answer");
     expect(loop.terminal_decision).toBe("answer_allowed");
@@ -761,6 +767,114 @@ describe("Helix Ask live environment agent loop", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("fails closed with missing_required_mailbox_tool_execution when a locked phase tool is unavailable", async () => {
+    const environment = seedEnvironment();
+    const phase: LiveSourceTurnPhaseResolutionV1 = {
+      ...lockedRecordDecisionPhase(),
+      allowedTools: ["live_env.not_registered_for_phase"],
+    };
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      maxIterations: 1,
+      now: "2026-05-26T12:00:05.000Z",
+      phaseResolver: () => phase,
+      chooser: ({ stepIndex }) => ({
+        schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+        decision_id: `live_step:premature_answer_unavailable:${stepIndex}`,
+        thread_id: environment.thread_id,
+        environment_id: environment.environment_id,
+        step_index: stepIndex,
+        decision_authority: "model",
+        decision_timing: "pre_observation",
+        next_step: "answer",
+        selected_tool: null,
+        tool_args: null,
+        rationale_summary: "The model tried to answer before the mandatory tool existed.",
+        expected_evidence_kind: null,
+        evidence_refs: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+
+    expect(loop.terminal_decision).toBe("fail_closed");
+    expect(loop.iterations[0]?.step_decision).toMatchObject({
+      decision_authority: "deterministic_policy_fallback",
+      next_step: "call_tool",
+      selected_tool: "live_env.not_registered_for_phase",
+    });
+    expect(loop.iterations[0]?.tool_observation).toMatchObject({
+      ok: false,
+      tool_name: "live_env.not_registered_for_phase",
+      summary: expect.stringContaining("missing_required_mailbox_tool_execution"),
+      observation: expect.objectContaining({
+        failure_code: "missing_required_mailbox_tool_execution",
+        terminal_eligible: false,
+      }),
+    });
+    expect(loop.evidence_refs).toContain("missing_required_mailbox_tool_execution");
+  });
+
+  it("fails closed with missing_voice_callout_draft when mandatory voice tool has no draft", async () => {
+    const environment = seedEnvironment();
+    const phase: LiveSourceTurnPhaseResolutionV1 = {
+      ...lockedRecordDecisionPhase(),
+      phase: "request_voice_after_decision",
+      allowedTools: ["live_env.request_interim_voice_callout"],
+      forbiddenTools: ["final_answer", "live_env.record_live_source_mail_decision"],
+      completionEvidence: ["live_source_interim_voice_callout_receipt"],
+      phaseLock: {
+        locked: true,
+        reason: "Voice output is only allowed after a recorded request_voice_callout decision.",
+      },
+    };
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      maxIterations: 1,
+      now: "2026-05-26T12:00:05.000Z",
+      phaseResolver: () => phase,
+      chooser: ({ stepIndex }) => ({
+        schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+        decision_id: `live_step:premature_voice_answer:${stepIndex}`,
+        thread_id: environment.thread_id,
+        environment_id: environment.environment_id,
+        step_index: stepIndex,
+        decision_authority: "model",
+        decision_timing: "pre_observation",
+        next_step: "answer",
+        selected_tool: null,
+        tool_args: null,
+        rationale_summary: "The model tried to answer before voice receipt.",
+        expected_evidence_kind: null,
+        evidence_refs: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      }),
+    });
+
+    expect(loop.terminal_decision).toBe("fail_closed");
+    expect(loop.iterations[0]?.step_decision).toMatchObject({
+      selected_tool: "live_env.request_interim_voice_callout",
+      tool_args: expect.not.objectContaining({
+        text: expect.any(String),
+      }),
+    });
+    expect(loop.iterations[0]?.tool_observation).toMatchObject({
+      ok: false,
+      tool_name: "live_env.request_interim_voice_callout",
+      summary: expect.stringContaining("missing_voice_callout_draft"),
+      observation: expect.objectContaining({
+        failure_code: "missing_voice_callout_draft",
+        terminal_eligible: false,
+      }),
+    });
+    expect(loop.evidence_refs).toContain("missing_voice_callout_draft");
   });
 
   it("drains pending voice steering before the next model step as compact evidence", async () => {

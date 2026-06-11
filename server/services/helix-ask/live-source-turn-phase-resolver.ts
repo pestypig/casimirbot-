@@ -173,6 +173,21 @@ export type ResolveLiveSourceTurnPhaseInput = {
 
 export const LIVE_SOURCE_TURN_PHASE_NO_MATCH_REASON = "No live-source turn phase was selected.";
 
+export const isLockedExecutableLiveSourcePhase = (
+  resolution: LiveSourceTurnPhaseResolutionV1 | null | undefined,
+): boolean =>
+  resolution?.phaseLock.locked === true &&
+  resolution.allowedTools.length === 1 &&
+  Boolean(resolution.allowedTools[0]?.startsWith("live_env.")) &&
+  resolution.phase !== "terminal_checkpoint";
+
+export const mandatoryToolForPhase = (
+  resolution: LiveSourceTurnPhaseResolutionV1 | null | undefined,
+): string | null =>
+  isLockedExecutableLiveSourcePhase(resolution)
+    ? resolution?.allowedTools[0] ?? null
+    : null;
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 

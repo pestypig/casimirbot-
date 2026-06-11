@@ -12,6 +12,10 @@ import {
   NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION,
 } from "../shared/contracts/nhm2-source-closure.v2";
 import {
+  buildNhm2SourceSideSameBasisTensorAuthorityArtifact,
+  isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+} from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import {
   buildNhm2WallSourceClosureArtifact,
   isNhm2WallSourceClosureArtifact,
 } from "../shared/contracts/nhm2-wall-source-closure.v1";
@@ -1153,7 +1157,7 @@ describe("nhm2 source closure artifact v2", () => {
     });
   });
 
-  it("keeps same-basis authority when a semantically aligned tile direct T00 counterpart is present", () => {
+  it("keeps T00 same-basis authority while blocking source-side full tensor authority", () => {
     const artifact = buildNhm2SourceClosureArtifactV2({
       metricTensorRef: "warp.metricStressEnergy",
       tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
@@ -1245,10 +1249,24 @@ describe("nhm2 source closure artifact v2", () => {
     });
 
     const region = artifact.regionComparisons.regions[0];
-    expect(artifact.status).toBe("pass");
-    expect(artifact.assumptionsDrifted).toBe(false);
+    expect(artifact.status).toBe("review");
+    expect(artifact.reasonCodes).toEqual(
+      expect.arrayContaining([
+        "source_side_same_basis_authority_missing",
+        "wall_source_side_same_basis_authority_missing",
+        "assumption_drift",
+      ]),
+    );
+    expect(artifact.assumptionsDrifted).toBe(true);
     expect(region.comparisonBasisStatus).toBe("same_basis");
     expect(region.comparisonBasisAuthorityStatus).toBe("authoritative_same_basis");
+    expect(region.sourceSideSameBasisAuthorityStatus).toBe("blocked");
+    expect(region.sourceSideFullTensorMissingComponentIds).toEqual(
+      expect.arrayContaining(["T01", "T02", "T03", "T12", "T13", "T23"]),
+    );
+    expect(region.sourceSideSameBasisAuthorityReason).toContain(
+      "requires full tensor components",
+    );
     expect(region.comparisonBasisAuthorityReason).toContain(
       "reciprocal aligned counterpart roles",
     );
@@ -1274,6 +1292,10 @@ describe("nhm2 source closure artifact v2", () => {
     );
     expect(region.comparisonContractNote).toContain("semantically aligned");
     expect(region.status).toBe("pass");
+    expect(artifact.wallSourceClosure.available.sourceAuthorityStatus).toBe("blocked");
+    expect(artifact.wallSourceClosure.blockers).toContain(
+      "wall_source_side_same_basis_authority_missing",
+    );
     expect(artifact.leadBlocker).toMatchObject({
       regionId: null,
       kind: "none",

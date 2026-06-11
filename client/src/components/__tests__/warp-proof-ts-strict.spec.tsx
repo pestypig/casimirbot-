@@ -96,6 +96,12 @@ const makeNhm2SolveState = () =>
           fullTensorComplete: false,
           missingComponentIds: ["T0x", "Txy"],
         },
+        sourceSideSameBasisTensorAuthority: {
+          available: true,
+          hasWallAuthority: false,
+          allRequiredRegionsAuthoritative: false,
+          blockers: ["source_side_full_tensor_components_missing"],
+        },
         wallSourceClosure: {
           available: true,
           pass: false,
@@ -135,6 +141,20 @@ const makeNhm2SolveState = () =>
         nhm2WallSourceClosure: {
           contractVersion: "nhm2_wall_source_closure/v1",
           required: { tensorRef: "metric-required-wall-t00" },
+        },
+        nhm2SourceSideSameBasisTensorAuthority: {
+          contractVersion: "nhm2_source_side_same_basis_tensor_authority/v1",
+          summary: {
+            hasWallAuthority: false,
+            allRequiredRegionsAuthoritative: false,
+          },
+          regions: [
+            {
+              regionId: "wall",
+              status: "blocked",
+              blockers: ["source_side_full_tensor_components_missing"],
+            },
+          ],
         },
         nhm2ObserverRobustEnergyConditions: {
           contractVersion: "nhm2_observer_robust_energy_conditions/v1",
@@ -212,12 +232,14 @@ describe("TS strict proof-pack rendering", () => {
 
     expect(screen.getByText("Closure Stack")).toBeDefined();
     expect(screen.getByText("Same-chart full tensor")).toBeDefined();
+    expect(screen.getByText("Source-side same-basis tensor authority")).toBeDefined();
     expect(screen.getByText("Wall T00 closure")).toBeDefined();
     expect(screen.getByText("Observer-robust energy conditions")).toBeDefined();
     expect(screen.getByText("QEI worldline dossier")).toBeDefined();
     expect(screen.getByText("Casimir material receipt")).toBeDefined();
     expect(screen.getByText(/Nat.rio invariant audit/i)).toBeDefined();
     expect(screen.getByText("missing components: T0x, Txy")).toBeDefined();
+    expect(screen.getByText("source_side_full_tensor_components_missing")).toBeDefined();
     expect(screen.getByText("wall residual outside tolerance")).toBeDefined();
     expect(screen.getByText("Observer scope: Eulerian only.")).toBeDefined();
     expect(screen.getByText("Ideal Casimir scalar budget is not material-receipted.")).toBeDefined();

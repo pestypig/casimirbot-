@@ -198,6 +198,12 @@ export type Nhm2SolveState = {
       fullTensorComplete: boolean | null;
       missingComponentIds: string[];
     };
+    sourceSideSameBasisTensorAuthority: {
+      available: boolean;
+      hasWallAuthority: boolean | null;
+      allRequiredRegionsAuthoritative: boolean | null;
+      blockers: string[];
+    };
     wallSourceClosure: {
       available: boolean;
       pass: boolean | null;
@@ -488,6 +494,33 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
   const sourceClosure =
     readRecord(pipelineRecord, "nhm2SourceClosure", "nhm2_source_closure") ??
     readRecord(natarioRecord, "nhm2SourceClosure", "nhm2_source_closure");
+  const sourceSideSameBasisTensorAuthority =
+    readRecord(
+      pipelineRecord,
+      "nhm2SourceSideSameBasisTensorAuthority",
+      "nhm2_source_side_same_basis_tensor_authority",
+    ) ??
+    readRecord(
+      natarioRecord,
+      "nhm2SourceSideSameBasisTensorAuthority",
+      "nhm2_source_side_same_basis_tensor_authority",
+    ) ??
+    readRecord(
+      sourceClosure,
+      "sourceSideSameBasisTensorAuthority",
+      "source_side_same_basis_tensor_authority",
+    );
+  const sourceSideAuthoritySummary = readRecord(
+    sourceSideSameBasisTensorAuthority,
+    "summary",
+  );
+  const sourceSideAuthorityRegions = Array.isArray(
+    sourceSideSameBasisTensorAuthority?.regions,
+  )
+    ? (sourceSideSameBasisTensorAuthority?.regions as unknown[])
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is RecordLike => entry != null)
+    : [];
   const wallSourceClosure =
     readRecord(pipelineRecord, "nhm2WallSourceClosure", "nhm2_wall_source_closure") ??
     readRecord(natarioRecord, "nhm2WallSourceClosure", "nhm2_wall_source_closure") ??
@@ -562,6 +595,26 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
         readBoolean(sameChartCompleteness, "fullTensorComplete") ??
         readBoolean(pipelineRecord, "nhm2_same_chart_full_tensor_complete"),
       missingComponentIds: readStringArray(sameChartCompleteness, "missingComponentIds"),
+    },
+    sourceSideSameBasisTensorAuthority: {
+      available: sourceSideSameBasisTensorAuthority != null,
+      hasWallAuthority:
+        readBoolean(sourceSideAuthoritySummary, "hasWallAuthority") ??
+        readBoolean(pipelineRecord, "nhm2_source_side_same_basis_wall_authority"),
+      allRequiredRegionsAuthoritative:
+        readBoolean(sourceSideAuthoritySummary, "allRequiredRegionsAuthoritative") ??
+        readBoolean(
+          pipelineRecord,
+          "nhm2_source_side_same_basis_all_regions_authoritative",
+        ),
+      blockers: Array.from(
+        new Set([
+          ...readStringArray(sourceSideSameBasisTensorAuthority, "blockers"),
+          ...sourceSideAuthorityRegions.flatMap((region) =>
+            readStringArray(region, "blockers"),
+          ),
+        ]),
+      ),
     },
     wallSourceClosure: {
       available: wallSourceClosure != null,
@@ -649,6 +702,18 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
     overallReasons.push("same-chart full tensor incomplete");
   }
   if (
+    !closureStack.sourceSideSameBasisTensorAuthority.available ||
+    closureStack.sourceSideSameBasisTensorAuthority.allRequiredRegionsAuthoritative !== true
+  ) {
+    overallReasons.push("source-side same-basis tensor authority missing");
+  }
+  if (
+    !closureStack.sourceSideSameBasisTensorAuthority.available ||
+    closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority !== true
+  ) {
+    overallReasons.push("wall source-side same-basis tensor authority missing");
+  }
+  if (
     !closureStack.wallSourceClosure.available ||
     closureStack.wallSourceClosure.pass !== true
   ) {
@@ -683,6 +748,7 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
   }
 
   const closureBlocked =
+    closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority === false ||
     closureStack.wallSourceClosure.pass === false ||
     closureStack.observerRobustEnergyConditions.anyViolation === true ||
     closureStack.natarioInvariantAudit.status === "fail";

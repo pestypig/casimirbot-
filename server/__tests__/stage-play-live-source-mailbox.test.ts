@@ -2310,6 +2310,54 @@ describe("Stage Play live-source mailbox", () => {
     ]));
   });
 
+  it("normalizes structured Ask wake launch results and stores launch projection metadata", async () => {
+    seedVisualEvidence();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:00:48.000Z",
+      askTurnRunner: async (input) => ({
+        ok: true,
+        askTurnId: "ask:wake-launch-result",
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: "live_env.record_live_source_mail_decision",
+        routeMetadata: input.routeMetadata ?? undefined,
+        response: {
+          turn_id: "ask:wake-launch-result",
+          selected_target_source: "live_source_mailbox",
+          selected_capability: "live_env.record_live_source_mail_decision",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-launch-result",
+                },
+              },
+            },
+          ],
+        },
+        errorCode: null,
+        errorMessage: null,
+      }),
+    });
+
+    expect(result?.askTurnId).toBe("ask:wake-launch-result");
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    expect(wake).toMatchObject({
+      askTurnId: "ask:wake-launch-result",
+      askLaunchStatus: "completed",
+      askLaunchRouteMetadata: expect.objectContaining({
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: "live_env.record_live_source_mail_decision",
+        sourceTarget: "live_source_mailbox",
+      }),
+    });
+  });
+
   it("defers 503 wake failures for retry without recording a mail decision", async () => {
     seedVisualEvidence();
 

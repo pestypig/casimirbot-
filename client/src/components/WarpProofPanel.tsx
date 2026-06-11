@@ -131,6 +131,13 @@ export function WarpProofPanel() {
     [pipelineRecord, natarioPipelineRecord],
     ["nhm2WallSourceClosure", "nhm2_wall_source_closure"],
   );
+  const sourceSideAuthorityArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    [
+      "nhm2SourceSideSameBasisTensorAuthority",
+      "nhm2_source_side_same_basis_tensor_authority",
+    ],
+  );
   const observerRobustArtifact = readFirstArtifactRecord(
     [pipelineRecord, natarioPipelineRecord],
     ["nhm2ObserverRobustEnergyConditions", "nhm2_observer_robust_energy_conditions"],
@@ -149,6 +156,10 @@ export function WarpProofPanel() {
   );
   const wallRequiredRecord = readPanelRecord(wallClosureArtifact, "required");
   const wallAvailableRecord = readPanelRecord(wallClosureArtifact, "available");
+  const sourceSideAuthoritySummary = readPanelRecord(
+    sourceSideAuthorityArtifact,
+    "summary",
+  );
   const observerSummaryRecord = readPanelRecord(observerRobustArtifact, "summary");
   const casimirStatus =
     closureStack.casimirMaterialReceipt.status ??
@@ -165,9 +176,20 @@ export function WarpProofPanel() {
     : closureStack.sameChartFullTensor.fullTensorComplete === true
       ? "pass"
       : "review";
+  const sourceSideAuthorityStatus: ClosureStackStatus = !closureStack
+    .sourceSideSameBasisTensorAuthority.available
+    ? "missing"
+    : closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority === true &&
+        closureStack.sourceSideSameBasisTensorAuthority.allRequiredRegionsAuthoritative === true
+      ? "pass"
+      : closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority === false
+        ? "fail"
+        : "review";
   const wallClosureStatus: ClosureStackStatus = !closureStack.wallSourceClosure.available
     ? "missing"
-    : closureStack.wallSourceClosure.pass === true
+    : closureStack.wallSourceClosure.blockers.length > 0
+      ? "review"
+      : closureStack.wallSourceClosure.pass === true
       ? "pass"
       : closureStack.wallSourceClosure.pass === false
         ? "fail"
@@ -225,6 +247,30 @@ export function WarpProofPanel() {
         "artifactRef",
       ),
       note: "Diagnostic closure artifact available; missing tensor components are not zero.",
+    },
+    {
+      id: "source-side-same-basis-tensor-authority",
+      label: "Source-side same-basis tensor authority",
+      status: sourceSideAuthorityStatus,
+      blocker:
+        closureStack.sourceSideSameBasisTensorAuthority.blockers[0] ??
+        (sourceSideAuthorityStatus === "missing"
+          ? "source-side tensor authority receipt missing"
+          : closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority !== true
+            ? "wall source-side tensor authority missing"
+            : closureStack.sourceSideSameBasisTensorAuthority.allRequiredRegionsAuthoritative !== true
+              ? "required regional source authority incomplete"
+              : "none"),
+      artifactRef: artifactRefFrom(
+        sourceSideAuthorityArtifact,
+        "nhm2SourceSideSameBasisTensorAuthority",
+        "sourceTensorArtifactRef",
+        "counterpartArtifactRef",
+      ),
+      note:
+        readPanelBoolean(sourceSideAuthoritySummary, "hasWallAuthority") === true
+          ? "Source-side tensor authority is diagnostic evidence, not source validation."
+          : "Wall T00 cannot be promoted from proxy or metric-echo source rows.",
     },
     {
       id: "wall-t00-closure",

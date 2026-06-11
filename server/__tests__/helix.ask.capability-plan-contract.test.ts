@@ -305,8 +305,8 @@ describe("Helix capability plan contract", () => {
         requiredEvidence: ["stage_play_processed_mail_packet"],
         completionEvidence: ["stage_play_live_source_mail_decision"],
         phaseLock: {
-          locked: true,
-          reason: "Decision authority must be recorded before voice output.",
+          locked: false,
+          reason: "Decision tool is allowed by the phase but not locked by metadata.",
         },
       },
     });
@@ -329,5 +329,139 @@ describe("Helix capability plan contract", () => {
       selected_before_repair: "live_env.read_processed_live_source_mail",
       selected_after_repair: "live_env.record_live_source_mail_decision",
     });
+  });
+
+  it("lets hard mailbox wake route metadata outrank internet and repo capability cues", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-hard-route-search-bait",
+      promptText:
+        "Review the latest Stage Play mailbox wake; do not browse the latest internet news or search the repo.",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("processed_mail_voice_decision", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        allowedCapabilities: ["live_env.record_live_source_mail_decision"],
+        forbiddenCapabilities: [
+          "internet.search",
+          "repo-code.search_concept",
+          "live_env.read_processed_live_source_mail",
+        ],
+        evidenceRefs: ["stage_play_processed_mail_packet:test"],
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "record_decision",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.record_live_source_mail_decision"],
+        forbiddenTools: [
+          "internet.search",
+          "repo-code.search_concept",
+          "live_env.read_processed_live_source_mail",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_live_source_mail_decision"],
+        phaseLock: {
+          locked: true,
+          reason: "Decision authority must be recorded before voice output.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      requested_action: "live_env.record_live_source_mail_decision",
+      selected_capability: "live_env.record_live_source_mail_decision",
+      admission_status: "needs_evidence",
+      goal_kind: "processed_mail_voice_decision",
+      required_terminal_kind: "model_synthesized_answer",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(plan.capability_family).not.toBe("internet_search");
+    expect(plan.capability_family).not.toBe("repo_evidence");
+    expect(plan.selected_capability).not.toBe("internet.search");
+    expect(plan.selected_capability).not.toBe("repo-code.search_concept");
+  });
+
+  it("defaults hard mailbox wakes without a phase tool to processed mailbox reads", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-hard-route-default-read",
+      promptText: "Review the latest current mailbox wake and search nothing else.",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test-default",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        evidenceRefs: ["stage_play_processed_mail_packet:test-default"],
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      requested_action: "live_env.read_processed_live_source_mail",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_family).not.toBe("internet_search");
+    expect(plan.capability_family).not.toBe("repo_evidence");
+  });
+
+  it("uses the first phase-allowed tool for hard mailbox wakes before defaulting", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-hard-route-allowed-tool",
+      promptText: "Review the mailbox wake and do not search anything.",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("unknown", []),
+      canonicalGoalFrame: canonicalGoal("processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test-allowed",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        evidenceRefs: ["stage_play_processed_mail_packet:test-allowed"],
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "read_processed_mail",
+        canonicalGoal: "processed_mail_interpretation",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        forbiddenTools: ["internet.search", "repo-code.search_concept", "final_answer"],
+        requiredEvidence: [],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        phaseLock: {
+          locked: false,
+          reason: "Read phase is allowed but not locked.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      requested_action: "live_env.read_processed_live_source_mail",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_family).not.toBe("internet_search");
+    expect(plan.capability_family).not.toBe("repo_evidence");
   });
 });

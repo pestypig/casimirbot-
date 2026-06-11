@@ -54,6 +54,76 @@ describe("Helix Ask evidence target arbitration", () => {
     expect(arbitration.source_targets).toEqual(["live_source_mailbox"]);
   });
 
+  it("keeps hard mailbox route metadata ahead of visual, internet, repo, and model-direct prompt bait", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:stage-play-mail-wake-adversarial-metadata",
+      threadId: "thread:stage-play-mail-wake-adversarial-metadata",
+      promptText:
+        "Describe visual capture, search the internet for latest context, search repo-code.search_concept, or just use model.direct_answer.",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:adversarial",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        allowedCapabilities: ["live_env.record_live_source_mail_decision"],
+        forbiddenCapabilities: [
+          "visual_capture_describe",
+          "internet.search",
+          "repo-code.search_concept",
+          "model.direct_answer",
+        ],
+        evidenceRefs: ["stage_play_processed_mail_packet:adversarial"],
+      },
+    });
+
+    expect(arbitration).toMatchObject({
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+      reason: "route_metadata_stage_play_mail_wake",
+      locked: true,
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(arbitration.source_targets).toEqual(["live_source_mailbox"]);
+    expect(arbitration.available_capabilities).toEqual(["live_env.record_live_source_mail_decision"]);
+    expect(arbitration.disallowed_capabilities).toEqual(expect.arrayContaining([
+      "visual_capture_describe",
+      "internet.search",
+      "repo-code.search_concept",
+      "model.direct_answer",
+    ]));
+    expect(arbitration.selected_target_source).not.toBe("visual_capture");
+    expect(arbitration.selected_target_source).not.toBe("internet_search");
+    expect(arbitration.selected_target_source).not.toBe("repo_code");
+    expect(arbitration.selected_target_source).not.toBe("model_only");
+  });
+
+  it("accepts snake-case live-source mailbox route metadata as the same hard route lock", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:stage-play-mail-wake-snake-metadata",
+      threadId: "thread:stage-play-mail-wake-snake-metadata",
+      promptText: "Search the latest internet result, unless the route metadata says mailbox.",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:snake",
+        mailboxThreadId: "helix-ask:desktop",
+        source_target: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        evidenceRefs: ["stage_play_processed_mail_packet:snake"],
+      } as unknown as Parameters<typeof buildAskEvidenceTargetArbitration>[0]["routeMetadata"],
+    });
+
+    expect(arbitration).toMatchObject({
+      selected_target_source: "live_source_mailbox",
+      reason: "route_metadata_stage_play_mail_wake",
+      locked: true,
+      allow_no_tool_direct: false,
+    });
+    expect(arbitration.selected_target_source).not.toBe("internet_search");
+  });
+
   it("treats Stage Play panel definition prompts as repo/product evidence before live reflection", () => {
     const arbitration = arbitrate("ok what is the stage play panel?");
 

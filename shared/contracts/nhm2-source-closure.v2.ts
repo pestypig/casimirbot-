@@ -21,6 +21,10 @@ import {
   isCasimirMaterialReceipt,
   type CasimirMaterialReceiptV1,
 } from "./casimir-material-receipt.v1";
+import {
+  NHM2_SOURCE_SIDE_SAME_BASIS_FULL_TENSOR_COMPONENTS,
+  type Nhm2SourceSideSameBasisTensorAuthorityStatus,
+} from "./nhm2-source-side-same-basis-tensor-authority.v1";
 
 export const NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION = "nhm2_source_closure/v2";
 
@@ -38,6 +42,8 @@ export const NHM2_SOURCE_CLOSURE_V2_REASON_CODES = [
   "region_tile_tensor_incomplete",
   "region_basis_diagnostic_only",
   "casimir_material_receipt_missing",
+  "source_side_same_basis_authority_missing",
+  "wall_source_side_same_basis_authority_missing",
 ] as const;
 
 export const NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES = [
@@ -316,6 +322,9 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   tileT00Diagnostics?: Nhm2SourceClosureV2RegionT00Diagnostics | null;
   tileProxyDiagnostics?: Nhm2SourceClosureV2RegionProxyDiagnostics | null;
   casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
+  sourceSideSameBasisAuthorityStatus?: Nhm2SourceSideSameBasisTensorAuthorityStatus | null;
+  sourceSideAuthorityRef?: string | null;
+  sourceSideFullTensorMissingComponentIds?: string[] | null;
   note?: string | null;
 };
 
@@ -333,6 +342,10 @@ export type Nhm2SourceClosureV2RegionComparison = {
   regionalComparisonPolicyStatus: Nhm2SourceClosureV2RegionComparisonPolicyStatus;
   regionalComparisonPolicyNote: string | null;
   comparisonContractNote: string | null;
+  sourceSideSameBasisAuthorityStatus: Nhm2SourceSideSameBasisTensorAuthorityStatus;
+  sourceSideSameBasisAuthorityReason: string | null;
+  sourceSideAuthorityRef: string | null;
+  sourceSideFullTensorMissingComponentIds: string[];
   status: Nhm2SourceClosureStatus;
   completeness: Nhm2SourceClosureCompleteness;
   metricTensorRef: string | null;
@@ -1803,6 +1816,137 @@ const resolveT00TraceNextInspectionTarget = (args: {
   return metricBoundary ?? tileBoundary ?? null;
 };
 
+const normalizeAuthorityStatus = (
+  value: unknown,
+): Nhm2SourceSideSameBasisTensorAuthorityStatus | null => {
+  if (
+    value === "authoritative_same_basis" ||
+    value === "diagnostic_only" ||
+    value === "counterpart_missing" ||
+    value === "contract_misaligned" ||
+    value === "metric_echo_forbidden" ||
+    value === "proxy_limited" ||
+    value === "blocked" ||
+    value === "missing"
+  ) {
+    return value;
+  }
+  return null;
+};
+
+const normalizeMissingFullTensorComponentIds = (
+  value: unknown,
+): string[] | null => {
+  if (!Array.isArray(value)) return null;
+  return Array.from(
+    new Set(
+      value
+        .map((entry) => toText(entry))
+        .filter((entry): entry is string => entry != null),
+    ),
+  );
+};
+
+const resolveSourceSideFullTensorMissingComponentIds = (
+  input: Nhm2SourceClosureV2RegionComparisonInput,
+): string[] => {
+  const explicit = normalizeMissingFullTensorComponentIds(
+    input.sourceSideFullTensorMissingComponentIds,
+  );
+  if (explicit != null) return explicit;
+  const tileTensor = input.tileEffectiveTensor ?? {};
+  return NHM2_SOURCE_SIDE_SAME_BASIS_FULL_TENSOR_COMPONENTS.filter(
+    (component) =>
+      component !== "T00" &&
+      component !== "T11" &&
+      component !== "T22" &&
+      component !== "T33",
+  ).filter((component) => (tileTensor as Record<string, unknown>)[component] == null);
+};
+
+const resolveSourceSideSameBasisAuthority = (args: {
+  input: Nhm2SourceClosureV2RegionComparisonInput;
+  comparisonBasisAuthorityStatus: Nhm2SourceClosureV2RegionBasisAuthorityStatus;
+  regionalComparisonContractStatus: Nhm2SourceClosureV2RegionComparisonContractStatus;
+  tileT00Diagnostics: Nhm2SourceClosureV2RegionT00Diagnostics | null;
+}): {
+  status: Nhm2SourceSideSameBasisTensorAuthorityStatus;
+  reason: string | null;
+  authorityRef: string | null;
+  missingComponentIds: string[];
+} => {
+  const explicitStatus = normalizeAuthorityStatus(
+    args.input.sourceSideSameBasisAuthorityStatus,
+  );
+  const missingComponentIds = resolveSourceSideFullTensorMissingComponentIds(args.input);
+  const authorityRef =
+    toRepoPath(args.input.sourceSideAuthorityRef) ??
+    toRepoPath(args.tileT00Diagnostics?.sourceRef) ??
+    toRepoPath(args.tileT00Diagnostics?.trace?.valueRef) ??
+    toRepoPath(args.tileT00Diagnostics?.trace?.tensorRef) ??
+    toRepoPath(args.input.tileTensorRef);
+  if (explicitStatus != null) {
+    return {
+      status: explicitStatus,
+      reason:
+        explicitStatus === "authoritative_same_basis"
+          ? "source-side same-basis tensor authority was supplied by an explicit authority receipt"
+          : "source-side same-basis tensor authority was supplied by an explicit non-authoritative receipt",
+      authorityRef,
+      missingComponentIds,
+    };
+  }
+  if (
+    args.comparisonBasisAuthorityStatus === "counterpart_missing" ||
+    args.regionalComparisonContractStatus === "narrowed_to_observation_only"
+  ) {
+    return {
+      status: "counterpart_missing",
+      reason:
+        "source-side same-basis tensor authority is missing because the tile side is only an observation path, not a dedicated counterpart",
+      authorityRef,
+      missingComponentIds,
+    };
+  }
+  if (
+    args.comparisonBasisAuthorityStatus === "contract_misaligned" ||
+    args.regionalComparisonContractStatus === "pending_counterpart_surface"
+  ) {
+    return {
+      status: "contract_misaligned",
+      reason:
+        "source-side same-basis tensor authority is blocked by unresolved comparison-contract alignment",
+      authorityRef,
+      missingComponentIds,
+    };
+  }
+  if (missingComponentIds.length > 0) {
+    return {
+      status: "blocked",
+      reason:
+        "source-side same-basis tensor authority requires full tensor components, but this source-closure surface only carries a partial tensor projection",
+      authorityRef,
+      missingComponentIds,
+    };
+  }
+  if (args.comparisonBasisAuthorityStatus === "authoritative_same_basis") {
+    return {
+      status: "authoritative_same_basis",
+      reason:
+        "source-side same-basis tensor authority is backed by semantically aligned counterpart evidence and full component coverage",
+      authorityRef,
+      missingComponentIds,
+    };
+  }
+  return {
+    status: "diagnostic_only",
+    reason:
+      "source-side same-basis tensor authority is diagnostic-only because source-side tensor authority was not established",
+    authorityRef,
+    missingComponentIds,
+  };
+};
+
 const summarizeT00Mechanism = (args: {
   residualComponents: Record<Nhm2SourceClosureComponent, Nhm2SourceClosureResidualComponent>;
   residualTolerance: number;
@@ -1997,6 +2141,12 @@ const buildRegionComparison = (args: {
     counterpartResolutionStatus: comparisonBasisAuthority.counterpartResolutionStatus,
     regionalComparisonContractStatus: regionalComparisonContract.status,
   });
+  const sourceSideAuthority = resolveSourceSideSameBasisAuthority({
+    input: args.input,
+    comparisonBasisAuthorityStatus: comparisonBasisAuthority.status,
+    regionalComparisonContractStatus: regionalComparisonContract.status,
+    tileT00Diagnostics,
+  });
   const sampleCount = toFiniteOrNull(args.input.sampleCount);
   const resolvedSampleCount =
     metricAccounting?.sampleCount ?? tileAccounting?.sampleCount ?? sampleCount;
@@ -2021,6 +2171,12 @@ const buildRegionComparison = (args: {
     casimirMaterialReceipt?.status === "ideal_scalar_only"
   ) {
     reasonCodes.add("casimir_material_receipt_missing");
+  }
+  if (sourceSideAuthority.status !== "authoritative_same_basis") {
+    reasonCodes.add("source_side_same_basis_authority_missing");
+    if (normalizeRegionId(args.input.regionId) === "wall") {
+      reasonCodes.add("wall_source_side_same_basis_authority_missing");
+    }
   }
 
   let status: Nhm2SourceClosureStatus = "unavailable";
@@ -2047,6 +2203,11 @@ const buildRegionComparison = (args: {
       regionalComparisonPolicyStatus: regionalComparisonPolicy.status,
       regionalComparisonPolicyNote: regionalComparisonPolicy.note,
       comparisonContractNote: comparisonBasisAuthority.comparisonContractNote,
+      sourceSideSameBasisAuthorityStatus: sourceSideAuthority.status,
+      sourceSideSameBasisAuthorityReason: sourceSideAuthority.reason,
+      sourceSideAuthorityRef: sourceSideAuthority.authorityRef,
+      sourceSideFullTensorMissingComponentIds:
+        sourceSideAuthority.missingComponentIds,
       status,
       completeness,
       metricTensorRef: toRepoPath(args.input.metricTensorRef),
@@ -2300,6 +2461,11 @@ export const buildNhm2SourceClosureArtifactV2 = (
   const anyRequiredRegionDiagnosticOnly = requiredRegions.some(
     (entry) => entry != null && entry.comparisonBasisStatus === "diagnostic_only",
   );
+  const anyRequiredRegionMissingSourceSideAuthority = requiredRegions.some(
+    (entry) =>
+      entry != null &&
+      entry.sourceSideSameBasisAuthorityStatus !== "authoritative_same_basis",
+  );
   const anyRequiredRegionResidualExceeded = requiredRegions.some(
     (entry) =>
       entry != null &&
@@ -2309,6 +2475,7 @@ export const buildNhm2SourceClosureArtifactV2 = (
   const assumptionsDrifted =
     input.assumptionsDrifted === true ||
     anyRequiredRegionDiagnosticOnly ||
+    anyRequiredRegionMissingSourceSideAuthority ||
     regionResults.some((entry) => entry.indicatesAssumptionDrift);
   if (assumptionsDrifted) {
     reasonCodes.add("assumption_drift");

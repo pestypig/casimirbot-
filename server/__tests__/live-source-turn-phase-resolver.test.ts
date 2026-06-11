@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   LIVE_SOURCE_TURN_PHASE_TABLE,
+  isLockedExecutableLiveSourcePhase,
+  mandatoryToolForPhase,
   resolveLiveSourceTurnPhase,
 } from "../services/helix-ask/live-source-turn-phase-resolver";
 
@@ -92,6 +94,68 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(phase.evidenceRefs).toEqual(expect.arrayContaining([
       "stage_play_processed_mail_packet:metadata-voice",
     ]));
+    expect(isLockedExecutableLiveSourcePhase(phase)).toBe(true);
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.record_live_source_mail_decision");
+  });
+
+  it("exposes mandatory tools only for locked executable live-source phases", () => {
+    const executable = resolveLiveSourceTurnPhase({
+      prompt: "Use the structured mailbox route metadata attached to this turn.",
+      selectedTargetSource: "live_source_mailbox",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:mandatory-helper",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "request_voice_after_decision",
+        evidenceRefs: [
+          "stage_play_processed_mail_packet:mandatory-helper",
+          "stage_play_live_source_mail_decision:mandatory-helper",
+        ],
+      },
+      latestToolReceipts: [{
+        toolName: "live_env.record_live_source_mail_decision",
+        observation: {
+          artifactId: "stage_play_live_source_mail_decision",
+          decisionId: "stage_play_live_source_mail_decision:mandatory-helper",
+          decision: "request_voice_callout",
+        },
+      }],
+    });
+
+    expect(executable.phase).toBe("request_voice_after_decision");
+    expect(isLockedExecutableLiveSourcePhase(executable)).toBe(true);
+    expect(mandatoryToolForPhase(executable)).toBe("live_env.request_interim_voice_callout");
+
+    const terminal = resolveLiveSourceTurnPhase({
+      prompt: "Use the structured mailbox route metadata attached to this turn.",
+      selectedTargetSource: "live_source_mailbox",
+      latestToolReceipts: [
+        {
+          toolName: "live_env.record_live_source_mail_decision",
+          observation: {
+            artifactId: "stage_play_live_source_mail_decision",
+            decisionId: "stage_play_live_source_mail_decision:terminal-helper",
+            decision: "request_voice_callout",
+          },
+        },
+        {
+          toolName: "live_env.request_interim_voice_callout",
+          observation: {
+            schema: "helix.interim_voice_callout_tool_result.v1",
+            receipt: {
+              receiptId: "live_source_interim_voice_callout_receipt:terminal-helper",
+              status: "awaiting_client_playback",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(terminal.phase).toBe("terminal_checkpoint");
+    expect(isLockedExecutableLiveSourcePhase(terminal)).toBe(false);
+    expect(mandatoryToolForPhase(terminal)).toBeNull();
   });
 
   it("lets Stage Play mail wake metadata map read_mailbox to read_processed_mail without generic visual scope", () => {

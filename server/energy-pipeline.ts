@@ -131,6 +131,10 @@ import {
   type Nhm2SourceClosureV2RegionProxyComponentAttribution,
   type Nhm2SourceClosureV2RegionProxyDiagnostics,
 } from "../shared/contracts/nhm2-source-closure.v2.ts";
+import {
+  buildNhm2SourceSideSameBasisTensorAuthorityArtifact,
+  type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
+} from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts";
 import type { Nhm2WallSourceClosureArtifactV1 } from "../shared/contracts/nhm2-wall-source-closure.v1.ts";
 import {
   buildNhm2StrictSignalReadinessArtifact,
@@ -1893,6 +1897,7 @@ export interface EnergyPipelineState {
   };
   nhm2SameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1;
   nhm2SourceClosure?: Nhm2SourceClosureArtifact | Nhm2SourceClosureV2Artifact;
+  nhm2SourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1;
   nhm2WallSourceClosure?: Nhm2WallSourceClosureArtifactV1;
   nhm2StrictSignalReadiness?: Nhm2StrictSignalReadinessArtifact;
   nhm2QeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1;
@@ -13726,6 +13731,7 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
 
   if (!nhm2Active) {
     delete state.nhm2SourceClosure;
+    delete state.nhm2SourceSideSameBasisTensorAuthority;
     delete state.nhm2WallSourceClosure;
     return;
   }
@@ -13767,7 +13773,20 @@ const refreshNhm2SourceClosure = (state: EnergyPipelineState): void => {
     scalarCl3RhoDeltaRel:
       Number.isFinite(state.rho_delta_metric_mean) ? Number(state.rho_delta_metric_mean) : null,
   });
+  const sourceSideSameBasisTensorAuthority =
+    buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: sourceClosure.wallSourceClosure.generatedAt,
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: sourceClosure.wallSourceClosure.selectedProfileId,
+      chartId: sourceClosure.wallSourceClosure.chartId,
+      sourceModelId: "nhm2_source_closure_region_projection",
+      sourceClosureRegions: sourceClosure.regionComparisons.regions,
+      requiredRegionIds: [...REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS],
+      casimirMaterialReceipt: state.casimirMaterialReceipt ?? null,
+    });
   state.nhm2SourceClosure = sourceClosure;
+  state.nhm2SourceSideSameBasisTensorAuthority =
+    sourceSideSameBasisTensorAuthority;
   state.nhm2WallSourceClosure = sourceClosure.wallSourceClosure;
 };
 

@@ -4253,27 +4253,48 @@ export function executeLiveEnvironmentTool(
     const hasExplicitMailIds =
       Object.prototype.hasOwnProperty.call(args, "mail_ids") ||
       Object.prototype.hasOwnProperty.call(args, "mailIds");
+    const suppliedProcessedPacketIds = readStringArray(args.processed_packet_ids ?? args.processedPacketIds);
+    const hasExplicitProcessedPacketIds =
+      Object.prototype.hasOwnProperty.call(args, "processed_packet_ids") ||
+      Object.prototype.hasOwnProperty.call(args, "processedPacketIds");
     const suppliedMailIds = readStringArray(args.mail_ids ?? args.mailIds);
     const activeJobStatesForDecision = listStagePlayLiveSourceJobStates({ threadId: input.thread_id, limit: 100 });
     const activeJobIdsForDecision = new Set(activeJobStatesForDecision.map((state) => state.jobId));
-    const recentProcessedPacketsForDecision = hasExplicitMailIds || suppliedMailIds.length > 0
+    const allProcessedPacketsForDecision =
+      suppliedProcessedPacketIds.length > 0 || hasExplicitProcessedPacketIds
+        ? listStagePlayProcessedMailPackets({ limit: 100 })
+        : [];
+    const suppliedProcessedPacketsForDecision = suppliedProcessedPacketIds.length > 0
+      ? allProcessedPacketsForDecision.filter((packet) => suppliedProcessedPacketIds.includes(packet.packetId))
+      : [];
+    const recentProcessedPacketsForDecision =
+      hasExplicitMailIds ||
+      suppliedMailIds.length > 0 ||
+      suppliedProcessedPacketIds.length > 0 ||
+      hasExplicitProcessedPacketIds
       ? []
       : listStagePlayProcessedMailPackets({ limit: 25 });
     const activeJobMatchedProcessedPacketsForDecision = recentProcessedPacketsForDecision
       .filter((packet) => activeJobIdsForDecision.size === 0 || activeJobIdsForDecision.has(packet.jobId));
     const recoveredProcessedPacketsForDecision = hasExplicitMailIds || suppliedMailIds.length > 0
       ? []
-      : (activeJobMatchedProcessedPacketsForDecision.length > 0
-          ? activeJobMatchedProcessedPacketsForDecision
-          : recentProcessedPacketsForDecision
-        ).slice(-1);
+      : suppliedProcessedPacketsForDecision.length > 0
+        ? suppliedProcessedPacketsForDecision
+        : (activeJobMatchedProcessedPacketsForDecision.length > 0
+            ? activeJobMatchedProcessedPacketsForDecision
+            : recentProcessedPacketsForDecision
+          ).slice(-1);
     const mailIds = suppliedMailIds.length > 0
       ? suppliedMailIds
       : uniqueStrings(recoveredProcessedPacketsForDecision.flatMap((packet) => packet.mailIds));
     const processedPacketsForMailIds = mailIds.length > 0
-      ? listStagePlayProcessedMailPackets({ limit: 100 })
+      ? (
+          allProcessedPacketsForDecision.length > 0
+            ? allProcessedPacketsForDecision
+            : listStagePlayProcessedMailPackets({ limit: 100 })
+        )
           .filter((packet) => packet.mailIds.some((mailId) => mailIds.includes(mailId)))
-      : [];
+      : suppliedProcessedPacketsForDecision;
     const latestProcessedPacket = processedPacketsForMailIds.at(-1) ?? null;
     const processedPacketEvidenceRefs = uniqueStrings(processedPacketsForMailIds.flatMap((packet) => packet.evidenceRefs));
     const processedPacketRefs = processedPacketsForMailIds.map((packet) => packet.packetId);

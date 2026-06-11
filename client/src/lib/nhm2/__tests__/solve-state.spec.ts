@@ -64,6 +64,19 @@ const passingClosurePipeline = () =>
     nhm2SameChartFullTensor: {
       completeness: { fullTensorComplete: true, missingComponentIds: [] },
     },
+    nhm2SourceSideSameBasisTensorAuthority: {
+      summary: {
+        hasWallAuthority: true,
+        allRequiredRegionsAuthoritative: true,
+      },
+      regions: [
+        {
+          regionId: "wall",
+          status: "authoritative_same_basis",
+          blockers: [],
+        },
+      ],
+    },
     nhm2WallSourceClosure: {
       residual: { pass: true, relative: 0 },
       blockers: [],
@@ -155,6 +168,19 @@ describe("buildNhm2SolveState", () => {
         nhm2SameChartFullTensor: {
           completeness: { fullTensorComplete: true, missingComponentIds: [] },
         },
+        nhm2SourceSideSameBasisTensorAuthority: {
+          summary: {
+            hasWallAuthority: true,
+            allRequiredRegionsAuthoritative: true,
+          },
+          regions: [
+            {
+              regionId: "wall",
+              status: "authoritative_same_basis",
+              blockers: [],
+            },
+          ],
+        },
         nhm2WallSourceClosure: {
           residual: { pass: true, relative: 0 },
           blockers: [],
@@ -234,6 +260,19 @@ describe("buildNhm2SolveState", () => {
         nhm2SameChartFullTensor: {
           completeness: { fullTensorComplete: false, missingComponentIds: ["T0x", "Txy"] },
         },
+        nhm2SourceSideSameBasisTensorAuthority: {
+          summary: {
+            hasWallAuthority: false,
+            allRequiredRegionsAuthoritative: false,
+          },
+          regions: [
+            {
+              regionId: "wall",
+              status: "blocked",
+              blockers: ["source_side_full_tensor_components_missing"],
+            },
+          ],
+        },
         nhm2WallSourceClosure: {
           residual: { pass: false, relative: 0.2 },
           blockers: ["wall_t00_residual_exceeded"],
@@ -267,12 +306,18 @@ describe("buildNhm2SolveState", () => {
 
     expect(state.overall.label).toBe("Blocked / proxy");
     expect(state.overall.reasons).toContain("same-chart full tensor incomplete");
+    expect(state.overall.reasons).toContain("source-side same-basis tensor authority missing");
+    expect(state.overall.reasons).toContain("wall source-side same-basis tensor authority missing");
     expect(state.overall.reasons).toContain("wall source closure missing/failing");
     expect(state.overall.reasons).toContain("observer-robust energy-condition check incomplete");
     expect(state.overall.reasons).toContain("QEI worldline dossier incomplete");
     expect(state.overall.reasons).toContain("Casimir material receipt missing");
     expect(state.overall.reasons).toContain("Natário invariant audit incomplete");
     expect(state.closureStack.sameChartFullTensor.missingComponentIds).toEqual(["T0x", "Txy"]);
+    expect(state.closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority).toBe(false);
+    expect(state.closureStack.sourceSideSameBasisTensorAuthority.blockers).toContain(
+      "source_side_full_tensor_components_missing",
+    );
     expect(state.closureStack.wallSourceClosure.pass).toBe(false);
     expect(state.closureStack.casimirMaterialReceipt.idealScalarOnly).toBe(true);
   });
@@ -291,6 +336,7 @@ describe("buildNhm2SolveState", () => {
 
     expect(state.overall.label).toBe("Guarded / partial");
     expect(state.closureStack.sameChartFullTensor.available).toBe(false);
+    expect(state.closureStack.sourceSideSameBasisTensorAuthority.available).toBe(false);
     expect(state.closureStack.wallSourceClosure.available).toBe(false);
     expect(state.closureStack.observerRobustEnergyConditions.available).toBe(false);
     expect(state.closureStack.qeiWorldlineDossier.available).toBe(false);
@@ -299,6 +345,8 @@ describe("buildNhm2SolveState", () => {
     expect(state.overall.reasons).toEqual(
       expect.arrayContaining([
         "same-chart full tensor incomplete",
+        "source-side same-basis tensor authority missing",
+        "wall source-side same-basis tensor authority missing",
         "wall source closure missing/failing",
         "observer-robust energy-condition check incomplete",
         "QEI worldline dossier incomplete",
@@ -330,6 +378,40 @@ describe("buildNhm2SolveState", () => {
     expect(state.closureStack.wallSourceClosure.relativeResidual).toBe(0.8);
     expect(state.overall.reasons).toContain("wall source closure missing/failing");
     expect(state.overall.reasons).not.toContain("same-chart full tensor incomplete");
+  });
+
+  it("blocks source closure when wall source-side tensor authority is missing", () => {
+    const pipeline = passingClosurePipeline();
+    pipeline.nhm2SourceSideSameBasisTensorAuthority = {
+      summary: {
+        hasWallAuthority: false,
+        allRequiredRegionsAuthoritative: false,
+      },
+      regions: [
+        {
+          regionId: "wall",
+          status: "blocked",
+          blockers: ["source_side_full_tensor_components_missing"],
+        },
+      ],
+    };
+    pipeline.nhm2WallSourceClosure = {
+      residual: { pass: true, relative: 0 },
+      blockers: ["wall_source_side_same_basis_authority_missing"],
+    };
+
+    const state = buildNhm2SolveState({
+      ...makeAuthorityInputs(),
+      pipeline,
+    });
+
+    expect(state.overall.label).toBe("Blocked / proxy");
+    expect(state.closureStack.wallSourceClosure.pass).toBe(true);
+    expect(state.closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority).toBe(false);
+    expect(state.overall.reasons).toContain("source-side same-basis tensor authority missing");
+    expect(state.overall.reasons).toContain(
+      "wall source-side same-basis tensor authority missing",
+    );
   });
 
   it("does not let scalar qei_margin substitute for a QEI worldline dossier", () => {

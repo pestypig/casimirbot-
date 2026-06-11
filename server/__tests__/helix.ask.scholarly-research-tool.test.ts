@@ -13,6 +13,7 @@ import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import {
+  __testHelixAgentStepDecisionHints,
   __testHelixAgentStepRepairHints,
   __testHelixGoalSatisfaction,
   __testHelixRuntimeToolCallValidation,
@@ -345,6 +346,90 @@ describe("Helix scholarly research tool admission", () => {
       identifiers: { doi: "10.1038/nature08811" },
       source_providers: ["crossref"],
     });
+  });
+
+  it("builds a model-visible preferred scholarly lookup step without becoming execution authority", () => {
+    const naturalPrompt =
+      "Do research using scholarly papers, DOI links, journals, and citations about quantum coherence in photosynthesis. Find relevant papers first, then answer with citations.";
+    const explicitPrompt =
+      "Research query: quantum coherence in photosynthesis. Use scholarly papers and DOI links before answering.";
+
+    expect(
+      __testHelixAgentStepDecisionHints.extractHelixScholarlyLookupQueryHint(
+        naturalPrompt,
+        canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      ),
+    ).toBe("quantum coherence in photosynthesis");
+    expect(
+      __testHelixAgentStepDecisionHints.extractHelixScholarlyLookupQueryHint(
+        explicitPrompt,
+        canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      ),
+    ).toBe("quantum coherence in photosynthesis");
+
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:scholarly-preferred-step",
+      manifest_role: "model_visible_tool_menu",
+      tool_manifest_version: "helix.ask.capability_manifest.v1",
+      user_goal_summary: naturalPrompt,
+      canonical_goal_kind: "scholarly_research_lookup",
+      recommended_capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      classifier_hints: [],
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          label: "Do research on papers, DOI, citations, journals, and references",
+          lane: "retrieval",
+          requires_action: true,
+          expected_artifacts: ["scholarly_research_observation"],
+          goal_fit: "primary",
+          reason: "Primary match for canonical goal scholarly_research_lookup.",
+          model_visible_name: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          model_visible_description: "Lookup scholarly papers.",
+          model_visible_input_schema: { properties: { query: { type: "string" } } },
+          availability: "available",
+        },
+      ],
+      model_visible_capability_keys: [HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as any;
+
+    const preferred = __testHelixAgentStepDecisionHints.buildHelixPreferredScholarlyLookupDecisionJson({
+      transcript: naturalPrompt,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      availableCapabilities,
+      currentTurnArtifacts: [],
+    });
+
+    expect(preferred).toMatchObject({
+      next_step: "next_action",
+      chosen_capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      args: { query: "quantum coherence in photosynthesis" },
+      expected_artifacts: ["scholarly_research_observation"],
+    });
+
+    const afterObservation = __testHelixAgentStepDecisionHints.buildHelixPreferredScholarlyLookupDecisionJson({
+      transcript: naturalPrompt,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      availableCapabilities,
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:scholarly-preferred-step:scholarly_research_observation",
+          kind: "scholarly_research_observation",
+          producer_item_id: "agent_runtime_scholarly_research_tool",
+          payload_ref: "inline",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            papers: [],
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ] as any,
+    });
+    expect(afterObservation).toBeNull();
   });
 
   it("rejects runtime tool calls outside the admitted tool family", () => {

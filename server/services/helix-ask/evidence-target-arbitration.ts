@@ -29,6 +29,17 @@ import {
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
+const readRouteMetadataSourceTarget = (
+  routeMetadata?: LiveSourceWakeRouteMetadataV1 | null,
+): string | null => {
+  if (!routeMetadata || typeof routeMetadata !== "object") return null;
+  const sourceTarget = routeMetadata.sourceTarget;
+  if (sourceTarget === "live_source_mailbox") return sourceTarget;
+  const metadataRecord = routeMetadata as unknown as Record<string, unknown>;
+  const snakeSourceTarget = metadataRecord.source_target;
+  return snakeSourceTarget === "live_source_mailbox" ? snakeSourceTarget : null;
+};
+
 const clampScore = (value: number): number =>
   Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 
@@ -132,7 +143,7 @@ export function buildAskEvidenceTargetArbitration(input: {
   routeMetadata?: LiveSourceWakeRouteMetadataV1 | null;
 }): HelixAskEvidenceTargetArbitration {
   const prompt = input.promptText.trim();
-  if (input.routeMetadata?.sourceTarget === "live_source_mailbox") {
+  if (readRouteMetadataSourceTarget(input.routeMetadata) === "live_source_mailbox") {
     const candidate = makeCandidate({
       candidateId: "live_source_mailbox.stage_play_mail_wake_route_metadata",
       targetSource: "live_source_mailbox",
