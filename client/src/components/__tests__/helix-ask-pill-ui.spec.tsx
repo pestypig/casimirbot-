@@ -490,6 +490,86 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(replies.every((reply: any) => reply.debug?.durable_chat_projection === true)).toBe(true);
   });
 
+  it("does not project generated Stage Play mailbox wake turns as normal chat history", () => {
+    const session = {
+      id: "session:helix",
+      title: "Helix Ask",
+      createdAt: "2026-06-10T15:00:00.000Z",
+      updatedAt: "2026-06-10T15:04:00.000Z",
+      personaId: "default",
+      contextId: "helix-ask:desktop",
+      messages: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "normal prompt",
+          at: "2026-06-10T15:00:00.000Z",
+          traceId: "ask:normal",
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "normal answer",
+          at: "2026-06-10T15:00:20.000Z",
+          traceId: "ask:normal",
+        },
+        {
+          id: "user-wake-old",
+          role: "user",
+          content:
+            "Use live_env.read_live_source_mail for the active Stage Play live-source mailbox. Wake request: stage_play_live_source_mail_wake:old",
+          at: "2026-06-10T15:01:00.000Z",
+          traceId: "ask:wake-old",
+        },
+        {
+          id: "assistant-wake-old",
+          role: "assistant",
+          content:
+            "I could not complete this live-source turn because the selected tool/action violated the current live-source phase contract.\nPhase: terminal_checkpoint.\nSelected: live_env.read_live_source_mail.",
+          at: "2026-06-10T15:01:20.000Z",
+          traceId: "ask:wake-old",
+        },
+        {
+          id: "user-wake-compact",
+          role: "user",
+          content:
+            "Review the latest Stage Play live-source mailbox finding. Use the structured mailbox route metadata attached to this turn to decide the next mailbox action.",
+          at: "2026-06-10T15:02:00.000Z",
+          traceId: "ask:wake-compact",
+        },
+        {
+          id: "assistant-wake-compact",
+          role: "assistant",
+          content: "The live-source mailbox route completed and the interim voice callout request was recorded.",
+          at: "2026-06-10T15:02:20.000Z",
+          traceId: "ask:wake-compact",
+        },
+        {
+          id: "user-2",
+          role: "user",
+          content: "why did the generated prompt mention live_env.read_live_source_mail?",
+          at: "2026-06-10T15:03:00.000Z",
+          traceId: "ask:manual-debug",
+        },
+        {
+          id: "assistant-2",
+          role: "assistant",
+          content: "Because the older generated wake prompt encoded tool names in visible prose.",
+          at: "2026-06-10T15:03:20.000Z",
+          traceId: "ask:manual-debug",
+        },
+      ],
+    } as any;
+
+    const replies = buildHelixAskRepliesFromChatSession(session);
+
+    expect(replies.map((reply: any) => reply.turn_id)).toEqual(["ask:normal", "ask:manual-debug"]);
+    expect(replies.map((reply: any) => reply.question)).toEqual([
+      "normal prompt",
+      "why did the generated prompt mention live_env.read_live_source_mail?",
+    ]);
+  });
+
   it("keeps voice turns ordered behind unified Ask by default", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG).toBe(true);
