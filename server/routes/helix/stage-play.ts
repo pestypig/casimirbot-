@@ -226,6 +226,15 @@ export const resolveStagePlayWakeManualRunForRoute = (
   readQueryBoolean(query.manualRun) ||
   readQueryBoolean(query.manual_run);
 
+export const resolveStagePlayWakeExecuteHiddenAskForRoute = (
+  body: Record<string, unknown>,
+  query: Record<string, unknown>,
+): boolean =>
+  readQueryBoolean(body.executeHiddenAsk) ||
+  readQueryBoolean(body.execute_hidden_ask) ||
+  readQueryBoolean(query.executeHiddenAsk) ||
+  readQueryBoolean(query.execute_hidden_ask);
+
 helixStagePlayRouter.options("/graph", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -1460,6 +1469,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: true,
+      executeHiddenAsk: resolveStagePlayWakeExecuteHiddenAskForRoute(body, req.query as Record<string, unknown>),
     });
     return res.json({
       ok: true,
@@ -1503,6 +1513,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: resolveStagePlayWakeManualRunForRoute(body, req.query as Record<string, unknown>),
+      executeHiddenAsk: resolveStagePlayWakeExecuteHiddenAskForRoute(body, req.query as Record<string, unknown>),
     });
     return res.json({
       ok: true,

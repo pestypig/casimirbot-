@@ -228,7 +228,8 @@ const summarizeWakeState = (input: {
   const running = wakes.filter((wake) => wake.status === "running");
   const deferred = wakes.filter((wake) => wake.status === "deferred_for_pressure");
   const queued = wakes.filter((wake) => wake.status === "queued");
-  const status = input.result?.status ??
+  const resultStatus = input.result?.status === "skipped" ? "queued" : input.result?.status;
+  const status = resultStatus ??
     (running.length > 0 ? "running" :
       runnable.length > 0 ? "queued" :
         deferred.length > 0 ? "deferred_for_pressure" :
@@ -419,6 +420,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
   jobId?: string | null;
   baseUrl?: string;
   askTurnRunner?: AskWakeTurnRunner;
+  executeHiddenAsk?: boolean;
   now?: string;
   pressureCheck?: StagePlayMailWakePressureCheck | null;
   manualRun?: boolean;
@@ -527,6 +529,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       jobId: input.jobId ?? null,
       baseUrl: input.baseUrl,
       askTurnRunner: input.askTurnRunner,
+      executeHiddenAsk: input.executeHiddenAsk ?? Boolean(input.askTurnRunner),
       pressureCheck,
       manualRun: input.manualRun,
       now,
@@ -549,7 +552,11 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       now,
       result,
       runtimeAdmission,
-      reason: result ? "wake_admitted" : "no_runnable_wake",
+      reason: result?.status === "skipped" && result.skippedReason === "ui_handoff_required"
+        ? "wake_ui_handoff_required"
+        : result
+          ? "wake_admitted"
+          : "no_runnable_wake",
       continuation,
       lockState,
     });

@@ -587,6 +587,30 @@ export const attachAskTurnToWakeRequest = (input: {
   });
 };
 
+export const markStagePlayMailWakeUiHandoffRequired = (input: {
+  wakeRequestId: string;
+  routeMetadata?: Record<string, unknown> | null;
+  evidenceRefs?: string[];
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(input.wakeRequestId);
+  if (!existing) return null;
+  return updateWake(input.wakeRequestId, {
+    status: "queued",
+    askTurnId: null,
+    askLaunchStatus: "not_started",
+    askLaunchStartedAt: null,
+    askLaunchCompletedAt: null,
+    askLaunchRouteMetadata: input.routeMetadata ?? existing.askLaunchRouteMetadata ?? null,
+    lifecycleStage: "queued",
+    lifecycleReason: "ui_handoff_required",
+    nextRetryAt: null,
+    failureReason: null,
+    evidenceRefs: input.evidenceRefs ?? existing.evidenceRefs,
+    updatedAt: input.now,
+  });
+};
+
 export const markStagePlayMailWakeCompleted = (input: {
   wakeRequestId: string;
   askTurnId?: string | null;

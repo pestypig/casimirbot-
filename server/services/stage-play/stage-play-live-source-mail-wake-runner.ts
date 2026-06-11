@@ -66,6 +66,7 @@ import {
   markStagePlayMailWakeRunning,
   markStagePlayMailWakeTerminalFailed,
   attachAskTurnToWakeRequest,
+  markStagePlayMailWakeUiHandoffRequired,
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
   latestStagePlayLiveSourceMailWakeResult,
@@ -2536,6 +2537,7 @@ export async function runNextMailWakeRequest(input: {
   voiceDeliveryRunner?: StagePlayLiveSourceVoiceDeliveryRunner | null;
   pressureCheck?: StagePlayMailWakePressureCheck | null;
   manualRun?: boolean;
+  executeHiddenAsk?: boolean;
   now?: string;
 } = {}): Promise<StagePlayLiveSourceMailWakeResultV1 | null> {
   const now = input.now ?? new Date().toISOString();
@@ -2874,6 +2876,52 @@ export async function runNextMailWakeRequest(input: {
       action: "deferred",
       retainedMailCount,
       evidenceRefs,
+      createdAt: wakeResult.createdAt,
+    });
+  }
+  const executeHiddenAsk = input.executeHiddenAsk ?? true;
+  if (!executeHiddenAsk) {
+    const wakeRouteMetadata = buildWakeAskRouteMetadata({
+      wake: running,
+      processedPacket: fastLayer.processedPacket,
+      evidenceRefs,
+    });
+    const queuedForUi = markStagePlayMailWakeUiHandoffRequired({
+      wakeRequestId: running.wakeRequestId,
+      routeMetadata: wakeRouteMetadata,
+      evidenceRefs: uniqueStrings([
+        ...evidenceRefs,
+        "stage_play_wake_ui_handoff_required",
+      ]),
+      now,
+    }) ?? running;
+    const priorUiHandoff = latestStagePlayLiveSourceMailWakeResult(running.wakeRequestId);
+    const priorCoversCurrentBatch =
+      priorUiHandoff?.status === "skipped" &&
+      priorUiHandoff.skippedReason === "ui_handoff_required" &&
+      running.mailIds.every((mailId) => priorUiHandoff.evidenceRefs.includes(mailId));
+    if (priorCoversCurrentBatch) return priorUiHandoff;
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: running.wakeRequestId,
+      threadId: running.threadId,
+      roomId: running.roomId ?? null,
+      environmentId: running.environmentId ?? null,
+      status: "skipped",
+      skippedReason: "ui_handoff_required",
+      evidenceRefs: uniqueStrings([
+        ...evidenceRefs,
+        "stage_play_wake_ui_handoff_required",
+      ]),
+      createdAt: now,
+    });
+    return recordNonTerminalWakeTranscript({
+      wake: queuedForUi,
+      wakeResult,
+      mailBatch,
+      fastLayer,
+      action: "deferred",
+      retainedMailCount,
+      evidenceRefs: wakeResult.evidenceRefs,
       createdAt: wakeResult.createdAt,
     });
   }

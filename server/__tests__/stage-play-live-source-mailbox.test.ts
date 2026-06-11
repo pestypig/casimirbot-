@@ -3994,6 +3994,70 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("server admission cycle leaves Ask-worthy wakes queued for visible UI handoff by default", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      jobId: "stage_play_live_source_job:ui-handoff",
+      sourceIds: [sourceId],
+      interpretationMode: "voice_commentary_watch",
+      objectiveText: "Watch the Minecraft source and call out immediate combat or hazard risk.",
+      decisionPolicyPrompt: "Request a voice callout when fire, lava, damage, hostile mobs, or combat risk appears.",
+      voicePolicy: {
+        enabled: true,
+        allowUrgentCallouts: true,
+        requireConfirmation: false,
+        importanceCriteria: ["fire, lava, damage, hostile mobs, and combat risk are urgent."],
+        suppressionCriteria: [],
+        maxCalloutLength: 160,
+      },
+      now: "2026-06-04T12:02:43.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:ui-handoff",
+      evidenceRef: "visual_evidence:ui-handoff",
+      summaryText: "Minecraft player is on fire with visible damage risk near hostile mobs.",
+      createdAt: "2026-06-04T12:02:44.000Z",
+    });
+
+    const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:02:45.000Z",
+      pressureCheck: () => ({ deferred: false }),
+    });
+
+    expect(cycle).toMatchObject({
+      status: "queued",
+      reason: "wake_ui_handoff_required",
+      result: {
+        status: "skipped",
+        skippedReason: "ui_handoff_required",
+        askTurnId: null,
+        decisionIds: [],
+      },
+    });
+    const wake = listStagePlayLiveSourceMailWakeRequests({ threadId, mailId: mail.mailId })[0];
+    expect(wake).toMatchObject({
+      status: "queued",
+      askTurnId: null,
+      askLaunchStatus: "not_started",
+      lifecycleStage: "queued",
+      lifecycleReason: "ui_handoff_required",
+    });
+    expect(wake.askLaunchRouteMetadata).toMatchObject({
+      invocationKind: "stage_play_mail_wake",
+      wakeRequestId: wake.wakeRequestId,
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_voice_decision",
+      mandatoryNextTool: "live_env.record_live_source_mail_decision",
+    });
+  });
+
   it("reports immediate continuation when a bounded wake leaves runnable retained mail", async () => {
     const previousBatchLimit = process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT;
     process.env.STAGE_PLAY_MAIL_WAKE_ASK_BATCH_LIMIT = "1";

@@ -765,6 +765,34 @@ function compactStagePlayText(value: string | null | undefined, fallback: string
   return text.length > max ? `${text.slice(0, Math.max(0, max - 1)).trimEnd()}...` : text;
 }
 
+function compactStagePlayMailPreview(value: string | null | undefined, fallback: string, max = 140): string {
+  const raw = String(value ?? "").trim();
+  const unfenced = raw
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  if (unfenced.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(unfenced) as Record<string, unknown>;
+      const hud = readStagePlayRecord(parsed.hud);
+      const hotbar = readStagePlayRecord(parsed.hotbar);
+      const parts = [
+        readStagePlayString(parsed.scene) ? `scene: ${readStagePlayString(parsed.scene)}` : null,
+        readStagePlayScalar(hud.health) ? `health: ${readStagePlayScalar(hud.health)}` : null,
+        readStagePlayScalar(hud.hunger) ? `hunger: ${readStagePlayScalar(hud.hunger)}` : null,
+        readStagePlayScalar(hud.armor) ? `armor: ${readStagePlayScalar(hud.armor)}` : null,
+        readStagePlayScalar(hotbar.selected_item) ? `item: ${readStagePlayScalar(hotbar.selected_item)}` : null,
+      ].filter((part): part is string => Boolean(part));
+      if (parts.length > 0) return compactStagePlayText(parts.join(" | "), fallback, max);
+    } catch {
+      // Fall back to plain compaction below.
+    }
+  }
+  return compactStagePlayText(unfenced || raw, fallback, max)
+    .replace(/[{}"]/g, "")
+    .replace(/\\n/g, " ");
+}
+
 function readStagePlayRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -1257,7 +1285,7 @@ function buildStagePlayMailLoopUnifiedTrace(input: {
       artifactId: mail.mailId,
       status: mail.status,
       sourceId: mail.sourceId,
-      preview: compactStagePlayText(mail.summary.preview || mail.summary.text, "", 220),
+      preview: compactStagePlayMailPreview(mail.summary.preview || mail.summary.text, "", 220),
       evidenceRefs: mail.evidenceRefs.slice(0, 12),
     })),
     ...packets.map((packet) => ({
@@ -1596,16 +1624,18 @@ const isStagePlayMailWakePressureResult = (
 
 const isStagePlayMailWakeAskAttemptResult = (
   result: StagePlayLiveSourceMailWakeResultV1,
-): boolean =>
-  result.status === "completed" ||
-  result.status === "failed_terminal" ||
-  result.status === "skipped" ||
-  Boolean(result.askTurnId) ||
-  result.decisionIds.length > 0 ||
-  (
-    result.status === "failed_retryable" &&
-    !isStagePlayMailWakePressureResult(result)
-  );
+): boolean => {
+  if (result.status === "skipped" && result.skippedReason === "ui_handoff_required") return false;
+  return result.status === "completed" ||
+    result.status === "failed_terminal" ||
+    result.status === "skipped" ||
+    Boolean(result.askTurnId) ||
+    result.decisionIds.length > 0 ||
+    (
+      result.status === "failed_retryable" &&
+      !isStagePlayMailWakePressureResult(result)
+    );
+};
 
 const isStagePlayMailWakeVoiceCheckpointResult = (
   result: StagePlayLiveSourceMailWakeResultV1,
@@ -1693,8 +1723,6 @@ const activeStagePlayJourneyIndex = (stations: StagePlayMailJourneyStation[]): n
 
 function StagePlayMailPayloadLedger({
   stations,
-  latestSummary,
-  mailAgeMs,
   payloadChars,
   packetChars,
   deckLatencyMs,
@@ -1702,8 +1730,6 @@ function StagePlayMailPayloadLedger({
   onSelectPayload,
 }: {
   stations: StagePlayMailJourneyStation[];
-  latestSummary: string;
-  mailAgeMs: number | null;
   payloadChars: number;
   packetChars: number;
   deckLatencyMs: number;
@@ -1726,13 +1752,15 @@ function StagePlayMailPayloadLedger({
           lineage
         </div>
       </div>
-      <div className="mt-3 rounded border border-slate-800 bg-black/25 p-3 text-sm leading-relaxed text-slate-200">
-        {compactStagePlayText(latestSummary, "The next visual-source observation will appear here before it is transformed.", 560)}
+      <div className="mt-3 rounded border border-slate-800 bg-black/25 p-3 text-xs leading-relaxed text-slate-400">
+        {payloadCount > 0
+          ? "Each chip is a mail, packet, wake, Ask handoff, or result artifact. Follow the same color/id across stations."
+          : "Waiting for the first visual-source mail artifact."}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
         <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
-          <div className="uppercase tracking-wide opacity-60">mail age</div>
-          <div className="mt-0.5 font-mono">{formatStagePlayMs(mailAgeMs)}</div>
+          <div className="uppercase tracking-wide opacity-60">payloads</div>
+          <div className="mt-0.5 font-mono">{payloadCount}</div>
         </div>
         <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
           <div className="uppercase tracking-wide opacity-60">mail chars</div>
@@ -1905,9 +1933,7 @@ function StagePlayFlowQueueColumn({
 
 function StagePlayMailJourneyRail({
   stations,
-  queueRows,
-  latestSummary,
-  mailAgeMs,
+  deckRows,
   payloadChars,
   packetChars,
   deckLatencyMs,
@@ -1917,9 +1943,7 @@ function StagePlayMailJourneyRail({
   onSelectPayload,
 }: {
   stations: StagePlayMailJourneyStation[];
-  queueRows: StagePlayFlowQueueRow[];
-  latestSummary: string;
-  mailAgeMs: number | null;
+  deckRows: StagePlayMailJourneyReasonerRow[];
   payloadChars: number;
   packetChars: number;
   deckLatencyMs: number;
@@ -1928,8 +1952,6 @@ function StagePlayMailJourneyRail({
   selectedPayloadId: string | null;
   onSelectPayload: (payloadId: string) => void;
 }) {
-  const activeIndex = activeStagePlayJourneyIndex(stations);
-  const progressLeft = stations.length > 1 ? `${(activeIndex / (stations.length - 1)) * 100}%` : "0%";
   return (
     <div
       className="rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3"
@@ -1947,8 +1969,6 @@ function StagePlayMailJourneyRail({
       <div className="mt-3 grid gap-4 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)_minmax(260px,320px)]">
         <StagePlayMailPayloadLedger
           stations={stations}
-          latestSummary={latestSummary}
-          mailAgeMs={mailAgeMs}
           payloadChars={payloadChars}
           packetChars={packetChars}
           deckLatencyMs={deckLatencyMs}
@@ -1956,20 +1976,15 @@ function StagePlayMailJourneyRail({
           onSelectPayload={onSelectPayload}
         />
         <div className="min-w-0 rounded-md border border-slate-800 bg-black/20 p-3">
-          <div className="relative h-10">
-            <div className="absolute left-4 right-4 top-1/2 h-px -translate-y-1/2 bg-slate-800" />
-            <div
-              className="absolute left-4 top-1/2 h-px -translate-y-1/2 bg-cyan-400 transition-all duration-500"
-              style={{ width: `calc(${progressLeft} - 1rem)` }}
-            />
-            <div
-              className="absolute top-1/2 z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded border border-cyan-300 bg-cyan-950 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.55)] transition-all duration-500"
-              style={{ left: progressLeft }}
-              data-testid="stage-play-mail-journey-moving-box"
-              title={`Current checkpoint pressure: ${stations[activeIndex]?.title ?? "unknown"}`}
-            >
-              <Waypoints className="h-4 w-4" aria-hidden="true" />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Payload station board</div>
+              <div className="mt-0.5 text-xs text-slate-500">Mail blocks appear inside every checkpoint they have reached.</div>
             </div>
+            <div className="rounded border border-slate-800 bg-slate-950 px-2 py-1 font-mono text-[10px] text-slate-400">
+              no global cursor
+            </div>
+            <span className="sr-only" data-testid="stage-play-mail-journey-moving-box">per-payload station board</span>
           </div>
           <div className="mt-2 grid gap-2 lg:grid-cols-4" data-testid="stage-play-mail-journey-stations">
             {stations.map((station, index) => (
@@ -2014,8 +2029,8 @@ function StagePlayMailJourneyRail({
             ))}
           </div>
         </div>
-        <StagePlayFlowQueueColumn
-          rows={queueRows}
+        <StagePlayMicroReasonerDeckColumn
+          rows={deckRows}
           deckRuntimeLabel={deckRuntimeLabel}
           combinedRuntimeTone={combinedRuntimeTone}
         />
@@ -2038,8 +2053,8 @@ function StagePlaySelectedTrafficDetail({ detail }: { detail: StagePlayTrafficDe
         className="rounded-md border border-slate-800 bg-black/20 p-3"
         data-testid="stage-play-selected-mail-detail"
       >
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Selected payload detail</div>
-        <div className="mt-2 text-sm text-slate-500">No live-source mail payload is selected yet.</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Packet inspector</div>
+        <div className="mt-2 text-sm text-slate-500">Click a mail or packet chip in the journey to inspect its lineage.</div>
       </div>
     );
   }
@@ -2050,7 +2065,7 @@ function StagePlaySelectedTrafficDetail({ detail }: { detail: StagePlayTrafficDe
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Selected payload detail</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Packet inspector</div>
           <div className="mt-1 truncate text-base font-semibold text-slate-50">{detail.label}</div>
           <div className="mt-0.5 font-mono text-[10px] text-slate-500">{detail.id}</div>
         </div>
@@ -3929,7 +3944,7 @@ function StagePlayMailLoopLiveOverview({
     id: mail.mailId,
     label: mail.mailId.split(":").at(-1)?.slice(0, 8) ?? "mail",
     status: labelize(mail.status),
-    preview: compactStagePlayText(mail.summary.preview || mail.summary.text, "No visual summary preview.", 120),
+    preview: compactStagePlayMailPreview(mail.summary.preview || mail.summary.text, "No visual summary preview.", 120),
     meta: formatStagePlayClock(mail.createdAt),
     state: mail.status === "unread" ? "active" : "done",
     evidenceRefs: mail.evidenceRefs,
@@ -4444,9 +4459,7 @@ function StagePlayMailLoopLiveOverview({
 
       <StagePlayMailJourneyRail
         stations={mailTransformSteps}
-        queueRows={queueRows}
-        latestSummary={latestSummary}
-        mailAgeMs={mailAgeMs}
+        deckRows={deckRows}
         payloadChars={latestMail?.summary.text.length ?? 0}
         packetChars={packetChars}
         deckLatencyMs={deckLatencyMs}
@@ -4456,7 +4469,34 @@ function StagePlayMailLoopLiveOverview({
         onSelectPayload={setSelectedTrafficPayloadId}
       />
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
+      <div className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-packet-profile">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Packet profile</div>
+            <div className="mt-0.5 text-xs text-slate-500">Compact size, latency, pressure, and deck budget for the current packet.</div>
+          </div>
+          <div className="font-mono text-[10px] text-slate-500">{latestPacket?.packetId ?? "packet pending"}</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-10">
+          <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
+          <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(packetChars)} />
+          <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
+          <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
+          <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
+          <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
+          <StagePlayMetricPill label="heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
+          <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
+        </div>
+      </div>
+
+      <details className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-diagnostics">
+        <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+          Diagnostics: queue, Ask handoff, selected packet, packet history, prompts
+        </summary>
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
         <StagePlaySelectedTrafficDetail detail={selectedTrafficDetail} />
         <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-queue">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -4550,13 +4590,8 @@ function StagePlayMailLoopLiveOverview({
         </div>
       </div>
 
-      <details className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-diagnostics">
-        <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-          Diagnostics: processor internals, packet history, prompts
-        </summary>
-        <div className="mt-3 space-y-3">
-          <StagePlayMicroReasonerDeckColumn
-            rows={deckRows}
+          <StagePlayFlowQueueColumn
+            rows={queueRows}
             deckRuntimeLabel={deckRuntimeLabel}
             combinedRuntimeTone={combinedRuntimeTone}
           />
@@ -4674,7 +4709,7 @@ function StagePlayMailLoopLiveOverview({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="hidden">
         <div className="rounded-md border border-slate-800 bg-black/20 p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Minecraft shade summary</div>
@@ -4694,16 +4729,16 @@ function StagePlayMailLoopLiveOverview({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
-          <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(packetChars)} />
-          <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
-          <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
-          <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
-          <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
-          <StagePlayMetricPill label="heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
-          <StagePlayMetricPill label="rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
-          <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
-          <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
+          <StagePlayMetricPill label="diag raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
+          <StagePlayMetricPill label="diag packet chars" value={formatStagePlayCount(packetChars)} />
+          <StagePlayMetricPill label="diag compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
+          <StagePlayMetricPill label="diag arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
+          <StagePlayMetricPill label="diag deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
+          <StagePlayMetricPill label="diag deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
+          <StagePlayMetricPill label="diag heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="diag rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
+          <StagePlayMetricPill label="diag pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
+          <StagePlayMetricPill label="diag reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
         </div>
       </div>
 
@@ -5479,12 +5514,14 @@ function shouldBridgeStagePlayWakeToAsk(input: {
   if (!wake) return false;
   if (wake.askTurnId || wake.decisionIds.length > 0) return false;
   if (input.wakeResult?.askTurnId || (input.wakeResult?.decisionIds.length ?? 0) > 0) return false;
-  const wakeStatus = input.wakeResult?.status ?? wake.status;
+  const uiHandoffRequired = input.wakeResult?.status === "skipped" &&
+    input.wakeResult.skippedReason === "ui_handoff_required";
+  const wakeStatus = uiHandoffRequired ? wake.status : input.wakeResult?.status ?? wake.status;
   if (!["queued", "running", "failed_retryable", "deferred_for_pressure"].includes(wakeStatus)) return false;
   const recommendedNext = input.packet?.arbiter?.recommendedNext ?? input.packet?.recommendedNext;
   if (!input.packet) return true;
   const wakeAsk = input.packet.arbiter?.wakeAsk === true || recommendedNext === "request_voice_callout";
-  return (wakeAsk || wake.status === "deferred_for_pressure" || wake.status === "failed_retryable") &&
+  return (wakeAsk || uiHandoffRequired || wake.status === "deferred_for_pressure" || wake.status === "failed_retryable") &&
     recommendedNext !== "wait_for_next_summary";
 }
 
