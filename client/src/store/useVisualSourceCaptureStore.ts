@@ -51,12 +51,26 @@ type VisualSourceCaptureStore = {
 export const useVisualSourceCaptureStore = create<VisualSourceCaptureStore>((set: (updater: (current: VisualSourceCaptureStore) => Partial<VisualSourceCaptureStore>) => void) => ({
   producers: {},
   upsertProducer: (state: VisualSourceCaptureState) =>
-    set((current: VisualSourceCaptureStore) => ({
-      producers: {
-        ...current.producers,
-        [state.source_id]: state,
-      },
-    })),
+    set((current: VisualSourceCaptureStore) => {
+      const existing = current.producers[state.source_id];
+      const hasLastFrameHash = Object.prototype.hasOwnProperty.call(state, "last_frame_hash");
+      const hasLastFramePreview = Object.prototype.hasOwnProperty.call(state, "last_frame_preview_data_url");
+      const hasFrameHistory = Object.prototype.hasOwnProperty.call(state, "frame_history");
+      return {
+        producers: {
+          ...current.producers,
+          [state.source_id]: {
+            ...existing,
+            ...state,
+            last_frame_hash: hasLastFrameHash ? state.last_frame_hash ?? null : existing?.last_frame_hash ?? null,
+            last_frame_preview_data_url: hasLastFramePreview
+              ? state.last_frame_preview_data_url ?? null
+              : existing?.last_frame_preview_data_url ?? null,
+            frame_history: hasFrameHistory ? state.frame_history : existing?.frame_history,
+          },
+        },
+      };
+    }),
   patchProducer: (sourceId: string, patch: Partial<VisualSourceCaptureState>) =>
     set((current: VisualSourceCaptureStore) => {
       const existing = current.producers[sourceId];
