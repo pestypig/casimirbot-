@@ -4368,7 +4368,7 @@ function StagePlayMailLoopLiveOverview({
             {latestPacket?.effortEstimate?.currentEffort ? labelize(latestPacket.effortEstimate.currentEffort) : "Waiting for current effort"}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            {latestPacket?.arbiter?.reason ?? "Micro-reasoner deck has not produced a wake verdict yet."}
+            {latestPacket?.arbiter?.reason ?? "Waiting for the first mail packet to decide whether Ask should wake."}
           </div>
           {latestWake ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -4856,6 +4856,11 @@ function StagePlayObserverMailLoopCanvas({
       data-stage-play-graph-mode="observer_mail_loop_v1"
     >
       <StagePlayMailLoopLiveOverview graph={graph} mailbox={mailbox} />
+      <details className="mt-4 rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-topology-diagnostics">
+        <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">
+          Topology diagnostics: nodes, wires, prompt inspector
+        </summary>
+        <div className="mt-4">
       <div
         className="grid items-start gap-6"
         style={{
@@ -5066,6 +5071,8 @@ function StagePlayObserverMailLoopCanvas({
           </div>
         </div>
       ) : null}
+        </div>
+      </details>
     </div>
   );
 }
