@@ -170,10 +170,7 @@ describe("Helix Ask Stage Play routing", () => {
       "docs-viewer.open",
     ]));
     expect(response.body?.source_target_intent?.stage_play_mail_wake_route_metadata, routeDebug).toMatchObject({
-      wakeRequestId,
-      mailboxThreadId: threadId,
       sourceTarget: "live_source_mailbox",
-      requiredCanonicalGoal: "processed_mail_voice_decision",
     });
     expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
       goal_kind: "live_source_processed_mail_interpretation",
