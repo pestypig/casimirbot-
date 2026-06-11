@@ -36,6 +36,7 @@ describe("NHM2 runtime field map", () => {
     expect(isNhm2RuntimeBoundBadge("nhm2.source.wall_t00_trace")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.tensor.full_authority_gate")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.tensor.same_chart_full_tensor")).toBe(true);
+    expect(isNhm2RuntimeBoundBadge("nhm2.source.same_basis_tensor_authority")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.sampling_window")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.qei.worldline_dossier")).toBe(true);
     expect(isNhm2RuntimeBoundBadge("nhm2.energy_condition.observer_robust_gate")).toBe(true);
@@ -48,6 +49,9 @@ describe("NHM2 runtime field map", () => {
     const wall = getNhm2RuntimeFieldBinding("nhm2.source.wall_t00_trace");
     const tensor = getNhm2RuntimeFieldBinding("nhm2.tensor.full_authority_gate");
     const sameChartTensor = getNhm2RuntimeFieldBinding("nhm2.tensor.same_chart_full_tensor");
+    const sourceAuthority = getNhm2RuntimeFieldBinding(
+      "nhm2.source.same_basis_tensor_authority",
+    );
 
     expect(wallClosure?.artifactFields).toEqual(
       expect.arrayContaining([
@@ -92,6 +96,21 @@ describe("NHM2 runtime field map", () => {
     expect(sameChartTensor?.requiredEvidence).toEqual(
       expect.arrayContaining(["same_chart_full_tensor_artifact", "adm_projection_state"]),
     );
+    expect(sourceAuthority?.artifactFields).toEqual(
+      expect.arrayContaining([
+        "nhm2SourceSideSameBasisTensorAuthority.summary.hasWallAuthority",
+        "nhm2SourceSideSameBasisTensorAuthority.summary.allRequiredRegionsAuthoritative",
+        "nhm2SourceSideSameBasisTensorAuthority.regions[].status",
+        "nhm2WallSourceClosure.available.sourceAuthorityStatus",
+      ]),
+    );
+    expect(sourceAuthority?.scalarCuts).toEqual([]);
+    expect(sourceAuthority?.requiredEvidence).toEqual(
+      expect.arrayContaining([
+        "source_side_same_basis_tensor_authority_artifact",
+        "tile_effective_counterpart_artifact",
+      ]),
+    );
   });
 
   it("maps observer-robust energy and Natario invariant gates without scalar cuts", () => {
@@ -132,6 +151,7 @@ describe("NHM2 runtime field map", () => {
         "nhm2.source.energy_density_proxy",
         "nhm2.closure.wall_t00_source_residual",
         "nhm2.closure.source_residual",
+        "nhm2.source.same_basis_tensor_authority",
         "nhm2.energy_condition.diagnostic_gate",
       ]),
     );

@@ -21,5 +21,6 @@ describe("QEI / stress-energy map", () => {
 
     const source = getQeiStressEnergyGroup("qei.stress_energy.source_residual");
     expect(source?.theoryBadgeIds).toContain("nhm2.source.wall_t00_trace");
+    expect(source?.theoryBadgeIds).toContain("nhm2.source.same_basis_tensor_authority");
   });
 });

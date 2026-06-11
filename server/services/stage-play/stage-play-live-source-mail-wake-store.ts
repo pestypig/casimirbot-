@@ -35,7 +35,10 @@ const makeAskLaunchId = (wakeRequestId: string, now: string, attemptCount: numbe
 const resolveAskLaunchStatusForRetry = (
   failureReason: string,
 ): StagePlayLiveSourceMailWakeAskLaunchStatusV1 =>
-  failureReason === "ask_launch_missing_ask_turn_id" ? "missing_turn_id" : "failed";
+  failureReason === "ask_launch_missing_ask_turn_id" ||
+  failureReason === "missing_ask_turn_id_for_completed_wake"
+    ? "missing_turn_id"
+    : "failed";
 
 const sortedKey = (values: string[]): string => uniqueStrings(values).sort().join("|");
 
@@ -68,6 +71,25 @@ const isVoiceCheckpointRef = (ref: string): boolean =>
 
 const voiceCheckpointRefsFromEvidence = (refs: string[]): string[] =>
   uniqueStrings(refs.filter(isVoiceCheckpointRef));
+
+const mergedRouteMetadata = (
+  candidate: Record<string, unknown> | null | undefined,
+  existing?: StagePlayLiveSourceMailWakeRequestV1 | null,
+): Record<string, unknown> | null =>
+  candidate ?? existing?.routeMetadata ?? existing?.askLaunchRouteMetadata ?? null;
+
+const wakeHasAskLaunchContext = (
+  wake: StagePlayLiveSourceMailWakeRequestV1 | null | undefined,
+  askTurnId?: string | null,
+): boolean => Boolean(
+  askTurnId ||
+  wake?.askTurnId ||
+  wake?.askLaunchId ||
+  wake?.askLaunchStartedAt ||
+  wake?.routeMetadata ||
+  wake?.askLaunchRouteMetadata ||
+  (wake?.askLaunchStatus && wake.askLaunchStatus !== "not_started")
+);
 
 const refIncludesVoiceStatus = (ref: string, statuses: string[]): boolean => {
   const normalized = ref.toLowerCase().replace(/[-\s]+/g, "_");
@@ -281,6 +303,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     askLaunchStartedAt: null,
     askLaunchCompletedAt: null,
     askLaunchRouteMetadata: null,
+    routeMetadata: null,
     decisionIds: [],
     attemptCount: 0,
     lastAttemptAt: null,
@@ -398,6 +421,7 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
     askLaunchStartedAt: null,
     askLaunchCompletedAt: null,
     askLaunchRouteMetadata: null,
+    routeMetadata: null,
     decisionIds: [],
     attemptCount: 0,
     lastAttemptAt: null,
@@ -518,7 +542,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -548,15 +572,40 @@ export const markStagePlayMailWakeRunning = (
   const updatedAt = now ?? new Date().toISOString();
   const attemptCount = (existing?.attemptCount ?? 0) + 1;
   const askTurnId = launch?.askTurnId ?? existing?.askTurnId ?? null;
+  const routeMetadata = mergedRouteMetadata(launch?.routeMetadata, existing);
+  const launchStarted = Boolean(askTurnId || launch?.askLaunchId || launch?.routeMetadata);
+  const askLaunchId = launchStarted
+    ? launch?.askLaunchId ?? existing?.askLaunchId ?? makeAskLaunchId(wakeRequestId, updatedAt, attemptCount)
+    : existing?.askLaunchId ?? null;
+  if (!askTurnId) {
+    return updateWake(wakeRequestId, {
+      status: existing?.status === "waiting_for_ui_handoff" ? "waiting_for_ui_handoff" : "queued",
+      askTurnId: null,
+      askLaunchId,
+      askLaunchStatus: launchStarted ? "launching" : existing?.askLaunchStatus ?? "not_started",
+      askLaunchStartedAt: launchStarted ? existing?.askLaunchStartedAt ?? updatedAt : existing?.askLaunchStartedAt ?? null,
+      askLaunchCompletedAt: null,
+      askLaunchRouteMetadata: routeMetadata,
+      routeMetadata,
+      lifecycleStage: existing?.status === "waiting_for_ui_handoff" ? "waiting_for_ui_handoff" : "queued",
+      lifecycleReason: launchStarted ? "wake_launch_started_waiting_for_ask_turn_id" : "wake_attempt_started_before_launch",
+      attemptCount,
+      lastAttemptAt: updatedAt,
+      nextRetryAt: null,
+      failureReason: null,
+      updatedAt,
+    });
+  }
   return updateWake(wakeRequestId, {
     status: "running",
     askTurnId,
-    askLaunchId: launch?.askLaunchId ?? existing?.askLaunchId ?? makeAskLaunchId(wakeRequestId, updatedAt, attemptCount),
-    askLaunchStatus: askTurnId ? "launched" : "launching",
+    askLaunchId,
+    askLaunchStatus: "launched",
     askLaunchStartedAt: existing?.askLaunchStartedAt ?? updatedAt,
-    askLaunchCompletedAt: askTurnId ? updatedAt : null,
-    askLaunchRouteMetadata: launch?.routeMetadata ?? existing?.askLaunchRouteMetadata ?? null,
-    lifecycleStage: askTurnId ? "ask_entered" : "queued",
+    askLaunchCompletedAt: updatedAt,
+    askLaunchRouteMetadata: routeMetadata,
+    routeMetadata,
+    lifecycleStage: "ask_entered",
     lifecycleReason: "wake_runner_started",
     attemptCount,
     lastAttemptAt: updatedAt,
@@ -576,6 +625,7 @@ export const attachAskTurnToWakeRequest = (input: {
   const existing = wakeById.get(input.wakeRequestId);
   if (!existing) return null;
   const updatedAt = input.now ?? new Date().toISOString();
+  const routeMetadata = mergedRouteMetadata(input.routeMetadata, existing);
   return updateWake(input.wakeRequestId, {
     status: existing.status === "queued" || existing.status === "waiting_for_ui_handoff" ? "running" : existing.status,
     askTurnId: input.askTurnId,
@@ -583,7 +633,8 @@ export const attachAskTurnToWakeRequest = (input: {
     askLaunchStatus: "launched",
     askLaunchStartedAt: existing.askLaunchStartedAt ?? updatedAt,
     askLaunchCompletedAt: updatedAt,
-    askLaunchRouteMetadata: input.routeMetadata ?? existing.askLaunchRouteMetadata ?? null,
+    askLaunchRouteMetadata: routeMetadata,
+    routeMetadata,
     lifecycleStage: "ask_entered",
     lifecycleReason: "ask_turn_id_attached",
     updatedAt,
@@ -598,13 +649,15 @@ export const markStagePlayMailWakeUiHandoffRequired = (input: {
 }): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(input.wakeRequestId);
   if (!existing) return null;
+  const routeMetadata = mergedRouteMetadata(input.routeMetadata, existing);
   return updateWake(input.wakeRequestId, {
     status: "waiting_for_ui_handoff",
     askTurnId: null,
     askLaunchStatus: "not_started",
     askLaunchStartedAt: null,
     askLaunchCompletedAt: null,
-    askLaunchRouteMetadata: input.routeMetadata ?? existing.askLaunchRouteMetadata ?? null,
+    askLaunchRouteMetadata: routeMetadata,
+    routeMetadata,
     lifecycleStage: "waiting_for_ui_handoff",
     lifecycleReason: "ui_handoff_required",
     nextRetryAt: null,
@@ -623,11 +676,42 @@ export const markStagePlayMailWakeCompleted = (input: {
   now?: string;
 }): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(input.wakeRequestId);
-  const evidenceRefs = uniqueStrings(input.evidenceRefs ?? []);
-  const decisionIds = uniqueStrings(input.decisionIds ?? []);
+  const evidenceRefs = uniqueStrings([...(existing?.evidenceRefs ?? []), ...(input.evidenceRefs ?? [])]);
+  const decisionIds = uniqueStrings([...(existing?.decisionIds ?? []), ...(input.decisionIds ?? [])]);
   const updatedAt = input.now ?? new Date().toISOString();
+  const askTurnId = input.askTurnId ?? existing?.askTurnId ?? null;
+  const askCompletionRequiresTurnId = wakeHasAskLaunchContext(existing, input.askTurnId);
+  if (askCompletionRequiresTurnId && !askTurnId) {
+    return updateWake(input.wakeRequestId, {
+      status: "failed_retryable",
+      askTurnId: null,
+      askLaunchStatus: "missing_turn_id",
+      askLaunchCompletedAt: updatedAt,
+      decisionIds,
+      evidenceRefs,
+      lifecycleStage: "failed",
+      lifecycleReason: "missing_ask_turn_id_for_completed_wake",
+      nextRetryAt: null,
+      failureReason: "missing_ask_turn_id_for_completed_wake",
+      updatedAt,
+    });
+  }
+  if (askCompletionRequiresTurnId && decisionIds.length === 0) {
+    return updateWake(input.wakeRequestId, {
+      status: "failed_retryable",
+      askTurnId,
+      askLaunchStatus: askTurnId ? "launched" : "missing_turn_id",
+      askLaunchCompletedAt: updatedAt,
+      decisionIds,
+      evidenceRefs,
+      lifecycleStage: "failed",
+      lifecycleReason: "missing_required_mailbox_decision_receipt",
+      nextRetryAt: null,
+      failureReason: "missing_required_mailbox_decision_receipt",
+      updatedAt,
+    });
+  }
   if (input.requiresVoiceCheckpoint === true && voiceCheckpointRefsFromEvidence(evidenceRefs).length === 0) {
-    const askTurnId = input.askTurnId ?? existing?.askTurnId ?? null;
     return updateWake(input.wakeRequestId, {
       status: existing?.status === "queued" || existing?.status === "waiting_for_ui_handoff" ? "running" : existing?.status ?? "running",
       askTurnId,
@@ -645,14 +729,14 @@ export const markStagePlayMailWakeCompleted = (input: {
   }
   return updateWake(input.wakeRequestId, {
     status: "completed",
-    askTurnId: input.askTurnId ?? undefined,
+    askTurnId: askTurnId ?? undefined,
     askLaunchStatus: "completed",
     askLaunchCompletedAt: updatedAt,
     decisionIds,
     evidenceRefs,
     lifecycleStage: resolveWakeLifecycleStage({
       status: "completed",
-      askTurnId: input.askTurnId ?? null,
+      askTurnId,
       decisionIds,
       evidenceRefs,
       requiresVoiceCheckpoint: input.requiresVoiceCheckpoint,
@@ -849,14 +933,30 @@ export function recordStagePlayMailWakeResult(input: {
 }): StagePlayLiveSourceMailWakeResultV1 {
   const createdAt = input.createdAt ?? new Date().toISOString();
   const wake = wakeById.get(input.wakeRequestId) ?? null;
+  const effectiveAskTurnId = input.askTurnId ?? wake?.askTurnId ?? null;
   const inputDecisionIds = uniqueStrings(input.decisionIds ?? []);
-  const inputEvidenceRefs = uniqueStrings([input.wakeRequestId, input.askTurnId, ...inputDecisionIds, ...(input.evidenceRefs ?? [])]);
+  const inputEvidenceRefs = uniqueStrings([input.wakeRequestId, effectiveAskTurnId, ...inputDecisionIds, ...(input.evidenceRefs ?? [])]);
+  const existingVoiceCheckpointRefs = voiceCheckpointRefsFromEvidence(inputEvidenceRefs);
+  let status = input.status;
+  let failedReason = input.failedReason ?? null;
+  if (status === "completed" && wakeHasAskLaunchContext(wake, effectiveAskTurnId)) {
+    if (!effectiveAskTurnId) {
+      status = "failed_retryable";
+      failedReason = failedReason ?? "missing_ask_turn_id_for_completed_wake_result";
+    } else if (inputDecisionIds.length === 0 && !input.skippedReason) {
+      status = "failed_retryable";
+      failedReason = failedReason ?? "missing_required_mailbox_decision_receipt";
+    } else if (wake?.lifecycleStage === "voice_pending" && existingVoiceCheckpointRefs.length === 0) {
+      status = "failed_retryable";
+      failedReason = failedReason ?? "missing_required_voice_receipt_or_hold";
+    }
+  }
   const wakeResultId = `stage_play_live_source_mail_wake_result:${hashShort([
     input.wakeRequestId,
-    input.status,
-    input.askTurnId ?? null,
+    status,
+    effectiveAskTurnId,
     input.skippedReason ?? null,
-    input.failedReason ?? null,
+    failedReason,
   ])}`;
   const existing = resultById.get(wakeResultId) ?? null;
   const decisionIds = uniqueStrings([...(existing?.decisionIds ?? []), ...inputDecisionIds]);
@@ -870,25 +970,25 @@ export function recordStagePlayMailWakeResult(input: {
     threadId: input.threadId,
     roomId: input.roomId ?? null,
     environmentId: input.environmentId ?? null,
-    status: input.status,
-    askTurnId: input.askTurnId ?? null,
+    status,
+    askTurnId: effectiveAskTurnId,
     decisionIds,
     voiceCheckpointRefs,
     budgetStateRef: existing?.budgetStateRef ?? null,
     skippedReason: input.skippedReason ?? null,
-    failedReason: input.failedReason ?? null,
+    failedReason,
     lifecycleStage: resolveWakeLifecycleStage({
-      status: input.status,
-      askTurnId: input.askTurnId ?? null,
+      status,
+      askTurnId: effectiveAskTurnId,
       decisionIds,
       evidenceRefs,
     }),
     lifecycleReason:
-      input.status === "deferred_for_pressure"
-        ? input.failedReason ?? "runtime_pressure_deferred_before_ask"
-        : input.status === "completed"
+      status === "deferred_for_pressure"
+        ? failedReason ?? "runtime_pressure_deferred_before_ask"
+        : status === "completed"
           ? "wake_result_completion_evidence_satisfied"
-          : input.failedReason ?? input.skippedReason ?? null,
+          : failedReason ?? input.skippedReason ?? null,
     evidenceRefs,
     causalTrace: mergeLiveSourceCausalTraces([wake?.causalTrace], {
       parentRefs: [input.wakeRequestId],
@@ -896,7 +996,7 @@ export function recordStagePlayMailWakeResult(input: {
       producedRefs: [wakeResultId],
       sourceIds: wake?.sourceIds ?? [],
       jobId: wake?.jobId ?? null,
-      askTurnId: input.askTurnId ?? null,
+      askTurnId: effectiveAskTurnId,
       evidenceRefs,
     }),
     createdAt,

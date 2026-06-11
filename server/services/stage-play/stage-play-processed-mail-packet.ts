@@ -24,6 +24,8 @@ import { compareMailToInterpreterProfile } from "./stage-play-live-source-interp
 import { extractStagePlayLiveSourceDelta } from "./stage-play-live-source-delta-extractor";
 import {
   getActiveStagePlayMicroReasonerPromptForRole,
+  getActiveStagePlayMicroReasonerPromptPresetForSource,
+  getStagePlayPromptedMicroReasonerRolesForSource,
   getStagePlayMicroReasonerRun,
   getStagePlayProcessedMailPacket,
   recordStagePlayMicroReasonerRun,
@@ -114,6 +116,15 @@ const promptedMicroReasonersEnabled = (options?: StagePlayPromptedMicroReasonerO
   if (options?.enabled === true) return true;
   if (String(process.env.STAGE_PLAY_MICRO_REASONER_LLM_ENABLED ?? "1").trim() === "0") return false;
   return Boolean(process.env.OPENAI_API_KEY?.trim());
+};
+
+const promptedRolesForSource = (
+  sourceId: string,
+  options?: StagePlayPromptedMicroReasonerOptions,
+): StagePlayMicroReasonerRoleV1[] => {
+  if (options?.roles) return options.roles;
+  if (process.env.STAGE_PLAY_MICRO_REASONER_LLM_ROLES?.trim()) return readPromptedRoleList();
+  return getStagePlayPromptedMicroReasonerRolesForSource({ sourceId });
 };
 
 const parseJsonObjectFromText = (text: string): Record<string, unknown> | null => {
@@ -716,7 +727,7 @@ const makeRun = (input: {
   missingEvidence?: string[];
   causalTrace?: LiveSourceCausalTraceV1;
 }): StagePlayMicroReasonerRunV1 => {
-  const activePrompt = getActiveStagePlayMicroReasonerPromptForRole(input.role);
+  const activePrompt = getActiveStagePlayMicroReasonerPromptForRole(input.role, { sourceId: input.sourceId });
   return recordStagePlayMicroReasonerRun({
     artifactId: "stage_play_micro_reasoner_run",
     schemaVersion: STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA,
@@ -792,12 +803,22 @@ export function buildStagePlayProcessedMailPacket(input: {
   };
   const mailIds = input.mailItems.map((item) => item.mailId);
   const sourceId = input.sourceId || input.mailItems[0]?.sourceId || "unknown_source";
+  const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId });
+  const activePromptSignature = activeMicroReasonerPromptPreset
+    ? [
+        activeMicroReasonerPromptPreset.presetId,
+        activeMicroReasonerPromptPreset.updatedAt,
+        activeMicroReasonerPromptPreset.promptedRoles,
+        activeMicroReasonerPromptPreset.rolePromptIds,
+      ]
+    : null;
   const packetId = `stage_play_processed_mail_packet:${hashShort([
     input.jobId,
     sourceId,
     mailIds,
     input.activeProfile?.profileId ?? null,
     input.activeProfile?.updatedAt ?? null,
+    activePromptSignature,
   ])}`;
   const existingPacket = getStagePlayProcessedMailPacket(packetId);
   if (existingPacket) {
@@ -1431,7 +1452,8 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
 
   const now = input.now ?? new Date().toISOString();
   const executor = input.promptedMicroReasoners?.executor ?? defaultPromptedMicroReasonerExecutor;
-  const requestedRoles = input.promptedMicroReasoners?.roles ?? readPromptedRoleList();
+  const sourceId = input.sourceId || input.mailItems[0]?.sourceId || "unknown_source";
+  const requestedRoles = promptedRolesForSource(sourceId, input.promptedMicroReasoners);
   const runByRole = new Map(baseline.microReasonerRuns.map((run) => [run.role, run]));
   const promptedOutputs: Record<string, unknown> = {};
   let packet = baseline.packet;
@@ -1440,7 +1462,7 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
 
   for (const role of requestedRoles) {
     const run = runByRole.get(role);
-    const prompt = getActiveStagePlayMicroReasonerPromptForRole(role);
+    const prompt = getActiveStagePlayMicroReasonerPromptForRole(role, { sourceId });
     if (!run || !prompt) continue;
     const startedAt = performance.now();
     let output: PromptedMicroReasonerOutput;

@@ -6,6 +6,7 @@ import { buildNhm2FullSolveTheoryBadgesV1 } from "../nhm2-full-solve-theory-badg
 describe("NHM2 full-solve theory badges", () => {
   const newClosureStackBadgeIds = [
     "nhm2.tensor.same_chart_full_tensor",
+    "nhm2.source.same_basis_tensor_authority",
     "nhm2.closure.wall_t00_source_residual",
     "nhm2.energy_condition.observer_robust_gate",
     "nhm2.qei.worldline_dossier",
@@ -38,6 +39,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.observer.spatial_stress_projection");
     expect(ids).toContain("nhm2.tensor.metric_required_stress_energy");
     expect(ids).toContain("nhm2.tensor.tile_effective_counterpart");
+    expect(ids).toContain("nhm2.source.same_basis_tensor_authority");
     expect(ids).toContain("nhm2.source.wall_t00_trace");
     expect(ids).toContain("nhm2.tensor.full_authority_gate");
     expect(ids).toContain("nhm2.tensor.same_chart_full_tensor");
@@ -73,6 +75,11 @@ describe("NHM2 full-solve theory badges", () => {
         }),
         expect.objectContaining({
           from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.closure.wall_t00_source_residual",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.source.same_basis_tensor_authority",
           to: "nhm2.closure.wall_t00_source_residual",
           relation: "requires",
         }),
@@ -113,6 +120,7 @@ describe("NHM2 full-solve theory badges", () => {
     const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
     const nonScalarIds = [
       "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.source.same_basis_tensor_authority",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -154,6 +162,7 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.source.wall_t00_trace",
         "nhm2.tensor.full_authority_gate",
         "nhm2.tensor.same_chart_full_tensor",
+        "nhm2.source.same_basis_tensor_authority",
         "nhm2.closure.same_basis_regional_residual",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
@@ -188,6 +197,7 @@ describe("NHM2 full-solve theory badges", () => {
 
     for (const badgeId of [
       "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.source.same_basis_tensor_authority",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -237,6 +247,18 @@ describe("NHM2 full-solve theory badges", () => {
         }),
         expect.objectContaining({
           from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.closure.wall_t00_source_residual",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.same_chart_full_tensor",
+          to: "nhm2.source.same_basis_tensor_authority",
+        }),
+        expect.objectContaining({
+          from: "nhm2.tensor.tile_effective_counterpart",
+          to: "nhm2.source.same_basis_tensor_authority",
+        }),
+        expect.objectContaining({
+          from: "nhm2.source.same_basis_tensor_authority",
           to: "nhm2.closure.wall_t00_source_residual",
         }),
         expect.objectContaining({

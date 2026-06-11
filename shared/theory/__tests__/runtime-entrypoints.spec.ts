@@ -75,6 +75,9 @@ describe("theory runtime entrypoint registry", () => {
     const sameChartTensorEntrypoints = findTheoryRuntimeEntrypointsForBadge(
       "nhm2.tensor.same_chart_full_tensor",
     ).map((entrypoint) => entrypoint.runtimeId);
+    const sourceAuthorityEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.source.same_basis_tensor_authority",
+    ).map((entrypoint) => entrypoint.runtimeId);
     const observerRobustEntrypoints = findTheoryRuntimeEntrypointsForBadge(
       "nhm2.energy_condition.observer_robust_gate",
     ).map((entrypoint) => entrypoint.runtimeId);
@@ -89,6 +92,9 @@ describe("theory runtime entrypoint registry", () => {
       expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
     );
     expect(sameChartTensorEntrypoints).toEqual(
+      expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(sourceAuthorityEntrypoints).toEqual(
       expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
     );
     expect(observerRobustEntrypoints).toEqual(

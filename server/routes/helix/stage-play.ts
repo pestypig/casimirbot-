@@ -54,7 +54,11 @@ import {
   listStagePlayLiveSourceInterpreterProfiles,
 } from "../../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import {
-  listStagePlayMicroReasonerPrompts,
+  applyStagePlayMicroReasonerPromptPreset,
+  ensureDefaultStagePlayMicroReasonerPromptPresets,
+  getActiveStagePlayMicroReasonerPromptPresetForSource,
+  listStagePlayActiveMicroReasonerPromptsForSource,
+  listStagePlayMicroReasonerPromptPresets,
   listStagePlayMicroReasonerRuns,
   listStagePlayProcessedMailPackets,
 } from "../../services/stage-play/stage-play-processed-mail-packet-store";
@@ -336,6 +340,16 @@ helixStagePlayRouter.options("/visual-observer-profile/apply", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/visual-observer-profile/test", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/micro-reasoner-prompt-preset", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/micro-reasoner-prompt-preset/apply", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -837,6 +851,16 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const activeVisualObserverProfile = getActiveStagePlayVisualObserverProfileForSource({
       sourceId: sourceId ?? mailItems.find((item) => item.sourceKind === "visual_frame")?.sourceId ?? null,
     });
+    const activeMicroReasonerSourceId = sourceId ?? mailItems.at(-1)?.sourceId ?? null;
+    const microReasonerPromptPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: activeMicroReasonerSourceId,
+      includePresets: true,
+      active: true,
+      limit: 100,
+    });
+    const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: activeMicroReasonerSourceId,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -868,10 +892,11 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       }).filter((comparison) =>
         comparison.mailIds.some((mailId) => mailIds.has(mailId))
       ),
-      microReasonerPrompts: listStagePlayMicroReasonerPrompts({
-        active: true,
-        limit: 20,
+      microReasonerPrompts: listStagePlayActiveMicroReasonerPromptsForSource({
+        sourceId: activeMicroReasonerSourceId,
       }),
+      microReasonerPromptPresets,
+      activeMicroReasonerPromptPreset,
       visualObserverProfiles,
       activeVisualObserverProfile,
       microReasonerRuns,
@@ -1340,6 +1365,99 @@ helixStagePlayRouter.post("/visual-observer-profile/test", (req: Request, res: R
       error: "stage-play-visual-observer-profile-test-failed",
       err,
       schema: "stage_play_visual_observer_profile_test_result/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/micro-reasoner-prompt-preset", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    ensureDefaultStagePlayMicroReasonerPromptPresets();
+    const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const presetId = readQueryString(req.query.presetId) ?? readQueryString(req.query.preset_id);
+    const presets = listStagePlayMicroReasonerPromptPresets({
+      sourceId,
+      includePresets: req.query.includePresets !== "false",
+      active: true,
+      limit: 100,
+    });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId, presetId });
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId,
+      presetId: activePreset?.presetId ?? presetId,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_micro_reasoner_prompt_preset_list_response/v1",
+      presets,
+      activePreset,
+      active_preset: activePreset,
+      prompts,
+      microReasonerPrompts: prompts,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-micro-reasoner-prompt-preset-list-failed",
+      err,
+      schema: "stage_play_micro_reasoner_prompt_preset_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const presetId = readQueryString(body.presetId) ?? readQueryString(body.preset_id);
+    const sourceIds = readStringArray(body.sourceIds ?? body.source_ids);
+    if (!presetId || sourceIds.length === 0) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
+        error: "missing_preset_or_source",
+        message: "presetId/preset_id and at least one source id are required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds });
+    if (!preset) {
+      return stagePlayJsonError(res, 404, {
+        schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
+        error: "micro_reasoner_prompt_preset_not_found",
+        message: `Micro-reasoner prompt preset was not found: ${presetId}`,
+        contextRole: "tool_evidence",
+      });
+    }
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId: sourceIds[0] ?? null,
+      presetId: preset.presetId,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
+      preset,
+      prompts,
+      sourceIds,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-micro-reasoner-prompt-preset-apply-failed",
+      err,
+      schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
       contextRole: "tool_evidence",
     });
   }

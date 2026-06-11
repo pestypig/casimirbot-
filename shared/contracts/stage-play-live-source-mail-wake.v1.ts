@@ -63,6 +63,7 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   askLaunchStartedAt?: string | null;
   askLaunchCompletedAt?: string | null;
   askLaunchRouteMetadata?: Record<string, unknown> | null;
+  routeMetadata?: Record<string, unknown> | null;
   decisionIds: string[];
   attemptCount: number;
   lastAttemptAt?: string | null;

@@ -31,6 +31,10 @@ import type { HelixLiveLineToolRequest } from "@shared/helix-live-line-tool-requ
 import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@shared/helix-live-card-line-state";
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
+import type {
+  StagePlayMicroReasonerPromptPresetV1,
+  StagePlayMicroReasonerPromptV1,
+} from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
 import type { HelixVisualFrameActionReplayRequest } from "@shared/helix-visual-frame-action-replay";
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
@@ -305,6 +309,14 @@ type VisualObserverProfileListRead = {
   profiles?: StagePlayVisualObserverProfileV1[];
   activeProfile?: StagePlayVisualObserverProfileV1 | null;
   active_profile?: StagePlayVisualObserverProfileV1 | null;
+};
+
+type MicroReasonerPromptPresetListRead = {
+  presets?: StagePlayMicroReasonerPromptPresetV1[];
+  activePreset?: StagePlayMicroReasonerPromptPresetV1 | null;
+  active_preset?: StagePlayMicroReasonerPromptPresetV1 | null;
+  prompts?: StagePlayMicroReasonerPromptV1[];
+  microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
 };
 
 type SourceBindingTransitionRead = {
