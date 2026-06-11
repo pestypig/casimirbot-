@@ -4088,8 +4088,7 @@ function StagePlayMailLoopLiveOverview({
     latestStagePlayMailWakeRequest(wakeRequests, latestMail?.mailId) ??
     latestStagePlayMailWakeRequest(wakeRequests);
   const latestWakeResult =
-    latestStagePlayMailWakeResult(wakeResults, latestWake?.wakeRequestId ?? null) ??
-    latestStagePlayMailWakeResult(wakeResults);
+    latestWake ? latestStagePlayMailWakeResult(wakeResults, latestWake.wakeRequestId) : null;
   const liveOverviewPendingWakes = wakeRequests.filter((wake) =>
     wake.status === "queued" ||
     wake.status === "waiting_for_ui_handoff" ||
