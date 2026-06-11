@@ -12,6 +12,7 @@ import {
   latestDirectAnswerSequence,
   materializeFinalAnswerDraftTerminal,
 } from "./final-answer-draft-terminal-materializer";
+import { attachHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -368,66 +369,11 @@ const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
     );
   });
 
-const isInternetSearchObservation = (artifact: ArtifactLike): boolean =>
-  /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "));
-
-const isTheoryLocatorObservation = (artifact: ArtifactLike): boolean =>
-  artifactMatchesObservationKind(artifact, /helix_theory_context_reflection_tool_receipt|theory_context_reflection/i);
-
-const isItineraryFamilyObserved = (family: string, artifacts: ArtifactLike[]): boolean => {
-  if (family === "scholarly_research") return artifacts.some(isScholarlyResearchObservation);
-  if (family === "internet_search") return artifacts.some(isInternetSearchObservation);
-  if (family === "theory_locator") return artifacts.some(isTheoryLocatorObservation);
-  if (family === "repo_code") return artifacts.some((artifact) => /repo_code_evidence_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
-  if (family === "docs_viewer") return artifacts.some((artifact) => /doc_|docs_viewer/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
-  if (family === "live_environment") return artifacts.some((artifact) => artifactKind(artifact) === "live_environment_tool_observation");
-  if (family === "workstation_action" || family === "notes") {
-    return artifacts.some((artifact) => /workspace_action_receipt|note_update_receipt|workstation_tool_evaluation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
-  }
-  return artifacts.some((artifact) => artifactMatchesObservationKind(artifact, new RegExp(family.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")));
-};
-
 const attachItineraryExecutionState = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
 ): string[] => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  if (terminalCriteria?.requires_post_observation_synthesis !== true) return [];
-  const requiredFamilies = readArray(terminalCriteria.required_observation_families)
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
-  const admittedFamilies = readArray(itinerary?.admitted_tool_families)
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
-  const observedFamilies = requiredFamilies.filter((family) => isItineraryFamilyObserved(family, artifacts));
-  const missingFamilies = requiredFamilies.filter((family) => !observedFamilies.includes(family));
-  const executionState = {
-    schema: "helix.capability_itinerary_execution_state.v1",
-    required_observation_families: requiredFamilies,
-    admitted_tool_families: admittedFamilies,
-    observed_families: observedFamilies,
-    missing_observation_families: missingFamilies,
-    complete: missingFamilies.length === 0,
-    assistant_answer: false,
-    raw_content_included: false,
-  };
-  payload.capability_itinerary_execution_state = executionState;
-  if (itinerary) {
-    itinerary.execution_state = {
-      required_observation_families: requiredFamilies,
-      admitted_tool_families: admittedFamilies,
-      observed_families: observedFamilies,
-      missing_observation_families: missingFamilies,
-      complete: missingFamilies.length === 0,
-    };
-  }
-  const debug = readRecord(payload.debug);
-  if (debug) {
-    debug.capability_itinerary_execution_state = executionState;
-    if (itinerary) debug.capability_itinerary = itinerary;
-  }
-  return missingFamilies;
+  return attachHelixCapabilityItineraryExecutionState(payload, artifacts);
 };
 
 type ScholarlyCitation = {

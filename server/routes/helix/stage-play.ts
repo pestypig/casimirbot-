@@ -4,6 +4,7 @@ import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-p
 import type {
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailTranscriptEntryV1,
+  StagePlayMicroReasonerRoleV1,
 } from "../../../shared/contracts/stage-play-live-source-mail.v1";
 import { buildStagePlayGraphFromWorld } from "../../services/stage-play/stage-play-badge-graph-builder";
 import {
@@ -43,6 +44,7 @@ import {
   listStagePlayLiveSourceNarrativeStates,
 } from "../../services/stage-play/stage-play-live-source-narrative-store";
 import {
+  dismissStagePlayMailWakeRequest,
   expireStaleStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeRequests,
   listStagePlayLiveSourceMailWakeResults,
@@ -59,8 +61,10 @@ import {
   getActiveStagePlayMicroReasonerPromptPresetForSource,
   listStagePlayActiveMicroReasonerPromptsForSource,
   listStagePlayMicroReasonerPromptPresets,
+  listStagePlayMicroReasonerPromptToolActivities,
   listStagePlayMicroReasonerRuns,
   listStagePlayProcessedMailPackets,
+  recordStagePlayCustomMicroReasonerPromptPreset,
 } from "../../services/stage-play/stage-play-processed-mail-packet-store";
 import {
   applyStagePlayVisualObserverProfile,
@@ -314,6 +318,11 @@ helixStagePlayRouter.options("/live-source-mail/wake", (_req, res) => {
   res.status(200).end();
 });
 
+helixStagePlayRouter.options("/live-source-mail/wake/dismiss", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
 helixStagePlayRouter.options("/live-source-mail/wake/run", (_req, res) => {
   setCors(res);
   res.status(200).end();
@@ -370,6 +379,34 @@ const readStringArray = (value: unknown): string[] =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const STAGE_PLAY_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
+  "claim_extractor",
+  "observation_classifier",
+  "effort_estimator",
+  "axiom_extractor",
+  "hypothesis_generator",
+  "profile_comparator",
+  "delta_extractor",
+  "prediction_validator",
+  "salience_scorer",
+  "hypothesis_arbiter",
+  "decision_selector",
+  "voice_callout_drafter",
+  "packet_composer",
+];
+
+const readMicroReasonerRole = (value: unknown): StagePlayMicroReasonerRoleV1 | null => {
+  const role = readQueryString(value);
+  return role && STAGE_PLAY_MICRO_REASONER_ROLES.includes(role as StagePlayMicroReasonerRoleV1)
+    ? role as StagePlayMicroReasonerRoleV1
+    : null;
+};
+
+const readMicroReasonerRoles = (value: unknown): StagePlayMicroReasonerRoleV1[] =>
+  readStringArray(value).filter((role): role is StagePlayMicroReasonerRoleV1 =>
+    STAGE_PLAY_MICRO_REASONER_ROLES.includes(role as StagePlayMicroReasonerRoleV1)
+  );
 
 const stagePlayVisualSummaryText = (text: string): string =>
   text.trim().replace(/\s+/g, " ").slice(0, 1200);
@@ -897,6 +934,10 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       }),
       microReasonerPromptPresets,
       activeMicroReasonerPromptPreset,
+      microReasonerPromptToolActivities: listStagePlayMicroReasonerPromptToolActivities({
+        sourceId: activeMicroReasonerSourceId,
+        limit: 12,
+      }),
       visualObserverProfiles,
       activeVisualObserverProfile,
       microReasonerRuns,
@@ -1412,6 +1453,68 @@ helixStagePlayRouter.get("/micro-reasoner-prompt-preset", (req: Request, res: Re
   }
 });
 
+helixStagePlayRouter.post("/micro-reasoner-prompt-preset", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const template = readQueryString(body.template) ?? readQueryString(body.prompt);
+    const role = readMicroReasonerRole(body.role);
+    if (!template || !role) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+        error: "missing_prompt_or_role",
+        message: "template/prompt and a valid micro-reasoner role are required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const sourceIds = readStringArray(body.sourceIds ?? body.source_ids);
+    const result = recordStagePlayCustomMicroReasonerPromptPreset({
+      title: readQueryString(body.title),
+      description: readQueryString(body.description),
+      basePresetId: readQueryString(body.basePresetId) ?? readQueryString(body.base_preset_id),
+      role,
+      template,
+      sourceIds,
+      promptedRoles: readMicroReasonerRoles(body.promptedRoles ?? body.prompted_roles),
+    });
+    if (!result) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+        error: "custom_micro_reasoner_preset_not_created",
+        message: "Custom MicroDeck preset could not be created from the supplied prompt.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId: sourceIds[0] ?? null,
+      presetId: result.preset.presetId,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+      preset: result.preset,
+      prompt: result.prompt,
+      prompts,
+      microReasonerPrompts: prompts,
+      sourceIds,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-micro-reasoner-prompt-preset-create-failed",
+      err,
+      schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
 helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -1560,6 +1663,56 @@ helixStagePlayRouter.post("/live-source-mail/wake", (req: Request, res: Response
       error: "stage-play-live-source-mail-wake-queue-failed",
       err,
       schema: "stage_play_live_source_mail_wake_queue_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/wake/dismiss", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const wakeRequestId =
+      readQueryString(body.wakeRequestId) ??
+      readQueryString(body.wake_request_id) ??
+      readQueryString(req.query.wakeRequestId) ??
+      readQueryString(req.query.wake_request_id);
+    if (!wakeRequestId) {
+      return res.status(400).json({
+        ok: false,
+        schema: "stage_play_live_source_mail_wake_dismiss_response/v1",
+        error: "missing_wake_request_id",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+        raw_content_included: false,
+      });
+    }
+    const dismissed = dismissStagePlayMailWakeRequest({
+      wakeRequestId,
+      reason: readQueryString(body.reason) ?? "operator_dismissed",
+      dismissedBy: "operator",
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_live_source_mail_wake_dismiss_response/v1",
+      wakeRequestId,
+      dismissed: Boolean(dismissed),
+      wakeRequest: dismissed?.wakeRequest ?? null,
+      wakeResult: dismissed?.wakeResult ?? null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-live-source-mail-wake-dismiss-failed",
+      err,
+      schema: "stage_play_live_source_mail_wake_dismiss_response/v1",
       contextRole: "tool_evidence",
     });
   }

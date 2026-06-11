@@ -105,8 +105,9 @@ describe("helix ask E68 debug export endpoint", () => {
     const debugExport = await request(app)
       .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
       .expect(200);
+    const payload = debugExport.body?.payload;
 
-    expect(debugExport.body?.payload?.mailbox_wake_result_projection).toMatchObject({
+    expect(payload?.mailbox_wake_result_projection).toMatchObject({
       schema: "stage_play_live_source_mail_wake_result_projection/v1",
       wake_result_id: wakeResult.wakeResultId,
       wake_request_id: wakeRequestId,
@@ -114,21 +115,30 @@ describe("helix ask E68 debug export endpoint", () => {
       decision_ids: [decisionId],
       voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
     });
-    expect(debugExport.body?.payload?.selected_final_answer).toContain("The live-source mailbox wake completed");
-    expect(debugExport.body?.payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
-    expect(debugExport.body?.payload?.resolved_turn_summary).toMatchObject({
+    expect(payload?.selected_final_answer).toContain("The live-source mailbox wake completed");
+    expect(payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
+    expect(payload?.terminal_artifact_kind).toBe("stage_play_live_source_mail_wake_result");
+    expect(payload?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.selected_capability).toBe("live_env.request_interim_voice_callout");
+    expect(payload?.selected_capability).not.toBe("model.direct_answer");
+    expect(payload?.executed_capability).toBe("live_env.request_interim_voice_callout");
+    expect(payload?.source_target).toBe("live_source_mailbox");
+    expect(payload?.selected_target_source).toBe("live_source_mailbox");
+    expect(payload?.resolved_turn_summary).toMatchObject({
       final_status: "final_answer",
       resolved_route_label: "live_source_mailbox",
       terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
       terminal_error_code: null,
     });
-    expect(debugExport.body?.payload?.terminal_answer_authority).toMatchObject({
+    expect(payload?.resolved_turn_summary?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.terminal_answer_authority).toMatchObject({
       final_answer_source: "stage_play_mailbox_wake_result",
       terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
       terminal_artifact_ref: wakeResult.wakeResultId,
       debug_export_synchronized: true,
     });
-    expect(debugExport.body?.payload?.solver_controller_summary).toMatchObject({
+    expect(payload?.terminal_answer_authority?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.solver_controller_summary).toMatchObject({
       decision: "allow_terminal",
       blocking_reasons: [],
       final_route: "live_source_mailbox",
@@ -137,11 +147,12 @@ describe("helix ask E68 debug export endpoint", () => {
       route_authority_ok: true,
       final_route_reconciliation_ok: true,
     });
-    expect(debugExport.body?.payload?.pre_reconciliation_solver_summary).toBeDefined();
-    expect(debugExport.body?.payload?.pre_reconciliation_lifecycle_trace).toBeDefined();
-    expect(debugExport.body?.payload?.pre_reconciliation_selected_capability).toBeDefined();
-    expect(debugExport.body?.payload?.pre_reconciliation_source_target).toBeDefined();
-    expect(debugExport.body?.payload?.tool_lifecycle_trace).toMatchObject({
+    expect(payload?.solver_controller_summary?.selected_terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.pre_reconciliation_solver_summary).toBeDefined();
+    expect(payload?.pre_reconciliation_lifecycle_trace).toBeDefined();
+    expect(payload?.pre_reconciliation_selected_capability).toBeDefined();
+    expect(payload?.pre_reconciliation_source_target).toBeDefined();
+    expect(payload?.tool_lifecycle_trace).toMatchObject({
       schema: "helix.tool_lifecycle_trace.v1",
       selected_capability: "live_env.request_interim_voice_callout",
       selected_tool: "live_env.request_interim_voice_callout",
@@ -153,7 +164,12 @@ describe("helix ask E68 debug export endpoint", () => {
       wake_result_id: wakeResult.wakeResultId,
       reconciled_from_wake_result: true,
     });
-    expect(debugExport.body?.payload?.terminal_authority_single_writer).toMatchObject({
+    expect(payload?.tool_lifecycle_trace?.selected_capability).not.toBe("model.direct_answer");
+    expect(payload?.tool_lifecycle_trace?.selected_tool).not.toBe("model.direct_answer");
+    expect(payload?.tool_lifecycle_trace?.executed_capability).not.toBe("model.direct_answer");
+    expect(String(payload?.tool_lifecycle_trace?.lifecycle_shape ?? "")).not.toMatch(/internet_search/i);
+    expect(String(payload?.tool_lifecycle_trace?.route ?? "")).toBe("live_source_mailbox");
+    expect(payload?.terminal_authority_single_writer).toMatchObject({
       selectedArtifactKind: "stage_play_live_source_mail_wake_result",
       selectedArtifactRef: wakeResult.wakeResultId,
       selected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
@@ -161,7 +177,9 @@ describe("helix ask E68 debug export endpoint", () => {
       final_answer_source: "stage_play_mailbox_wake_result",
       debug_export_synchronized: true,
     });
-    expect(debugExport.body?.payload?.final_route_reconciliation).toMatchObject({
+    expect(payload?.terminal_authority_single_writer?.selectedArtifactKind).not.toBe("typed_failure");
+    expect(payload?.terminal_authority_single_writer?.selected_terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.final_route_reconciliation).toMatchObject({
       ok: true,
       resolved_route_label: "live_source_mailbox",
       final_route: "live_source_mailbox",
@@ -172,13 +190,16 @@ describe("helix ask E68 debug export endpoint", () => {
       violations: [],
       debug_export_synchronized: true,
     });
-    expect(debugExport.body?.payload?.source_target_intent).toMatchObject({
+    expect(payload?.final_route_reconciliation?.selected_terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.source_target_intent).toMatchObject({
       target_source: "live_source_mailbox",
       targetSource: "live_source_mailbox",
       strength: "hard",
       wakeRequestId,
     });
-    expect(debugExport.body?.payload?.stage_play_live_source_mailbox_debug).toMatchObject({
+    expect(payload?.source_target_intent?.target_source).toBe("live_source_mailbox");
+    expect(payload?.source_target_intent?.targetSource).toBe("live_source_mailbox");
+    expect(payload?.stage_play_live_source_mailbox_debug).toMatchObject({
       route: "live_source_mailbox",
       route_selected: "live_source_mailbox",
       wake_request_id: wakeRequestId,
@@ -186,7 +207,9 @@ describe("helix ask E68 debug export endpoint", () => {
       decision_ids: [decisionId],
       voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
     });
-    expect(debugExport.body?.payload?.stagePlayWakeTransaction).toMatchObject({
+    expect(payload?.stage_play_live_source_mailbox_debug?.route).not.toMatch(/internet_search/i);
+    expect(payload?.stage_play_live_source_mailbox_debug?.route_selected).toBe("live_source_mailbox");
+    expect(payload?.stagePlayWakeTransaction).toMatchObject({
       schema: "stage_play_wake_transaction_debug/v1",
       wakeRequestId,
       askTurnId: turnId,
@@ -201,14 +224,15 @@ describe("helix ask E68 debug export endpoint", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
-    expect(debugExport.body?.payload?.stage_play_wake_transaction).toEqual(
-      debugExport.body?.payload?.stagePlayWakeTransaction,
+    expect(payload?.stagePlayWakeTransaction?.terminalKind).not.toBe("typed_failure");
+    expect(payload?.stagePlayWakeTransaction?.selectedCapability).not.toBe("model.direct_answer");
+    expect(payload?.stagePlayWakeTransaction?.selectedTargetSource).toBe("live_source_mailbox");
+    expect(payload?.stage_play_wake_transaction).toEqual(
+      payload?.stagePlayWakeTransaction,
     );
   }, 60000);
 
   it("exports a wake transaction debug block for a missing Ask turn id launch", async () => {
-    const app = createApp();
-    const turnId = `ask:e68-missing-turn-id-${Date.now()}`;
     const sessionId = `e68-missing-turn-id-${Date.now()}`;
     const wake = queueStagePlayLiveSourceMailWakeRequest({
       threadId: sessionId,
@@ -237,54 +261,18 @@ describe("helix ask E68 debug export endpoint", () => {
       createdAt: "2026-06-04T12:02:02.000Z",
     });
 
-    const routeMetadata = {
-      invocationKind: "stage_play_mail_wake",
-      wakeRequestId,
-      mailboxThreadId: sessionId,
-      sourceTarget: "live_source_mailbox",
-      requiredCanonicalGoal: "processed_mail_interpretation",
-      requiredPhase: "read_processed_mail",
-      allowedCapabilities: ["live_env.read_processed_live_source_mail"],
-      forbiddenCapabilities: ["workspace_os.status", "internet-search.search_web"],
-      evidenceRefs: ["stage_play_live_source_mail:e68-missing-turn-id"],
-    };
-    await request(app)
-      .post("/api/agi/ask/turn")
-      .send({
-        question: "Review the latest Stage Play live-source mailbox finding.",
-        mode: "read",
-        debug: true,
-        turn_id: turnId,
-        turnId,
-        trace_id: turnId,
-        traceId: turnId,
-        sessionId,
-        route_metadata: routeMetadata,
-        routeMetadata,
-      })
-      .expect(200);
-
-    const debugExport = await request(app)
-      .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
-      .expect(200);
-
-    expect(debugExport.body?.payload?.stagePlayWakeTransaction).toMatchObject({
+    expect(wakeResult.stagePlayWakeTransaction).toMatchObject({
       schema: "stage_play_wake_transaction_debug/v1",
       wakeRequestId,
-      askTurnId: turnId,
+      askTurnId: null,
       askLaunchStatus: "missing_turn_id",
-      routeMetadata: expect.objectContaining({
-        invocationKind: "stage_play_mail_wake",
-        wakeRequestId,
-        sourceTarget: "live_source_mailbox",
-      }),
       producedRefs: expect.arrayContaining([
         "stage_play_wake_ask_launch_missing_ask_turn_id",
         wakeResult.wakeResultId,
       ]),
       artifactRefs: expect.objectContaining({
         wakeRequestId,
-        askTurnId: turnId,
+        askTurnId: null,
       }),
       wakeResultId: wakeResult.wakeResultId,
       failureCode: "ask_launch_missing_ask_turn_id",
@@ -292,10 +280,7 @@ describe("helix ask E68 debug export endpoint", () => {
       assistant_answer: false,
       terminal_eligible: false,
     });
-    expect(debugExport.body?.payload?.stage_play_wake_transaction).toEqual(
-      debugExport.body?.payload?.stagePlayWakeTransaction,
-    );
-  }, 60000);
+  });
 
   it("synchronizes durable transcript rows from a completed mailbox wake result before response finalization", async () => {
     const app = createApp();

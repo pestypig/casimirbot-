@@ -19,6 +19,7 @@ import type {
   StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceWatchJobPolicyV1,
@@ -128,11 +129,19 @@ import {
   buildStagePlayProcessedMailPacket,
 } from "../stage-play/stage-play-processed-mail-packet";
 import {
+  applyStagePlayMicroReasonerPromptPreset,
+  ensureDefaultStagePlayMicroReasonerPromptPresets,
   getActiveStagePlayMicroReasonerPromptForRole,
+  getActiveStagePlayMicroReasonerPromptPresetForSource,
+  listStagePlayActiveMicroReasonerPromptsForSource,
+  listStagePlayMicroReasonerPromptPresets,
   listStagePlayMicroReasonerPrompts,
+  listStagePlayMicroReasonerPromptToolActivities,
   listStagePlayMicroReasonerRuns,
   listStagePlayProcessedMailPackets,
+  recordStagePlayCustomMicroReasonerPromptPreset,
   recordStagePlayMicroReasonerPrompt,
+  recordStagePlayMicroReasonerPromptToolActivity,
 } from "../stage-play/stage-play-processed-mail-packet-store";
 import {
   applyStagePlayVisualObserverProfile,
@@ -192,6 +201,34 @@ const readStringArray = (value: unknown): string[] =>
   Array.isArray(value)
     ? Array.from(new Set(value.map(readString).filter((entry): entry is string => Boolean(entry))))
     : [];
+
+const STAGE_PLAY_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
+  "claim_extractor",
+  "observation_classifier",
+  "effort_estimator",
+  "axiom_extractor",
+  "hypothesis_generator",
+  "profile_comparator",
+  "delta_extractor",
+  "prediction_validator",
+  "salience_scorer",
+  "hypothesis_arbiter",
+  "packet_composer",
+  "decision_selector",
+  "voice_callout_drafter",
+];
+
+const readMicroReasonerRole = (value: unknown): StagePlayMicroReasonerRoleV1 | null => {
+  const role = readString(value);
+  return role && STAGE_PLAY_MICRO_REASONER_ROLES.includes(role as StagePlayMicroReasonerRoleV1)
+    ? role as StagePlayMicroReasonerRoleV1
+    : null;
+};
+
+const readMicroReasonerRoles = (value: unknown): StagePlayMicroReasonerRoleV1[] =>
+  readStringArray(value).filter((role): role is StagePlayMicroReasonerRoleV1 =>
+    STAGE_PLAY_MICRO_REASONER_ROLES.includes(role as StagePlayMicroReasonerRoleV1)
+  );
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -2315,6 +2352,310 @@ export function executeLiveEnvironmentTool(
             ]
           : []),
       ],
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.query_micro_reasoner_presets" ||
+    input.tool_name === "live_env.apply_micro_reasoner_preset" ||
+    input.tool_name === "live_env.create_micro_reasoner_preset"
+  ) {
+    ensureDefaultStagePlayMicroReasonerPromptPresets();
+    const sourceIds = uniqueStrings([
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ]);
+    const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
+    const presetId = readString(args.preset_id) ?? readString(args.presetId);
+    const basePresetId = readString(args.base_preset_id) ?? readString(args.basePresetId);
+    const activityAction =
+      input.tool_name === "live_env.apply_micro_reasoner_preset"
+        ? "apply"
+        : input.tool_name === "live_env.create_micro_reasoner_preset"
+          ? "create"
+          : "query";
+    const activityId = `stage_play_micro_reasoner_prompt_tool_activity:${hashShort([
+      input.thread_id,
+      input.environment_id ?? null,
+      input.tool_name,
+      sourceIds,
+      presetId ?? basePresetId ?? null,
+      Date.now(),
+    ])}`;
+    const now = new Date().toISOString();
+    recordStagePlayMicroReasonerPromptToolActivity({
+      activityId,
+      toolName: input.tool_name,
+      action: activityAction,
+      status: "running",
+      summary: `${input.tool_name} started.`,
+      sourceIds,
+      presetId: presetId ?? basePresetId ?? null,
+      promptId: null,
+      createdAt: now,
+      updatedAt: now,
+      evidenceRefs: uniqueStrings([presetId, basePresetId, ...sourceIds]),
+    });
+
+    if (input.tool_name === "live_env.apply_micro_reasoner_preset") {
+      if (!presetId || sourceIds.length === 0) {
+        recordStagePlayMicroReasonerPromptToolActivity({
+          activityId,
+          toolName: input.tool_name,
+          action: "apply",
+          status: "failed",
+          summary: "MicroDeck preset apply requires preset_id/presetId and at least one source id.",
+          sourceIds,
+          presetId,
+          promptId: null,
+          createdAt: now,
+          updatedAt: new Date().toISOString(),
+          evidenceRefs: uniqueStrings([presetId, ...sourceIds]),
+        });
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: "MicroDeck preset apply requires a preset and source.",
+          observation: {
+            schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
+            applied: false,
+            reason: "missing_preset_or_source",
+            presetId,
+            sourceIds,
+            source_ids: sourceIds,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: uniqueStrings([presetId, ...sourceIds, activityId]),
+        });
+      }
+      const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds });
+      const prompts = preset
+        ? listStagePlayActiveMicroReasonerPromptsForSource({
+            sourceId,
+            presetId: preset.presetId,
+          })
+        : [];
+      const summary = preset
+        ? `Applied MicroDeck preset ${preset.title} to ${sourceIds.length} source(s).`
+        : `MicroDeck preset was not found: ${presetId}.`;
+      recordStagePlayMicroReasonerPromptToolActivity({
+        activityId,
+        toolName: input.tool_name,
+        action: "apply",
+        status: preset ? "completed" : "failed",
+        summary,
+        sourceIds,
+        presetId,
+        promptId: null,
+        createdAt: now,
+        updatedAt: new Date().toISOString(),
+        evidenceRefs: uniqueStrings([presetId, ...sourceIds, ...prompts.map((prompt) => prompt.promptId)]),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: Boolean(preset),
+        summary,
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
+          applied: Boolean(preset),
+          reason: preset ? "applied" : "micro_reasoner_prompt_preset_not_found",
+          preset,
+          prompts,
+          microReasonerPrompts: prompts,
+          sourceIds,
+          source_ids: sourceIds,
+          toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([presetId, ...sourceIds, ...prompts.map((prompt) => prompt.promptId), activityId]),
+        producedRefs: preset ? uniqueStrings([preset.presetId]) : [],
+      });
+    }
+
+    if (input.tool_name === "live_env.create_micro_reasoner_preset") {
+      const role = readMicroReasonerRole(args.role);
+      const template = readString(args.template) ?? readString(args.prompt);
+      if (!role || !template) {
+        recordStagePlayMicroReasonerPromptToolActivity({
+          activityId,
+          toolName: input.tool_name,
+          action: "create",
+          status: "failed",
+          summary: "Custom MicroDeck creation requires a valid role and template/prompt.",
+          sourceIds,
+          presetId: basePresetId ?? presetId,
+          promptId: null,
+          createdAt: now,
+          updatedAt: new Date().toISOString(),
+          evidenceRefs: uniqueStrings([basePresetId, presetId, ...sourceIds]),
+        });
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: false,
+          summary: "Custom MicroDeck creation requires a valid role and prompt template.",
+          observation: {
+            schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+            created: false,
+            reason: !role ? "missing_or_invalid_role" : "missing_template",
+            sourceIds,
+            source_ids: sourceIds,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: uniqueStrings([basePresetId, presetId, ...sourceIds, activityId]),
+        });
+      }
+      const result = recordStagePlayCustomMicroReasonerPromptPreset({
+        title: readString(args.title),
+        description: readString(args.description),
+        basePresetId: basePresetId ?? presetId,
+        role,
+        template,
+        sourceIds,
+        promptedRoles: readMicroReasonerRoles(args.prompted_roles ?? args.promptedRoles),
+      });
+      const prompts = result
+        ? listStagePlayActiveMicroReasonerPromptsForSource({
+            sourceId,
+            presetId: result.preset.presetId,
+          })
+        : [];
+      const summary = result
+        ? `Created custom MicroDeck preset ${result.preset.title}.`
+        : "Custom MicroDeck preset could not be created from the supplied prompt.";
+      recordStagePlayMicroReasonerPromptToolActivity({
+        activityId,
+        toolName: input.tool_name,
+        action: "create",
+        status: result ? "completed" : "failed",
+        summary,
+        sourceIds,
+        presetId: result?.preset.presetId ?? basePresetId ?? presetId,
+        promptId: result?.prompt.promptId ?? null,
+        createdAt: now,
+        updatedAt: new Date().toISOString(),
+        evidenceRefs: uniqueStrings([
+          result?.preset.presetId,
+          result?.prompt.promptId,
+          ...sourceIds,
+          ...prompts.map((prompt) => prompt.promptId),
+        ]),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: Boolean(result),
+        summary,
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+          created: Boolean(result),
+          reason: result ? "created" : "custom_micro_reasoner_preset_not_created",
+          preset: result?.preset ?? null,
+          prompt: result?.prompt ?? null,
+          prompts,
+          microReasonerPrompts: prompts,
+          sourceIds,
+          source_ids: sourceIds,
+          toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([
+          result?.preset.presetId,
+          result?.prompt.promptId,
+          ...sourceIds,
+          ...prompts.map((prompt) => prompt.promptId),
+          activityId,
+        ]),
+        producedRefs: result ? uniqueStrings([result.preset.presetId, result.prompt.promptId]) : [],
+      });
+    }
+
+    const presets = listStagePlayMicroReasonerPromptPresets({
+      sourceId,
+      includePresets: args.include_presets !== false && args.includePresets !== false,
+      active: true,
+      limit: readNumber(args.limit, 100),
+    });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId,
+      presetId,
+    });
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId,
+      presetId: activePreset?.presetId ?? presetId,
+    });
+    const summary = `Found ${presets.length} MicroDeck preset(s) and ${prompts.length} prompt(s).`;
+    recordStagePlayMicroReasonerPromptToolActivity({
+      activityId,
+      toolName: input.tool_name,
+      action: "query",
+      status: "completed",
+      summary,
+      sourceIds,
+      presetId: activePreset?.presetId ?? presetId,
+      promptId: null,
+      createdAt: now,
+      updatedAt: new Date().toISOString(),
+      evidenceRefs: uniqueStrings([
+        activePreset?.presetId,
+        ...presets.map((preset) => preset.presetId),
+        ...prompts.map((prompt) => prompt.promptId),
+        ...sourceIds,
+      ]),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary,
+      observation: {
+        schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+        presets,
+        activePreset,
+        active_preset: activePreset,
+        prompts,
+        microReasonerPrompts: prompts,
+        sourceId,
+        source_id: sourceId,
+        sourceIds,
+        source_ids: sourceIds,
+        toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([
+        activePreset?.presetId,
+        ...presets.map((preset) => preset.presetId),
+        ...prompts.map((prompt) => prompt.promptId),
+        ...sourceIds,
+        activityId,
+      ]),
     });
   }
 

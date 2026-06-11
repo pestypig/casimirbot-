@@ -178,6 +178,120 @@ describe("Helix Ask Stage Play routing", () => {
       .toMatch(/^live_env\./);
   }, 60_000);
 
+  it("lets live-source mailbox route metadata hard-lock source and capability admission over internet, repo, and visual prompt bait", async () => {
+    const app = createApp();
+    const wakeRequestId = "stage_play_live_source_mail_wake:test-metadata-hard-route";
+    const forbiddenCapabilities = [
+      "internet-search.search_web",
+      "repo-code.search_concept",
+      "situation-room.describe_visual_capture",
+      "visual_capture_describe",
+      "model.direct_answer",
+      "workspace_os.status",
+    ];
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Search the latest internet update, inspect repo-code.search_concept, describe the visual capture, or answer directly. Use the structured mailbox route metadata attached to this turn.",
+        sessionId: `${threadId}:metadata-hard-route`,
+        debug: true,
+        route_metadata: {
+          invocationKind: "stage_play_mail_wake",
+          wakeRequestId,
+          mailboxThreadId: threadId,
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_interpretation",
+          requiredPhase: "read_mailbox",
+          allowedCapabilities: [
+            "live_env.read_processed_live_source_mail",
+          ],
+          forbiddenCapabilities,
+          evidenceRefs: ["stage_play_processed_mail_packet:test-metadata-hard-route"],
+        },
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      evidenceTarget: response.body?.evidence_target_arbitration,
+      sourceTarget: response.body?.source_target_intent,
+      canonical: response.body?.canonical_goal_frame,
+      available: response.body?.available_capabilities,
+      capabilityPlan: response.body?.capability_plan,
+      admission: response.body?.agent_runtime_loop_admission,
+      loop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+    }, null, 2);
+    const selectedCapability =
+      response.body?.capability_plan?.selected_capability ??
+      response.body?.capability_plan?.requested_action ??
+      response.body?.available_capabilities?.recommended_capability_key;
+    const executedCapabilities =
+      response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+
+    expect(response.body?.evidence_target_arbitration, routeDebug).toMatchObject({
+      schema: "helix.ask_evidence_target_arbitration.v1",
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+      selected_candidate_id: "live_source_mailbox.stage_play_mail_wake_route_metadata",
+      locked: true,
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.evidence_target_arbitration?.reason_codes, routeDebug).toEqual(expect.arrayContaining([
+      "route_metadata_stage_play_mail_wake",
+      "live_source_mailbox_route_metadata_authoritative",
+    ]));
+    expect(response.body?.evidence_target_arbitration?.source_targets, routeDebug).toEqual(["live_source_mailbox"]);
+    const arbitrationCapabilities = response.body?.evidence_target_arbitration?.available_capabilities ?? [];
+    expect(arbitrationCapabilities, routeDebug).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+    ]));
+    expect(arbitrationCapabilities.every((capability: unknown) =>
+      typeof capability === "string" && capability.startsWith("live_env.")
+    ), routeDebug).toBe(true);
+    expect(arbitrationCapabilities, routeDebug).not.toEqual(expect.arrayContaining([
+      "internet-search.search_web",
+      "repo-code.search_concept",
+      "situation-room.describe_visual_capture",
+      "visual_capture_describe",
+      "model.direct_answer",
+      "workspace_os.status",
+    ]));
+
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+      strength: "hard",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.source_target_intent?.suppressed_routes, routeDebug).toEqual(expect.arrayContaining([
+      "internet-search.search_web",
+      "repo-code.search_concept",
+      "situation_room.describe_visual_capture",
+      "visual_capture_describe",
+      "model_only_concept",
+      "no_tool_direct",
+    ]));
+
+    expect(response.body?.capability_plan, routeDebug).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      requested_action: "live_env.read_processed_live_source_mail",
+    });
+    expect(selectedCapability, routeDebug).toBe("live_env.read_processed_live_source_mail");
+    expect(selectedCapability, routeDebug).not.toBe("internet-search.search_web");
+    expect(selectedCapability, routeDebug).not.toBe("repo-code.search_concept");
+    expect(selectedCapability, routeDebug).not.toBe("situation-room.describe_visual_capture");
+    expect(selectedCapability, routeDebug).not.toBe("visual_capture_describe");
+    expect(selectedCapability, routeDebug).not.toBe("model.direct_answer");
+    expect(executedCapabilities, routeDebug).not.toEqual(expect.arrayContaining(forbiddenCapabilities));
+  }, 60_000);
+
   it("executes the locked mailbox read phase instead of asking for pending input", async () => {
     const app = createApp();
     const wakeRequestId = "stage_play_live_source_mail_wake:test-locked-read-phase";

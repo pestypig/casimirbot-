@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Volume2, Waypoints } from "lucide-react";
+import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Trash2, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -73,6 +73,7 @@ const STAGE_PLAY_TRANSCRIPT_QUERY_KEY = [
   STAGE_PLAY_PANEL_THREAD_ID,
   STAGE_PLAY_PANEL_THREAD_ID,
 ] as const;
+const STAGE_PLAY_CUSTOM_MICRODECK_STORAGE_KEY = "stage-play-custom-microdeck-presets:v1";
 
 const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
   routeTo: "narrative_stage_play",
@@ -270,6 +271,7 @@ type StagePlayLiveSourceMailListResponse = {
   microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
   microReasonerPromptPresets?: StagePlayMicroReasonerPromptPresetV1[];
   activeMicroReasonerPromptPreset?: StagePlayMicroReasonerPromptPresetV1 | null;
+  microReasonerPromptToolActivities?: StagePlayMicroReasonerPromptToolActivityV1[];
   microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   processedMailPackets?: StagePlayProcessedMailPacketV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
@@ -280,6 +282,25 @@ type StagePlayLiveSourceMailListResponse = {
   terminal_eligible: false;
   context_role: "tool_evidence";
   raw_content_included: false;
+};
+
+type StagePlayMicroReasonerPromptToolActivityV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt_tool_activity";
+  schemaVersion: "stage_play_micro_reasoner_prompt_tool_activity/v1";
+  activityId: string;
+  toolName: string;
+  action: "query" | "apply" | "create" | "update" | "test";
+  status: "running" | "completed" | "failed";
+  summary: string;
+  sourceIds: string[];
+  presetId?: string | null;
+  promptId?: string | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  updatedAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
 };
 
 type StagePlayLiveSourceMailTranscriptResponse = {
@@ -690,6 +711,37 @@ async function fetchStagePlayLiveSourceMailTranscript(input: {
   return await response.json() as StagePlayLiveSourceMailTranscriptResponse;
 }
 
+async function dismissStagePlayLiveSourceMailWake(input: {
+  wakeRequestId: string;
+  reason?: string;
+}): Promise<{
+  ok: boolean;
+  dismissed: boolean;
+  wakeRequest?: StagePlayLiveSourceMailWakeRequestV1 | null;
+  wakeResult?: StagePlayLiveSourceMailWakeResultV1 | null;
+}> {
+  const response = await fetch("/api/helix/stage-play/live-source-mail/wake/dismiss", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      wakeRequestId: input.wakeRequestId,
+      reason: input.reason ?? "operator_dismissed",
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Stage Play wake dismiss failed: ${response.status}`);
+  }
+  return await response.json() as {
+    ok: boolean;
+    dismissed: boolean;
+    wakeRequest?: StagePlayLiveSourceMailWakeRequestV1 | null;
+    wakeResult?: StagePlayLiveSourceMailWakeResultV1 | null;
+  };
+}
+
 async function fetchStagePlayBuilderContext(input: {
   threadId: string;
   environmentId?: string | null;
@@ -769,6 +821,63 @@ async function applyStagePlayMicroReasonerPromptPreset(input: {
   }
   return await response.json() as { ok?: boolean; preset?: StagePlayMicroReasonerPromptPresetV1 };
 }
+
+async function createStagePlayCustomMicroReasonerPromptPreset(input: {
+  title: string;
+  description?: string;
+  basePresetId?: string | null;
+  role: StagePlayMicroReasonerRoleV1;
+  template: string;
+  sourceIds: string[];
+  promptedRoles: StagePlayMicroReasonerRoleV1[];
+}): Promise<{
+  ok?: boolean;
+  preset?: StagePlayMicroReasonerPromptPresetV1;
+  prompt?: StagePlayMicroReasonerPromptV1;
+  prompts?: StagePlayMicroReasonerPromptV1[];
+}> {
+  const response = await fetch("/api/helix/stage-play/micro-reasoner-prompt-preset", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(`Custom MicroDeck save failed: ${response.status}`);
+  }
+  return await response.json() as {
+    ok?: boolean;
+    preset?: StagePlayMicroReasonerPromptPresetV1;
+    prompt?: StagePlayMicroReasonerPromptV1;
+    prompts?: StagePlayMicroReasonerPromptV1[];
+  };
+}
+
+const rememberStagePlayCustomMicroDeckPreset = (preset: StagePlayMicroReasonerPromptPresetV1): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(STAGE_PLAY_CUSTOM_MICRODECK_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const entries = Array.isArray(parsed) ? parsed : [];
+    const next = [
+      ...entries.filter((entry: unknown) =>
+        entry && typeof entry === "object" && (entry as { presetId?: unknown }).presetId !== preset.presetId
+      ),
+      {
+        presetId: preset.presetId,
+        title: preset.title,
+        sourceIds: preset.sourceIds,
+        savedAt: preset.updatedAt,
+        ownerScope: "browser_session",
+      },
+    ].slice(-25);
+    window.localStorage.setItem(STAGE_PLAY_CUSTOM_MICRODECK_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Browser session persistence is a convenience; server-side preset creation is the source of truth for this run.
+  }
+};
 
 async function validateStagePlayDraft(input: {
   threadId: string;
@@ -4157,12 +4266,18 @@ function StagePlayMailLoopLiveOverview({
 }) {
   const queryClient = useQueryClient();
   const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "full">("idle");
+  const [dismissingWakeId, setDismissingWakeId] = useState<string | null>(null);
   const [selectedTrafficPayloadId, setSelectedTrafficPayloadId] = useState<string | null>(null);
   const [selectedPacketTrafficKey, setSelectedPacketTrafficKey] = useState<string | null>(null);
   const [selectedMicroReasonerRole, setSelectedMicroReasonerRole] = useState<StagePlayMicroReasonerRoleV1>("claim_extractor");
   const [selectedMicroPresetId, setSelectedMicroPresetId] = useState("");
+  const [microReasonerPromptDraft, setMicroReasonerPromptDraft] = useState("");
   const [microDeckApplyStatus, setMicroDeckApplyStatus] = useState<{
     state: "idle" | "applying" | "applied" | "failed";
+    message: string;
+  }>({ state: "idle", message: "" });
+  const [microDeckSaveStatus, setMicroDeckSaveStatus] = useState<{
+    state: "idle" | "saving" | "saved" | "failed";
     message: string;
   }>({ state: "idle", message: "" });
   const debugCopyResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -4172,6 +4287,8 @@ function StagePlayMailLoopLiveOverview({
   const prompts = mailbox?.microReasonerPrompts ?? [];
   const microReasonerPromptPresets = mailbox?.microReasonerPromptPresets ?? [];
   const activeMicroReasonerPromptPreset = mailbox?.activeMicroReasonerPromptPreset ?? null;
+  const microReasonerPromptToolActivities = mailbox?.microReasonerPromptToolActivities ?? [];
+  const latestMicroReasonerPromptToolActivity = microReasonerPromptToolActivities.at(-1) ?? null;
   const wakeRequests = mailbox?.wakeRequests ?? [];
   const wakeResults = mailbox?.wakeResults ?? [];
   const decisions = mailbox?.decisions ?? [];
@@ -4183,6 +4300,11 @@ function StagePlayMailLoopLiveOverview({
     latestStagePlayMailWakeRequest(wakeRequests);
   const latestWakeResult =
     latestWake ? latestStagePlayMailWakeResult(wakeResults, latestWake.wakeRequestId) : null;
+  const dismissibleWakeRequests = wakeRequests
+    .filter(isDismissibleStagePlayWakeRequest)
+    .slice()
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .slice(0, 8);
   const liveOverviewPendingWakes = wakeRequests.filter((wake) =>
     wake.status === "queued" ||
     wake.status === "waiting_for_ui_handoff" ||
@@ -4236,6 +4358,7 @@ function StagePlayMailLoopLiveOverview({
   useEffect(() => {
     if (microReasonerPromptPresets.length === 0) return;
     if (selectedMicroPresetId && microReasonerPromptPresets.some((preset) => preset.presetId === selectedMicroPresetId)) return;
+    if (selectedMicroPresetId.startsWith("stage_play_micro_reasoner_prompt_preset:custom:")) return;
     setSelectedMicroPresetId(preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset));
   }, [activeMicroReasonerPromptPreset, microReasonerPromptPresets, selectedMicroPresetId]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) =>
@@ -4601,12 +4724,24 @@ function StagePlayMailLoopLiveOverview({
   }));
   const selectedDeckRow = deckRows.find((row) => row.role === selectedMicroReasonerRole) ?? deckRows[0] ?? null;
   const selectedDeckPromptStatus = selectedDeckRow?.prompt
-    ? selectedMicroPresetApplied
+    ? !selectedDeckRow.promptedBySelectedPreset
+      ? "inactive for selected preset"
+      : selectedMicroPresetApplied
       ? "active prompt"
       : "available prompt"
     : selectedDeckRow?.selectedPresetPromptMissing
       ? "apply preset to load"
       : "prompt missing";
+  const selectedDeckPromptTemplate = selectedDeckRow?.prompt?.template ?? "";
+  const microReasonerPromptChanged = Boolean(
+    selectedDeckRow?.prompt &&
+      microReasonerPromptDraft.trim() &&
+      microReasonerPromptDraft.trim() !== selectedDeckPromptTemplate.trim()
+  );
+  useEffect(() => {
+    setMicroReasonerPromptDraft(selectedDeckPromptTemplate);
+    setMicroDeckSaveStatus({ state: "idle", message: "" });
+  }, [selectedDeckPromptTemplate, selectedDeckRow?.role]);
   const askHandoffCount = wakeRequests.filter((wake) => wake.askTurnId || wake.status === "running").length;
   const queueRows: StagePlayFlowQueueRow[] = [
     {
@@ -5229,6 +5364,32 @@ function StagePlayMailLoopLiveOverview({
     writeStagePlayWakeBridgeMemory(markStagePlayWakeBridgeLaunched(memory, latestWake.wakeRequestId, Date.now()));
   };
 
+  const handleDismissWake = async (wakeRequestId: string) => {
+    if (dismissingWakeId) return;
+    setDismissingWakeId(wakeRequestId);
+    try {
+      await dismissStagePlayLiveSourceMailWake({ wakeRequestId, reason: "operator_dismissed" });
+      const memory = readStagePlayWakeBridgeMemory();
+      if (memory.launchedWakeIds.includes(wakeRequestId)) {
+        const launchedWakeAtById = { ...memory.launchedWakeAtById };
+        delete launchedWakeAtById[wakeRequestId];
+        writeStagePlayWakeBridgeMemory({
+          launchedWakeIds: memory.launchedWakeIds.filter((id) => id !== wakeRequestId),
+          launchedWakeAtById,
+          lastLaunchedAt: memory.lastLaunchedAt,
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY }),
+      ]);
+    } catch (error) {
+      console.warn("[stage-play] wake dismiss failed", error);
+    } finally {
+      setDismissingWakeId(null);
+    }
+  };
+
   const handleApplyMicroReasonerPreset = async () => {
     if (!selectedMicroReasonerPromptPreset) {
       setMicroDeckApplyStatus({ state: "failed", message: "MicroDeck preset is not available." });
@@ -5253,6 +5414,51 @@ function StagePlayMailLoopLiveOverview({
       setMicroDeckApplyStatus({
         state: "failed",
         message: error instanceof Error ? error.message : "micro_reasoner_prompt_preset_apply_failed",
+      });
+    }
+  };
+
+  const handleSaveCustomMicroReasonerPreset = async () => {
+    if (!selectedDeckRow?.prompt) {
+      setMicroDeckSaveStatus({ state: "failed", message: "Select a MicroReasoner prompt before saving a custom deck." });
+      return;
+    }
+    if (!microReasonerPromptChanged) return;
+    const template = microReasonerPromptDraft.trim();
+    if (!template) {
+      setMicroDeckSaveStatus({ state: "failed", message: "Custom MicroReasoner prompt cannot be empty." });
+      return;
+    }
+    if (!microDeckSourceId) {
+      setMicroDeckSaveStatus({ state: "failed", message: "No live source is available for this custom MicroDeck." });
+      return;
+    }
+    const baseTitle = selectedMicroReasonerPromptPreset?.title ?? activeMicroReasonerPromptPreset?.title ?? "MicroDeck";
+    const title = `Custom ${selectedDeckRow.display.title}`;
+    setMicroDeckSaveStatus({ state: "saving", message: `Saving ${title} from ${baseTitle}.` });
+    try {
+      const response = await createStagePlayCustomMicroReasonerPromptPreset({
+        title,
+        description: `Browser-session custom MicroDeck based on ${baseTitle}; overrides ${selectedDeckRow.display.title}.`,
+        basePresetId: selectedMicroReasonerPromptPreset?.presetId ?? activeMicroReasonerPromptPreset?.presetId ?? null,
+        role: selectedDeckRow.role,
+        template,
+        sourceIds: [microDeckSourceId],
+        promptedRoles: selectedMicroReasonerPromptPreset?.promptedRoles ?? activeMicroReasonerPromptPreset?.promptedRoles ?? [],
+      });
+      if (response.preset) {
+        rememberStagePlayCustomMicroDeckPreset(response.preset);
+        setSelectedMicroPresetId(response.preset.presetId);
+      }
+      await queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+      setMicroDeckSaveStatus({
+        state: "saved",
+        message: `${response.preset?.title ?? title} saved and attached to ${microDeckSourceId}.`,
+      });
+    } catch (error) {
+      setMicroDeckSaveStatus({
+        state: "failed",
+        message: error instanceof Error ? error.message : "custom_micro_reasoner_prompt_preset_save_failed",
       });
     }
   };
@@ -5290,6 +5496,19 @@ function StagePlayMailLoopLiveOverview({
               <span className="font-mono text-[10px] text-slate-500">
                 {latestWake.wakeRequestId}
               </span>
+              {isDismissibleStagePlayWakeRequest(latestWake) ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDismissWake(latestWake.wakeRequestId)}
+                  disabled={dismissingWakeId === latestWake.wakeRequestId}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-700 bg-slate-950 text-slate-400 hover:border-rose-500 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-label="Dismiss queued wake"
+                  title="Dismiss this queued wake"
+                  data-testid="stage-play-dismiss-latest-wake"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -5425,6 +5644,30 @@ function StagePlayMailLoopLiveOverview({
             {microDeckApplyStatus.message}
           </div>
         ) : null}
+        {latestMicroReasonerPromptToolActivity ? (
+          <div
+            className={`mt-2 rounded border px-3 py-2 text-[11px] ${
+              latestMicroReasonerPromptToolActivity.status === "failed"
+                ? "border-rose-800 bg-rose-950/25 text-rose-100"
+                : latestMicroReasonerPromptToolActivity.status === "running"
+                  ? "border-cyan-700 bg-cyan-950/25 text-cyan-100"
+                  : "border-emerald-900 bg-emerald-950/15 text-emerald-100"
+            }`}
+            data-testid="stage-play-microdeck-tool-activity"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Tool activity: {labelize(latestMicroReasonerPromptToolActivity.action)} {labelize(latestMicroReasonerPromptToolActivity.status)}
+              </span>
+              <span className="font-mono text-[10px] opacity-75">
+                {formatStagePlayClock(latestMicroReasonerPromptToolActivity.updatedAt)}
+              </span>
+            </div>
+            <div className="mt-1 text-[10px] opacity-80">
+              {latestMicroReasonerPromptToolActivity.summary}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.48fr)]">
           <div className="space-y-3">
@@ -5435,13 +5678,18 @@ function StagePlayMailLoopLiveOverview({
                   {cluster.rows.map(({ role, run, prompt, display, promptedBySelectedPreset, selectedPresetPromptMissing }) => {
                     const selected = selectedDeckRow?.role === role;
                     const roleLoaded = Boolean(prompt);
+                    const inactiveForPreset = selectedMicroReasonerPromptPreset && !promptedBySelectedPreset;
                     return (
                       <button
                         key={role}
                         type="button"
                         onClick={() => setSelectedMicroReasonerRole(role)}
                         className={`min-h-[112px] rounded-md border p-3 text-left transition ${
-                          selected
+                          inactiveForPreset
+                            ? selected
+                              ? "border-slate-600 bg-slate-950/95 opacity-80 ring-1 ring-slate-700"
+                              : "border-slate-900 bg-black/35 opacity-45 hover:opacity-65"
+                            : selected
                             ? "border-cyan-300 bg-cyan-950/35"
                             : promptedBySelectedPreset
                               ? "border-cyan-800 bg-cyan-950/15 hover:border-cyan-500"
@@ -5452,11 +5700,13 @@ function StagePlayMailLoopLiveOverview({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-semibold text-slate-100">{display.title}</div>
-                            <div className="mt-0.5 truncate text-[10px] text-slate-500">{display.subtitle}</div>
+                            <div className={`truncate text-xs font-semibold ${inactiveForPreset ? "text-slate-500" : "text-slate-100"}`}>{display.title}</div>
+                            <div className={`mt-0.5 truncate text-[10px] ${inactiveForPreset ? "text-slate-700" : "text-slate-500"}`}>{display.subtitle}</div>
                           </div>
                           <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${
-                            run?.status === "completed"
+                            inactiveForPreset
+                              ? "border-slate-800 text-slate-600"
+                              : run?.status === "completed"
                               ? "border-emerald-800 text-emerald-100"
                               : run
                                 ? "border-amber-800 text-amber-100"
@@ -5464,16 +5714,18 @@ function StagePlayMailLoopLiveOverview({
                                   ? "border-cyan-800 text-cyan-100"
                                   : "border-slate-700 text-slate-400"
                           }`}>
-                            {run?.status ?? (roleLoaded ? "ready" : "missing")}
+                            {inactiveForPreset ? "inactive" : run?.status ?? (roleLoaded ? "ready" : "missing")}
                           </span>
                         </div>
                         <div className="mt-3 grid grid-cols-3 gap-1 text-[9px]">
-                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
-                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
-                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{promptedBySelectedPreset ? "preset" : "base"}</span>
+                          <span className={`rounded border border-slate-800 px-1.5 py-1 ${inactiveForPreset ? "text-slate-700" : "text-slate-400"}`}>{inactiveForPreset ? "off" : formatStagePlayMs(run?.latencyMs)}</span>
+                          <span className={`rounded border border-slate-800 px-1.5 py-1 ${inactiveForPreset ? "text-slate-700" : "text-slate-400"}`}>{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
+                          <span className={`rounded border border-slate-800 px-1.5 py-1 ${inactiveForPreset ? "text-slate-700" : "text-slate-400"}`}>{promptedBySelectedPreset ? "preset" : "inactive"}</span>
                         </div>
-                        <div className="mt-2 line-clamp-2 text-[10px] leading-snug text-slate-400">
-                          {selectedPresetPromptMissing
+                        <div className={`mt-2 line-clamp-2 text-[10px] leading-snug ${inactiveForPreset ? "text-slate-700" : "text-slate-400"}`}>
+                          {inactiveForPreset
+                            ? "Not used by the selected preset."
+                            : selectedPresetPromptMissing
                             ? "Apply this preset to load its source-bound template."
                             : prompt?.title ?? run?.outputPreview ?? display.missingPreview}
                         </div>
@@ -5506,12 +5758,21 @@ function StagePlayMailLoopLiveOverview({
             </div>
             <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3">
               <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
-              <pre className="mt-2 max-h-[280px] overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-4 text-slate-300">
-                {selectedDeckRow?.prompt?.template ??
-                  (selectedDeckRow?.selectedPresetPromptMissing
+              {selectedDeckRow?.prompt ? (
+                <textarea
+                  value={microReasonerPromptDraft}
+                  onChange={(event) => setMicroReasonerPromptDraft(event.currentTarget.value)}
+                  className="mt-2 min-h-[280px] w-full resize-y rounded border border-slate-800 bg-black/30 p-2 font-mono text-[10px] leading-4 text-slate-300 outline-none focus:border-cyan-500"
+                  aria-label="MicroReasoner prompt draft"
+                  spellCheck={false}
+                />
+              ) : (
+                <pre className="mt-2 max-h-[280px] overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-4 text-slate-300">
+                  {selectedDeckRow?.selectedPresetPromptMissing
                     ? "This preset maps the role to a template that is not in the current source-bound mailbox projection yet. Apply the preset, then the prompt will refresh here."
-                    : "Prompt missing for this role.")}
-              </pre>
+                    : "Prompt missing for this role."}
+                </pre>
+              )}
             </div>
             <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3">
               <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Latest Output</div>
@@ -5519,6 +5780,32 @@ function StagePlayMailLoopLiveOverview({
                 {selectedDeckRow?.run?.outputPreview ?? selectedDeckRow?.display.missingPreview ?? "No run output yet."}
               </div>
             </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
+              <div className="text-[10px] leading-relaxed text-slate-500">
+                Custom decks are saved to this browser session and attached to the active live source.
+              </div>
+              {microReasonerPromptChanged ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveCustomMicroReasonerPreset()}
+                  disabled={microDeckSaveStatus.state === "saving"}
+                  className="rounded border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {microDeckSaveStatus.state === "saving" ? "Saving" : "Save As"}
+                </button>
+              ) : null}
+            </div>
+            {microDeckSaveStatus.message ? (
+              <div className={`mt-2 rounded border px-2 py-1.5 text-[11px] ${
+                microDeckSaveStatus.state === "failed"
+                  ? "border-rose-800 bg-rose-950/25 text-rose-100"
+                  : microDeckSaveStatus.state === "saved"
+                    ? "border-emerald-800 bg-emerald-950/20 text-emerald-100"
+                    : "border-cyan-800 bg-cyan-950/20 text-cyan-100"
+              }`}>
+                {microDeckSaveStatus.message}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -5642,7 +5929,22 @@ function StagePlayMailLoopLiveOverview({
               </div>
             </div>
             <div className="rounded-md border border-amber-900/60 bg-amber-950/15 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred wake</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred wake</div>
+                {isDismissibleStagePlayWakeRequest(liveOverviewPendingWake) ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleDismissWake(liveOverviewPendingWake.wakeRequestId)}
+                    disabled={dismissingWakeId === liveOverviewPendingWake.wakeRequestId}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-amber-700/50 bg-amber-950/30 text-amber-100 hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label="Dismiss pending wake"
+                    title="Dismiss this pending wake"
+                    data-testid="stage-play-dismiss-pending-wake"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
               <div className="mt-1 text-sm font-semibold text-amber-50">
                 {liveOverviewPendingWake
                   ? labelize(liveOverviewPendingWakeResult?.lifecycleStage ?? liveOverviewPendingWake.lifecycleStage ?? liveOverviewPendingWakeResult?.status ?? liveOverviewPendingWake.status)
@@ -5653,6 +5955,37 @@ function StagePlayMailLoopLiveOverview({
               </div>
             </div>
           </div>
+          {dismissibleWakeRequests.length > 0 ? (
+            <div className="mt-3 rounded-md border border-slate-800 bg-slate-950/55 p-2.5" data-testid="stage-play-dismissible-wake-list">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Queued wake controls</div>
+                <div className="font-mono text-[9px] text-slate-500">{dismissibleWakeRequests.length} clearable</div>
+              </div>
+              <div className="space-y-1.5">
+                {dismissibleWakeRequests.map((wake) => (
+                  <div key={wake.wakeRequestId} className="flex items-center gap-2 rounded border border-slate-800 bg-black/20 px-2 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-mono text-[10px] text-slate-200">{wake.wakeRequestId}</div>
+                      <div className="mt-0.5 truncate text-[10px] text-slate-500">
+                        {labelize(wake.lifecycleStage ?? wake.status)} | {wake.mailIds.length} mail | {formatStagePlayClock(wake.updatedAt)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDismissWake(wake.wakeRequestId)}
+                      disabled={dismissingWakeId === wake.wakeRequestId}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-950 text-slate-400 hover:border-rose-500 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-45"
+                      aria-label={`Dismiss wake ${wake.wakeRequestId}`}
+                      title="Dismiss this queued wake"
+                      data-testid="stage-play-dismiss-queued-wake"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -6569,6 +6902,16 @@ function markStagePlayWakeBridgeLaunched(
     },
     lastLaunchedAt: now,
   };
+}
+
+function isDismissibleStagePlayWakeRequest(wake: StagePlayLiveSourceMailWakeRequestV1 | null | undefined): wake is StagePlayLiveSourceMailWakeRequestV1 {
+  if (!wake) return false;
+  if (wake.askTurnId || wake.decisionIds.length > 0) return false;
+  return wake.status === "queued" ||
+    wake.status === "waiting_for_ui_handoff" ||
+    wake.status === "failed_retryable" ||
+    wake.status === "failed_terminal" ||
+    wake.status === "deferred_for_pressure";
 }
 
 function shouldBridgeStagePlayWakeToAsk(input: {

@@ -108,6 +108,35 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   failedReason?: string | null;
   lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
   lifecycleReason?: string | null;
+  stagePlayWakeTransaction?: {
+    schema: "stage_play_wake_transaction_debug/v1";
+    wakeRequestId: string;
+    askTurnId?: string | null;
+    askLaunchId?: string | null;
+    askLaunchStatus?: StagePlayLiveSourceMailWakeAskLaunchStatusV1 | null;
+    routeMetadata?: Record<string, unknown> | null;
+    selectedTargetSource?: string | null;
+    selectedCapability?: string | null;
+    phaseResolution?: Record<string, unknown> | null;
+    producedRefs: string[];
+    artifactRefs: {
+      processedPacketIds?: string[];
+      decisionIds?: string[];
+      voiceReceiptIds?: string[];
+      wakeRequestId?: string | null;
+      askTurnId?: string | null;
+    };
+    decisionReceiptId?: string | null;
+    voiceReceiptId?: string | null;
+    wakeResultId: string;
+    terminalKind?: string | null;
+    failureCode?: string | null;
+    failureReason?: string | null;
+    assistant_answer: false;
+    terminal_eligible: false;
+    context_role: "debug_trace";
+    raw_content_included: false;
+  };
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   createdAt: string;

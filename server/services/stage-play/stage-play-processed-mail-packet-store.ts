@@ -14,8 +14,28 @@ const promptsById = new Map<string, StagePlayMicroReasonerPromptV1>();
 const promptPresetsById = new Map<string, StagePlayMicroReasonerPromptPresetV1>();
 const runsById = new Map<string, StagePlayMicroReasonerRunV1>();
 const packetsById = new Map<string, StagePlayProcessedMailPacketV1>();
+const promptToolActivitiesById = new Map<string, StagePlayMicroReasonerPromptToolActivityV1>();
 
 const DEFAULT_PROMPT_UPDATED_AT = "2026-06-01T00:00:00.000Z";
+
+export type StagePlayMicroReasonerPromptToolActivityV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt_tool_activity";
+  schemaVersion: "stage_play_micro_reasoner_prompt_tool_activity/v1";
+  activityId: string;
+  toolName: string;
+  action: "query" | "apply" | "create" | "update" | "test";
+  status: "running" | "completed" | "failed";
+  summary: string;
+  sourceIds: string[];
+  presetId?: string | null;
+  promptId?: string | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  updatedAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+};
 
 const defaultPromptIdForRole = (role: StagePlayMicroReasonerRoleV1): string =>
   `stage_play_micro_reasoner_prompt:${role}:v1`;
@@ -24,6 +44,13 @@ const presetPromptIdForRole = (
   preset: "calculator-tool-call" | "science-visual",
   role: StagePlayMicroReasonerRoleV1,
 ): string => `stage_play_micro_reasoner_prompt:${preset}:${role}:v1`;
+
+const customSlug = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "custom";
 
 const DEFAULT_PROMPTED_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "claim_extractor",
@@ -773,7 +800,7 @@ export function ensureDefaultStagePlayMicroReasonerPrompts(): StagePlayMicroReas
       updatedAt: DEFAULT_PROMPT_UPDATED_AT,
     });
   }
-  return Array.from(promptsById.values()).filter((prompt) => prompt.active);
+  return Array.from(promptsById.values()).filter((prompt: StagePlayMicroReasonerPromptV1) => prompt.active);
 }
 
 export function ensureDefaultStagePlayMicroReasonerPromptPresets(): StagePlayMicroReasonerPromptPresetV1[] {
@@ -786,11 +813,11 @@ export function ensureDefaultStagePlayMicroReasonerPromptPresets(): StagePlayMic
       updatedAt: DEFAULT_PROMPT_UPDATED_AT,
     });
   }
-  return Array.from(promptPresetsById.values()).filter((preset) => preset.active);
+  return Array.from(promptPresetsById.values()).filter((preset: StagePlayMicroReasonerPromptPresetV1) => preset.active);
 }
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
-  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+  Array.from(new Set(values.map((value: string | null | undefined) => String(value ?? "").trim()).filter(Boolean)));
 
 const runScopeMatches = (
   run: StagePlayMicroReasonerRunV1,
@@ -826,6 +853,114 @@ export function recordStagePlayMicroReasonerPrompt(
   ensureDefaultStagePlayMicroReasonerPrompts();
   promptsById.set(prompt.promptId, prompt);
   return prompt;
+}
+
+export function recordStagePlayMicroReasonerPromptToolActivity(
+  input: Omit<StagePlayMicroReasonerPromptToolActivityV1, "artifactId" | "schemaVersion" | "evidenceRefs" | "assistant_answer" | "terminal_eligible" | "context_role"> & {
+    evidenceRefs?: string[];
+  },
+): StagePlayMicroReasonerPromptToolActivityV1 {
+  const activity: StagePlayMicroReasonerPromptToolActivityV1 = {
+    artifactId: "stage_play_micro_reasoner_prompt_tool_activity",
+    schemaVersion: "stage_play_micro_reasoner_prompt_tool_activity/v1",
+    ...input,
+    sourceIds: uniqueStrings(input.sourceIds),
+    evidenceRefs: uniqueStrings(input.evidenceRefs ?? []),
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+  };
+  promptToolActivitiesById.set(activity.activityId, activity);
+  return activity;
+}
+
+export function listStagePlayMicroReasonerPromptToolActivities(input: {
+  sourceId?: string | null;
+  presetId?: string | null;
+  status?: StagePlayMicroReasonerPromptToolActivityV1["status"] | null;
+  limit?: number;
+} = {}): StagePlayMicroReasonerPromptToolActivityV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 100));
+  return Array.from(promptToolActivitiesById.values())
+    .filter((activity) => !input.sourceId || activity.sourceIds.includes(input.sourceId))
+    .filter((activity) => !input.presetId || activity.presetId === input.presetId)
+    .filter((activity) => input.status == null || activity.status === input.status)
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+    .slice(-limit);
+}
+
+export function recordStagePlayCustomMicroReasonerPromptPreset(input: {
+  title?: string | null;
+  description?: string | null;
+  basePresetId?: string | null;
+  role: StagePlayMicroReasonerRoleV1;
+  template: string;
+  sourceIds?: string[];
+  promptedRoles?: StagePlayMicroReasonerRoleV1[];
+  now?: string;
+}): {
+  preset: StagePlayMicroReasonerPromptPresetV1;
+  prompt: StagePlayMicroReasonerPromptV1;
+} | null {
+  ensureDefaultStagePlayMicroReasonerPromptPresets();
+  const template = input.template.trim();
+  if (!template) return null;
+  const now = input.now ?? new Date().toISOString();
+  const basePreset =
+    (input.basePresetId ? getStagePlayMicroReasonerPromptPreset(input.basePresetId) : null) ??
+    getStagePlayMicroReasonerPromptPreset("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
+  if (!basePreset) return null;
+  const basePrompt =
+    getStagePlayMicroReasonerPrompt(basePreset.rolePromptIds[input.role] ?? defaultPromptIdForRole(input.role)) ??
+    getStagePlayMicroReasonerPrompt(defaultPromptIdForRole(input.role));
+  if (!basePrompt) return null;
+  const title = input.title?.trim() || `Custom ${basePrompt.title}`;
+  const presetSlug = customSlug(`${title}-${input.role}-${Date.now().toString(36)}`);
+  const presetId = `stage_play_micro_reasoner_prompt_preset:custom:${presetSlug}:v1`;
+  const promptId = `stage_play_micro_reasoner_prompt:custom:${presetSlug}:${input.role}:v1`;
+  const promptedRoles = uniqueStrings([
+    ...(input.promptedRoles ?? basePreset.promptedRoles),
+    input.role,
+  ]) as StagePlayMicroReasonerRoleV1[];
+  const prompt: StagePlayMicroReasonerPromptV1 = {
+    ...basePrompt,
+    promptId,
+    title,
+    role: input.role,
+    version: basePrompt.version + 1,
+    active: true,
+    template,
+    linkedNoteId: basePrompt.linkedNoteId ?? null,
+    presetIds: [presetId],
+    createdAt: now,
+    updatedAt: now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  };
+  const preset: StagePlayMicroReasonerPromptPresetV1 = {
+    ...basePreset,
+    presetId,
+    title: title.endsWith("Deck") ? title : `${title} Deck`,
+    description: input.description?.trim() ||
+      `Custom MicroDeck based on ${basePreset.title}; overrides ${basePrompt.title}.`,
+    domain: "custom",
+    sourceIds: uniqueStrings(input.sourceIds ?? []),
+    rolePromptIds: {
+      ...basePreset.rolePromptIds,
+      [input.role]: promptId,
+    },
+    promptedRoles,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  };
+  promptsById.set(prompt.promptId, prompt);
+  promptPresetsById.set(preset.presetId, preset);
+  return { preset, prompt };
 }
 
 export function getStagePlayMicroReasonerPromptPreset(
@@ -1035,4 +1170,5 @@ export function resetStagePlayProcessedMailPacketStoreForTest(): void {
   promptPresetsById.clear();
   runsById.clear();
   packetsById.clear();
+  promptToolActivitiesById.clear();
 }

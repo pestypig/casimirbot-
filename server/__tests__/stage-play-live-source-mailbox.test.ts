@@ -28,6 +28,7 @@ import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
+  dismissStagePlayMailWakeRequest,
   listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
   expireStaleStagePlayLiveSourceMailWakeRequests,
@@ -1192,6 +1193,65 @@ describe("Stage Play live-source mailbox", () => {
       wakeRequestId: wake?.wakeRequestId,
       status: "expired_stale",
       failedReason: "wake_relevance_ttl_expired",
+    });
+  });
+
+  it("lets the operator dismiss unresolved wake requests without deleting evidence", () => {
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:operator-dismiss"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:operator-dismiss"],
+      now: "2026-06-04T12:00:24.000Z",
+    });
+
+    const dismissed = dismissStagePlayMailWakeRequest({
+      wakeRequestId: wake?.wakeRequestId ?? "",
+      reason: "operator_dismissed",
+      now: "2026-06-04T12:00:25.000Z",
+    });
+
+    expect(dismissed?.wakeRequest).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "skipped",
+      lifecycleStage: "completed",
+      lifecycleReason: "operator_dismissed",
+      nextRetryAt: null,
+    });
+    expect(dismissed?.wakeResult).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "skipped",
+      skippedReason: "operator_dismissed",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "queued" })).toHaveLength(0);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "skipped" })).toHaveLength(1);
+  });
+
+  it("does not dismiss wake requests after Ask or decision evidence exists", () => {
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:operator-dismiss-running"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:operator-dismiss-running"],
+      now: "2026-06-04T12:00:26.000Z",
+    });
+    markStagePlayMailWakeRunning(wake?.wakeRequestId ?? "", "2026-06-04T12:00:27.000Z", {
+      askTurnId: "ask:operator-dismiss-running",
+    });
+
+    expect(dismissStagePlayMailWakeRequest({
+      wakeRequestId: wake?.wakeRequestId ?? "",
+      reason: "operator_dismissed",
+      now: "2026-06-04T12:00:28.000Z",
+    })).toBeNull();
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "running",
+      askTurnId: "ask:operator-dismiss-running",
     });
   });
 

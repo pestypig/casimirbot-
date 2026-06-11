@@ -314,6 +314,8 @@ Source closure is numerically tight on the global diagonal comparison in the cur
 
 The full-solve closure stack therefore promotes the wall-region comparison to the front-door blocker. The wall artifact `nhm2_wall_source_closure/v1` compares metric-required wall `T00` against tile-effective or material-receipted wall `T00` and records absolute residual, relative residual, tolerance, blockers, and claim boundary. A global residual may remain useful secondary context, but it cannot mask a failing wall residual; missing wall closure leaves full-loop readiness at review, and failing wall closure blocks readiness.
 
+The source-side authority receipt adds one more guardrail to that comparison. The available wall `T00` is not promotion-relevant merely because a number exists on the tile/material side. The source side must also pass `nhm2_source_side_same_basis_tensor_authority/v1`, which records whether the tile/material tensor is independently source-side, same-chart, same-basis, regional, non-proxy, and not a metric echo. If that receipt is missing, proxy-limited, diagonal-only, contract-misaligned, or blocked, the wall closure remains a diagnostic comparison even when a scalar residual can be calculated.
+
 ### 4.6 Divergence surface: where new physics or a source-model correction must enter
 
 The red-team baseline localizes the central divergence. The metric-required lane can compute a same-chart stress-energy demand from the selected geometry:
@@ -359,6 +361,14 @@ metricRequiredInputRefs = []
 
 and each controlled region must provide chart, units, region mask, aggregation mode, normalization basis, sample count, source support metadata, provenance, and either full tensor authority or explicit symmetric full-tensor authority. Diagonal-only and proxy tensors remain diagnostic. If a source path copies or depends on `T_ab_metric_required`, it is not source closure; it is a forbidden metric echo.
 
+The follow-up authority receipt is:
+
+```text
+nhm2_source_side_same_basis_tensor_authority/v1
+```
+
+It is a gate over the source-side tensor candidate rather than a second tensor producer. Its job is to state whether the source-side artifact has enough basis, chart, region, provenance, material-receipt, and full-component evidence to be compared against the metric-required tensor. A tensor-shaped source artifact can still fail this receipt if it is diagonal-only, proxy-derived, material-unreceipted where material authority is claimed, missing wall authority, or dependent on metric-required references. This distinction keeps the paper from treating "a tile tensor exists" as equivalent to "source-side same-basis authority exists."
+
 This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
 
 ```text
@@ -377,6 +387,17 @@ nhm2_tile_counterpart_conservation/v1
 does not prove physical realizability. It records whether `div T`, continuity, and momentum residual diagnostics have been emitted on the same chart and region masks. Missing conservation remains a blocker before residual tuning should be interpreted as source-closure evidence.
 
 The newer wall-closure and material-receipt surfaces tighten this source chain. A future ledger may show a tile-effective full tensor candidate and a conservation diagnostic while still remaining blocked if the wall `T00` residual fails, if the wall source is only proxy evidence, or if the Casimir row is still ideal scalar math rather than a material-receipted source. That is the intended result: source closure advances only when the regional, material, and tensor-authority surfaces advance together.
+
+With the authority receipt in place, the canonical source-side progression is now:
+
+```text
+source tensor candidate
+-> source-side same-basis tensor authority receipt
+-> wall-region T00 closure
+-> conservation / QEI / observer / policy gates
+```
+
+The present patch improves the ledger language for that progression. It does not imply that the current reference/full-loop solve has crossed the source-to-geometry bridge.
 
 ### 4.8 Current frozen ledger state
 
@@ -858,6 +879,7 @@ The detailed implementation state belongs in an appendix because it is evidence 
 | ledger claim locks | `validationClaimAllowed = false`, `physicalMechanismClaimAllowed = false`, `promotionAllowed = false` | no promotion or physical-mechanism language allowed |
 | ledger primaryBlockerClass | `tile_counterpart` | next blocker is semantic/source-side counterpart authority |
 | tile-effective full-tensor source producer | implemented as `nhm2_tile_effective_full_tensor_source/v1` | source-side candidate path; does not itself retire source closure |
+| source-side same-basis tensor authority | implemented as `nhm2_source_side_same_basis_tensor_authority/v1` | gate that distinguishes authoritative regional source tensors from proxy, diagonal-only, contract-misaligned, or metric-echo source rows |
 | tile counterpart conservation artifact | implemented as `nhm2_tile_counterpart_conservation/v1` | diagnostic conservation surface; missing/failing conservation remains a blocker |
 | same-chart full tensor ledger | implemented as `nhm2_same_chart_full_tensor/v1` | records `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`; missing components are blockers, not zeros |
 | wall source closure | implemented as `nhm2_wall_source_closure/v1` | wall `T00` residual is the front-door source-closure blocker; global residual cannot override wall failure |
@@ -919,6 +941,8 @@ The representation-space navigation patch adds no run-free validation command. I
 
 The June closure-stack contracts add placeholder-safe runtime artifacts rather than a new numerical relativity solver. Their builders are allowed to emit `missing`, `blocked`, `not_run`, `proxy`, or `ideal_scalar_only` when the current runtime lacks a component. That behavior is part of the reproducibility boundary: an incomplete artifact is still useful because it preserves the blocker instead of omitting it.
 
+The source-side same-basis authority receipt follows the same placeholder-safe rule. Its presence is not a source-closure pass by itself; its value is that it prevents a tile-effective scalar, diagonal projection, or metric-shaped proxy from being silently promoted into source-side tensor evidence. A future frozen run should be judged by whether this receipt moves the source-side blocker forward, not by whether the receipt merely exists.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -931,6 +955,7 @@ The June closure-stack contracts add placeholder-safe runtime artifacts rather t
 | `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
 | `R_wall_T00 = T00_wall_required - T00_wall_available` | wall-region source residual | front-door wall closure badge / audit row | global residual cannot override wall failure |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
+| `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
 | `nhm2_same_chart_full_tensor/v1` | full metric-required tensor component ledger | records complete, missing, or blocked `T00`, `T0i`, and `Tij` surfaces | noncomputable runtime reference; no scalar replay |
 | `nhm2_observer_robust_energy_conditions/v1` | observer-family energy-condition scope | separates Eulerian-only checks from robust-family checks | no continuous-optimizer claim unless implemented |
@@ -975,4 +1000,4 @@ The June closure-stack contracts add placeholder-safe runtime artifacts rather t
 
 NHM2 is best described as a bounded, same-chart, artifact-limited mathematical and computational framework for evaluating a selected lapse-shift profile, its observer stress-energy route, and its centerline clocking targets. The scientific value of the current framework is that it makes the calculation auditable: accepted 3+1 formalism defines the variables, NHM2 instantiates them in one chart, the Einstein-tensor route supplies a metric-required tensor, observer projections define energy-condition gates, the closure stack records missing or proxy evidence explicitly, and the centerline-lapse law computes expected timing targets.
 
-The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, make wall closure the front-door source blocker, attach a complete QEI/QFT worldline dossier, distinguish ideal Casimir scalar budgets from material receipts, audit Natario-adjacent invariants, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The June closure stack is progress because it makes missing tensor, wall, observer, QEI, material, and invariant evidence impossible to hide. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. The representation-space navigation patch is the naming layer for the broader perspective: projective quantum rays and ADM metric tensors both warn us not to mistake representatives for physics, while keeping the lanes separate. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.
+The red-team update sharpens the next scientific target. The current evidence does not support physical viability, max speed, route ETA, black-hole operation, arbitrary external-field operation, promoted deep-clock rows, or a quantum-spacetime propulsion mechanism. It does, however, define the divergence surface well enough to guide the next solve cycle: freeze one reference run, remove `latest` alias drift, reconcile observer artifacts, publish regional same-basis tile-effective counterpart tensors, make wall closure the front-door source blocker, attach a complete QEI/QFT worldline dossier, distinguish ideal Casimir scalar budgets from material receipts, audit Natario-adjacent invariants, emit conservation and convergence/reproduction evidence, and only then consider stronger source-to-geometry claims. The May 8 full-tensor source-side producer is progress because it makes the next blocker measurable. The source-side same-basis authority receipt is progress because it prevents a tensor-shaped source artifact, scalar wall number, diagonal projection, or metric echo from masquerading as source closure. The June closure stack is progress because it makes missing tensor, wall, observer, QEI, material, and invariant evidence impossible to hide. The QST proxy lane is progress of a different kind: it keeps entropy, holography, and expansion analogies useful but non-promoting. The representation-space navigation patch is the naming layer for the broader perspective: projective quantum rays and ADM metric tensors both warn us not to mistake representatives for physics, while keeping the lanes separate. Any future novel claim should be made at the source-to-geometry bridge, after the bridge passes, not before.

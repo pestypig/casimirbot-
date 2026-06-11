@@ -12,6 +12,7 @@ import { buildCapabilityResultGate } from "../services/helix-ask/capability-resu
 import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final-answer-draft-quality-gate";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 import {
   __testHelixAgentStepDecisionHints,
   __testHelixAgentStepRepairHints,
@@ -46,6 +47,18 @@ const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null)
   concept_tokens: [],
   confidence: "high",
   classifier_reasons: ["test"],
+});
+
+const compoundScholarlyLocatorItinerary = (turnId: string) => ({
+  schema: "helix.capability_itinerary.v1",
+  turn_id: turnId,
+  prompt_shape: "compound_tool",
+  relevant_tool_families: ["scholarly_research", "theory_locator"],
+  admitted_tool_families: ["scholarly_research", "theory_locator"],
+  terminal_success_criteria: {
+    requires_post_observation_synthesis: true,
+    required_observation_families: ["scholarly_research", "theory_locator"],
+  },
 });
 
 describe("Helix scholarly research tool admission", () => {
@@ -141,6 +154,289 @@ describe("Helix scholarly research tool admission", () => {
     });
     expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
   }, 60000);
+
+  it("continues to the theory locator after scholarly evidence when compound itinerary is incomplete", () => {
+    const turnId = "ask:scholarly-locator-continuation";
+    const promptText =
+      "Use scholarly research to find papers about photosynthesis quantum coherence and microtubule Orch-OR claims, then use the Theory Badge Graph locator to place the relevant claims and synthesize uncertainty with citations.";
+
+    const decision = __testHelixAgentStepDecisionHints.buildHelixAgentStepDecisionArtifact({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      capabilityItinerary: compoundScholarlyLocatorItinerary(turnId),
+      availableCapabilities: {
+        schema: "helix.available_capabilities.v1",
+        turn_id: turnId,
+        recommended_capability_key: "helix_ask.reflect_theory_context",
+        tool_admission_suppressed: false,
+        capabilities: [
+          {
+            capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+            requires_action: true,
+            availability: "available",
+            goal_fit: "possible",
+            expected_artifacts: ["scholarly_research_observation"],
+            reason: "Scholarly evidence has already been observed.",
+          },
+          {
+            capability_key: "helix_ask.reflect_theory_context",
+            requires_action: true,
+            availability: "available",
+            goal_fit: "primary",
+            expected_artifacts: ["helix_theory_context_reflection_tool_receipt"],
+            reason: "The compound prompt still requires badge-graph placement evidence.",
+          },
+          {
+            capability_key: "model.direct_answer",
+            requires_action: false,
+            availability: "available",
+            goal_fit: "forbidden",
+            expected_artifacts: ["direct_answer_text"],
+            reason: "Direct answer is forbidden before required observations are complete.",
+          },
+        ],
+      } as any,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+            query: "quantum coherence in photosynthesis",
+            result_count: 2,
+          },
+        },
+      ] as any,
+      goalSatisfactionEvaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [
+          {
+            ref: `${turnId}:lookup:scholarly_research_observation`,
+            kind: "scholarly_research_observation",
+            status: "observed",
+            supports_goal: true,
+            reason: "Scholarly lookup produced source evidence.",
+          },
+        ],
+      } as any,
+      capabilityItineraryRef: `${turnId}:capability_itinerary`,
+      decisionTiming: "post_observation",
+    });
+
+    expect(decision.decision).toBe("execute");
+    expect(decision.next_step).toBe("next_action");
+    expect(decision.chosen_capability).toBe("helix_ask.reflect_theory_context");
+    expect(decision.action_authorization).toMatchObject({
+      required_before_tool_execution: true,
+      authorizes_tool_execution: true,
+      authorized_capability: "helix_ask.reflect_theory_context",
+    });
+    expect(decision.stop_condition).toMatch(/theory_locator/);
+    expect(decision.continuation_policy).not.toBe("terminal_only");
+  });
+
+  it("does not let satisfied goal status preempt a missing compound itinerary family", () => {
+    const turnId = "ask:scholarly-locator-terminal-shortcut";
+    const promptText =
+      "Use scholarly research to find papers about photosynthesis quantum coherence, then use the Theory Badge Graph locator and synthesize uncertainty.";
+    const itineraryExecutionState = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: compoundScholarlyLocatorItinerary(turnId),
+      artifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            query: "quantum coherence in photosynthesis",
+            result_count: 8,
+          },
+        },
+      ] as any,
+    });
+
+    expect(itineraryExecutionState).toMatchObject({
+      applies: true,
+      complete: false,
+      observed_families: ["scholarly_research"],
+      missing_observation_families: ["theory_locator"],
+      next_missing_family: "theory_locator",
+    });
+    expect(
+      __testHelixAgentStepDecisionHints.shouldPromoteSatisfiedGoalToTerminalInRuntimeLoop({
+        goalSatisfactionEvaluation: {
+          schema: "helix.goal_satisfaction_evaluation.v1",
+          turn_id: turnId,
+          satisfaction: "satisfied",
+          next_decision: "allow_terminal",
+          required_evidence: [],
+          observed_results: [
+            {
+              ref: `${turnId}:lookup:scholarly_research_observation`,
+              kind: "scholarly_research_observation",
+              status: "observed",
+              supports_goal: true,
+              reason: "Scholarly lookup produced source evidence.",
+            },
+          ],
+          missing_requirements: [],
+          required_actions: [],
+          confidence: "medium",
+        } as any,
+        capabilityItineraryExecutionState: itineraryExecutionState,
+        decisionNextStep: "next_action",
+        transcript: promptText,
+      }),
+    ).toBe(false);
+  });
+
+  it("allows terminal when the compound itinerary observations are complete", () => {
+    const turnId = "ask:scholarly-locator-complete";
+    const promptText =
+      "Use scholarly research to find papers about photosynthesis quantum coherence, then use the Theory Badge Graph locator and synthesize uncertainty.";
+
+    const decision = __testHelixAgentStepDecisionHints.buildHelixAgentStepDecisionArtifact({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      capabilityItinerary: compoundScholarlyLocatorItinerary(turnId),
+      availableCapabilities: {
+        schema: "helix.available_capabilities.v1",
+        turn_id: turnId,
+        recommended_capability_key: "model.direct_answer",
+        tool_admission_suppressed: false,
+        capabilities: [
+          {
+            capability_key: "helix_ask.reflect_theory_context",
+            requires_action: true,
+            availability: "available",
+            goal_fit: "possible",
+            expected_artifacts: ["helix_theory_context_reflection_tool_receipt"],
+            reason: "Theory locator already produced graph evidence.",
+          },
+          {
+            capability_key: "model.direct_answer",
+            requires_action: false,
+            availability: "available",
+            goal_fit: "fallback",
+            expected_artifacts: ["direct_answer_text"],
+            reason: "Terminal synthesis is available after itinerary completion.",
+          },
+        ],
+      } as any,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          },
+        },
+        {
+          artifact_id: `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+          turn_id: turnId,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            schema: "helix.theory_context_reflection_tool_receipt.v1",
+            artifact_id: `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+          },
+        },
+      ] as any,
+      goalSatisfactionEvaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [],
+      } as any,
+      capabilityItineraryRef: `${turnId}:capability_itinerary`,
+      decisionTiming: "post_observation",
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.next_step).toBe("answer");
+    expect(decision.continuation_policy).toBe("terminal_only");
+  });
+
+  it("fails closed when a missing itinerary family has no admitted executable capability", () => {
+    const turnId = "ask:scholarly-locator-missing-capability";
+    const promptText =
+      "Use scholarly research and an internet search, then synthesize uncertainty with citations.";
+
+    const decision = __testHelixAgentStepDecisionHints.buildHelixAgentStepDecisionArtifact({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      capabilityItinerary: {
+        schema: "helix.capability_itinerary.v1",
+        turn_id: turnId,
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["scholarly_research", "internet_search"],
+        admitted_tool_families: ["scholarly_research"],
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["scholarly_research", "internet_search"],
+        },
+      },
+      availableCapabilities: {
+        schema: "helix.available_capabilities.v1",
+        turn_id: turnId,
+        recommended_capability_key: "model.direct_answer",
+        tool_admission_suppressed: false,
+        capabilities: [
+          {
+            capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+            requires_action: true,
+            availability: "available",
+            goal_fit: "possible",
+            expected_artifacts: ["scholarly_research_observation"],
+            reason: "Scholarly evidence has already been observed.",
+          },
+          {
+            capability_key: "model.direct_answer",
+            requires_action: false,
+            availability: "available",
+            goal_fit: "forbidden",
+            expected_artifacts: ["direct_answer_text"],
+            reason: "Direct answer is forbidden before required observations are complete.",
+          },
+        ],
+      } as any,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          },
+        },
+      ] as any,
+      goalSatisfactionEvaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [],
+      } as any,
+      capabilityItineraryRef: `${turnId}:capability_itinerary`,
+      decisionTiming: "post_observation",
+    });
+
+    expect(decision.decision).toBe("fail_closed");
+    expect(decision.next_step).toBe("fail");
+    expect(decision.chosen_capability).toBeNull();
+    expect(decision.why_this_capability_satisfies_goal).toMatch(/internet_search/);
+  });
 
   it("rejects empty scholarly runtime tool args instead of falling back to the full prompt", () => {
     const availableCapabilities = {
