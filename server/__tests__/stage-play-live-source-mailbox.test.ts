@@ -31,6 +31,7 @@ import {
   listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
   expireStaleStagePlayLiveSourceMailWakeRequests,
+  markStagePlayMailWakeCompleted,
   markStagePlayMailWakeRunning,
   queueStagePlayLiveSourceMailWakeRequest,
   reconcileStagePlayMailWakeRequestFromAskTurn,
@@ -2502,7 +2503,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(reconciled).toEqual([]);
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
       wakeRequestId: wake?.wakeRequestId,
-      status: "queued",
+      status: "running",
       lifecycleStage: "voice_pending",
       lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
       decisionIds: [decision.decisionId],
@@ -2530,8 +2531,74 @@ describe("Stage Play live-source mailbox", () => {
       lifecycleStage: "voice_pending",
       lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
       askTurnId: "ask:voice-decision-without-checkpoint",
+      askLaunchStatus: "launched",
       decisionIds: [decision.decisionId],
     });
+  });
+
+  it("keeps direct wake completion in voice-pending state when a voice checkpoint is required", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:direct-complete-without-voice",
+      evidenceRef: "visual_evidence:direct-complete-without-voice",
+      summaryText: "A visual summary produced an urgent voice candidate.",
+      createdAt: "2026-06-04T12:01:24.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:25.000Z",
+    });
+    const decision = recordStagePlayMailDecision({
+      mailIds: [mail.mailId],
+      threadId,
+      roomId,
+      decision: "request_voice_callout",
+      rationalePreview: "The mailbox Ask turn decided this needs voice.",
+      voiceCalloutDraft: "Damage cue detected; create distance.",
+      voiceEligible: true,
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: { text: "Damage cue detected; create distance." },
+      },
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [mail.mailId, "ask:direct-complete-without-voice"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:26.000Z",
+    });
+
+    const completed = markStagePlayMailWakeCompleted({
+      wakeRequestId: wake!.wakeRequestId,
+      askTurnId: "ask:direct-complete-without-voice",
+      decisionIds: [decision.decisionId],
+      evidenceRefs: [mail.mailId, decision.decisionId, "ask:direct-complete-without-voice"],
+      requiresVoiceCheckpoint: true,
+      now: "2026-06-04T12:01:27.000Z",
+    });
+
+    expect(completed).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "running",
+      askTurnId: "ask:direct-complete-without-voice",
+      askLaunchStatus: "launched",
+      decisionIds: [decision.decisionId],
+      lifecycleStage: "voice_pending",
+      lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "running",
+      lifecycleStage: "voice_pending",
+      decisionIds: [decision.decisionId],
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual([]);
   });
 
   it("reconciles a UI-bridged Ask wake by wake id after decision and voice receipt evidence", () => {
@@ -2622,6 +2689,116 @@ describe("Stage Play live-source mailbox", () => {
         ]),
       }),
     ]);
+  });
+
+  it("reconciles active voice-pending wakes attached to the same Ask turn id", () => {
+    const secondSourceId = "visual_source:stage-play-mailbox-secondary";
+    const first = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:same-ask-first",
+      evidenceRef: "visual_evidence:same-ask-first",
+      summaryText: "First live packet in the same Ask turn voice batch.",
+      createdAt: "2026-06-04T12:01:28.000Z",
+    });
+    const second = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId: secondSourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:same-ask-second",
+      evidenceRef: "visual_evidence:same-ask-second",
+      summaryText: "Second live packet in the same Ask turn voice batch.",
+      createdAt: "2026-06-04T12:01:29.000Z",
+    });
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [first.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [first.mailId, ...first.evidenceRefs],
+      now: "2026-06-04T12:01:30.000Z",
+    });
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [second.mailId],
+      sourceIds: [secondSourceId],
+      reason: "unread_mail",
+      evidenceRefs: [second.mailId, ...second.evidenceRefs],
+      now: "2026-06-04T12:01:31.000Z",
+    });
+    const decision = recordStagePlayMailDecision({
+      mailIds: [first.mailId, second.mailId],
+      threadId,
+      roomId,
+      decision: "request_voice_callout",
+      rationalePreview: "Same Ask turn decided both pending wakes require one voice checkpoint.",
+      voiceCalloutDraft: "Create distance from danger.",
+      voiceEligible: true,
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: { text: "Create distance from danger." },
+      },
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [first.mailId, second.mailId, "ask:same-turn-voice"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:32.000Z",
+    });
+    for (const wake of [firstWake, secondWake]) {
+      markStagePlayMailWakeCompleted({
+        wakeRequestId: wake!.wakeRequestId,
+        askTurnId: "ask:same-turn-voice",
+        decisionIds: [decision.decisionId],
+        evidenceRefs: [decision.decisionId, "ask:same-turn-voice", ...(wake?.mailIds ?? [])],
+        requiresVoiceCheckpoint: true,
+        now: "2026-06-04T12:01:33.000Z",
+      });
+    }
+
+    const reconciliation = reconcileStagePlayMailWakeRequestFromAskTurn({
+      wakeRequestIds: [firstWake!.wakeRequestId],
+      askTurnId: "ask:same-turn-voice",
+      decisionIds: [decision.decisionId],
+      voiceReceiptRefs: ["helix_interim_voice_callout_receipt:same-turn-voice"],
+      mailIds: [first.mailId, second.mailId],
+      now: "2026-06-04T12:01:34.000Z",
+    });
+
+    expect(reconciliation.reconciledWakeIds).toEqual([
+      firstWake?.wakeRequestId,
+      secondWake?.wakeRequestId,
+    ]);
+    expect(reconciliation.wakeResultIds).toHaveLength(2);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wakeRequestId: firstWake?.wakeRequestId,
+        status: "completed",
+        lifecycleStage: "voice_unknown",
+        askTurnId: "ask:same-turn-voice",
+      }),
+      expect.objectContaining({
+        wakeRequestId: secondWake?.wakeRequestId,
+        status: "completed",
+        lifecycleStage: "voice_unknown",
+        askTurnId: "ask:same-turn-voice",
+      }),
+    ]));
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wakeRequestId: firstWake?.wakeRequestId,
+        status: "completed",
+        voiceCheckpointRefs: ["helix_interim_voice_callout_receipt:same-turn-voice"],
+      }),
+      expect.objectContaining({
+        wakeRequestId: secondWake?.wakeRequestId,
+        status: "completed",
+        voiceCheckpointRefs: ["helix_interim_voice_callout_receipt:same-turn-voice"],
+      }),
+    ]));
   });
 
   it("does not complete a queued wake when a later decision covers only part of the wake batch", () => {

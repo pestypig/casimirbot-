@@ -616,27 +616,51 @@ export const markStagePlayMailWakeCompleted = (input: {
   askTurnId?: string | null;
   decisionIds?: string[];
   evidenceRefs?: string[];
+  requiresVoiceCheckpoint?: boolean;
   now?: string;
-}): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(input.wakeRequestId, {
+}): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(input.wakeRequestId);
+  const evidenceRefs = uniqueStrings(input.evidenceRefs ?? []);
+  const decisionIds = uniqueStrings(input.decisionIds ?? []);
+  const updatedAt = input.now ?? new Date().toISOString();
+  if (input.requiresVoiceCheckpoint === true && voiceCheckpointRefsFromEvidence(evidenceRefs).length === 0) {
+    const askTurnId = input.askTurnId ?? existing?.askTurnId ?? null;
+    return updateWake(input.wakeRequestId, {
+      status: existing?.status === "queued" ? "running" : existing?.status ?? "running",
+      askTurnId,
+      askLaunchStatus: askTurnId ? "launched" : existing?.askLaunchStatus ?? "not_started",
+      askLaunchStartedAt: askTurnId ? existing?.askLaunchStartedAt ?? updatedAt : existing?.askLaunchStartedAt ?? null,
+      askLaunchCompletedAt: askTurnId ? existing?.askLaunchCompletedAt ?? updatedAt : existing?.askLaunchCompletedAt ?? null,
+      decisionIds,
+      evidenceRefs,
+      lifecycleStage: "voice_pending",
+      lifecycleReason: "decision_recorded_waiting_for_voice_receipt",
+      nextRetryAt: null,
+      failureReason: null,
+      updatedAt,
+    });
+  }
+  return updateWake(input.wakeRequestId, {
     status: "completed",
     askTurnId: input.askTurnId ?? undefined,
     askLaunchStatus: "completed",
-    askLaunchCompletedAt: input.now ?? new Date().toISOString(),
-    decisionIds: input.decisionIds,
-    evidenceRefs: input.evidenceRefs,
+    askLaunchCompletedAt: updatedAt,
+    decisionIds,
+    evidenceRefs,
     lifecycleStage: resolveWakeLifecycleStage({
       status: "completed",
       askTurnId: input.askTurnId ?? null,
-      decisionIds: input.decisionIds ?? [],
-      evidenceRefs: input.evidenceRefs ?? [],
+      decisionIds,
+      evidenceRefs,
+      requiresVoiceCheckpoint: input.requiresVoiceCheckpoint,
     }),
     lifecycleReason: "wake_completion_evidence_satisfied",
     nextRetryAt: null,
     failureReason: null,
     expiresAt: null,
-    updatedAt: input.now,
+    updatedAt,
   });
+};
 
 export const markStagePlayMailWakeSkipped = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
   updateWake(wakeRequestId, {
@@ -963,8 +987,11 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
       !hasVoiceCheckpointForDecisions(matchingDecisionRecords, evidenceRefs)
     ) {
       updateWake(wake.wakeRequestId, {
-        status: wake.status,
+        status: wake.status === "queued" ? "running" : wake.status,
         askTurnId: askTurnId ?? undefined,
+        askLaunchStatus: askTurnId ? "launched" : wake.askLaunchStatus ?? "not_started",
+        askLaunchStartedAt: askTurnId ? wake.askLaunchStartedAt ?? now : wake.askLaunchStartedAt ?? null,
+        askLaunchCompletedAt: askTurnId ? wake.askLaunchCompletedAt ?? now : wake.askLaunchCompletedAt ?? null,
         decisionIds: decisions,
         evidenceRefs,
         lifecycleStage: "voice_pending",
@@ -978,6 +1005,7 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
       askTurnId,
       decisionIds: decisions,
       evidenceRefs,
+      requiresVoiceCheckpoint: decisionsRequireVoiceCheckpoint(matchingDecisionRecords),
       now,
     });
     if (updated) {
@@ -1031,7 +1059,7 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
   raw_content_included: false;
 } {
   const now = input.now ?? new Date().toISOString();
-  const wakeRequestIds = uniqueStrings(input.wakeRequestIds);
+  const explicitWakeRequestIds = uniqueStrings(input.wakeRequestIds);
   const decisionIds = uniqueStrings(input.decisionIds ?? []);
   const voiceReceiptRefs = uniqueStrings(input.voiceReceiptRefs ?? []);
   const mailIds = uniqueStrings(input.mailIds ?? []);
@@ -1048,6 +1076,21 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
     wakeRequestId: string;
     reason: "wake_not_found" | "wake_not_active" | "missing_decision_or_voice_receipt" | "mail_batch_not_covered";
   }> = [];
+  const askTurnId = input.askTurnId ?? null;
+  const askMatchedWakeRequestIds = askTurnId
+    ? Array.from(wakeById.values())
+        .filter((wake) =>
+          ACTIVE_WAKE_STATUSES.has(wake.status) &&
+          wake.askTurnId === askTurnId &&
+          (
+            decisionIds.length === 0 ||
+            wake.decisionIds.length === 0 ||
+            wake.decisionIds.some((decisionId) => decisionIds.includes(decisionId))
+          )
+        )
+        .map((wake) => wake.wakeRequestId)
+    : [];
+  const wakeRequestIds = uniqueStrings([...explicitWakeRequestIds, ...askMatchedWakeRequestIds]);
 
   for (const wakeRequestId of wakeRequestIds) {
     const wake = wakeById.get(wakeRequestId);
@@ -1067,6 +1110,9 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
       updateWake(wakeRequestId, {
         status: wake.status === "queued" ? "running" : wake.status,
         askTurnId: input.askTurnId ?? null,
+        askLaunchStatus: input.askTurnId ? "launched" : wake.askLaunchStatus ?? "not_started",
+        askLaunchStartedAt: input.askTurnId ? wake.askLaunchStartedAt ?? now : wake.askLaunchStartedAt ?? null,
+        askLaunchCompletedAt: input.askTurnId ? wake.askLaunchCompletedAt ?? now : wake.askLaunchCompletedAt ?? null,
         decisionIds,
         evidenceRefs: uniqueStrings([...wake.evidenceRefs, ...evidenceRefs]),
         lifecycleStage: "voice_pending",
@@ -1087,6 +1133,7 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
       askTurnId: input.askTurnId ?? null,
       decisionIds,
       evidenceRefs: uniqueStrings([...wake.evidenceRefs, ...evidenceRefs]),
+      requiresVoiceCheckpoint: input.requiresVoiceCheckpoint === true,
       now,
     });
     if (!completed) {

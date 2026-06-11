@@ -6248,6 +6248,7 @@ function launchStagePlayWakeInHelixAsk(input: {
     }),
     autoSubmit: true,
     panelId: "stage-play-badge-graph",
+    bypassWorkstationDispatch: true,
     forceReasoningDispatch: true,
     suppressWorkstationPayloadActions: true,
     routeMetadata: buildStagePlayMailWakeRouteMetadata({

@@ -48,7 +48,11 @@ import {
   startVisualFrameProducerInterval,
   stopVisualFrameProducerInterval,
 } from "@/lib/helix/visualFrameProducer";
-import { useVisualSourceCaptureStore, type VisualSourceCaptureState } from "@/store/useVisualSourceCaptureStore";
+import {
+  useVisualSourceCaptureStore,
+  type VisualSourceCaptureFrameHistoryItem,
+  type VisualSourceCaptureState,
+} from "@/store/useVisualSourceCaptureStore";
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type ClientCapabilityActionRead = {
@@ -551,6 +555,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [selectedVisualObserverProfileId, setSelectedVisualObserverProfileId] = useState<string>("");
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
+  const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -743,6 +748,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return sourceId ? state.producers[sourceId] ?? null : null;
   });
   const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+  const visualFrameHistory = visualProducerState?.frame_history ?? [];
+  const selectedVisualFrameHistory =
+    visualFrameHistory.find((item: VisualSourceCaptureFrameHistoryItem) => item.history_id === selectedVisualFrameHistoryId) ??
+    visualFrameHistory.at(-1) ??
+    null;
+  const selectedVisualFrameHistoryIndex = selectedVisualFrameHistory
+    ? visualFrameHistory.findIndex((item: VisualSourceCaptureFrameHistoryItem) => item.history_id === selectedVisualFrameHistory.history_id)
+    : -1;
+  const selectVisualFrameHistoryByOffset = (offset: number): void => {
+    if (!visualFrameHistory.length) return;
+    const baseIndex = selectedVisualFrameHistoryIndex >= 0 ? selectedVisualFrameHistoryIndex : visualFrameHistory.length - 1;
+    const nextIndex = Math.max(0, Math.min(visualFrameHistory.length - 1, baseIndex + offset));
+    setSelectedVisualFrameHistoryId(visualFrameHistory[nextIndex]?.history_id ?? null);
+  };
   const selectedShadeApplied = Boolean(
     activeVisualObserverProfile &&
       selectedVisualObserverProfile &&
@@ -1649,29 +1668,155 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             {visualEvidenceHealth?.status ?? visualLatest?.source?.status ?? visualSourceCapability?.status ?? "not registered"}
           </span>
         </div>
-        <div className="mt-2 grid gap-2 md:grid-cols-3">
-          <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Source</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.source?.source_id ?? "none"}</p>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+          <div className="overflow-hidden rounded border border-sky-300/15 bg-black">
+            <div className="flex aspect-video items-center justify-center">
+              {visualProducerState?.last_frame_preview_data_url ? (
+                <img
+                  src={visualProducerState.last_frame_preview_data_url}
+                  alt="Latest captured visual frame preview"
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="px-3 text-center">
+                  <p className="text-[11px] font-semibold text-slate-400">No frame preview</p>
+                  <p className="mt-1 text-[10px] text-slate-600">
+                    {visualProducerState?.stream_active || visualLatest?.source
+                      ? "Waiting for first captured frame."
+                      : "Hook up a visual source to start preview."}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Latest frame</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualLatest?.frame?.frame_id ?? "none"}</p>
-          </div>
-          <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Vision provider</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.provider_status ?? "unknown"}</p>
+            <div className="grid gap-x-3 gap-y-1 text-[11px] md:grid-cols-2">
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Source</span>{" "}
+                <span className="break-all font-mono text-slate-200">{visualLatest?.source?.source_id ?? "none"}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Frame</span>{" "}
+                <span className="break-all font-mono text-slate-200">{visualLatest?.frame?.frame_id ?? "none"}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Evidence</span>{" "}
+                <span className="break-all font-mono text-slate-200">{visualEvidenceHealth?.latest_evidence_id ?? visualLatest?.evidence?.evidence_id ?? "none"}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Vision</span>{" "}
+                <span className="break-all font-mono text-slate-200">{visualEvidenceHealth?.provider_status ?? "unknown"}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Next</span>{" "}
+                <span className="break-all font-mono text-slate-200">{visualEvidenceHealth?.next_required_action ?? "none"}</span>
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] uppercase text-slate-500">Preview</span>{" "}
+                <span className="break-all font-mono text-slate-200">
+                  {visualProducerState?.last_frame_hash ? `hash ${visualProducerState.last_frame_hash}` : "local only"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-2 grid gap-2 md:grid-cols-2">
-          <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Latest evidence</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.latest_evidence_id ?? visualLatest?.evidence?.evidence_id ?? "none"}</p>
+        <div className="mt-3 rounded border border-white/10 bg-black/20 p-2" data-testid="visual-frame-review-carousel">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-slate-200">Recent frame review</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                Local carousel, capped at 20 frames and auto-expiring after 10 minutes.
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Review previous visual frame"
+                onClick={() => selectVisualFrameHistoryByOffset(-1)}
+                disabled={selectedVisualFrameHistoryIndex <= 0}
+                className="rounded border border-white/10 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <span className="min-w-14 text-center text-[10px] text-slate-500">
+                {selectedVisualFrameHistoryIndex >= 0 ? `${selectedVisualFrameHistoryIndex + 1}/${visualFrameHistory.length}` : "0/0"}
+              </span>
+              <button
+                type="button"
+                aria-label="Review next visual frame"
+                onClick={() => selectVisualFrameHistoryByOffset(1)}
+                disabled={!visualFrameHistory.length || selectedVisualFrameHistoryIndex >= visualFrameHistory.length - 1}
+                className="rounded border border-white/10 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
-          <div className="rounded border border-white/10 bg-black/20 p-2">
-            <p className="text-[10px] uppercase text-slate-500">Next visual action</p>
-            <p className="mt-1 truncate text-xs text-slate-200">{visualEvidenceHealth?.next_required_action ?? "none"}</p>
-          </div>
+          {selectedVisualFrameHistory ? (
+            <div className="mt-2 grid gap-2 lg:grid-cols-[8rem_minmax(0,1fr)]">
+              <div className="overflow-hidden rounded border border-white/10 bg-black">
+                <img
+                  src={selectedVisualFrameHistory.preview_data_url}
+                  alt="Selected visual frame review preview"
+                  className="aspect-video h-full w-full object-contain"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="max-h-20 overflow-y-auto pr-1 text-[11px] leading-5 text-slate-300">
+                  {selectedVisualFrameHistory.summary}
+                </p>
+                <div className="mt-2 grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Frame</span>{" "}
+                    <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.frame_id ?? "pending"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Evidence</span>{" "}
+                    <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.evidence_id ?? "pending"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Shade</span>{" "}
+                    <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.visual_observer_profile_title ?? "generic"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Prompt hash</span>{" "}
+                    <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.visual_prompt_hash ?? "none"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Captured</span>{" "}
+                    <span className="font-mono text-slate-300">{formatTime(selectedVisualFrameHistory.captured_at)}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Expires</span>{" "}
+                    <span className="font-mono text-slate-300">{formatTime(selectedVisualFrameHistory.expires_at)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              Captured frame summaries will appear here after visual analysis returns.
+            </p>
+          )}
+          {visualFrameHistory.length ? (
+            <div className="mt-2 flex gap-1 overflow-x-auto pb-1" aria-label="Recent visual frame thumbnails">
+              {visualFrameHistory.map((item: VisualSourceCaptureFrameHistoryItem, index: number) => (
+                <button
+                  key={item.history_id}
+                  type="button"
+                  aria-label={`Review visual frame ${index + 1}`}
+                  onClick={() => setSelectedVisualFrameHistoryId(item.history_id)}
+                  className={`h-12 w-20 shrink-0 overflow-hidden rounded border bg-black ${
+                    item.history_id === selectedVisualFrameHistory?.history_id
+                      ? "border-sky-300/70"
+                      : "border-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <img src={item.preview_data_url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <button

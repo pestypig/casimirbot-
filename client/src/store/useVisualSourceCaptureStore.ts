@@ -1,5 +1,19 @@
 import { create } from "zustand";
 
+export type VisualSourceCaptureFrameHistoryItem = {
+  history_id: string;
+  frame_id: string | null;
+  evidence_id: string | null;
+  captured_at: string;
+  preview_data_url: string;
+  preview_hash: string | null;
+  summary: string;
+  visual_observer_profile_id?: string | null;
+  visual_observer_profile_title?: string | null;
+  visual_prompt_hash?: string | null;
+  expires_at: string;
+};
+
 export type VisualSourceCaptureState = {
   source_id: string;
   thread_id: string;
@@ -20,6 +34,8 @@ export type VisualSourceCaptureState = {
   capture_count?: number;
   post_count?: number;
   last_frame_hash?: string | null;
+  last_frame_preview_data_url?: string | null;
+  frame_history?: VisualSourceCaptureFrameHistoryItem[];
   last_chunk_id?: string | null;
   last_error?: string | null;
 };

@@ -96,6 +96,7 @@ let sortHelixAskRepliesChronologically: typeof import("@/components/helix/HelixA
 let appendHelixAskReplyChronologically: typeof import("@/components/helix/HelixAskPill").appendHelixAskReplyChronologically;
 let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
 let shouldRenderHelixAskActiveTurnStream: typeof import("@/components/helix/HelixAskPill").shouldRenderHelixAskActiveTurnStream;
+let shouldAdmitHelixAskExternalLiveEventToActiveStream: typeof import("@/components/helix/HelixAskPill").shouldAdmitHelixAskExternalLiveEventToActiveStream;
 let filterHelixAskActiveTurnStreamRows: typeof import("@/components/helix/HelixAskPill").filterHelixAskActiveTurnStreamRows;
 let isDurableHelixAskMailTranscriptGroup: typeof import("@/components/helix/HelixAskPill").isDurableHelixAskMailTranscriptGroup;
 let shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata: typeof import("@/components/helix/HelixAskPill").shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata;
@@ -199,6 +200,7 @@ beforeAll(async () => {
     appendHelixAskReplyChronologically,
     buildHelixAskRepliesFromChatSession,
     shouldRenderHelixAskActiveTurnStream,
+    shouldAdmitHelixAskExternalLiveEventToActiveStream,
     filterHelixAskActiveTurnStreamRows,
     isDurableHelixAskMailTranscriptGroup,
     shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata,
@@ -307,7 +309,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(null, "Quote this prompt: Review the latest Stage Play live-source mailbox finding.")).toBe(false);
   });
 
-  it("hides the active stream once the same turn has a durable reply", () => {
+  it("hides the active stream only once the same turn has a durable reply", () => {
     const durableActiveReply = {
       id: "reply-final",
       createdAtMs: 2_000,
@@ -340,7 +342,7 @@ describe("HelixAskPill mic-first surface contract", () => {
       activeTurnId: "ask:stale-active-turn",
       activeStartedAtMs: 900,
       latestReply: durableActiveReply,
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldRenderHelixAskActiveTurnStream({
       askBusy: true,
       activeTurnId: null,
@@ -353,6 +355,51 @@ describe("HelixAskPill mic-first surface contract", () => {
       activeStartedAtMs: 2_100,
       latestReply: durableActiveReply,
     })).toBe(true);
+  });
+
+  it("admits only active-turn external live events into the Ask reasoning stream", () => {
+    expect(shouldAdmitHelixAskExternalLiveEventToActiveStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeTraceId: "ask:active-turn",
+      eventTraceId: "ask:active-turn",
+      eventMeta: { kind: "workstation_action_receipt" },
+    })).toBe(true);
+
+    expect(shouldAdmitHelixAskExternalLiveEventToActiveStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeTraceId: "ask:active-turn",
+      eventTraceId: "workstation-action:copy:123",
+      eventMeta: { kind: "workstation_clipboard_receipt" },
+    })).toBe(false);
+
+    expect(shouldAdmitHelixAskExternalLiveEventToActiveStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeTraceId: "ask:active-turn",
+      eventTraceId: null,
+      eventMeta: { kind: "stage_play_mail_wake_queue_status" },
+    })).toBe(false);
+
+    expect(shouldAdmitHelixAskExternalLiveEventToActiveStream({
+      askBusy: true,
+      activeTurnId: "ask:active-turn",
+      activeTraceId: "ask:active-turn",
+      eventTraceId: "workstation-action:panel:456",
+      eventMeta: {
+        kind: "workstation_action_receipt",
+        turnKey: "ask:active-turn",
+      },
+    })).toBe(true);
+
+    expect(shouldAdmitHelixAskExternalLiveEventToActiveStream({
+      askBusy: false,
+      activeTurnId: "ask:active-turn",
+      activeTraceId: "ask:active-turn",
+      eventTraceId: "ask:active-turn",
+      eventMeta: { kind: "workstation_action_receipt" },
+    })).toBe(false);
   });
 
   it("does not render terminal active stream rows as the latest console session", () => {
@@ -516,7 +563,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(replies.every((reply: any) => reply.debug?.durable_chat_projection === true)).toBe(true);
   });
 
-  it("does not project generated Stage Play mailbox wake turns as normal chat history", () => {
+  it("filters stale generated Stage Play mailbox wake failures but keeps grounded compact wake answers", () => {
     const session = {
       id: "session:helix",
       title: "Helix Ask",
@@ -571,6 +618,21 @@ describe("HelixAskPill mic-first surface contract", () => {
           traceId: "ask:wake-compact",
         },
         {
+          id: "user-wake-grounded",
+          role: "user",
+          content:
+            "Review the latest Stage Play live-source mailbox finding.\nCurrent effort: combat or recovery.\nMicro-reasoner recommendation: request voice callout.\nUse the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
+          at: "2026-06-10T15:02:40.000Z",
+          traceId: "ask:wake-grounded",
+        },
+        {
+          id: "assistant-wake-grounded",
+          role: "assistant",
+          content: "I need retrieval before finalizing this claim. I do not yet have grounded evidence references for it.",
+          at: "2026-06-10T15:02:50.000Z",
+          traceId: "ask:wake-grounded",
+        },
+        {
           id: "user-2",
           role: "user",
           content: "why did the generated prompt mention live_env.read_live_source_mail?",
@@ -589,9 +651,14 @@ describe("HelixAskPill mic-first surface contract", () => {
 
     const replies = buildHelixAskRepliesFromChatSession(session);
 
-    expect(replies.map((reply: any) => reply.turn_id)).toEqual(["ask:normal", "ask:manual-debug"]);
+    expect(replies.map((reply: any) => reply.turn_id)).toEqual([
+      "ask:normal",
+      "ask:wake-grounded",
+      "ask:manual-debug",
+    ]);
     expect(replies.map((reply: any) => reply.question)).toEqual([
       "normal prompt",
+      "Review the latest Stage Play live-source mailbox finding.\nCurrent effort: combat or recovery.\nMicro-reasoner recommendation: request voice callout.\nUse the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
       "why did the generated prompt mention live_env.read_live_source_mail?",
     ]);
   });

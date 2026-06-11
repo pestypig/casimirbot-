@@ -1,4 +1,7 @@
-import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
+import {
+  useVisualSourceCaptureStore,
+  type VisualSourceCaptureFrameHistoryItem,
+} from "@/store/useVisualSourceCaptureStore";
 import { postVisualLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
 
 type PostJson = (path: string, body?: Record<string, unknown>) => Promise<any>;
@@ -29,6 +32,21 @@ type VisualProducerIntervalOptions = {
 const activeIntervals = new Map<string, number>();
 const activeStreams = new Map<string, MediaStream>();
 const activeCaptureLocks = new Set<string>();
+const visualFrameHistoryLimit = 20;
+const visualFrameHistoryTtlMs = 10 * 60 * 1000;
+
+const readEvidenceString = (evidence: Record<string, unknown> | null | undefined, key: string): string | null => {
+  const value = evidence?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const pruneVisualFrameHistory = (
+  history: VisualSourceCaptureFrameHistoryItem[],
+  nowMs: number,
+): VisualSourceCaptureFrameHistoryItem[] =>
+  history
+    .filter((item) => Date.parse(item.expires_at) > nowMs)
+    .slice(-visualFrameHistoryLimit);
 
 type ServerVisualProducer = {
   producer_id?: string;
@@ -176,6 +194,7 @@ export async function runVisualFrameProducerOnce(input: {
   useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
     capture_count: (existingState?.capture_count ?? 0) + 1,
     last_frame_hash: frameHash,
+    last_frame_preview_data_url: imageBase64,
   });
   const analysis = await input.postJson("/api/agi/situation/visual-frame/analyze", {
     thread_id: input.threadId,
@@ -209,10 +228,29 @@ export async function runVisualFrameProducerOnce(input: {
     ? analysis.evidence.summary.trim()
     : "Visual frame captured and recorded as compact evidence.";
   const frameAt = new Date().toISOString();
+  const frameHistoryNowMs = Date.parse(frameAt);
+  const evidence = analysis?.evidence && typeof analysis.evidence === "object"
+    ? analysis.evidence as Record<string, unknown>
+    : null;
+  const existingProducerState = useVisualSourceCaptureStore.getState().producers[input.sourceId];
+  const frameHistoryItem: VisualSourceCaptureFrameHistoryItem = {
+    history_id: `${frameId ?? "pending"}:${frameHash}:${frameHistoryNowMs}`,
+    frame_id: frameId,
+    evidence_id: evidenceId,
+    captured_at: frameAt,
+    preview_data_url: imageBase64,
+    preview_hash: frameHash,
+    summary,
+    visual_observer_profile_id: readEvidenceString(evidence, "visual_observer_profile_id"),
+    visual_observer_profile_title: readEvidenceString(evidence, "visual_observer_profile_title"),
+    visual_prompt_hash: readEvidenceString(evidence, "visual_prompt_hash"),
+    expires_at: new Date(frameHistoryNowMs + visualFrameHistoryTtlMs).toISOString(),
+  };
   useVisualSourceCaptureStore.getState().patchProducer(input.sourceId, {
     last_frame_at: frameAt,
     last_heartbeat_at: frameAt,
     post_count: (useVisualSourceCaptureStore.getState().producers[input.sourceId]?.post_count ?? 0) + 1,
+    frame_history: pruneVisualFrameHistory([...(existingProducerState?.frame_history ?? []), frameHistoryItem], frameHistoryNowMs),
     last_chunk_id: chunkId,
     pending_analysis_job_id: Array.isArray(analysis?.live_source_analysis_jobs) && typeof analysis.live_source_analysis_jobs.at(-1)?.job_id === "string"
       ? analysis.live_source_analysis_jobs.at(-1).job_id
@@ -228,9 +266,7 @@ export async function runVisualFrameProducerOnce(input: {
     frame_id: frameId,
     evidence_id: evidenceId,
     summary,
-    evidence: analysis?.evidence && typeof analysis.evidence === "object"
-      ? analysis.evidence as Record<string, unknown>
-      : null,
+    evidence,
   };
 }
 
@@ -552,6 +588,7 @@ export async function adoptServerVisualProducerPolicies(input: {
           capture_count: fallbackState?.capture_count ?? 0,
           post_count: fallbackState?.post_count ?? 0,
           last_frame_hash: fallbackState?.last_frame_hash ?? null,
+          last_frame_preview_data_url: fallbackState?.last_frame_preview_data_url ?? null,
           last_error: null,
         });
       }

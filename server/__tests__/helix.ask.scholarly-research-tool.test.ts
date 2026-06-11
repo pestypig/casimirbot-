@@ -1,3 +1,5 @@
+import express from "express";
+import request from "supertest";
 import { describe, expect, it } from "vitest";
 import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
@@ -16,12 +18,20 @@ import {
   __testHelixRuntimeToolCallValidation,
   __testHelixScholarlyTerminalAuthorityRefresh,
   __testHelixScholarlyFinalFallback,
+  planRouter,
 } from "../routes/agi.plan";
 import {
   runScholarlyResearchLookup,
   type ScholarlyFetch,
 } from "../services/helix-ask/retrieval/scholarly-research-lookup";
 import { runScholarlyFullTextFetch } from "../services/helix-ask/retrieval/scholarly-full-text-fetch";
+
+const createApp = (): express.Express => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", planRouter);
+  return app;
+};
 
 const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null) => ({
   turn_id: "ask:scholarly",
@@ -38,6 +48,55 @@ const canonicalGoal = (goal_kind: string, required_terminal_kind: string | null)
 });
 
 describe("Helix scholarly research tool admission", () => {
+  it("publishes scholarly lookup as executable for compound scholarly plus theory locator asks", async () => {
+    const app = createApp();
+    const promptText =
+      "Do not write files. Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with scale bands and uncertainty mode. Explain what evidence was actually used.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:test:scholarly-compound-menu",
+        question: promptText,
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    const availableCapabilities =
+      response.body?.initial_available_capabilities ??
+      response.body?.available_capabilities;
+    const scholarlyLookup = availableCapabilities?.capabilities?.find(
+      (capability: any) => capability?.capability_key === HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+    );
+    const directAnswer = availableCapabilities?.capabilities?.find(
+      (capability: any) => capability?.capability_key === "model.direct_answer",
+    );
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("scholarly_research_lookup");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    );
+    expect(response.body?.capability_itinerary?.prompt_shape).toBe("compound_tool");
+    expect(availableCapabilities?.recommended_capability_key).toBe(HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY);
+    expect(scholarlyLookup).toMatchObject({
+      capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      goal_fit: "primary",
+    });
+    expect(directAnswer?.goal_fit).toBe("forbidden");
+    expect(response.body?.tool_choice_arbitration).toMatchObject({
+      answer_scope: "source_tool_backed",
+      evidence_need: "scholarly_research",
+      first_step: "tool",
+    });
+    expect(response.body?.capability_selection_result).toMatchObject({
+      capability_id: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      expected_observation: {
+        kind: "scholarly_research_observation",
+      },
+    });
+  }, 60000);
+
   it("rejects empty scholarly runtime tool args instead of falling back to the full prompt", () => {
     const availableCapabilities = {
       schema: "helix.available_capabilities.v1",

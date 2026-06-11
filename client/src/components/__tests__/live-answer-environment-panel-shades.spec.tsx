@@ -8,6 +8,12 @@ const panelSource = () =>
     "utf8",
   );
 
+const producerSource = () =>
+  fs.readFileSync(
+    path.resolve(__dirname, "../../lib/helix/visualFrameProducer.ts"),
+    "utf8",
+  );
+
 describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
   it("surfaces doc equation context as observation-only context", () => {
     const source = panelSource();
@@ -67,6 +73,33 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('Source: {activeVisualSourceId ?? "will register on apply"}');
     expect(source).toContain("Shade presets are still loading. Refresh shades if the server was just restarted.");
     expect(source).toContain("Refresh shades");
+  });
+
+  it("renders a local-only last-frame preview in the visual capture source panel", () => {
+    const source = panelSource();
+
+    expect(source).toContain("Latest captured visual frame preview");
+    expect(source).toContain("visualProducerState?.last_frame_preview_data_url");
+    expect(source).toContain("No frame preview");
+    expect(source).toContain("Hook up a visual source to start preview.");
+    expect(source).toContain("local only");
+  });
+
+  it("keeps a bounded local review carousel for recent visual frames", () => {
+    const source = panelSource();
+    const producer = producerSource();
+
+    expect(source).toContain('data-testid="visual-frame-review-carousel"');
+    expect(source).toContain("Recent frame review");
+    expect(source).toContain("capped at 20 frames and auto-expiring after 10 minutes");
+    expect(source).toContain("selectedVisualFrameHistory.summary");
+    expect(source).toContain("selectedVisualFrameHistory.visual_prompt_hash");
+    expect(source).toContain("Review previous visual frame");
+    expect(source).toContain("Review next visual frame");
+    expect(source).toContain("Recent visual frame thumbnails");
+    expect(producer).toContain("const visualFrameHistoryLimit = 20");
+    expect(producer).toContain("const visualFrameHistoryTtlMs = 10 * 60 * 1000");
+    expect(producer).toContain("frame_history: pruneVisualFrameHistory");
   });
 
   it("does not mark a missing shade preset as applied", () => {

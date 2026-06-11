@@ -6877,6 +6877,7 @@ const STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS = [
   /^\s*use\s+live_env\.(?:read_live_source_mail|read_processed_live_source_mail|record_live_source_mail_decision|request_interim_voice_callout)\b/i,
   /^\s*read the active stage play live-source mailbox and use the latest processed micro-reasoner finding\b/i,
   /^\s*review the latest stage play live-source mailbox finding\.\s*use the structured mailbox route metadata attached to this turn\b/i,
+  /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*(?:record\s+interpretation|request\s+voice\s+callout|request\s+more\s+evidence|request\s+stage\s+play\s+checkpoint|draft\s+text\s+answer)\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
   /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*request\s+voice\s+callout\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
   /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner wake candidate|operator opened queued wake)/i,
 ];
@@ -6911,8 +6912,7 @@ function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
 ): boolean {
   if (!isGeneratedStagePlayMailWakePrompt(userMessage)) return false;
   if (isGeneratedStagePlayMailWakeAssistantProjection(assistantMessage)) return true;
-  const answer = assistantMessage.content.trim();
-  return answer.length > 0 && answer.length < 800;
+  return false;
 }
 
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
@@ -9763,7 +9763,9 @@ export function shouldRenderHelixAskActiveTurnStream(input: {
   const activeTurnId = coerceText(input.activeTurnId).trim();
   const latestReply = input.latestReply ?? null;
   if (!latestReply) return true;
-  if (activeTurnId && resolveHelixAskReplyCanonicalKey(latestReply) === activeTurnId) return false;
+  if (activeTurnId) {
+    return resolveHelixAskReplyCanonicalKey(latestReply) !== activeTurnId;
+  }
   const activeStartedAtMs =
     typeof input.activeStartedAtMs === "number" && Number.isFinite(input.activeStartedAtMs)
       ? input.activeStartedAtMs
@@ -9774,6 +9776,45 @@ export function shouldRenderHelixAskActiveTurnStream(input: {
   }
   if (!activeTurnId && activeStartedAtMs === null) return false;
   return true;
+}
+
+function collectHelixAskExternalLiveEventIdentityKeys(input: {
+  eventTraceId?: string | null;
+  eventMeta?: Record<string, unknown> | null;
+}): string[] {
+  const meta = input.eventMeta ?? null;
+  return Array.from(new Set([
+    coerceText(input.eventTraceId).trim(),
+    coerceText(meta?.traceId).trim(),
+    coerceText(meta?.trace_id).trim(),
+    coerceText(meta?.turnKey).trim(),
+    coerceText(meta?.turn_key).trim(),
+    coerceText(meta?.turnId).trim(),
+    coerceText(meta?.turn_id).trim(),
+    coerceText(meta?.askTurnId).trim(),
+    coerceText(meta?.ask_turn_id).trim(),
+    coerceText(meta?.activeTurnId).trim(),
+    coerceText(meta?.active_turn_id).trim(),
+  ].filter(Boolean)));
+}
+
+export function shouldAdmitHelixAskExternalLiveEventToActiveStream(input: {
+  askBusy: boolean;
+  activeTurnId?: string | null;
+  activeTraceId?: string | null;
+  eventTraceId?: string | null;
+  eventMeta?: Record<string, unknown> | null;
+}): boolean {
+  if (!input.askBusy) return false;
+  const activeKeys = new Set([
+    coerceText(input.activeTurnId).trim(),
+    coerceText(input.activeTraceId).trim(),
+  ].filter(Boolean));
+  if (activeKeys.size === 0) return false;
+  return collectHelixAskExternalLiveEventIdentityKeys({
+    eventTraceId: input.eventTraceId,
+    eventMeta: input.eventMeta,
+  }).some((key) => activeKeys.has(key));
 }
 
 export function filterHelixAskActiveTurnStreamRows(
@@ -30239,6 +30280,19 @@ export function HelixAskPill({
       const toolName = detail.entry.tool?.trim() || "workstation.job_executor";
       const text = clipText(detail.entry.text.trim(), HELIX_ASK_LIVE_EVENT_MAX_CHARS);
       if (!text) return;
+      const meta =
+        detail.entry.meta && typeof detail.entry.meta === "object" && !Array.isArray(detail.entry.meta)
+          ? detail.entry.meta
+          : undefined;
+      if (!shouldAdmitHelixAskExternalLiveEventToActiveStream({
+        askBusy,
+        activeTurnId: activeAskTurnIdRef.current,
+        activeTraceId: askLiveTraceId,
+        eventTraceId: detail.traceId,
+        eventMeta: meta,
+      })) {
+        return;
+      }
       const eventTs = parseTimestampMs(detail.entry.ts);
       setAskStatus(text);
       setAskLiveEvents((prev) => {
@@ -30259,10 +30313,7 @@ export function HelixAskPill({
               typeof detail.entry.durationMs === "number" && Number.isFinite(detail.entry.durationMs)
                 ? detail.entry.durationMs
                 : undefined,
-            meta:
-              detail.entry.meta && typeof detail.entry.meta === "object" && !Array.isArray(detail.entry.meta)
-                ? detail.entry.meta
-                : undefined,
+            meta,
           },
         ];
         const clipped = next.slice(-HELIX_ASK_LIVE_EVENT_LIMIT);
@@ -30288,7 +30339,7 @@ export function HelixAskPill({
     return () => {
       window.removeEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handleExternalLiveEvent as EventListener);
     };
-  }, [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, contextId, updateReasoningAttempt]);
+  }, [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, askBusy, askLiveTraceId, contextId, updateReasoningAttempt]);
 
   const askLiveAgenticEventRows = useMemo(
     () => buildAskLiveAgenticEventRows(askLiveEvents),
@@ -32922,11 +32973,13 @@ export function HelixAskPill({
         });
         return;
       }
-      const bypassWorkstationDispatch = pending?.bypassWorkstationDispatch === true;
-      const forceReasoningDispatch = pending?.forceReasoningDispatch === true;
-      const suppressWorkstationPayloadActions = pending?.suppressWorkstationPayloadActions === true;
       const answerContract = pending?.answerContract;
       const routeMetadata = pending?.routeMetadata;
+      const isStagePlayMailboxWake = hasStagePlayMailboxWakeRouteMetadata(routeMetadata);
+      const bypassWorkstationDispatch = pending?.bypassWorkstationDispatch === true || isStagePlayMailboxWake;
+      const forceReasoningDispatch = pending?.forceReasoningDispatch === true || isStagePlayMailboxWake;
+      const suppressWorkstationPayloadActions =
+        pending?.suppressWorkstationPayloadActions === true || isStagePlayMailboxWake;
       const externalTurnId =
         String(pending?.traceId ?? "").trim() || `external:${claimId}`;
       clearPendingHelixAskPrompt();
@@ -35489,7 +35542,7 @@ export function HelixAskPill({
               {isLatestReply ? (
               <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-slate-500">
                 <span>
-                  Saved in Helix Console
+                  In Helix Console
                   {reply.promptIngested ? " | Prompt ingested" : ""}
                 </span>
               </div>

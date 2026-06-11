@@ -3245,6 +3245,7 @@ export async function runNextMailWakeRequest(input: {
       askTurnId,
       decisionIds,
       evidenceRefs: completionEvidenceRefs,
+      requiresVoiceCheckpoint: voiceDecisionIds.length > 0,
       now: completionAt,
     });
     const wakeResult = recordStagePlayMailWakeResult({
