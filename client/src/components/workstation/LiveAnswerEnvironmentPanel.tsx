@@ -2357,6 +2357,99 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           ) : null}
         </div>
+        <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase text-cyan-100">MicroDeck</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-300">
+                {microReasonerPresetStatus}
+              </p>
+              <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                Source: {activeVisualSourceId ?? "will register on apply"}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <label className="sr-only" htmlFor="micro-reasoner-preset-select">
+                Micro-reasoner prompt preset
+              </label>
+              <select
+                id="micro-reasoner-preset-select"
+                aria-label="Micro-reasoner prompt preset"
+                value={selectedMicroReasonerPromptPreset?.presetId ?? ""}
+                onChange={(event) => setSelectedMicroReasonerPromptPresetId(event.currentTarget.value)}
+                disabled={microReasonerPromptPresets.length === 0}
+                className="min-w-[18rem] rounded border border-cyan-300/30 bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {microReasonerPresetGroups.length === 0 ? (
+                  <option value="">No MicroDeck presets loaded</option>
+                ) : (
+                  microReasonerPresetGroups.map((group) => (
+                    <optgroup key={group.category} label={`${group.category} source`}>
+                      {group.presets.map((preset) => (
+                        <option key={preset.presetId} value={preset.presetId}>
+                          {microReasonerPresetOptionLabel(preset)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                )}
+              </select>
+              <button
+                type="button"
+                aria-label="Apply selected micro-reasoner prompt preset"
+                onClick={() => void applyMicroReasonerPromptPreset(selectedMicroReasonerPromptPreset)}
+                disabled={!selectedMicroReasonerPromptPreset}
+                className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                  selectedMicroPresetApplied
+                    ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                    : "border-cyan-300/30 text-cyan-100 hover:bg-cyan-400/10"
+                }`}
+              >
+                {selectedMicroPresetApplied ? "Selected deck applied" : "Apply selected deck"}
+              </button>
+              <button
+                type="button"
+                aria-label="Refresh micro-reasoner prompt presets"
+                onClick={() => void refresh()}
+                className="rounded border border-white/15 px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-white/10"
+              >
+                Refresh deck
+              </button>
+            </div>
+          </div>
+          {microReasonerPromptPresets.length === 0 ? (
+            <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1.5 text-[11px] text-amber-100">
+              MicroDeck presets are still loading. Refresh deck if the server was just restarted.
+            </p>
+          ) : null}
+          {selectedMicroReasonerPromptPreset ? (
+            <div className="mt-2 space-y-2">
+              <p className="rounded border border-cyan-300/15 bg-black/20 px-2 py-1.5 text-[11px] text-cyan-100">
+                {selectedMicroReasonerPromptPreset.description}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {selectedMicroReasonerPromptPreset.promptedRoles.map((role: string) => (
+                  <span key={role} className="rounded border border-cyan-300/20 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                    {role}
+                  </span>
+                ))}
+              </div>
+              <div className="grid gap-2 md:grid-cols-2">
+                {selectedMicroPromptPreview.map((prompt: StagePlayMicroReasonerPromptV1) => (
+                  <div key={prompt.promptId} className="rounded border border-white/10 bg-black/25 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-[10px] font-semibold uppercase text-slate-300">{prompt.title}</div>
+                      <div className="font-mono text-[9px] text-slate-500">{prompt.maxOutputTokens ?? "auto"} tok</div>
+                    </div>
+                    <p className="mt-1 line-clamp-3 whitespace-pre-wrap font-mono text-[10px] leading-4 text-slate-400">
+                      {prompt.template}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
         {visualLatest?.evidence?.summary ? (
           <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             {visualLatest.evidence.summary}

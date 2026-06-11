@@ -4519,7 +4519,7 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
-  it("keeps no-turn launch attempts queued so they retry before newer queued wakes", async () => {
+  it("keeps no-turn launch attempts non-locking when a newer queued wake runs first", async () => {
     seedVisualEvidence();
     const firstWake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
     markStagePlayMailWakeRunning(firstWake.wakeRequestId, "2026-06-04T12:03:00.000Z");
@@ -4569,22 +4569,23 @@ describe("Stage Play live-source mailbox", () => {
     expect(result).toMatchObject({
       status: "completed",
       askTurnId: "ask:wake-newer-after-entry-stale",
-      wakeRequestId: firstWake?.wakeRequestId,
+      wakeRequestId: newerWake?.wakeRequestId,
     });
     const firstWakeAfter = listStagePlayLiveSourceMailWakeRequests({ threadId })
       .find((wake) => wake.wakeRequestId === firstWake.wakeRequestId);
     expect(firstWakeAfter).toMatchObject({
-      status: "completed",
+      status: "queued",
+      askTurnId: null,
       failureReason: null,
-      askTurnId: "ask:wake-newer-after-entry-stale",
     });
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })
       .find((wake) => wake.wakeRequestId === newerWake?.wakeRequestId)).toMatchObject({
-        status: "queued",
+        status: "completed",
+        askTurnId: "ask:wake-newer-after-entry-stale",
       });
     expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        wakeRequestId: firstWake?.wakeRequestId,
+        wakeRequestId: newerWake?.wakeRequestId,
         status: "completed",
         askTurnId: "ask:wake-newer-after-entry-stale",
       }),

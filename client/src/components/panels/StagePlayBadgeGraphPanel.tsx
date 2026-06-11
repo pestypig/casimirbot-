@@ -13,6 +13,7 @@ import type {
   StagePlayLiveSourceMailItemV1,
   AskTurnTranscriptRowDraftV1,
   StagePlayMicroReasonerPromptV1,
+  StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
@@ -267,6 +268,8 @@ type StagePlayLiveSourceMailListResponse = {
   visualObserverProfiles?: StagePlayVisualObserverProfileV1[];
   activeVisualObserverProfile?: StagePlayVisualObserverProfileV1 | null;
   microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
+  microReasonerPromptPresets?: StagePlayMicroReasonerPromptPresetV1[];
+  activeMicroReasonerPromptPreset?: StagePlayMicroReasonerPromptPresetV1 | null;
   microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   processedMailPackets?: StagePlayProcessedMailPacketV1[];
   decisions?: StagePlayLiveSourceMailDecisionV1[];
