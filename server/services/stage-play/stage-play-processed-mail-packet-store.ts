@@ -915,6 +915,8 @@ export function getActiveStagePlayMicroReasonerPromptForRole(
     const presetPrompt = getStagePlayMicroReasonerPrompt(promptId);
     if (presetPrompt?.active) return presetPrompt;
   }
+  const defaultPrompt = getStagePlayMicroReasonerPrompt(defaultPromptIdForRole(role));
+  if (defaultPrompt?.active) return defaultPrompt;
   return listStagePlayMicroReasonerPrompts({ active: true, role, limit: 1 }).at(-1) ?? null;
 }
 

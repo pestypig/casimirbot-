@@ -161,6 +161,83 @@ const expectNoRawMailboxReceiptFinal = (answer: unknown, debug: string): void =>
 };
 
 describe.sequential("Helix Ask live-source mail interpretation routing", () => {
+  it("normalizes processed-mail read observations with predictable artifact refs even when empty", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_processed_live_source_mail",
+      thread_id: threadId,
+      environment_id: "env:mail-refs",
+      args: {
+        mailbox_thread_id: threadId,
+        auto_process_missing: false,
+        read_only: true,
+        route_metadata: {
+          wakeRequestId: "stage_play_live_source_mail_wake:read-normalized",
+          askTurnId: "ask:read-normalized",
+        },
+      },
+    });
+
+    expect(observation).toMatchObject({
+      tool_name: "live_env.read_processed_live_source_mail",
+      producedRefs: [],
+      artifactRefs: {
+        processedPacketIds: [],
+        decisionIds: [],
+        voiceReceiptIds: [],
+        wakeRequestId: "stage_play_live_source_mail_wake:read-normalized",
+        askTurnId: "ask:read-normalized",
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+  });
+
+  it("normalizes mail decision observations with decision refs, wake id, and Ask turn id", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:decision-normalized",
+      evidenceRef: "visual_evidence:decision-normalized",
+      summaryText: "The live source shows routine movement.",
+      createdAt: "2026-06-04T12:06:00.000Z",
+    });
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.record_live_source_mail_decision",
+      thread_id: threadId,
+      environment_id: "env:mail-refs",
+      args: {
+        mail_ids: [mail.mailId],
+        decision: "record_interpretation",
+        rationale_preview: "Record the processed finding.",
+        route_metadata: {
+          wakeRequestId: "stage_play_live_source_mail_wake:decision-normalized",
+          askTurnId: "ask:decision-normalized",
+        },
+      },
+    });
+
+    const decisionIds = observation.artifactRefs?.decisionIds ?? [];
+    expect(decisionIds).toHaveLength(1);
+    expect(observation).toMatchObject({
+      tool_name: "live_env.record_live_source_mail_decision",
+      producedRefs: decisionIds,
+      artifactRefs: {
+        processedPacketIds: [],
+        decisionIds,
+        voiceReceiptIds: [],
+        wakeRequestId: "stage_play_live_source_mail_wake:decision-normalized",
+        askTurnId: "ask:decision-normalized",
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+    });
+  });
+
   it("resolves interpreter profile setup as a locked configure phase", () => {
     const phase = __testHelixGoalSatisfaction.liveSourceTurnPhaseResolution({
       transcript:
