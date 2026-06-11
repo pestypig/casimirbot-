@@ -2204,6 +2204,61 @@ describe("Stage Play live-source mailbox", () => {
     });
   });
 
+  it("does not treat an Ask launch payload without a turn id as entered into Ask", async () => {
+    seedVisualEvidence();
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:00:45.000Z",
+      askTurnRunner: async () => ({
+        current_turn_artifact_ledger: [
+          {
+            kind: "live_environment_tool_observation",
+            payload: {
+              tool_name: "live_env.record_live_source_mail_decision",
+              observation: {
+                artifactId: "stage_play_live_source_mail_decision",
+                decisionId: "stage_play_live_source_mail_decision:missing-ask-turn-id",
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(result).toMatchObject({
+      artifactId: "stage_play_live_source_mail_wake_result",
+      status: "failed_retryable",
+      askTurnId: null,
+      failedReason: "ask_launch_missing_ask_turn_id",
+      decisionIds: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "failed_retryable",
+      askTurnId: null,
+      askLaunchId: expect.stringMatching(/^stage_play_live_source_mail_wake_launch:/),
+      askLaunchStatus: "missing_turn_id",
+      askLaunchStartedAt: expect.any(String),
+      askLaunchCompletedAt: expect.any(String),
+      failureReason: "ask_launch_missing_ask_turn_id",
+      decisionIds: [],
+    });
+    expect(listStagePlayMailDecisions({ threadId })).toHaveLength(0);
+    const transcriptEntries = listStagePlayLiveSourceMailTranscriptEntries({ threadId });
+    expect(transcriptEntries.map((entry) => entry.row.title)).toEqual(expect.arrayContaining([
+      "Wake Ask launch missing turn id",
+      "Loop state",
+    ]));
+    expect(transcriptEntries.map((entry) => entry.row.body).join("\n")).toContain(
+      "Ask returned a launch payload without an Ask turn id",
+    );
+  });
+
   it("defers 503 wake failures for retry without recording a mail decision", async () => {
     seedVisualEvidence();
 

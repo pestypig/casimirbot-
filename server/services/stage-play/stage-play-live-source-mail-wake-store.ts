@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type {
   StagePlayLiveSourceMailWakeReasonV1,
+  StagePlayLiveSourceMailWakeAskLaunchStatusV1,
   StagePlayLiveSourceMailWakeLifecycleStageV1,
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
@@ -27,6 +28,14 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const makeAskLaunchId = (wakeRequestId: string, now: string, attemptCount: number): string =>
+  `stage_play_live_source_mail_wake_launch:${hashShort([wakeRequestId, now, attemptCount])}`;
+
+const resolveAskLaunchStatusForRetry = (
+  failureReason: string,
+): StagePlayLiveSourceMailWakeAskLaunchStatusV1 =>
+  failureReason === "ask_launch_missing_ask_turn_id" ? "missing_turn_id" : "failed";
 
 const sortedKey = (values: string[]): string => uniqueStrings(values).sort().join("|");
 
@@ -264,6 +273,11 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     reason: input.reason ?? "unread_mail",
     status: "queued",
     askTurnId: null,
+    askLaunchId: null,
+    askLaunchStatus: "not_started",
+    askLaunchStartedAt: null,
+    askLaunchCompletedAt: null,
+    askLaunchRouteMetadata: null,
     decisionIds: [],
     attemptCount: 0,
     lastAttemptAt: null,
@@ -376,6 +390,11 @@ export function splitStagePlayLiveSourceMailWakeRequestForAsk(input: {
     mailIds: retainedMailIds,
     status: "queued",
     askTurnId: null,
+    askLaunchId: null,
+    askLaunchStatus: "not_started",
+    askLaunchStartedAt: null,
+    askLaunchCompletedAt: null,
+    askLaunchRouteMetadata: null,
     decisionIds: [],
     attemptCount: 0,
     lastAttemptAt: null,
@@ -496,7 +515,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -513,17 +532,57 @@ const updateWake = (
   return updated;
 };
 
-export const markStagePlayMailWakeRunning = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null => {
+export const markStagePlayMailWakeRunning = (
+  wakeRequestId: string,
+  now?: string,
+  launch?: {
+    askLaunchId?: string | null;
+    askTurnId?: string | null;
+    routeMetadata?: Record<string, unknown> | null;
+  },
+): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   const updatedAt = now ?? new Date().toISOString();
+  const attemptCount = (existing?.attemptCount ?? 0) + 1;
+  const askTurnId = launch?.askTurnId ?? existing?.askTurnId ?? null;
   return updateWake(wakeRequestId, {
     status: "running",
-    lifecycleStage: existing?.askTurnId ? "ask_entered" : "queued",
+    askTurnId,
+    askLaunchId: launch?.askLaunchId ?? existing?.askLaunchId ?? makeAskLaunchId(wakeRequestId, updatedAt, attemptCount),
+    askLaunchStatus: askTurnId ? "launched" : "launching",
+    askLaunchStartedAt: existing?.askLaunchStartedAt ?? updatedAt,
+    askLaunchCompletedAt: askTurnId ? updatedAt : null,
+    askLaunchRouteMetadata: launch?.routeMetadata ?? existing?.askLaunchRouteMetadata ?? null,
+    lifecycleStage: askTurnId ? "ask_entered" : "queued",
     lifecycleReason: "wake_runner_started",
-    attemptCount: (existing?.attemptCount ?? 0) + 1,
+    attemptCount,
     lastAttemptAt: updatedAt,
     nextRetryAt: null,
     failureReason: null,
+    updatedAt,
+  });
+};
+
+export const attachAskTurnToWakeRequest = (input: {
+  wakeRequestId: string;
+  askTurnId: string;
+  askLaunchId?: string | null;
+  routeMetadata?: Record<string, unknown> | null;
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(input.wakeRequestId);
+  if (!existing) return null;
+  const updatedAt = input.now ?? new Date().toISOString();
+  return updateWake(input.wakeRequestId, {
+    status: existing.status === "queued" ? "running" : existing.status,
+    askTurnId: input.askTurnId,
+    askLaunchId: input.askLaunchId ?? existing.askLaunchId ?? makeAskLaunchId(input.wakeRequestId, updatedAt, existing.attemptCount),
+    askLaunchStatus: "launched",
+    askLaunchStartedAt: existing.askLaunchStartedAt ?? updatedAt,
+    askLaunchCompletedAt: updatedAt,
+    askLaunchRouteMetadata: input.routeMetadata ?? existing.askLaunchRouteMetadata ?? null,
+    lifecycleStage: "ask_entered",
+    lifecycleReason: "ask_turn_id_attached",
     updatedAt,
   });
 };
@@ -538,6 +597,8 @@ export const markStagePlayMailWakeCompleted = (input: {
   updateWake(input.wakeRequestId, {
     status: "completed",
     askTurnId: input.askTurnId ?? undefined,
+    askLaunchStatus: "completed",
+    askLaunchCompletedAt: input.now ?? new Date().toISOString(),
     decisionIds: input.decisionIds,
     evidenceRefs: input.evidenceRefs,
     lifecycleStage: resolveWakeLifecycleStage({
@@ -554,10 +615,24 @@ export const markStagePlayMailWakeCompleted = (input: {
   });
 
 export const markStagePlayMailWakeSkipped = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(wakeRequestId, { status: "skipped", lifecycleStage: "completed", lifecycleReason: "wake_skipped", updatedAt: now });
+  updateWake(wakeRequestId, {
+    status: "skipped",
+    askLaunchStatus: "completed",
+    askLaunchCompletedAt: now ?? new Date().toISOString(),
+    lifecycleStage: "completed",
+    lifecycleReason: "wake_skipped",
+    updatedAt: now,
+  });
 
 export const markStagePlayMailWakeFailed = (wakeRequestId: string, now?: string): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(wakeRequestId, { status: "failed", lifecycleStage: "failed", lifecycleReason: "wake_failed", updatedAt: now });
+  updateWake(wakeRequestId, {
+    status: "failed",
+    askLaunchStatus: "failed",
+    askLaunchCompletedAt: now ?? new Date().toISOString(),
+    lifecycleStage: "failed",
+    lifecycleReason: "wake_failed",
+    updatedAt: now,
+  });
 
 export const markStagePlayMailWakeRetryable = (input: {
   wakeRequestId: string;
@@ -565,16 +640,31 @@ export const markStagePlayMailWakeRetryable = (input: {
   failureReason: string;
   nextRetryAt?: string | null;
   now?: string;
-}): StagePlayLiveSourceMailWakeRequestV1 | null =>
-  updateWake(input.wakeRequestId, {
+}): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(input.wakeRequestId);
+  const completedAt = input.now ?? new Date().toISOString();
+  const askLaunchStatus: StagePlayLiveSourceMailWakeAskLaunchStatusV1 =
+    input.status === "deferred_for_pressure"
+      ? "not_started"
+      : existing?.askTurnId
+        ? existing.askLaunchStatus === "completed"
+          ? "completed"
+          : "launched"
+        : resolveAskLaunchStatusForRetry(input.failureReason);
+  return updateWake(input.wakeRequestId, {
     status: input.status ?? "failed_retryable",
     failureReason: input.failureReason,
+    askLaunchStatus,
+    askLaunchCompletedAt: askLaunchStatus === "missing_turn_id" || askLaunchStatus === "failed"
+      ? completedAt
+      : existing?.askLaunchCompletedAt ?? null,
     lifecycleStage: input.status === "deferred_for_pressure" ? "pressure_deferred" : "failed",
     lifecycleReason: input.failureReason,
     nextRetryAt: input.nextRetryAt ?? null,
     expiresAt: addMsIso(input.nextRetryAt ?? input.now ?? new Date().toISOString(), DEFAULT_WAKE_RELEVANCE_TTL_MS),
     updatedAt: input.now,
   });
+};
 
 export const markStagePlayMailWakeTerminalFailed = (input: {
   wakeRequestId: string;
@@ -584,6 +674,8 @@ export const markStagePlayMailWakeTerminalFailed = (input: {
   updateWake(input.wakeRequestId, {
     status: "failed_terminal",
     failureReason: input.failureReason,
+    askLaunchStatus: "failed",
+    askLaunchCompletedAt: input.now ?? new Date().toISOString(),
     lifecycleStage: "failed",
     lifecycleReason: input.failureReason,
     nextRetryAt: null,

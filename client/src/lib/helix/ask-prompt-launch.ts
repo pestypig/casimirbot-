@@ -20,14 +20,25 @@ export type HelixAskAnswerContract = {
 };
 
 export type HelixAskRouteMetadata = {
-  schema: "helix.ask.route_metadata.v1";
-  source: "stage_play_mail_wake" | string;
+  schema?: "helix.ask.route_metadata.v1" | string;
+  source?: "stage_play_mail_wake" | string;
+  invocationKind?: "stage_play_mail_wake" | string;
+  wakeRequestId?: string | null;
+  mailboxThreadId?: string | null;
+  sourceTarget?: "live_source_mailbox" | string;
+  requiredCanonicalGoal?:
+    | "processed_mail_interpretation"
+    | "processed_mail_voice_decision"
+    | "processed_mail_checkpoint"
+    | string;
+  requiredPhase?: string | null;
+  allowedCapabilities?: string[];
+  forbiddenCapabilities?: string[];
+  evidenceRefs?: string[];
   source_target_intent?: Record<string, unknown>;
   stage_play_live_source_mailbox_debug?: Record<string, unknown>;
   live_source_mailbox_authority_summary?: Record<string, unknown>;
   mandatory_next_tool?: Record<string, unknown>;
-  wakeRequestId?: string | null;
-  requiredPhase?: string | null;
   requiredToolFamily?: string | null;
   compact_context?: Record<string, unknown>;
 };

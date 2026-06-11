@@ -65,6 +65,7 @@ import {
   markStagePlayMailWakeRetryable,
   markStagePlayMailWakeRunning,
   markStagePlayMailWakeTerminalFailed,
+  attachAskTurnToWakeRequest,
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
   latestStagePlayLiveSourceMailWakeResult,
@@ -83,7 +84,18 @@ import { validateStagePlayLiveSourcePredictionFromMail } from "./stage-play-live
 import { buildStagePlayProcessedMailPacket } from "./stage-play-processed-mail-packet";
 import { recordLiveSourceMailDecisionForAsk } from "./stage-play-visual-summary-mail-ingest";
 
-type AskWakeTurnResponse = Record<string, unknown>;
+type AskWakeTurnResponse = Record<string, unknown> | AskWakeTurnLaunchResult;
+
+export type AskWakeTurnLaunchResult = {
+  ok: boolean;
+  askTurnId: string | null;
+  routeTarget: "live_source_mailbox";
+  selectedCapability?: string | null;
+  debugRef?: string | null;
+  response?: Record<string, unknown>;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+};
 
 export type AskWakeTurnRunner = (input: {
   prompt: string;
@@ -1627,6 +1639,8 @@ const buildNonTerminalWakeTranscriptRows = (input: {
     ? "Wake Ask launch timed out"
     : failureReason === "ask_launch_stale_without_turn_id"
       ? "Wake Ask launch stale"
+      : failureReason === "ask_launch_missing_ask_turn_id"
+        ? "Wake Ask launch missing turn id"
       : /^mail_wake_ask_turn_timeout:/i.test(failureReason)
     ? "Wake Ask timed out"
     : /^wake_preflight_blocked:/i.test(failureReason)
@@ -1638,6 +1652,8 @@ const buildNonTerminalWakeTranscriptRows = (input: {
     ? `${failureReason}. Ask did not return a turn id or mailbox decision before the launch timeout; the batch was retained for retry.`
     : failureReason === "ask_launch_stale_without_turn_id"
       ? "The wake was running without an Ask turn id long enough to block the mailbox lane. It was released for retry so newer live-source wakes can proceed."
+      : failureReason === "ask_launch_missing_ask_turn_id"
+        ? "Ask returned a launch payload without an Ask turn id. The wake was not treated as entered into Helix Ask, no mailbox decision fallback was recorded, and the batch was retained for retry."
       : /^mail_wake_ask_turn_timeout:/i.test(failureReason)
     ? `${failureReason}. The bounded mail batch was retained for retry; no model-reviewed decision was recorded.`
     : /^wake_preflight_blocked:/i.test(failureReason)
@@ -2188,12 +2204,39 @@ const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
     return await response.json() as AskWakeTurnResponse;
   };
 
-const extractAskTurnId = (response: AskWakeTurnResponse): string | null =>
+const isAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): response is AskWakeTurnLaunchResult =>
+  readRecord(response) !== null &&
+  typeof (response as AskWakeTurnLaunchResult).ok === "boolean" &&
+  (response as AskWakeTurnLaunchResult).routeTarget === "live_source_mailbox";
+
+const extractAskTurnId = (response: Record<string, unknown>): string | null =>
   readString(response.turn_id) ??
   readString(response.trace_id) ??
   readString(response.id);
 
-const extractDecisionIds = (response: AskWakeTurnResponse): string[] => {
+const normalizeAskWakeTurnLaunchResult = (response: AskWakeTurnResponse): AskWakeTurnLaunchResult => {
+  if (isAskWakeTurnLaunchResult(response)) {
+    const payload = readRecord(response.response) ?? readRecord(response) ?? {};
+    const askTurnId = response.askTurnId ?? extractAskTurnId(payload);
+    return {
+      ...response,
+      askTurnId,
+      response: payload,
+      errorCode: response.ok && askTurnId ? response.errorCode ?? null : response.errorCode ?? "ask_launch_missing_ask_turn_id",
+    };
+  }
+  const payload = readRecord(response) ?? {};
+  const askTurnId = extractAskTurnId(payload);
+  return {
+    ok: Boolean(askTurnId),
+    askTurnId,
+    routeTarget: "live_source_mailbox",
+    response: payload,
+    errorCode: askTurnId ? null : "ask_launch_missing_ask_turn_id",
+  };
+};
+
+const extractDecisionIds = (response: Record<string, unknown>): string[] => {
   const ledger = readArray(response.current_turn_artifact_ledger);
   const ids = ledger.flatMap((artifact): string[] => {
     const record = readRecord(artifact);
@@ -2301,7 +2344,7 @@ const recordMandatoryWakeDecisionFallback = (input: {
   });
 };
 
-const askWakeDebugInconsistencyRefs = (response: AskWakeTurnResponse): string[] => {
+const askWakeDebugInconsistencyRefs = (response: Record<string, unknown>): string[] => {
   const solver = readRecord(response.solver_controller_summary);
   const reentry = readRecord(response.evidence_reentry_proof);
   const reentryGate = readRecord(reentry?.evidence_reentry_gate);
@@ -2898,14 +2941,69 @@ export async function runNextMailWakeRequest(input: {
     });
   }
   try {
-    const response = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({
+    const launchResponse = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({
       prompt,
       threadId: running.threadId,
       evidenceRefs,
       wakeRequest: runningAttempt,
     });
+    const launch = normalizeAskWakeTurnLaunchResult(launchResponse);
+    const response = launch.response ?? {};
+    const askTurnId = launch.askTurnId;
+    if (!launch.ok || !askTurnId) {
+      const failedAt = new Date().toISOString();
+      const failedReason = launch.errorCode ?? "ask_launch_missing_ask_turn_id";
+      const launchEvidenceRefs = uniqueStrings([
+        ...evidenceRefs,
+        launch.debugRef,
+        "stage_play_wake_ask_launch_missing_ask_turn_id",
+      ]);
+      markStagePlayMailWakeRetryable({
+        wakeRequestId: running.wakeRequestId,
+        failureReason: failedReason,
+        nextRetryAt: addMs(failedAt, wakeAttemptBackoffMs(runningAttempt.attemptCount)),
+        now: failedAt,
+      });
+      releaseAdmission("failed");
+      const wakeResult = recordStagePlayMailWakeResult({
+        wakeRequestId: running.wakeRequestId,
+        threadId: running.threadId,
+        roomId: running.roomId ?? null,
+        environmentId: running.environmentId ?? null,
+        status: "failed_retryable",
+        askTurnId: null,
+        failedReason,
+        evidenceRefs: launchEvidenceRefs,
+        createdAt: failedAt,
+      });
+      return recordNonTerminalWakeTranscript({
+        wake: runningAttempt,
+        wakeResult,
+        mailBatch,
+        fastLayer,
+        action: "deferred",
+        retainedMailCount,
+        evidenceRefs: launchEvidenceRefs,
+        createdAt: wakeResult.createdAt,
+      });
+    }
+    const launchBoundWake = attachAskTurnToWakeRequest({
+      wakeRequestId: running.wakeRequestId,
+      askTurnId,
+      askLaunchId: runningAttempt.askLaunchId ?? null,
+      routeMetadata: {
+        routeTarget: "live_source_mailbox",
+        wakeRequestId: running.wakeRequestId,
+        requiredPhase: fastLayer.processedPacket.recommendedNext === "request_voice_callout"
+          ? "record_decision"
+          : "record_interpretation",
+        mandatoryNextTool: "live_env.record_live_source_mail_decision",
+        selectedCapability: launch.selectedCapability ?? null,
+        debugRef: launch.debugRef ?? null,
+      },
+      now: new Date().toISOString(),
+    });
     const askDebugInconsistencyRefs = askWakeDebugInconsistencyRefs(response);
-    const askTurnId = extractAskTurnId(response);
     let decisionIds = extractDecisionIds(response);
     if (decisionIds.length === 0) {
       const fallbackDecision = recordMandatoryWakeDecisionFallback({
@@ -2949,7 +3047,7 @@ export async function runNextMailWakeRequest(input: {
         createdAt: new Date().toISOString(),
       });
       return recordNonTerminalWakeTranscript({
-        wake: running,
+        wake: launchBoundWake ?? running,
         wakeResult,
         mailBatch,
         fastLayer,
@@ -3037,7 +3135,7 @@ export async function runNextMailWakeRequest(input: {
       createdAt: completionAt,
     });
     const budgetReceipt = recordWakeBudgetReceipt({
-      wake: completed ?? running,
+      wake: completed ?? launchBoundWake ?? running,
       wakeResult,
       action: retainedMailCount > 0 ? "batched" : "processed",
       reason: retainedMailCount > 0 ? "wake_batch_split" : "wake_processed",
@@ -3047,7 +3145,7 @@ export async function runNextMailWakeRequest(input: {
       createdAt: wakeResult.createdAt,
     });
     const transcriptRows = buildDurableWakeTranscriptRows({
-      wake: completed ?? running,
+      wake: completed ?? launchBoundWake ?? running,
       wakeResult: budgetReceipt.wakeResult,
       mailBatch,
       priorNarrativeState: latestNarrativeState,

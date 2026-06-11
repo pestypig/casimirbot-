@@ -100,6 +100,97 @@ describe("Helix Ask Stage Play routing", () => {
     });
   });
 
+  it("hard-locks structured Stage Play mail wake turns to the live source mailbox", async () => {
+    const app = createApp();
+    const wakeRequestId = "stage_play_live_source_mail_wake:test-hard-route";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Review the latest live-source mailbox finding.",
+        sessionId: threadId,
+        debug: true,
+        route_metadata: {
+          invocationKind: "stage_play_mail_wake",
+          wakeRequestId,
+          mailboxThreadId: threadId,
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_voice_decision",
+          requiredPhase: "record_decision",
+          allowedCapabilities: [
+            "live_env.read_processed_live_source_mail",
+            "live_env.record_live_source_mail_decision",
+          ],
+          forbiddenCapabilities: [
+            "workspace_os.status",
+            "internet-search.search_web",
+            "docs-viewer.open",
+          ],
+          evidenceRefs: ["stage_play_processed_mail_packet:test-hard-route"],
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          source: "stage_play_mail_wake_route_metadata",
+          wakeRequestId,
+          stage_play_live_source_mail_wake_request_id: wakeRequestId,
+          target_source: "live_source_mailbox",
+          target_kind: "live_source_mailbox",
+          targetSource: "live_source_mailbox",
+          targetKind: "live_source_mailbox",
+          strength: "hard",
+          requiredPhase: "record_decision",
+          mandatoryNextTool: "live_env.record_live_source_mail_decision",
+        },
+      })
+      .expect(200);
+
+    const routeDebug = JSON.stringify({
+      turnId: response.body?.turn_id,
+      sourceTarget: response.body?.source_target_intent,
+      canonical: response.body?.canonical_goal_frame,
+      available: response.body?.available_capabilities,
+      answer: response.body?.answer,
+      terminal: response.body?.terminal_artifact_kind,
+    }, null, 2);
+
+    expect(response.body?.turn_id, routeDebug).toMatch(/^ask:/);
+    expect(response.body?.source_target_intent, routeDebug).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+      strength: "hard",
+      precedence_reason: "stage_play_mail_wake_route_metadata",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      mailbox_source_target_override: true,
+    });
+    expect(response.body?.source_target_intent?.suppressed_routes, routeDebug).toEqual(expect.arrayContaining([
+      "workspace_os.status",
+      "internet-search.search_web",
+      "visual_capture_describe",
+      "docs-viewer.open",
+    ]));
+    expect(response.body?.source_target_intent?.stage_play_mail_wake_route_metadata, routeDebug).toMatchObject({
+      wakeRequestId,
+      mailboxThreadId: threadId,
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_voice_decision",
+    });
+    expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      answer_scope: "live_environment_state",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toEqual(expect.arrayContaining([
+      "stage_play_mail_wake_route_metadata",
+      "live_source_mailbox_intent",
+      "live_source_mail_loop_intent",
+      "prefer_read_processed_live_source_mail",
+      "prefer_record_live_source_mail_decision",
+    ]));
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug)
+      .not.toBe("workspace_os.status");
+  }, 60_000);
+
   it("routes visual watch prompts to watch-job policy configuration without reading mail", async () => {
     startVisualSnapshotSource({
       source_id: sourceId,

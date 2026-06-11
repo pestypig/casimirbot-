@@ -35,6 +35,14 @@ export type StagePlayLiveSourceMailWakeLifecycleStageV1 =
   | "expired"
   | "failed";
 
+export type StagePlayLiveSourceMailWakeAskLaunchStatusV1 =
+  | "not_started"
+  | "launching"
+  | "launched"
+  | "missing_turn_id"
+  | "completed"
+  | "failed";
+
 export type StagePlayLiveSourceMailWakeRequestV1 = {
   artifactId: "stage_play_live_source_mail_wake_request";
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA;
@@ -48,6 +56,11 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   reason: StagePlayLiveSourceMailWakeReasonV1;
   status: StagePlayLiveSourceMailWakeStatusV1;
   askTurnId?: string | null;
+  askLaunchId?: string | null;
+  askLaunchStatus?: StagePlayLiveSourceMailWakeAskLaunchStatusV1;
+  askLaunchStartedAt?: string | null;
+  askLaunchCompletedAt?: string | null;
+  askLaunchRouteMetadata?: Record<string, unknown> | null;
   decisionIds: string[];
   attemptCount: number;
   lastAttemptAt?: string | null;
