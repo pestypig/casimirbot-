@@ -1200,6 +1200,8 @@ helixStagePlayRouter.post("/visual-observer-profile", (req: Request, res: Respon
     const profile = recordStagePlayVisualObserverProfile({
       title: readQueryString(body.title),
       domain: readQueryString(body.domain),
+      subjectCategory: readQueryString(body.subjectCategory) ?? readQueryString(body.subject_category),
+      subject: readQueryString(body.subject),
       sourceIds: readStringArray(body.sourceIds ?? body.source_ids),
       prompt,
       outputMode: readQueryString(body.outputMode) ?? readQueryString(body.output_mode),

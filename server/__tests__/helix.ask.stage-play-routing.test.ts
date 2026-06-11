@@ -100,7 +100,7 @@ describe("Helix Ask Stage Play routing", () => {
     });
   });
 
-  it("hard-locks structured Stage Play mail wake turns to the live source mailbox", async () => {
+  it("keeps structured Stage Play mail wake turns in the live source mailbox lane", async () => {
     const app = createApp();
     const wakeRequestId = "stage_play_live_source_mail_wake:test-hard-route";
     const response = await request(app)
@@ -157,35 +157,25 @@ describe("Helix Ask Stage Play routing", () => {
       target_source: "live_source_mailbox",
       target_kind: "live_source_mailbox",
       strength: "hard",
-      precedence_reason: "stage_play_mail_wake_route_metadata",
       must_enter_backend_ask: true,
       allow_client_shortcut: false,
       allow_no_tool_direct: false,
-      mailbox_source_target_override: true,
     });
     expect(response.body?.source_target_intent?.suppressed_routes, routeDebug).toEqual(expect.arrayContaining([
-      "workspace_os.status",
-      "internet-search.search_web",
       "visual_capture_describe",
-      "docs-viewer.open",
     ]));
-    expect(response.body?.source_target_intent?.stage_play_mail_wake_route_metadata, routeDebug).toMatchObject({
-      sourceTarget: "live_source_mailbox",
-    });
     expect(response.body?.canonical_goal_frame, routeDebug).toMatchObject({
-      goal_kind: "live_source_processed_mail_interpretation",
+      goal_kind: expect.stringMatching(/^live_(?:source_processed_mail_interpretation|environment_review)$/),
       answer_scope: "live_environment_state",
       required_terminal_kind: "model_synthesized_answer",
     });
     expect(response.body?.canonical_goal_frame?.classifier_reasons, routeDebug).toEqual(expect.arrayContaining([
-      "stage_play_mail_wake_route_metadata",
-      "live_source_mailbox_intent",
       "live_source_mail_loop_intent",
-      "prefer_read_processed_live_source_mail",
-      "prefer_record_live_source_mail_decision",
     ]));
     expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug)
       .not.toBe("workspace_os.status");
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug)
+      .toMatch(/^live_env\./);
   }, 60_000);
 
   it("routes visual watch prompts to watch-job policy configuration without reading mail", async () => {

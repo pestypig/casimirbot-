@@ -281,4 +281,53 @@ describe("Helix capability plan contract", () => {
     });
     expect(plan.capability_family).not.toBe("live_source");
   });
+
+  it("repairs forbidden live-source mailbox reads to the phase-allowed decision tool", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-phase-record-decision",
+      promptText: "Read the processed live source mail and decide whether the voice candidate should be called out.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "record_decision",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.record_live_source_mail_decision"],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.request_interim_voice_callout",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_live_source_mail_decision"],
+        phaseLock: {
+          locked: true,
+          reason: "Decision authority must be recorded before voice output.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      requested_action: "live_env.record_live_source_mail_decision",
+      selected_capability: "live_env.record_live_source_mail_decision",
+      phase_repaired: true,
+      phase_violation_reason: "live_source_phase_forbidden_capability_repaired",
+      admission_status: "needs_evidence",
+      source_target: "live_source_mailbox",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(plan.phase_constraint).toMatchObject({
+      phase: "record_decision",
+      allowed_tools: ["live_env.record_live_source_mail_decision"],
+      forbidden_tools: expect.arrayContaining(["live_env.read_processed_live_source_mail"]),
+      selected_before_repair: "live_env.read_processed_live_source_mail",
+      selected_after_repair: "live_env.record_live_source_mail_decision",
+    });
+  });
 });

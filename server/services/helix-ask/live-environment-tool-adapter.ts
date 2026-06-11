@@ -2459,6 +2459,8 @@ export function executeLiveEnvironmentTool(
       const profile = recordStagePlayVisualObserverProfile({
         title: readString(args.title),
         domain,
+        subjectCategory: readString(args.subject_category) ?? readString(args.subjectCategory),
+        subject: readString(args.subject),
         sourceIds,
         prompt,
         outputMode: readString(args.output_mode) ?? readString(args.outputMode),

@@ -1,6 +1,7 @@
 import type {
   LiveSourceTurnPhaseResolutionV1,
   LiveSourceTurnPhaseV1,
+  LiveSourceWakeRouteMetadataV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 
 type RecordLike = Record<string, unknown>;
@@ -167,6 +168,7 @@ export type ResolveLiveSourceTurnPhaseInput = {
   activeInterpreterProfileRef?: string | null;
   processedPackets?: unknown[];
   voicePolicy?: unknown;
+  routeMetadata?: LiveSourceWakeRouteMetadataV1 | null;
 };
 
 export const LIVE_SOURCE_TURN_PHASE_NO_MATCH_REASON = "No live-source turn phase was selected.";
@@ -187,6 +189,29 @@ const readStringList = (value: unknown): string[] =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
+
+const LIVE_SOURCE_TURN_PHASES = new Set<string>(Object.keys(LIVE_SOURCE_TURN_PHASE_TABLE));
+
+const normalizeMetadataPhase = (phase: unknown): LiveSourceTurnPhaseV1 | null => {
+  const normalized = readString(phase);
+  if (!normalized) return null;
+  if (normalized === "read_mailbox") return "read_processed_mail";
+  return LIVE_SOURCE_TURN_PHASES.has(normalized) ? (normalized as LiveSourceTurnPhaseV1) : null;
+};
+
+const normalizeMetadataCanonicalGoal = (
+  goal: unknown,
+): LiveSourceTurnPhaseResolutionV1["canonicalGoal"] | null => {
+  const normalized = readString(goal);
+  if (
+    normalized === "processed_mail_interpretation" ||
+    normalized === "processed_mail_voice_decision" ||
+    normalized === "processed_mail_checkpoint"
+  ) {
+    return normalized;
+  }
+  return null;
+};
 
 const normalizeReceipt = (value: unknown): RecordLike | null => {
   const record = readRecord(value);
@@ -468,10 +493,18 @@ export const resolveLiveSourceTurnPhase = (
   const packets = collectProcessedPackets(input, receipts);
   const latestPacket = packets.at(-1) ?? null;
   const selectedCapability = readString(input.selectedCapability);
-  const selectedTargetSource = readString(input.selectedTargetSource);
+  const routeMetadata = readRecord(input.routeMetadata);
+  const routeMetadataTargetsMailbox =
+    readString(routeMetadata?.invocationKind) === "stage_play_mail_wake" &&
+    readString(routeMetadata?.sourceTarget) === "live_source_mailbox";
+  const routeMetadataPhase = normalizeMetadataPhase(routeMetadata?.requiredPhase);
+  const routeMetadataCanonicalGoal = normalizeMetadataCanonicalGoal(routeMetadata?.requiredCanonicalGoal);
+  const selectedTargetSource =
+    readString(input.selectedTargetSource) ?? (routeMetadataTargetsMailbox ? "live_source_mailbox" : null);
   const evidenceRefs = uniqueStrings([
     input.activePolicyRef,
     input.activeInterpreterProfileRef,
+    ...readStringList(routeMetadata?.evidenceRefs),
     ...receipts.flatMap((receipt) => {
       const observation = receiptObservation(receipt);
       return [
@@ -487,6 +520,105 @@ export const resolveLiveSourceTurnPhase = (
     }),
     ...packets.map(packetId),
   ]);
+
+  if (routeMetadataTargetsMailbox) {
+    if (hasVoiceCalloutDecisionReceipt(receipts) && !hasVoiceCalloutCompletionReceipt(receipts)) {
+      return makeResolution({
+        phase: "request_voice_after_decision",
+        reason: "Stage Play mail wake metadata targets the live-source mailbox and an existing decision requests voice; voice/hold/block receipt is mandatory before terminal synthesis.",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.request_interim_voice_callout"],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_live_source_mail_decision"],
+        completionEvidence: [
+          "live_source_interim_voice_callout_receipt",
+          "voice_hold_receipt",
+          "voice_block_receipt",
+          "voice_receipt",
+        ],
+        nextPhase: "terminal_checkpoint",
+        locked: true,
+        lockReason: "Stage Play mail wake metadata forbids prompt-text drift between decision and voice receipt.",
+        evidenceRefs,
+      });
+    }
+
+    if (hasVoiceCalloutDecisionReceipt(receipts) && hasVoiceCalloutCompletionReceipt(receipts)) {
+      return makeResolution({
+        phase: "terminal_checkpoint",
+        reason: "Stage Play mail wake metadata has mailbox decision and voice/hold/block evidence; terminal synthesis may proceed without more mailbox tools.",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: [],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        requiredEvidence: [
+          ...(latestPacket || evidenceRefs.some((ref) => ref.includes("stage_play_processed_mail_packet"))
+            ? ["stage_play_processed_mail_packet"]
+            : []),
+          "stage_play_live_source_mail_decision",
+          "live_source_interim_voice_callout_receipt",
+        ],
+        completionEvidence: ["model_synthesized_answer"],
+        nextPhase: null,
+        locked: true,
+        lockReason: "Stage Play mail wake metadata completed the mailbox voice route.",
+        evidenceRefs,
+      });
+    }
+
+    if (
+      routeMetadataPhase === "record_decision" ||
+      routeMetadataCanonicalGoal === "processed_mail_voice_decision"
+    ) {
+      return makeResolution({
+        phase: "record_decision",
+        reason: "Stage Play mail wake metadata requires a live-source mailbox voice decision; prompt phrasing cannot downgrade this to read/process/status.",
+        canonicalGoal: "processed_mail_voice_decision",
+        allowedTools: ["live_env.record_live_source_mail_decision"],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.request_interim_voice_callout",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_live_source_mail_decision"],
+        nextPhase: "request_voice_after_decision",
+        locked: true,
+        lockReason: "Stage Play mail wake route metadata is authoritative for the mailbox decision phase.",
+        evidenceRefs,
+      });
+    }
+
+    if (routeMetadataPhase === "read_processed_mail") {
+      return makeResolution({
+        phase: "read_processed_mail",
+        reason: "Stage Play mail wake metadata targets the live-source mailbox read phase; generic visual and situation routes are out of scope.",
+        canonicalGoal: routeMetadataCanonicalGoal ?? "processed_mail_interpretation",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        fallbackTools: ["live_env.process_live_source_mail"],
+        forbiddenTools: ["live_env.request_interim_voice_callout"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        nextPhase: "record_decision",
+        locked: true,
+        lockReason: "Stage Play mail wake route metadata is authoritative for mailbox reads.",
+        evidenceRefs,
+      });
+    }
+  }
 
   if (hasInterpreterProfileConfigCue(prompt)) {
     if (hasInterpreterProfileReceipt(receipts)) {

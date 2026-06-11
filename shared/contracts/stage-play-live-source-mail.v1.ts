@@ -94,6 +94,21 @@ export type LiveSourceTurnCanonicalGoalV1 =
   | "processed_mail_checkpoint"
   | "live_source_status";
 
+export type LiveSourceWakeRouteMetadataV1 = {
+  invocationKind: "stage_play_mail_wake";
+  wakeRequestId: string;
+  mailboxThreadId: string;
+  sourceTarget: "live_source_mailbox";
+  requiredCanonicalGoal:
+    | "processed_mail_interpretation"
+    | "processed_mail_voice_decision"
+    | "processed_mail_checkpoint";
+  requiredPhase?: LiveSourceTurnPhaseV1 | "read_mailbox" | string;
+  allowedCapabilities?: string[];
+  forbiddenCapabilities?: string[];
+  evidenceRefs?: string[];
+};
+
 export type LiveSourceTurnPhaseResolutionV1 = {
   artifactId: "live_source_turn_phase_resolution";
   schemaVersion: typeof LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA;

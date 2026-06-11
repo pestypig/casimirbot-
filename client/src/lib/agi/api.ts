@@ -544,6 +544,7 @@ type RunAskTurnPayload = {
   capsuleIds?: string[];
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
+  route_metadata?: HelixAskRouteMetadata;
   signal?: AbortSignal;
 };
 
@@ -1766,19 +1767,20 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
-  if (payload.routeMetadata) {
-    body.route_metadata = payload.routeMetadata;
-    if (payload.routeMetadata.source_target_intent) {
-      body.source_target_intent = payload.routeMetadata.source_target_intent;
+  const routeMetadata = payload.routeMetadata ?? payload.route_metadata;
+  if (routeMetadata) {
+    body.route_metadata = routeMetadata;
+    if (routeMetadata.source_target_intent) {
+      body.source_target_intent = routeMetadata.source_target_intent;
     }
-    if (payload.routeMetadata.stage_play_live_source_mailbox_debug) {
-      body.stage_play_live_source_mailbox_debug = payload.routeMetadata.stage_play_live_source_mailbox_debug;
+    if (routeMetadata.stage_play_live_source_mailbox_debug) {
+      body.stage_play_live_source_mailbox_debug = routeMetadata.stage_play_live_source_mailbox_debug;
     }
-    if (payload.routeMetadata.live_source_mailbox_authority_summary) {
-      body.live_source_mailbox_authority_summary = payload.routeMetadata.live_source_mailbox_authority_summary;
+    if (routeMetadata.live_source_mailbox_authority_summary) {
+      body.live_source_mailbox_authority_summary = routeMetadata.live_source_mailbox_authority_summary;
     }
-    if (payload.routeMetadata.mandatory_next_tool) {
-      body.mandatory_next_tool = payload.routeMetadata.mandatory_next_tool;
+    if (routeMetadata.mandatory_next_tool) {
+      body.mandatory_next_tool = routeMetadata.mandatory_next_tool;
     }
   }
   return body;
@@ -2401,6 +2403,7 @@ export async function askLocal(
     requiredEvidence?: string[];
     answerContract?: HelixAskAnswerContract;
     routeMetadata?: HelixAskRouteMetadata;
+    route_metadata?: HelixAskRouteMetadata;
     verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
     place?: HaloBankPlace;
     timestamp?: string | number;
@@ -2499,19 +2502,20 @@ export async function askLocal(
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
   if (options?.answerContract) body.answer_contract = options.answerContract;
-  if (options?.routeMetadata) {
-    body.route_metadata = options.routeMetadata;
-    if (options.routeMetadata.source_target_intent) {
-      body.source_target_intent = options.routeMetadata.source_target_intent;
+  const routeMetadata = options?.routeMetadata ?? options?.route_metadata;
+  if (routeMetadata) {
+    body.route_metadata = routeMetadata;
+    if (routeMetadata.source_target_intent) {
+      body.source_target_intent = routeMetadata.source_target_intent;
     }
-    if (options.routeMetadata.stage_play_live_source_mailbox_debug) {
-      body.stage_play_live_source_mailbox_debug = options.routeMetadata.stage_play_live_source_mailbox_debug;
+    if (routeMetadata.stage_play_live_source_mailbox_debug) {
+      body.stage_play_live_source_mailbox_debug = routeMetadata.stage_play_live_source_mailbox_debug;
     }
-    if (options.routeMetadata.live_source_mailbox_authority_summary) {
-      body.live_source_mailbox_authority_summary = options.routeMetadata.live_source_mailbox_authority_summary;
+    if (routeMetadata.live_source_mailbox_authority_summary) {
+      body.live_source_mailbox_authority_summary = routeMetadata.live_source_mailbox_authority_summary;
     }
-    if (options.routeMetadata.mandatory_next_tool) {
-      body.mandatory_next_tool = options.routeMetadata.mandatory_next_tool;
+    if (routeMetadata.mandatory_next_tool) {
+      body.mandatory_next_tool = routeMetadata.mandatory_next_tool;
     }
   }
   if (options?.verify) body.verify = options.verify;

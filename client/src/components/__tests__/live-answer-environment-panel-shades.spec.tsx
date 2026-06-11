@@ -23,10 +23,20 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
   it("exposes explicit apply controls in the visual capture panel", () => {
     const source = panelSource();
 
-    expect(source).toContain("Apply Minecraft shade");
-    expect(source).toContain("Apply Generic shade");
-    expect(source).toContain('aria-label="Apply Minecraft visual observer shade"');
-    expect(source).toContain('aria-label="Apply generic visual observer shade"');
+    expect(source).toContain('aria-label="Visual observer shade subject"');
+    expect(source).toContain('aria-label="Apply selected visual observer shade"');
+    expect(source).toContain("Apply selected shade");
+    expect(source).toContain("Selected shade applied");
+  });
+
+  it("organizes visual observer shades by subject category", () => {
+    const source = panelSource();
+
+    expect(source).toContain("visualShadeSubjectCategory");
+    expect(source).toContain("Science");
+    expect(source).toContain("stage_play_visual_observer_profile:solar-sdo-aia-193:v1");
+    expect(source).toContain("Selected subject:");
+    expect(source).toContain('label={`${group.category} subject`}');
   });
 
   it("applies shades through the Stage Play visual observer profile route", () => {
@@ -51,7 +61,7 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
 
     expect(source).toContain("Boolean(");
     expect(source).toContain("activeVisualObserverProfile &&");
-    expect(source).toContain("minecraftVisualObserverProfile &&");
-    expect(source).toContain("genericVisualObserverProfile &&");
+    expect(source).toContain("selectedVisualObserverProfile &&");
+    expect(source).toContain("selectedShadeApplied");
   });
 });

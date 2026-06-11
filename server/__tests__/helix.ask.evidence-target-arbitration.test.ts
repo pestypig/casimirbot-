@@ -10,6 +10,50 @@ const arbitrate = (promptText: string) =>
   });
 
 describe("Helix Ask evidence target arbitration", () => {
+  it("lets Stage Play mail wake route metadata lock the live-source mailbox target before prompt scoring", () => {
+    const arbitration = buildAskEvidenceTargetArbitration({
+      turnId: "turn:stage-play-mail-wake-metadata",
+      threadId: "thread:stage-play-mail-wake-metadata",
+      promptText:
+        "Compact wake: describe current visual capture status, but use the queued mailbox finding.",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:evidence-target",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        allowedCapabilities: ["live_env.record_live_source_mail_decision"],
+        forbiddenCapabilities: ["visual_capture_describe", "situation_context_pack", "workspace_os.status"],
+        evidenceRefs: ["stage_play_processed_mail_packet:evidence-target"],
+      },
+    });
+
+    expect(arbitration).toMatchObject({
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+      selected_candidate_id: "live_source_mailbox.stage_play_mail_wake_route_metadata",
+      reason: "route_metadata_stage_play_mail_wake",
+      locked: true,
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "admission_control",
+    });
+    expect(arbitration.reason_codes).toEqual(expect.arrayContaining([
+      "route_metadata_stage_play_mail_wake",
+      "live_source_mailbox_route_metadata_authoritative",
+    ]));
+    expect(arbitration.available_capabilities).toEqual(["live_env.record_live_source_mail_decision"]);
+    expect(arbitration.disallowed_capabilities).toEqual(expect.arrayContaining([
+      "visual_capture_describe",
+      "situation_context_pack",
+      "workspace_os.status",
+    ]));
+    expect(arbitration.source_targets).toEqual(["live_source_mailbox"]);
+  });
+
   it("treats Stage Play panel definition prompts as repo/product evidence before live reflection", () => {
     const arbitration = arbitrate("ok what is the stage play panel?");
 

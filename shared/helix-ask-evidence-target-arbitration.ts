@@ -36,6 +36,8 @@ export type HelixAskEvidenceTargetArbitration = {
   selected_target_kind: HelixAskSourceTarget;
   confidence: "high" | "medium" | "low";
   reason_codes: string[];
+  reason?: string | null;
+  locked?: boolean;
   must_enter_backend_ask: boolean;
   allow_no_tool_direct: boolean;
   terminal_product_constraints: string[];

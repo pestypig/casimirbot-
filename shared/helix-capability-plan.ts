@@ -39,6 +39,16 @@ export type HelixCapabilityPlan = {
 
   admission_status: HelixCapabilityAdmissionStatus;
   rejection_reason?: string;
+  selected_capability?: string | null;
+  phase_repaired?: boolean;
+  phase_violation_reason?: string;
+  phase_constraint?: {
+    phase?: string | null;
+    allowed_tools: string[];
+    forbidden_tools: string[];
+    selected_before_repair?: string | null;
+    selected_after_repair?: string | null;
+  };
   tool_admission_suppressed?: boolean;
   suppression_reason?: string;
 

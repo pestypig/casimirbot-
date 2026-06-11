@@ -9,6 +9,7 @@ import type {
   HelixAskSourceTargetRequestedOutput,
   HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
+import type { LiveSourceWakeRouteMetadataV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
@@ -125,8 +126,66 @@ export function buildAskEvidenceTargetArbitration(input: {
   turnId: string;
   threadId: string;
   promptText: string;
+  routeMetadata?: LiveSourceWakeRouteMetadataV1 | null;
 }): HelixAskEvidenceTargetArbitration {
   const prompt = input.promptText.trim();
+  if (input.routeMetadata?.sourceTarget === "live_source_mailbox") {
+    const candidate = makeCandidate({
+      candidateId: "live_source_mailbox.stage_play_mail_wake_route_metadata",
+      targetSource: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
+      strength: "hard",
+      score: 1,
+      reasonCodes: ["route_metadata_stage_play_mail_wake", "live_source_mailbox_route_metadata_authoritative"],
+      requestedOutputs: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_read_result",
+        "stage_play_live_source_mail_decision",
+        "stage_play_live_source_narrative_state",
+        "typed_failure",
+      ],
+      capabilityKeys: input.routeMetadata.allowedCapabilities?.length
+        ? input.routeMetadata.allowedCapabilities
+        : [
+            "live_env.read_processed_live_source_mail",
+            "live_env.process_live_source_mail",
+            "live_env.read_live_source_mail",
+            "live_env.record_live_source_mail_decision",
+            "live_env.request_interim_voice_callout",
+          ],
+      terminalProductConstraints: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_read_result",
+        "stage_play_live_source_mail_decision",
+        "stage_play_live_source_narrative_state",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    });
+    return {
+      schema: HELIX_ASK_EVIDENCE_TARGET_ARBITRATION_SCHEMA,
+      turn_id: input.turnId,
+      thread_id: input.threadId,
+      prompt_intent_candidates: ["stage_play_mail_wake_route_metadata"],
+      evidence_target_candidates: [candidate],
+      source_targets: ["live_source_mailbox"],
+      available_capabilities: candidate.capability_keys,
+      disallowed_capabilities: unique(input.routeMetadata.forbiddenCapabilities ?? []),
+      selected_candidate_id: candidate.candidate_id,
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+      confidence: "high",
+      reason_codes: candidate.reason_codes,
+      reason: "route_metadata_stage_play_mail_wake",
+      locked: true,
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+      terminal_product_constraints: candidate.terminal_product_constraints,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "admission_control",
+    };
+  }
   const candidates: HelixAskEvidenceTargetCandidate[] = [];
   const promptIntentCandidates: string[] = [];
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);

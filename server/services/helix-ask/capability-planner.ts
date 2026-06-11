@@ -34,6 +34,8 @@ const readStringArray = (value: unknown): string[] =>
     ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+
 const normalize = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, " ");
 
 const commandVerbPattern = /\b(?:click|press|tap|open|close|start|stop|set|change|update|run|repair|attach|select|choose|submit|use|solve|evaluate|compute|calculate|check|verify)\b/i;
@@ -190,6 +192,107 @@ const requestedActionFor = (
   return "diagnose_debug_or_runtime_evidence";
 };
 
+const liveSourceToolForRequestedAction = (requestedAction: string): string => {
+  if (requestedAction.startsWith("live_env.")) return requestedAction;
+  if (
+    requestedAction === "read_processed_live_source_mail" ||
+    requestedAction === "process_live_source_mail" ||
+    requestedAction === "read_live_source_mail" ||
+    requestedAction === "record_live_source_mail_decision" ||
+    requestedAction === "request_interim_voice_callout" ||
+    requestedAction === "configure_interpreter_profile" ||
+    requestedAction === "configure_live_source_watch_job" ||
+    requestedAction === "reflect_stage_play_context" ||
+    requestedAction === "query_live_source_quality" ||
+    requestedAction === "summarize_live_source_current_state"
+  ) {
+    return `live_env.${requestedAction}`;
+  }
+  return requestedAction;
+};
+
+const applyLiveSourcePhaseCapabilityFilter = (input: {
+  requestedAction: string;
+  phaseResolution?: RecordLike | null;
+}): {
+  requestedAction: string;
+  selectedCapability: string;
+  repaired: boolean;
+  violationReason?: string;
+  phaseConstraint?: {
+    phase?: string | null;
+    allowed_tools: string[];
+    forbidden_tools: string[];
+    selected_before_repair?: string | null;
+    selected_after_repair?: string | null;
+  };
+} => {
+  const phase = readRecord(input.phaseResolution);
+  const allowedTools = uniqueStrings([
+    ...readStringArray(phase?.allowedTools),
+    ...readStringArray(phase?.allowed_tools),
+  ]);
+  const forbiddenTools = uniqueStrings([
+    ...readStringArray(phase?.forbiddenTools),
+    ...readStringArray(phase?.forbidden_tools),
+  ]);
+  const selectedCapability = liveSourceToolForRequestedAction(input.requestedAction);
+  const phaseName = readString(phase?.phase) || null;
+  const locked = readRecord(phase?.phaseLock)?.locked === true || readRecord(phase?.phase_lock)?.locked === true;
+  const selectedForbidden = forbiddenTools.includes(selectedCapability);
+  const selectedOutsideLockedAllowlist =
+    locked && allowedTools.length > 0 && !allowedTools.includes(selectedCapability);
+  const repairTarget = allowedTools[0] ?? "";
+  if ((selectedForbidden || selectedOutsideLockedAllowlist) && repairTarget) {
+    return {
+      requestedAction: repairTarget,
+      selectedCapability: repairTarget,
+      repaired: true,
+      violationReason: selectedForbidden
+        ? "live_source_phase_forbidden_capability_repaired"
+        : "live_source_phase_locked_capability_repaired",
+      phaseConstraint: {
+        phase: phaseName,
+        allowed_tools: allowedTools,
+        forbidden_tools: forbiddenTools,
+        selected_before_repair: selectedCapability,
+        selected_after_repair: repairTarget,
+      },
+    };
+  }
+  if ((selectedForbidden || selectedOutsideLockedAllowlist) && !repairTarget) {
+    return {
+      requestedAction: input.requestedAction,
+      selectedCapability,
+      repaired: false,
+      violationReason: selectedForbidden
+        ? "live_source_phase_forbidden_capability"
+        : "live_source_phase_locked_without_allowed_tool",
+      phaseConstraint: {
+        phase: phaseName,
+        allowed_tools: allowedTools,
+        forbidden_tools: forbiddenTools,
+        selected_before_repair: selectedCapability,
+        selected_after_repair: null,
+      },
+    };
+  }
+  return {
+    requestedAction: input.requestedAction,
+    selectedCapability,
+    repaired: false,
+    phaseConstraint: phase
+      ? {
+          phase: phaseName,
+          allowed_tools: allowedTools,
+          forbidden_tools: forbiddenTools,
+          selected_before_repair: selectedCapability,
+          selected_after_repair: selectedCapability,
+        }
+      : undefined,
+  };
+};
+
 const instructionRules = (instructionFrame?: RecordLike | null): string[] =>
   readStringArray(readRecord(instructionFrame)?.capability_permission_rules);
 
@@ -285,6 +388,7 @@ export const buildCapabilityPlan = (input: {
   toolCallAdmissionDecision?: RecordLike | null;
   canonicalGoalFrame?: RecordLike | null;
   instructionFrame?: RecordLike | null;
+  liveSourceTurnPhaseResolution?: RecordLike | null;
 }): HelixCapabilityPlan => {
   const sourceTargetIntent = readRecord(input.sourceTargetIntent);
   const routeProductContract = readRecord(input.routeProductContract);
@@ -326,12 +430,26 @@ export const buildCapabilityPlan = (input: {
           ? "workstation_action"
           : classifiedFamily;
   const rules = instructionRules(instructionFrame);
-  const requestedAction = contextualSuppression
+  const plannedRequestedAction = contextualSuppression
     ? "suppressed_contextual_tool_reference"
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"
         : requestedActionFor(family, input.promptText, sourceTarget);
+  const phaseFilteredPlan =
+    family === "live_environment" || sourceTarget === "live_source_mailbox"
+      ? applyLiveSourcePhaseCapabilityFilter({
+          requestedAction: plannedRequestedAction,
+          phaseResolution: input.liveSourceTurnPhaseResolution,
+        })
+      : {
+          requestedAction: plannedRequestedAction,
+          selectedCapability: plannedRequestedAction,
+          repaired: false,
+          phaseConstraint: undefined,
+          violationReason: undefined,
+        };
+  const requestedAction = phaseFilteredPlan.requestedAction;
   const operatorCommandPresent =
     hasOperatorCommand(input.promptText) ||
     (
@@ -349,7 +467,9 @@ export const buildCapabilityPlan = (input: {
     );
   const mutating = isMutatingCapability(family, requestedAction, input.promptText);
   const operatorCommandRequired = mutating;
-  const admission = admissionFor({
+  const admission = phaseFilteredPlan.violationReason && !phaseFilteredPlan.repaired
+    ? { status: "rejected" as const, rejectionReason: "live_source_phase_violation" }
+    : admissionFor({
     family,
     mutating,
     operatorCommandRequired,
@@ -378,6 +498,10 @@ export const buildCapabilityPlan = (input: {
         ? "internet_search_answer"
         : readString(canonicalGoalFrame?.required_terminal_kind) || null,
     admission_status: admission.status,
+    selected_capability: phaseFilteredPlan.selectedCapability,
+    ...(phaseFilteredPlan.repaired ? { phase_repaired: true } : {}),
+    ...(phaseFilteredPlan.violationReason ? { phase_violation_reason: phaseFilteredPlan.violationReason } : {}),
+    ...(phaseFilteredPlan.phaseConstraint ? { phase_constraint: phaseFilteredPlan.phaseConstraint } : {}),
     ...(contextualSuppression
       ? {
           tool_admission_suppressed: true,

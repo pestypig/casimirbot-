@@ -9,6 +9,7 @@ export type HelixModelTurnPacket = {
   source_target_intent?: RecordLike;
   route_product_contract?: RecordLike;
   compound_prompt_contract?: RecordLike;
+  capability_itinerary?: RecordLike;
   available_capabilities: unknown[];
   artifact_refs: string[];
   model_visible_artifacts: Array<{
@@ -102,6 +103,7 @@ export function buildHelixModelTurnPacket(input: {
     source_target_intent: sourceTargetIntent,
     route_product_contract: readRecord(input.payload.route_product_contract),
     compound_prompt_contract: compoundPromptContract,
+    capability_itinerary: readRecord(input.payload.capability_itinerary),
     available_capabilities: input.availableCapabilities ?? [],
     artifact_refs: artifactRefs,
     model_visible_artifacts: modelVisibleArtifacts,

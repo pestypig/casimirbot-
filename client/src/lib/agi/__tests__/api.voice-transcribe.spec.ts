@@ -415,4 +415,70 @@ describe("askLocal lane parity default", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
   });
+
+  it("serializes structured route_metadata for mailbox wake turns without prompt text embedding", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          text: "Mailbox route accepted.",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await askLocal("Review the latest Stage Play live-source mailbox finding.", {
+      question: "Review the latest Stage Play live-source mailbox finding.",
+      route_metadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:api-client",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        allowedCapabilities: ["live_env.read_processed_live_source_mail"],
+        forbiddenCapabilities: ["workspace_os.status"],
+        evidenceRefs: ["stage_play_processed_mail_packet:api-client"],
+        source_target_intent: {
+          target_source: "live_source_mailbox",
+          target_kind: "live_source_mailbox",
+          strength: "hard",
+        },
+        mandatory_next_tool: {
+          tool_name: "live_env.record_live_source_mail_decision",
+          terminal_forbidden: true,
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(requestInit.body ?? "{}")) as Record<string, any>;
+    expect(body.prompt).toBe("Review the latest Stage Play live-source mailbox finding.");
+    expect(body.prompt).not.toContain("live_env.record_live_source_mail_decision");
+    expect(body.route_metadata).toMatchObject({
+      invocationKind: "stage_play_mail_wake",
+      wakeRequestId: "stage_play_live_source_mail_wake:api-client",
+      mailboxThreadId: "helix-ask:desktop",
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_voice_decision",
+      requiredPhase: "record_decision",
+      allowedCapabilities: ["live_env.read_processed_live_source_mail"],
+      forbiddenCapabilities: ["workspace_os.status"],
+      evidenceRefs: ["stage_play_processed_mail_packet:api-client"],
+    });
+    expect(body.source_target_intent).toMatchObject({
+      target_source: "live_source_mailbox",
+      target_kind: "live_source_mailbox",
+      strength: "hard",
+    });
+    expect(body.mandatory_next_tool).toMatchObject({
+      tool_name: "live_env.record_live_source_mail_decision",
+      terminal_forbidden: true,
+    });
+  });
 });

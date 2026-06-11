@@ -45,6 +45,80 @@ describe("resolveLiveSourceTurnPhase", () => {
     });
   });
 
+  it("lets Stage Play mail wake metadata force record_decision over ambiguous setup or status prompt text", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt:
+        "Status check: create a Minecraft profile later, but for this wake decide whether the latest mailbox finding needs voice.",
+      selectedTargetSource: "visual_capture",
+      selectedCapability: "workspace_os.status",
+      processedPackets: [{
+        artifactId: "stage_play_processed_mail_packet",
+        packetId: "stage_play_processed_mail_packet:metadata-voice",
+        observedFacts: ["The player is near fire."],
+        recommendedNext: "request_voice_callout",
+        salience: {
+          level: "urgent",
+          voiceCandidate: true,
+          calloutDraft: "Fire nearby; move clear.",
+        },
+      }],
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:metadata-force",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        evidenceRefs: ["stage_play_processed_mail_packet:metadata-voice"],
+        allowedCapabilities: ["live_env.record_live_source_mail_decision"],
+        forbiddenCapabilities: ["workspace_os.status", "visual_capture_describe", "situation_context_pack"],
+      },
+    });
+
+    expect(phase.phase).toBe("record_decision");
+    expect(phase.canonicalGoal).toBe("processed_mail_voice_decision");
+    expect(phase.allowedTools).toEqual(["live_env.record_live_source_mail_decision"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.read_live_source_mail",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Stage Play mail wake route metadata is authoritative for the mailbox decision phase.",
+    });
+    expect(phase.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_processed_mail_packet:metadata-voice",
+    ]));
+  });
+
+  it("lets Stage Play mail wake metadata map read_mailbox to read_processed_mail without generic visual scope", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Describe the current visual capture and use the situation context pack.",
+      selectedTargetSource: "visual_capture",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:metadata-read",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        requiredPhase: "read_mailbox",
+        evidenceRefs: ["stage_play_live_source_mail_wake:metadata-read"],
+        allowedCapabilities: ["live_env.read_processed_live_source_mail"],
+        forbiddenCapabilities: ["visual_capture_describe", "situation_context_pack"],
+      },
+    });
+
+    expect(phase.phase).toBe("read_processed_mail");
+    expect(phase.canonicalGoal).toBe("processed_mail_interpretation");
+    expect(phase.allowedTools).toEqual(["live_env.read_processed_live_source_mail"]);
+    expect(phase.fallbackTools).toEqual(["live_env.process_live_source_mail"]);
+    expect(phase.requiredEvidence).toEqual(["stage_play_processed_mail_packet"]);
+    expect(phase.phaseLock.locked).toBe(true);
+  });
+
   it("locks interpreter profile setup before mail-reading or voice wording", () => {
     const phase = resolveLiveSourceTurnPhase({
       prompt:

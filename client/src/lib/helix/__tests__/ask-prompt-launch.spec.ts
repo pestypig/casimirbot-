@@ -56,8 +56,15 @@ describe("helix ask prompt launch bridge", () => {
         routeMetadata: {
           schema: "helix.ask.route_metadata.v1",
           source: "stage_play_mail_wake",
+          invocationKind: "stage_play_mail_wake",
           wakeRequestId: "stage_play_live_source_mail_wake:test",
+          mailboxThreadId: "helix-ask:desktop",
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_interpretation",
           requiredPhase: "read_mailbox",
+          allowedCapabilities: ["live_env.read_live_source_mail"],
+          forbiddenCapabilities: ["workspace_os.status"],
+          evidenceRefs: ["stage_play_processed_mail_packet:test"],
           requiredToolFamily: "live_source_mail",
           source_target_intent: {
             target_source: "live_source_mailbox",
@@ -77,7 +84,14 @@ describe("helix ask prompt launch bridge", () => {
     expect(listener.mock.calls[0]?.[0]).toMatchObject({
       detail: {
         routeMetadata: {
+          invocationKind: "stage_play_mail_wake",
           wakeRequestId: "stage_play_live_source_mail_wake:test",
+          mailboxThreadId: "helix-ask:desktop",
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_interpretation",
+          allowedCapabilities: ["live_env.read_live_source_mail"],
+          forbiddenCapabilities: ["workspace_os.status"],
+          evidenceRefs: ["stage_play_processed_mail_packet:test"],
           mandatory_next_tool: {
             tool_name: "live_env.read_live_source_mail",
           },
@@ -86,7 +100,14 @@ describe("helix ask prompt launch bridge", () => {
     });
     const consumed = consumePendingHelixAskPrompt();
     expect(consumed?.routeMetadata).toMatchObject({
+      invocationKind: "stage_play_mail_wake",
       wakeRequestId: "stage_play_live_source_mail_wake:test",
+      mailboxThreadId: "helix-ask:desktop",
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_interpretation",
+      allowedCapabilities: ["live_env.read_live_source_mail"],
+      forbiddenCapabilities: ["workspace_os.status"],
+      evidenceRefs: ["stage_play_processed_mail_packet:test"],
       source_target_intent: {
         target_source: "live_source_mailbox",
       },
