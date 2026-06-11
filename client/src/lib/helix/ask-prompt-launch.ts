@@ -19,7 +19,32 @@ export type HelixAskAnswerContract = {
   min_tokens?: number;
 };
 
-export type HelixAskRouteMetadata = {
+export type HelixAskMailboxWakeRequiredCanonicalGoal =
+  | "processed_mail_interpretation"
+  | "processed_mail_voice_decision"
+  | "processed_mail_checkpoint";
+
+export type HelixAskStagePlayMailboxWakeRouteMetadata = {
+  schema?: "helix.ask.route_metadata.v1" | string;
+  source?: "stage_play_mail_wake" | string;
+  invocationKind: "stage_play_mail_wake";
+  wakeRequestId: string;
+  mailboxThreadId: string;
+  sourceTarget: "live_source_mailbox";
+  requiredCanonicalGoal: HelixAskMailboxWakeRequiredCanonicalGoal;
+  requiredPhase?: string;
+  allowedCapabilities: string[];
+  forbiddenCapabilities: string[];
+  evidenceRefs: string[];
+  source_target_intent?: Record<string, unknown>;
+  stage_play_live_source_mailbox_debug?: Record<string, unknown>;
+  live_source_mailbox_authority_summary?: Record<string, unknown>;
+  mandatory_next_tool?: Record<string, unknown>;
+  requiredToolFamily?: string | null;
+  compact_context?: Record<string, unknown>;
+};
+
+export type HelixAskGenericRouteMetadata = {
   schema?: "helix.ask.route_metadata.v1" | string;
   source?: "stage_play_mail_wake" | string;
   invocationKind?: "stage_play_mail_wake" | string;
@@ -43,6 +68,10 @@ export type HelixAskRouteMetadata = {
   compact_context?: Record<string, unknown>;
 };
 
+export type HelixAskRouteMetadata =
+  | HelixAskStagePlayMailboxWakeRouteMetadata
+  | HelixAskGenericRouteMetadata;
+
 export type PendingHelixAskPrompt = {
   promptId: string;
   question: string;
@@ -54,6 +83,7 @@ export type PendingHelixAskPrompt = {
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
+  route_metadata?: HelixAskRouteMetadata;
   createdAt: number;
 };
 
@@ -78,6 +108,16 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
     const parsed = JSON.parse(raw) as Partial<PendingHelixAskPrompt>;
     const question = typeof parsed.question === "string" ? parsed.question.trim() : "";
     if (!question) return null;
+    const routeMetadata =
+      parsed.routeMetadata &&
+      typeof parsed.routeMetadata === "object" &&
+      !Array.isArray(parsed.routeMetadata)
+        ? (parsed.routeMetadata as HelixAskRouteMetadata)
+        : parsed.route_metadata &&
+            typeof parsed.route_metadata === "object" &&
+            !Array.isArray(parsed.route_metadata)
+          ? (parsed.route_metadata as HelixAskRouteMetadata)
+          : undefined;
     return {
       promptId:
         typeof parsed.promptId === "string" && parsed.promptId.trim()
@@ -97,12 +137,8 @@ export function consumePendingHelixAskPrompt(): PendingHelixAskPrompt | null {
         !Array.isArray(parsed.answerContract)
           ? (parsed.answerContract as HelixAskAnswerContract)
           : undefined,
-      routeMetadata:
-        parsed.routeMetadata &&
-        typeof parsed.routeMetadata === "object" &&
-        !Array.isArray(parsed.routeMetadata)
-          ? (parsed.routeMetadata as HelixAskRouteMetadata)
-          : undefined,
+      routeMetadata,
+      route_metadata: routeMetadata,
       createdAt:
         typeof parsed.createdAt === "number" && Number.isFinite(parsed.createdAt)
           ? parsed.createdAt
@@ -124,11 +160,13 @@ export function launchHelixAskPrompt(args: {
   suppressWorkstationPayloadActions?: boolean;
   answerContract?: HelixAskAnswerContract;
   routeMetadata?: HelixAskRouteMetadata;
+  route_metadata?: HelixAskRouteMetadata;
 }) {
   if (typeof window === "undefined") return;
   const question = args.question.trim();
   if (!question) return;
 
+  const routeMetadata = args.routeMetadata ?? args.route_metadata;
   const payload: PendingHelixAskPrompt = {
     promptId: crypto.randomUUID(),
     question,
@@ -139,7 +177,8 @@ export function launchHelixAskPrompt(args: {
     forceReasoningDispatch: args.forceReasoningDispatch === true,
     suppressWorkstationPayloadActions: args.suppressWorkstationPayloadActions === true,
     answerContract: args.answerContract,
-    routeMetadata: args.routeMetadata,
+    routeMetadata,
+    route_metadata: routeMetadata,
     createdAt: Date.now(),
   };
 

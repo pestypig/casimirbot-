@@ -548,6 +548,26 @@ type RunAskTurnPayload = {
   signal?: AbortSignal;
 };
 
+const appendHelixAskRouteMetadataToBody = (
+  body: Record<string, unknown>,
+  routeMetadata?: HelixAskRouteMetadata,
+): void => {
+  if (!routeMetadata) return;
+  body.route_metadata = routeMetadata;
+  if (routeMetadata.source_target_intent) {
+    body.source_target_intent = routeMetadata.source_target_intent;
+  }
+  if (routeMetadata.stage_play_live_source_mailbox_debug) {
+    body.stage_play_live_source_mailbox_debug = routeMetadata.stage_play_live_source_mailbox_debug;
+  }
+  if (routeMetadata.live_source_mailbox_authority_summary) {
+    body.live_source_mailbox_authority_summary = routeMetadata.live_source_mailbox_authority_summary;
+  }
+  if (routeMetadata.mandatory_next_tool) {
+    body.mandatory_next_tool = routeMetadata.mandatory_next_tool;
+  }
+};
+
 export type HelixAskReasoningTheaterPhase =
   | "observe"
   | "plan"
@@ -1767,22 +1787,7 @@ const buildRunAskTurnBody = (payload: RunAskTurnPayload): Record<string, unknown
     body.capsuleIds = payload.capsuleIds.slice(0, HELIX_CONTEXT_CAPSULE_MAX_IDS);
   }
   if (payload.answerContract) body.answer_contract = payload.answerContract;
-  const routeMetadata = payload.routeMetadata ?? payload.route_metadata;
-  if (routeMetadata) {
-    body.route_metadata = routeMetadata;
-    if (routeMetadata.source_target_intent) {
-      body.source_target_intent = routeMetadata.source_target_intent;
-    }
-    if (routeMetadata.stage_play_live_source_mailbox_debug) {
-      body.stage_play_live_source_mailbox_debug = routeMetadata.stage_play_live_source_mailbox_debug;
-    }
-    if (routeMetadata.live_source_mailbox_authority_summary) {
-      body.live_source_mailbox_authority_summary = routeMetadata.live_source_mailbox_authority_summary;
-    }
-    if (routeMetadata.mandatory_next_tool) {
-      body.mandatory_next_tool = routeMetadata.mandatory_next_tool;
-    }
-  }
+  appendHelixAskRouteMetadataToBody(body, payload.routeMetadata ?? payload.route_metadata);
   return body;
 };
 
@@ -2502,22 +2507,7 @@ export async function askLocal(
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
   if (options?.answerContract) body.answer_contract = options.answerContract;
-  const routeMetadata = options?.routeMetadata ?? options?.route_metadata;
-  if (routeMetadata) {
-    body.route_metadata = routeMetadata;
-    if (routeMetadata.source_target_intent) {
-      body.source_target_intent = routeMetadata.source_target_intent;
-    }
-    if (routeMetadata.stage_play_live_source_mailbox_debug) {
-      body.stage_play_live_source_mailbox_debug = routeMetadata.stage_play_live_source_mailbox_debug;
-    }
-    if (routeMetadata.live_source_mailbox_authority_summary) {
-      body.live_source_mailbox_authority_summary = routeMetadata.live_source_mailbox_authority_summary;
-    }
-    if (routeMetadata.mandatory_next_tool) {
-      body.mandatory_next_tool = routeMetadata.mandatory_next_tool;
-    }
-  }
+  appendHelixAskRouteMetadataToBody(body, options?.routeMetadata ?? options?.route_metadata);
   if (options?.verify) body.verify = options.verify;
   if (options?.place) body.place = options.place;
   if (options?.timestamp !== undefined) body.timestamp = options.timestamp;

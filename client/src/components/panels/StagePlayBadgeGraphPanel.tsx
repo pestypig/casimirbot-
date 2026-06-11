@@ -752,6 +752,24 @@ async function projectStagePlayLiveAnswer(input: {
   return await response.json() as StagePlayProjectLiveAnswerResponse;
 }
 
+async function applyStagePlayMicroReasonerPromptPreset(input: {
+  presetId: string;
+  sourceIds: string[];
+}): Promise<{ ok?: boolean; preset?: StagePlayMicroReasonerPromptPresetV1 }> {
+  const response = await fetch("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw new Error(`MicroDeck preset apply failed: ${response.status}`);
+  }
+  return await response.json() as { ok?: boolean; preset?: StagePlayMicroReasonerPromptPresetV1 };
+}
+
 async function validateStagePlayDraft(input: {
   threadId: string;
   environmentId?: string | null;
@@ -2167,7 +2185,15 @@ function StagePlayPacketTrafficBoard({
           <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Processed Mail Traffic Board</div>
           <div className="mt-0.5 text-xs text-cyan-100/70">One packet, one visible path. Colors stay stable across refresh.</div>
         </div>
-        <div className="font-mono text-[10px] text-cyan-100/60">{traffic.length} trail{traffic.length === 1 ? "" : "s"}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="#stage-play-microdeck-panel"
+            className="rounded border border-cyan-600/60 bg-cyan-950/40 px-2.5 py-1.5 text-[10px] font-semibold text-cyan-100 hover:border-cyan-300"
+          >
+            MicroReasoner Deck
+          </a>
+          <div className="font-mono text-[10px] text-cyan-100/60">{traffic.length} trail{traffic.length === 1 ? "" : "s"}</div>
+        </div>
       </div>
       <div className="mt-3 overflow-x-auto">
         <div
@@ -3950,6 +3976,51 @@ const STAGE_PLAY_DECK_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "packet_composer",
 ];
 
+const STAGE_PLAY_MICRO_REASONER_ROLE_CLUSTERS: Array<{
+  key: string;
+  title: string;
+  roles: StagePlayMicroReasonerRoleV1[];
+}> = [
+  {
+    key: "observation",
+    title: "Observation",
+    roles: ["claim_extractor", "observation_classifier", "delta_extractor"],
+  },
+  {
+    key: "model",
+    title: "Task Model",
+    roles: ["effort_estimator", "axiom_extractor", "hypothesis_generator", "profile_comparator", "prediction_validator"],
+  },
+  {
+    key: "arbiter",
+    title: "Arbiter",
+    roles: ["salience_scorer", "hypothesis_arbiter", "decision_selector", "voice_callout_drafter", "packet_composer"],
+  },
+];
+
+const microReasonerPresetCategory = (preset: StagePlayMicroReasonerPromptPresetV1): string => {
+  if (preset.domain === "minecraft_gameplay") return "Gaming";
+  if (preset.domain === "calculator_stream") return "Tools";
+  if (preset.domain === "science_visual") return "Science";
+  if (preset.domain === "browser_workflow") return "Workflows";
+  if (preset.domain === "custom") return "Custom";
+  return "General";
+};
+
+const microReasonerPresetOptionLabel = (preset: StagePlayMicroReasonerPromptPresetV1): string =>
+  `${preset.title}${preset.sourceIds.length > 0 ? " (applied)" : ""}`;
+
+const preferredMicroReasonerPresetId = (
+  presets: StagePlayMicroReasonerPromptPresetV1[],
+  activePreset?: StagePlayMicroReasonerPromptPresetV1 | null,
+): string => {
+  if (activePreset && presets.some((preset) => preset.presetId === activePreset.presetId)) return activePreset.presetId;
+  return presets.find((preset) => preset.presetId === "stage_play_micro_reasoner_prompt_preset:minecraft-gameplay:v1")?.presetId ??
+    presets.find((preset) => preset.presetId === "stage_play_micro_reasoner_prompt_preset:generic-live-source:v1")?.presetId ??
+    presets[0]?.presetId ??
+    "";
+};
+
 function jsonCharCount(value: unknown): number {
   try {
     return JSON.stringify(value ?? null).length;
@@ -4073,14 +4144,23 @@ function StagePlayMailLoopLiveOverview({
   graph: StagePlayBadgeGraphV1;
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
 }) {
+  const queryClient = useQueryClient();
   const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "full">("idle");
   const [selectedTrafficPayloadId, setSelectedTrafficPayloadId] = useState<string | null>(null);
   const [selectedPacketTrafficKey, setSelectedPacketTrafficKey] = useState<string | null>(null);
+  const [selectedMicroReasonerRole, setSelectedMicroReasonerRole] = useState<StagePlayMicroReasonerRoleV1>("claim_extractor");
+  const [selectedMicroPresetId, setSelectedMicroPresetId] = useState("");
+  const [microDeckApplyStatus, setMicroDeckApplyStatus] = useState<{
+    state: "idle" | "applying" | "applied" | "failed";
+    message: string;
+  }>({ state: "idle", message: "" });
   const debugCopyResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const mailItems = mailbox?.mailItems ?? [];
   const packets = mailbox?.processedMailPackets ?? [];
   const runs = mailbox?.microReasonerRuns ?? [];
   const prompts = mailbox?.microReasonerPrompts ?? [];
+  const microReasonerPromptPresets = mailbox?.microReasonerPromptPresets ?? [];
+  const activeMicroReasonerPromptPreset = mailbox?.activeMicroReasonerPromptPreset ?? null;
   const wakeRequests = mailbox?.wakeRequests ?? [];
   const wakeResults = mailbox?.wakeResults ?? [];
   const decisions = mailbox?.decisions ?? [];
@@ -4115,6 +4195,38 @@ function StagePlayMailLoopLiveOverview({
   const visualSource = graph.sourceWindow.sources.find((source) =>
     source.modality === "visual_frame" && source.status === "active"
   ) ?? graph.sourceWindow.sources.find((source) => source.modality === "visual_frame") ?? null;
+  const microDeckSourceId =
+    visualSource?.sourceId ??
+    latestMail?.sourceId ??
+    activeMicroReasonerPromptPreset?.sourceIds.at(-1) ??
+    null;
+  const selectedMicroReasonerPromptPreset =
+    microReasonerPromptPresets.find((preset) => preset.presetId === selectedMicroPresetId) ??
+    microReasonerPromptPresets.find((preset) => preset.presetId === preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset)) ??
+    null;
+  const selectedMicroPresetApplied = Boolean(
+    activeMicroReasonerPromptPreset &&
+      selectedMicroReasonerPromptPreset &&
+      activeMicroReasonerPromptPreset.presetId === selectedMicroReasonerPromptPreset.presetId,
+  );
+  const microReasonerPresetGroups = useMemo(() => {
+    const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
+    for (const preset of microReasonerPromptPresets) {
+      const category = microReasonerPresetCategory(preset);
+      groups.set(category, [...(groups.get(category) ?? []), preset]);
+    }
+    return Array.from(groups.entries())
+      .map(([category, presets]) => ({
+        category,
+        presets: presets.sort((left, right) => left.title.localeCompare(right.title)),
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category));
+  }, [microReasonerPromptPresets]);
+  useEffect(() => {
+    if (microReasonerPromptPresets.length === 0) return;
+    if (selectedMicroPresetId && microReasonerPromptPresets.some((preset) => preset.presetId === selectedMicroPresetId)) return;
+    setSelectedMicroPresetId(preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset));
+  }, [activeMicroReasonerPromptPreset, microReasonerPromptPresets, selectedMicroPresetId]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) =>
     visualSource?.sourceId ? state.producers[visualSource.sourceId] ?? null : null
   );
@@ -4453,14 +4565,37 @@ function StagePlayMailLoopLiveOverview({
   const recentPackets = packets.slice(-6);
   const deckRows = STAGE_PLAY_DECK_ROLES.map((role) => {
     const run = latestStagePlayRunForPacket(runs, role, latestPacket);
-    const prompt = activeMicroReasonerPromptForRole(prompts, role);
+    const activePrompt = activeMicroReasonerPromptForRole(prompts, role);
+    const selectedPresetPromptId = selectedMicroReasonerPromptPreset?.rolePromptIds[role] ?? null;
+    const selectedPresetPrompt = selectedPresetPromptId
+      ? prompts.find((prompt) => prompt.promptId === selectedPresetPromptId) ?? null
+      : null;
+    const prompt = selectedPresetPrompt ?? activePrompt;
+    const promptedBySelectedPreset = Boolean(
+      selectedMicroReasonerPromptPreset?.promptedRoles.includes(role) ||
+        selectedPresetPromptId,
+    );
     return {
       role,
       run,
       prompt,
+      promptedBySelectedPreset,
+      selectedPresetPromptMissing: Boolean(selectedPresetPromptId && !selectedPresetPrompt),
       display: MICRO_REASONER_DISPLAY[role],
     };
   });
+  const microDeckClusters = STAGE_PLAY_MICRO_REASONER_ROLE_CLUSTERS.map((cluster) => ({
+    ...cluster,
+    rows: cluster.roles.map((role) => deckRows.find((row) => row.role === role)).filter(Boolean) as typeof deckRows,
+  }));
+  const selectedDeckRow = deckRows.find((row) => row.role === selectedMicroReasonerRole) ?? deckRows[0] ?? null;
+  const selectedDeckPromptStatus = selectedDeckRow?.prompt
+    ? selectedMicroPresetApplied
+      ? "active prompt"
+      : "available prompt"
+    : selectedDeckRow?.selectedPresetPromptMissing
+      ? "apply preset to load"
+      : "prompt missing";
   const askHandoffCount = wakeRequests.filter((wake) => wake.askTurnId || wake.status === "running").length;
   const queueRows: StagePlayFlowQueueRow[] = [
     {
@@ -5083,6 +5218,34 @@ function StagePlayMailLoopLiveOverview({
     writeStagePlayWakeBridgeMemory(markStagePlayWakeBridgeLaunched(memory, latestWake.wakeRequestId, Date.now()));
   };
 
+  const handleApplyMicroReasonerPreset = async () => {
+    if (!selectedMicroReasonerPromptPreset) {
+      setMicroDeckApplyStatus({ state: "failed", message: "MicroDeck preset is not available." });
+      return;
+    }
+    if (!microDeckSourceId) {
+      setMicroDeckApplyStatus({ state: "failed", message: "No live visual source is available for this MicroDeck preset." });
+      return;
+    }
+    setMicroDeckApplyStatus({ state: "applying", message: `Applying ${selectedMicroReasonerPromptPreset.title} to ${microDeckSourceId}.` });
+    try {
+      const response = await applyStagePlayMicroReasonerPromptPreset({
+        presetId: selectedMicroReasonerPromptPreset.presetId,
+        sourceIds: [microDeckSourceId],
+      });
+      await queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+      setMicroDeckApplyStatus({
+        state: "applied",
+        message: `${response.preset?.title ?? selectedMicroReasonerPromptPreset.title} applied. Future processed-mail packets will use this deck.`,
+      });
+    } catch (error) {
+      setMicroDeckApplyStatus({
+        state: "failed",
+        message: error instanceof Error ? error.message : "micro_reasoner_prompt_preset_apply_failed",
+      });
+    }
+  };
+
   return (
     <section
       className="mb-5 space-y-4 rounded-md border border-slate-800 bg-slate-950/80 p-4"
@@ -5170,6 +5333,184 @@ function StagePlayMailLoopLiveOverview({
         selectedPacketKey={selectedPacketTrafficKey}
         onSelectPacket={setSelectedPacketTrafficKey}
       />
+
+      <section
+        id="stage-play-microdeck-panel"
+        className="rounded-md border border-cyan-900/60 bg-slate-950/80 p-3 scroll-mt-4"
+        data-testid="stage-play-microdeck-panel"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">MicroReasoner Deck</div>
+            <div className="mt-1 text-sm font-semibold text-slate-50">
+              {activeMicroReasonerPromptPreset?.title ?? "Generic MicroDeck"}
+            </div>
+            <div className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
+              Source {microDeckSourceId ?? "pending"} uses this prompt deck for future processed-mail packets. Squares show the role assembly; selecting one opens the prompt currently available for that role.
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="sr-only" htmlFor="stage-play-microdeck-preset-select">
+              MicroReasoner prompt preset
+            </label>
+            <select
+              id="stage-play-microdeck-preset-select"
+              aria-label="MicroReasoner prompt preset"
+              value={selectedMicroReasonerPromptPreset?.presetId ?? ""}
+              onChange={(event) => setSelectedMicroPresetId(event.currentTarget.value)}
+              disabled={microReasonerPromptPresets.length === 0}
+              className="min-w-[18rem] rounded border border-cyan-300/30 bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {microReasonerPresetGroups.length === 0 ? (
+                <option value="">No MicroDeck presets loaded</option>
+              ) : (
+                microReasonerPresetGroups.map((group) => (
+                  <optgroup key={group.category} label={`${group.category} source`}>
+                    {group.presets.map((preset) => (
+                      <option key={preset.presetId} value={preset.presetId}>
+                        {microReasonerPresetOptionLabel(preset)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={() => void handleApplyMicroReasonerPreset()}
+              disabled={!selectedMicroReasonerPromptPreset || selectedMicroPresetApplied || microDeckApplyStatus.state === "applying"}
+              className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                selectedMicroPresetApplied
+                  ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                  : "border-cyan-300/30 text-cyan-100 hover:bg-cyan-400/10"
+              }`}
+              aria-label="Apply selected MicroReasoner prompt preset"
+            >
+              {microDeckApplyStatus.state === "applying"
+                ? "Applying"
+                : selectedMicroPresetApplied
+                  ? "Selected deck applied"
+                  : "Apply selected deck"}
+            </button>
+          </div>
+        </div>
+
+        {selectedMicroReasonerPromptPreset ? (
+          <div className="mt-3 rounded border border-cyan-300/15 bg-black/20 px-3 py-2 text-xs leading-relaxed text-cyan-100">
+            {selectedMicroReasonerPromptPreset.description}
+            <span className="ml-2 font-mono text-[10px] text-cyan-200/70">
+              {selectedMicroReasonerPromptPreset.promptedRoles.length} prompted role{selectedMicroReasonerPromptPreset.promptedRoles.length === 1 ? "" : "s"} | {selectedMicroReasonerPromptPreset.outputPolicy}
+            </span>
+          </div>
+        ) : null}
+        {microDeckApplyStatus.message ? (
+          <div className={`mt-2 rounded border px-3 py-2 text-[11px] ${
+            microDeckApplyStatus.state === "failed"
+              ? "border-rose-800 bg-rose-950/25 text-rose-100"
+              : microDeckApplyStatus.state === "applied"
+                ? "border-emerald-800 bg-emerald-950/20 text-emerald-100"
+                : "border-cyan-800 bg-cyan-950/20 text-cyan-100"
+          }`}>
+            {microDeckApplyStatus.message}
+          </div>
+        ) : null}
+
+        <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.48fr)]">
+          <div className="space-y-3">
+            {microDeckClusters.map((cluster) => (
+              <div key={cluster.key}>
+                <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{cluster.title}</div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {cluster.rows.map(({ role, run, prompt, display, promptedBySelectedPreset, selectedPresetPromptMissing }) => {
+                    const selected = selectedDeckRow?.role === role;
+                    const roleLoaded = Boolean(prompt);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => setSelectedMicroReasonerRole(role)}
+                        className={`min-h-[112px] rounded-md border p-3 text-left transition ${
+                          selected
+                            ? "border-cyan-300 bg-cyan-950/35"
+                            : promptedBySelectedPreset
+                              ? "border-cyan-800 bg-cyan-950/15 hover:border-cyan-500"
+                              : "border-slate-800 bg-slate-950/65 hover:border-slate-600"
+                        }`}
+                        aria-pressed={selected}
+                        data-testid="stage-play-microdeck-role-square"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-semibold text-slate-100">{display.title}</div>
+                            <div className="mt-0.5 truncate text-[10px] text-slate-500">{display.subtitle}</div>
+                          </div>
+                          <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${
+                            run?.status === "completed"
+                              ? "border-emerald-800 text-emerald-100"
+                              : run
+                                ? "border-amber-800 text-amber-100"
+                                : roleLoaded
+                                  ? "border-cyan-800 text-cyan-100"
+                                  : "border-slate-700 text-slate-400"
+                          }`}>
+                            {run?.status ?? (roleLoaded ? "ready" : "missing")}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-1 text-[9px]">
+                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
+                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
+                          <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{promptedBySelectedPreset ? "preset" : "base"}</span>
+                        </div>
+                        <div className="mt-2 line-clamp-2 text-[10px] leading-snug text-slate-400">
+                          {selectedPresetPromptMissing
+                            ? "Apply this preset to load its source-bound template."
+                            : prompt?.title ?? run?.outputPreview ?? display.missingPreview}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-microdeck-prompt-inspector">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Prompt Inspector</div>
+                <div className="mt-1 truncate text-sm font-semibold text-slate-50">
+                  {selectedDeckRow?.display.title ?? "Select a role"}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-500">
+                  {selectedDeckPromptStatus} | {selectedDeckRow?.role ?? "none"}
+                </div>
+              </div>
+              <div className="rounded border border-slate-700 px-2 py-1 font-mono text-[10px] text-slate-300">
+                {selectedDeckRow?.run?.modelUsed ?? selectedDeckRow?.prompt?.modelPreference ?? "model pending"}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+              <StagePlayMetricPill label="prompt chars" value={formatStagePlayCount(jsonCharCount(selectedDeckRow?.prompt?.template ?? ""))} />
+              <StagePlayMetricPill label="output chars" value={formatStagePlayCount((selectedDeckRow?.run?.outputPreview ?? "").length)} />
+            </div>
+            <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3">
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
+              <pre className="mt-2 max-h-[280px] overflow-auto whitespace-pre-wrap font-mono text-[10px] leading-4 text-slate-300">
+                {selectedDeckRow?.prompt?.template ??
+                  (selectedDeckRow?.selectedPresetPromptMissing
+                    ? "This preset maps the role to a template that is not in the current source-bound mailbox projection yet. Apply the preset, then the prompt will refresh here."
+                    : "Prompt missing for this role.")}
+              </pre>
+            </div>
+            <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3">
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Latest Output</div>
+              <div className="mt-2 max-h-[180px] overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed text-slate-300">
+                {selectedDeckRow?.run?.outputPreview ?? selectedDeckRow?.display.missingPreview ?? "No run output yet."}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <details className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-diagnostics">
         <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">

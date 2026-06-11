@@ -53,7 +53,7 @@ describe("helix ask prompt launch bridge", () => {
         question: "Review the latest Stage Play live-source mailbox finding.",
         autoSubmit: true,
         panelId: "stage-play-badge-graph",
-        routeMetadata: {
+        route_metadata: {
           schema: "helix.ask.route_metadata.v1",
           source: "stage_play_mail_wake",
           invocationKind: "stage_play_mail_wake",
@@ -96,6 +96,13 @@ describe("helix ask prompt launch bridge", () => {
             tool_name: "live_env.read_live_source_mail",
           },
         },
+        route_metadata: {
+          invocationKind: "stage_play_mail_wake",
+          wakeRequestId: "stage_play_live_source_mail_wake:test",
+          mailboxThreadId: "helix-ask:desktop",
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_interpretation",
+        },
       },
     });
     const consumed = consumePendingHelixAskPrompt();
@@ -114,6 +121,13 @@ describe("helix ask prompt launch bridge", () => {
       mandatory_next_tool: {
         tool_name: "live_env.read_live_source_mail",
       },
+    });
+    expect(consumed?.route_metadata).toMatchObject({
+      invocationKind: "stage_play_mail_wake",
+      wakeRequestId: "stage_play_live_source_mail_wake:test",
+      mailboxThreadId: "helix-ask:desktop",
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_interpretation",
     });
   });
 

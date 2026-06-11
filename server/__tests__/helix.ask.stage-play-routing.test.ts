@@ -178,6 +178,158 @@ describe("Helix Ask Stage Play routing", () => {
       .toMatch(/^live_env\./);
   }, 60_000);
 
+  it("executes the locked mailbox read phase instead of asking for pending input", async () => {
+    const app = createApp();
+    const wakeRequestId = "stage_play_live_source_mail_wake:test-locked-read-phase";
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Review the latest Stage Play live-source mailbox finding.",
+        sessionId: `${threadId}:locked-read-phase`,
+        debug: true,
+        route_metadata: {
+          invocationKind: "stage_play_mail_wake",
+          wakeRequestId,
+          mailboxThreadId: threadId,
+          sourceTarget: "live_source_mailbox",
+          requiredCanonicalGoal: "processed_mail_interpretation",
+          requiredPhase: "read_mailbox",
+          allowedCapabilities: [
+            "live_env.read_processed_live_source_mail",
+          ],
+          forbiddenCapabilities: [
+            "workspace_os.status",
+            "internet-search.search_web",
+            "docs-viewer.open",
+            "model.direct_answer",
+          ],
+          evidenceRefs: ["stage_play_live_source_mail_wake:test-locked-read-phase"],
+        },
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          source: "stage_play_mail_wake_route_metadata",
+          wakeRequestId,
+          stage_play_live_source_mail_wake_request_id: wakeRequestId,
+          target_source: "live_source_mailbox",
+          target_kind: "live_source_mailbox",
+          targetSource: "live_source_mailbox",
+          targetKind: "live_source_mailbox",
+          strength: "hard",
+          requiredPhase: "read_mailbox",
+          mandatoryNextTool: "live_env.read_processed_live_source_mail",
+          must_enter_backend_ask: true,
+          allow_client_shortcut: false,
+          allow_no_tool_direct: false,
+        },
+        live_source_turn_phase_resolution: {
+          phase: "read_processed_mail",
+          canonicalGoal: "processed_mail_interpretation",
+          allowedTools: ["live_env.read_processed_live_source_mail"],
+          forbiddenTools: [
+            "workspace_os.status",
+            "internet-search.search_web",
+            "docs-viewer.open",
+            "model.direct_answer",
+            "final_answer",
+          ],
+          phaseLock: {
+            locked: true,
+            reason: "Stage Play mail wake route metadata is authoritative for the mailbox read phase.",
+          },
+          terminalAllowed: false,
+        },
+        mandatory_next_tool: {
+          schema: "helix.mandatory_next_tool.v1",
+          tool_name: "live_env.read_processed_live_source_mail",
+          allowed_tools: ["live_env.read_processed_live_source_mail"],
+          terminal_forbidden: true,
+          reason: "locked mailbox read phase must execute the processed mailbox read tool",
+          canonical_goal: "processed_mail_interpretation",
+        },
+      })
+      .expect(200);
+
+    const executedCapabilities =
+      response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      sourceTarget: response.body?.source_target_intent,
+      phase: response.body?.live_source_turn_phase_resolution,
+      mandatory: response.body?.mandatory_next_tool,
+      admission: response.body?.agent_runtime_loop_admission,
+      loop: response.body?.agent_runtime_loop,
+      pending: response.body?.pending_server_request,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.source_target_intent?.target_source, routeDebug).toBe("live_source_mailbox");
+    expect(response.body?.mandatory_next_tool, routeDebug).toMatchObject({
+      phase: "read_processed_mail",
+      tool_name: "live_env.read_processed_live_source_mail",
+      allowed_tools: ["live_env.read_processed_live_source_mail"],
+      terminal_forbidden: true,
+    });
+    expect(response.body?.mandatory_next_tool?.tool_name, routeDebug).toBe("live_env.read_processed_live_source_mail");
+    expect(response.body?.agent_runtime_loop_admission, routeDebug).toMatchObject({
+      admitted: true,
+      mode: "execute_or_record",
+    });
+    expect(response.body?.agent_runtime_loop_admission?.reason, routeDebug).not.toBe("pending_user_input");
+    expect(response.body?.route_reason_code, routeDebug).not.toBe("clarify:missing_args");
+    expect(response.body?.pending_server_request ?? null, routeDebug).toBeNull();
+    expect(response.body?.agent_runtime_loop?.executed_tool_call_count ?? 0, routeDebug).toBeGreaterThanOrEqual(1);
+    expect(executedCapabilities, routeDebug).toContain("live_env.read_processed_live_source_mail");
+  }, 60_000);
+
+  it("keeps interpreter profile setup on configure_interpreter_profile without reading mail", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Create a Minecraft Survival Coach interpreter profile for this source.",
+        sessionId: `${threadId}:profile-setup-no-mail-read`,
+        debug: true,
+      })
+      .expect(200);
+
+    const executedCapabilities =
+      response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration?.chosen_capability) ?? [];
+    const routeDebug = JSON.stringify({
+      route: response.body?.route_reason_code,
+      sourceTarget: response.body?.source_target_intent,
+      canonical: response.body?.canonical_goal_frame,
+      available: response.body?.available_capabilities,
+      phase: response.body?.live_source_turn_phase_resolution,
+      mandatory: response.body?.mandatory_next_tool,
+      admission: response.body?.agent_runtime_loop_admission,
+      loop: response.body?.agent_runtime_loop,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug)
+      .toBe("live_env.configure_interpreter_profile");
+    expect(response.body?.mandatory_next_tool?.tool_name, routeDebug)
+      .toBe("live_env.configure_interpreter_profile");
+    expect(response.body?.agent_runtime_loop_admission, routeDebug).toMatchObject({
+      admitted: true,
+      mode: "execute_or_record",
+    });
+    expect(executedCapabilities, routeDebug).toContain("live_env.configure_interpreter_profile");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.read_processed_live_source_mail");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.read_live_source_mail");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.process_live_source_mail");
+    expect(response.body?.stage_play_live_source_mailbox_debug?.executed_capabilities_seen ?? [], routeDebug)
+      .not.toEqual(expect.arrayContaining(["live_env.read_processed_live_source_mail"]));
+  }, 60_000);
+
   it("does not let hard mailbox wake metadata skip execution behind stale pending input", async () => {
     const app = createApp();
     const sessionId = `${threadId}:hard-mailbox-pending-supersede`;
