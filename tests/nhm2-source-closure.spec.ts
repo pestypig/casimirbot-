@@ -223,7 +223,7 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
     expect(receipt.regions[0]).toMatchObject({
       regionId: "wall",
-      status: "blocked",
+      status: "proxy_limited",
       sourceTensorRef: "artifact://tile-wall/direct-t00",
       comparisonRole: "tile_effective_counterpart",
       tensorAuthorityMode: "diagonal_reduced_order",
@@ -382,10 +382,16 @@ describe("nhm2 source closure artifact v2", () => {
 
     expect(isNhm2SourceClosureV2Artifact(artifact)).toBe(true);
     expect(artifact.schemaVersion).toBe(NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION);
-    expect(artifact.status).toBe("pass");
+    expect(artifact.status).toBe("review");
     expect(artifact.completeness).toBe("complete");
-    expect(artifact.reasonCodes).toEqual([]);
-    expect(artifact.assumptionsDrifted).toBe(false);
+    expect(artifact.reasonCodes).toEqual(
+      expect.arrayContaining([
+        "source_side_same_basis_authority_missing",
+        "wall_source_side_same_basis_authority_missing",
+        "assumption_drift",
+      ]),
+    );
+    expect(artifact.assumptionsDrifted).toBe(true);
     expect(artifact.regionComparisons.regions.map((entry) => entry.status)).toEqual([
       "pass",
       "pass",
@@ -404,6 +410,9 @@ describe("nhm2 source closure artifact v2", () => {
       expect(region.metricT00Diagnostics?.evidenceStatus).toBe("measured");
       expect(region.tileT00Diagnostics?.evidenceStatus).toBe("measured");
       expect(region.tileProxyDiagnostics).toBeNull();
+      expect(region.sourceSideSameBasisAuthorityStatus).not.toBe(
+        "authoritative_same_basis",
+      );
       expect(region.mismatchDiagnostics).toBeTruthy();
       expect(region.mismatchDiagnostics?.components.T00.ratioTileToMetric).not.toBeNull();
       expect(region.mismatchDiagnostics?.components.T00.signedRatioTileToMetric).not.toBeNull();
@@ -451,7 +460,8 @@ describe("nhm2 source closure artifact v2", () => {
     expect(artifact.status).toBe("fail");
     expect(artifact.completeness).toBe("complete");
     expect(artifact.reasonCodes).toContain("tensor_residual_exceeded");
-    expect(artifact.assumptionsDrifted).toBe(false);
+    expect(artifact.reasonCodes).toContain("wall_source_side_same_basis_authority_missing");
+    expect(artifact.assumptionsDrifted).toBe(true);
     expect(isNhm2WallSourceClosureArtifact(artifact.wallSourceClosure)).toBe(true);
     expect(artifact.wallSourceClosure.residual.pass).toBe(false);
     expect(artifact.wallSourceClosure.required.T00_SI).toBe(-100);

@@ -446,6 +446,29 @@ const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV
     "";
 };
 
+const microReasonerPresetCategory = (preset: StagePlayMicroReasonerPromptPresetV1): string => {
+  if (preset.domain === "minecraft_gameplay") return "Gaming";
+  if (preset.domain === "calculator_stream") return "Tools";
+  if (preset.domain === "science_visual") return "Science";
+  if (preset.domain === "browser_workflow") return "Workflows";
+  if (preset.domain === "custom") return "Custom";
+  return "General";
+};
+
+const microReasonerPresetOptionLabel = (preset: StagePlayMicroReasonerPromptPresetV1): string =>
+  `${preset.title}${preset.sourceIds.length > 0 ? " (applied)" : ""}`;
+
+const preferredMicroReasonerPresetId = (
+  presets: StagePlayMicroReasonerPromptPresetV1[],
+  activePreset?: StagePlayMicroReasonerPromptPresetV1 | null,
+): string => {
+  if (activePreset && presets.some((preset) => preset.presetId === activePreset.presetId)) return activePreset.presetId;
+  return presets.find((preset) => preset.presetId === "stage_play_micro_reasoner_prompt_preset:minecraft-gameplay:v1")?.presetId ??
+    presets.find((preset) => preset.presetId === "stage_play_micro_reasoner_prompt_preset:generic-live-source:v1")?.presetId ??
+    presets[0]?.presetId ??
+    "";
+};
+
 const visualShadeCustomSlot = (profile: StagePlayVisualObserverProfileV1): number | null => {
   if (visualShadeSubjectCategory(profile) !== "Custom") return null;
   const match = `${profile.title} ${profile.subject ?? ""}`.match(/\bCustom\s+(\d+)\b/i);
@@ -576,6 +599,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [sessionVisualObserverProfiles, setSessionVisualObserverProfiles] = useState<StagePlayVisualObserverProfileV1[]>([]);
   const [activeVisualObserverProfile, setActiveVisualObserverProfile] = useState<StagePlayVisualObserverProfileV1 | null>(null);
   const [selectedVisualObserverProfileId, setSelectedVisualObserverProfileId] = useState<string>("");
+  const [microReasonerPromptPresets, setMicroReasonerPromptPresets] = useState<StagePlayMicroReasonerPromptPresetV1[]>([]);
+  const [activeMicroReasonerPromptPreset, setActiveMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
+  const [microReasonerPrompts, setMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
+  const [selectedMicroReasonerPromptPresetId, setSelectedMicroReasonerPromptPresetId] = useState<string>("");
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -769,6 +796,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       }))
       .sort((left, right) => left.category.localeCompare(right.category));
   }, [visualShadeProfiles]);
+  const selectedMicroReasonerPromptPreset = useMemo(
+    () => microReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedMicroReasonerPromptPresetId) ??
+      microReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset)) ??
+      null,
+    [activeMicroReasonerPromptPreset, microReasonerPromptPresets, selectedMicroReasonerPromptPresetId],
+  );
+  const microReasonerPresetGroups = useMemo(() => {
+    const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
+    for (const preset of microReasonerPromptPresets) {
+      const category = microReasonerPresetCategory(preset);
+      groups.set(category, [...(groups.get(category) ?? []), preset]);
+    }
+    return Array.from(groups.entries())
+      .map(([category, presets]) => ({
+        category,
+        presets: presets.sort((left, right) => left.title.localeCompare(right.title)),
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category));
+  }, [microReasonerPromptPresets]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     return sourceId ? state.producers[sourceId] ?? null : null;
@@ -815,9 +861,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       selectedVisualObserverProfile &&
       activeVisualObserverProfile.profileId === selectedVisualObserverProfile.profileId,
   );
+  const selectedMicroPresetApplied = Boolean(
+    activeMicroReasonerPromptPreset &&
+      selectedMicroReasonerPromptPreset &&
+      activeMicroReasonerPromptPreset.presetId === selectedMicroReasonerPromptPreset.presetId,
+  );
   const visualShadeStatus = activeVisualObserverProfile
     ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
     : "Generic visual capture prompt is active until a shade is applied.";
+  const microReasonerPresetStatus = activeMicroReasonerPromptPreset
+    ? `${activeMicroReasonerPromptPreset.title} active; ${activeMicroReasonerPromptPreset.promptedRoles.length} prompted role${activeMicroReasonerPromptPreset.promptedRoles.length === 1 ? "" : "s"}; ${activeMicroReasonerPromptPreset.outputPolicy}`
+    : "Generic MicroDeck prompt preset is active until a source preset is applied.";
+  const selectedMicroPromptPreview = useMemo(
+    () => selectedMicroReasonerPromptPreset
+      ? microReasonerPrompts
+        .filter((prompt: StagePlayMicroReasonerPromptV1) =>
+          selectedMicroReasonerPromptPreset.promptedRoles.includes(prompt.role) ||
+          Boolean(selectedMicroReasonerPromptPreset.rolePromptIds[prompt.role])
+        )
+        .slice(0, 6)
+      : [],
+    [microReasonerPrompts, selectedMicroReasonerPromptPreset],
+  );
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
       selectedVisualObserverProfile &&
@@ -978,6 +1043,18 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
       setVisualObserverProfiles(Array.isArray(visualObserverProfileBody.profiles) ? visualObserverProfileBody.profiles : []);
       setActiveVisualObserverProfile(visualObserverProfileBody.activeProfile ?? visualObserverProfileBody.active_profile ?? null);
+      const microReasonerPromptPresetBody: MicroReasonerPromptPresetListRead = await fetch(
+        `/api/helix/stage-play/micro-reasoner-prompt-preset?sourceId=${encodeURIComponent(visualSourceId)}&includePresets=true`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setMicroReasonerPromptPresets(Array.isArray(microReasonerPromptPresetBody.presets) ? microReasonerPromptPresetBody.presets : []);
+      setActiveMicroReasonerPromptPreset(microReasonerPromptPresetBody.activePreset ?? microReasonerPromptPresetBody.active_preset ?? null);
+      setMicroReasonerPrompts(
+        Array.isArray(microReasonerPromptPresetBody.prompts)
+          ? microReasonerPromptPresetBody.prompts
+          : Array.isArray(microReasonerPromptPresetBody.microReasonerPrompts)
+            ? microReasonerPromptPresetBody.microReasonerPrompts
+            : [],
+      );
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -998,6 +1075,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const preferred = preferredVisualShadeProfileId(visualShadeProfiles, activeVisualObserverProfile);
     if (preferred) setSelectedVisualObserverProfileId(preferred);
   }, [activeVisualObserverProfile, selectedVisualObserverProfileId, visualShadeProfiles]);
+
+  useEffect(() => {
+    const selectionStillAvailable = microReasonerPromptPresets.some(
+      (preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedMicroReasonerPromptPresetId,
+    );
+    if (selectionStillAvailable) return;
+    const preferred = preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset);
+    if (preferred) setSelectedMicroReasonerPromptPresetId(preferred);
+  }, [activeMicroReasonerPromptPreset, microReasonerPromptPresets, selectedMicroReasonerPromptPresetId]);
 
   useEffect(() => {
     if (!selectedVisualObserverProfile) return;
@@ -1302,6 +1388,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       await refresh();
     } catch (error) {
       setLastActionStatus(error instanceof Error ? error.message : "visual_observer_profile_apply_failed");
+    }
+  };
+
+  const applyMicroReasonerPromptPreset = async (preset: StagePlayMicroReasonerPromptPresetV1 | null) => {
+    if (!preset) {
+      setLastActionStatus("Micro-reasoner prompt preset is not available.");
+      return;
+    }
+    try {
+      const source = await ensureVisualSourceRegistered();
+      const response = await postJson("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
+        presetId: preset.presetId,
+        sourceIds: [source.source_id],
+      });
+      const applied = response?.preset as StagePlayMicroReasonerPromptPresetV1 | undefined;
+      setLastActionStatus(`${applied?.title ?? preset.title} MicroDeck preset applied to ${source.source_id}. Future mail-loop packets will use this prompt deck.`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "micro_reasoner_prompt_preset_apply_failed");
     }
   };
 

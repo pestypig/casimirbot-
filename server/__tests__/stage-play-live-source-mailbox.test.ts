@@ -1236,7 +1236,9 @@ describe("Stage Play live-source mailbox", () => {
       now: "2026-06-04T12:00:41.000Z",
       expiresAfterMs: 1_000,
     });
-    markStagePlayMailWakeRunning(wake?.wakeRequestId ?? "", "2026-06-04T12:00:41.500Z");
+    markStagePlayMailWakeRunning(wake?.wakeRequestId ?? "", "2026-06-04T12:00:41.500Z", {
+      askTurnId: "ask:phase-locked",
+    });
 
     const expired = expireStaleStagePlayLiveSourceMailWakeRequests({
       threadId,
@@ -4226,7 +4228,9 @@ describe("Stage Play live-source mailbox", () => {
       createdAt: "2026-06-04T12:02:01.000Z",
     });
     const first = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
-    markStagePlayMailWakeRunning(first.wakeRequestId, "2026-06-04T12:02:02.000Z");
+    markStagePlayMailWakeRunning(first.wakeRequestId, "2026-06-04T12:02:02.000Z", {
+      askTurnId: "ask:block-first-running",
+    });
     const skipped = await runNextMailWakeRequest({
       threadId,
       roomId,
@@ -4471,10 +4475,16 @@ describe("Stage Play live-source mailbox", () => {
     }
   });
 
-  it("releases a stale running Ask-entry wake into retryable state", async () => {
+  it("retries a stale no-turn launch attempt as queued work instead of treating it as running", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
     markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z");
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "queued",
+      askTurnId: null,
+      askLaunchStatus: "not_started",
+      lifecycleReason: "wake_attempt_started_before_launch",
+    });
 
     const retry = await runNextMailWakeRequest({
       threadId,
@@ -4497,16 +4507,19 @@ describe("Stage Play live-source mailbox", () => {
       }),
     });
 
-    expect(retry).toBeNull();
+    expect(retry).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:wake-stale-retry",
+    });
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
-      status: "failed_retryable",
-      attemptCount: 1,
-      failureReason: "ask_launch_stale_without_turn_id",
-      nextRetryAt: "2026-06-04T12:05:01.000Z",
+      status: "completed",
+      attemptCount: 2,
+      askTurnId: "ask:wake-stale-retry",
+      failureReason: null,
     });
   });
 
-  it("releases a stale Ask-entry wake and admits a newer queued wake", async () => {
+  it("keeps no-turn launch attempts queued so they retry before newer queued wakes", async () => {
     seedVisualEvidence();
     const firstWake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
     markStagePlayMailWakeRunning(firstWake.wakeRequestId, "2026-06-04T12:03:00.000Z");
@@ -4556,23 +4569,22 @@ describe("Stage Play live-source mailbox", () => {
     expect(result).toMatchObject({
       status: "completed",
       askTurnId: "ask:wake-newer-after-entry-stale",
-      wakeRequestId: newerWake?.wakeRequestId,
+      wakeRequestId: firstWake?.wakeRequestId,
     });
     const firstWakeAfter = listStagePlayLiveSourceMailWakeRequests({ threadId })
       .find((wake) => wake.wakeRequestId === firstWake.wakeRequestId);
     expect(firstWakeAfter).toMatchObject({
-      status: "failed_retryable",
-      failureReason: "ask_launch_stale_without_turn_id",
-      nextRetryAt: "2026-06-04T12:03:55.000Z",
+      status: "completed",
+      failureReason: null,
+      askTurnId: "ask:wake-newer-after-entry-stale",
     });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })
+      .find((wake) => wake.wakeRequestId === newerWake?.wakeRequestId)).toMatchObject({
+        status: "queued",
+      });
     expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        wakeRequestId: firstWake.wakeRequestId,
-        status: "failed_retryable",
-        failedReason: "ask_launch_stale_without_turn_id",
-      }),
-      expect.objectContaining({
-        wakeRequestId: newerWake?.wakeRequestId,
+        wakeRequestId: firstWake?.wakeRequestId,
         status: "completed",
         askTurnId: "ask:wake-newer-after-entry-stale",
       }),
@@ -4582,7 +4594,9 @@ describe("Stage Play live-source mailbox", () => {
   it("server admission cycle releases a stale running wake before dispatching Ask", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
-    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z");
+    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:03:00.000Z", {
+      askTurnId: "ask:wake-cycle-stale-running",
+    });
 
     const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
       threadId,
@@ -4638,7 +4652,9 @@ describe("Stage Play live-source mailbox", () => {
   it("server admission cycle keeps a fresh running wake locked and does not call Ask", async () => {
     seedVisualEvidence();
     const wake = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
-    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:05:00.000Z");
+    markStagePlayMailWakeRunning(wake.wakeRequestId, "2026-06-04T12:05:00.000Z", {
+      askTurnId: "ask:wake-cycle-fresh-running",
+    });
 
     const cycle = await runStagePlayLiveSourceMailWakeAdmissionCycle({
       threadId,

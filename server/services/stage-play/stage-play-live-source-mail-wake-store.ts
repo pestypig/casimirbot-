@@ -786,10 +786,18 @@ export const markStagePlayMailWakeRetryable = (input: {
           ? "completed"
           : "launched"
         : resolveAskLaunchStatusForRetry(input.failureReason);
+  const missingTurnIdLaunch = askLaunchStatus === "missing_turn_id";
+  const askLaunchId = missingTurnIdLaunch
+    ? existing?.askLaunchId ?? makeAskLaunchId(input.wakeRequestId, completedAt, existing?.attemptCount ?? 0)
+    : existing?.askLaunchId ?? null;
   return updateWake(input.wakeRequestId, {
     status: input.status ?? "failed_retryable",
     failureReason: input.failureReason,
+    askLaunchId,
     askLaunchStatus,
+    askLaunchStartedAt: missingTurnIdLaunch
+      ? existing?.askLaunchStartedAt ?? existing?.lastAttemptAt ?? completedAt
+      : existing?.askLaunchStartedAt ?? null,
     askLaunchCompletedAt: askLaunchStatus === "missing_turn_id" || askLaunchStatus === "failed"
       ? completedAt
       : existing?.askLaunchCompletedAt ?? null,
