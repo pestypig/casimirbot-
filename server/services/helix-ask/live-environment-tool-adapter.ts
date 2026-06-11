@@ -195,6 +195,37 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+type LiveSourceToolArtifactRefs = {
+  processedPacketIds?: string[];
+  decisionIds?: string[];
+  voiceReceiptIds?: string[];
+  wakeRequestId?: string | null;
+  askTurnId?: string | null;
+};
+
+const readRouteMetadataRecord = (args: Record<string, unknown>): Record<string, unknown> | null =>
+  readRecord(args.route_metadata) ?? readRecord(args.routeMetadata);
+
+const liveSourceWakeRequestIdFromArgs = (args: Record<string, unknown>): string | null => {
+  const routeMetadata = readRouteMetadataRecord(args);
+  return (
+    readString(args.wake_request_id) ??
+    readString(args.wakeRequestId) ??
+    readString(routeMetadata?.wakeRequestId) ??
+    readString(routeMetadata?.wake_request_id)
+  );
+};
+
+const liveSourceAskTurnIdFromArgs = (args: Record<string, unknown>): string | null => {
+  const routeMetadata = readRouteMetadataRecord(args);
+  return (
+    readString(args.ask_turn_id) ??
+    readString(args.askTurnId) ??
+    readString(routeMetadata?.askTurnId) ??
+    readString(routeMetadata?.ask_turn_id)
+  );
+};
+
 const readRequestedTool = (
   value: unknown,
 ): Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["requestedTool"] | null => {
@@ -1565,6 +1596,8 @@ const makeObservation = (input: {
   summary: string;
   observation: unknown;
   evidenceRefs?: string[];
+  producedRefs?: string[];
+  artifactRefs?: LiveSourceToolArtifactRefs;
   transcriptRows?: AskTurnTranscriptRowDraftV1[];
 }): HelixLiveEnvironmentToolObservation => ({
   schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
@@ -1583,6 +1616,24 @@ const makeObservation = (input: {
   observation: input.observation,
   ...(input.transcriptRows && input.transcriptRows.length > 0 ? { transcriptRows: input.transcriptRows } : {}),
   evidence_refs: Array.from(new Set(input.evidenceRefs ?? [])),
+  ...(input.producedRefs && input.producedRefs.length > 0 ? { producedRefs: uniqueStrings(input.producedRefs) } : {}),
+  ...(input.artifactRefs
+    ? {
+        artifactRefs: {
+          ...(input.artifactRefs.processedPacketIds && input.artifactRefs.processedPacketIds.length > 0
+            ? { processedPacketIds: uniqueStrings(input.artifactRefs.processedPacketIds) }
+            : {}),
+          ...(input.artifactRefs.decisionIds && input.artifactRefs.decisionIds.length > 0
+            ? { decisionIds: uniqueStrings(input.artifactRefs.decisionIds) }
+            : {}),
+          ...(input.artifactRefs.voiceReceiptIds && input.artifactRefs.voiceReceiptIds.length > 0
+            ? { voiceReceiptIds: uniqueStrings(input.artifactRefs.voiceReceiptIds) }
+            : {}),
+          wakeRequestId: input.artifactRefs.wakeRequestId ?? null,
+          askTurnId: input.artifactRefs.askTurnId ?? null,
+        },
+      }
+    : {}),
   instruction_authority: "none",
   ask_instruction_authority: "none",
   context_role: "tool_evidence",
@@ -2693,6 +2744,9 @@ export function executeLiveEnvironmentTool(
       microReasonerRunRefs,
       resolutionStateSummary,
     });
+    const processedPacketIds = packets.map((packet) => packet.packetId);
+    const wakeRequestId = liveSourceWakeRequestIdFromArgs(args);
+    const askTurnId = liveSourceAskTurnIdFromArgs(args);
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
@@ -2740,6 +2794,12 @@ export function executeLiveEnvironmentTool(
         ...microReasonerRuns.map((run) => run.runId),
         ...mailItems.map((item) => item.mailId),
       ]),
+      producedRefs: processedPacketIds,
+      artifactRefs: {
+        processedPacketIds,
+        wakeRequestId,
+        askTurnId,
+      },
       transcriptRows,
     });
   }
@@ -4447,6 +4507,8 @@ export function executeLiveEnvironmentTool(
       : null;
     const waitDecisionWithoutMail =
       mailIds.length === 0 && recordedDecision.decision === "wait_for_next_summary";
+    const wakeRequestId = liveSourceWakeRequestIdFromArgs(args);
+    const askTurnId = liveSourceAskTurnIdFromArgs(args);
     return makeObservation({
       threadId: input.thread_id,
       environmentId: recordedDecision.environmentId ?? environment?.environment_id ?? input.environment_id,
@@ -4508,6 +4570,13 @@ export function executeLiveEnvironmentTool(
         ...recordedDecision.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+      producedRefs: [recordedDecision.decisionId],
+      artifactRefs: {
+        processedPacketIds: processedPacketRefs,
+        decisionIds: [recordedDecision.decisionId],
+        wakeRequestId,
+        askTurnId,
+      },
     });
   }
 
@@ -4543,6 +4612,8 @@ export function executeLiveEnvironmentTool(
           evidenceRefs: result.receipt.evidenceRefs,
         })
       : [];
+    const wakeRequestId = liveSourceWakeRequestIdFromArgs(args);
+    const askTurnId = liveSourceAskTurnIdFromArgs(args);
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -4569,6 +4640,12 @@ export function executeLiveEnvironmentTool(
       },
       transcriptRows,
       evidenceRefs: [result.request.requestId, result.receipt.receiptId, ...result.receipt.evidenceRefs],
+      producedRefs: [result.request.requestId, result.receipt.receiptId],
+      artifactRefs: {
+        voiceReceiptIds: [result.receipt.receiptId],
+        wakeRequestId,
+        askTurnId,
+      },
     });
   }
 

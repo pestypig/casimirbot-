@@ -412,4 +412,80 @@ describe("Helix terminal authority single writer", () => {
     expect(["post_tool_model_step_missing", "terminal_boundary_ineligible"]).toContain(payload.terminal_error_code);
     expect(payload.selected_final_answer).not.toBe(staleText);
   });
+
+  it("fails closed when a compound itinerary lacks required research and locator observations", () => {
+    const turnId = "ask:test:compound-itinerary-missing-observations";
+    const draftText = "Generic model-only answer with citations and badge names.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_research_locator",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["scholarly_research", "theory_locator"],
+        terminal_success_criteria: {
+          required_observation_families: ["scholarly_research", "theory_locator"],
+          requires_post_observation_synthesis: true,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.selectedArtifactKind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(result.visible_text).toContain("required itinerary observations are missing");
+    expect(result.visible_text).toContain("scholarly_research");
+    expect(result.visible_text).toContain("theory_locator");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          reason: "missing_required_observation",
+        }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.selected_final_answer).not.toBe(draftText);
+  });
 });

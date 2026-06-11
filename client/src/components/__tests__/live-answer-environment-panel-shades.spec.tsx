@@ -48,6 +48,19 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Future visual frames will use this observer prompt.");
   });
 
+  it("lets shade prompt edits save as custom profiles without mutating presets", () => {
+    const source = panelSource();
+
+    expect(source).toContain('aria-label="Visual observer shade prompt"');
+    expect(source).toContain('aria-label="Save visual observer shade prompt as custom"');
+    expect(source).toContain("Presets are read-only. Edits save as the next Custom slot.");
+    expect(source).toContain("Save As");
+    expect(source).toContain("nextVisualShadeCustomSlot");
+    expect(source).toContain('title = `Custom ${slot}`');
+    expect(source).toContain("/api/helix/stage-play/visual-observer-profile");
+    expect(source).toContain("setSessionVisualObserverProfiles");
+  });
+
   it("surfaces source and preset loading state for inaccessible shades", () => {
     const source = panelSource();
 

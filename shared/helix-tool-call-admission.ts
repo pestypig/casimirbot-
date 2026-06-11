@@ -10,6 +10,7 @@ export type HelixToolCallAdmissionFamily =
   | "repo_code"
   | "scholarly_research"
   | "internet_search"
+  | "theory_locator"
   | "runtime_evidence"
   | "workspace_diagnostic"
   | "live_environment"

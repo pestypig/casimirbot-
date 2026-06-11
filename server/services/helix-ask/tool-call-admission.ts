@@ -6,7 +6,10 @@ import {
   type HelixToolCallAdmissionFamily,
   type HelixToolCallAdmissionMode,
 } from "@shared/helix-tool-call-admission";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 import { buildToolUseRestatement } from "./internet-search-intent";
 import { buildTurnOperationalConstraints } from "./operational-constraints";
 import {
@@ -47,6 +50,60 @@ const HARD_SOURCE_TARGETS = new Set([
   "workspace_action",
   "calculator_stream",
 ]);
+
+const sourceTargetToolFamilies = (
+  sourceTarget: string,
+  promptText = "",
+  sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null,
+): string[] => {
+  if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc") return ["docs_viewer"];
+  if (sourceTarget === "scholarly_research") return ["scholarly_research"];
+  if (sourceTarget === "internet_search") return ["internet_search"];
+  if (sourceTarget === "repo_code") return ["repo_code"];
+  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") return ["live_environment"];
+  if (sourceTarget === "active_note") return ["notes"];
+  if (sourceTarget === "workspace_panel" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_action") {
+    const joined = [
+      promptText,
+      ...(
+        Array.isArray((sourceTargetIntent as Record<string, unknown> | null | undefined)?.explicit_cues)
+          ? (sourceTargetIntent as Record<string, unknown>).explicit_cues as string[]
+          : []
+      ),
+      ...(
+        Array.isArray((sourceTargetIntent as Record<string, unknown> | null | undefined)?.reasons)
+          ? (sourceTargetIntent as Record<string, unknown>).reasons as string[]
+          : []
+      ),
+      ...(
+        Array.isArray((sourceTargetIntent as Record<string, unknown> | null | undefined)?.requested_outputs)
+          ? (sourceTargetIntent as Record<string, unknown>).requested_outputs as string[]
+          : []
+      ),
+    ].join(" ");
+    if (/theory_context_reflection|reflect_theory_context|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|scale\s+bands?|uncertainty\s+mode/i.test(joined)) {
+      return ["theory_locator"];
+    }
+    return ["workstation_action"];
+  }
+  return [sourceTarget];
+};
+
+const contextualForbiddenToolFamilies = (
+  suppression: ReturnType<typeof detectContextualToolAdmissionSuppression>,
+): string[] => {
+  if (!suppression) return [];
+  return [
+    contextualToolSuppressionBlocksFamily(suppression, "docs_viewer") ? "docs_viewer" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "scholarly_research") ? "scholarly_research" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "internet_search") ? "internet_search" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "theory_locator") ? "theory_locator" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "workstation_action") ? "workstation_action" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "notes") ? "notes" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "repo_code") ? "repo_code" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "live_environment") ? "live_environment" : "",
+  ].filter(Boolean);
+};
 
 export const hasUnknownSourceArtifactDiscoveryIntent = (promptText: string): boolean => {
   const prompt = promptText.trim();
@@ -106,7 +163,21 @@ export function buildToolCallAdmissionDecision(input: {
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
-  if (contextualSuppression) {
+  const effectiveSourceTarget =
+    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
+      ? "internet_search"
+      : sourceTarget;
+  const contextualSuppressionBlocksSelectedTarget =
+    Boolean(contextualSuppression) &&
+    (
+      effectiveSourceTarget === "unknown" ||
+      effectiveSourceTarget === "model_only" ||
+      effectiveSourceTarget === "general_background" ||
+      sourceTargetToolFamilies(effectiveSourceTarget, promptText, input.sourceTargetIntent).some((family) =>
+        contextualToolSuppressionBlocksFamily(contextualSuppression, family),
+      )
+    );
+  if (contextualSuppressionBlocksSelectedTarget && contextualSuppression) {
     return {
       schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
       turn_id: input.turnId,
@@ -124,10 +195,6 @@ export function buildToolCallAdmissionDecision(input: {
     };
   }
 
-  const effectiveSourceTarget =
-    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
-      ? "internet_search"
-      : sourceTarget;
   let required = HARD_SOURCE_TARGETS.has(effectiveSourceTarget);
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];
   let extraForbiddenTerminalKinds: string[] = [];
@@ -273,10 +340,15 @@ export function buildToolCallAdmissionDecision(input: {
     ];
     reason = "workspace_diagnostic_requires_workspace_os_status_tool_path";
   } else if (sourceTarget === "workspace_panel" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_action") {
-    admittedToolFamilies = ["workstation_action"];
+    const workspacePanelFamilies = sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent);
+    admittedToolFamilies = workspacePanelFamilies.includes("theory_locator")
+      ? ["theory_locator"]
+      : ["workstation_action"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "active_doc_summary", "doc_open_best", "model_only_concept", "no_tool_direct"];
-    reason = "workspace_panel_requires_workstation_action_path";
+    reason = workspacePanelFamilies.includes("theory_locator")
+      ? "theory_locator_requires_readonly_locator_path"
+      : "workspace_panel_requires_workstation_action_path";
   } else if (sourceTarget === "calculator_stream") {
     admittedToolFamilies = ["calculator", "workstation_action"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept", "direct_answer_text"];
@@ -382,6 +454,7 @@ export function buildToolCallAdmissionDecision(input: {
     forbidden_tool_families: unique([
       ...operationalFields.forbidden_tool_families,
       ...extraForbiddenToolFamilies,
+      ...contextualForbiddenToolFamilies(contextualSuppression),
     ]),
     required_surface: operationalFields.required_surface,
     reason,

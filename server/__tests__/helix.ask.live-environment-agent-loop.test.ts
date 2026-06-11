@@ -140,6 +140,10 @@ describe("Helix Ask live environment agent loop", () => {
         text: "I am checking the live environment evidence now.",
         evidence_refs: ["tool_call:query_event_log"],
         reason_codes: ["tool_progress"],
+        route_metadata: {
+          wakeRequestId: "stage_play_mail_wake:test-voice",
+          askTurnId: "ask:test-voice",
+        },
       },
     });
 
@@ -153,6 +157,16 @@ describe("Helix Ask live environment agent loop", () => {
       ask_instruction_authority: "none",
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
+    });
+    const voicePayload = observation.observation as any;
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      voicePayload.request.requestId,
+      voicePayload.receipt.receiptId,
+    ]));
+    expect(observation.artifactRefs).toMatchObject({
+      voiceReceiptIds: expect.arrayContaining([voicePayload.receipt.receiptId]),
+      wakeRequestId: "stage_play_mail_wake:test-voice",
+      askTurnId: "ask:test-voice",
     });
     expect(observation.observation).toMatchObject({
       schema: "helix.interim_voice_callout_tool_result.v1",

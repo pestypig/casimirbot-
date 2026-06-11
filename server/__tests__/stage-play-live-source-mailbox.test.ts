@@ -2259,6 +2259,54 @@ describe("Stage Play live-source mailbox", () => {
     );
   });
 
+  it("passes structured live-source mailbox route metadata to Ask wake launches", async () => {
+    seedVisualEvidence();
+    let capturedRouteMetadata: Record<string, unknown> | null = null;
+
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:00:47.000Z",
+      askTurnRunner: async (input) => {
+        capturedRouteMetadata = input.routeMetadata ?? null;
+        return {
+          turn_id: "ask:wake-route-metadata",
+          current_turn_artifact_ledger: [
+            {
+              kind: "live_environment_tool_observation",
+              payload: {
+                tool_name: "live_env.record_live_source_mail_decision",
+                observation: {
+                  artifactId: "stage_play_live_source_mail_decision",
+                  decisionId: "stage_play_live_source_mail_decision:wake-route-metadata",
+                },
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    expect(result?.askTurnId).toBe("ask:wake-route-metadata");
+    expect(capturedRouteMetadata).toMatchObject({
+      invocationKind: "stage_play_mail_wake",
+      sourceTarget: "live_source_mailbox",
+      mailboxThreadId: threadId,
+      requiredCanonicalGoal: "processed_mail_interpretation",
+      requiredPhase: "record_interpretation",
+      mandatoryNextTool: "live_env.record_live_source_mail_decision",
+    });
+    expect(capturedRouteMetadata?.wakeRequestId).toMatch(/^stage_play_live_source_mail_wake:/);
+    expect(capturedRouteMetadata?.allowedCapabilities).toEqual(expect.arrayContaining([
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ]));
+    expect(capturedRouteMetadata?.forbiddenCapabilities).toEqual(expect.arrayContaining([
+      "workspace_os.status",
+      "internet-search.search_web",
+    ]));
+  });
+
   it("defers 503 wake failures for retry without recording a mail decision", async () => {
     seedVisualEvidence();
 

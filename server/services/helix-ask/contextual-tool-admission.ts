@@ -13,6 +13,16 @@ export type HelixContextualToolAdmissionSuppression = {
   text: string;
 };
 
+export type HelixContextualToolSuppressionFamily =
+  | "docs_viewer"
+  | "scholarly_research"
+  | "internet_search"
+  | "theory_locator"
+  | "workstation_action"
+  | "notes"
+  | "repo_code"
+  | "live_environment";
+
 const DOCS_VIEWER_CUE_RE = /\bdocs?\s+viewer\b|\bdocuments?\s+viewer\b|\bdocs?\s+panel\b|\bdocuments?\s+panel\b/i;
 const DOCS_VIEWER_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load)\b[\s\S]{0,100}(?:the\s+|a\s+)?(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)\b/i;
 const DOCS_VIEWER_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
@@ -23,15 +33,55 @@ const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|wh
 const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
 const REWRITE_ONLY_CURRENT_TEXT_RE = /\b(?:do\s+not|don't|dont|without|no)\s+(?:browse|browsing|search(?:ing)?|web|internet|look\s*up|lookup|google|check\s+online)\b[\s\S]{0,160}\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b|\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b[\s\S]{0,160}\b(?:this|the)\s+(?:paragraph|passage|prompt|text|quote)\b[\s\S]{0,120}\b(?:about\s+(?:current|recent|latest)|current\s+events?|ongoing\s+(?:conflict|war|crisis))/i;
+const NEGATED_MUTATING_WRITE_CLAUSE_RE =
+  /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[^.!?;\n]{0,180}/gi;
+const MUTATING_WRITE_TARGET_RE =
+  /\b(?:write|create|edit|modify|save|append|update|delete|remove|commit|stage)\b[\s\S]{0,80}\b(?:files?|notes?|docs?|documents?|repo|repository|workspace|disk)\b/i;
+const EXTERNAL_READONLY_TOOL_RE =
+  /\b(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online|do\s+research|research|retrieve|fetch|query|resolve|collect|cite|citations?|sources?|papers?|doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall)\b/i;
+const MUTATING_WRITE_NEGATION_RE =
+  /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\s+(?:write|create|edit|modify|save|append|update|delete|remove|commit|stage)\s+(?:any\s+)?(?:files?|notes?|docs?|documents?|repo|repository|workspace|disk)\b/gi;
+
+const stripWriteOnlyNegationsForExternalToolMatching = (prompt: string): string =>
+  prompt.replace(MUTATING_WRITE_NEGATION_RE, " ").replace(NEGATED_MUTATING_WRITE_CLAUSE_RE, (clause) => {
+    if (!MUTATING_WRITE_TARGET_RE.test(clause)) return clause;
+    if (EXTERNAL_READONLY_TOOL_RE.test(clause)) return clause;
+    return " ";
+  });
 
 const scholarlyVerbOrCue = (text: string): string =>
   /\b(?:pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b/i.test(text)
     ? "scholarly-research.fetch_full_text"
     : "scholarly-research.lookup_papers";
 
+export function contextualToolSuppressionBlocksFamily(
+  suppression: HelixContextualToolAdmissionSuppression | null | undefined,
+  family: HelixContextualToolSuppressionFamily | string,
+): boolean {
+  if (!suppression) return false;
+  const cue = suppression.verb_or_cue;
+  if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue);
+  if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
+  if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
+  if (family === "theory_locator") return /theory|locator|badge|graph|reflection/i.test(cue);
+  if (family === "workstation_action" || family === "notes") return /workstation|workspace|note|write|file/i.test(cue);
+  if (family === "repo_code") return /repo|code/i.test(cue);
+  if (family === "live_environment") return /live|stage_play/i.test(cue);
+  return false;
+}
+
 export function detectContextualToolAdmissionSuppression(promptText: string): HelixContextualToolAdmissionSuppression | null {
   const prompt = promptText.trim();
-  if (!prompt || (!DOCS_VIEWER_CUE_RE.test(prompt) && !SCHOLARLY_CUE_RE.test(prompt) && !INTERNET_SEARCH_CUE_RE.test(prompt))) return null;
+  if (
+    !prompt ||
+    (
+      !DOCS_VIEWER_CUE_RE.test(prompt) &&
+      !SCHOLARLY_CUE_RE.test(prompt) &&
+      !INTERNET_SEARCH_CUE_RE.test(prompt) &&
+      !MUTATING_WRITE_NEGATION_RE.test(prompt)
+    )
+  ) return null;
+  MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
 
   const quoted = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
   if (quoted) {
@@ -79,7 +129,17 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: negated,
     };
   }
-  const negatedScholarly = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
+  const negatedMutatingWrite = prompt.match(MUTATING_WRITE_NEGATION_RE)?.[0];
+  if (negatedMutatingWrite) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "workstation.write_file",
+      text: negatedMutatingWrite,
+    };
+  }
+  const promptForExternalNegation = stripWriteOnlyNegationsForExternalToolMatching(prompt);
+  const negatedScholarly = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to)\b[\s\S]{0,120}(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?|10\.\d{4,9}\/[-._;()/:A-Z0-9]+)\b/i)?.[0];
   if (negatedScholarly) {
     return {
       tool_admission_suppressed: true,
@@ -88,13 +148,13 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: negatedScholarly,
     };
   }
-  const negatedInternet = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[\s\S]{0,120}(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online)\b/i)?.[0];
-  if (negatedInternet || REWRITE_ONLY_CURRENT_TEXT_RE.test(prompt)) {
+  const negatedInternet = promptForExternalNegation.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[\s\S]{0,120}(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online)\b/i)?.[0];
+  if (negatedInternet || REWRITE_ONLY_CURRENT_TEXT_RE.test(promptForExternalNegation)) {
     return {
       tool_admission_suppressed: true,
       suppression_reason: "negated_tool_instruction",
       verb_or_cue: "internet_search.web_research",
-      text: negatedInternet ?? prompt.match(REWRITE_ONLY_CURRENT_TEXT_RE)?.[0] ?? "rewrite-only current-affairs prompt",
+      text: negatedInternet ?? promptForExternalNegation.match(REWRITE_ONLY_CURRENT_TEXT_RE)?.[0] ?? "rewrite-only current-affairs prompt",
     };
   }
   const hypothetical = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,100}(?:I|we|you)?\s*(?:opened?|open|show|view|pull\s+up|bring\s+up)\b[\s\S]{0,100}(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)\b/i)?.[0];

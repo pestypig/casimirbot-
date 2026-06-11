@@ -253,6 +253,38 @@ const hasObservedScholarlyFullText = (artifacts: ArtifactLike[]): boolean =>
     );
   });
 
+const isInternetSearchObservation = (artifact: ArtifactLike): boolean =>
+  /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "));
+
+const isTheoryLocatorObservation = (artifact: ArtifactLike): boolean =>
+  artifactMatchesObservationKind(artifact, /helix_theory_context_reflection_tool_receipt|theory_context_reflection/i);
+
+const isItineraryFamilyObserved = (family: string, artifacts: ArtifactLike[]): boolean => {
+  if (family === "scholarly_research") return artifacts.some(isScholarlyResearchObservation);
+  if (family === "internet_search") return artifacts.some(isInternetSearchObservation);
+  if (family === "theory_locator") return artifacts.some(isTheoryLocatorObservation);
+  if (family === "repo_code") return artifacts.some((artifact) => /repo_code_evidence_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
+  if (family === "docs_viewer") return artifacts.some((artifact) => /doc_|docs_viewer/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
+  if (family === "live_environment") return artifacts.some((artifact) => artifactKind(artifact) === "live_environment_tool_observation");
+  if (family === "workstation_action" || family === "notes") {
+    return artifacts.some((artifact) => /workspace_action_receipt|note_update_receipt|workstation_tool_evaluation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
+  }
+  return artifacts.some((artifact) => artifactMatchesObservationKind(artifact, new RegExp(family.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")));
+};
+
+const missingItineraryObservationFamilies = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): string[] => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  if (terminalCriteria?.requires_post_observation_synthesis !== true) return [];
+  const requiredFamilies = readArray(terminalCriteria.required_observation_families)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  return requiredFamilies.filter((family) => !isItineraryFamilyObserved(family, artifacts));
+};
+
 type ScholarlyCitation = {
   label: string;
   url: string;
@@ -621,6 +653,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     artifactLedger: artifacts,
     routeProductContract: readRecord(input.payload.route_product_contract),
   });
+  const missingItineraryFamilies = missingItineraryObservationFamilies(input.payload, artifacts);
+  const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
   const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;
   const latestDraftCandidateForStaleCheck = findLatestFinalAnswerDraftCandidate(artifacts);
@@ -629,7 +663,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
     hasAcceptedObservation &&
     isStaleModelOnlyNoObservationText(latestDraftCandidateForStaleCheck?.text);
   const usableDraftMaterialization =
-    draftMaterialization?.ok === true && !materializedDraftRejectedForStaleObservation;
+    draftMaterialization?.ok === true &&
+    !materializedDraftRejectedForStaleObservation &&
+    itineraryObservationCriteriaSatisfied;
   if (draftMaterialization) {
     input.payload.final_answer_draft_selection = {
       candidate_count: artifacts.filter(isFinalAnswerDraft).length,
@@ -646,6 +682,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
           : null,
       blocked_reason: materializedDraftRejectedForStaleObservation
         ? "composer_claimed_no_observations_but_receipts_exist"
+        : !itineraryObservationCriteriaSatisfied
+          ? "capability_itinerary_observations_missing"
         : draftMaterialization.blocked_reason ?? null,
     };
     input.payload.route_terminal_materialization = {
@@ -656,6 +694,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materialization_attempted: true,
       materialization_ok: usableDraftMaterialization,
       materialization_blocked_reason: draftMaterialization.blocked_reason ?? null,
+      capability_itinerary_observation_missing_families: missingItineraryFamilies,
       stale_model_only_blocked_reason: materializedDraftRejectedForStaleObservation
         ? "composer_claimed_no_observations_but_receipts_exist"
         : null,
@@ -723,7 +762,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedDraftCandidate = findSelectedDraftAfterRequiredObservation(artifacts);
   const selectedDraftRejectedForStaleObservation =
     Boolean(selectedDraftCandidate && hasAcceptedObservation && isStaleModelOnlyNoObservationText(artifactText(selectedDraftCandidate.artifact)));
-  if (selectedDraftCandidate && selectedDraftRejectedForStaleObservation && !materializedDraftRejectedForStaleObservation) {
+  if (selectedDraftCandidate && !itineraryObservationCriteriaSatisfied) {
+    rejectedCandidates.push({
+      ref: artifactId(selectedDraftCandidate.artifact) ?? undefined,
+      kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "missing_required_observation",
+    });
+  } else if (selectedDraftCandidate && selectedDraftRejectedForStaleObservation && !materializedDraftRejectedForStaleObservation) {
     rejectedCandidates.push({
       ref: artifactId(selectedDraftCandidate.artifact) ?? undefined,
       kind: "model_synthesized_answer",
@@ -731,7 +777,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       reason: "composer_claimed_no_observations_but_receipts_exist",
     });
   }
-  const selectedDraft = selectedDraftRejectedForStaleObservation ? null : selectedDraftCandidate;
+  const selectedDraft =
+    selectedDraftRejectedForStaleObservation || !itineraryObservationCriteriaSatisfied
+      ? null
+      : selectedDraftCandidate;
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
@@ -753,6 +802,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     routeContractRequiresInternetSearchAnswer(input.payload) &&
     artifacts.some((artifact) => /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
 
+  if (draftMaterialization?.ok === true && !itineraryObservationCriteriaSatisfied) {
+    rejectedCandidates.push({
+      ref: draftMaterialization.materialized_terminal_artifact_ref ?? draftMaterialization.final_answer_draft_ref ?? undefined,
+      kind: draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "missing_required_observation",
+    });
+  }
   if (selectedDraft && !routeAllowsModelSynthesizedAnswer && draftMaterialization?.ok !== true) {
     rejectedCandidates.push({
       ref: artifactId(selectedDraft.artifact) ?? undefined,
@@ -827,7 +884,30 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (!solverContinuationPending && selectedLiveEnvironmentBindingDiagnosis) {
+  if (!solverContinuationPending && !itineraryObservationCriteriaSatisfied) {
+    const terminalErrorCode = "capability_itinerary_observations_missing";
+    const terminalErrorText = `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
+      missing_itinerary_observation_families: missingItineraryFamilies,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+  } else if (!solverContinuationPending && selectedLiveEnvironmentBindingDiagnosis) {
     selectedArtifactRef = selectedLiveEnvironmentBindingDiagnosis.ref;
     selectedArtifactKind = selectedLiveEnvironmentBindingDiagnosis.kind;
     selectedSource = "live_environment_binding_diagnosis";
@@ -1042,15 +1122,25 @@ export function applyHelixTerminalAuthoritySingleWriter(
     return Boolean(text && text === visibleText);
   });
   const wroteVisibleFields = [...VISIBLE_ANSWER_FIELDS];
-  const selectedTerminalArtifactKind = selectedArtifactKind ?? (
-    appliedEnvelope.terminal_artifact_kind === "typed_failure"
+  const envelopeTerminalKind =
+    appliedEnvelope.terminal_artifact_kind === "typed_failure" ||
+    appliedEnvelope.final_answer_source === "typed_failure" ||
+    appliedEnvelope.terminal_artifact_kind === "request_user_input" ||
+    appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
+      ? appliedEnvelope.terminal_artifact_kind
+      : null;
+  const selectedTerminalArtifactKind = envelopeTerminalKind ?? selectedArtifactKind ?? null;
+  const resultSource =
+    appliedEnvelope.terminal_artifact_kind === "typed_failure" ||
+    appliedEnvelope.final_answer_source === "typed_failure"
       ? "typed_failure"
       : appliedEnvelope.terminal_artifact_kind === "request_user_input"
         ? "request_user_input"
         : appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
           ? "direct_answer_text"
-          : null
-  );
+          : selectedSource === "terminal_authority_repair_failure"
+            ? selectedSource
+            : selectedSource;
   const selectedArtifactRefForResult =
     selectedTerminalArtifactKind &&
     selectedTerminalArtifactKind !== "typed_failure" &&
@@ -1082,13 +1172,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selected_terminal_artifact_kind: selectedTerminalArtifactKind,
     visible_text: visibleText,
     assistant_answer: false,
-    source: selectedSource === "terminal_authority_repair_failure"
-      ? appliedEnvelope.final_answer_source === "typed_failure"
-        ? "typed_failure"
-        : appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
-          ? "direct_answer_text"
-          : selectedSource
-      : selectedSource,
+    source: resultSource,
     rejected_candidates: rejectedCandidates,
     writes: {
       payload_text: visibleText,

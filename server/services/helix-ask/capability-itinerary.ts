@@ -11,7 +11,10 @@ import {
   HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 
@@ -53,9 +56,8 @@ const theoryLocatorRequested = (promptText: string): boolean =>
 
 const requestedResearchFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
   const suppression = detectContextualToolAdmissionSuppression(promptText);
-  const suppressedCue = suppression?.verb_or_cue ?? "";
-  const scholarlySuppressed = /scholarly|research|doi|arxiv/i.test(suppressedCue);
-  const internetSuppressed = /internet|web|search/i.test(suppressedCue);
+  const scholarlySuppressed = contextualToolSuppressionBlocksFamily(suppression, "scholarly_research");
+  const internetSuppressed = contextualToolSuppressionBlocksFamily(suppression, "internet_search");
   const scholarlyIntent = detectScholarlyResearchIntent(promptText);
   const internetIntent = detectInternetSearchIntent(promptText);
   const restatement = buildToolUseRestatement(promptText);

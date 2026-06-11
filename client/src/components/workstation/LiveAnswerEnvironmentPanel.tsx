@@ -407,7 +407,9 @@ const visualShadeSubjectCategory = (profile: StagePlayVisualObserverProfileV1): 
 };
 
 const visualShadeOptionLabel = (profile: StagePlayVisualObserverProfileV1): string =>
-  profile.subject?.trim() ? `${profile.title} - ${profile.subject.trim()}` : profile.title;
+  profile.subject?.trim() && profile.subject.trim() !== profile.title
+    ? `${profile.title} - ${profile.subject.trim()}`
+    : profile.title;
 
 const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV1[], activeProfile?: StagePlayVisualObserverProfileV1 | null): string => {
   if (activeProfile && profiles.some((profile) => profile.profileId === activeProfile.profileId)) return activeProfile.profileId;
@@ -415,6 +417,54 @@ const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV
     profiles.find((profile) => profile.profileId === "stage_play_visual_observer_profile:generic:v1")?.profileId ??
     profiles[0]?.profileId ??
     "";
+};
+
+const visualShadeCustomSlot = (profile: StagePlayVisualObserverProfileV1): number | null => {
+  if (visualShadeSubjectCategory(profile) !== "Custom") return null;
+  const match = `${profile.title} ${profile.subject ?? ""}`.match(/\bCustom\s+(\d+)\b/i);
+  if (!match) return null;
+  const slot = Number(match[1]);
+  return Number.isFinite(slot) && slot > 0 ? slot : null;
+};
+
+const nextVisualShadeCustomSlot = (profiles: StagePlayVisualObserverProfileV1[]): number => {
+  const slots = profiles
+    .map(visualShadeCustomSlot)
+    .filter((slot): slot is number => typeof slot === "number");
+  return slots.length > 0 ? Math.max(...slots) + 1 : 1;
+};
+
+const buildSessionVisualObserverProfile = (input: {
+  slot: number;
+  prompt: string;
+  baseProfile?: StagePlayVisualObserverProfileV1 | null;
+}): StagePlayVisualObserverProfileV1 => {
+  const now = new Date().toISOString();
+  const title = `Custom ${input.slot}`;
+  return {
+    artifactId: "stage_play_visual_observer_profile",
+    schemaVersion: "stage_play_visual_observer_profile/v1",
+    profileId: `stage_play_visual_observer_profile:session-custom-${input.slot}:${Date.now().toString(36)}`,
+    title,
+    domain: "custom",
+    subjectCategory: "Custom",
+    subject: title,
+    sourceIds: [],
+    prompt: input.prompt,
+    outputMode: input.baseProfile?.outputMode ?? "semi_structured_json",
+    expectedSchema: input.baseProfile?.expectedSchema ?? null,
+    cadenceHintMs: input.baseProfile?.cadenceHintMs ?? null,
+    status: "active",
+    linkedInterpreterProfileId: null,
+    linkedWatchJobPolicyId: null,
+    linkedNoteId: null,
+    promptHash: `session-${now}`,
+    createdAt: now,
+    updatedAt: now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  };
 };
 
 const docEquationScopeLabel = (artifact: DocEquationContextArtifactV1): string => {
@@ -496,8 +546,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [planExecutions, setPlanExecutions] = useState<LivePlanContractExecutionRead[]>([]);
   const [visualLatest, setVisualLatest] = useState<VisualLatestRead | null>(null);
   const [visualObserverProfiles, setVisualObserverProfiles] = useState<StagePlayVisualObserverProfileV1[]>([]);
+  const [sessionVisualObserverProfiles, setSessionVisualObserverProfiles] = useState<StagePlayVisualObserverProfileV1[]>([]);
   const [activeVisualObserverProfile, setActiveVisualObserverProfile] = useState<StagePlayVisualObserverProfileV1 | null>(null);
   const [selectedVisualObserverProfileId, setSelectedVisualObserverProfileId] = useState<string>("");
+  const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
+  const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -652,10 +705,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     [sourceHealthEntries],
   );
   const visualEvidenceHealth = visualLatest?.visual_evidence_health ?? null;
-  const visualShadeProfiles = useMemo(
-    () => visualObserverProfiles.filter((profile: StagePlayVisualObserverProfileV1) => profile.status === "active"),
-    [visualObserverProfiles],
-  );
+  const visualShadeProfiles = useMemo(() => {
+    const serverProfileIds = new Set(visualObserverProfiles.map((profile: StagePlayVisualObserverProfileV1) => profile.profileId));
+    return [
+      ...visualObserverProfiles,
+      ...sessionVisualObserverProfiles.filter((profile: StagePlayVisualObserverProfileV1) => !serverProfileIds.has(profile.profileId)),
+    ].filter((profile: StagePlayVisualObserverProfileV1) => profile.status === "active");
+  }, [sessionVisualObserverProfiles, visualObserverProfiles]);
   const selectedVisualObserverProfile = useMemo(
     () => visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === selectedVisualObserverProfileId) ??
       visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) => profile.profileId === preferredVisualShadeProfileId(visualShadeProfiles, activeVisualObserverProfile)) ??
@@ -671,7 +727,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     return Array.from(groups.entries())
       .map(([category, profiles]) => ({
         category,
-        profiles: profiles.sort((left, right) => left.title.localeCompare(right.title)),
+        profiles: profiles.sort((left, right) => {
+          const leftSlot = visualShadeCustomSlot(left);
+          const rightSlot = visualShadeCustomSlot(right);
+          if (leftSlot && rightSlot) return leftSlot - rightSlot;
+          if (leftSlot) return -1;
+          if (rightSlot) return 1;
+          return left.title.localeCompare(right.title);
+        }),
       }))
       .sort((left, right) => left.category.localeCompare(right.category));
   }, [visualShadeProfiles]);
@@ -688,6 +751,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const visualShadeStatus = activeVisualObserverProfile
     ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
     : "Generic visual capture prompt is active until a shade is applied.";
+  const visualShadePromptChanged = Boolean(
+    visualShadePromptDraft.trim() &&
+      selectedVisualObserverProfile &&
+      visualShadePromptDraft.trim() !== selectedVisualObserverProfile.prompt.trim(),
+  );
   const latestClientAction = useMemo(() => clientActions.at(-1) ?? null, [clientActions]);
   const latestClientAdoption = useMemo(() => clientAdoptions.at(-1) ?? null, [clientAdoptions]);
   const latestClientObserved = latestClientAdoption?.observed_state ?? {};
@@ -863,6 +931,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const preferred = preferredVisualShadeProfileId(visualShadeProfiles, activeVisualObserverProfile);
     if (preferred) setSelectedVisualObserverProfileId(preferred);
   }, [activeVisualObserverProfile, selectedVisualObserverProfileId, visualShadeProfiles]);
+
+  useEffect(() => {
+    if (!selectedVisualObserverProfile) return;
+    if (visualShadePromptBaseProfileId === selectedVisualObserverProfile.profileId) return;
+    setVisualShadePromptDraft(selectedVisualObserverProfile.prompt);
+    setVisualShadePromptBaseProfileId(selectedVisualObserverProfile.profileId);
+  }, [selectedVisualObserverProfile, visualShadePromptBaseProfileId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1145,6 +1220,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setLastActionStatus("Visual observer shade preset is not available.");
       return;
     }
+    if (profile.profileId.includes(":session-custom-")) {
+      setLastActionStatus("This custom shade is saved only in this panel session. Use Save As to create a profile before applying it to visual capture.");
+      return;
+    }
     try {
       const source = await ensureVisualSourceRegistered();
       const response = await postJson("/api/helix/stage-play/visual-observer-profile/apply", {
@@ -1156,6 +1235,44 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       await refresh();
     } catch (error) {
       setLastActionStatus(error instanceof Error ? error.message : "visual_observer_profile_apply_failed");
+    }
+  };
+
+  const saveVisualObserverPromptAsCustom = async () => {
+    const prompt = visualShadePromptDraft.trim();
+    if (!prompt) {
+      setLastActionStatus("Custom shade prompt cannot be empty.");
+      return;
+    }
+    const slot = nextVisualShadeCustomSlot(visualShadeProfiles);
+    const title = `Custom ${slot}`;
+    try {
+      const response = await postJson("/api/helix/stage-play/visual-observer-profile", {
+        title,
+        domain: "custom",
+        subjectCategory: "Custom",
+        subject: title,
+        prompt,
+        outputMode: selectedVisualObserverProfile?.outputMode ?? "semi_structured_json",
+      });
+      const profile = response?.profile as StagePlayVisualObserverProfileV1 | undefined;
+      if (!profile?.profileId) throw new Error("custom_visual_observer_profile_save_missing_profile");
+      setSelectedVisualObserverProfileId(profile.profileId);
+      setVisualShadePromptDraft(profile.prompt);
+      setVisualShadePromptBaseProfileId(profile.profileId);
+      setLastActionStatus(`${profile.title} saved as a custom shade. Apply it when you want future visual frames to use this observer prompt.`);
+      await refresh();
+    } catch (error) {
+      const sessionProfile = buildSessionVisualObserverProfile({
+        slot,
+        prompt,
+        baseProfile: selectedVisualObserverProfile,
+      });
+      setSessionVisualObserverProfiles((current: StagePlayVisualObserverProfileV1[]) => [...current, sessionProfile]);
+      setSelectedVisualObserverProfileId(sessionProfile.profileId);
+      setVisualShadePromptDraft(sessionProfile.prompt);
+      setVisualShadePromptBaseProfileId(sessionProfile.profileId);
+      setLastActionStatus(`Saved ${sessionProfile.title} in this panel session only. Profile save failed: ${error instanceof Error ? error.message : "custom_visual_observer_profile_save_failed"}`);
     }
   };
 
@@ -1679,10 +1796,35 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               Selected subject: {visualShadeSubjectCategory(selectedVisualObserverProfile)} / {selectedVisualObserverProfile.subject}
             </p>
           ) : null}
-          {activeVisualObserverProfile?.prompt ? (
-            <p className="mt-2 line-clamp-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] leading-5 text-slate-300">
-              {activeVisualObserverProfile.prompt}
-            </p>
+          {selectedVisualObserverProfile ? (
+            <div className="mt-2 space-y-2">
+              <label className="text-[10px] font-semibold uppercase text-slate-400" htmlFor="visual-observer-shade-prompt">
+                Visual capture prompt
+              </label>
+              <textarea
+                id="visual-observer-shade-prompt"
+                aria-label="Visual observer shade prompt"
+                value={visualShadePromptDraft}
+                onChange={(event) => setVisualShadePromptDraft(event.currentTarget.value)}
+                className="h-44 w-full resize-y rounded border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-[11px] leading-5 text-slate-200 outline-none placeholder:text-slate-600 focus:border-violet-300/50"
+                placeholder="Select a shade to view or customize its prompt."
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] text-slate-500">
+                  Presets are read-only. Edits save as the next Custom slot.
+                </p>
+                {visualShadePromptChanged ? (
+                  <button
+                    type="button"
+                    aria-label="Save visual observer shade prompt as custom"
+                    onClick={() => void saveVisualObserverPromptAsCustom()}
+                    className="rounded border border-emerald-300/35 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-400/10"
+                  >
+                    Save As
+                  </button>
+                ) : null}
+              </div>
+            </div>
           ) : null}
         </div>
         {visualLatest?.evidence?.summary ? (

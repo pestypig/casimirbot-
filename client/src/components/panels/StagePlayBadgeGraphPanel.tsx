@@ -379,6 +379,18 @@ type StagePlayTrafficDetail = {
   evidenceRefs: string[];
 };
 
+type StagePlayFlowQueueRow = {
+  key: string;
+  label: string;
+  from: string;
+  to: string;
+  count: number;
+  bytes: number;
+  ageMs: number | null;
+  status: string;
+  tone: StagePlayJourneyState;
+};
+
 type StagePlayMailJourneyReasonerRow = {
   role: StagePlayMicroReasonerRoleV1;
   run: StagePlayMicroReasonerRunV1 | null;
@@ -1827,9 +1839,73 @@ function StagePlayMicroReasonerDeckColumn({
   );
 }
 
+function StagePlayFlowQueueColumn({
+  rows,
+  deckRuntimeLabel,
+  combinedRuntimeTone,
+}: {
+  rows: StagePlayFlowQueueRow[];
+  deckRuntimeLabel: string;
+  combinedRuntimeTone: "good" | "warn" | "blocked" | "default";
+}) {
+  const totalCount = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalBytes = rows.reduce((sum, row) => sum + row.bytes, 0);
+  return (
+    <div className="rounded-md border border-slate-800 bg-slate-950/70 p-3" data-testid="stage-play-mail-loop-queue-traffic">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Queues / traffic</div>
+          <div className="mt-0.5 text-xs text-slate-400">connections, backlog, age, and payload volume</div>
+        </div>
+        <span
+          className={`rounded border px-2 py-1 font-mono text-[10px] ${
+            combinedRuntimeTone === "blocked"
+              ? "border-rose-800 text-rose-100"
+              : combinedRuntimeTone === "warn"
+                ? "border-amber-800 text-amber-100"
+                : "border-slate-700 text-slate-300"
+          }`}
+        >
+          {deckRuntimeLabel}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {rows.map((row) => (
+          <div key={row.key} className={`rounded border px-2.5 py-2 ${stagePlayJourneyStationTone(row.tone)}`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="truncate text-[11px] font-semibold">{row.label}</div>
+              <div className="font-mono text-[9px] opacity-70">{row.count} item{row.count === 1 ? "" : "s"}</div>
+            </div>
+            <div className="mt-1 flex items-center gap-2 font-mono text-[9px] opacity-70">
+              <span className="truncate">{row.from}</span>
+              <span aria-hidden="true">-&gt;</span>
+              <span className="truncate">{row.to}</span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1 font-mono text-[9px]">
+              <span className="rounded border border-current/15 px-1.5 py-1 opacity-80">{formatStagePlayCount(row.bytes)}</span>
+              <span className="rounded border border-current/15 px-1.5 py-1 opacity-80">{formatStagePlayMs(row.ageMs)}</span>
+              <span className="truncate rounded border border-current/15 px-1.5 py-1 opacity-80">{row.status}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">traffic</div>
+          <div className="mt-0.5 font-mono text-[10px] text-slate-200">{totalCount} payload{totalCount === 1 ? "" : "s"}</div>
+        </div>
+        <div className="rounded border border-slate-800 bg-black/20 px-2 py-1.5">
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">volume</div>
+          <div className="mt-0.5 font-mono text-[10px] text-slate-200">{formatStagePlayCount(totalBytes)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StagePlayMailJourneyRail({
   stations,
-  deckRows,
+  queueRows,
   latestSummary,
   mailAgeMs,
   payloadChars,
@@ -1841,7 +1917,7 @@ function StagePlayMailJourneyRail({
   onSelectPayload,
 }: {
   stations: StagePlayMailJourneyStation[];
-  deckRows: StagePlayMailJourneyReasonerRow[];
+  queueRows: StagePlayFlowQueueRow[];
   latestSummary: string;
   mailAgeMs: number | null;
   payloadChars: number;
@@ -1938,8 +2014,8 @@ function StagePlayMailJourneyRail({
             ))}
           </div>
         </div>
-        <StagePlayMicroReasonerDeckColumn
-          rows={deckRows}
+        <StagePlayFlowQueueColumn
+          rows={queueRows}
           deckRuntimeLabel={deckRuntimeLabel}
           combinedRuntimeTone={combinedRuntimeTone}
         />
@@ -1989,6 +2065,23 @@ function StagePlaySelectedTrafficDetail({ detail }: { detail: StagePlayTrafficDe
             {detail.summary}
           </div>
           <div className="mt-2 font-mono text-[10px] text-slate-500">{detail.meta}</div>
+          <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-2" data-testid="stage-play-selected-mail-lineage">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Trace lineage</div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-[9px] text-slate-300">
+              {[detail.id, ...detail.evidenceRefs.slice(0, 5)].map((ref, index) => (
+                <React.Fragment key={`${detail.id}:lineage:${ref}:${index}`}>
+                  {index > 0 ? <span className="text-slate-600" aria-hidden="true">-&gt;</span> : null}
+                  <span className={`max-w-[12rem] truncate rounded border px-1.5 py-0.5 ${
+                    index === 0
+                      ? "border-cyan-700 bg-cyan-950/35 text-cyan-100"
+                      : "border-slate-800 bg-black/20 text-slate-400"
+                  }`}>
+                    {ref}
+                  </span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
         </div>
         <div className="space-y-2">
           {detail.rows.slice(0, 8).map((row) => (
@@ -3997,6 +4090,81 @@ function StagePlayMailLoopLiveOverview({
       display: MICRO_REASONER_DISPLAY[role],
     };
   });
+  const askHandoffCount = wakeRequests.filter((wake) => wake.askTurnId || wake.status === "running").length;
+  const queueRows: StagePlayFlowQueueRow[] = [
+    {
+      key: "capture-shade",
+      label: "visual capture queue",
+      from: "source",
+      to: "shade mail",
+      count: mailItems.length,
+      bytes: latestMail?.summary.text.length ?? 0,
+      ageMs: mailAgeMs,
+      status: latestMail ? labelize(latestMail.status) : "pending",
+      tone: latestMail ? "done" : captureStateTone === "blocked" ? "blocked" : "pending",
+    },
+    {
+      key: "shade-deck",
+      label: "reasoner input queue",
+      from: "shade mail",
+      to: "micro deck",
+      count: latestPacketRuns.length || runs.length,
+      bytes: runChars,
+      ageMs: latestPacket ? packetAgeMs : mailAgeMs,
+      status: latestPacketRuns.length || runs.length ? "binding" : "waiting",
+      tone: latestPacketRuns.some((run) => run.status === "failed") ? "blocked" : latestPacketRuns.length || runs.length ? "active" : "pending",
+    },
+    {
+      key: "deck-packet",
+      label: "packet output queue",
+      from: "micro deck",
+      to: "packet",
+      count: packets.length,
+      bytes: packetChars,
+      ageMs: packetAgeMs,
+      status: latestPacket ? labelize(latestPacket.recommendedNext) : "not processed",
+      tone: latestPacket ? latestPacket.arbiter?.wakeAsk ? "active" : "done" : "pending",
+    },
+    {
+      key: "packet-wake",
+      label: "wake admission queue",
+      from: "packet",
+      to: "wake",
+      count: wakeRequests.length,
+      bytes: compactPacketChars,
+      ageMs: latestWake ? Date.now() - new Date(latestWake.updatedAt).getTime() : null,
+      status: labelize(wakeLifecycleStage ?? wakeStatus),
+      tone: stagePlayWakeLifecycleTone(wakeLifecycleStage, wakeStatus) === "blocked" ? "blocked" : latestWake ? "active" : "pending",
+    },
+    {
+      key: "wake-ask",
+      label: "Ask handoff queue",
+      from: "wake",
+      to: "Ask",
+      count: askHandoffCount,
+      bytes: currentAskTurnId ? currentAskTurnId.length : 0,
+      ageMs: currentWakeForOperator ? Date.now() - new Date(currentWakeForOperator.updatedAt).getTime() : null,
+      status: blockedBeforeAsk ? "blocked before Ask" : currentAskTurnId ? "entered" : "waiting",
+      tone: blockedBeforeAsk ? "blocked" : currentAskTurnId ? "done" : liveOverviewPendingWake ? "active" : "pending",
+    },
+    {
+      key: "ask-output",
+      label: "decision / voice queue",
+      from: "Ask",
+      to: "operator",
+      count: wakeResults.length,
+      bytes: voiceCheckpointRefs.join("").length,
+      ageMs: currentWakeResultForOperator ? Date.now() - new Date(currentWakeResultForOperator.createdAt).getTime() : null,
+      status: voiceStatusLabel,
+      tone: currentWakeResultForOperator?.status === "completed"
+        ? "done"
+        : currentWakeResultForOperator?.status?.includes("failed")
+          ? "blocked"
+          : voiceRequested
+            ? "active"
+            : "pending",
+    },
+  ];
   const trafficDetails: StagePlayTrafficDetail[] = [
     ...mailItems.slice(-5).reverse().map((mail): StagePlayTrafficDetail => ({
       id: mail.mailId,
@@ -4276,7 +4444,7 @@ function StagePlayMailLoopLiveOverview({
 
       <StagePlayMailJourneyRail
         stations={mailTransformSteps}
-        deckRows={deckRows}
+        queueRows={queueRows}
         latestSummary={latestSummary}
         mailAgeMs={mailAgeMs}
         payloadChars={latestMail?.summary.text.length ?? 0}
@@ -4384,9 +4552,14 @@ function StagePlayMailLoopLiveOverview({
 
       <details className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-diagnostics">
         <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">
-          Diagnostics: legacy summaries, packet flow, deck internals
+          Diagnostics: processor internals, packet history, prompts
         </summary>
         <div className="mt-3 space-y-3">
+          <StagePlayMicroReasonerDeckColumn
+            rows={deckRows}
+            deckRuntimeLabel={deckRuntimeLabel}
+            combinedRuntimeTone={combinedRuntimeTone}
+          />
 
       <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-summary">
         <div className="flex flex-wrap items-start justify-between gap-3">

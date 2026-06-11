@@ -10,7 +10,10 @@ import type {
   HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import type { LiveSourceWakeRouteMetadataV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 import { detectInternetSearchIntent } from "./internet-search-intent";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
@@ -189,6 +192,11 @@ export function buildAskEvidenceTargetArbitration(input: {
   const candidates: HelixAskEvidenceTargetCandidate[] = [];
   const promptIntentCandidates: string[] = [];
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const suppressesScholarlyResearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "scholarly_research");
+  const suppressesInternetSearch = contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search");
+  const suppressesWorkstationAction = contextualToolSuppressionBlocksFamily(contextualSuppression, "workstation_action");
+  const suppressesRepoCode = contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code");
+  const suppressesLiveEnvironment = contextualToolSuppressionBlocksFamily(contextualSuppression, "live_environment");
   const repoIntent = detectRepoCodeEvidenceIntent(prompt);
   const scholarlyIntent = detectScholarlyResearchIntent(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
@@ -245,7 +253,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && repoIntent.repoEvidenceRequested) {
+  if (!suppressesRepoCode && repoIntent.repoEvidenceRequested) {
     promptIntentCandidates.push("repo_code_evidence");
     candidates.push(makeCandidate({
       candidateId: "repo_code.project_concept_or_code_evidence",
@@ -260,7 +268,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && zenGraphReflectionCue) {
+  if (!suppressesWorkstationAction && zenGraphReflectionCue) {
     promptIntentCandidates.push(theoryIdeologyBridgeCue ? "theory_ideology_bridge_reflection" : "zen_graph_reflection");
     candidates.push(makeCandidate({
       candidateId: theoryIdeologyBridgeCue
@@ -310,7 +318,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && scholarlyIntent.researchRequested) {
+  if (!suppressesScholarlyResearch && scholarlyIntent.researchRequested) {
     promptIntentCandidates.push("scholarly_research");
     candidates.push(makeCandidate({
       candidateId: "scholarly_research.external_sources",
@@ -346,7 +354,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && internetSearchIntent.searchRequested) {
+  if (!suppressesInternetSearch && internetSearchIntent.searchRequested) {
     promptIntentCandidates.push("internet_search");
     candidates.push(makeCandidate({
       candidateId: "internet_search.external_web_sources",
@@ -386,7 +394,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && !stagePlayOperational && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+  if (!suppressesLiveEnvironment && !stagePlayOperational && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     promptIntentCandidates.push("live_source_mailbox");
     candidates.push(makeCandidate({
       candidateId: "live_source_mailbox.mail_loop",
@@ -419,7 +427,7 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!contextualSuppression && !stagePlayOperational && hasLiveSourceCurrentStateCue(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+  if (!suppressesLiveEnvironment && !stagePlayOperational && hasLiveSourceCurrentStateCue(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     promptIntentCandidates.push("live_source_current_state");
     candidates.push(makeCandidate({
       candidateId: "live_source_mailbox.current_state_or_quality",

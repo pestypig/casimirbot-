@@ -127,6 +127,23 @@ describe("helix ask E68 debug export endpoint", () => {
       decision_ids: [decisionId],
       voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
     });
+    expect(debugExport.body?.payload?.stagePlayWakeTransaction).toMatchObject({
+      schema: "stage_play_wake_transaction_debug/v1",
+      wakeRequestId,
+      askTurnId: turnId,
+      selectedTargetSource: "live_source_mailbox",
+      producedRefs: expect.arrayContaining([decisionId, voiceReceiptRef, wakeResult.wakeResultId]),
+      decisionReceiptId: decisionId,
+      voiceReceiptId: voiceReceiptRef,
+      wakeResultId: wakeResult.wakeResultId,
+      terminalKind: "stage_play_live_source_mail_wake_result",
+      failureCode: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(debugExport.body?.payload?.stage_play_wake_transaction).toEqual(
+      debugExport.body?.payload?.stagePlayWakeTransaction,
+    );
   }, 60000);
 
   it("returns replay-safe reasoning battle stage beats for a completed turn", async () => {

@@ -163,6 +163,14 @@ export type HelixLiveEnvironmentToolObservation = {
   observation: unknown;
   transcriptRows?: AskTurnTranscriptRowDraftV1[];
   evidence_refs: string[];
+  producedRefs?: string[];
+  artifactRefs?: {
+    processedPacketIds?: string[];
+    decisionIds?: string[];
+    voiceReceiptIds?: string[];
+    wakeRequestId?: string | null;
+    askTurnId?: string | null;
+  };
   instruction_authority: "none";
   ask_instruction_authority: "none";
   context_role: "tool_evidence";

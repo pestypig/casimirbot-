@@ -1023,11 +1023,21 @@ describe("live-source mail live environment tools", () => {
         room_id: roomId,
         source_id: sourceId,
         source_kind: "visual_frame",
+        route_metadata: {
+          wakeRequestId: "stage_play_mail_wake:test-read",
+          askTurnId: "ask:test-read",
+        },
       },
     });
 
     const readPayload = readObservation.observation as any;
     expect(readObservation.summary).toContain("processed live-source packet");
+    expect(readObservation.producedRefs).toContain(processPayload.packets[0].packetId);
+    expect(readObservation.artifactRefs).toMatchObject({
+      processedPacketIds: expect.arrayContaining([processPayload.packets[0].packetId]),
+      wakeRequestId: "stage_play_mail_wake:test-read",
+      askTurnId: "ask:test-read",
+    });
     expect(readPayload.packets.map((packet: any) => packet.packetId)).toContain(processPayload.packets[0].packetId);
     expect(readPayload.missingRawMailIds).toEqual([]);
     expect(readPayload.fallbackTool).toBeNull();
@@ -1208,6 +1218,10 @@ describe("live-source mail live environment tools", () => {
         room_id: roomId,
         decision: "record_interpretation",
         rationale_preview: "Interpret the latest processed Minecraft packet and say what to watch next.",
+        route_metadata: {
+          wakeRequestId: "stage_play_mail_wake:test-decision",
+          askTurnId: "ask:test-decision",
+        },
         live_source_mail_output_intent: {
           wants_interpretation: true,
         },
@@ -1244,6 +1258,13 @@ describe("live-source mail live environment tools", () => {
       processed_packet_refs: expect.arrayContaining([packet.packetId]),
       post_tool_model_step_required: true,
       terminal_eligible: false,
+    });
+    expect(decisionObservation.producedRefs).toContain(payload.decisionId);
+    expect(decisionObservation.artifactRefs).toMatchObject({
+      processedPacketIds: expect.arrayContaining([packet.packetId]),
+      decisionIds: expect.arrayContaining([payload.decisionId]),
+      wakeRequestId: "stage_play_mail_wake:test-decision",
+      askTurnId: "ask:test-decision",
     });
     expect(payload.narrativeStateId).toBe(payload.narrativeStateRef);
     expect(payload.narrative_state_id).toBe(payload.narrativeStateRef);
