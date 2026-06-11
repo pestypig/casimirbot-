@@ -3,6 +3,7 @@ import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogO
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
@@ -246,6 +247,7 @@ export default function AccountSessionPanel() {
   const session = status.session;
   const usage = status.usage;
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const interfaceText = useInterfaceText(interfaceLanguage.code);
   const showLocalDevSignIn = import.meta.env.DEV;
 
   return (
@@ -359,11 +361,11 @@ export default function AccountSessionPanel() {
             <section className="rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
                 <Languages className="h-3.5 w-3.5" />
-                Language
+                {interfaceText.t("account.language.title")}
               </div>
               <div className="mt-3 max-w-sm">
                 <label className="block text-xs text-slate-300">
-                  Interface language
+                  {interfaceText.t("account.language.interfaceLabel")}
                   <select
                     value={interfaceLanguage.code}
                     onChange={(event) =>

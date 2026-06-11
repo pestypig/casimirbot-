@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS } from "./useHelixStartSettings";
 import { getInterfaceLanguageOption, normalizeInterfaceLanguageCode } from "@/lib/i18n/interfaceLanguage";
+import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
 
 describe("Helix Start settings defaults", () => {
   it("keeps the legacy Helix Ask observer lane opt-in", () => {
@@ -21,5 +22,10 @@ describe("Helix Start settings defaults", () => {
     expect(normalizeInterfaceLanguageCode("en_US")).toBe("en");
     expect(normalizeInterfaceLanguageCode("zz")).toBe("en");
     expect(getInterfaceLanguageOption("haw").translationMode).toBe("procedural_catalog");
+  });
+
+  it("resolves interface message catalogs with English fallback", () => {
+    expect(createInterfaceTextResolver("haw").t("account.language.title")).toBe("\u02bb\u014clelo");
+    expect(createInterfaceTextResolver("zz").t("account.language.interfaceLabel")).toBe("Interface language");
   });
 });
