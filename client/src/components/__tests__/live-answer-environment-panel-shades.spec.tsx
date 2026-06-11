@@ -75,6 +75,17 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Refresh shades");
   });
 
+  it("exposes MicroDeck prompt presets beside visual shades", () => {
+    const source = panelSource();
+
+    expect(source).toContain('aria-label="Micro-reasoner prompt preset"');
+    expect(source).toContain('aria-label="Apply selected micro-reasoner prompt preset"');
+    expect(source).toContain("/api/helix/stage-play/micro-reasoner-prompt-preset/apply");
+    expect(source).toContain("Future mail-loop packets will use this prompt deck.");
+    expect(source).toContain("MicroDeck presets are still loading. Refresh deck if the server was just restarted.");
+    expect(source).toContain("selectedMicroPromptPreview");
+  });
+
   it("renders a local-only last-frame preview in the visual capture source panel", () => {
     const source = panelSource();
 
