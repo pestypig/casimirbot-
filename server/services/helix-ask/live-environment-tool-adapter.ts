@@ -1601,50 +1601,48 @@ const makeObservation = (input: {
   evidenceRefs?: string[];
   producedRefs?: string[];
   artifactRefs?: LiveSourceToolArtifactRefs;
+  forceNormalizedRefs?: boolean;
   transcriptRows?: AskTurnTranscriptRowDraftV1[];
-}): HelixLiveEnvironmentToolObservation => ({
-  schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
-  observation_id: `live_env_tool_observation:${hashShort([
-    input.threadId,
-    input.environmentId ?? null,
-    input.toolName,
-    input.summary,
-    input.evidenceRefs ?? [],
-  ])}`,
-  thread_id: input.threadId,
-  environment_id: input.environmentId ?? null,
-  tool_name: input.toolName,
-  ok: input.ok,
-  summary: input.summary,
-  observation: input.observation,
-  ...(input.transcriptRows && input.transcriptRows.length > 0 ? { transcriptRows: input.transcriptRows } : {}),
-  evidence_refs: Array.from(new Set(input.evidenceRefs ?? [])),
-  ...(input.producedRefs && input.producedRefs.length > 0 ? { producedRefs: uniqueStrings(input.producedRefs) } : {}),
-  ...(input.artifactRefs
+}): HelixLiveEnvironmentToolObservation => {
+  const producedRefs = uniqueStrings(input.producedRefs ?? []);
+  const shouldIncludeNormalizedRefs = input.forceNormalizedRefs === true || producedRefs.length > 0 || Boolean(input.artifactRefs);
+  const artifactRefs = shouldIncludeNormalizedRefs
     ? {
-        artifactRefs: {
-          ...(input.artifactRefs.processedPacketIds && input.artifactRefs.processedPacketIds.length > 0
-            ? { processedPacketIds: uniqueStrings(input.artifactRefs.processedPacketIds) }
-            : {}),
-          ...(input.artifactRefs.decisionIds && input.artifactRefs.decisionIds.length > 0
-            ? { decisionIds: uniqueStrings(input.artifactRefs.decisionIds) }
-            : {}),
-          ...(input.artifactRefs.voiceReceiptIds && input.artifactRefs.voiceReceiptIds.length > 0
-            ? { voiceReceiptIds: uniqueStrings(input.artifactRefs.voiceReceiptIds) }
-            : {}),
-          wakeRequestId: input.artifactRefs.wakeRequestId ?? null,
-          askTurnId: input.artifactRefs.askTurnId ?? null,
-        },
+        processedPacketIds: uniqueStrings(input.artifactRefs?.processedPacketIds ?? []),
+        decisionIds: uniqueStrings(input.artifactRefs?.decisionIds ?? []),
+        voiceReceiptIds: uniqueStrings(input.artifactRefs?.voiceReceiptIds ?? []),
+        wakeRequestId: input.artifactRefs?.wakeRequestId ?? null,
+        askTurnId: input.artifactRefs?.askTurnId ?? null,
       }
-    : {}),
-  instruction_authority: "none",
-  ask_instruction_authority: "none",
-  context_role: "tool_evidence",
-  ask_context_policy: "evidence_only",
-  assistant_answer: false,
-  raw_content_included: false,
-  created_at: new Date().toISOString(),
-});
+    : null;
+  return {
+    schema: HELIX_LIVE_ENVIRONMENT_TOOL_OBSERVATION_SCHEMA,
+    observation_id: `live_env_tool_observation:${hashShort([
+      input.threadId,
+      input.environmentId ?? null,
+      input.toolName,
+      input.summary,
+      input.evidenceRefs ?? [],
+    ])}`,
+    thread_id: input.threadId,
+    environment_id: input.environmentId ?? null,
+    tool_name: input.toolName,
+    ok: input.ok,
+    summary: input.summary,
+    observation: input.observation,
+    ...(input.transcriptRows && input.transcriptRows.length > 0 ? { transcriptRows: input.transcriptRows } : {}),
+    evidence_refs: Array.from(new Set(input.evidenceRefs ?? [])),
+    ...(shouldIncludeNormalizedRefs ? { producedRefs } : {}),
+    ...(artifactRefs ? { artifactRefs } : {}),
+    instruction_authority: "none",
+    ask_instruction_authority: "none",
+    context_role: "tool_evidence",
+    ask_context_policy: "evidence_only",
+    assistant_answer: false,
+    raw_content_included: false,
+    created_at: new Date().toISOString(),
+  };
+};
 
 const eventKind = (value: unknown): HelixInterpretedEventKind => {
   const raw = readString(value);
@@ -2873,6 +2871,7 @@ export function executeLiveEnvironmentTool(
         wakeRequestId,
         askTurnId,
       },
+      forceNormalizedRefs: true,
       transcriptRows,
     });
   }
@@ -4671,6 +4670,7 @@ export function executeLiveEnvironmentTool(
         wakeRequestId,
         askTurnId,
       },
+      forceNormalizedRefs: true,
     });
   }
 
@@ -4740,6 +4740,7 @@ export function executeLiveEnvironmentTool(
         wakeRequestId,
         askTurnId,
       },
+      forceNormalizedRefs: true,
     });
   }
 
