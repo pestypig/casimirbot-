@@ -6843,6 +6843,48 @@ function buildHelixAskChatProjectionId(
   return `helix-chat-turn:${session.id}:${userMessage?.id ?? "standalone"}:${assistantMessage.id}`;
 }
 
+const STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS = [
+  /\bstage_play_live_source_mail_wake:/i,
+  /^\s*use\s+live_env\.(?:read_live_source_mail|read_processed_live_source_mail|record_live_source_mail_decision|request_interim_voice_callout)\b/i,
+  /^\s*read the active stage play live-source mailbox and use the latest processed micro-reasoner finding\b/i,
+  /^\s*review the latest stage play live-source mailbox finding\.\s*use the structured mailbox route metadata attached to this turn\b/i,
+  /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner wake candidate|operator opened queued wake)/i,
+];
+
+const STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS = [
+  /\bi could not complete this live-source turn\b/i,
+  /\bthe live-source mailbox route completed\b/i,
+  /\bthe interim voice callout\b/i,
+  /\bsolver authority failed\b/i,
+  /\bselected:\s*live_env\./i,
+  /\bphase:\s*(?:terminal_checkpoint|record_decision|request_voice_after_decision)\b/i,
+  /\bvoice callout request\b/i,
+];
+
+function isGeneratedStagePlayMailWakePrompt(message: ChatMessage | null): boolean {
+  if (!message || message.role !== "user") return false;
+  const text = message.content.trim();
+  if (!text) return false;
+  return STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function isGeneratedStagePlayMailWakeAssistantProjection(message: ChatMessage | null): boolean {
+  if (!message || message.role !== "assistant") return false;
+  const text = message.content.trim();
+  if (!text) return false;
+  return STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
+  userMessage: ChatMessage | null,
+  assistantMessage: ChatMessage,
+): boolean {
+  if (!isGeneratedStagePlayMailWakePrompt(userMessage)) return false;
+  if (isGeneratedStagePlayMailWakeAssistantProjection(assistantMessage)) return true;
+  const answer = assistantMessage.content.trim();
+  return answer.length > 0 && answer.length < 800;
+}
+
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
   const messages = [...(session.messages ?? [])].sort((left, right) => {
     const leftMs = parseChatMessageTimeMs(left);
@@ -6862,6 +6904,10 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
     if (message.role !== "assistant") continue;
     const answer = message.content.trim();
     if (!answer) continue;
+    if (shouldSuppressGeneratedStagePlayMailWakeChatProjection(pendingUser, message)) {
+      pendingUser = null;
+      continue;
+    }
     const createdAtMs = parseChatMessageTimeMs(message) ?? parseChatMessageTimeMs(pendingUser ?? message) ?? Date.now();
     const turnId = message.traceId?.trim() || pendingUser?.traceId?.trim() || null;
     replies.push({

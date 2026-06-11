@@ -2255,7 +2255,7 @@ const defaultAskTurnRunner = (baseUrl?: string): AskWakeTurnRunner =>
       throw new Error(`mail_wake_ask_turn_failed:${response.status}`);
     }
     const payload = await response.json() as Record<string, unknown>;
-    const responseAskTurnId = resolvedAskTurnId ?? extractAskTurnId(payload);
+    const responseAskTurnId = extractAskTurnId(payload);
     return {
       ok: Boolean(responseAskTurnId),
       askTurnId: responseAskTurnId,
@@ -3016,15 +3016,7 @@ export async function runNextMailWakeRequest(input: {
   const preboundAskTurnId = input.askTurnRunner
     ? null
     : buildWakeAskTurnId(running.wakeRequestId, runningAttempt.attemptCount, now);
-  const wakeForAskLaunch = preboundAskTurnId
-    ? attachAskTurnToWakeRequest({
-        wakeRequestId: running.wakeRequestId,
-        askTurnId: preboundAskTurnId,
-        askLaunchId: runningAttempt.askLaunchId ?? null,
-        routeMetadata: wakeRouteMetadata,
-        now,
-      }) ?? runningAttempt
-    : runningAttempt;
+  const wakeForAskLaunch = runningAttempt;
   try {
     const launchResponse = await (input.askTurnRunner ?? defaultAskTurnRunner(input.baseUrl))({
       prompt,
@@ -3305,9 +3297,9 @@ export async function runNextMailWakeRequest(input: {
         roomId: running.roomId ?? null,
         environmentId: running.environmentId ?? null,
         status: "deferred_for_pressure",
-        askTurnId: preboundAskTurnId,
+        askTurnId: null,
         failedReason: "ask_turn_pressure_503",
-        evidenceRefs: uniqueStrings([...evidenceRefs, preboundAskTurnId]),
+        evidenceRefs: uniqueStrings(evidenceRefs),
         createdAt: failedAt,
       });
       return recordNonTerminalWakeTranscript({
@@ -3317,14 +3309,13 @@ export async function runNextMailWakeRequest(input: {
         fastLayer,
         action: "pressure_blocked",
         retainedMailCount,
-        evidenceRefs: uniqueStrings([...evidenceRefs, preboundAskTurnId]),
+        evidenceRefs: uniqueStrings(evidenceRefs),
         createdAt: wakeResult.createdAt,
       });
     }
     const failedReason = normalizeAskWakeFailureReason(err);
     const failureEvidenceRefs = uniqueStrings([
       ...evidenceRefs,
-      preboundAskTurnId,
       failedReason.startsWith("ask_launch_no_response_timeout:")
         ? "stage_play_wake_ask_launch_no_response_timeout"
         : null,
@@ -3341,7 +3332,7 @@ export async function runNextMailWakeRequest(input: {
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
       status: "failed_retryable",
-      askTurnId: preboundAskTurnId,
+      askTurnId: null,
       failedReason,
       evidenceRefs: failureEvidenceRefs,
       createdAt: failedAt,

@@ -92,7 +92,7 @@ const sourceTargetToolFamilies = (
 const theoryLocatorRequested = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
-  if (/\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|scale\s+bands?|uncertainty\s+mode)\b/i.test(prompt)) {
+  if (/\b(?:do\s+not|don't|dont|never|without|no)\b[^.!?;\n]{0,120}\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|scale\s+bands?|uncertainty\s+mode)\b/i.test(prompt)) {
     return false;
   }
   return /\b(?:theory\s+badge\s+graph|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(prompt);
