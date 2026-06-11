@@ -272,7 +272,7 @@ const isItineraryFamilyObserved = (family: string, artifacts: ArtifactLike[]): b
   return artifacts.some((artifact) => artifactMatchesObservationKind(artifact, new RegExp(family.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")));
 };
 
-const missingItineraryObservationFamilies = (
+const attachItineraryExecutionState = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
 ): string[] => {
@@ -282,7 +282,37 @@ const missingItineraryObservationFamilies = (
   const requiredFamilies = readArray(terminalCriteria.required_observation_families)
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
-  return requiredFamilies.filter((family) => !isItineraryFamilyObserved(family, artifacts));
+  const admittedFamilies = readArray(itinerary?.admitted_tool_families)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const observedFamilies = requiredFamilies.filter((family) => isItineraryFamilyObserved(family, artifacts));
+  const missingFamilies = requiredFamilies.filter((family) => !observedFamilies.includes(family));
+  const executionState = {
+    schema: "helix.capability_itinerary_execution_state.v1",
+    required_observation_families: requiredFamilies,
+    admitted_tool_families: admittedFamilies,
+    observed_families: observedFamilies,
+    missing_observation_families: missingFamilies,
+    complete: missingFamilies.length === 0,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.capability_itinerary_execution_state = executionState;
+  if (itinerary) {
+    itinerary.execution_state = {
+      required_observation_families: requiredFamilies,
+      admitted_tool_families: admittedFamilies,
+      observed_families: observedFamilies,
+      missing_observation_families: missingFamilies,
+      complete: missingFamilies.length === 0,
+    };
+  }
+  const debug = readRecord(payload.debug);
+  if (debug) {
+    debug.capability_itinerary_execution_state = executionState;
+    if (itinerary) debug.capability_itinerary = itinerary;
+  }
+  return missingFamilies;
 };
 
 type ScholarlyCitation = {
@@ -653,7 +683,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     artifactLedger: artifacts,
     routeProductContract: readRecord(input.payload.route_product_contract),
   });
-  const missingItineraryFamilies = missingItineraryObservationFamilies(input.payload, artifacts);
+  const missingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
   const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
   const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;

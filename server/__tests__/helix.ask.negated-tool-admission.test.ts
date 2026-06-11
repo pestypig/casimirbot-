@@ -129,7 +129,7 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(admission).toMatchObject({
       source_target: "scholarly_research",
       required: true,
-      admitted_tool_families: expect.arrayContaining(["scholarly_research"]),
+      admitted_tool_families: expect.arrayContaining(["scholarly_research", "theory_locator"]),
     });
     expect(admission.tool_admission_suppressed).toBeUndefined();
     expect(admission.forbidden_tool_families ?? []).toEqual(

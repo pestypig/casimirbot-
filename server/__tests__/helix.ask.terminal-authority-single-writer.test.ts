@@ -487,5 +487,14 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("typed_failure");
     expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
     expect(payload.selected_final_answer).not.toBe(draftText);
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      schema: "helix.capability_itinerary_execution_state.v1",
+      required_observation_families: ["scholarly_research", "theory_locator"],
+      observed_families: [],
+      missing_observation_families: ["scholarly_research", "theory_locator"],
+      complete: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
   });
 });
