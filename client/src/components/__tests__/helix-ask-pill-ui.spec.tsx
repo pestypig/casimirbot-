@@ -98,6 +98,7 @@ let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/Helix
 let shouldRenderHelixAskActiveTurnStream: typeof import("@/components/helix/HelixAskPill").shouldRenderHelixAskActiveTurnStream;
 let filterHelixAskActiveTurnStreamRows: typeof import("@/components/helix/HelixAskPill").filterHelixAskActiveTurnStreamRows;
 let isDurableHelixAskMailTranscriptGroup: typeof import("@/components/helix/HelixAskPill").isDurableHelixAskMailTranscriptGroup;
+let shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata: typeof import("@/components/helix/HelixAskPill").shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
 let HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG;
 let evaluateVoiceAutoDispatchGovernance: typeof import("@/components/helix/HelixAskPill").evaluateVoiceAutoDispatchGovernance;
@@ -200,6 +201,7 @@ beforeAll(async () => {
     shouldRenderHelixAskActiveTurnStream,
     filterHelixAskActiveTurnStreamRows,
     isDurableHelixAskMailTranscriptGroup,
+    shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
     HELIX_VOICE_LEGACY_DISPATCH_FALLBACK_FLAG,
     evaluateVoiceAutoDispatchGovernance,
@@ -279,6 +281,30 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(appended[0]?.createdAtMs).toBe(1_000);
     expect(appended[0]?.content).toBe("Voice callout delivered.");
     expect(appended[0]?.debug?.selected_final_answer).toBe("Voice callout delivered.");
+  });
+
+  it("blocks compact Stage Play wake prompts that lost structured route metadata", () => {
+    const question = [
+      "Review the latest Stage Play live-source mailbox finding.",
+      "Current effort: combat or recovery.",
+      "Micro-reasoner recommendation: request voice callout.",
+      "Use the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
+    ].join("\n");
+
+    expect(shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(null, question)).toBe(true);
+    expect(shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata({
+      promptId: "wake:test",
+      question,
+      autoSubmit: true,
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+      },
+      createdAt: 1_000,
+    }, question)).toBe(false);
+    expect(shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(null, "Quote this prompt: Review the latest Stage Play live-source mailbox finding.")).toBe(false);
   });
 
   it("hides the active stream once the same turn has a durable reply", () => {
@@ -1208,7 +1234,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildHelixCausalTurnTraceRows");
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("chronologicalAskRepliesForState");
-    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null");
+    expect(source).toContain("chronologicalAskRepliesForTranscript");
+    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain('aria-label="Turn stream"');
     expect(source).not.toContain(">Turn stream<");
@@ -1345,7 +1372,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("sortHelixAskRepliesChronologically");
     expect(source).toContain("appendHelixAskReplyChronologically");
     expect(source).toContain("chronologicalAskRepliesForState");
-    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null");
+    expect(source).toContain("chronologicalAskRepliesForTranscript");
+    expect(source).toContain("shouldHideHelixAskTranscriptReply");
+    expect(source).toContain("isHelixAskProgressPlaceholderText(answer)");
+    expect(source).toContain("const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
     expect(source).toContain("const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId");
     expect(source).toContain("reply.id === transcriptLatestAskReplyId");

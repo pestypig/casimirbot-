@@ -133,13 +133,18 @@ const isComplexCurrentAffairsAnalysis = (promptText: string): boolean =>
   );
 
 const isCompactLiveSourceMailboxHandoff = (promptText: string): boolean =>
-  (
+  ((
     /\bContinuing\s+live[-\s]?source\s+watch\s+job\s+compact\s+Ask\s+handoff\b/i.test(promptText) ||
     /\bUI\s+bridge\s+reason\b[\s\S]{0,120}\bHelix\s+Ask\s+wake\b/i.test(promptText)
   ) &&
   /\bWake\s+request:\s*stage_play_live_source_mail_wake:/i.test(promptText) &&
   /\bProcessed\s+packet:\s*stage_play_processed_mail_packet:/i.test(promptText) &&
-  /\blive_env\.record_live_source_mail_decision\b/i.test(promptText);
+  /\blive_env\.record_live_source_mail_decision\b/i.test(promptText)) ||
+  (
+    /\bReview\s+the\s+latest\s+Stage\s+Play\s+live[-\s]?source\s+mailbox\s+finding\b/i.test(promptText) &&
+    /\bMicro[-\s]?reasoner\s+recommendation\s*:\s*(?:request\s+voice\s+callout|record\s+interpretation|request\s+more\s+evidence|request\s+stage\s+play\s+checkpoint)\b/i.test(promptText) &&
+    /\bstructured\s+mailbox\s+route\s+metadata\b/i.test(promptText)
+  );
 
 export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV1 => {
   const prompt = promptText.trim();

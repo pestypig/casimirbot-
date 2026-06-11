@@ -243,9 +243,9 @@ import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 
-const HELIX_ASK_TURN_EXPANSION_STORAGE_KEY = "helix.ask.turnExpansion.v1";
 const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
+const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
 
 export type ReadAloudPlaybackState = "idle" | "requesting" | "playing" | "dry-run" | "error";
 
@@ -266,10 +266,6 @@ function readStoredHelixAskExpansionState(storageKey: string): Record<string, bo
   } catch {
     return {};
   }
-}
-
-function readStoredHelixAskTurnExpansion(): Record<string, boolean> {
-  return readStoredHelixAskExpansionState(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY);
 }
 
 function readStoredHelixAskAnswerExpansion(): Record<string, boolean> {
@@ -1655,6 +1651,39 @@ function resolveExternalPromptClaimId(pending: PendingHelixAskPrompt | null, que
   if (promptId) return promptId;
   const createdAt = typeof pending?.createdAt === "number" ? pending.createdAt : 0;
   return `${createdAt}:${question.trim().toLowerCase()}`;
+}
+
+function isHelixAskProgressPlaceholderText(value: string | null | undefined): boolean {
+  return coerceText(value).trim().toLowerCase() === HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT.toLowerCase();
+}
+
+function isStagePlayMailboxWakePromptText(question: string): boolean {
+  const normalized = question.trim();
+  if (!normalized) return false;
+  return (
+    /\bReview\s+the\s+latest\s+Stage\s+Play\s+live[-\s]?source\s+mailbox\s+finding\b/i.test(normalized) &&
+    /\bMicro[-\s]?reasoner\s+recommendation\b/i.test(normalized) &&
+    /\bstructured\s+mailbox\s+route\s+metadata\b/i.test(normalized)
+  );
+}
+
+function hasStagePlayMailboxWakeRouteMetadata(routeMetadata: PendingHelixAskPrompt["routeMetadata"]): boolean {
+  return Boolean(
+    routeMetadata &&
+      routeMetadata.invocationKind === "stage_play_mail_wake" &&
+      routeMetadata.sourceTarget === "live_source_mailbox" &&
+      typeof routeMetadata.wakeRequestId === "string" &&
+      routeMetadata.wakeRequestId.trim() &&
+      typeof routeMetadata.mailboxThreadId === "string" &&
+      routeMetadata.mailboxThreadId.trim(),
+  );
+}
+
+export function shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(
+  pending: PendingHelixAskPrompt | null,
+  question: string,
+): boolean {
+  return isStagePlayMailboxWakePromptText(question) && !hasStagePlayMailboxWakeRouteMetadata(pending?.routeMetadata);
 }
 
 function claimExternalPromptSingleFlight(claimId: string): boolean {
@@ -6848,6 +6877,7 @@ const STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS = [
   /^\s*use\s+live_env\.(?:read_live_source_mail|read_processed_live_source_mail|record_live_source_mail_decision|request_interim_voice_callout)\b/i,
   /^\s*read the active stage play live-source mailbox and use the latest processed micro-reasoner finding\b/i,
   /^\s*review the latest stage play live-source mailbox finding\.\s*use the structured mailbox route metadata attached to this turn\b/i,
+  /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*request\s+voice\s+callout\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
   /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner wake candidate|operator opened queued wake)/i,
 ];
 
@@ -6904,6 +6934,10 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
     if (message.role !== "assistant") continue;
     const answer = message.content.trim();
     if (!answer) continue;
+    if (isHelixAskProgressPlaceholderText(answer)) {
+      pendingUser = null;
+      continue;
+    }
     if (shouldSuppressGeneratedStagePlayMailWakeChatProjection(pendingUser, message)) {
       pendingUser = null;
       continue;
@@ -9624,6 +9658,22 @@ function resolveHelixAskReplyCanonicalKey(reply: HelixAskReply): string {
     if (normalized) return normalized;
   }
   return reply.id;
+}
+
+function isHelixAskProgressPlaceholderReply(reply: HelixAskReply | null | undefined): boolean {
+  return Boolean(reply && isHelixAskProgressPlaceholderText(reply.content));
+}
+
+function shouldHideHelixAskTranscriptReply(args: {
+  reply: HelixAskReply;
+  askBusy: boolean;
+  activeTurnId?: string | null;
+}): boolean {
+  if (!isHelixAskProgressPlaceholderReply(args.reply)) return false;
+  const activeTurnId = coerceText(args.activeTurnId).trim();
+  const replyKey = resolveHelixAskReplyCanonicalKey(args.reply);
+  if (args.askBusy && activeTurnId && replyKey === activeTurnId) return true;
+  return true;
 }
 
 function mergeHelixAskReplyPreservingOrder(
@@ -13904,11 +13954,11 @@ function buildFallbackReplyMasterDebugExport(reply: HelixAskReply, reason: strin
     },
     visibleAnswerState: {
       question: reply.question ?? null,
-      finalAnswer: visibleAnswerText,
+      finalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
       terminalSource: visibleTerminal.source,
       backendTerminalAnswer: visibleTerminal.backendTerminalText,
     },
-    finalAnswer: visibleAnswerText,
+    finalAnswer: clientProgressPlaceholderExport ? "" : visibleAnswerText,
     plannerContract: readAgentLoopAuditRecord(reply.debug?.planner_contract),
     executionTrace: Array.isArray(reply.debug?.execution_trace) ? reply.debug.execution_trace : [],
     stepResults: Array.isArray(reply.debug?.step_results) ? reply.debug.step_results : [],
@@ -14099,12 +14149,15 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     terminalArtifactKind === "typed_failure" ||
     finalAnswerSource === "typed_failure" ||
     Boolean(terminalErrorCode);
+  const terminalAuthorityTrustedForDebug =
+    terminalAuthorityForDebug?.schema === "helix.turn_terminal_authority.v1" &&
+    terminalAuthorityForDebug.server_authoritative === true;
   const typedFailureText =
     coerceText(payload.terminal_failure_text).trim() ||
     coerceText(typedFailure?.message).trim() ||
     terminalAuthorityText ||
     renderTypedFailureFallback(terminalErrorCode);
-  const selectedFinalAnswerCandidate =
+  const selectedFinalAnswerCandidateRaw =
     terminalIsTypedFailure
       ? typedFailureText
       : coerceText(payload.selectedDebugFinalAnswer).trim() ||
@@ -14113,6 +14166,16 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
         coerceText(debug?.selected_final_answer).trim() ||
         reply.content ||
         null;
+  const selectedFinalAnswerCandidate =
+    !terminalAuthorityTrustedForDebug &&
+    !terminalIsTypedFailure &&
+    isHelixAskProgressPlaceholderText(selectedFinalAnswerCandidateRaw)
+      ? null
+      : selectedFinalAnswerCandidateRaw;
+  const clientProgressPlaceholderExport =
+    !terminalAuthorityTrustedForDebug &&
+    !terminalIsTypedFailure &&
+    isHelixAskProgressPlaceholderText(selectedFinalAnswerCandidateRaw);
   const liveEnvironmentAnswerApplied =
     Boolean(liveEnvironmentAnswerForDebug) &&
     (isInvalidTerminalAnswerText(selectedFinalAnswerCandidate) ||
@@ -14231,13 +14294,14 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     active_prompt: activePrompt,
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
-    final_answer_source: finalAnswerSource,
+    final_answer_source: clientProgressPlaceholderExport ? null : finalAnswerSource,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status:
+        (clientProgressPlaceholderExport ? "in_progress" : null) ||
         (liveEnvironmentAnswerApplied ? "final_answer" : null) ||
         coerceText(resolvedTurnSummary?.final_status).trim() ||
         coerceText(payload.visible_projection_invariant).trim() ||
@@ -14389,8 +14453,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
       ],
     },
   };
-  const visibleFinalAnswerForParity =
-    terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
+  const visibleFinalAnswerForParity = clientProgressPlaceholderExport
+    ? ""
+    : terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
       ? selectedFinalAnswer || coerceText(reply.content).trim()
       : coerceText(reply.content).trim() || selectedFinalAnswer || "";
   const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
@@ -17430,8 +17495,7 @@ export function HelixAskPill({
     () => sortHelixAskRepliesChronologically(askReplies),
     [askReplies],
   );
-  const latestAskReply = chronologicalAskRepliesForState.at(-1) ?? null;
-  const latestAskReplyId = latestAskReply?.id ?? null;
+  const latestAskReplyIdForDebugDrawer = chronologicalAskRepliesForState.at(-1)?.id ?? null;
   const [liveSourceMailTranscriptRefreshSeq, setLiveSourceMailTranscriptRefreshSeq] = useState(0);
   const [liveSourceMailStateRefreshSeq, setLiveSourceMailStateRefreshSeq] = useState(0);
   const [liveSourceMailState, setLiveSourceMailState] = useState<StagePlayLiveSourceMailStateResponse | null>(null);
@@ -17473,17 +17537,9 @@ export function HelixAskPill({
   }, [situationRoomId]);
   useEffect(() => {
     setDebugExportDrawer((current) =>
-      current && current.replyId !== latestAskReplyId ? null : current,
+      current && current.replyId !== latestAskReplyIdForDebugDrawer ? null : current,
     );
-  }, [latestAskReplyId]);
-  useEffect(() => {
-    if (!latestAskReply) return;
-    try {
-      publishZenGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
-    } catch {
-      // ZenGraph answer blocks are a debug projection; Ask rendering must not depend on them.
-    }
-  }, [latestAskReply?.content, latestAskReply?.debug, latestAskReply?.id]);
+  }, [latestAskReplyIdForDebugDrawer]);
   useEffect(() => {
     const onWakeTranscript = (event: Event) => {
       const detail = (event as CustomEvent<StagePlayLiveSourceMailWakeTranscriptEventDetail>).detail;
@@ -17623,6 +17679,28 @@ export function HelixAskPill({
   const terminalOutcomeByTurnIdRef = useRef<Record<string, HelixTurnTerminalOutcome>>({});
   const [askLiveSessionId, setAskLiveSessionId] = useState<string | null>(null);
   const [askLiveTraceId, setAskLiveTraceId] = useState<string | null>(null);
+  const chronologicalAskRepliesForTranscript = useMemo(
+    () =>
+      chronologicalAskRepliesForState.filter(
+        (reply) =>
+          !shouldHideHelixAskTranscriptReply({
+            reply,
+            askBusy,
+            activeTurnId: askLiveTraceId ?? activeAskTurnIdRef.current,
+          }),
+      ),
+    [askBusy, askLiveTraceId, chronologicalAskRepliesForState],
+  );
+  const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null;
+  const latestAskReplyId = latestAskReply?.id ?? null;
+  useEffect(() => {
+    if (!latestAskReply) return;
+    try {
+      publishZenGraphCurrentAnswerFromDebugExport(normalizeReplyMasterDebugPayload(latestAskReply, null));
+    } catch {
+      // ZenGraph answer blocks are a debug projection; Ask rendering must not depend on them.
+    }
+  }, [latestAskReply?.content, latestAskReply?.debug, latestAskReply?.id]);
   const [askElapsedMs, setAskElapsedMs] = useState<number | null>(null);
   const [askLiveDraft, setAskLiveDraft] = useState<string>("");
   const askLiveDraftRef = useRef("");
@@ -17697,9 +17775,6 @@ export function HelixAskPill({
   const [askExpandedByReply, setAskExpandedByReply] = useState<Record<string, boolean>>(
     () => readStoredHelixAskAnswerExpansion(),
   );
-  const [askTurnExpandedByReply, setAskTurnExpandedByReply] = useState<Record<string, boolean>>(
-    () => readStoredHelixAskTurnExpansion(),
-  );
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
@@ -17710,20 +17785,6 @@ export function HelixAskPill({
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (askReplies.length === 0) return;
-    try {
-      const liveIds = new Set(askReplies.map((reply) => reply.id));
-      const pruned = Object.fromEntries(
-        Object.entries(askTurnExpandedByReply).filter(([replyId]) => liveIds.has(replyId)),
-      );
-      window.localStorage.setItem(HELIX_ASK_TURN_EXPANSION_STORAGE_KEY, JSON.stringify(pruned));
-    } catch {
-      // Ignore storage failures; expansion controls should still work for the session.
-    }
-  }, [askReplies, askTurnExpandedByReply]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -31502,7 +31563,7 @@ export function HelixAskPill({
             id: runAskTurnId,
             turn_id: runAskTurnId,
             createdAtMs: startedAtMs,
-            content: "Reasoning in progress...",
+            content: HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT,
             question: trimmed,
             mode: inferredMode,
             liveEvents: [
@@ -32821,6 +32882,27 @@ export function HelixAskPill({
     async (pending: PendingHelixAskPrompt | null) => {
       const question = pending?.question?.trim() ?? "";
       if (!question) return;
+      if (shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata(pending, question)) {
+        clearPendingHelixAskPrompt();
+        addHelixTimelineEntry({
+          type: "action_receipt",
+          source: "manual",
+          status: "failed",
+          text: "Stage Play wake handoff blocked: route metadata was missing.",
+          detail: "stage_play_mail_wake_missing_route_metadata",
+          mode: "act",
+          meta: {
+            kind: "stage_play_mail_wake_route_guard",
+            source: "external_prompt",
+            route_required: "live_source_mailbox",
+            reason: "compact_mailbox_wake_prompt_without_route_metadata",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        });
+        setAskError("Stage Play wake handoff was blocked because route metadata was missing.");
+        return;
+      }
       const claimId = resolveExternalPromptClaimId(pending, question);
       if (!claimExternalPromptSingleFlight(claimId)) {
         addHelixTimelineEntry({
@@ -33371,7 +33453,7 @@ export function HelixAskPill({
     (layoutVariant === "dock"
       ? "mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-2"
       : "mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-2");
-  const chronologicalAskReplies = chronologicalAskRepliesForState;
+  const chronologicalAskReplies = chronologicalAskRepliesForTranscript;
   const transcriptLatestAskReplyId = chronologicalAskReplies.at(-1)?.id ?? latestAskReplyId;
   const currentPlaceholder = askBusy ? "Add another question..." : inputPlaceholder;
   const voiceInputStatusLabel = buildVoiceInputStatusLabel(
@@ -34979,62 +35061,12 @@ export function HelixAskPill({
         <style>
           {`@keyframes helixAskTurnFadeIn{0%{opacity:0;transform:translate3d(0,8px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}@keyframes helixAskTurnLineFadeIn{0%{opacity:0;transform:translate3d(0,5px,0)}100%{opacity:1;transform:translate3d(0,0,0)}}.helix-ask-turn-enter{animation:helixAskTurnFadeIn 220ms ease-out both}.helix-ask-turn-line-enter{animation:helixAskTurnLineFadeIn 180ms ease-out both}@media (prefers-reduced-motion:reduce){.helix-ask-turn-enter,.helix-ask-turn-line-enter{animation:none}}`}
         </style>
-        {askReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
+        {chronologicalAskReplies.length > 0 || visibleActiveTurnStreamRows.length > 0 ? (
           <div
             ref={askReplyListRef}
             className={replyListClassNameResolved}
             onScroll={handleAskReplyListScroll}
           >
-          {askReplies.length > 1 ? (
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAskTurnExpandedByReply((prev) => {
-                    const next = { ...prev };
-                    chronologicalAskReplies.forEach((reply) => {
-                      next[reply.id] = true;
-                    });
-                    return next;
-                  });
-                  setAskExpandedByReply((prev) => {
-                    const next = { ...prev };
-                    chronologicalAskReplies.forEach((reply) => {
-                      next[reply.id] = true;
-                    });
-                    return next;
-                  });
-                }}
-                className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100 transition hover:bg-cyan-400/20"
-              >
-                Expand all
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAskTurnExpandedByReply((prev) => {
-                    const next = { ...prev };
-                    chronologicalAskReplies.forEach((reply) => {
-                      if (reply.id === transcriptLatestAskReplyId) return;
-                      next[reply.id] = false;
-                    });
-                    return next;
-                  });
-                  setAskExpandedByReply((prev) => {
-                    const next = { ...prev };
-                    chronologicalAskReplies.forEach((reply) => {
-                      if (reply.id === transcriptLatestAskReplyId) return;
-                      next[reply.id] = false;
-                    });
-                    return next;
-                  });
-                }}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-300 transition hover:bg-white/10 hover:text-slate-100"
-              >
-                Collapse previous
-              </button>
-            </div>
-          ) : null}
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
@@ -35151,7 +35183,6 @@ export function HelixAskPill({
                 normalizeTerminalAnswerText(transcriptTerminal.backendTerminalText) !==
                   normalizeTerminalAnswerText(transcriptTerminal.text),
             );
-            const turnExpanded = Boolean(askTurnExpandedByReply[reply.id]);
             const liveAnswerTurnBridge = buildLiveAnswerTurnBridgeState({
               hasLiveState: stagePlayChatLedgerEvents.length > 0,
               stagePlayEvents: stagePlayChatLedgerEvents,
@@ -35170,10 +35201,6 @@ export function HelixAskPill({
               finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || transcriptTerminal.source,
               terminalMismatch: terminalMismatchForReply,
             });
-            const historySummary = clipText(
-              transcriptTerminal.text || reply.content || reply.question || "Previous Helix Ask turn",
-              180,
-            );
             const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
             const latestQuestionTestId = isLatestReply ? "helix-ask-latest-question" : undefined;
             const latestWorkLogTestId = isLatestReply ? "helix-ask-latest-work-log" : undefined;
@@ -35470,58 +35497,7 @@ export function HelixAskPill({
                 </div>
               </div>
               );
-            if (isLatestReply) {
-              return <div key={reply.id}>{replyCard}</div>;
-            }
-            return (
-              <details
-                key={reply.id}
-                open={turnExpanded}
-                onToggle={(event) => {
-                  const open = event.currentTarget.open;
-                  setAskTurnExpandedByReply((prev) =>
-                    prev[reply.id] === open ? prev : { ...prev, [reply.id]: open },
-                  );
-                }}
-                className="rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2 text-xs text-slate-300"
-              >
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-left">
-                  <span className="min-w-0">
-                    <span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500">
-                      Previous turn
-                    </span>
-                    <span className="mt-1 block truncate text-slate-200">
-                      {reply.question ? `${reply.question} -> ${historySummary}` : historySummary}
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-slate-400">
-                    {turnExpanded ? "collapse" : "expand"}
-                  </span>
-                </summary>
-                <div className="mt-3 opacity-90">
-                  {replyCard}
-                  {userSettings.showHelixAskDebug ? (
-                    <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyReplyMasterDebug(reply, replyMasterEventClockPayload)}
-                        disabled={
-                          typeof window === "undefined"
-                        }
-                        className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.2em] transition ${
-                          typeof window !== "undefined"
-                            ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-300/25"
-                            : "border-slate-600 text-slate-500"
-                        }`}
-                        aria-label="Debug copy previous turn"
-                      >
-                        {copiedReplyMasterDebugId === reply.id ? "Copied Debug" : "Unified Debug Copy"}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </details>
-            );
+            return <div key={reply.id}>{replyCard}</div>;
             })}
             {visibleActiveTurnStreamRows.length > 0 ? (
               <div

@@ -136,6 +136,113 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.solver_risk_flags).not.toContain("receipt_terminal_without_reentry");
   });
 
+  it("does not hard-fail admitted read-only research and locator calls because file writes were negated", () => {
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:compound-readonly-contextual",
+      promptText:
+        "Do not write files. Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with scale bands and uncertainty mode.",
+      selectedRoute: "dispatch:act",
+      terminalArtifactKind: "typed_failure",
+      finalAnswerSource: "typed_failure",
+      payload: {
+        ...authorityPayload({
+          sourceTarget: "scholarly_research",
+          allowed: ["final_answer_draft", "scholarly_research_answer", "theory_context_reflection_answer", "typed_failure"],
+          forbidden: ["workspace_action_receipt", "note_update_receipt", "direct_answer_text"],
+        }),
+        tool_call_admission_decision: {
+          admitted_tool_families: ["scholarly_research", "theory_locator"],
+          forbidden_tool_families: ["workstation_action", "notes"],
+        },
+      },
+      loopParityTrace: {
+        actual_tool_calls: [
+          {
+            tool_id: "scholarly-research.lookup_papers",
+            family: "scholarly_research",
+            admitted: true,
+            mutating: false,
+            result_ref: "obs:papers",
+          },
+          {
+            tool_id: "helix_ask.reflect_theory_context",
+            family: "theory_locator",
+            admitted: true,
+            mutating: false,
+            result_ref: "obs:theory",
+          },
+        ],
+        unexpected_tool_calls: [],
+        observations_created: [
+          { observation_id: "obs:papers", source_kind: "scholarly_research" },
+          { observation_id: "obs:theory", source_kind: "theory_locator" },
+        ],
+        evidence_selected_for_answer: ["obs:papers", "obs:theory"],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.prompt_interpretation.contextual_tool_mentions.length).toBeGreaterThan(0);
+    expect(trace.contextual_tool_audit).toMatchObject({
+      contextual_tool_mention_present: true,
+      contextual_tool_family_blocked: true,
+      blocked_contextual_tool_executed: false,
+      blocked_families: expect.arrayContaining(["workstation_action", "notes"]),
+      executed_blocked_tool_ids: [],
+    });
+    expect(trace.contextual_tool_audit.blocked_families).not.toEqual(
+      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    );
+    expect(trace.solver_risk_flags).not.toContain("blocked_contextual_tool_executed");
+    expect(trace.solver_risk_flags.map(String)).not.toContain("contextual_tool_mention_executed");
+  });
+
+  it("hard-fails only when a contextual write negation matches an executed blocked family", () => {
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:blocked-contextual-note",
+      promptText: "Do not write files. Create a note with the research summary.",
+      selectedRoute: "dispatch:act",
+      terminalArtifactKind: "workspace_action_receipt",
+      finalAnswerSource: "workspace_action_receipt",
+      payload: authorityPayload({
+        sourceTarget: "active_note",
+        allowed: ["workspace_action_receipt", "typed_failure"],
+        forbidden: [],
+      }),
+      loopParityTrace: {
+        actual_tool_calls: [
+          {
+            tool_id: "workstation-notes.create_note",
+            family: "notes",
+            admitted: false,
+            mutating: true,
+            result_ref: "receipt:note",
+          },
+        ],
+        unexpected_tool_calls: ["workstation-notes.create_note"],
+        observations_created: [],
+        evidence_selected_for_answer: [],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.contextual_tool_audit).toMatchObject({
+      contextual_tool_mention_present: true,
+      contextual_tool_family_blocked: true,
+      blocked_contextual_tool_executed: true,
+      executed_blocked_tool_ids: ["workstation-notes.create_note"],
+    });
+    expect(trace.solver_risk_flags).toContain("blocked_contextual_tool_executed");
+  });
+
   it("treats debug set_rate prompts as diagnosis and rejects receipt-as-answer", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "turn:debug-set-rate",

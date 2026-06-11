@@ -42,6 +42,7 @@ import {
   buildToolUseRestatement,
   type ToolUseRestatementV1,
 } from "./internet-search-intent";
+import { contextualToolSuppressionBlocksFamily } from "./contextual-tool-admission";
 
 type RecordLike = Record<string, unknown>;
 
@@ -52,7 +53,7 @@ export type HelixAskTurnSolverRiskFlag =
   | "route_selected_before_intent_arbitration"
   | "receipt_terminal_without_reentry"
   | "tool_result_terminal_without_reasoning"
-  | "contextual_tool_mention_executed"
+  | "blocked_contextual_tool_executed"
   | "negative_constraint_ignored"
   | "primary_secondary_intent_collapsed"
   | "missing_followup_reasoning"
@@ -63,7 +64,7 @@ export type HelixAskTurnSolverHardFailureCode =
   | "intent_arbitration_missing"
   | "classifier_became_decision"
   | "route_selected_before_intent_arbitration"
-  | "contextual_tool_mention_executed"
+  | "blocked_contextual_tool_executed"
   | "receipt_terminal_without_reentry"
   | "missing_followup_reasoning"
   | "terminal_authority_before_solver_completion"
@@ -132,6 +133,17 @@ export type HelixAskTurnSolverTrace = {
     mutating: boolean;
     reason: string;
   }>;
+
+  contextual_tool_audit: {
+    schema: "helix.contextual_tool_audit.v1";
+    contextual_tool_mention_present: boolean;
+    contextual_tool_family_blocked: boolean;
+    blocked_contextual_tool_executed: boolean;
+    blocked_families: string[];
+    executed_blocked_tool_ids: string[];
+    assistant_answer: false;
+    raw_content_included: false;
+  };
 
   evidence_requests: Array<{
     request_id: string;
@@ -335,6 +347,10 @@ const toolFamilyMutating = (family: string): boolean =>
   /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);
 
 const inferToolFamily = (toolId: string): string => {
+  if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
+  if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph/i.test(toolId)) return "theory_locator";
+  if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId)) return "internet_search";
+  if (/^live_env\./i.test(toolId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";
   if (/workspace[-_.]?directory/i.test(toolId)) return "workspace_directory";
@@ -343,6 +359,74 @@ const inferToolFamily = (toolId: string): string => {
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";
   if (/docs-viewer|doc[_-]?viewer/i.test(toolId)) return "docs_viewer";
   return "unknown";
+};
+
+const CONTEXTUAL_TOOL_AUDIT_FAMILIES = [
+  "docs_viewer",
+  "scholarly_research",
+  "internet_search",
+  "theory_locator",
+  "workstation_action",
+  "notes",
+  "repo_code",
+  "live_environment",
+  "live_pipeline",
+  "process_graph",
+  "calculator",
+  "workspace_directory",
+] as const;
+
+const contextualMentionBlocksFamily = (
+  mention: HelixPromptInterpretation["contextual_tool_mentions"][number],
+  family: string,
+): boolean =>
+  contextualToolSuppressionBlocksFamily(
+    {
+      tool_admission_suppressed: true,
+      suppression_reason: mention.reason === "negated" ? "negated_tool_instruction" : "explanatory_only",
+      verb_or_cue: mention.verb_or_cue,
+      text: mention.text,
+    },
+    family,
+  );
+
+const blockedFamiliesForContextualMentions = (
+  mentions: HelixPromptInterpretation["contextual_tool_mentions"],
+): string[] =>
+  unique(CONTEXTUAL_TOOL_AUDIT_FAMILIES.filter((family) =>
+    mentions.some((mention) => contextualMentionBlocksFamily(mention, family)),
+  ));
+
+const buildContextualToolAudit = (input: {
+  contextualToolMentions: HelixPromptInterpretation["contextual_tool_mentions"];
+  actualToolCalls: RecordLike[];
+  unexpectedToolCalls: string[];
+}): HelixAskTurnSolverTrace["contextual_tool_audit"] => {
+  const blockedFamilies = blockedFamiliesForContextualMentions(input.contextualToolMentions);
+  const blockedFamilySet = new Set(blockedFamilies);
+  const executedBlockedToolIds = unique([
+    ...input.actualToolCalls
+      .map((entry) => {
+        const toolId = readString(entry.tool_id);
+        const family = readString(entry.family) || inferToolFamily(toolId);
+        return toolId && blockedFamilySet.has(family) ? toolId : "";
+      }),
+    ...input.unexpectedToolCalls
+      .map((toolId) => {
+        const family = inferToolFamily(toolId);
+        return toolId && blockedFamilySet.has(family) ? toolId : "";
+      }),
+  ].filter(Boolean));
+  return {
+    schema: "helix.contextual_tool_audit.v1",
+    contextual_tool_mention_present: input.contextualToolMentions.length > 0,
+    contextual_tool_family_blocked: blockedFamilies.length > 0,
+    blocked_contextual_tool_executed: executedBlockedToolIds.length > 0,
+    blocked_families: blockedFamilies,
+    executed_blocked_tool_ids: executedBlockedToolIds,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; targetKind: string; reason: string; strength: string } => {
@@ -515,8 +599,8 @@ export function evaluateAskTurnSolverHardGate(input: {
       if (flag === "route_selected_before_intent_arbitration") {
         pushHardFailure(details, "route_selected_before_intent_arbitration", "route was selected before intent arbitration completed");
       }
-      if (flag === "contextual_tool_mention_executed" && !terminalReceiptAllowed) {
-        pushHardFailure(details, "contextual_tool_mention_executed", "contextual, negated, historical, future, quoted, or screen-visible tool cue executed");
+      if (flag === "blocked_contextual_tool_executed" && !terminalReceiptAllowed) {
+        pushHardFailure(details, "blocked_contextual_tool_executed", "a blocked contextual, negated, historical, future, quoted, or screen-visible tool family was actually executed");
       }
       if (flag === "receipt_terminal_without_reentry" && !terminalReceiptAllowed) {
         pushHardFailure(details, "receipt_terminal_without_reentry", "receipt became terminal without solver re-entry for this intent");
@@ -765,6 +849,7 @@ const buildRiskFlags = (input: {
   primary: HelixAskTurnIntentKind;
   secondary: HelixAskTurnIntentKind[];
   contextualToolMentions: HelixPromptInterpretation["contextual_tool_mentions"];
+  contextualToolAudit: HelixAskTurnSolverTrace["contextual_tool_audit"];
   negativeConstraints: string[];
   actualToolCalls: RecordLike[];
   evidenceReentryRequired: boolean;
@@ -781,7 +866,6 @@ const buildRiskFlags = (input: {
   liveSourceIdentityOk: boolean;
   liveSourceIdentityTerminalAllowed: boolean;
 }): HelixAskTurnSolverRiskFlag[] => {
-  const unexpectedToolCalls = readStringArray(input.loopTrace?.unexpected_tool_calls);
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
   const routeCandidates = readStringArray(readRecord(input.payload.ask_turn_preflight_context)?.route_candidate_labels);
@@ -808,8 +892,8 @@ const buildRiskFlags = (input: {
     actualToolIds.length > 0 && input.followupRequired && !input.followupCompleted
       ? "tool_result_terminal_without_reasoning"
       : null,
-    input.contextualToolMentions.length > 0 && (mutatingToolExecuted || unexpectedToolCalls.length > 0)
-      ? "contextual_tool_mention_executed"
+    input.contextualToolAudit.blocked_contextual_tool_executed
+      ? "blocked_contextual_tool_executed"
       : null,
     input.negativeConstraints.length > 0 && (mutatingToolExecuted || /receipt/i.test(input.finalAnswerSource))
       ? "negative_constraint_ignored"
@@ -959,6 +1043,11 @@ export function buildAskTurnSolverTrace(input: {
   const actualToolCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
+  const contextualToolAudit = buildContextualToolAudit({
+    contextualToolMentions: promptInterpretation.contextual_tool_mentions,
+    actualToolCalls,
+    unexpectedToolCalls: readStringArray(loopTrace?.unexpected_tool_calls),
+  });
   const solverRiskFlags = buildRiskFlags({
     payload: input.payload,
     loopTrace,
@@ -969,6 +1058,7 @@ export function buildAskTurnSolverTrace(input: {
     primary,
     secondary,
     contextualToolMentions: promptInterpretation.contextual_tool_mentions,
+    contextualToolAudit,
     negativeConstraints: promptInterpretation.negative_constraints,
     actualToolCalls,
     evidenceReentryRequired: evidenceReentryGate.required,
@@ -1019,6 +1109,7 @@ export function buildAskTurnSolverTrace(input: {
           evidence_required: evidenceRequired,
         }],
     tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace),
+    contextual_tool_audit: contextualToolAudit,
     evidence_requests: toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? [({
           request_id: `internet-search:${input.turnId}`,

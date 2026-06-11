@@ -78,6 +78,9 @@ const readStringArray = (value: unknown): string[] =>
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const inferToolFamily = (toolId: string): string => {
+  if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
+  if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph/i.test(toolId)) return "theory_locator";
+  if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId)) return "internet_search";
   if (/^live_env\./i.test(toolId)) return "live_environment";
   if (/^situation-room\.live-source\.|^situation-room\.pipeline\./i.test(toolId)) return "live_pipeline";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(toolId)) return "workspace_diagnostic";

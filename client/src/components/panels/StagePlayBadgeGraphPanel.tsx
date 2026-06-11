@@ -391,6 +391,89 @@ type StagePlayFlowQueueRow = {
   tone: StagePlayJourneyState;
 };
 
+type StagePlayPacketTrafficStationKey =
+  | "visual_source"
+  | "observer_shades"
+  | "raw_mail"
+  | "processed_packet"
+  | "micro_reasoner_deck"
+  | "ask_handoff"
+  | "decision"
+  | "output"
+  | "loop_state";
+
+type StagePlayPacketTrafficStationStatus =
+  | "complete"
+  | "pending"
+  | "running"
+  | "skipped"
+  | "failed"
+  | "deferred";
+
+type StagePlayPacketTrafficStationState = {
+  station: StagePlayPacketTrafficStationKey;
+  status: StagePlayPacketTrafficStationStatus;
+  preview: string;
+  refs: string[];
+  startedAt?: string | null;
+  completedAt?: string | null;
+  durationMs?: number | null;
+};
+
+type StagePlayPacketTrafficReasonerRun = {
+  runId: string;
+  role: StagePlayMicroReasonerRoleV1;
+  status: StagePlayMicroReasonerRunV1["status"] | "missing";
+  promptId?: string | null;
+  outputPreview: string;
+  inputPreview?: string | null;
+  latencyMs?: number | null;
+  refs: string[];
+};
+
+type StagePlayPacketTrafficViewV1 = {
+  packetKey: string;
+  colorKey: string;
+  mailIds: string[];
+  packetId?: string | null;
+  wakeRequestId?: string | null;
+  askTurnId?: string | null;
+  decisionId?: string | null;
+  voiceReceiptId?: string | null;
+  sourceId?: string | null;
+  observerProfileId?: string | null;
+  observerProfileTitle?: string | null;
+  status:
+    | "mail_received"
+    | "packet_ready"
+    | "deck_running"
+    | "deck_complete"
+    | "ask_skipped"
+    | "ask_pending"
+    | "ask_running"
+    | "decision_recorded"
+    | "voice_pending"
+    | "voice_done"
+    | "waiting"
+    | "deferred"
+    | "failed";
+  stationStates: StagePlayPacketTrafficStationState[];
+  microReasonerRuns: StagePlayPacketTrafficReasonerRun[];
+  metrics: {
+    mailAgeMs?: number | null;
+    packetAgeMs?: number | null;
+    deckMs?: number | null;
+    rawMailChars?: number | null;
+    packetChars?: number | null;
+    compactChars?: number | null;
+    arbiterChars?: number | null;
+    deckChars?: number | null;
+    heapMb?: number | null;
+    rssMb?: number | null;
+    pressure?: string | null;
+  };
+};
+
 type StagePlayMailJourneyReasonerRow = {
   role: StagePlayMicroReasonerRoleV1;
   run: StagePlayMicroReasonerRunV1 | null;
@@ -1710,6 +1793,54 @@ const stagePlayJourneyStationTone = (state: StagePlayJourneyState): string => {
   return "border-slate-800 bg-slate-950/70 text-slate-400";
 };
 
+const STAGE_PLAY_PACKET_TRAFFIC_STATIONS: Array<{
+  key: StagePlayPacketTrafficStationKey;
+  label: string;
+  shortLabel: string;
+}> = [
+  { key: "visual_source", label: "Visual Source", shortLabel: "Source" },
+  { key: "observer_shades", label: "Observer Shades", shortLabel: "Shade" },
+  { key: "raw_mail", label: "Raw Mail", shortLabel: "Mail" },
+  { key: "processed_packet", label: "Processed Packet", shortLabel: "Packet" },
+  { key: "micro_reasoner_deck", label: "Micro-Reasoner Deck", shortLabel: "Deck" },
+  { key: "ask_handoff", label: "Ask Handoff", shortLabel: "Ask" },
+  { key: "decision", label: "Decision", shortLabel: "Decision" },
+  { key: "output", label: "Output", shortLabel: "Output" },
+  { key: "loop_state", label: "Loop State", shortLabel: "Loop" },
+];
+
+const packetTrailColor = (value: string): { hsl: string; border: string; background: string; glow: string } => {
+  let hash = 0;
+  for (const char of value || "packet") {
+    hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return {
+    hsl: `hsl(${hue} 84% 62%)`,
+    border: `hsl(${hue} 78% 52%)`,
+    background: `hsl(${hue} 72% 24% / 0.28)`,
+    glow: `0 0 0 1px hsl(${hue} 78% 52% / 0.45), 0 0 18px hsl(${hue} 84% 62% / 0.22)`,
+  };
+};
+
+const stagePlayTrafficStatusClass = (status: StagePlayPacketTrafficStationStatus): string => {
+  if (status === "complete") return "border-emerald-800/60 bg-emerald-950/20 text-emerald-100";
+  if (status === "running") return "border-cyan-600/70 bg-cyan-950/25 text-cyan-100";
+  if (status === "deferred") return "border-amber-700/70 bg-amber-950/25 text-amber-100";
+  if (status === "failed") return "border-rose-700/70 bg-rose-950/25 text-rose-100";
+  if (status === "skipped") return "border-slate-700 bg-slate-950/55 text-slate-400";
+  return "border-slate-800 bg-slate-950/65 text-slate-500";
+};
+
+const stagePlayTrafficStatusGlyph = (status: StagePlayPacketTrafficStationStatus): string => {
+  if (status === "complete") return "OK";
+  if (status === "running") return "RUN";
+  if (status === "deferred") return "WAIT";
+  if (status === "failed") return "FAIL";
+  if (status === "skipped") return "SKIP";
+  return "--";
+};
+
 const activeStagePlayJourneyIndex = (stations: StagePlayMailJourneyStation[]): number => {
   const blocked = stations.findIndex((station) => station.state === "blocked");
   if (blocked >= 0) return blocked;
@@ -1927,6 +2058,225 @@ function StagePlayFlowQueueColumn({
           <div className="mt-0.5 font-mono text-[10px] text-slate-200">{formatStagePlayCount(totalBytes)}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StagePlayTrafficHeader({
+  cadenceMs,
+  mailAgeMs,
+  packetAgeMs,
+  deckLatencyMs,
+  wakeLabel,
+  wakeTone,
+  runtimePressureLabel,
+  unreadCount,
+  retainedCount,
+  heapRamLabel,
+  rssRamLabel,
+  pressureTone,
+}: {
+  cadenceMs: number;
+  mailAgeMs: number | null;
+  packetAgeMs: number | null;
+  deckLatencyMs: number;
+  wakeLabel: string;
+  wakeTone: "good" | "warn" | "blocked" | "default";
+  runtimePressureLabel: string;
+  unreadCount: number;
+  retainedCount: number;
+  heapRamLabel: string;
+  rssRamLabel: string;
+  pressureTone: "good" | "warn" | "blocked" | "default";
+}) {
+  return (
+    <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-packet-traffic-header">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Traffic header</div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+        <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
+        <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
+        <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
+        <StagePlayMetricPill label="deck time" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
+        <StagePlayMetricPill label="wake / ask" value={wakeLabel} tone={wakeTone} />
+        <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={pressureTone} />
+        <StagePlayMetricPill label="unread / retained" value={`${unreadCount} / ${retainedCount}`} />
+        <StagePlayMetricPill label="heap / rss" value={`${heapRamLabel} | ${rssRamLabel}`} tone={pressureTone} />
+      </div>
+    </div>
+  );
+}
+
+function StagePlayReasonerDots({
+  traffic,
+  onSelect,
+}: {
+  traffic: StagePlayPacketTrafficViewV1;
+  onSelect: (packetKey: string) => void;
+}) {
+  const color = packetTrailColor(traffic.colorKey);
+  const runByRole = new Map(traffic.microReasonerRuns.map((run) => [run.role, run]));
+  return (
+    <div className="flex flex-wrap gap-1" data-testid="stage-play-packet-reasoner-dots">
+      {STAGE_PLAY_DECK_ROLES.map((role) => {
+        const run = runByRole.get(role);
+        const status = run?.status ?? "missing";
+        const statusClass = status === "completed"
+          ? "bg-emerald-400 text-emerald-950"
+          : status === "running" || status === "queued"
+            ? "bg-cyan-300 text-cyan-950"
+            : status === "failed"
+              ? "bg-rose-400 text-rose-950"
+              : status === "skipped"
+                ? "bg-slate-600 text-slate-200"
+                : "bg-slate-800 text-slate-500";
+        return (
+          <button
+            key={`${traffic.packetKey}:${role}`}
+            type="button"
+            onClick={() => onSelect(traffic.packetKey)}
+            className={`h-5 min-w-5 rounded border px-1 font-mono text-[8px] font-semibold ${statusClass}`}
+            style={{ borderColor: color.border }}
+            title={`${MICRO_REASONER_DISPLAY[role].title}: ${status}${run?.latencyMs != null ? ` (${run.latencyMs}ms)` : ""}`}
+            data-testid="stage-play-packet-reasoner-dot"
+          >
+            {MICRO_REASONER_DISPLAY[role].title.split(/\s+/).map((part) => part[0]).join("").slice(0, 2)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StagePlayPacketTrafficBoard({
+  traffic,
+  selectedPacketKey,
+  onSelectPacket,
+}: {
+  traffic: StagePlayPacketTrafficViewV1[];
+  selectedPacketKey: string | null;
+  onSelectPacket: (packetKey: string) => void;
+}) {
+  const selected = traffic.find((row) => row.packetKey === selectedPacketKey) ?? null;
+  return (
+    <div className="rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3" data-testid="stage-play-packet-traffic-board">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Processed Mail Traffic Board</div>
+          <div className="mt-0.5 text-xs text-cyan-100/70">One packet, one visible path. Colors stay stable across refresh.</div>
+        </div>
+        <div className="font-mono text-[10px] text-cyan-100/60">{traffic.length} trail{traffic.length === 1 ? "" : "s"}</div>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <div
+          className="grid min-w-[1180px] gap-2"
+          style={{ gridTemplateColumns: `160px repeat(${STAGE_PLAY_PACKET_TRAFFIC_STATIONS.length}, minmax(116px, 1fr))` }}
+        >
+          <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Packet</div>
+          {STAGE_PLAY_PACKET_TRAFFIC_STATIONS.map((station) => (
+            <div key={station.key} className="rounded border border-slate-800 bg-slate-950/70 p-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-200">{station.label}</div>
+            </div>
+          ))}
+          {traffic.length > 0 ? traffic.map((row) => {
+            const color = packetTrailColor(row.colorKey);
+            return (
+              <React.Fragment key={row.packetKey}>
+                <button
+                  type="button"
+                  onClick={() => onSelectPacket(row.packetKey)}
+                  className={`rounded border p-2 text-left ${selectedPacketKey === row.packetKey ? "bg-slate-900" : "bg-black/20"}`}
+                  style={{ borderColor: color.border, boxShadow: selectedPacketKey === row.packetKey ? color.glow : undefined }}
+                  data-testid="stage-play-packet-trail-row"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.hsl }} />
+                    <span className="truncate text-[11px] font-semibold text-slate-100">{row.packetId?.split(":").at(-1)?.slice(0, 10) ?? row.packetKey.split(":").at(-1)?.slice(0, 10)}</span>
+                  </div>
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-500">{labelize(row.status)}</div>
+                </button>
+                {STAGE_PLAY_PACKET_TRAFFIC_STATIONS.map((station) => {
+                  const state = row.stationStates.find((entry) => entry.station === station.key);
+                  const cellClassName = `min-h-[74px] rounded border p-2 text-left ${stagePlayTrafficStatusClass(state?.status ?? "pending")}`;
+                  const cellStyle = { borderColor: state?.status === "pending" ? undefined : color.border };
+                  if (station.key === "micro_reasoner_deck") {
+                    return (
+                      <div
+                        key={`${row.packetKey}:${station.key}`}
+                        className={cellClassName}
+                        style={cellStyle}
+                        title={state?.preview ?? station.label}
+                        data-testid="stage-play-packet-station-cell"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onSelectPacket(row.packetKey)}
+                          className="flex w-full items-center justify-between gap-2 text-left"
+                        >
+                          <span className="font-mono text-[9px] opacity-75">{stagePlayTrafficStatusGlyph(state?.status ?? "pending")}</span>
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color.hsl }} />
+                        </button>
+                        <div className="mt-2">
+                          <StagePlayReasonerDots traffic={row} onSelect={onSelectPacket} />
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={`${row.packetKey}:${station.key}`}
+                      type="button"
+                      onClick={() => onSelectPacket(row.packetKey)}
+                      className={cellClassName}
+                      style={cellStyle}
+                      title={state?.preview ?? station.label}
+                      data-testid="stage-play-packet-station-cell"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[9px] opacity-75">{stagePlayTrafficStatusGlyph(state?.status ?? "pending")}</span>
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color.hsl }} />
+                      </div>
+                      <div className="mt-2 line-clamp-2 text-[10px] leading-snug opacity-85">{state?.preview ?? "waiting"}</div>
+                    </button>
+                  );
+                })}
+              </React.Fragment>
+            );
+          }) : (
+            <div className="col-span-10 rounded border border-slate-800 bg-black/20 p-3 text-sm text-slate-500">
+              Waiting for the first mail artifact to enter the traffic board.
+            </div>
+          )}
+        </div>
+      </div>
+      {selected ? (
+        <div className="mt-3 rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-packet-inspector-drawer">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Packet inspector</div>
+              <div className="mt-1 font-mono text-xs text-slate-200">{selected.packetId ?? selected.packetKey}</div>
+            </div>
+            <div className="rounded border border-slate-700 px-2 py-1 font-mono text-[10px] text-slate-300">{labelize(selected.status)}</div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-5">
+            <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(selected.metrics.rawMailChars ?? 0)} />
+            <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(selected.metrics.packetChars ?? 0)} />
+            <StagePlayMetricPill label="compact chars" value={formatStagePlayCount(selected.metrics.compactChars ?? 0)} />
+            <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(selected.metrics.deckMs ?? null)} />
+            <StagePlayMetricPill label="reasoners" value={`${selected.microReasonerRuns.filter((run) => run.status === "completed").length}/${STAGE_PLAY_DECK_ROLES.length}`} />
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {selected.microReasonerRuns.map((run) => (
+              <div key={run.runId} className="rounded border border-slate-800 bg-slate-950/70 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-[11px] font-semibold text-slate-100">{MICRO_REASONER_DISPLAY[run.role].title}</div>
+                  <div className="font-mono text-[9px] text-slate-500">{run.latencyMs == null ? run.status : `${run.latencyMs}ms`}</div>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{run.outputPreview || "No output yet."}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3720,6 +4070,7 @@ function StagePlayMailLoopLiveOverview({
 }) {
   const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "full">("idle");
   const [selectedTrafficPayloadId, setSelectedTrafficPayloadId] = useState<string | null>(null);
+  const [selectedPacketTrafficKey, setSelectedPacketTrafficKey] = useState<string | null>(null);
   const debugCopyResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const mailItems = mailbox?.mailItems ?? [];
   const packets = mailbox?.processedMailPackets ?? [];
@@ -4180,6 +4531,362 @@ function StagePlayMailLoopLiveOverview({
             : "pending",
     },
   ];
+  const mailById = new Map(mailItems.map((mail) => [mail.mailId, mail]));
+  const wakeResultsByWakeId = new Map<string, StagePlayLiveSourceMailWakeResultV1[]>();
+  for (const result of wakeResults) {
+    const bucket = wakeResultsByWakeId.get(result.wakeRequestId) ?? [];
+    bucket.push(result);
+    wakeResultsByWakeId.set(result.wakeRequestId, bucket);
+  }
+  const packetMailIdSet = new Set(packets.flatMap((packet) => packet.mailIds));
+  const buildReasonerTrafficRuns = (
+    packet: StagePlayProcessedMailPacketV1 | null,
+    mailIds: string[],
+  ): StagePlayPacketTrafficReasonerRun[] => {
+    const scopedRuns = runs.filter((run) => {
+      if (packet?.microReasonerRunRefs.includes(run.runId)) return true;
+      return run.mailIds.some((mailId) => mailIds.includes(mailId));
+    });
+    return STAGE_PLAY_DECK_ROLES.map((role) => {
+      const run =
+        (packet ? latestStagePlayRunForPacket(scopedRuns, role, packet) : null) ??
+        scopedRuns.filter((entry) => entry.role === role).at(-1) ??
+        null;
+      return {
+        runId: run?.runId ?? `${packet?.packetId ?? mailIds[0] ?? "mail"}:${role}:missing`,
+        role,
+        status: run?.status ?? "missing",
+        promptId: run?.promptId ?? null,
+        inputPreview: run?.inputPreview ?? null,
+        outputPreview: run?.outputPreview ?? MICRO_REASONER_DISPLAY[role].missingPreview,
+        latencyMs: run?.latencyMs ?? null,
+        refs: uniqueSorted([...(run?.inputRefs ?? []), ...(run?.outputRefs ?? []), ...(run ? [run.runId] : [])]),
+      };
+    });
+  };
+  const stationStatusForDeck = (reasonerRuns: StagePlayPacketTrafficReasonerRun[]): StagePlayPacketTrafficStationStatus => {
+    if (reasonerRuns.some((run) => run.status === "failed")) return "failed";
+    if (reasonerRuns.some((run) => run.status === "running" || run.status === "queued")) return "running";
+    if (reasonerRuns.some((run) => run.status === "completed")) return "complete";
+    return "pending";
+  };
+  const buildPacketTrafficRow = (packet: StagePlayProcessedMailPacketV1): StagePlayPacketTrafficViewV1 => {
+    const mailIds = packet.mailIds;
+    const primaryMail = mailIds.map((mailId) => mailById.get(mailId)).find(Boolean) ?? null;
+    const reasonerRuns = buildReasonerTrafficRuns(packet, mailIds);
+    const deckStatus = stationStatusForDeck(reasonerRuns);
+    const wake = wakeRequests
+      .filter((candidate) => candidate.mailIds.some((mailId) => mailIds.includes(mailId)))
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .at(-1) ?? null;
+    const wakeResult = wake
+      ? latestStagePlayMailWakeResult(wakeResultsByWakeId.get(wake.wakeRequestId) ?? [], wake.wakeRequestId)
+      : null;
+    const decisionIds = new Set([...(wake?.decisionIds ?? []), ...(wakeResult?.decisionIds ?? [])]);
+    const decision = decisions.filter((entry) => decisionIds.has(entry.decisionId)).at(-1) ?? null;
+    const voiceRefs = wakeResult?.voiceCheckpointRefs ?? [];
+    const wakeFailure = wakeResult?.failedReason ?? wakeResult?.skippedReason ?? wake?.failureReason ?? null;
+    const packetVoiceRequested =
+      packet.recommendedNext === "request_voice_callout" ||
+      packet.arbiter?.recommendedNext === "request_voice_callout" ||
+      decision?.decision === "request_voice_callout";
+    const askStatus: StagePlayPacketTrafficStationStatus = wake?.askTurnId || wakeResult?.askTurnId
+      ? "complete"
+      : wake?.status === "deferred_for_pressure" || wakeResult?.status === "deferred_for_pressure"
+        ? "deferred"
+        : wake?.status === "failed_retryable" || wakeResult?.status === "failed_retryable" || wakeResult?.status === "failed_terminal"
+          ? "failed"
+          : wake
+            ? "running"
+            : packet.arbiter?.wakeAsk
+              ? "pending"
+              : "skipped";
+    const decisionStatus: StagePlayPacketTrafficStationStatus = decision
+      ? "complete"
+      : askStatus === "failed" || askStatus === "deferred"
+        ? askStatus
+        : wake
+          ? "pending"
+          : "skipped";
+    const outputStatus: StagePlayPacketTrafficStationStatus = voiceRefs.length > 0 || wakeResult?.status === "completed"
+      ? "complete"
+      : packetVoiceRequested
+        ? "pending"
+        : decision
+          ? "skipped"
+          : "pending";
+    const loopStatus: StagePlayPacketTrafficStationStatus =
+      askStatus === "failed" || decisionStatus === "failed"
+        ? "failed"
+        : askStatus === "deferred" || decisionStatus === "deferred"
+          ? "deferred"
+          : outputStatus === "complete" || packet.recommendedNext === "wait_for_next_summary"
+            ? "complete"
+            : "running";
+    const trafficStatus: StagePlayPacketTrafficViewV1["status"] =
+      loopStatus === "failed"
+        ? "failed"
+        : loopStatus === "deferred"
+          ? "deferred"
+          : voiceRefs.length > 0
+            ? "voice_done"
+            : packetVoiceRequested && outputStatus !== "complete"
+              ? "voice_pending"
+              : decision
+                ? "decision_recorded"
+                : wake?.askTurnId || wakeResult?.askTurnId
+                  ? "ask_running"
+                  : wake
+                    ? "ask_pending"
+                    : deckStatus === "running"
+                      ? "deck_running"
+                      : deckStatus === "complete"
+                        ? packet.arbiter?.wakeAsk ? "deck_complete" : "ask_skipped"
+                        : "packet_ready";
+    const packetDeckMs = reasonerRuns.reduce((sum, run) => sum + (run.latencyMs ?? 0), 0);
+    const packetRunChars = jsonCharCount(reasonerRuns.filter((run) => run.status !== "missing"));
+    const packetRawMailChars = mailIds.reduce((sum, mailId) => sum + (mailById.get(mailId)?.summary.text.length ?? 0), 0);
+    const packetCompactChars = jsonCharCount({
+      packetId: packet.packetId,
+      mailIds: packet.mailIds,
+      observedFacts: packet.observedFacts.slice(0, 4),
+      changedFacts: packet.changedFacts.slice(0, 4),
+      effort: packet.effortEstimate,
+      axioms: packet.axioms,
+      hypotheses: packet.hypotheses?.slice(0, 4) ?? [],
+      arbiter: packet.arbiter,
+      recommendedNext: packet.recommendedNext,
+      watchNext: packet.watchNext.slice(0, 4),
+    });
+    const packetArbiterChars = jsonCharCount({
+      packetId: packet.packetId,
+      effort: packet.effortEstimate?.currentEffort ?? "unknown",
+      arbiter: packet.arbiter,
+      recommendedNext: packet.recommendedNext,
+      evidenceRefs: packet.evidenceRefs.slice(0, 10),
+    });
+    const stationStates: StagePlayPacketTrafficStationState[] = [
+      {
+        station: "visual_source",
+        status: captureStateTone === "blocked" ? "failed" : captureStateTone === "good" ? "complete" : "running",
+        preview: `${visualSource?.sourceId ?? "visual source"}: ${captureStateLabel}`,
+        refs: visualSource?.sourceId ? [visualSource.sourceId] : [],
+        completedAt: primaryMail?.createdAt ?? null,
+      },
+      {
+        station: "observer_shades",
+        status: primaryMail ? "complete" : "pending",
+        preview: compactStagePlayMailPreview(primaryMail?.summary.preview ?? primaryMail?.summary.text, "Observer shade pending.", 90),
+        refs: primaryMail?.evidenceRefs ?? [],
+        completedAt: primaryMail?.createdAt ?? null,
+      },
+      {
+        station: "raw_mail",
+        status: primaryMail ? "complete" : "pending",
+        preview: `${mailIds.length} mail item${mailIds.length === 1 ? "" : "s"} | ${formatStagePlayCount(packetRawMailChars)} chars`,
+        refs: mailIds,
+        completedAt: primaryMail?.createdAt ?? null,
+      },
+      {
+        station: "processed_packet",
+        status: "complete",
+        preview: `${labelize(packet.recommendedNext)} | ${labelize(packet.salience.level)}`,
+        refs: [packet.packetId, ...packet.evidenceRefs],
+        completedAt: packet.createdAt,
+      },
+      {
+        station: "micro_reasoner_deck",
+        status: deckStatus,
+        preview: `${reasonerRuns.filter((run) => run.status === "completed").length}/${STAGE_PLAY_DECK_ROLES.length} complete`,
+        refs: reasonerRuns.flatMap((run) => run.refs),
+        durationMs: packetDeckMs,
+      },
+      {
+        station: "ask_handoff",
+        status: askStatus,
+        preview: wake
+          ? `${labelize(wake.lifecycleStage ?? wake.status)} | ${wake.askTurnId ?? "no Ask turn"}`
+          : packet.arbiter?.wakeAsk
+            ? "Wake requested, admission pending."
+            : "Ask skipped by packet decision.",
+        refs: wake ? [wake.wakeRequestId, ...wake.evidenceRefs] : [],
+        completedAt: wake?.updatedAt ?? wakeResult?.createdAt ?? null,
+      },
+      {
+        station: "decision",
+        status: decisionStatus,
+        preview: decision
+          ? `${labelize(decision.decision)} | ${compactStagePlayText(decision.rationalePreview, "rationale pending", 70)}`
+          : wakeFailure
+            ? compactStagePlayText(wakeFailure, "Decision blocked.", 90)
+            : "Decision pending or not required.",
+        refs: decision ? [decision.decisionId, ...decision.evidenceRefs] : [...decisionIds],
+        completedAt: decision?.createdAt ?? null,
+      },
+      {
+        station: "output",
+        status: outputStatus,
+        preview: voiceRefs.length > 0
+          ? `${voiceRefs.length} voice checkpoint ref${voiceRefs.length === 1 ? "" : "s"}`
+          : packetVoiceRequested
+            ? "Voice requested, receipt pending."
+            : wakeResult?.status === "completed"
+              ? "Wake result completed."
+              : "No output required yet.",
+        refs: voiceRefs,
+        completedAt: wakeResult?.createdAt ?? null,
+      },
+      {
+        station: "loop_state",
+        status: loopStatus,
+        preview: packet.watchNext.length > 0
+          ? compactStagePlayText(packet.watchNext.slice(0, 3).join(" | "), "Loop armed for next observation.", 100)
+          : loopStatus === "deferred"
+            ? `Deferred: ${runtimePressureLabel}`
+            : "Loop armed for next observation.",
+        refs: uniqueSorted([...packet.evidenceRefs, ...(wakeResult?.evidenceRefs ?? [])]),
+        completedAt: wakeResult?.createdAt ?? packet.createdAt,
+      },
+    ];
+    return {
+      packetKey: packet.packetId,
+      colorKey: packet.packetId || mailIds[0] || wake?.wakeRequestId || "packet",
+      mailIds,
+      packetId: packet.packetId,
+      wakeRequestId: wake?.wakeRequestId ?? null,
+      askTurnId: wake?.askTurnId ?? wakeResult?.askTurnId ?? null,
+      decisionId: decision?.decisionId ?? null,
+      voiceReceiptId: voiceRefs[0] ?? null,
+      sourceId: primaryMail?.sourceId ?? visualSource?.sourceId ?? null,
+      observerProfileId: latestPolicy?.observerProfileId ?? null,
+      observerProfileTitle: latestPolicy?.observerProfileTitle ?? null,
+      status: trafficStatus,
+      stationStates,
+      microReasonerRuns: reasonerRuns,
+      metrics: {
+        mailAgeMs: ageMsFromIso(primaryMail?.createdAt),
+        packetAgeMs: ageMsFromIso(packet.createdAt),
+        deckMs: packetDeckMs,
+        rawMailChars: packetRawMailChars,
+        packetChars: jsonCharCount(packet),
+        compactChars: packetCompactChars,
+        arbiterChars: packetArbiterChars,
+        deckChars: packetRunChars,
+        heapMb: runtimeAdmission?.memory?.heapUsedMiB ?? null,
+        rssMb: runtimeAdmission?.memory?.rssMiB ?? null,
+        pressure: runtimePressureLabel,
+      },
+    };
+  };
+  const buildMailOnlyTrafficRow = (mail: StagePlayLiveSourceMailItemV1): StagePlayPacketTrafficViewV1 => ({
+    packetKey: mail.mailId,
+    colorKey: mail.mailId,
+    mailIds: [mail.mailId],
+    packetId: null,
+    wakeRequestId: null,
+    askTurnId: null,
+    decisionId: null,
+    voiceReceiptId: null,
+    sourceId: mail.sourceId,
+    observerProfileId: latestPolicy?.observerProfileId ?? null,
+    observerProfileTitle: latestPolicy?.observerProfileTitle ?? null,
+    status: "mail_received",
+    stationStates: [
+      {
+        station: "visual_source",
+        status: captureStateTone === "blocked" ? "failed" : "complete",
+        preview: `${visualSource?.sourceId ?? mail.sourceId}: ${captureStateLabel}`,
+        refs: visualSource?.sourceId ? [visualSource.sourceId] : [mail.sourceId],
+        completedAt: mail.createdAt,
+      },
+      {
+        station: "observer_shades",
+        status: "complete",
+        preview: compactStagePlayMailPreview(mail.summary.preview || mail.summary.text, "Observer shade captured.", 90),
+        refs: mail.evidenceRefs,
+        completedAt: mail.createdAt,
+      },
+      {
+        station: "raw_mail",
+        status: "complete",
+        preview: `${labelize(mail.status)} | ${formatStagePlayCount(mail.summary.text.length)} chars`,
+        refs: [mail.mailId, ...mail.evidenceRefs],
+        completedAt: mail.createdAt,
+      },
+      {
+        station: "processed_packet",
+        status: "pending",
+        preview: "Packet not composed yet.",
+        refs: [mail.mailId],
+      },
+      {
+        station: "micro_reasoner_deck",
+        status: "pending",
+        preview: "Deck waiting for packet.",
+        refs: [],
+      },
+      {
+        station: "ask_handoff",
+        status: "skipped",
+        preview: "Ask cannot wake until packet exists.",
+        refs: [],
+      },
+      {
+        station: "decision",
+        status: "skipped",
+        preview: "No packet decision yet.",
+        refs: [],
+      },
+      {
+        station: "output",
+        status: "skipped",
+        preview: "No output yet.",
+        refs: [],
+      },
+      {
+        station: "loop_state",
+        status: "running",
+        preview: "Waiting for micro-reasoner deck.",
+        refs: [mail.mailId],
+      },
+    ],
+    microReasonerRuns: buildReasonerTrafficRuns(null, [mail.mailId]),
+    metrics: {
+      mailAgeMs: ageMsFromIso(mail.createdAt),
+      packetAgeMs: null,
+      deckMs: null,
+      rawMailChars: mail.summary.text.length,
+      packetChars: null,
+      compactChars: null,
+      arbiterChars: null,
+      deckChars: null,
+      heapMb: runtimeAdmission?.memory?.heapUsedMiB ?? null,
+      rssMb: runtimeAdmission?.memory?.rssMiB ?? null,
+      pressure: runtimePressureLabel,
+    },
+  });
+  const packetTrafficRows = [
+    ...packets.slice(-8).map((packet) => ({
+      sortAt: packet.createdAt,
+      row: buildPacketTrafficRow(packet),
+    })),
+    ...mailItems
+      .filter((mail) => !packetMailIdSet.has(mail.mailId))
+      .slice(-4)
+      .map((mail) => ({
+        sortAt: mail.createdAt,
+        row: buildMailOnlyTrafficRow(mail),
+      })),
+  ]
+    .sort((left, right) => right.sortAt.localeCompare(left.sortAt))
+    .map((entry) => entry.row)
+    .slice(0, 8);
+  const packetTrafficIds = packetTrafficRows.map((row) => row.packetKey).join("\n");
+  const defaultPacketTrafficKey = latestPacket?.packetId ?? latestMail?.mailId ?? packetTrafficRows[0]?.packetKey ?? null;
+  useEffect(() => {
+    if (selectedPacketTrafficKey && packetTrafficRows.some((row) => row.packetKey === selectedPacketTrafficKey)) return;
+    setSelectedPacketTrafficKey(defaultPacketTrafficKey);
+  }, [defaultPacketTrafficKey, packetTrafficIds, selectedPacketTrafficKey]);
   const trafficDetails: StagePlayTrafficDetail[] = [
     ...mailItems.slice(-5).reverse().map((mail): StagePlayTrafficDetail => ({
       id: mail.mailId,
@@ -4436,66 +5143,68 @@ function StagePlayMailLoopLiveOverview({
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StagePlayMetricPill label="source" value={captureStateLabel} tone={captureStateTone} />
-          <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
-          <StagePlayMetricPill
-            label={visualProducerState?.interval_active === false ? "last mail" : "mail age"}
-            value={formatStagePlayMs(mailAgeMs)}
-            tone={visualProducerState?.interval_active === false ? "default" : mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"}
-          />
-          <StagePlayMetricPill
-            label={visualProducerState?.interval_active === false ? "last packet" : "packet age"}
-            value={formatStagePlayMs(packetAgeMs)}
-            tone={visualProducerState?.interval_active === false ? "default" : packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"}
-          />
-          <StagePlayMetricPill
-            label="wake"
-            value={labelize(wakeLifecycleStage ?? wakeStatus)}
-            tone={stagePlayWakeLifecycleTone(wakeLifecycleStage, wakeStatus)}
-          />
-        </div>
       </div>
 
-      <StagePlayMailJourneyRail
-        stations={mailTransformSteps}
-        deckRows={deckRows}
-        payloadChars={latestMail?.summary.text.length ?? 0}
-        packetChars={packetChars}
+      <StagePlayTrafficHeader
+        cadenceMs={cadenceMs}
+        mailAgeMs={mailAgeMs}
+        packetAgeMs={packetAgeMs}
         deckLatencyMs={deckLatencyMs}
-        deckRuntimeLabel={deckRuntimeLabel}
-        combinedRuntimeTone={combinedRuntimeTone}
-        selectedPayloadId={selectedTrafficDetail?.id ?? selectedTrafficPayloadId}
-        onSelectPayload={setSelectedTrafficPayloadId}
+        wakeLabel={labelize(wakeLifecycleStage ?? wakeStatus)}
+        wakeTone={stagePlayWakeLifecycleTone(wakeLifecycleStage, wakeStatus)}
+        runtimePressureLabel={runtimePressureLabel}
+        unreadCount={mailItems.filter((mail) => mail.status === "unread").length}
+        retainedCount={mailItems.length}
+        heapRamLabel={heapRamLabel}
+        rssRamLabel={rssRamLabel}
+        pressureTone={combinedRuntimeTone}
       />
 
-      <div className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-packet-profile">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Packet profile</div>
-            <div className="mt-0.5 text-xs text-slate-500">Compact size, latency, pressure, and deck budget for the current packet.</div>
-          </div>
-          <div className="font-mono text-[10px] text-slate-500">{latestPacket?.packetId ?? "packet pending"}</div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-10">
-          <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
-          <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(packetChars)} />
-          <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
-          <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
-          <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
-          <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
-          <StagePlayMetricPill label="heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
-          <StagePlayMetricPill label="rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
-          <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
-          <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
-        </div>
-      </div>
+      <StagePlayPacketTrafficBoard
+        traffic={packetTrafficRows}
+        selectedPacketKey={selectedPacketTrafficKey}
+        onSelectPacket={setSelectedPacketTrafficKey}
+      />
 
       <details className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-diagnostics">
         <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-slate-300">
           Diagnostics: queue, Ask handoff, selected packet, packet history, prompts
         </summary>
         <div className="mt-3 space-y-3">
+          <StagePlayMailJourneyRail
+            stations={mailTransformSteps}
+            deckRows={deckRows}
+            payloadChars={latestMail?.summary.text.length ?? 0}
+            packetChars={packetChars}
+            deckLatencyMs={deckLatencyMs}
+            deckRuntimeLabel={deckRuntimeLabel}
+            combinedRuntimeTone={combinedRuntimeTone}
+            selectedPayloadId={selectedTrafficDetail?.id ?? selectedTrafficPayloadId}
+            onSelectPayload={setSelectedTrafficPayloadId}
+          />
+
+          <div className="rounded-md border border-slate-800 bg-black/20 p-3" data-testid="stage-play-mail-loop-packet-profile">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Packet profile</div>
+                <div className="mt-0.5 text-xs text-slate-500">Compact size, latency, pressure, and deck budget for the current packet.</div>
+              </div>
+              <div className="font-mono text-[10px] text-slate-500">{latestPacket?.packetId ?? "packet pending"}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-10">
+              <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(latestMail?.summary.text.length ?? 0)} />
+              <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(packetChars)} />
+              <StagePlayMetricPill label="compact ask chars" value={formatStagePlayCount(compactPacketChars)} tone={compactPacketChars <= 4000 ? "good" : "warn"} />
+              <StagePlayMetricPill label="arbiter chars" value={formatStagePlayCount(arbiterChars)} tone={arbiterChars <= 1500 ? "good" : "warn"} />
+              <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
+              <StagePlayMetricPill label="deck chars" value={formatStagePlayCount(runChars)} tone={runChars > compactPacketChars * 3 ? "warn" : "default"} />
+              <StagePlayMetricPill label="heap ram" value={heapRamLabel} tone={stagePlayRuntimeTone(heapRamPercent, runtimePressureLevel)} />
+              <StagePlayMetricPill label="rss ram" value={rssRamLabel} tone={stagePlayRuntimeTone(rssRamPercent, runtimePressureLevel)} />
+              <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={combinedRuntimeTone} />
+              <StagePlayMetricPill label="reasoners" value={`${latestPacketRuns.length || runs.length} runs`} />
+            </div>
+          </div>
+
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(340px,0.75fr)]">
         <StagePlaySelectedTrafficDetail detail={selectedTrafficDetail} />
         <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-mail-loop-operator-queue">

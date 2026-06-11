@@ -52,11 +52,11 @@ describe("Helix Ask solver continuation", () => {
     expect(continuation?.required_next_step).toBe("evidence_reentry");
   });
 
-  it("does not continue unknown hard failures", () => {
+  it("does not continue blocked contextual tool execution failures", () => {
     const continuation = buildSolverContinuationObservation({
       turnId: "turn-4",
       payload: {},
-      hardGateCode: "contextual_tool_mention_executed",
+      hardGateCode: "blocked_contextual_tool_executed",
       finalRoute: "dispatch:act",
       terminalKind: "typed_failure",
       artifactLedger: [],

@@ -848,6 +848,39 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind, debug).not.toBe("visual_capture_describe");
   }, 60_000);
 
+  it("treats current compact mailbox wake wording as route-locked mailbox work", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceId,
+      objective: "Watch the active visual source and wake Ask only for salient findings.",
+    });
+    seedVisualMail("The Minecraft scene shows an urgent combat cue while the player holds a sword.");
+
+    const compactWakePrompt = [
+      "Review the latest Stage Play live-source mailbox finding.",
+      "Current effort: combat or recovery.",
+      "Micro-reasoner recommendation: request voice callout.",
+      "Use the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
+    ].join("\n");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(compactWakePrompt);
+
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.canonical_goal_frame, debug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      classifier_reasons: expect.arrayContaining([
+        "stage_play_mail_wake_route_metadata",
+        "live_source_mailbox_intent",
+        "processed_mail_interpretation_goal",
+      ]),
+    });
+    expect(response.body?.planner_contract?.selection_fail_reason, debug).toBe("compact_mailbox_wake_forbids_workspace_action");
+    expect(response.body?.tool_use_restatement?.requiredToolFamilies, debug).not.toContain("internet_search");
+    expect(liveEnvironmentToolNames, debug).not.toContain("workspace_os.status");
+    expect(liveEnvironmentToolNames, debug).not.toContain("internet-search.search_web");
+  }, 60_000);
+
   it("requires a decision receipt when processed mail recommends interpretation", () => {
     const prompt =
       "Read the visual mail and interpret what is happening. Predict what happens next and say what should be watched next.";
