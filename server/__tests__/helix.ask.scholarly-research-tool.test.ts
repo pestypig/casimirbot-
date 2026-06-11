@@ -115,7 +115,57 @@ describe("Helix scholarly research tool admission", () => {
       expect(response.body?.final_answer_source).toBe("typed_failure");
       expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
     }
+    expect(response.body?.live_source_turn_phase_resolution).toBeFalsy();
+    expect(response.body?.terminal_error_code).not.toBe("live_source_phase_violation");
   }, 60000);
+
+  it("does not let negated workspace mutation language activate live-source phase suppression", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:test:scholarly-negated-write-not-live-source",
+        question:
+          "Use scholarly research to find papers about quantum coherence in photosynthesis, then use the Theory Badge Graph locator to place the claim and synthesize uncertainty with citations. Do not write files, do not create notes, and do not mutate workspace state.",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("scholarly_research_lookup");
+    expect(response.body?.source_target_intent?.target_source).toBe("scholarly_research");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    );
+    expect(response.body?.available_capabilities?.recommended_capability_key ?? response.body?.initial_available_capabilities?.recommended_capability_key)
+      .toBe(HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY);
+    expect(response.body?.live_source_turn_phase_resolution).toBeFalsy();
+    expect(response.body?.terminal_error_code).not.toBe("live_source_phase_violation");
+  }, 90000);
+
+  it("preserves multi-source compound prompts instead of collapsing theory locator to workstation panel control", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:test:multi-source-compound-not-panel-shortcut",
+        question:
+          "Use scholarly research, the Theory Badge Graph locator, and repo/code evidence together to explain whether Helix Ask correctly treats tool receipts as observations rather than answer authority. Do not write files.",
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("panel_control");
+    expect(response.body?.source_target_intent?.target_source).not.toBe("workstation_panel");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families ?? []).toEqual(
+      expect.arrayContaining(["theory_locator"]),
+    );
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families ?? []).toEqual(
+      expect.arrayContaining(["scholarly_research"]),
+    );
+    expect(response.body?.terminal_error_code).not.toBe("solver_path_incomplete_before_terminal");
+  }, 90000);
 
   it("attaches compound coverage for source-targeted scholarly plus locator phrasings", async () => {
     const app = createApp();

@@ -28,16 +28,25 @@ describe("theory badge overlap locator", () => {
       graph,
       input: {
         unitSignatures: ["M L^-1 T^-2"],
-        limit: 10,
+        limit: 40,
       },
     });
+    const matchIds = matches.map((match: TheoryBadgeLookupMatch) => match.badgeId);
 
-    expect(matches.map((match: TheoryBadgeLookupMatch) => match.badgeId)).toEqual(
+    expect(matchIds).toEqual(
       expect.arrayContaining([
         "nhm2.source.energy_density_proxy",
         "nhm2.qei.sampling_window",
         "nhm2.closure.source_residual",
+        "nhm2.closure.wall_t00_source_residual",
+        "nhm2.tensor.same_chart_full_tensor",
       ]),
+    );
+    expect(matches.find((match) => match.badgeId === "nhm2.source.energy_density_proxy")?.calculatorPayloadIds).toContain(
+      "rho_equals_E_over_V_payload",
+    );
+    expect(matches.find((match) => match.badgeId === "nhm2.qei.sampling_window")?.calculatorPayloadIds).toContain(
+      "qei_margin_difference_payload",
     );
   });
 

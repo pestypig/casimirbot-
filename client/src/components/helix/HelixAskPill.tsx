@@ -12062,6 +12062,7 @@ function buildAskLiveEventFromTurnTranscriptRecord(
   if (!text) return null;
   const type = coerceText(record.type).trim() || coerceText(record.source_event_type).trim() || "turn_transcript_event";
   const sourceEventType = coerceText(record.source_event_type).trim();
+  const turnId = coerceText(record.turn_id ?? record.turnId ?? record.active_turn_id).trim();
   const atMs = typeof record.at_ms === "number" && Number.isFinite(record.at_ms) ? Math.trunc(record.at_ms) : null;
   const ts = atMs ? new Date(atMs).toISOString() : undefined;
   const seq = typeof record.seq === "number" && Number.isFinite(record.seq) ? Math.trunc(record.seq) : undefined;
@@ -12084,6 +12085,8 @@ function buildAskLiveEventFromTurnTranscriptRecord(
       lane: coerceText(record.lane).trim() || null,
       source_event_type: sourceEventType || type,
       event_source: coerceText(record.event_source).trim() || "live",
+      turn_id: turnId || null,
+      reconstructed: record.reconstructed === true,
       stream_event: "turn_transcript_event",
     },
   };
@@ -23253,11 +23256,15 @@ export function HelixAskPill({
         }
         return clipped;
       });
-      const activeTurnId = activeAskTurnIdRef.current?.trim() ?? "";
-      if (activeTurnId) {
+      const eventMeta = readAgentLoopAuditRecord(entry.meta);
+      const targetTurnId =
+        coerceText(eventMeta?.turn_id ?? eventMeta?.turnId ?? eventMeta?.active_turn_id ?? eventMeta?.ask_turn_id).trim() ||
+        activeAskTurnIdRef.current?.trim() ||
+        "";
+      if (targetTurnId) {
         setAskReplies((prev) =>
           prev.map((reply) => {
-            if (resolveHelixAskReplyCanonicalKey(reply) !== activeTurnId) return reply;
+            if (resolveHelixAskReplyCanonicalKey(reply) !== targetTurnId) return reply;
             const existing = Array.isArray(reply.liveEvents) ? reply.liveEvents : [];
             if (existing.some((liveEvent) => liveEvent.id === entry.id)) return reply;
             return {

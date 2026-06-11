@@ -76,6 +76,9 @@ describe("helix ask turn e10.28 ui regressions", () => {
 
     expect(response.headers["content-type"]).toMatch(/text\/event-stream/);
     const text = response.text ?? "";
+    const events = parseSseEvents(text);
+    const transcriptEvents = events.filter((event) => event.event === "turn_transcript_event");
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
     expect(text).toContain("event: turn_transcript_event");
     expect(text).toContain("event: turn_final");
     expect(text).toContain("\"type\":\"plan\"");
@@ -88,6 +91,12 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(text).toContain("\"async_executor_used\":true");
     expect(text).toContain("\"async_step_durations\"");
     expect(text.indexOf("event: turn_transcript_event")).toBeLessThan(text.indexOf("event: turn_final"));
+    expect(transcriptEvents.length).toBeGreaterThan(0);
+    expect(finalPacket?.turn_id).toBeTruthy();
+    expect(transcriptEvents.every((event) => event.data?.turn_id === finalPacket?.turn_id)).toBe(true);
+    expect(transcriptEvents.some((event) => event.data?.event_source === "live")).toBe(true);
+    expect(finalPacket?.turn_transcript_live_event_count).toBeGreaterThan(0);
+    expect(finalPacket?.turn_transcript_reconstructed_fallback_count).toEqual(expect.any(Number));
   });
 
   it("terminalizes stream errors as a final typed-failure turn payload", async () => {

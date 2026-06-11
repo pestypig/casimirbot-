@@ -248,6 +248,45 @@ describe("helix ask repo/code intent precedence", () => {
     );
   }, 90000);
 
+  it("keeps runtime intent attached for repo/doc evidence prompts with conditional calculator wording", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Use document or repo evidence to find the Helix Ask rule of thumb for tools, then use calculator-style reasoning only if there is a numeric gate or count to verify. Synthesize the result without writing files.",
+        mode: "read",
+        debug: true,
+        sessionId: `repo-doc-calculator-compound-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.runtime_intent_packet).toMatchObject({
+      schema: "helix.runtime_intent_packet.v1",
+      completion_authority: "agent_runtime_loop_and_goal_satisfaction",
+    });
+    expect(response.body?.runtime_authority_audit).toMatchObject({
+      schema: "helix.runtime_authority_audit.v1",
+      runtime_intent_packet_ref: expect.stringContaining(":runtime_intent_packet"),
+      source_targeted_turn: true,
+    });
+    expect(response.body?.runtime_authority_audit?.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          check: "runtime_intent_packet_present_for_source_or_capability_turn",
+          passed: true,
+        }),
+      ]),
+    );
+    expect(response.body?.terminal_error_code).not.toBe("terminal_boundary_ineligible");
+  }, 90000);
+
   it("diagnoses tool-call eligibility questions from repo/runtime evidence", async () => {
     const app = createApp();
     const response = await request(app)
