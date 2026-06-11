@@ -107,6 +107,42 @@ describe("workstation dynamic tools", () => {
     });
   });
 
+  it("exposes account-session interface language as a schema-bound workstation tool", () => {
+    const tools = getWorkstationDynamicTools();
+    const setLanguage = tools.find((tool) => tool.name === "account_session.set_interface_language");
+
+    expect(setLanguage).toMatchObject({
+      namespace: "workstation",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      deferLoading: false,
+      risk: "low",
+      returns_artifact: true,
+      terminal_artifact_kind: "workspace_action_receipt",
+    });
+    expect(setLanguage?.inputSchema).toMatchObject({
+      required: ["language"],
+      properties: {
+        language: { enum: ["en", "haw"] },
+      },
+    });
+
+    expect(
+      mapClientWorkstationDynamicToolCallToAction("account_session.set_interface_language", {
+        language: "haw",
+      }),
+    ).toEqual({
+      ok: true,
+      action: {
+        schema_version: "helix.workstation.action/v1",
+        action: "run_panel_action",
+        panel_id: "account-session",
+        action_id: "set_interface_language",
+        args: { language: "haw" },
+      },
+    });
+  });
+
   it("returns a bounded missing-slot result instead of choosing another action", () => {
     const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.create_job", {
       target_language: "es",

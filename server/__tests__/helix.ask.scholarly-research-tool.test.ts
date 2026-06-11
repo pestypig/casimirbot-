@@ -103,6 +103,44 @@ describe("Helix scholarly research tool admission", () => {
     }
   }, 60000);
 
+  it("attaches compound coverage for source-targeted scholarly plus locator phrasings", async () => {
+    const app = createApp();
+    const promptText =
+      "Use scholarly research to find papers about photosynthesis quantum coherence and microtubule Orch-OR claims, then use the Theory Badge Graph locator / theory locator to place the relevant claims and synthesize the uncertainty with citations. Do not write files.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "helix-ask:test:source-targeted-compound-contract",
+        question: promptText,
+        mode: "read",
+        debug: true,
+      })
+      .expect(200);
+
+    const compoundContract =
+      response.body?.compound_prompt_contract ??
+      response.body?.ask_turn_solver_trace?.compound_prompt_contract ??
+      response.body?.prompt_interpretation?.compound_contract;
+
+    expect(response.body?.capability_itinerary).toMatchObject({
+      prompt_shape: "compound_tool",
+      relevant_tool_families: expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    });
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toEqual(
+      expect.arrayContaining(["scholarly_research", "theory_locator"]),
+    );
+    expect(compoundContract).toMatchObject({
+      schema: "helix.compound_prompt_contract.v1",
+    });
+    expect(compoundContract?.requirements?.length).toBeGreaterThanOrEqual(2);
+    expect(response.body?.compound_prompt_coverage_gate).toMatchObject({
+      schema: "helix.compound_prompt_coverage_gate.v1",
+      applies: true,
+    });
+    expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
+  }, 60000);
+
   it("rejects empty scholarly runtime tool args instead of falling back to the full prompt", () => {
     const availableCapabilities = {
       schema: "helix.available_capabilities.v1",

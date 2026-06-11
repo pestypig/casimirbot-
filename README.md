@@ -191,6 +191,21 @@ Best-practice policy for agent and panel work:
 - Fail-closed standard: missing capability lifecycle, agent step decision,
   selected capability observation, or post-observation model decision blocks the
   terminal answer.
+- Compound coverage standard: for compound prompts, correct route/tool admission
+  and a correct itinerary are necessary but not sufficient. Required observation
+  coverage must be attached before terminal authority and public/debug export
+  projection. If coverage is missing or fail-closed, terminal state should be a
+  typed failure and every public/debug mirror should copy that authority rather
+  than an older final-answer draft.
+- Projection standard: response envelopes, debug exports, cache entries, live
+  cards, and resolved summaries are projections of terminal authority. They can
+  enrich or slim the trace, but they must not preserve stale terminal kind,
+  final-answer source, or error-code values after authority has selected a
+  typed failure.
+- Isolation tests: when repairing Ask routes, test the layers separately:
+  prompt/source/tool admission, observation or coverage satisfaction, terminal
+  authority, public response projection, and debug-export/cache projection. A
+  passing admission/itinerary test does not prove terminal success.
 - Shortcut tests: shortcut-like route rules need adversarial coverage for
   contextual, negated, future or conditional, historical, quoted or
   screen-visible, and mixed-intent prompts.

@@ -1764,6 +1764,21 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         risk: "low",
         aliases: ["open account", "show sessions", "show token usage", "open profile"],
       },
+      {
+        id: "set_interface_language",
+        title: "Set Interface Language",
+        description: "Change the workstation interface language preference.",
+        risk: "low",
+        aliases: [
+          "set interface language",
+          "change interface language",
+          "switch ui language",
+          "switch interface to hawaiian",
+          "set ui to hawaiian",
+        ],
+        required_args: ["language"],
+        returns_artifact: true,
+      },
     ],
   }),
 };

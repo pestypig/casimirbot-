@@ -142,4 +142,74 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
     });
     expect(JSON.stringify(envelope)).not.toContain("terminal_consistency_violation");
   });
+
+  it("normalizes terminal-consistency errors to typed failure when coverage is missing", () => {
+    const failureText = "The turn failed before a terminal answer was authoritative.";
+    const payload = {
+      turn_id: "ask:test-missing-coverage-terminal-mirror",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_error_code: "terminal_consistency_violation",
+      selected_final_answer: "stale draft",
+      answer: "stale draft",
+      text: "stale draft",
+      current_turn_artifact_ledger: [],
+      terminal_answer_authority: {
+        schema: "helix.terminal_authority.v1",
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_text_preview: failureText,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+        concise_text: failureText,
+      },
+      resolved_turn_summary: {
+        final_status: "final_failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+      debug: {
+        final_answer_source: "final_answer_draft",
+      },
+    };
+
+    const normalized = __testHelixAskOutputContract.prepareHelixAskLiveResponsePayload(payload, { mode: "deep" }) as Record<string, any>;
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "Use scholarly research then theory locator.",
+      sessionId: "test-session",
+    });
+
+    expect(normalized).toMatchObject({
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "typed_failure",
+    });
+    expect(normalized.debug).toMatchObject({
+      terminal_error_code: "typed_failure",
+    });
+    expect(envelope).toMatchObject({
+      terminal_error_code: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+    });
+    expect(envelope?.resolved_turn_summary).toMatchObject({
+      terminal_error_code: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+    });
+    expect(JSON.stringify(envelope)).not.toContain("terminal_consistency_violation");
+  });
 });

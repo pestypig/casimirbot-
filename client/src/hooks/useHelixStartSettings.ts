@@ -6,6 +6,12 @@ import {
   normalizeInterfaceLanguageCode,
   type InterfaceLanguageCode,
 } from "@/lib/i18n/interfaceLanguage";
+import {
+  INTERFACE_LANGUAGE_CHANGED_EVENT,
+  PROFILE_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+  type InterfaceLanguageChangedDetail,
+} from "@/lib/i18n/interfaceLanguagePreference";
 
 export type StartSettings = {
   settingsVersion: number;
@@ -47,8 +53,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   preferredResponseLanguage: "auto",
 };
 
-export const SETTINGS_STORAGE_KEY = "helix-start-settings";
-export const PROFILE_STORAGE_KEY = "helix-start-profile";
+export { PROFILE_STORAGE_KEY, SETTINGS_STORAGE_KEY };
 
 export function useHelixStartSettings() {
   const [userSettings, setUserSettings] = React.useState<StartSettings>(DEFAULT_SETTINGS);
@@ -113,6 +118,24 @@ export function useHelixStartSettings() {
       // storing user preference is best-effort
     }
   }, [settingsHydrated, userSettings]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleInterfaceLanguageChanged = (event: Event) => {
+      const detail = (event as CustomEvent<InterfaceLanguageChangedDetail>).detail;
+      const language = normalizeInterfaceLanguageCode(detail?.language);
+      setUserSettings((prev) =>
+        prev.interfaceLanguage === language
+          ? prev
+          : {
+              ...prev,
+              interfaceLanguage: language,
+            },
+      );
+    };
+    window.addEventListener(INTERFACE_LANGUAGE_CHANGED_EVENT, handleInterfaceLanguageChanged);
+    return () => window.removeEventListener(INTERFACE_LANGUAGE_CHANGED_EVENT, handleInterfaceLanguageChanged);
+  }, []);
 
   React.useEffect(() => {
     setAlcubierreDebugLogEnabled(Boolean(userSettings.showAlcubierreRenderDebugLog));

@@ -1,7 +1,12 @@
 export type WorkstationDebugEvent = {
   id: string;
   ts: string;
-  channel: "situation_room" | "situation_room_job" | "situation_room_translation" | "situation_room_graph";
+  channel:
+    | "account_session"
+    | "situation_room"
+    | "situation_room_job"
+    | "situation_room_translation"
+    | "situation_room_graph";
   action: string;
   room_id?: string;
   source_id?: string;

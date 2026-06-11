@@ -61,6 +61,8 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
   const errorCode =
     compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
       ? "compound_prompt_coverage_incomplete"
+      : existingErrorCode === "terminal_consistency_violation"
+        ? "typed_failure"
       : existingErrorCode ?? "typed_failure";
 
   payload.ok = false;

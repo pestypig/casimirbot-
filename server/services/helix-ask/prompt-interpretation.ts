@@ -140,7 +140,7 @@ const negativeConstraintPatterns = [
   /\bwithout\s+run(?:ning)?\b/i,
   /\bwithout\s+(?:pressing|starting|changing|executing)\b/i,
   /\b(?:open|run|click|start|stop|set|change|update|repair|refresh)\s+nothing\b/i,
-  /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:open|run|click|start|stop|set|change|update|repair|refresh|call|execute)\b/i,
+  /\b(?:do\s+not|don't|without|never)\b[\s\S]{0,80}\b(?:open|run|click|start|stop|set|change|update|repair|refresh|call|execute|write|create|modify|mutate)\b/i,
   /\b(?:haven't|have not|didn't|did not|not)\b[\s\S]{0,80}\b(?:started|run|opened|clicked|set|changed|updated|called|executed)\b/i,
 ];
 
@@ -281,11 +281,43 @@ const classifyCompoundRequirementKind = (text: string): HelixCompoundPromptContr
   return "instruction";
 };
 
+const compoundActionCuePattern =
+  /\b(?:use|find|locate|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b/i;
+
+const negativeOnlyRequirementPattern =
+  /^(?:do\s+not|don't|never|without|no\s+(?:file|files|write|writing|mutat|mutation|notes?))\b/i;
+
+const cleanCompoundRequirementText = (text: string): string =>
+  text
+    .replace(/\s+(?:do\s+not|don't|never)\s+(?:write|create|update|modify|mutate)\b[\s\S]*$/i, "")
+    .trim()
+    .replace(/^[,;]\s*/, "")
+    .replace(/\s+/g, " ");
+
+const isCompoundRequirementCandidate = (text: string): boolean => {
+  const cleaned = cleanCompoundRequirementText(text);
+  if (cleaned.length < 8) return false;
+  if (negativeOnlyRequirementPattern.test(cleaned)) return false;
+  return compoundActionCuePattern.test(cleaned) || /[?ï¼Ÿ]\s*$/.test(cleaned);
+};
+
+const extractCoordinatedCompoundClauses = (prompt: string): string[] => {
+  const clauses = prompt
+    .split(
+      /\s*(?:;|,\s*(?:and\s+)?|\band\s+|\bthen\s+|\.\s+then\s+)\s*(?=(?:use|find|locate|place|synthesi[sz]e|explain|compare|identify|include|propose|write|implement|test|diagnose|analy[sz]e|research|cite|verify|summari[sz]e|map)\b)/i,
+    )
+    .map(cleanCompoundRequirementText)
+    .filter(isCompoundRequirementCandidate);
+  return uniqueBy(clauses, (entry) => entry.toLowerCase());
+};
+
 const extractCompoundRequirementTexts = (prompt: string): string[] => {
   const lines = prompt
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+  const coordinatedRequirements = extractCoordinatedCompoundClauses(prompt);
+  if (coordinatedRequirements.length > 1) return coordinatedRequirements;
   const lineRequirements = lines
     .map((line) => {
       const labeled = line.match(/^(?:question|task|goal|requirement|acceptance|instruction|context)\s*:\s*(.+)$/i)?.[1]?.trim();

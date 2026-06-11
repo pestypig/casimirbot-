@@ -29,7 +29,7 @@ export const INTERFACE_LANGUAGE_OPTIONS: InterfaceLanguageOption[] = [
   {
     code: "haw",
     label: "Hawaiian",
-    nativeLabel: "ʻŌlelo Hawaiʻi",
+    nativeLabel: "\u02bb\u014clelo Hawai\u02bbi",
     bcp47: "haw",
     writingSystem: "Latn",
     direction: "ltr",
@@ -47,6 +47,13 @@ export function normalizeInterfaceLanguageCode(value: unknown): InterfaceLanguag
   const normalized = value.trim().toLowerCase().replace("_", "-");
   const primary = normalized.split("-")[0] as InterfaceLanguageCode;
   return interfaceLanguageCodes.has(primary) ? primary : DEFAULT_INTERFACE_LANGUAGE;
+}
+
+export function isInterfaceLanguageCode(value: unknown): value is InterfaceLanguageCode {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase().replace("_", "-");
+  const primary = normalized.split("-")[0] as InterfaceLanguageCode;
+  return interfaceLanguageCodes.has(primary);
 }
 
 export function getInterfaceLanguageOption(value: unknown): InterfaceLanguageOption {

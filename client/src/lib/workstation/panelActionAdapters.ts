@@ -2,6 +2,8 @@ import { openDocPanel } from "@/lib/docs/openDocPanel";
 import { DOC_MANIFEST, findDocEntry } from "@/lib/docs/docManifest";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
+import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
+import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePreference";
 import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
 import {
   buildScientificCalculatorDebugSnapshot,
@@ -1982,6 +1984,31 @@ function buildWorkspaceActionReceipt(panelId: string, actionId: string): Record<
   };
 }
 
+function buildInterfaceLanguagePreferenceReceipt(
+  panelId: string,
+  actionId: string,
+  option: {
+    code: string;
+    label: string;
+    nativeLabel: string;
+    bcp47: string;
+    translationMode: string;
+    readiness: string;
+  },
+): Record<string, unknown> {
+  return {
+    ...buildWorkspaceActionReceipt(panelId, actionId),
+    preference_key: "interfaceLanguage",
+    language: option.code,
+    bcp47: option.bcp47,
+    label: option.label,
+    native_label: option.nativeLabel,
+    translation_mode: option.translationMode,
+    readiness: option.readiness,
+    source: "workstation_action",
+  };
+}
+
 function buildRuntimeDocsObservationArtifact(args: {
   actionId: "summarize_doc" | "summarize_section" | "explain_paper" | "locate_in_doc";
   path: string;
@@ -2466,6 +2493,53 @@ export function executeHelixPanelAction(
       panel_id: panelId,
       action_id: actionId,
       artifact: { tab },
+    };
+  }
+
+  if (panelId === "account-session" && actionId === "set_interface_language") {
+    const args = asRecord(request.args) ?? {};
+    const language = args.language ?? args.interface_language ?? args.interfaceLanguage;
+    const writeResult = writeInterfaceLanguagePreference(language, "workstation_action");
+    if (!writeResult.ok) {
+      return {
+        ok: false,
+        panel_id: panelId,
+        action_id: actionId,
+        message: "account-session.set_interface_language requires a supported language code.",
+        artifact: {
+          kind: "workspace_action_receipt",
+          schema: "helix.workspace_action_receipt.v1",
+          panel_id: panelId,
+          action_id: actionId,
+          status: "failed",
+          state_observed: true,
+          assistant_answer: false,
+          raw_content_included: false,
+          reason: writeResult.reason,
+          language: writeResult.language,
+          supported_languages: ["en", "haw"],
+        },
+      };
+    }
+
+    context.openPanel("account-session", undefined);
+    context.focusPanel("account-session", undefined);
+    pushWorkstationDebugEvent({
+      channel: "account_session",
+      action: "interface_language.changed",
+      detail: {
+        language: writeResult.option.code,
+        bcp47: writeResult.option.bcp47,
+        label: writeResult.option.label,
+        source: "workstation_action",
+      },
+    });
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: buildInterfaceLanguagePreferenceReceipt(panelId, actionId, writeResult.option),
+      message: `Interface language set to ${writeResult.option.label}.`,
     };
   }
 

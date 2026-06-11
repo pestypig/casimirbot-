@@ -46,6 +46,11 @@ vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
 
 import { executeHelixPanelAction } from "@/lib/workstation/panelActionAdapters";
 import {
+  clearWorkstationDebugEvents,
+  getWorkstationDebugSnapshot,
+  setWorkstationDebugEnabled,
+} from "@/lib/helix/workstation-debug";
+import {
   clearDottieVoiceDebugClips,
   getDottieVoiceDebugClipsSnapshot,
 } from "@/lib/helix/dottie-voice-debug-clips";
@@ -59,13 +64,47 @@ function actionContext() {
   };
 }
 
+function installWindowStorageStub() {
+  const storage = new Map<string, string>();
+  const localStorage = {
+    getItem: vi.fn((key: string) => storage.get(key) ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      storage.set(key, value);
+    }),
+    removeItem: vi.fn((key: string) => {
+      storage.delete(key);
+    }),
+    clear: vi.fn(() => {
+      storage.clear();
+    }),
+  };
+  class TestCustomEvent<T = unknown> extends Event {
+    detail: T;
+    constructor(type: string, init?: CustomEventInit<T>) {
+      super(type);
+      this.detail = init?.detail as T;
+    }
+  }
+  vi.stubGlobal("CustomEvent", TestCustomEvent);
+  vi.stubGlobal("window", {
+    localStorage,
+    dispatchEvent: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  });
+}
+
 describe("panelActionAdapters", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    installWindowStorageStub();
     hoisted.callOrder.length = 0;
     hoisted.openDocPanelMock.mockClear();
     hoisted.launchHelixAskPromptMock.mockClear();
     clearDottieVoiceDebugClips();
+    clearWorkstationDebugEvents();
+    setWorkstationDebugEnabled(false);
+    window.localStorage.clear();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
     useScientificCalculatorStore.setState({
@@ -137,6 +176,72 @@ describe("panelActionAdapters", () => {
       panel_id: "docs-viewer",
       action_id: "close",
       state_observed: true,
+    });
+  });
+
+  it("sets interface language through the account-session workstation action", () => {
+    const opened: string[] = [];
+    setWorkstationDebugEnabled(true);
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "account-session",
+        action_id: "set_interface_language",
+        args: { language: "haw" },
+      },
+      {
+        openPanel: (panelId) => opened.push(`open:${panelId}`),
+        focusPanel: (panelId) => opened.push(`focus:${panelId}`),
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(opened).toEqual(["open:account-session", "focus:account-session"]);
+    expect(JSON.parse(window.localStorage.getItem("helix-start-settings") ?? "{}")).toMatchObject({
+      interfaceLanguage: "haw",
+    });
+    expect(result.artifact).toMatchObject({
+      kind: "workspace_action_receipt",
+      schema: "helix.workspace_action_receipt.v1",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      status: "completed",
+      preference_key: "interfaceLanguage",
+      language: "haw",
+      bcp47: "haw",
+      translation_mode: "procedural_catalog",
+      assistant_answer: false,
+    });
+    expect(getWorkstationDebugSnapshot().events.at(-1)).toMatchObject({
+      channel: "account_session",
+      action: "interface_language.changed",
+      detail: {
+        language: "haw",
+        bcp47: "haw",
+      },
+    });
+  });
+
+  it("rejects unsupported interface language action values without changing storage", () => {
+    const result = executeHelixPanelAction(
+      {
+        panel_id: "account-session",
+        action_id: "set_interface_language",
+        args: { language: "zz" },
+      },
+      actionContext(),
+    );
+
+    expect(result.ok).toBe(false);
+    expect(window.localStorage.getItem("helix-start-settings")).toBeNull();
+    expect(result.artifact).toMatchObject({
+      kind: "workspace_action_receipt",
+      panel_id: "account-session",
+      action_id: "set_interface_language",
+      status: "failed",
+      reason: "unsupported_language",
+      supported_languages: ["en", "haw"],
     });
   });
 

@@ -925,6 +925,23 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "workstation-process-graph", action_id: "export_svg", required_args: [], optional_args: ["mode", "max_nodes"], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "clear_historical", required_args: [], optional_args: [], returns_artifact: true },
   { panel_id: "agi-essence-console", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "account-session", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "account-session",
+    action_id: "set_interface_language",
+    title: "Set Interface Language",
+    description: "Change the workstation interface language preference.",
+    aliases: [
+      "set interface language",
+      "change interface language",
+      "switch ui language",
+      "switch interface to hawaiian",
+      "set ui to hawaiian",
+    ],
+    required_args: ["language"],
+    optional_args: [],
+    returns_artifact: true,
+  },
   { panel_id: "agi-task-history", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "scientific-calculator", action_id: "open", required_args: [], optional_args: [] },
   {
@@ -1135,6 +1152,34 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
   {
+    action_key: "account-session.open",
+    family: "panel_control",
+    target_id: "account-session",
+    action_id: "open",
+    label: "Account Sessions",
+    aliases: ["open account", "show sessions", "show token usage", "open profile"],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
+    action_key: "account-session.set_interface_language",
+    family: "panel_control",
+    target_id: "account-session",
+    action_id: "set_interface_language",
+    label: "Set Interface Language",
+    aliases: [
+      "set interface language",
+      "change interface language",
+      "switch ui language",
+      "switch interface to hawaiian",
+      "set ui to hawaiian",
+    ],
+    terminal_receipt_required: true,
+    source: "shared_dynamic_tool_registry",
+    enabled: true,
+  },
+  {
     action_key: "agi-task-history.open",
     family: "task_history",
     target_id: "agi-task-history",
@@ -1170,6 +1215,7 @@ export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "workstation-workflow-timeline",
   "workstation-process-graph",
   "agi-essence-console",
+  "account-session",
   "agi-task-history",
   "scientific-calculator",
 ] as const;
@@ -1287,6 +1333,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "lane") return { enum: ["audio", "speaker_identity", "transcript", "translation", "context", "command", "voice_output"] };
   if (arg === "attachment_policy") return { enum: ["manual_only"] };
   if (arg === "context_injection") return { enum: ["explicit_attachment_only"] };
+  if (arg === "language") return { enum: ["en", "haw"] };
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
   if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "environment_state", "environment_affordance", "procedure_graph", "calculator_stream", "simulation_stream"] };
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
@@ -1404,6 +1451,7 @@ export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolAc
 export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
   if (actionId === "open") return "workspace_action_receipt";
   if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
+  if (panelId === "account-session" && actionId === "set_interface_language") return "workspace_action_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_execution_receipt";
   if (panelId === "situation-room-sources") return "situation_room_context";
   if (panelId === "situation-room-pipelines" && actionId === "create_job") return "situation_room_job";

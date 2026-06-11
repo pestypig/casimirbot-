@@ -52,7 +52,7 @@ const hasAnyCapability = (availableCapabilities: unknown, keys: string[]): boole
   keys.some((key) => hasCapability(availableCapabilities, key));
 
 const theoryLocatorRequested = (promptText: string): boolean =>
-  /\b(?:theory\s+badge\s+graph|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(promptText);
+  /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(promptText);
 
 const requestedResearchFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
   const suppression = detectContextualToolAdmissionSuppression(promptText);

@@ -201,4 +201,26 @@ describe("Helix Ask prompt interpretation", () => {
     ]);
     expect(interpretation.compound_contract?.requirements.every((entry) => entry.status === "pending")).toBe(true);
   });
+
+  it("builds a compound contract for coordinated research, locator, and synthesis prompts", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Use scholarly research to find papers about photosynthesis quantum coherence and microtubule Orch-OR claims, then use the Theory Badge Graph locator / theory locator to place the relevant claims and synthesize the uncertainty with citations. Do not write files.",
+    );
+
+    expect(interpretation.negative_constraints).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/do not write files/i),
+      ]),
+    );
+    expect(interpretation.compound_contract).toMatchObject({
+      schema: "helix.compound_prompt_contract.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(interpretation.compound_contract?.requirements.map((entry) => entry.text)).toEqual([
+      "Use scholarly research to find papers about photosynthesis quantum coherence and microtubule Orch-OR claims",
+      "use the Theory Badge Graph locator / theory locator to place the relevant claims",
+      "synthesize the uncertainty with citations.",
+    ]);
+  });
 });
