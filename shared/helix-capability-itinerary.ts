@@ -54,6 +54,13 @@ export type HelixCapabilityItinerary = {
     requires_post_observation_synthesis: boolean;
     typed_failure_codes: string[];
   };
+  execution_state?: {
+    required_observation_families: HelixCapabilityItineraryFamily[];
+    admitted_tool_families: HelixCapabilityItineraryFamily[];
+    observed_families: HelixCapabilityItineraryFamily[];
+    missing_observation_families: HelixCapabilityItineraryFamily[];
+    complete: boolean;
+  };
   authority: "planning_only";
   not_terminal: true;
   assistant_answer: false;

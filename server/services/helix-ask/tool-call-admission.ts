@@ -89,6 +89,15 @@ const sourceTargetToolFamilies = (
   return [sourceTarget];
 };
 
+const theoryLocatorRequested = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  if (/\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|scale\s+bands?|uncertainty\s+mode)\b/i.test(prompt)) {
+    return false;
+  }
+  return /\b(?:theory\s+badge\s+graph|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(prompt);
+};
+
 const contextualForbiddenToolFamilies = (
   suppression: ReturnType<typeof detectContextualToolAdmissionSuppression>,
 ): string[] => {
@@ -426,6 +435,26 @@ export function buildToolCallAdmissionDecision(input: {
     required = false;
     admittedToolFamilies = ["model_only"];
     reason = "no_hard_tool_path_admitted";
+  }
+
+  const compoundLocatorRequired =
+    theoryLocatorRequested(promptText) &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "theory_locator") &&
+    ![
+      ...operationalFields.forbidden_tool_families,
+      ...extraForbiddenToolFamilies,
+      ...contextualForbiddenToolFamilies(contextualSuppression),
+    ].includes("theory_locator") &&
+    (
+      effectiveSourceTarget === "scholarly_research" ||
+      effectiveSourceTarget === "internet_search" ||
+      admittedToolFamilies.includes("scholarly_research") ||
+      admittedToolFamilies.includes("internet_search")
+    );
+  if (compoundLocatorRequired && !admittedToolFamilies.includes("theory_locator")) {
+    admittedToolFamilies = [...admittedToolFamilies.filter((family) => family !== "model_only"), "theory_locator"];
+    required = true;
+    reason = `${reason}+compound_theory_locator_required`;
   }
 
   return {
