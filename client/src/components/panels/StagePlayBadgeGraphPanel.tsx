@@ -2203,7 +2203,18 @@ function StagePlayPacketTrafficBoard({
           <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Packet</div>
           {STAGE_PLAY_PACKET_TRAFFIC_STATIONS.map((station) => (
             <div key={station.key} className="rounded border border-slate-800 bg-slate-950/70 p-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-200">{station.label}</div>
+              {station.key === "micro_reasoner_deck" ? (
+                <a
+                  href="#stage-play-microdeck-panel"
+                  className="inline-flex w-full items-center justify-between gap-2 rounded border border-cyan-700/60 bg-cyan-950/35 px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-cyan-100 hover:border-cyan-300"
+                  aria-label="Open MicroReasoner Deck section"
+                >
+                  <span>{station.label}</span>
+                  <span className="font-mono text-[9px] normal-case tracking-normal text-cyan-200/80">open</span>
+                </a>
+              ) : (
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-200">{station.label}</div>
+              )}
             </div>
           ))}
           {traffic.length > 0 ? traffic.map((row) => {

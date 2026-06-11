@@ -2212,6 +2212,7 @@ describe("Stage Play live-source mailbox", () => {
   it("does not treat an Ask launch payload without a turn id as entered into Ask", async () => {
     seedVisualEvidence();
 
+    const startedAtMs = Date.now();
     const result = await runNextMailWakeRequest({
       threadId,
       roomId,
@@ -2231,6 +2232,7 @@ describe("Stage Play live-source mailbox", () => {
         ],
       }),
     });
+    const elapsedMs = Date.now() - startedAtMs;
 
     expect(result).toMatchObject({
       artifactId: "stage_play_live_source_mail_wake_result",
@@ -2243,6 +2245,11 @@ describe("Stage Play live-source mailbox", () => {
       context_role: "tool_evidence",
       raw_content_included: false,
     });
+    expect(elapsedMs).toBeLessThan(5_000);
+    expect(result?.failedReason).not.toMatch(/^ask_launch_no_response_timeout:/);
+    expect(result?.evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_wake_ask_launch_missing_ask_turn_id",
+    ]));
     expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
       status: "failed_retryable",
       askTurnId: null,
@@ -2741,6 +2748,168 @@ describe("Stage Play live-source mailbox", () => {
         ]),
       }),
     ]);
+  });
+
+  it("completes a voice wake only after read, decision, and voice checkpoint evidence", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceIds: [sourceId],
+      objectiveText: "Watch the Minecraft source and call out immediate combat or hazard risk.",
+      decisionPolicyPrompt: "Request a voice callout when fire, damage, hostile mobs, combat, or visible danger appears.",
+      outputPolicy: {
+        allowTextAnswer: true,
+        allowVoiceCallout: true,
+        voiceRequiresUrgency: true,
+        confirmationRequired: false,
+      },
+      importanceCriteria: ["fire, damage, hostile mobs, combat, and visible danger are urgent."],
+      suppressCriteria: ["routine safe movement is not user-facing."],
+      now: "2026-06-04T12:01:28.000Z",
+    });
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:voice-trajectory",
+      evidenceRef: "visual_evidence:voice-trajectory",
+      summaryText: "Minecraft player is on fire with visible damage while holding a sword near hostile mobs.",
+      createdAt: "2026-06-04T12:01:29.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:30.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+
+    const simulatedAskToolOrder: string[] = [];
+    const result = await runNextMailWakeRequest({
+      threadId,
+      roomId,
+      now: "2026-06-04T12:01:31.000Z",
+      pressureCheck: () => ({ deferred: false }),
+      askTurnRunner: async ({ wakeRequest }) => {
+        const packet = getLatestStagePlayProcessedMailPacket({
+          sourceId,
+          mailId: mail.mailId,
+        });
+        simulatedAskToolOrder.push("live_env.read_processed_live_source_mail");
+        const decision = recordLiveSourceMailDecisionForAsk({
+          threadId: wakeRequest.threadId,
+          roomId: wakeRequest.roomId,
+          environmentId: wakeRequest.environmentId,
+          mailIds: wakeRequest.mailIds,
+          decision: "request_voice_callout",
+          rationalePreview: "Processed packet recommended request_voice_callout for urgent fire/damage danger.",
+          voiceCalloutDraft: "Fire and damage risk visible; create distance or recover.",
+          voicePolicy: {
+            voiceEnabled: true,
+            requiresConfirmation: false,
+            allowedNow: true,
+            reason: "urgent_voice_allowed",
+          },
+          requestedTool: {
+            toolName: "live_env.request_interim_voice_callout",
+            args: {
+              kind: "tool_result",
+              text: "Fire and damage risk visible; create distance or recover.",
+              max_chars: 140,
+              evidence_refs: [mail.mailId, packet?.packetId].filter(Boolean),
+              reason_codes: ["minecraft_fire_or_damage_cue", "processed_packet_voice_candidate"],
+            },
+          },
+          evidenceRefs: [mail.mailId, packet?.packetId, "ask:voice-trajectory"].filter(Boolean) as string[],
+          modelReviewed: true,
+          now: "2026-06-04T12:01:32.000Z",
+        });
+        simulatedAskToolOrder.push("live_env.record_live_source_mail_decision");
+        return {
+          ok: true,
+          askTurnId: "ask:voice-trajectory",
+          selectedTargetSource: "live_source_mailbox",
+          selectedCapability: "live_env.request_interim_voice_callout",
+          response: {
+            turn_id: "ask:voice-trajectory",
+            current_turn_artifact_ledger: [
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.read_processed_live_source_mail",
+                  observation: {
+                    artifactId: "stage_play_processed_mail_packet",
+                    packetId: packet?.packetId,
+                    packets: packet ? [packet] : [],
+                  },
+                },
+              },
+              {
+                kind: "live_environment_tool_observation",
+                payload: {
+                  tool_name: "live_env.record_live_source_mail_decision",
+                  observation: decision,
+                },
+              },
+            ],
+          },
+          errorCode: null,
+        };
+      },
+    });
+
+    const packet = getLatestStagePlayProcessedMailPacket({
+      sourceId,
+      mailId: mail.mailId,
+    });
+    expect(packet).toMatchObject({
+      recommendedNext: "request_voice_callout",
+      salience: expect.objectContaining({
+        level: "urgent",
+        voiceCandidate: true,
+      }),
+    });
+    expect(simulatedAskToolOrder).toEqual([
+      "live_env.read_processed_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ]);
+    expect(result).toMatchObject({
+      status: "completed",
+      askTurnId: "ask:voice-trajectory",
+    });
+    expect(result?.decisionIds ?? []).toHaveLength(1);
+    expect(result?.voiceCheckpointRefs ?? []).toEqual(expect.arrayContaining([
+      expect.stringMatching(/^(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt):/),
+    ]));
+    expect(result?.evidenceRefs ?? []).toEqual(expect.arrayContaining([
+      mail.mailId,
+      packet!.packetId,
+      result!.decisionIds[0],
+      expect.stringMatching(/^(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt):/),
+    ]));
+    const wakeAfter = listStagePlayLiveSourceMailWakeRequests({ threadId })[0];
+    expect(wakeAfter).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "completed",
+      askTurnId: "ask:voice-trajectory",
+      askLaunchStatus: "completed",
+      decisionIds: result?.decisionIds,
+    });
+    expect(wakeAfter.evidenceRefs).toEqual(expect.arrayContaining(result?.voiceCheckpointRefs ?? []));
+    const rows = listStagePlayLiveSourceMailTranscriptEntries({ threadId, askTurnId: "ask:voice-trajectory" })
+      .map((entry) => entry.row);
+    const rowKinds = rows.map((row) => row.rowKind);
+    expect(rowKinds.indexOf("agent_decision")).toBeGreaterThan(rowKinds.indexOf("micro_reasoner_run"));
+    expect(rowKinds.indexOf("voice_callout_request")).toBeGreaterThan(rowKinds.indexOf("agent_decision"));
+    expect(rowKinds.indexOf("voice_tool_call")).toBeGreaterThan(rowKinds.indexOf("voice_callout_request"));
+    expect(rowKinds.indexOf("voice_receipt")).toBeGreaterThan(rowKinds.indexOf("voice_tool_call"));
+    expect(rows.find((row) => row.title === "Agent decision")?.body).toContain("request_voice_callout");
+    expect(rows.find((row) => row.title === "Voice tool call")?.body).toContain("live_env.request_interim_voice_callout");
+    expect(rows.find((row) => row.rowKind === "voice_receipt")?.body).toMatch(/queued|delivered|awaiting_client_playback/i);
   });
 
   it("reconciles a waiting UI-handoff wake from Ask transaction evidence", () => {

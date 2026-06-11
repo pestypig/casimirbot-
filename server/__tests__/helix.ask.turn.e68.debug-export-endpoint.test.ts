@@ -1,9 +1,14 @@
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
-import { recordStagePlayMailWakeResult } from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
+  markStagePlayMailWakeRetryable,
+  queueStagePlayLiveSourceMailWakeRequest,
+  recordStagePlayMailWakeResult,
+  resetStagePlayLiveSourceMailWakeStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -11,6 +16,10 @@ const createApp = (): express.Express => {
   app.use("/api/agi", planRouter);
   return app;
 };
+
+beforeEach(() => {
+  resetStagePlayLiveSourceMailWakeStoreForTest();
+});
 
 describe("helix ask E68 debug export endpoint", () => {
   it("returns a canonical active-turn debug export matching the completed turn", async () => {
@@ -189,6 +198,97 @@ describe("helix ask E68 debug export endpoint", () => {
       wakeResultId: wakeResult.wakeResultId,
       terminalKind: "stage_play_live_source_mail_wake_result",
       failureCode: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(debugExport.body?.payload?.stage_play_wake_transaction).toEqual(
+      debugExport.body?.payload?.stagePlayWakeTransaction,
+    );
+  }, 60000);
+
+  it("exports a wake transaction debug block for a missing Ask turn id launch", async () => {
+    const app = createApp();
+    const turnId = `ask:e68-missing-turn-id-${Date.now()}`;
+    const sessionId = `e68-missing-turn-id-${Date.now()}`;
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId: sessionId,
+      roomId: "room:e68-missing-turn-id",
+      mailIds: ["stage_play_live_source_mail:e68-missing-turn-id"],
+      sourceIds: ["visual_source:e68-missing-turn-id"],
+      reason: "unread_mail",
+      evidenceRefs: ["stage_play_live_source_mail:e68-missing-turn-id"],
+      now: "2026-06-04T12:02:00.000Z",
+    });
+    expect(wake?.wakeRequestId).toBeTruthy();
+    const wakeRequestId = wake!.wakeRequestId;
+    markStagePlayMailWakeRetryable({
+      wakeRequestId,
+      failureReason: "ask_launch_missing_ask_turn_id",
+      now: "2026-06-04T12:02:01.000Z",
+    });
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId,
+      threadId: sessionId,
+      roomId: "room:e68-missing-turn-id",
+      status: "failed_retryable",
+      askTurnId: null,
+      failedReason: "ask_launch_missing_ask_turn_id",
+      evidenceRefs: ["stage_play_wake_ask_launch_missing_ask_turn_id"],
+      createdAt: "2026-06-04T12:02:02.000Z",
+    });
+
+    const routeMetadata = {
+      invocationKind: "stage_play_mail_wake",
+      wakeRequestId,
+      mailboxThreadId: sessionId,
+      sourceTarget: "live_source_mailbox",
+      requiredCanonicalGoal: "processed_mail_interpretation",
+      requiredPhase: "read_processed_mail",
+      allowedCapabilities: ["live_env.read_processed_live_source_mail"],
+      forbiddenCapabilities: ["workspace_os.status", "internet-search.search_web"],
+      evidenceRefs: ["stage_play_live_source_mail:e68-missing-turn-id"],
+    };
+    await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Review the latest Stage Play live-source mailbox finding.",
+        mode: "read",
+        debug: true,
+        turn_id: turnId,
+        turnId,
+        trace_id: turnId,
+        traceId: turnId,
+        sessionId,
+        route_metadata: routeMetadata,
+        routeMetadata,
+      })
+      .expect(200);
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+      .expect(200);
+
+    expect(debugExport.body?.payload?.stagePlayWakeTransaction).toMatchObject({
+      schema: "stage_play_wake_transaction_debug/v1",
+      wakeRequestId,
+      askTurnId: turnId,
+      askLaunchStatus: "missing_turn_id",
+      routeMetadata: expect.objectContaining({
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId,
+        sourceTarget: "live_source_mailbox",
+      }),
+      producedRefs: expect.arrayContaining([
+        "stage_play_wake_ask_launch_missing_ask_turn_id",
+        wakeResult.wakeResultId,
+      ]),
+      artifactRefs: expect.objectContaining({
+        wakeRequestId,
+        askTurnId: turnId,
+      }),
+      wakeResultId: wakeResult.wakeResultId,
+      failureCode: "ask_launch_missing_ask_turn_id",
+      failureReason: "ask_launch_missing_ask_turn_id",
       assistant_answer: false,
       terminal_eligible: false,
     });
