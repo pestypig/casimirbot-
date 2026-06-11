@@ -436,6 +436,57 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.source.same_basis_tensor_authority",
+    title: "Source-Side Same-Basis Tensor Authority",
+    plainMeaning:
+      "Records whether the tile/material side supplies an independent same-chart tensor counterpart instead of a proxy scalar or metric echo.",
+    whyItMatters:
+      "It prevents wall T00 closure from comparing metric-required geometry against a scalar or observation path that is not source-side tensor authority.",
+    subjects: ["nhm2", "source_side", "same_basis", "tensor_authority", "wall_region"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["source_side_same_basis_tensor_authority", "tile_effective_counterpart"],
+    tags: ["source_side", "same_basis", "tensor_authority", "metric_echo_forbidden", "blocks_promotion"],
+    equations: [
+      {
+        id: "source_side_same_basis_tensor_authority_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{Authority}_{source}=sourceSide\\land sameChart\\land fullTensor\\land \\neg metricEcho",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["sourceSide", "sameChart", "fullTensor", "metricEcho"],
+        outputSymbols: ["source_side_same_basis_authority_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Source authority must be independently produced on the source side.",
+      "Metric-required tensors, scalar Casimir budgets, and GR matter observations are not source-side tensor receipts by themselves.",
+      "Wall T00 residuals remain diagnostic until wall source-side tensor authority exists.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef("shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts", "nhm2-source-side-same-basis-tensor-authority-contract", "Typed source-side same-basis tensor authority receipt."),
+      artifactRef("shared/contracts/nhm2-tile-effective-counterpart.v1.ts", "nhm2-tile-effective-counterpart-contract", "Existing tile-effective counterpart contract consumed by the authority receipt."),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "source-side-full-tensor-counterpart", "Source-side tensor authority discussion."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_side", "same_basis", "tensor_authority", "wall_region"],
+      symbols: ["source_side_same_basis_authority_status", "sourceSide", "sameChart", "fullTensor", "metricEcho"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1.ts",
+        "shared/contracts/nhm2-tile-effective-counterpart.v1.ts",
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["source_side_same_basis_tensor_authority", "tile_effective_counterpart"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.source.wall_t00_trace",
     title: "Wall T00 Trace Blocker",
     plainMeaning:
@@ -1218,6 +1269,38 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "Observer-robust energy-condition checks require the same-chart tensor component surface.",
     claimBoundaryNote: "Eulerian-only or component-incomplete checks cannot become observer-robust passes.",
+  },
+  {
+    id: "same_chart_full_tensor_context_feeds_source_side_authority",
+    from: "nhm2.tensor.same_chart_full_tensor",
+    to: "nhm2.source.same_basis_tensor_authority",
+    relation: "requires",
+    label: "Source-side tensor authority must align with the same-chart tensor component surface.",
+    claimBoundaryNote: "Same-chart geometry evidence does not itself create source-side authority.",
+  },
+  {
+    id: "tile_counterpart_feeds_source_side_authority",
+    from: "nhm2.tensor.tile_effective_counterpart",
+    to: "nhm2.source.same_basis_tensor_authority",
+    relation: "requires",
+    label: "The tile-effective counterpart is an input to source-side same-basis tensor authority.",
+    claimBoundaryNote: "Counterpart evidence must still prove source-side independence and full component authority.",
+  },
+  {
+    id: "lifshitz_receipt_feeds_source_side_authority",
+    from: "casimir.material.lifshitz_receipt",
+    to: "nhm2.source.same_basis_tensor_authority",
+    relation: "requires",
+    label: "Material receipt evidence is required before Casimir source rows can support source-side tensor authority.",
+    claimBoundaryNote: "Material receipts are diagnostics and do not validate a physical source by themselves.",
+  },
+  {
+    id: "source_side_authority_feeds_wall_t00_source_residual",
+    from: "nhm2.source.same_basis_tensor_authority",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "requires",
+    label: "Wall T00 residual interpretation requires an independent source-side same-basis tensor authority receipt.",
+    claimBoundaryNote: "Wall residuals cannot be promoted when the source side is proxy, diagonal-only, or metric-echo-derived.",
   },
   {
     id: "tile_counterpart_checks_same_basis_closure",

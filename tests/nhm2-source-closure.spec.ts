@@ -186,6 +186,105 @@ describe("nhm2 source closure artifact", () => {
   });
 });
 
+describe("nhm2 source-side same-basis tensor authority receipt", () => {
+  it("marks wall authority incomplete when source closure only has a diagonal projection", () => {
+    const receipt = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: "2026-06-11T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      requiredRegionIds: ["wall"],
+      sourceClosureRegions: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          comparisonBasisAuthorityStatus: "authoritative_same_basis",
+          regionalComparisonContractStatus: "same_basis_counterpart_available",
+          resolvedTileCounterpartRef: "artifact://tile-wall/direct-t00",
+          tileTensorRef: "artifact://tile-wall/diagonal",
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileT00Diagnostics: {
+            sourceRef: "artifact://tile-wall/direct-t00",
+            trace: {
+              valueRef: "artifact://tile-wall/direct-t00",
+              pathFacts: {
+                comparisonRole: "tile_effective_counterpart",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: true,
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
+    expect(receipt.summary.hasWallAuthority).toBe(false);
+    expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
+    expect(receipt.regions[0]).toMatchObject({
+      regionId: "wall",
+      status: "blocked",
+      sourceTensorRef: "artifact://tile-wall/direct-t00",
+      comparisonRole: "tile_effective_counterpart",
+      tensorAuthorityMode: "diagonal_reduced_order",
+    });
+    expect(receipt.regions[0]?.missingComponentIds).toEqual(
+      expect.arrayContaining(["T01", "T02", "T03", "T12", "T13", "T23"]),
+    );
+    expect(receipt.regions[0]?.blockers).toContain(
+      "source_side_full_tensor_components_missing",
+    );
+    expect(receipt.claimBoundary).toMatchObject({
+      diagnosticOnly: true,
+      doesNotValidatePhysicalSource: true,
+      metricEchoForbidden: true,
+      wallT00ClosureRequiresWallAuthority: true,
+    });
+  });
+
+  it("can represent an explicit full source-side tensor authority receipt without calculator promotion", () => {
+    const receipt = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt: "2026-06-11T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      requiredRegionIds: ["wall"],
+      sourceClosureRegions: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          comparisonBasisAuthorityStatus: "authoritative_same_basis",
+          regionalComparisonContractStatus: "same_basis_counterpart_available",
+          resolvedTileCounterpartRef: "artifact://tile-wall/full-tensor",
+          tileTensorRef: "artifact://tile-wall/full-tensor",
+          sourceSideSameBasisAuthorityStatus: "authoritative_same_basis",
+          sourceSideAuthorityRef: "artifact://tile-wall/full-tensor",
+          sourceSideFullTensorMissingComponentIds: [],
+          tileEffectiveTensor: { T00: -100, T11: 100, T22: 100, T33: 100 },
+          tileT00Diagnostics: {
+            sourceRef: "artifact://tile-wall/full-tensor",
+            trace: {
+              valueRef: "artifact://tile-wall/full-tensor",
+              pathFacts: {
+                comparisonRole: "tile_effective_counterpart",
+                expectedCounterpartRole: "metric_required_reference",
+                semanticEquivalenceExpected: true,
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(receipt.summary.hasWallAuthority).toBe(true);
+    expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(true);
+    expect(receipt.regions[0]?.status).toBe("authoritative_same_basis");
+    expect(receipt.regions[0]?.blockers).toEqual([]);
+    expect(receipt.claimBoundary.diagnosticOnly).toBe(true);
+    expect(receipt.claimBoundary.doesNotValidatePhysicalSource).toBe(true);
+  });
+});
+
 describe("nhm2 source closure artifact v2", () => {
   const makeAccounting = (sampleCount: number, note: string) => ({
     sampleCount,

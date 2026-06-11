@@ -11,6 +11,7 @@ export const STAGE_PLAY_LIVE_SOURCE_IMMERSION_STATE_SCHEMA = "stage_play_live_so
 export const STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA =
   "stage_play_live_source_prediction_validation/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA = "stage_play_micro_reasoner_prompt/v1" as const;
+export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA = "stage_play_micro_reasoner_prompt_preset/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
 export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
@@ -378,6 +379,33 @@ export type StagePlayMicroReasonerPromptV1 = {
   maxInputItems: number;
   maxOutputTokens?: number | null;
   linkedNoteId?: string | null;
+  presetIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_policy";
+};
+
+export type StagePlayMicroReasonerPromptPresetV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt_preset";
+  schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA;
+  presetId: string;
+  title: string;
+  description: string;
+  domain:
+    | "generic"
+    | "minecraft_gameplay"
+    | "calculator_stream"
+    | "science_visual"
+    | "browser_workflow"
+    | "custom";
+  sourceKinds: StagePlayLiveSourceMailItemV1["sourceKind"][];
+  sourceIds: string[];
+  rolePromptIds: Partial<Record<StagePlayMicroReasonerRoleV1, string>>;
+  promptedRoles: StagePlayMicroReasonerRoleV1[];
+  outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "record_only";
+  active: boolean;
   createdAt: string;
   updatedAt: string;
   assistant_answer: false;
