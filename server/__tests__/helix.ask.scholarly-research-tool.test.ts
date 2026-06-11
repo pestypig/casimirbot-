@@ -138,7 +138,7 @@ describe("Helix scholarly research tool admission", () => {
     });
     expect(emptyLookup.validation.valid).toBe(false);
     expect(emptyLookup.validation.args_valid).toBe(false);
-    expect(emptyLookup.validation.errors).toContain("missing_required_arg:query_or_identifier");
+    expect(emptyLookup.validation.errors).toContain("missing_required_arg:query");
 
     const emptyFullText = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
       availableCapabilities,
@@ -170,6 +170,20 @@ describe("Helix scholarly research tool admission", () => {
     });
     expect(exactLookup.validation.valid).toBe(true);
 
+    const aliasLookup = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-validation",
+        call_id: "call:lookup-alias",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: { query_or_identifier: "quantum coherence in photosynthesis" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(aliasLookup.validation.valid).toBe(true);
+
     const selectedPaperFetch = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
       availableCapabilities,
       call: {
@@ -183,6 +197,116 @@ describe("Helix scholarly research tool admission", () => {
       },
     });
     expect(selectedPaperFetch.validation.valid).toBe(true);
+  });
+
+  it("normalizes photosynthesis scholarly lookup aliases before observation materialization", async () => {
+    const inputSchema = __testHelixRuntimeToolCallValidation.buildHelixCapabilityInputSchema({
+      capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      requires_action: true,
+    } as any);
+    expect(inputSchema).toMatchObject({
+      type: "object",
+      properties: {
+        query: expect.objectContaining({ type: "string" }),
+        query_or_identifier: expect.objectContaining({ type: "string" }),
+        doi: expect.objectContaining({ type: "string" }),
+        arxiv_id: expect.objectContaining({ type: "string" }),
+        title: expect.objectContaining({ type: "string" }),
+        journal: expect.objectContaining({ type: "string" }),
+        reference: expect.objectContaining({ type: "string" }),
+        citation: expect.objectContaining({ type: "string" }),
+      },
+    });
+
+    const normalizedArgs = __testHelixRuntimeToolCallValidation.normalizeHelixRuntimeToolArgsForCapability(
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      { query_or_identifier: "quantum coherence in photosynthesis" },
+    );
+    expect(normalizedArgs).toMatchObject({
+      query: "quantum coherence in photosynthesis",
+      runtime_arg_repair: {
+        source: "query_or_identifier",
+        target: "query",
+        reason: "scholarly_lookup_alias_normalized",
+      },
+    });
+
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:scholarly-photosynthesis",
+      tool_admission_suppressed: false,
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+    } as any;
+    const firstScholarlyCall = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: "ask:scholarly-photosynthesis",
+        call_id: "call:photosynthesis-lookup",
+        capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        args: normalizedArgs,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+    expect(firstScholarlyCall.validation.valid).toBe(true);
+
+    const fetchImpl: ScholarlyFetch = async (url) => {
+      expect(url).toContain("api.crossref.org/works");
+      expect(decodeURIComponent(url)).toContain("query.bibliographic=quantum coherence in photosynthesis");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          message: {
+            items: [
+              {
+                title: ["Long-lived quantum coherence in photosynthetic complexes at physiological temperature"],
+                DOI: "10.1038/nature08811",
+                author: [{ given: "Elisabetta", family: "Collini" }],
+                published: { "date-parts": [[2010]] },
+                "container-title": ["Nature"],
+                "is-referenced-by-count": 1500,
+                "reference-count": 30,
+                URL: "https://doi.org/10.1038/nature08811",
+              },
+            ],
+          },
+        }),
+      };
+    };
+
+    const observation = await runScholarlyResearchLookup({
+      turnId: "ask:scholarly-photosynthesis",
+      callId: "call:photosynthesis-lookup",
+      query: String(normalizedArgs.query),
+      providers: ["crossref"],
+      limit: 3,
+      fetchImpl,
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.scholarly_research_observation.v1",
+      artifact_id: "call:photosynthesis-lookup:scholarly_research_observation",
+      capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      providers_called: ["crossref"],
+      selected_for_answer: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(observation.papers).toHaveLength(1);
+    expect(observation.papers[0]).toMatchObject({
+      title: "Long-lived quantum coherence in photosynthetic complexes at physiological temperature",
+      identifiers: { doi: "10.1038/nature08811" },
+      source_providers: ["crossref"],
+    });
   });
 
   it("rejects runtime tool calls outside the admitted tool family", () => {

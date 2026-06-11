@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final-answer-draft-quality-gate";
 import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
 import { applyHelixProjectionMismatchGate } from "../services/helix-ask/projection-mismatch-gate";
-import { applyHelixTerminalAuthoritySingleWriter } from "../services/helix-ask/terminal-authority-single-writer";
+import {
+  applyHelixTerminalAuthoritySingleWriter,
+  syncHelixTypedFailureAuthorityPublicMirrors,
+} from "../services/helix-ask/terminal-authority-single-writer";
 
 const modelOnlyContract = (turnId: string) => ({
   schema: "helix.route_product_contract.v1",
@@ -262,6 +265,113 @@ describe("final_answer_draft terminal selection", () => {
         }),
       ]),
     );
+  });
+
+  it("syncs public mirrors from typed-failure authority after stale final-draft projection", () => {
+    const turnId = "ask:test:typed-failure-authority-public-mirror";
+    const staleDraft = "This stale draft should not remain the public answer.";
+    const failureText =
+      "I could not complete this compound turn because required prompt items failed closed or remain unresolved: R2.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      selected_final_answer: staleDraft,
+      answer: staleDraft,
+      text: staleDraft,
+      assistant_answer: staleDraft,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_error_code: "terminal_consistency_violation",
+      compound_prompt_coverage_gate: {
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        applies: true,
+        passed: false,
+        decision: "FAIL_CLOSED",
+        unresolved_requirement_ids: ["R2"],
+      },
+      terminal_answer_authority: {
+        schema: "helix.terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_text_preview: failureText,
+        server_authoritative: true,
+        assistant_answer: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        concise_text: staleDraft,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "terminal_consistency_violation",
+        text: "Old consistency failure.",
+        answer_text: "Old consistency failure.",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:terminal_consistency:typed_failure`,
+          turn_id: turnId,
+          kind: "typed_failure",
+          payload: {
+            schema: "helix.typed_failure.v1",
+            error_code: "terminal_consistency_violation",
+            text: "Old consistency failure.",
+            answer_text: "Old consistency failure.",
+          },
+        },
+      ],
+      debug: {
+        ok: true,
+        response_type: "final_answer",
+        final_status: "final_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_error_code: "terminal_consistency_violation",
+        selected_final_answer: staleDraft,
+      },
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+
+    expect(payload.ok).toBe(false);
+    expect(payload.response_type).toBe("final_failure");
+    expect(payload.final_status).toBe("final_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("compound_prompt_coverage_incomplete");
+    expect(payload.selected_final_answer).toBe(failureText);
+    expect(payload.answer).toBe(failureText);
+    expect(payload.text).toBe(failureText);
+    expect(payload.terminal_presentation).toMatchObject({
+      terminal_artifact_kind: "typed_failure",
+      concise_text: failureText,
+    });
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "compound_prompt_coverage_incomplete",
+      text: failureText,
+      answer_text: failureText,
+    });
+    expect(payload.debug).toMatchObject({
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "compound_prompt_coverage_incomplete",
+      selected_final_answer: failureText,
+    });
+    expect(JSON.stringify(payload.current_turn_artifact_ledger)).not.toContain("terminal_consistency_violation");
   });
 
   it("materializes a supported repo draft into repo_code_evidence_answer", () => {

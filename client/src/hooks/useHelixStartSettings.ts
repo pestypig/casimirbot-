@@ -1,6 +1,11 @@
 import * as React from "react";
 import { setAlcubierreDebugLogEnabled } from "@/lib/alcubierre-debug-log";
 import { setWorkstationDebugEnabled } from "@/lib/helix/workstation-debug";
+import {
+  DEFAULT_INTERFACE_LANGUAGE,
+  normalizeInterfaceLanguageCode,
+  type InterfaceLanguageCode,
+} from "@/lib/i18n/interfaceLanguage";
 
 export type StartSettings = {
   settingsVersion: number;
@@ -17,13 +22,14 @@ export type StartSettings = {
   showAlcubierreRenderDebugLog: boolean;
   showWorkstationDebug: boolean;
   powerShellScratch: string;
+  interfaceLanguage: InterfaceLanguageCode;
   preferredResponseLanguage: string;
 };
 
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 12,
+  settingsVersion: 13,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
@@ -37,6 +43,7 @@ export const DEFAULT_SETTINGS: StartSettings = {
   showAlcubierreRenderDebugLog: false,
   showWorkstationDebug: false,
   powerShellScratch: "",
+  interfaceLanguage: DEFAULT_INTERFACE_LANGUAGE,
   preferredResponseLanguage: "auto",
 };
 
@@ -45,14 +52,22 @@ export const PROFILE_STORAGE_KEY = "helix-start-profile";
 
 export function useHelixStartSettings() {
   const [userSettings, setUserSettings] = React.useState<StartSettings>(DEFAULT_SETTINGS);
+  const [settingsHydrated, setSettingsHydrated] = React.useState(false);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      setSettingsHydrated(true);
+      return;
+    }
     try {
       const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        setSettingsHydrated(true);
+        return;
+      }
       const parsed = JSON.parse(raw) as Partial<StartSettings>;
       const merged: StartSettings = { ...DEFAULT_SETTINGS, ...parsed };
+      merged.interfaceLanguage = normalizeInterfaceLanguageCode(parsed.interfaceLanguage);
       if (typeof parsed.showHelixAskDebug !== "boolean") {
         const legacyUnifiedPreference =
           (parsed as Record<string, unknown>).showHelixAskReasoningEventLog ??
@@ -76,6 +91,7 @@ export function useHelixStartSettings() {
           typeof parsed.showWorkstationDebug === "boolean"
             ? parsed.showWorkstationDebug
             : DEFAULT_SETTINGS.showWorkstationDebug;
+        merged.interfaceLanguage = normalizeInterfaceLanguageCode(parsed.interfaceLanguage);
         merged.preferredResponseLanguage =
           typeof parsed.preferredResponseLanguage === "string" && parsed.preferredResponseLanguage.trim().length > 0
             ? parsed.preferredResponseLanguage.trim()
@@ -84,17 +100,19 @@ export function useHelixStartSettings() {
       setUserSettings(merged);
     } catch {
       // ignore malformed localStorage entries
+    } finally {
+      setSettingsHydrated(true);
     }
   }, []);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !settingsHydrated) return;
     try {
       window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(userSettings));
     } catch {
       // storing user preference is best-effort
     }
-  }, [userSettings]);
+  }, [settingsHydrated, userSettings]);
 
   React.useEffect(() => {
     setAlcubierreDebugLogEnabled(Boolean(userSettings.showAlcubierreRenderDebugLog));

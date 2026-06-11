@@ -33,6 +33,7 @@ import {
   expireStaleStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeCompleted,
   markStagePlayMailWakeRunning,
+  markStagePlayMailWakeUiHandoffRequired,
   queueStagePlayLiveSourceMailWakeRequest,
   reconcileStagePlayMailWakeRequestFromAskTurn,
   reconcileStagePlayMailWakeRequestsWithDecisions,
@@ -2690,6 +2691,98 @@ describe("Stage Play live-source mailbox", () => {
         ]),
       }),
     ]);
+  });
+
+  it("reconciles a waiting UI-handoff wake from Ask transaction evidence", () => {
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId,
+      sourceId,
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:waiting-ui-transaction",
+      evidenceRef: "visual_evidence:waiting-ui-transaction",
+      summaryText: "A waiting UI handoff wake later produced a voice checkpoint.",
+      createdAt: "2026-06-04T12:01:24.000Z",
+    });
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: [mail.mailId],
+      sourceIds: [sourceId],
+      reason: "unread_mail",
+      evidenceRefs: [mail.mailId, ...mail.evidenceRefs],
+      now: "2026-06-04T12:01:25.000Z",
+    });
+    expect(wake?.status).toBe("queued");
+    markStagePlayMailWakeUiHandoffRequired({
+      wakeRequestId: wake!.wakeRequestId,
+      now: "2026-06-04T12:01:26.000Z",
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "waiting_for_ui_handoff",
+      lifecycleStage: "waiting_for_ui_handoff",
+    });
+
+    const decision = recordStagePlayMailDecision({
+      mailIds: [mail.mailId],
+      threadId,
+      roomId,
+      decision: "request_voice_callout",
+      rationalePreview: "Transaction evidence recorded the voice callout decision.",
+      voiceCalloutDraft: "Fire cue detected; recover now.",
+      voiceEligible: true,
+      requestedTool: {
+        toolName: "live_env.request_interim_voice_callout",
+        args: {
+          text: "Fire cue detected; recover now.",
+        },
+      },
+      nextLoopState: "armed_for_next_summary",
+      evidenceRefs: [mail.mailId, "ask:waiting-ui-transaction-turn"],
+      modelReviewed: true,
+      createdAt: "2026-06-04T12:01:27.000Z",
+    });
+
+    const reconciliation = reconcileStagePlayMailWakeRequestFromAskTurn({
+      wakeRequestIds: [wake!.wakeRequestId],
+      askTurnId: "ask:waiting-ui-transaction-turn",
+      decisionIds: [decision.decisionId],
+      requiresVoiceCheckpoint: true,
+      voiceReceiptRefs: ["helix_interim_voice_callout_receipt:waiting-ui-transaction"],
+      evidenceRefs: [
+        "stage_play_wake_transaction_debug_reconciled",
+        "stage_play_processed_mail_packet:waiting-ui-transaction",
+      ],
+      now: "2026-06-04T12:01:28.000Z",
+    });
+
+    expect(reconciliation).toMatchObject({
+      reconciledWakeIds: [wake?.wakeRequestId],
+      skippedWakeIds: [],
+      askTurnId: "ask:waiting-ui-transaction-turn",
+      decisionIds: [decision.decisionId],
+      voiceReceiptRefs: ["helix_interim_voice_callout_receipt:waiting-ui-transaction"],
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "completed",
+      askTurnId: "ask:waiting-ui-transaction-turn",
+      askLaunchStatus: "completed",
+      decisionIds: [decision.decisionId],
+      lifecycleStage: "voice_unknown",
+      evidenceRefs: expect.arrayContaining([
+        "stage_play_wake_transaction_debug_reconciled",
+        "helix_interim_voice_callout_receipt:waiting-ui-transaction",
+      ]),
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })[0]).toMatchObject({
+      wakeRequestId: wake?.wakeRequestId,
+      status: "completed",
+      askTurnId: "ask:waiting-ui-transaction-turn",
+      decisionIds: [decision.decisionId],
+      voiceCheckpointRefs: ["helix_interim_voice_callout_receipt:waiting-ui-transaction"],
+    });
   });
 
   it("reconciles active voice-pending wakes attached to the same Ask turn id", () => {

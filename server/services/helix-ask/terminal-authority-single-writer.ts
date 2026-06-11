@@ -37,6 +37,119 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const typedFailureAuthorityApplies = (authority: Record<string, unknown> | null): boolean =>
+  readString(authority?.terminal_artifact_kind) === "typed_failure" ||
+  readString(authority?.final_answer_source) === "typed_failure" ||
+  readString(authority?.terminal_kind) === "failure";
+
+export function syncHelixTypedFailureAuthorityPublicMirrors(
+  payload: Record<string, unknown>,
+): boolean {
+  const authority = readRecord(payload.terminal_answer_authority);
+  if (!typedFailureAuthorityApplies(authority)) return false;
+  const compoundCoverageGate = readRecord(payload.compound_prompt_coverage_gate);
+  const compoundCoverageFailedClosed = readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
+  const typedFailure = readRecord(payload.typed_failure);
+  const failureText =
+    readString(authority?.terminal_text_preview) ??
+    readString(typedFailure?.text) ??
+    readString(typedFailure?.answer_text) ??
+    readString(payload.terminal_failure_text) ??
+    readString(payload.selected_final_answer) ??
+    "I could not complete this turn because terminal authority selected a typed failure.";
+  const existingErrorCode = readString(typedFailure?.error_code) ?? readString(payload.terminal_error_code);
+  const errorCode =
+    compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
+      ? "compound_prompt_coverage_incomplete"
+      : existingErrorCode ?? "typed_failure";
+
+  payload.ok = false;
+  payload.response_type = "final_failure";
+  payload.final_status = "final_failure";
+  payload.status = "final_failure";
+  payload.final_answer_source = "typed_failure";
+  payload.terminal_artifact_kind = "typed_failure";
+  payload.terminal_error_code = errorCode;
+  payload.terminal_failure_text = failureText;
+  payload.selected_final_answer = failureText;
+  payload.answer = failureText;
+  payload.text = failureText;
+  payload.assistant_answer = failureText;
+  payload.typed_failure = {
+    ...(typedFailure ?? {}),
+    schema: "helix.typed_failure.v1",
+    error_code: errorCode,
+    message: readString(typedFailure?.message) ?? failureText,
+    text: failureText,
+    answer_text: failureText,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
+  if (resolvedTurnSummary) {
+    payload.resolved_turn_summary = {
+      ...resolvedTurnSummary,
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: errorCode,
+      final_answer_source: "typed_failure",
+    };
+  }
+
+  const presentation = readRecord(payload.terminal_presentation);
+  if (presentation) {
+    payload.terminal_presentation = {
+      ...presentation,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: failureText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  const artifacts = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  for (const artifact of artifacts) {
+    const record = readRecord(artifact);
+    if (!record || readString(record.kind) !== "typed_failure") continue;
+    const artifactPayload = readRecord(record.payload);
+    if (!artifactPayload) continue;
+    if (readString(artifactPayload.error_code) !== "terminal_consistency_violation" && !compoundCoverageFailedClosed) continue;
+    record.payload = {
+      ...artifactPayload,
+      error_code: errorCode,
+      text: failureText,
+      answer_text: failureText,
+      terminal_consistency_repaired_by_authority_sync: true,
+    };
+  }
+
+  const debug = readRecord(payload.debug);
+  if (debug) {
+    debug.ok = false;
+    debug.response_type = "final_failure";
+    debug.final_status = "final_failure";
+    debug.status = "final_failure";
+    debug.final_answer_source = "typed_failure";
+    debug.terminal_artifact_kind = "typed_failure";
+    debug.terminal_error_code = errorCode;
+    debug.terminal_failure_text = failureText;
+    debug.selected_final_answer = failureText;
+    debug.answer = failureText;
+    debug.text = failureText;
+    debug.assistant_answer = failureText;
+    debug.typed_failure = payload.typed_failure;
+    debug.terminal_answer_authority = payload.terminal_answer_authority;
+    if (payload.terminal_presentation) debug.terminal_presentation = payload.terminal_presentation;
+    if (Array.isArray(payload.current_turn_artifact_ledger)) {
+      debug.current_turn_artifact_ledger = payload.current_turn_artifact_ledger;
+    }
+  }
+  return true;
+}
+
 const textHash = (value: string): string => {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {

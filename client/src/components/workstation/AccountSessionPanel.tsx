@@ -1,6 +1,8 @@
 import React from "react";
-import { Archive, ChevronDown, Database, KeyRound, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
+import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogOut, ShieldCheck, UserCircle } from "lucide-react";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
@@ -133,6 +135,7 @@ export default function AccountSessionPanel() {
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
   const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
   const [categorizationJobs, setCategorizationJobs] = React.useState<CategorizationJobView[]>([]);
+  const { userSettings, updateSettings } = useHelixStartSettings();
   const memoryRegistrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
     state.buildRegistrySnapshot(),
   );
@@ -242,6 +245,7 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const showLocalDevSignIn = import.meta.env.DEV;
 
   return (
@@ -351,25 +355,52 @@ export default function AccountSessionPanel() {
             )}
           </section>
 
-          <details className="group rounded-lg border border-white/10 bg-black/20 p-3">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-              <span>Usage</span>
-              <ChevronDown
-                className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
-                aria-hidden
-              />
-            </summary>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
-              <Metric label="Threads" value={usage.thread_count} />
-              <Metric label="Items" value={usage.item_count} />
-              <Metric label="Answers" value={usage.answer_count} />
-              <Metric label="Observations" value={usage.tool_observation_count} />
-              <Metric label="Est. tokens" value={usage.estimated_token_count} />
-            </div>
-            <div className="mt-4 text-xs text-slate-400">
-              Window: {usage.window_started_at || "none"} {"->"} {usage.window_ended_at || "none"}
-            </div>
-          </details>
+          <div className="space-y-3">
+            <section className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <Languages className="h-3.5 w-3.5" />
+                Language
+              </div>
+              <div className="mt-3 max-w-sm">
+                <label className="block text-xs text-slate-300">
+                  Interface language
+                  <select
+                    value={interfaceLanguage.code}
+                    onChange={(event) =>
+                      updateSettings({ interfaceLanguage: getInterfaceLanguageOption(event.target.value).code })
+                    }
+                    className="mt-1 h-9 w-full rounded border border-white/15 bg-slate-900 px-2 text-sm text-white outline-none focus:border-cyan-400"
+                  >
+                    {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.label} ({option.nativeLabel})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <details className="group rounded-lg border border-white/10 bg-black/20 p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <span>Usage</span>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+                  aria-hidden
+                />
+              </summary>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
+                <Metric label="Threads" value={usage.thread_count} />
+                <Metric label="Items" value={usage.item_count} />
+                <Metric label="Answers" value={usage.answer_count} />
+                <Metric label="Observations" value={usage.tool_observation_count} />
+                <Metric label="Est. tokens" value={usage.estimated_token_count} />
+              </div>
+              <div className="mt-4 text-xs text-slate-400">
+                Window: {usage.window_started_at || "none"} {"->"} {usage.window_ended_at || "none"}
+              </div>
+            </details>
+          </div>
         </div>
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
