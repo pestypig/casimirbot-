@@ -170,13 +170,39 @@ const hasVoiceCheckpointForDecisions = (
   );
 };
 
+const wakeHasVoiceCheckpoint = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
+  voiceCheckpointRefsFromEvidence(wake.evidenceRefs).length > 0;
+
 const wakeIsPhaseLocked = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
   wake.status === "running" ||
   Boolean(wake.askTurnId) ||
-  wake.decisionIds.length > 0;
+  wake.askLaunchStatus === "launched" ||
+  wake.askLaunchStatus === "completed" ||
+  wake.decisionIds.length > 0 ||
+  wakeHasVoiceCheckpoint(wake);
 
 const wakeCanBeExpired = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
   EXPIRABLE_WAKE_STATUSES.has(wake.status) && !wakeIsPhaseLocked(wake);
+
+const wakeIsOlderThan = (
+  wake: StagePlayLiveSourceMailWakeRequestV1,
+  nowMs: number,
+  ttlMs: number,
+): boolean => {
+  const queuedAtMs = Date.parse(wake.queuedAt);
+  return Number.isFinite(queuedAtMs) && nowMs - queuedAtMs >= ttlMs;
+};
+
+const wakeShouldBeSupersededByNewerSourceWake = (
+  wake: StagePlayLiveSourceMailWakeRequestV1,
+  nowMs: number,
+): boolean => {
+  if (!wakeCanBeExpired(wake)) return false;
+  if (wake.status === "deferred_for_pressure" || wake.status === "failed_retryable") return true;
+  const expiresAtMs = Date.parse(wake.expiresAt ?? "");
+  if (Number.isFinite(expiresAtMs) && expiresAtMs <= nowMs) return true;
+  return wakeIsOlderThan(wake, nowMs, DEFAULT_WAKE_RELEVANCE_TTL_MS);
+};
 
 const listThreadWakes = (threadId: string): StagePlayLiveSourceMailWakeRequestV1[] =>
   Array.from(wakeById.values())
@@ -224,6 +250,27 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     ACTIVE_WAKE_STATUSES.has(wake.status)
   );
   if (existing) return existing;
+  const boundedMailIds = mailIds.slice(0, MAX_MAIL_IDS_PER_WAKE_BATCH);
+  const wakeRequestId = `stage_play_live_source_mail_wake:${hashShort([
+    input.threadId,
+    input.roomId ?? null,
+    input.environmentId ?? null,
+    input.jobId ?? null,
+    boundedMailIds,
+    now,
+  ])}`;
+  if (sourceIds.length > 0) {
+    supersedeActiveStagePlayLiveSourceMailWakeRequests({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      sourceIds,
+      replacementWakeRequestId: wakeRequestId,
+      force: input.expiresAfterMs != null,
+      now,
+    });
+  }
   const queuedSameSource = input.expiresAfterMs == null && sourceIds.length > 0
     ? Array.from(wakeById.values()).find((wake) =>
         wake.threadId === input.threadId &&
@@ -269,26 +316,6 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
       return merged;
     }
     return queuedSameSource;
-  }
-  const boundedMailIds = mailIds.slice(0, MAX_MAIL_IDS_PER_WAKE_BATCH);
-  const wakeRequestId = `stage_play_live_source_mail_wake:${hashShort([
-    input.threadId,
-    input.roomId ?? null,
-    input.environmentId ?? null,
-    input.jobId ?? null,
-    boundedMailIds,
-    now,
-  ])}`;
-  if (input.expiresAfterMs != null && sourceIds.length > 0) {
-    supersedeActiveStagePlayLiveSourceMailWakeRequests({
-      threadId: input.threadId,
-      roomId: input.roomId ?? null,
-      environmentId: input.environmentId ?? null,
-      jobId: input.jobId ?? null,
-      sourceIds,
-      replacementWakeRequestId: wakeRequestId,
-      now,
-    });
   }
   const ttlMs = typeof input.expiresAfterMs === "number" && Number.isFinite(input.expiresAfterMs) && input.expiresAfterMs > 0
     ? input.expiresAfterMs
@@ -935,11 +962,13 @@ export function supersedeActiveStagePlayLiveSourceMailWakeRequests(input: {
   jobId?: string | null;
   sourceIds: string[];
   replacementWakeRequestId: string;
+  force?: boolean;
   now?: string;
 }): StagePlayLiveSourceMailWakeRequestV1[] {
   const now = input.now ?? new Date().toISOString();
+  const nowMs = Date.parse(now);
   const sourceKey = sortedKey(input.sourceIds);
-  if (!sourceKey) return [];
+  if (!sourceKey || !Number.isFinite(nowMs)) return [];
   const superseded: StagePlayLiveSourceMailWakeRequestV1[] = [];
   for (const wake of Array.from(wakeById.values())) {
     if (wake.threadId !== input.threadId) continue;
@@ -949,6 +978,7 @@ export function supersedeActiveStagePlayLiveSourceMailWakeRequests(input: {
     if (wake.wakeRequestId === input.replacementWakeRequestId) continue;
     if (sortedKey(wake.sourceIds) !== sourceKey) continue;
     if (!wakeCanBeExpired(wake)) continue;
+    if (input.force !== true && !wakeShouldBeSupersededByNewerSourceWake(wake, nowMs)) continue;
     const updated = updateWake(wake.wakeRequestId, {
       status: "expired_superseded",
       failureReason: "wake_superseded_by_newer_source_packet",

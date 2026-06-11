@@ -67,6 +67,7 @@ const STAGE_PLAY_MAILBOX_QUERY_KEY = [
   "/api/helix/stage-play/live-source-mail",
   STAGE_PLAY_PANEL_THREAD_ID,
   STAGE_PLAY_PANEL_THREAD_ID,
+  "overview",
 ] as const;
 const STAGE_PLAY_TRANSCRIPT_QUERY_KEY = [
   "/api/helix/stage-play/live-source-mail/transcript",
@@ -228,6 +229,7 @@ type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointR
 type StagePlayLiveSourceMailListResponse = {
   ok: boolean;
   schema: "stage_play_live_source_mail_list_response/v1";
+  view?: "overview" | "full";
   requestedThreadId?: string;
   mailboxThreadId?: string;
   mailboxThreadResolution?: Record<string, unknown>;
@@ -678,11 +680,14 @@ async function fetchStagePlayLiveSourceMail(input: {
   mailboxThreadId?: string | null;
   roomId?: string | null;
   environmentId?: string | null;
+  view?: "overview" | "full";
+  limit?: number;
 }): Promise<StagePlayLiveSourceMailListResponse> {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
   if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
-  params.set("limit", "20");
+  params.set("view", input.view ?? "full");
+  params.set("limit", String(input.limit ?? (input.view === "overview" ? 8 : 50)));
   const response = await fetch(`/api/helix/stage-play/live-source-mail?${params.toString()}`, {
     headers: { Accept: "application/json" },
   });
@@ -5308,12 +5313,18 @@ function StagePlayMailLoopLiveOverview({
     if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
     debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
   };
-  const handleCopyFullMailbox = () => {
+  const handleCopyFullMailbox = async () => {
+    const fullMailbox = await fetchStagePlayLiveSourceMail({
+      threadId: STAGE_PLAY_PANEL_THREAD_ID,
+      mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
+      view: "full",
+      limit: 50,
+    }).catch(() => mailbox ?? null);
     copyStagePlayText(JSON.stringify({
       schema: "helix.stage_play.mail_loop_full_mailbox_capture.v1",
       exportedAt: new Date().toISOString(),
       graphId: graph.graphId,
-      mailbox,
+      mailbox: fullMailbox,
     }, null, 2));
     setDebugCopyState("full");
     if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
@@ -5524,7 +5535,7 @@ function StagePlayMailLoopLiveOverview({
             </button>
             <button
               type="button"
-              onClick={handleCopyFullMailbox}
+              onClick={() => void handleCopyFullMailbox()}
               className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
               data-testid="stage-play-copy-mail-loop-full-state"
               title="Copy the full mailbox API projection for deep debugging."
@@ -9407,6 +9418,8 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayLiveSourceMail({
       threadId: STAGE_PLAY_PANEL_THREAD_ID,
       mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
+      view: "overview",
+      limit: 8,
     }),
     refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
   });

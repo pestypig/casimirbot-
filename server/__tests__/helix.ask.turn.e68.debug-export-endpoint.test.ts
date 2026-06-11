@@ -3,6 +3,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import {
   markStagePlayMailWakeRetryable,
   queueStagePlayLiveSourceMailWakeRequest,
@@ -19,6 +20,7 @@ const createApp = (): express.Express => {
 
 beforeEach(() => {
   resetStagePlayLiveSourceMailWakeStoreForTest();
+  runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
 });
 
 describe("helix ask E68 debug export endpoint", () => {
@@ -60,6 +62,46 @@ describe("helix ask E68 debug export endpoint", () => {
     });
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.artifact_refs)).toBe(true);
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.queryable_artifact_keys)).toBe(true);
+  }, 60000);
+
+  it("registers Ask turns with the runtime memory governor and exports the admission debug", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "hello",
+        mode: "read",
+        debug: true,
+        sessionId: `e68-runtime-governor-${Date.now()}`,
+      })
+      .expect(200);
+
+    const admission = response.body?.runtime_memory_governor_admission;
+    expect(admission).toMatchObject({
+      schema: "helix.ask.runtime_memory_governor_admission.v1",
+      task_class: "active_user_turn",
+      source: "helix_ask_turn",
+      admitted: true,
+      action: "admit",
+      reason: "ok",
+      blocked_reason: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(admission?.lease_id).toEqual(expect.any(String));
+    expect(admission?.pressure_state).toEqual(expect.any(String));
+    expect(response.body?.debug?.runtime_memory_governor_admission?.lease_id).toBe(admission?.lease_id);
+
+    const turnId = response.body?.turn_id;
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+      .expect(200);
+
+    expect(debugExport.body?.payload?.runtime_memory_governor_admission?.lease_id).toBe(admission?.lease_id);
+    expect(debugExport.body?.payload?.runtime_memory_governor_admission?.pressure_state).toBe(admission?.pressure_state);
+    expect(runtimeMemoryGovernor.getRuntimeTaskSnapshot().activeTasks).not.toContainEqual(
+      expect.objectContaining({ id: admission?.lease_id }),
+    );
   }, 60000);
 
   it("returns a typed debug failure for missing turn ids", async () => {
@@ -119,6 +161,15 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
     expect(payload?.terminal_artifact_kind).toBe("stage_play_live_source_mail_wake_result");
     expect(payload?.terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.terminal_error_code).toBeUndefined();
+    expect(payload?.terminal_failure_text).toBeUndefined();
+    expect(payload?.typed_failure).toBeUndefined();
+    expect(payload?.status).toBe("final_answer");
+    expect(payload?.final_status).toBe("final_answer");
+    expect(payload?.response_type).toBe("final_answer");
+    expect(payload?.answer).toBe(payload?.selected_final_answer);
+    expect(payload?.text).toBe(payload?.selected_final_answer);
+    expect(payload?.assistant_answer).toBe(payload?.selected_final_answer);
     expect(payload?.selected_capability).toBe("live_env.request_interim_voice_callout");
     expect(payload?.selected_capability).not.toBe("model.direct_answer");
     expect(payload?.executed_capability).toBe("live_env.request_interim_voice_callout");
@@ -175,10 +226,23 @@ describe("helix ask E68 debug export endpoint", () => {
       selected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
       selected_terminal_artifact_ref: wakeResult.wakeResultId,
       final_answer_source: "stage_play_mailbox_wake_result",
+      source: "stage_play_mailbox_wake_result",
+      visible_text: payload?.selected_final_answer,
       debug_export_synchronized: true,
     });
     expect(payload?.terminal_authority_single_writer?.selectedArtifactKind).not.toBe("typed_failure");
+    expect(payload?.terminal_authority_single_writer?.selectedArtifactRef).not.toMatch(/^typed_failure:/);
     expect(payload?.terminal_authority_single_writer?.selected_terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.terminal_authority_single_writer?.writes).toMatchObject({
+      payload_text: payload?.selected_final_answer,
+      payload_answer: payload?.selected_final_answer,
+      payload_selected_final_answer: payload?.selected_final_answer,
+      debug_selected_final_answer: payload?.selected_final_answer,
+    });
+    expect(payload?.terminal_authority_single_writer?.audit).toMatchObject({
+      selectedArtifactKind: "stage_play_live_source_mail_wake_result",
+      selectedArtifactRef: wakeResult.wakeResultId,
+    });
     expect(payload?.final_route_reconciliation).toMatchObject({
       ok: true,
       resolved_route_label: "live_source_mailbox",

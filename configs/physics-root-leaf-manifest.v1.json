@@ -664,6 +664,43 @@
         ],
         "strict_fail_reason": "ROOT_LEAF_STELLAR_SPECTRAL_VIABILITY_FAIL"
       }
+    },
+    {
+      "id": "path_stellar_chemical_inheritance_to_life_consciousness",
+      "bundle_id": "stellar.chemical-inheritance.audit",
+      "root_id": "physics_stellar_structure_nucleosynthesis",
+      "leaf_id": "leaf_life_cosmology_consciousness",
+      "nodes": [
+        "physics_stellar_structure_nucleosynthesis",
+        "physics_prebiotic_chemistry",
+        "physics_biology_life",
+        "leaf_life_cosmology_consciousness"
+      ],
+      "dag_bridges": [
+        "bridge-stellar-inheritance-to-carbon-synthesis",
+        "bridge-stellar-carbon-to-astrochemistry",
+        "bridge-astrochemistry-to-prebiotic-organics",
+        "bridge-prebiotic-organics-to-terrestrial-biochemistry",
+        "bridge-neural-signaling-to-consciousness-hypotheses"
+      ],
+      "falsifier": {
+        "observable": "stellar chemical-inheritance provenance and no-teleology boundary",
+        "reject_rule": "missing B2FH source anchor OR missing no-life/no-consciousness boundary OR bridge_order_preserved != true",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=session)",
+        "test_refs": [
+          "tests/physics-root-leaf-manifest.spec.ts",
+          "tests/helix-ask-graph-resolver.spec.ts",
+          "shared/theory/__tests__/astrochemistry-prebiotic-theory-badges.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "measured",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_STELLAR_CHEMICAL_INHERITANCE_BOUNDARY_FAIL"
+      }
     }
   ],
   "maturity_propagation_policy": {
@@ -708,6 +745,15 @@
         "path_curvature_proxy_to_collapse_benchmark",
         "path_collapse_benchmark_entrypoint",
         "path_solar_coherence_to_collapse_hypothesis"
+      ]
+    },
+    {
+      "id": "stellar.chemical-inheritance.audit",
+      "summary": "Diagnostic stellar chemical-inheritance lane that uses B2FH-style nucleosynthesis as the root batch for astrochemical possibility space while blocking direct life or consciousness promotion.",
+      "claim_scope": "cross_domain",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_stellar_chemical_inheritance_to_life_consciousness"
       ]
     },
     {

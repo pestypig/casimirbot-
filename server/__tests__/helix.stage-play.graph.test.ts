@@ -647,6 +647,47 @@ describe("GET /api/helix/stage-play/live-source-visual-summaries", () => {
   });
 });
 
+describe("GET /api/helix/stage-play/live-source-mail", () => {
+  it("returns a slim overview projection while preserving the full debug view", async () => {
+    const app = makeApp();
+    const longSummary = [
+      "Minecraft visual source shows a player moving through a cave corridor with repeated torch, sword, and inventory details.",
+      "This deliberately long summary represents the high-churn observer payload that should not be sent every second.",
+      "The complete text remains available from the full mailbox capture path for debugging.",
+    ].join(" ").repeat(10);
+    enqueueStagePlayLiveSourceMailItem({
+      threadId: "thread:mail-overview-route",
+      roomId: "room:mail-overview-route",
+      sourceId: "visual_source:mail-overview-route",
+      sourceKind: "visual_frame",
+      frameRef: "visual_frame:mail-overview-route",
+      evidenceRef: "visual_evidence:mail-overview-route",
+      summaryText: longSummary,
+      createdAt: "2026-06-04T12:00:00.000Z",
+    });
+
+    const full = await request(app)
+      .get("/api/helix/stage-play/live-source-mail")
+      .query({ threadId: "thread:mail-overview-route" })
+      .expect(200);
+    const overview = await request(app)
+      .get("/api/helix/stage-play/live-source-mail")
+      .query({ threadId: "thread:mail-overview-route", view: "overview", limit: 8 })
+      .expect(200);
+
+    expect(full.body.view).toBe("full");
+    expect(overview.body.view).toBe("overview");
+    expect(full.body.mailItems[0].summary.text.length).toBeGreaterThan(overview.body.mailItems[0].summary.text.length);
+    expect(overview.body.mailItems[0].summary.text.length).toBeLessThanOrEqual(703);
+    expect(overview.body).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  });
+});
+
 describe("POST /api/helix/stage-play/live-source-mail/job", () => {
   it("stores a watch-job policy without reading mail", async () => {
     const app = makeApp();

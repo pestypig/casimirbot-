@@ -446,6 +446,122 @@ const readOptionalNumber = (value: unknown): number | null =>
       ? Number(value)
       : null;
 
+type StagePlayLiveSourceMailView = "overview" | "full";
+
+const readLiveSourceMailView = (value: unknown): StagePlayLiveSourceMailView =>
+  readQueryString(value)?.toLowerCase() === "overview" ? "overview" : "full";
+
+const compactStagePlayRouteText = (value: unknown, max = 360): string => {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}...`;
+};
+
+const compactStagePlayRouteTextArray = (values: unknown, maxItems = 6, maxChars = 180): string[] =>
+  Array.isArray(values)
+    ? values.slice(0, maxItems).map((value) => compactStagePlayRouteText(value, maxChars)).filter(Boolean)
+    : [];
+
+const compactStagePlayRouteRefs = (values: unknown, maxItems = 12): string[] =>
+  Array.isArray(values)
+    ? values.map(String).filter(Boolean).slice(0, maxItems)
+    : [];
+
+const compactStagePlayRouteObject = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const compactStagePlayMailForOverview = <T extends Record<string, any>>(mail: T): T => ({
+  ...mail,
+  summary: {
+    ...(compactStagePlayRouteObject(mail.summary) ?? {}),
+    text: compactStagePlayRouteText(mail.summary?.text, 700),
+    preview: compactStagePlayRouteText(mail.summary?.preview, 360),
+  },
+  evidenceRefs: compactStagePlayRouteRefs(mail.evidenceRefs, 14),
+  causalTrace: undefined,
+});
+
+const compactStagePlayPacketForOverview = <T extends Record<string, any>>(packet: T): T => ({
+  ...packet,
+  visualEvidenceRefs: compactStagePlayRouteRefs(packet.visualEvidenceRefs, 8),
+  observedFacts: compactStagePlayRouteTextArray(packet.observedFacts, 6),
+  inferredFacts: compactStagePlayRouteTextArray(packet.inferredFacts, 4),
+  uncertainties: compactStagePlayRouteTextArray(packet.uncertainties, 4),
+  stableFactsUsed: compactStagePlayRouteTextArray(packet.stableFactsUsed, 4),
+  changedFacts: compactStagePlayRouteTextArray(packet.changedFacts, 6),
+  matchedCriteria: compactStagePlayRouteTextArray(packet.matchedCriteria, 6),
+  suppressedCriteria: compactStagePlayRouteTextArray(packet.suppressedCriteria, 4),
+  riskMatches: compactStagePlayRouteTextArray(packet.riskMatches, 6),
+  opportunityMatches: compactStagePlayRouteTextArray(packet.opportunityMatches, 4),
+  voiceCalloutMatches: compactStagePlayRouteTextArray(packet.voiceCalloutMatches, 6),
+  watchNext: compactStagePlayRouteTextArray(packet.watchNext, 6),
+  hypotheses: Array.isArray(packet.hypotheses)
+    ? packet.hypotheses.slice(0, 3).map((hypothesis: Record<string, unknown>) => ({
+        ...hypothesis,
+        prediction: compactStagePlayRouteText(hypothesis.prediction, 240),
+        validationSignals: compactStagePlayRouteTextArray(hypothesis.validationSignals, 4, 120),
+        whatWouldContradictIt: compactStagePlayRouteTextArray(hypothesis.whatWouldContradictIt, 4, 120),
+      }))
+    : packet.hypotheses,
+  arbiter: packet.arbiter && typeof packet.arbiter === "object"
+    ? {
+        ...packet.arbiter,
+        reason: compactStagePlayRouteText(packet.arbiter.reason, 260),
+        calloutDraft: compactStagePlayRouteText(packet.arbiter.calloutDraft, 180),
+        missingEvidence: compactStagePlayRouteTextArray(packet.arbiter.missingEvidence, 4, 120),
+      }
+    : packet.arbiter,
+  microReasonerRunRefs: compactStagePlayRouteRefs(packet.microReasonerRunRefs, 20),
+  evidenceRefs: compactStagePlayRouteRefs(packet.evidenceRefs, 20),
+  causalTrace: undefined,
+});
+
+const compactStagePlayRunForOverview = <T extends Record<string, any>>(run: T): T => ({
+  ...run,
+  inputRefs: compactStagePlayRouteRefs(run.inputRefs, 8),
+  outputRefs: compactStagePlayRouteRefs(run.outputRefs, 8),
+  inputPreview: compactStagePlayRouteText(run.inputPreview, 280),
+  outputPreview: compactStagePlayRouteText(run.outputPreview, 360),
+  missingEvidence: compactStagePlayRouteTextArray(run.missingEvidence, 4, 120),
+  error: compactStagePlayRouteText(run.error, 220) || null,
+  causalTrace: undefined,
+});
+
+const compactStagePlayDecisionForOverview = <T extends Record<string, any>>(decision: T): T => ({
+  ...decision,
+  rationalePreview: compactStagePlayRouteText(decision.rationalePreview, 300),
+  evidenceRefs: compactStagePlayRouteRefs(decision.evidenceRefs, 14),
+  profileComparisonRefs: compactStagePlayRouteRefs(decision.profileComparisonRefs, 8),
+});
+
+const compactStagePlayWakeForOverview = <T extends Record<string, any>>(wake: T): T => ({
+  ...wake,
+  mailIds: compactStagePlayRouteRefs(wake.mailIds, 12),
+  sourceIds: compactStagePlayRouteRefs(wake.sourceIds, 4),
+  evidenceRefs: compactStagePlayRouteRefs(wake.evidenceRefs, 20),
+  decisionIds: compactStagePlayRouteRefs(wake.decisionIds, 8),
+  failureReason: compactStagePlayRouteText(wake.failureReason, 220) || null,
+  causalTrace: undefined,
+});
+
+const compactStagePlayWakeResultForOverview = <T extends Record<string, any>>(result: T): T => ({
+  ...result,
+  evidenceRefs: compactStagePlayRouteRefs(result.evidenceRefs, 24),
+  decisionIds: compactStagePlayRouteRefs(result.decisionIds, 8),
+  voiceCheckpointRefs: compactStagePlayRouteRefs(result.voiceCheckpointRefs, 8),
+  skippedReason: compactStagePlayRouteText(result.skippedReason, 220) || null,
+  failedReason: compactStagePlayRouteText(result.failedReason, 220) || null,
+  stagePlayWakeTransaction: result.stagePlayWakeTransaction && typeof result.stagePlayWakeTransaction === "object"
+    ? {
+        ...result.stagePlayWakeTransaction,
+        producedRefs: compactStagePlayRouteRefs(result.stagePlayWakeTransaction.producedRefs, 12),
+        phaseResolution: undefined,
+      }
+    : result.stagePlayWakeTransaction,
+  causalTrace: undefined,
+});
+
 const readInterpretationPayload = (
   value: unknown,
   fallbackSource?: Record<string, unknown>,
@@ -837,12 +953,17 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
     const status = readQueryString(req.query.status) as any;
-    const limit = readOptionalNumber(req.query.limit) ?? 50;
+    const view = readLiveSourceMailView(req.query.view);
+    const overview = view === "overview";
+    const limit = Math.min(
+      Math.max(readOptionalNumber(req.query.limit) ?? (overview ? 8 : 50), 1),
+      overview ? 12 : 100,
+    );
     const decisions = listStagePlayMailDecisions({
       threadId,
       roomId,
       environmentId,
-      limit: 20,
+      limit: overview ? 8 : 20,
     });
     expireStaleStagePlayLiveSourceMailWakeRequests({
       threadId,
@@ -868,13 +989,13 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const mailIds = new Set(mailItems.map((item) => item.mailId));
     const processedMailPackets = listStagePlayProcessedMailPackets({
       sourceId,
-      limit: 50,
+      limit: overview ? 16 : 50,
     }).filter((packet) =>
       packet.mailIds.some((mailId) => mailIds.has(mailId))
     );
     const microReasonerRuns = listStagePlayMicroReasonerRuns({
       sourceId,
-      limit: 100,
+      limit: overview ? 64 : 100,
     }).filter((run) =>
       run.mailIds.some((mailId) => mailIds.has(mailId)) ||
       processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
@@ -898,37 +1019,58 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
       sourceId: activeMicroReasonerSourceId,
     });
+    const jobStates = listStagePlayLiveSourceJobStates({
+      threadId,
+      roomId,
+      environmentId,
+      limit: overview ? 4 : 10,
+    });
+    const watchJobPolicies = listStagePlayLiveSourceWatchJobPolicies({
+      threadId,
+      roomId,
+      environmentId,
+      limit: overview ? 4 : 10,
+    });
+    const interpreterProfiles = listStagePlayLiveSourceInterpreterProfiles({
+      threadId,
+      roomId,
+      environmentId,
+      includeArchived: true,
+      limit: overview ? 8 : 20,
+    });
+    const interpreterProfileComparisons = listStagePlayLiveSourceInterpreterProfileComparisons({
+      limit: overview ? 16 : 50,
+    }).filter((comparison) =>
+      comparison.mailIds.some((mailId) => mailIds.has(mailId))
+    );
+    const narrativeStates = listStagePlayLiveSourceNarrativeStates({
+      threadId,
+      roomId,
+      environmentId,
+      limit: overview ? 6 : 20,
+    });
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({
+      threadId,
+      roomId,
+      environmentId,
+      limit: overview ? 12 : 20,
+    });
+    const wakeResults = listStagePlayLiveSourceMailWakeResults({
+      threadId,
+      limit: overview ? 12 : 20,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
+      view,
       requestedThreadId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
-      mailItems,
-      jobStates: listStagePlayLiveSourceJobStates({
-        threadId,
-        roomId,
-        environmentId,
-        limit: 10,
-      }),
-      watchJobPolicies: listStagePlayLiveSourceWatchJobPolicies({
-        threadId,
-        roomId,
-        environmentId,
-        limit: 10,
-      }),
-      interpreterProfiles: listStagePlayLiveSourceInterpreterProfiles({
-        threadId,
-        roomId,
-        environmentId,
-        includeArchived: true,
-        limit: 20,
-      }),
-      interpreterProfileComparisons: listStagePlayLiveSourceInterpreterProfileComparisons({
-        limit: 50,
-      }).filter((comparison) =>
-        comparison.mailIds.some((mailId) => mailIds.has(mailId))
-      ),
+      mailItems: overview ? mailItems.map(compactStagePlayMailForOverview) : mailItems,
+      jobStates,
+      watchJobPolicies,
+      interpreterProfiles,
+      interpreterProfileComparisons,
       microReasonerPrompts: listStagePlayActiveMicroReasonerPromptsForSource({
         sourceId: activeMicroReasonerSourceId,
       }),
@@ -940,25 +1082,12 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       }),
       visualObserverProfiles,
       activeVisualObserverProfile,
-      microReasonerRuns,
-      processedMailPackets,
-      decisions,
-      narrativeStates: listStagePlayLiveSourceNarrativeStates({
-        threadId,
-        roomId,
-        environmentId,
-        limit: 20,
-      }),
-      wakeRequests: listStagePlayLiveSourceMailWakeRequests({
-        threadId,
-        roomId,
-        environmentId,
-        limit: 20,
-      }),
-      wakeResults: listStagePlayLiveSourceMailWakeResults({
-        threadId,
-        limit: 20,
-      }),
+      microReasonerRuns: overview ? microReasonerRuns.map(compactStagePlayRunForOverview) : microReasonerRuns,
+      processedMailPackets: overview ? processedMailPackets.map(compactStagePlayPacketForOverview) : processedMailPackets,
+      decisions: overview ? decisions.map(compactStagePlayDecisionForOverview) : decisions,
+      narrativeStates,
+      wakeRequests: overview ? wakeRequests.map(compactStagePlayWakeForOverview) : wakeRequests,
+      wakeResults: overview ? wakeResults.map(compactStagePlayWakeResultForOverview) : wakeResults,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",

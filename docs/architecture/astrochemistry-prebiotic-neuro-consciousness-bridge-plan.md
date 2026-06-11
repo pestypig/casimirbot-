@@ -11,6 +11,39 @@ Execution follow-on:
 
 Record the correct way to represent a possible bridge from stellar carbon chemistry to prebiotic organics, terrestrial biochemistry, dopamine signaling, and speculative consciousness models without collapsing unsupported claims into the executable physics framework.
 
+## Stellar Chemical Inheritance Root Batch
+
+Use the Burbidge, Burbidge, Fowler, and Hoyle 1957 stellar-nucleosynthesis result as the root batch for the astrochemistry flow:
+
+- primordial H/He substrate
+- stellar burning and neutron-capture reaction networks
+- stellar-remnant dispersal and interstellar mixing
+- elemental and isotopic inheritance by later molecular clouds and disks
+- astrochemical molecular inventory
+- planetary boundary conditions
+- prebiotic self-organization
+- biological common ancestry
+- evolved nervous systems and optional consciousness hypotheses
+
+Mathematical bounds that must stay attached to the root:
+
+- nuclear reaction paths preserve charge, baryon number, lepton number, and energy
+- isotope abundances follow coupled reaction-network production and destruction terms
+- reaction channels require temperature, density, cross-section, decay-rate, and flux conditions that are competitive with the stellar phase lifetime
+- s-process and r-process regimes are separated by neutron-capture timescale relative to beta-decay timescale
+- later chemical inventory is a yield-and-mixing inheritance vector, not a life certificate
+
+Allowed claim:
+
+- stellar nucleosynthesis supplies the elemental phase space within which astrochemistry, planetary chemistry, biochemistry, evolution, and consciousness can later emerge
+
+Blocked claims:
+
+- stellar nucleosynthesis creates life
+- fullerenes or organics in space are evidence of life
+- consciousness follows directly from stellar chemistry
+- Earth biology was predetermined by stellar-remnant enrichment
+
 ## Hard Corrections
 
 The following distinctions are required for correctness:

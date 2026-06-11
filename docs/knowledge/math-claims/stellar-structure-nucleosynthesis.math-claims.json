@@ -276,6 +276,37 @@
       "notes": "This is the element-creation anchor for the stellar branch."
     },
     {
+      "claimId": "claim:stellar.structure:chemical_inheritance",
+      "statement": "The stellar-chemical-inheritance root is only admissible at diagnostic tier when stellar nucleosynthesis, remnant dispersal, and interstellar mixing are treated as bounds on later elemental and isotopic possibility space, not as a direct life or consciousness mechanism.",
+      "maturity": "diagnostic",
+      "validityDomain": {
+        "system": "stellar-structure lane to astrochemistry bridge",
+        "constraints": [
+          "nuclear reaction paths must preserve conservation-law bookkeeping",
+          "reaction-network and stellar-phase timescale bounds must stay explicit",
+          "stellar yields may constrain astrochemistry but must not certify life, fullerenes-as-life, or consciousness"
+        ]
+      },
+      "sources": [
+        {
+          "kind": "paper",
+          "citation": "Burbidge, Burbidge, Fowler, and Hoyle, Synthesis of the Elements in Stars, Reviews of Modern Physics 29, 547-650 (1957), DOI: 10.1103/RevModPhys.29.547.",
+          "note": "Primary B2FH source for stellar element synthesis as the chemical-inheritance root."
+        },
+        {
+          "kind": "paper",
+          "citation": "Wallerstein et al., Synthesis of the elements in stars: forty years of progress, Reviews of Modern Physics 69, 995-1084 (1997).",
+          "note": "Modern review context for stellar evolution, yields, and abundance constraints after B2FH."
+        }
+      ],
+      "repoBindings": [
+        "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+        "docs/knowledge/physics/stellar-chemical-inheritance.md",
+        "docs/knowledge/bridges/astrochemistry-prebiotic-neuro-consciousness-bridge-tree.json"
+      ],
+      "notes": "This root batch converts stellar nucleosynthesis into bounded astrochemical initial conditions while preserving the no-teleology boundary."
+    },
+    {
       "claimId": "claim:stellar.structure:composition_feedback",
       "statement": "The composition-feedback anchor is only admissible at diagnostic tier when newly produced elements are allowed to feed back into opacity, equation of state, and later stellar evolution.",
       "maturity": "diagnostic",

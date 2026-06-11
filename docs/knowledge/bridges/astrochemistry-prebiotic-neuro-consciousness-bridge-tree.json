@@ -23,6 +23,7 @@
         "exploratory"
       ],
       "children": [
+        "stellar-chemical-inheritance-root",
         "stellar-carbon-synthesis",
         "interstellar-aromatic-carbon-chemistry",
         "interstellar-pah-chemistry",
@@ -33,6 +34,7 @@
         "quantum-consciousness-hypothesis",
         "orch-or-hypothesis",
         "conscious-experience-mapping",
+        "bridge-stellar-inheritance-to-carbon-synthesis",
         "bridge-stellar-carbon-to-astrochemistry",
         "bridge-astrochemistry-to-prebiotic-organics",
         "bridge-prebiotic-organics-to-terrestrial-biochemistry",
@@ -79,6 +81,68 @@
       "deterministic": true
     },
     {
+      "id": "stellar-chemical-inheritance-root",
+      "nodeType": "concept",
+      "title": "Stellar Chemical Inheritance Root",
+      "summary": "B2FH-style root batch stating that stellar nucleosynthesis and remnant dispersal bound the elemental and isotopic possibility space inherited by later astrochemistry.",
+      "tags": [
+        "astrochemistry",
+        "stellar",
+        "nucleosynthesis",
+        "chemical-inheritance",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root"
+        },
+        {
+          "rel": "constrains",
+          "to": "stellar-carbon-synthesis"
+        }
+      ],
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "first_principles_bounds": [
+        "conservation-law bookkeeping bounds nuclear reaction paths",
+        "reaction-network rates must be competitive with stellar phase lifetimes",
+        "s-process and r-process branches are separated by neutron-capture versus beta-decay timescales",
+        "stellar yields must be integrated over mass, metallicity, event rate, and interstellar mixing",
+        "chemical availability does not imply life or consciousness inevitability"
+      ],
+      "falsifiers": [
+        "stellar_nucleosynthesis_claimed_as_life",
+        "fullerenes_claimed_as_extraterrestrial_life_evidence",
+        "stellar_chemistry_claimed_as_direct_consciousness_mechanism",
+        "no_teleological_chemical_inheritance_law"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-chemical-inheritance.md",
+          "scope": "whole",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json",
+          "scope": "chemical-inheritance-root",
+          "provenance_class": "inferred",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
       "id": "stellar-carbon-synthesis",
       "nodeType": "concept",
       "title": "Stellar Carbon Synthesis",
@@ -94,6 +158,10 @@
         {
           "rel": "parent",
           "to": "astrochemistry-prebiotic-neuro-consciousness-bridge-root"
+        },
+        {
+          "rel": "depends_on",
+          "to": "stellar-chemical-inheritance-root"
         },
         {
           "rel": "enables",
@@ -498,6 +566,65 @@
           "scope": "whole",
           "provenance_class": "inferred",
           "claim_tier": "exploratory",
+          "certifying": false
+        }
+      ],
+      "deterministic": true
+    },
+    {
+      "id": "bridge-stellar-inheritance-to-carbon-synthesis",
+      "nodeType": "bridge",
+      "title": "Bridge Stellar Inheritance To Carbon Synthesis",
+      "summary": "Diagnostic bridge from B2FH-style nucleosynthetic inheritance into the stellar carbon entry point used by the astrochemistry lane.",
+      "tags": [
+        "bridge",
+        "stellar",
+        "nucleosynthesis",
+        "astrochemistry",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "see-also",
+          "to": "stellar-chemical-inheritance-root"
+        },
+        {
+          "rel": "see-also",
+          "to": "stellar-carbon-synthesis"
+        },
+        {
+          "rel": "constrains",
+          "to": "stellar-carbon-synthesis"
+        }
+      ],
+      "bridge": {
+        "left": "stellar-chemical-inheritance-root",
+        "right": "stellar-carbon-synthesis",
+        "relation": "constrains"
+      },
+      "claim_tier": "diagnostic",
+      "maturity": "diagnostic",
+      "falsifiers": [
+        "bridge_left_invalid",
+        "bridge_right_invalid",
+        "chemical_inheritance_overpromoted_to_biology"
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-chemical-inheritance.md",
+          "scope": "left",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
+          "certifying": false
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-carbon-synthesis.md",
+          "scope": "right",
+          "provenance_class": "measured",
+          "claim_tier": "diagnostic",
           "certifying": false
         }
       ],

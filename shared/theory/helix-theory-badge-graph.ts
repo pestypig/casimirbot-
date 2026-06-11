@@ -57,6 +57,12 @@ import {
 import {
   buildOrchOrCoherenceTheoryBadgesV1,
 } from "./orch-or-coherence-theory-badges";
+import {
+  buildNucleosynthesisOriginTheoryBadgesV1,
+} from "./nucleosynthesis-origin-theory-badges";
+import {
+  buildPeriodicElementOriginTheoryBadgesV1,
+} from "./periodic-element-origin-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -919,6 +925,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const granularTidal = buildGranularTidalLoveNumberTheoryBadgesV1();
   const curvature = buildCurvatureCollapseTheoryBadgesV1();
   const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
+  const nucleosynthesisOrigins = buildNucleosynthesisOriginTheoryBadgesV1();
+  const periodicElements = buildPeriodicElementOriginTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
@@ -943,6 +951,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...granularTidal.badges,
       ...curvature.badges,
       ...orchOr.badges,
+      ...nucleosynthesisOrigins.badges,
+      ...periodicElements.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -962,6 +972,8 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...granularTidal.edges,
       ...curvature.edges,
       ...orchOr.edges,
+      ...nucleosynthesisOrigins.edges,
+      ...periodicElements.edges,
     ],
   });
 }

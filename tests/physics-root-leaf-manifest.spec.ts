@@ -721,4 +721,43 @@ describe("validatePhysicsRootLeafManifest", () => {
     ).toContain("path_stellar_structure_to_spectral_viability");
   });
 
+  it("declares the stellar chemical-inheritance path to the life/consciousness bridge", () => {
+    const manifestPath = path.join(process.cwd(), "configs", "physics-root-leaf-manifest.v1.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      paths?: Array<{
+        id: string;
+        root_id?: string;
+        leaf_id?: string;
+        bundle_id?: string;
+        dag_bridges?: string[];
+        maturity_gate?: { strict_fail_reason?: string };
+      }>;
+      bridge_bundles?: Array<{ id: string; path_ids?: string[] }>;
+    };
+
+    const pathEntry = manifest.paths?.find(
+      (entry) => entry.id === "path_stellar_chemical_inheritance_to_life_consciousness",
+    );
+    expect(pathEntry).toEqual(
+      expect.objectContaining({
+        root_id: "physics_stellar_structure_nucleosynthesis",
+        leaf_id: "leaf_life_cosmology_consciousness",
+        bundle_id: "stellar.chemical-inheritance.audit",
+      }),
+    );
+    expect(pathEntry?.dag_bridges).toEqual(
+      expect.arrayContaining([
+        "bridge-stellar-inheritance-to-carbon-synthesis",
+        "bridge-stellar-carbon-to-astrochemistry",
+        "bridge-astrochemistry-to-prebiotic-organics",
+      ]),
+    );
+    expect(pathEntry?.maturity_gate?.strict_fail_reason).toBe(
+      "ROOT_LEAF_STELLAR_CHEMICAL_INHERITANCE_BOUNDARY_FAIL",
+    );
+    expect(
+      manifest.bridge_bundles?.find((entry) => entry.id === "stellar.chemical-inheritance.audit")?.path_ids,
+    ).toContain("path_stellar_chemical_inheritance_to_life_consciousness");
+  });
+
 });

@@ -170,6 +170,66 @@ const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKi
   });
 };
 
+const hasMaterializedScholarlyResearchAnswer = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (terminalArtifactKind !== "scholarly_research_answer") return false;
+  if (readString(payload.final_answer_source) !== "final_answer_draft") return false;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  if (readString(canonicalGoal?.goal_kind) !== "scholarly_research_lookup") return false;
+  if (readString(canonicalGoal?.required_terminal_kind) !== "scholarly_research_answer") return false;
+  const consistency = readRecord(payload.terminal_consistency_check);
+  if (readBoolean(consistency?.consistent) === false) return false;
+  const itinerary = readRecord(payload.capability_itinerary_execution_state);
+  if (readBoolean(itinerary?.applies) === true && readBoolean(itinerary?.complete) !== true) return false;
+
+  const finalDraft =
+    readRecord(payload.final_answer_draft) ??
+    readArray(payload.current_turn_artifact_ledger)
+      .map((entry) => readRecord(readRecord(entry)?.payload))
+      .find((entry) =>
+        readString(entry?.schema) === "helix.final_answer_draft.v1" &&
+        readString(entry?.authority) === "llm_post_observation_composer" &&
+        readString(entry?.composer_scope) === "source_tool_backed"
+      ) ??
+    null;
+  if (
+    readString(finalDraft?.authority) !== "llm_post_observation_composer" ||
+    readString(finalDraft?.composer_scope) !== "source_tool_backed"
+  ) {
+    return false;
+  }
+  const finalDraftSupportRefs = [
+    ...readStringArray(finalDraft?.support_refs),
+    ...readStringArray(finalDraft?.grounded_in_observation_refs),
+    ...readStringArray(finalDraft?.receipt_refs),
+  ];
+
+  const scholarlyAnswer =
+    readRecord(payload.scholarly_research_answer) ??
+    readArray(payload.current_turn_artifact_ledger)
+      .map((entry) => {
+        const artifact = readRecord(entry);
+        return readString(artifact?.kind) === "scholarly_research_answer"
+          ? readRecord(artifact?.payload)
+          : null;
+      })
+      .find((entry) => Boolean(entry)) ??
+    null;
+  const scholarlyAnswerSupportRefs = [
+    ...readStringArray(scholarlyAnswer?.support_refs),
+    ...readStringArray(scholarlyAnswer?.source_observation_refs),
+    ...readStringArray(scholarlyAnswer?.receipt_refs),
+  ];
+  const supportRefs = [...finalDraftSupportRefs, ...scholarlyAnswerSupportRefs];
+  const hasScholarlyObservationRef = supportRefs.some((ref) => /scholarly_research_observation|scholarly_full_text_observation/i.test(ref));
+  if (!hasScholarlyObservationRef) return false;
+
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    return readString(artifact?.kind) === "scholarly_research_observation" ||
+      readString(artifact?.kind) === "scholarly_full_text_observation";
+  });
+};
+
 const hasFinalInterimVoiceCalloutReceipt = (payload: RecordLike): boolean =>
   readArray(payload.current_turn_artifact_ledger).some((entry) => {
     const artifact = readRecord(entry);
@@ -373,6 +433,7 @@ const hasModelOnlyCompoundAnswerCoverage = (payload: RecordLike): boolean => {
 };
 
 const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (hasMaterializedScholarlyResearchAnswer(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
@@ -627,6 +688,8 @@ export function buildSolverControllerDecision(input: {
     readRecord(payload.capability_binding_mismatch_observation) ??
     buildCapabilityBindingMismatchObservation(payload);
   const modelOnlyAnswerCoverageSupersedesCompoundGate = hasModelOnlyCompoundAnswerCoverage(payload);
+  const scholarlyAnswerCoverageSupersedesCompoundGate =
+    hasMaterializedScholarlyResearchAnswer(payload, terminalArtifactKind);
 
   const blockingReasons: HelixSolverControllerBlockingReason[] = [];
   const liveSourcePhaseBlockingReasons: HelixSolverControllerBlockingReason[] = [];
@@ -727,10 +790,12 @@ export function buildSolverControllerDecision(input: {
       pushUnique(blockingReasons, "doc_retrieval_coverage_incomplete");
     }
     if (hasIncompleteCompoundPromptCoverageGate(payload)) {
-      if (modelOnlyAnswerCoverageSupersedesCompoundGate) {
+      if (modelOnlyAnswerCoverageSupersedesCompoundGate || scholarlyAnswerCoverageSupersedesCompoundGate) {
         payload.compound_prompt_coverage_gate_superseded_by_answer_artifact = true;
         payload.compound_prompt_coverage_superseded_ref =
-          readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref);
+          scholarlyAnswerCoverageSupersedesCompoundGate
+            ? readString(payload.terminal_artifact_id) ?? readString(readRecord(payload.scholarly_research_answer)?.artifact_id)
+            : readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref);
       } else {
       pushUnique(blockingReasons, "compound_prompt_coverage_incomplete");
       }
@@ -972,12 +1037,15 @@ export function buildSolverControllerDecision(input: {
     consumed_artifact_refs: capabilityBindingMismatchObservation
       ? [...consumedRefs, "capability_binding_mismatch_observation"]
       : consumedRefs,
-    superseded_blocking_reasons: modelOnlyAnswerCoverageSupersedesCompoundGate
+    superseded_blocking_reasons: modelOnlyAnswerCoverageSupersedesCompoundGate || scholarlyAnswerCoverageSupersedesCompoundGate
       ? ["compound_prompt_coverage_incomplete"]
       : undefined,
-    compound_prompt_coverage_gate_superseded_by_answer_artifact: modelOnlyAnswerCoverageSupersedesCompoundGate || undefined,
-    compound_prompt_coverage_superseded_ref: modelOnlyAnswerCoverageSupersedesCompoundGate
-      ? readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref)
+    compound_prompt_coverage_gate_superseded_by_answer_artifact:
+      modelOnlyAnswerCoverageSupersedesCompoundGate || scholarlyAnswerCoverageSupersedesCompoundGate || undefined,
+    compound_prompt_coverage_superseded_ref: scholarlyAnswerCoverageSupersedesCompoundGate
+      ? readString(payload.terminal_artifact_id) ?? readString(readRecord(payload.scholarly_research_answer)?.artifact_id)
+      : modelOnlyAnswerCoverageSupersedesCompoundGate
+        ? readString(readRecord(payload.model_only_compound_coverage_from_answer)?.candidate_ref)
       : undefined,
     retry_policy_ref: capabilityBindingMismatchObservation ? "capability_binding_mismatch_observation" : undefined,
     typed_failure_code: typedFailureCode,

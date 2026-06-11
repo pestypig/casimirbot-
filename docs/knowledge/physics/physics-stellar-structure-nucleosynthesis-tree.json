@@ -24,6 +24,7 @@
         "physics-stellar-structure-nucleosynthesis-helium-burning-definition",
         "physics-stellar-structure-nucleosynthesis-advanced-burning-stages-definition",
         "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+        "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root",
         "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
         "physics-stellar-structure-nucleosynthesis-stellar-oscillation-definition",
         "physics-stellar-structure-nucleosynthesis-helioseismology-definition",
@@ -460,7 +461,7 @@
       "slug": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
       "title": "Stellar Nucleosynthesis Definition",
       "excerpt": "Definition-level anchor for element creation in stellar interiors.",
-      "bodyMD": "This node anchors the production of new nuclei through stellar burning and late-stage nuclear processing.",
+      "bodyMD": "This node anchors the production of new nuclei through stellar burning and late-stage nuclear processing. It remains a stellar-physics anchor, not a biology or consciousness claim.",
       "tags": [
         "physics",
         "stellar",
@@ -486,6 +487,12 @@
           "to": "physics-stellar-structure-nucleosynthesis-composition-feedback-definition",
           "edgeType": "association",
           "requiresCL": "none"
+        },
+        {
+          "rel": "supports",
+          "to": "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root",
+          "edgeType": "association",
+          "requiresCL": "none"
         }
       ],
       "summary": "Definition-level anchor for element creation in stellar interiors.",
@@ -500,6 +507,90 @@
         ]
       },
       "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-nucleosynthesis.md"
+        },
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-chemical-inheritance.md"
+        }
+      ]
+    },
+    {
+      "id": "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root",
+      "slug": "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root",
+      "title": "Stellar Chemical Inheritance Root",
+      "excerpt": "First-principles root batch for B2FH-style elemental inheritance into later astrochemistry.",
+      "bodyMD": "This node anchors the B2FH-style root claim: nuclear reaction networks, stellar lifecycles, remnant dispersal, and interstellar mixing bound the elemental and isotopic inventory available to later molecular clouds, disks, planets, and prebiotic chemistry. It permits an inheritance claim about chemical possibility space, while explicitly blocking direct life, fullerenes-as-life, or consciousness claims.",
+      "tags": [
+        "physics",
+        "stellar",
+        "nucleosynthesis",
+        "chemical-inheritance",
+        "astrochemistry",
+        "diagnostic"
+      ],
+      "children": [],
+      "links": [
+        {
+          "rel": "parent",
+          "to": "physics-stellar-structure-nucleosynthesis-tree",
+          "edgeType": "hierarchy",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "depends_on",
+          "to": "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition",
+          "edgeType": "association",
+          "requiresCL": "none"
+        },
+        {
+          "rel": "constrains",
+          "to": "physics-prebiotic-chemistry-tree",
+          "edgeType": "association",
+          "requiresCL": "none"
+        }
+      ],
+      "summary": "First-principles root batch for stellar nucleosynthetic inheritance into later astrochemistry.",
+      "nodeType": "definition",
+      "dependencies": [
+        "physics-stellar-structure-nucleosynthesis-tree",
+        "physics-stellar-structure-nucleosynthesis-stellar-nucleosynthesis-definition"
+      ],
+      "validity": {
+        "equation_ref": "nuclear_reaction_network_rate",
+        "claim_ids": [
+          "claim:stellar.structure:chemical_inheritance"
+        ]
+      },
+      "first_principles_bounds": [
+        {
+          "id": "conservation_bounds",
+          "statement": "Nuclear reaction paths must conserve charge, baryon number, lepton number, and energy."
+        },
+        {
+          "id": "reaction_network_bound",
+          "statement": "Isotopic abundances evolve by coupled production and destruction terms over stellar temperature, density, cross-section, flux, and decay-rate conditions."
+        },
+        {
+          "id": "timescale_bound",
+          "statement": "A reaction channel can dominate only when its reaction timescale is no longer than the relevant stellar-environment lifetime."
+        },
+        {
+          "id": "yield_integration_bound",
+          "statement": "Later systems inherit abundance vectors from stellar yields integrated over stellar mass, metallicity, event rates, and interstellar mixing."
+        },
+        {
+          "id": "no_teleology_bound",
+          "statement": "Chemical availability changes possibility space but does not imply life or consciousness inevitability."
+        }
+      ],
+      "evidence": [
+        {
+          "type": "doc",
+          "path": "docs/knowledge/physics/stellar-chemical-inheritance.md"
+        },
         {
           "type": "doc",
           "path": "docs/knowledge/physics/stellar-nucleosynthesis.md"

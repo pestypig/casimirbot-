@@ -23,6 +23,9 @@ const STARSIM_STAGE1_DOC = "docs/research/starsim-fusion-microphysics-stage1.md"
 const STARSIM_MESA_REPRO_DOC = "docs/research/starsim-solar-mesa-docker-repro-v1.md";
 const STELLAR_NUCLEOSYNTHESIS_AUDIT_DOC =
   "docs/audits/research/stellar-structure-nucleosynthesis-source-check-2026-03-25.md";
+const STELLAR_CHEMICAL_INHERITANCE_DOC = "docs/knowledge/physics/stellar-chemical-inheritance.md";
+const STELLAR_NUCLEOSYNTHESIS_TREE_DOC =
+  "docs/knowledge/physics/physics-stellar-structure-nucleosynthesis-tree.json";
 const STARSIM_FUSION_BENCHMARK_DOC = "docs/research/starsim-fusion-benchmark-stage2-candidate.md";
 const STARSIM_FUSION_CLAIMS_DOC = "docs/knowledge/math-claims/starsim-fusion-microphysics.claims.json";
 
@@ -409,15 +412,17 @@ export const SOLAR_STELLAR_REFERENCE_THEORY_BADGES: TheoryBadgeV1[] = [
   }),
   solarStellarBadge({
     id: "stellar.nucleosynthesis.reaction_network_context",
-    title: "Stellar Reaction-Network Context",
-    plainMeaning: "Names nucleosynthesis abundance flow as reaction-network context.",
-    whyItMatters: "It gives fusion and nucleosynthesis prompts a first-principles path without claiming a full stellar-evolution solver.",
-    subjects: ["stellar", "nucleosynthesis", "reaction_network", "fusion", "abundance"],
-    level: "model",
+    title: "Stellar Chemical Inheritance Root",
+    plainMeaning:
+      "Names B2FH-style stellar nucleosynthesis abundance flow as the elemental and isotopic inheritance root for later astrochemistry.",
+    whyItMatters:
+      "It grounds fusion, nucleosynthesis, and astrochemistry prompts in first-principles reaction-network bounds without claiming a full stellar-evolution solver or a direct life/consciousness mechanism.",
+    subjects: ["stellar", "nucleosynthesis", "reaction_network", "fusion", "abundance", "chemical_inheritance"],
+    level: "first_principle",
     status: "diagnostic",
     simulationOwners: ["starsim", "stellar_reference"],
-    equationFamilies: ["stellar_reaction_network", "nucleosynthesis_context"],
-    tags: ["stellar", "nucleosynthesis", "reaction_network"],
+    equationFamilies: ["stellar_reaction_network", "nucleosynthesis_context", "stellar_yield_context"],
+    tags: ["stellar", "nucleosynthesis", "reaction_network", "b2fh", "no_teleology_boundary"],
     equations: [
       {
         id: "stellar_reaction_network_context",
@@ -428,6 +433,15 @@ export const SOLAR_STELLAR_REFERENCE_THEORY_BADGES: TheoryBadgeV1[] = [
         inputSymbols: ["Y_i", "R_ji", "R_ik"],
         outputSymbols: ["dY_i_dt"],
       },
+      {
+        id: "stellar_yield_inheritance_context",
+        role: "noncomputable_reference",
+        displayLatex: "Z_{system}\\sim\\int \\xi(M)\\,y_i(M,Z,t)\\,R(M,Z,t)\\,dM",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["initial_mass_function", "stellar_yield", "event_rate", "metallicity"],
+        outputSymbols: ["system_abundance_vector"],
+      },
     ],
     units: [
       { symbol: "Y_i", quantity: "abundance", dimensionSignature: "1" },
@@ -435,19 +449,40 @@ export const SOLAR_STELLAR_REFERENCE_THEORY_BADGES: TheoryBadgeV1[] = [
       { symbol: "R_ik", quantity: "reaction_flow", dimensionSignature: "T^-1" },
       { symbol: "dY_i_dt", quantity: "abundance_rate", dimensionSignature: "T^-1" },
     ],
-    assumptions: COMMON_ASSUMPTIONS,
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Stellar nucleosynthesis supplies chemical possibility-space constraints.",
+      "Reaction-network and yield terms do not certify life, fullerenes-as-life, consciousness, or Earth inevitability.",
+    ],
     calculatorPayloads: [],
     sourceRefs: [
+      {
+        kind: "literature_ref",
+        id: "doi:10.1103/RevModPhys.29.547",
+        note: "B2FH stellar nucleosynthesis source anchor.",
+      },
+      docRef(STELLAR_CHEMICAL_INHERITANCE_DOC, "stellar-chemical-inheritance", "B2FH chemical-inheritance root batch."),
+      docRef(
+        STELLAR_NUCLEOSYNTHESIS_TREE_DOC,
+        "physics-stellar-structure-nucleosynthesis-chemical-inheritance-root",
+        "Stellar lane graph node for chemical inheritance.",
+      ),
       docRef(STELLAR_NUCLEOSYNTHESIS_AUDIT_DOC, "stellar-structure-nucleosynthesis", "Source-check audit."),
       docRef(STARSIM_FUSION_BENCHMARK_DOC, "stage2-candidate", "Fusion benchmark candidate context."),
       docRef(STARSIM_FUSION_CLAIMS_DOC, "fusion-microphysics-claims", "Math-claims reference for StarSim fusion microphysics."),
     ],
     hintKeys: {
-      subjects: ["stellar", "nucleosynthesis", "reaction_network", "fusion", "abundance"],
-      symbols: ["Y_i", "R_ji", "R_ik", "dY_i_dt"],
+      subjects: ["stellar", "nucleosynthesis", "reaction_network", "fusion", "abundance", "chemical_inheritance"],
+      symbols: ["Y_i", "R_ji", "R_ik", "dY_i_dt", "system_abundance_vector"],
       unitSignatures: ["1", "T^-1"],
-      repoPaths: [STELLAR_NUCLEOSYNTHESIS_AUDIT_DOC, STARSIM_FUSION_BENCHMARK_DOC, STARSIM_FUSION_CLAIMS_DOC],
-      equationFamilies: ["stellar_reaction_network", "nucleosynthesis_context"],
+      repoPaths: [
+        STELLAR_CHEMICAL_INHERITANCE_DOC,
+        STELLAR_NUCLEOSYNTHESIS_TREE_DOC,
+        STELLAR_NUCLEOSYNTHESIS_AUDIT_DOC,
+        STARSIM_FUSION_BENCHMARK_DOC,
+        STARSIM_FUSION_CLAIMS_DOC,
+      ],
+      equationFamilies: ["stellar_reaction_network", "nucleosynthesis_context", "stellar_yield_context"],
       simulationOwners: ["starsim", "stellar_reference"],
     },
   }),

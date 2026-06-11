@@ -316,17 +316,34 @@ const classifyWakePriority = (input: {
   reason: string;
 } => {
   const packet = input.processedPacket;
-  const salience = input.immersionState.salience;
-  const arbiterRequestsVoice =
-    packet.arbiter?.recommendedNext === "request_voice_callout" &&
-    (packet.arbiter.voiceCandidate === true || packet.arbiter.wakeAsk === true);
-  const packetRequestsVoice =
-    packet.recommendedNext === "request_voice_callout" ||
-    input.predictionValidation.recommendedNext === "request_voice_callout";
+  const arbiter = packet.arbiter ?? null;
+  if (arbiter) {
+    if (
+      arbiter.recommendedNext === "request_voice_callout" &&
+      (arbiter.voiceCandidate === true || packet.salience.voiceCandidate === true)
+    ) {
+      return {
+        priority: "urgent_voice",
+        reason: "processed_packet_arbiter_request_voice_callout",
+      };
+    }
+    if (arbiter.wakeAsk === true || arbiter.recommendedNext !== "wait_for_next_summary") {
+      return {
+        priority: "ask_wake",
+        reason: arbiter.wakeAsk === true
+          ? "processed_packet_arbiter_wake"
+          : `processed_packet_arbiter_${arbiter.recommendedNext}`,
+      };
+    }
+    return {
+      priority: "local_observer",
+      reason: "processed_packet_arbiter_wait_for_next_summary",
+    };
+  }
   if (
-    packetRequestsVoice &&
-    salience.level === "urgent" &&
-    (salience.voiceCandidate === true || arbiterRequestsVoice)
+    packet.recommendedNext === "request_voice_callout" &&
+    packet.salience.level === "urgent" &&
+    packet.salience.voiceCandidate === true
   ) {
     return {
       priority: "urgent_voice",
@@ -334,15 +351,28 @@ const classifyWakePriority = (input: {
     };
   }
   if (
-    packet.arbiter?.wakeAsk === true ||
-    packet.recommendedNext !== "wait_for_next_summary" ||
-    input.predictionValidation.recommendedNext !== "wait_for_next_summary"
+    packet.recommendedNext !== "wait_for_next_summary"
   ) {
     return {
       priority: "ask_wake",
-      reason: packet.arbiter?.wakeAsk === true
-        ? "processed_packet_arbiter_wake"
-        : `processed_packet_${packet.recommendedNext}`,
+      reason: `processed_packet_${packet.recommendedNext}`,
+    };
+  }
+  const salience = input.immersionState.salience;
+  if (
+    input.predictionValidation.recommendedNext === "request_voice_callout" &&
+    salience.level === "urgent" &&
+    salience.voiceCandidate === true
+  ) {
+    return {
+      priority: "urgent_voice",
+      reason: "prediction_validation_urgent_voice_candidate",
+    };
+  }
+  if (input.predictionValidation.recommendedNext !== "wait_for_next_summary") {
+    return {
+      priority: "ask_wake",
+      reason: `prediction_validation_${input.predictionValidation.recommendedNext}`,
     };
   }
   return {

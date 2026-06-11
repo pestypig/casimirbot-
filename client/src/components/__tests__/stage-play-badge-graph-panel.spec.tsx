@@ -3075,6 +3075,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(mailboxUrl).toContain("/api/helix/stage-play/live-source-mail?");
     expect(mailboxUrl).toContain("threadId=helix-ask%3Adesktop");
     expect(mailboxUrl).toContain("mailboxThreadId=helix-ask%3Adesktop");
+    expect(mailboxUrl).toContain("view=overview");
+    expect(mailboxUrl).toContain("limit=8");
     expect(mailboxUrl).not.toContain("roomId=");
     expect(mailboxUrl).not.toContain("environmentId=");
     const builderUrl = fetchCallUrls().find((url: string) => url.includes("/api/helix/stage-play/builder?")) ?? "";

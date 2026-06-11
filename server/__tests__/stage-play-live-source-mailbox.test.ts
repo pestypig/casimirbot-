@@ -33,6 +33,7 @@ import {
   listStagePlayLiveSourceMailWakeRequests,
   expireStaleStagePlayLiveSourceMailWakeRequests,
   markStagePlayMailWakeCompleted,
+  markStagePlayMailWakeRetryable,
   markStagePlayMailWakeRunning,
   markStagePlayMailWakeUiHandoffRequired,
   queueStagePlayLiveSourceMailWakeRequest,
@@ -1284,6 +1285,110 @@ describe("Stage Play live-source mailbox", () => {
       supersededByWakeRequestId: secondWake?.wakeRequestId,
       failureReason: "wake_superseded_by_newer_source_packet",
     });
+  });
+
+  it("coalesces fresh same-source queued wakes instead of creating duplicate pressure", () => {
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:fresh-coalesce-first"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:fresh-coalesce-first"],
+      now: "2026-06-04T12:00:36.100Z",
+    });
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:fresh-coalesce-second"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:fresh-coalesce-second"],
+      now: "2026-06-04T12:00:36.200Z",
+    });
+
+    expect(secondWake?.wakeRequestId).toBe(firstWake?.wakeRequestId);
+    expect(secondWake?.mailIds).toEqual(expect.arrayContaining([
+      "stage_play_live_source_mail:fresh-coalesce-first",
+      "stage_play_live_source_mail:fresh-coalesce-second",
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "queued" })).toHaveLength(1);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "expired_superseded" })).toHaveLength(0);
+  });
+
+  it("supersedes deferred same-source wakes when a newer present packet arrives", () => {
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:deferred-first-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:deferred-first-present"],
+      now: "2026-06-04T12:00:36.300Z",
+    });
+    markStagePlayMailWakeRetryable({
+      wakeRequestId: firstWake?.wakeRequestId ?? "",
+      status: "deferred_for_pressure",
+      failureReason: "runtime_memory_queue_deferrable",
+      nextRetryAt: "2026-06-04T12:00:51.000Z",
+      now: "2026-06-04T12:00:36.400Z",
+    });
+
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:deferred-second-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:deferred-second-present"],
+      now: "2026-06-04T12:00:40.000Z",
+    });
+
+    expect(secondWake?.wakeRequestId).not.toBe(firstWake?.wakeRequestId);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "queued" }).map((entry) => entry.wakeRequestId)).toEqual([
+      secondWake?.wakeRequestId,
+    ]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "expired_superseded" })[0]).toMatchObject({
+      wakeRequestId: firstWake?.wakeRequestId,
+      supersededByWakeRequestId: secondWake?.wakeRequestId,
+      failureReason: "wake_superseded_by_newer_source_packet",
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wakeRequestId: firstWake?.wakeRequestId,
+        status: "expired_superseded",
+        failedReason: "wake_superseded_by_newer_source_packet",
+      }),
+    ]));
+  });
+
+  it("does not supersede same-source wakes that already have voice checkpoint evidence", () => {
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:voice-checkpoint-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: [
+        "stage_play_live_source_mail:voice-checkpoint-present",
+        "helix_interim_voice_callout_receipt:voice-checkpoint-present",
+      ],
+      now: "2026-06-04T12:00:40.100Z",
+      expiresAfterMs: 1_000,
+    });
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:voice-checkpoint-newer-present"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:voice-checkpoint-newer-present"],
+      now: "2026-06-04T12:00:45.000Z",
+      expiresAfterMs: 30_000,
+    });
+
+    expect(secondWake?.wakeRequestId).not.toBe(firstWake?.wakeRequestId);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId }).find((entry) =>
+      entry.wakeRequestId === firstWake?.wakeRequestId
+    )).toMatchObject({
+      status: "queued",
+      evidenceRefs: expect.arrayContaining(["helix_interim_voice_callout_receipt:voice-checkpoint-present"]),
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId, status: "expired_superseded" })).toHaveLength(0);
   });
 
   it("does not expire phase-locked running wakes before decision and voice reconciliation", () => {
@@ -3602,7 +3707,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(listStagePlayLiveSourceMailItems({ threadId })[0].status).toBe("unread");
   });
 
-  it("merges new same-source unread mail into an existing deferred wake", async () => {
+  it("supersedes an existing deferred wake when newer same-source unread mail arrives", async () => {
     seedVisualEvidence();
     const first = await runNextMailWakeRequest({
       threadId,
@@ -3631,14 +3736,16 @@ describe("Stage Play live-source mailbox", () => {
       now: "2026-06-04T12:01:35.000Z",
     });
 
-    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })).toHaveLength(1);
-    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0].wakeRequestId).toBe(first?.wakeRequestId);
-    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
-      status: "deferred_for_pressure",
-      mailIds: expect.arrayContaining([
-        listStagePlayLiveSourceMailItems({ threadId })[0].mailId,
-        listStagePlayLiveSourceMailItems({ threadId })[1].mailId,
-      ]),
+    const allWakes = listStagePlayLiveSourceMailWakeRequests({ threadId });
+    const queuedWake = allWakes.find((wake) => wake.status === "queued");
+    expect(queuedWake?.wakeRequestId).not.toBe(first?.wakeRequestId);
+    expect(queuedWake?.mailIds).toEqual(expect.arrayContaining([
+      listStagePlayLiveSourceMailItems({ threadId })[1].mailId,
+    ]));
+    expect(allWakes.find((wake) => wake.wakeRequestId === first?.wakeRequestId)).toMatchObject({
+      status: "expired_superseded",
+      supersededByWakeRequestId: queuedWake?.wakeRequestId,
+      failureReason: "wake_superseded_by_newer_source_packet",
     });
   });
 

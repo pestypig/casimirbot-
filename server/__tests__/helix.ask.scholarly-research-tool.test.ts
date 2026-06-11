@@ -1878,4 +1878,267 @@ describe("Helix scholarly research tool admission", () => {
       }),
     });
   });
+
+  it("materializes a scholarly terminal answer from a source-backed final draft when stale state still points at the observation", () => {
+    const turnId = "ask:scholarly-terminal-materialize-from-draft";
+    const scholarlyObservationRef = `${turnId}:runtime_tool_call:1:scholarly_research_observation`;
+    const theoryReceiptRef = "helix-theory-reflection-tool-receipt:test";
+    const sourceBackedFinalDraftRef = `${turnId}:final_answer_draft`;
+    const staleModelOnlyDraftText = "A stale model-only draft should not become the scholarly terminal answer.";
+    const finalDraftText =
+      "Scholarly lookup found paper metadata for quantum coherence in photosynthesis, and the Theory Badge Graph locator placed the claim near photosynthetic light-harvesting and coherence lifetime gates. The answer should treat microtubule/Orch-OR comparisons as uncertain and boundary-constrained.";
+    const artifacts = [
+      {
+        artifact_id: scholarlyObservationRef,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_tool_executor",
+        kind: "scholarly_research_observation",
+        created_at_ms: 1,
+        source_scope: "current_turn",
+        goal_hash: "scholarly",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          query: "quantum coherence in photosynthesis",
+          selected_for_answer: true,
+          papers: [{
+            title: "Quantum coherence in photosynthesis",
+            year: 2007,
+            authors: [{ name: "Engel" }],
+          }],
+        },
+      },
+      {
+        artifact_id: theoryReceiptRef,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "helix_theory_context_reflection_tool_receipt",
+        created_at_ms: 2,
+        source_scope: "current_turn",
+        goal_hash: "theory",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          tool_id: "helix_ask.reflect_theory_context",
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: sourceBackedFinalDraftRef,
+        turn_id: turnId,
+        producer_item_id: "runtime_final_answer_composer",
+        kind: "final_answer_draft",
+        created_at_ms: 3,
+        source_scope: "current_turn",
+        goal_hash: "source-backed-draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          artifact_id: sourceBackedFinalDraftRef,
+          turn_id: turnId,
+          goal_kind: "scholarly_research_lookup",
+          required_terminal_kind: "scholarly_research_answer",
+          authority: "llm_post_observation_composer",
+          composer_scope: "source_tool_backed",
+          llm_error_code: null,
+          duration_ms: 12,
+          text: finalDraftText,
+          artifact_refs: [scholarlyObservationRef, theoryReceiptRef],
+          support_refs: [scholarlyObservationRef],
+          receipt_refs: [theoryReceiptRef],
+          coverage_refs: [`${turnId}:goal_satisfaction_evaluation`],
+          grounded_in_observation_refs: [scholarlyObservationRef],
+          unsupported_claim_guard: {
+            source_targeted: true,
+            policy: "selected_artifacts_only",
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Use scholarly research to find papers about quantum coherence in photosynthesis. After the scholarly observation, use the Theory Badge Graph locator to place the claim. Then synthesize uncertainty with citations.",
+      canonical_goal_frame: {
+        ...canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+        turn_id: turnId,
+      },
+      current_turn_artifact_ledger: artifacts,
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        required_observation_families: ["scholarly_research", "theory_locator"],
+        admitted_tool_families: ["scholarly_research", "theory_locator"],
+        observed_families: ["scholarly_research", "theory_locator"],
+        missing_observation_families: [],
+        next_missing_family: null,
+        complete: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      solver_hard_gate: {
+        schema: "helix.ask_turn_solver_hard_gate.v1",
+        applies: true,
+        failed: false,
+        failure_codes: [],
+        primary_failure_code: null,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: `${turnId}:model_only_concept_final_draft`,
+        turn_id: turnId,
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+        authority: "model_turn_assistant_message",
+        composer_scope: "model_only",
+        llm_error_code: null,
+        duration_ms: 0,
+        text: staleModelOnlyDraftText,
+        artifact_refs: [],
+        support_refs: [],
+        receipt_refs: [],
+        coverage_refs: [],
+        grounded_in_observation_refs: [],
+        unsupported_claim_guard: {
+          source_targeted: false,
+          policy: "not_applicable",
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_artifact_id: scholarlyObservationRef,
+      terminal_artifact_kind: "scholarly_research_observation",
+      final_answer_source: "no_tool_direct",
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      answer: "I could not produce a terminal answer for this turn.",
+      text: "I could not produce a terminal answer for this turn.",
+      terminal_error_code: "typed_failure",
+      terminal_consistency_check: {
+        selected_terminal_kind: "scholarly_research_observation",
+        final_answer_source: "no_tool_direct",
+        consistent: false,
+        violations: ["invalid_terminal_artifact_shape"],
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        canonical_goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+        terminal_contract: {
+          goal_kind: "scholarly_research_lookup",
+          required_terminal_kinds: ["scholarly_research_answer"],
+          acceptable_fallbacks: [],
+          forbidden_terminal_kinds: ["scholarly_research_observation", "no_tool_direct", "model_direct_answer"],
+          required_actions: ["scholarly-research.lookup_papers", "helix_ask.reflect_theory_context"],
+          required_evidence: ["scholarly_research_observation", "helix_theory_context_reflection_tool_receipt"],
+        },
+        required_actions: [],
+        required_evidence: [],
+        observed_results: [],
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        stop_reason: "terminal_satisfied",
+        executed_tool_call_count: 2,
+        iterations: [
+          {
+            iteration: 1,
+            decision_ref: `${turnId}:agent-step:1`,
+            next_step: "next_action",
+            chosen_capability: "scholarly-research.lookup_papers",
+            executed_action_key: "scholarly-research.lookup_papers",
+            observation_role: "executed_tool_result",
+            produced_artifacts: ["runtime_tool_call", "runtime_tool_call_validation", "scholarly_research_observation", "runtime_tool_observation"],
+            observed_artifact_refs: [scholarlyObservationRef],
+            satisfaction: "satisfied",
+            missing_requirement_ids: [],
+          },
+          {
+            iteration: 2,
+            decision_ref: `${turnId}:agent-step:2`,
+            next_step: "next_action",
+            chosen_capability: "helix_ask.reflect_theory_context",
+            executed_action_key: "helix_ask.reflect_theory_context",
+            observation_role: "executed_tool_result",
+            produced_artifacts: ["runtime_tool_call", "runtime_tool_call_validation", "helix_theory_context_reflection_tool_receipt", "runtime_tool_observation"],
+            observed_artifact_refs: [theoryReceiptRef],
+            satisfaction: "satisfied",
+            missing_requirement_ids: [],
+          },
+          {
+            iteration: 3,
+            decision_ref: `${turnId}:agent-step:3`,
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            executed_action_key: null,
+            observation_role: "terminal_decision",
+            produced_artifacts: ["direct_answer_text", "final_answer_draft"],
+            observed_artifact_refs: [`${turnId}:final_answer_draft`],
+            satisfaction: "satisfied",
+            missing_requirement_ids: [],
+          },
+        ],
+      },
+      agent_step_decision: {
+        decision_id: `${turnId}:agent-step:3`,
+        next_step: "answer",
+        decision: "allow_terminal",
+        chosen_capability: "model.direct_answer",
+        decision_timing: "terminal_review",
+        action_authorization: {
+          required_before_tool_execution: false,
+          authorizes_tool_execution: false,
+          authorized_capability: null,
+        },
+      },
+      debug: {
+        terminal_artifact_kind: "scholarly_research_observation",
+        final_answer_source: "no_tool_direct",
+        terminal_error_code: "typed_failure",
+      },
+    };
+
+    const refreshed = __testHelixScholarlyTerminalAuthorityRefresh.refreshScholarlyTerminalAuthorityAfterMaterialization({
+      payload,
+      threadId: "thread:test",
+      turnId,
+      route: "scholarly_research_lookup",
+      prompt: String(payload.active_prompt),
+    });
+
+    expect(refreshed).toBe(true);
+    expect(payload.ok).toBe(true);
+    expect(payload.response_type).toBe("final_answer");
+    expect(payload.terminal_artifact_kind).toBe("scholarly_research_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.selected_final_answer).toBe(finalDraftText);
+    expect((payload.final_answer_draft as any).artifact_id).toBe(sourceBackedFinalDraftRef);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.scholarly_research_answer).toMatchObject({
+      schema: "helix.scholarly_research_answer.v1",
+      artifact_id: `${turnId}:scholarly_research_answer`,
+      answer_text: finalDraftText,
+      support_refs: expect.arrayContaining([scholarlyObservationRef, theoryReceiptRef]),
+      receipt_refs: expect.arrayContaining([theoryReceiptRef]),
+    });
+    expect((payload.current_turn_artifact_ledger as any[]).some((artifact) =>
+      artifact.kind === "scholarly_research_answer" &&
+      artifact.payload?.text === finalDraftText
+    )).toBe(true);
+    expect(payload.terminal_consistency_check).toMatchObject({
+      selected_terminal_kind: "scholarly_research_answer",
+      final_answer_source: "final_answer_draft",
+      consistent: true,
+      violations: [],
+    });
+    expect(payload.solver_controller_decision).toMatchObject({
+      decision: "allow_terminal",
+      selected_terminal_artifact_kind: "scholarly_research_answer",
+      blocking_reasons: [],
+    });
+  });
 });

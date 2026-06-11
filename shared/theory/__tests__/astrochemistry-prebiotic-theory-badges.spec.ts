@@ -29,6 +29,7 @@ describe("astrochemistry/prebiotic theory badges", () => {
     expect(branchBadgeIds).toContain("biophysics.membrane.open_system_entropy_flow");
     expect(branchBadgeIds).toContain("orch_or.claim_boundary.prebiotic_consciousness_exploratory_only");
 
+    expect(graphBadgeIds).toContain("stellar.nucleosynthesis.reaction_network_context");
     expect(graphBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
     expect(graphBadgeIds).toContain("prebiotic.inventory.meteoritic_organics_context");
     expect(graphBadgeIds).toContain("prebiotic.claim_boundary.dopamine_not_pah_shortcut");
@@ -74,6 +75,32 @@ describe("astrochemistry/prebiotic theory badges", () => {
       expect(badge.claimBoundary.physicalMechanismClaimAllowed).toBe(false);
       expect(badge.claimBoundary.promotionAllowed).toBe(false);
     }
+  });
+
+  it("anchors the stellar chemical inheritance root without promoting biology or consciousness", () => {
+    const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    const byId = new Map(graph.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+    const root = byId.get("stellar.nucleosynthesis.reaction_network_context");
+
+    expect(root).toBeTruthy();
+    expect(root?.level).toBe("first_principle");
+    expect(root?.sourceRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "literature_ref", id: "doi:10.1103/RevModPhys.29.547" }),
+        expect.objectContaining({ path: "docs/knowledge/physics/stellar-chemical-inheritance.md" }),
+      ]),
+    );
+    expect(root?.assumptions.join(" ")).toMatch(/do not certify life/i);
+    expect(branch.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "stellar.nucleosynthesis.reaction_network_context",
+          to: "astrochemistry.aromatic_carbon.interstellar_context",
+          relation: "documents",
+        }),
+      ]),
+    );
   });
 
   it("keeps C60 and coupled-ring rows dimensionally inspectable", () => {
