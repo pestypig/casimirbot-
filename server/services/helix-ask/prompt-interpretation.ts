@@ -292,6 +292,7 @@ const cleanCompoundRequirementText = (text: string): string =>
     .replace(/\s+(?:do\s+not|don't|never)\s+(?:write|create|update|modify|mutate)\b[\s\S]*$/i, "")
     .trim()
     .replace(/^[,;]\s*/, "")
+    .replace(/[,;]\s*$/, "")
     .replace(/\s+/g, " ");
 
 const isCompoundRequirementCandidate = (text: string): boolean => {

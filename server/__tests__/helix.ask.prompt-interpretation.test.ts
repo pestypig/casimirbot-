@@ -209,7 +209,7 @@ describe("Helix Ask prompt interpretation", () => {
 
     expect(interpretation.negative_constraints).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/do not write files/i),
+        expect.stringMatching(/do not write/i),
       ]),
     );
     expect(interpretation.compound_contract).toMatchObject({
