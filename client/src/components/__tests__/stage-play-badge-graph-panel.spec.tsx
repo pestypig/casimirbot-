@@ -2546,11 +2546,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("Ask debug copied");
 
     fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-full-state"));
-    expect(writeText).toHaveBeenCalledTimes(5);
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(5));
     const fullLoopState = JSON.parse(String(writeText.mock.calls[4]?.[0] ?? "{}")) as Record<string, any>;
     expect(fullLoopState).toMatchObject({
-      schema: "helix.stage_play.mail_loop_full_state.v1",
-      graphId: "stage_play_badge_graph:ui",
+      schema: "helix.stage_play.mail_loop_full_mailbox_capture.v1",
+      graphId: "stage_play_badge_graph:ui-fixture",
     });
     expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("full mailbox copied");
   });

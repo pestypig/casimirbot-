@@ -35241,6 +35241,67 @@ export function HelixAskPill({
             className={replyListClassNameResolved}
             onScroll={handleAskReplyListScroll}
           >
+            {visibleActiveTurnStreamRows.length > 0 ? (
+              <div
+                className="relative px-1 py-1 text-xs text-slate-100"
+                aria-label="Active turn stream"
+                data-testid="helix-ask-active-turn-stream"
+                data-turn-stream-lines={visibleActiveTurnStreamRows.length}
+              >
+                <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
+                  {visibleActiveTurnStreamRows.map((row, index) => {
+                    const isQuestionRow = row.source === "question";
+                    const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
+                    const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
+                    const visibleText = clipText(row.text, row.detailLimit ?? 360);
+                    const isLatestActiveRow = index === visibleActiveTurnStreamRows.length - 1;
+                    return (
+                      <div
+                        key={row.key}
+                        className={`relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
+                          isLatestActiveRow ? "helix-ask-turn-line-enter" : ""
+                        }`}
+                        data-testid={isLatestActiveRow ? "helix-ask-active-turn-latest-line" : undefined}
+                        data-stream-row-source={row.source}
+                      >
+                        <span
+                          className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
+                          aria-hidden
+                        />
+                        <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="break-words font-semibold">{row.label}</p>
+                            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
+                              {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed">{visibleText}</p>
+                          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
+                            {row.meta || row.status}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {helixAskConsoleDebugSnapshot ? (
+              <details
+                className="rounded-lg border border-cyan-300/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-50"
+                data-testid="helix-ask-console-debug"
+              >
+                <summary className="cursor-pointer select-none text-[10px] uppercase tracking-[0.2em] text-cyan-200">
+                  Console assembly debug
+                </summary>
+                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-cyan-300/15 bg-black/30 p-2 font-mono text-[10px] leading-4 text-cyan-50">
+                  {JSON.stringify(helixAskConsoleDebugSnapshot, null, 2)}
+                </pre>
+              </details>
+            ) : null}
           {chronologicalAskReplies.map((reply) => {
             const replyEvents = resolveReplyEvents(reply);
             const replyEventsChronological = [...replyEvents].sort((left, right) => {
@@ -35531,7 +35592,7 @@ export function HelixAskPill({
                                 ) : null}
                                 {isFinalRow ? (
                                   <>
-                                    <div className="mt-2 flex max-w-fit items-center gap-1 opacity-0 transition-opacity duration-150 group-hover/streamrow:opacity-100 group-focus-within/streamrow:opacity-100">
+                                    <div className="mt-2 flex max-w-fit items-center gap-1 opacity-100 transition-opacity duration-150">
                                       <button
                                         type="button"
                                         onClick={() => void handleCopyReply(reply)}
@@ -35673,54 +35734,6 @@ export function HelixAskPill({
               );
             return <div key={reply.id}>{replyCard}</div>;
             })}
-            {visibleActiveTurnStreamRows.length > 0 ? (
-              <div
-                className="relative px-1 py-1 text-xs text-slate-100"
-                aria-label="Active turn stream"
-                data-testid="helix-ask-active-turn-stream"
-                data-turn-stream-lines={visibleActiveTurnStreamRows.length}
-              >
-                <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
-                  {visibleActiveTurnStreamRows.map((row, index) => {
-                    const isQuestionRow = row.source === "question";
-                    const rowClass = readHelixContinuousTurnStreamRowClass(row.tone);
-                    const dotClass = readHelixContinuousTurnStreamDotClass(row.tone);
-                    const visibleText = clipText(row.text, row.detailLimit ?? 360);
-                    const isLatestActiveRow = index === visibleActiveTurnStreamRows.length - 1;
-                    return (
-                      <div
-                        key={row.key}
-                        className={`relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
-                          isLatestActiveRow ? "helix-ask-turn-line-enter" : ""
-                        }`}
-                        data-testid={isLatestActiveRow ? "helix-ask-active-turn-latest-line" : undefined}
-                        data-stream-row-source={row.source}
-                      >
-                        <span
-                          className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
-                          aria-hidden
-                        />
-                        <span className="mt-0.5 min-w-6 text-right text-[10px] tabular-nums text-slate-400">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="break-words font-semibold">{row.label}</p>
-                            <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.12em] text-slate-300">
-                              {isQuestionRow ? "user prompt" : row.source.replace(/_/g, " ")}
-                            </span>
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed">{visibleText}</p>
-                          <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-400/80">
-                            {row.meta || row.status}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
             <div
               ref={askReplyListBottomRef}
               className="h-px w-full"
