@@ -10,8 +10,10 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
-import { buildToolUseRestatement } from "./internet-search-intent";
+import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { buildTurnOperationalConstraints } from "./operational-constraints";
+import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
+import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   isStagePlayCheckpointRequestPrompt,
   isStagePlayJobPlanningPrompt,
@@ -437,19 +439,56 @@ export function buildToolCallAdmissionDecision(input: {
     reason = "no_hard_tool_path_admitted";
   }
 
+  const forbiddenFamiliesForTurn = unique([
+    ...operationalFields.forbidden_tool_families,
+    ...extraForbiddenToolFamilies,
+    ...contextualForbiddenToolFamilies(contextualSuppression),
+  ]);
+  const familyAllowed = (family: HelixToolCallAdmissionFamily): boolean =>
+    !forbiddenFamiliesForTurn.includes(family) &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, family);
+  const compoundPromptFamilies: HelixToolCallAdmissionFamily[] = [];
+  if (detectScholarlyResearchIntent(promptText).researchRequested && familyAllowed("scholarly_research")) {
+    compoundPromptFamilies.push("scholarly_research");
+  }
+  if (
+    (
+      detectInternetSearchIntent(promptText).searchRequested ||
+      toolUseRestatement.requiredToolFamilies.includes("internet_search")
+    ) &&
+    familyAllowed("internet_search")
+  ) {
+    compoundPromptFamilies.push("internet_search");
+  }
+  if (detectRepoCodeEvidenceIntent(promptText).repoEvidenceRequested && familyAllowed("repo_code")) {
+    compoundPromptFamilies.push("repo_code");
+  }
+  if (theoryLocatorRequested(promptText) && familyAllowed("theory_locator")) {
+    compoundPromptFamilies.push("theory_locator");
+  }
+  const uniqueCompoundPromptFamilies = unique(compoundPromptFamilies);
+  if (uniqueCompoundPromptFamilies.length > 1) {
+    const nextFamilies = unique([
+      ...admittedToolFamilies.filter((family) => family !== "model_only"),
+      ...uniqueCompoundPromptFamilies,
+    ]);
+    if (nextFamilies.length > admittedToolFamilies.filter((family) => family !== "model_only").length) {
+      admittedToolFamilies = nextFamilies;
+      required = true;
+      reason = `${reason}+compound_evidence_families_required`;
+    }
+  }
+
   const compoundLocatorRequired =
     theoryLocatorRequested(promptText) &&
-    !contextualToolSuppressionBlocksFamily(contextualSuppression, "theory_locator") &&
-    ![
-      ...operationalFields.forbidden_tool_families,
-      ...extraForbiddenToolFamilies,
-      ...contextualForbiddenToolFamilies(contextualSuppression),
-    ].includes("theory_locator") &&
+    familyAllowed("theory_locator") &&
     (
       effectiveSourceTarget === "scholarly_research" ||
       effectiveSourceTarget === "internet_search" ||
+      effectiveSourceTarget === "repo_code" ||
       admittedToolFamilies.includes("scholarly_research") ||
-      admittedToolFamilies.includes("internet_search")
+      admittedToolFamilies.includes("internet_search") ||
+      admittedToolFamilies.includes("repo_code")
     );
   if (compoundLocatorRequired && !admittedToolFamilies.includes("theory_locator")) {
     admittedToolFamilies = [...admittedToolFamilies.filter((family) => family !== "model_only"), "theory_locator"];
@@ -483,7 +522,7 @@ export function buildToolCallAdmissionDecision(input: {
     forbidden_tool_families: unique([
       ...operationalFields.forbidden_tool_families,
       ...extraForbiddenToolFamilies,
-      ...contextualForbiddenToolFamilies(contextualSuppression),
+      ...forbiddenFamiliesForTurn,
     ]),
     required_surface: operationalFields.required_surface,
     reason,

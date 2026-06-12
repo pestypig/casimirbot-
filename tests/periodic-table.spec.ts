@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ELEMENT_ORIGIN_REGISTRY, ELEMENT_Z_LOOKUP } from "@shared/periodic-table";
+import {
+  ELEMENT_ORIGIN_PROFILE_BY_SYMBOL,
+  ELEMENT_ORIGIN_REGISTRY,
+  ELEMENT_Z_LOOKUP,
+} from "@shared/periodic-table";
 
 describe("ELEMENT_Z_LOOKUP", () => {
   it("covers all 118 elements", () => {
@@ -20,9 +24,23 @@ describe("ELEMENT_ORIGIN_REGISTRY", () => {
       expect(entry.Z).toBeGreaterThan(0);
       expect(entry.originFamilies.length).toBeGreaterThan(0);
       expect(entry.originFamilies).toContain(entry.primaryOrigin);
+      expect(entry.originSummary).toBeTruthy();
       expect(entry.observableRoutes.length).toBeGreaterThan(0);
+      expect(entry.evidenceNotes.length).toBeGreaterThan(0);
       expect(entry.claimBoundaryNotes.length).toBeGreaterThan(0);
       expect(entry.sourceKeys.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("has an explicit origin profile for every element symbol", () => {
+    const registrySymbols = ELEMENT_ORIGIN_REGISTRY.map((entry) => entry.symbol);
+
+    expect(Object.keys(ELEMENT_ORIGIN_PROFILE_BY_SYMBOL).sort()).toEqual([...registrySymbols].sort());
+    for (const symbol of registrySymbols) {
+      const profile = ELEMENT_ORIGIN_PROFILE_BY_SYMBOL[symbol];
+      expect(profile.originSummary).toBeTruthy();
+      expect(profile.originFamilies.length).toBeGreaterThan(0);
+      expect(profile.evidenceNotes?.length ?? 0).toBeGreaterThan(0);
     }
   });
 

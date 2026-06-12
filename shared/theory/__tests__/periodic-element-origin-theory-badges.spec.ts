@@ -29,6 +29,7 @@ describe("periodic element origin theory badges", () => {
       expect(badge?.claimBoundary.physicalMechanismClaimAllowed).toBe(false);
       expect(badge?.claimBoundary.promotionAllowed).toBe(false);
       expect(badge?.tags).toContain("atomic_line_observable");
+      expect(badge?.assumptions.join(" ")).toContain("origin summary");
       expect(badge?.units).toEqual(expect.arrayContaining([expect.objectContaining({ symbol: `Z_${entry.symbol}` })]));
     }
   });

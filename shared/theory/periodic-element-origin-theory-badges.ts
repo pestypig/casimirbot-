@@ -149,6 +149,8 @@ function elementBadge(entry: ElementOriginEntry): TheoryBadgeV1 {
     ],
     assumptions: [
       `${entry.name} origin families: ${originLabels.join(", ")}.`,
+      `${entry.name} origin summary: ${entry.originSummary}`,
+      ...entry.evidenceNotes,
       ...entry.claimBoundaryNotes,
       "Element presence is a prerequisite for downstream chemistry, not proof that a molecule or biological pathway formed.",
     ],

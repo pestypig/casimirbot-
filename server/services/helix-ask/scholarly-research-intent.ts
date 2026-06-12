@@ -50,7 +50,7 @@ const hasCitationCue = (promptText: string): boolean =>
   /\b(?:cited\s+by|citations?|references?|bibliograph(?:y|ies)|bibtex|journal\s+references?|reference\s+list)\b/i.test(promptText);
 
 const hasPaperCorpusCue = (promptText: string): boolean =>
-  /\b(?:research\s+papers?|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
+  /\b(?:scholarly\s+research|research\s+papers?|paper\s+metadata|journal\s+(?:article|articles|paper|papers)|peer[-\s]?reviewed|literature|preprints?|scholarly\s+(?:papers?|articles?|sources?))\b/i.test(promptText);
 
 export const hasScholarlyFullTextCue = (promptText: string): boolean =>
   /\b(?:pdfs?|full[-\s]?text|paper\s+text|article\s+text|extract\s+(?:text|sections?|passages?|chunks?)|read\s+(?:the\s+)?(?:paper|pdf|article)|pages?|page\s+images?|figures?|tables?|equations?|methods?|results?|discussion|conclusion)\b/i.test(promptText);

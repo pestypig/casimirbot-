@@ -153,8 +153,9 @@ describe("Helix scholarly research tool admission", () => {
           "Use scholarly research, the Theory Badge Graph locator, and repo/code evidence together to explain whether Helix Ask correctly treats tool receipts as observations rather than answer authority. Do not write files.",
         mode: "read",
         debug: true,
-      })
-      .expect(200);
+      });
+
+    expect(response.status, JSON.stringify(response.body, null, 2).slice(0, 6000)).toBe(200);
 
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("panel_control");
     expect(response.body?.source_target_intent?.target_source).not.toBe("workstation_panel");

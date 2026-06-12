@@ -16,6 +16,7 @@ import {
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
+import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 
 type RecordLike = Record<string, unknown>;
@@ -77,6 +78,16 @@ const requestedResearchFamilies = (promptText: string): HelixCapabilityItinerary
   return families;
 };
 
+const requestedRepoFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
+  const suppression = detectContextualToolAdmissionSuppression(promptText);
+  if (contextualToolSuppressionBlocksFamily(suppression, "repo_code")) return [];
+  const repoIntent = detectRepoCodeEvidenceIntent(promptText);
+  return repoIntent.repoEvidenceRequested ||
+    /\b(?:repo\/code|repo\s+code|repo\s+evidence|code\s+evidence|repository\s+evidence|file-backed|file\s+backed)\b/i.test(promptText)
+    ? ["repo_code"]
+    : [];
+};
+
 const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText: string): string[] => {
   if (family === "scholarly_research") {
     return detectScholarlyResearchIntent(promptText).fullTextRequested
@@ -85,6 +96,7 @@ const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText:
   }
   if (family === "internet_search") return ["internet_search_observation"];
   if (family === "theory_locator") return ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"];
+  if (family === "repo_code") return ["repo_code_evidence_observation"];
   return [`${family}_observation`];
 };
 
@@ -96,6 +108,7 @@ const capabilityHintFor = (family: HelixCapabilityItineraryFamily, promptText: s
   }
   if (family === "internet_search") return HELIX_INTERNET_SEARCH_CAPABILITY;
   if (family === "theory_locator") return THEORY_CONTEXT_REFLECTION_CAPABILITY;
+  if (family === "repo_code") return "repo-code.search_concept";
   return null;
 };
 
@@ -103,6 +116,7 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
   const kinds: string[] = ["final_answer_draft"];
   if (families.includes("scholarly_research")) kinds.push("scholarly_research_answer");
   if (families.includes("internet_search")) kinds.push("internet_search_answer");
+  if (families.includes("repo_code")) kinds.push("repo_code_evidence_answer");
   if (families.includes("theory_locator")) kinds.push("theory_context_reflection_answer", "workstation_tool_evaluation");
   return unique(kinds);
 };
@@ -116,6 +130,9 @@ const statusForFamily = (input: {
   if (input.forbiddenFamilies.includes(input.family)) return "forbidden";
   if (input.family === "theory_locator") {
     return hasCapability(input.availableCapabilities, THEORY_CONTEXT_REFLECTION_CAPABILITY) ? "planned" : "missing";
+  }
+  if (input.family === "repo_code" && hasCapability(input.availableCapabilities, "repo-code.search_concept")) {
+    return "planned";
   }
   if (input.admittedFamilies.includes(input.family)) return "admitted";
   if (
@@ -137,6 +154,7 @@ const reasonForStep = (family: HelixCapabilityItineraryFamily, status: HelixCapa
   if (status === "forbidden") return "The route/tool-admission policy forbids this family for the current turn.";
   if (status === "missing") return "The prompt appears to require this family, but it is not admitted or visible as an available capability.";
   if (family === "theory_locator") return "The prompt asks for badge-graph placement, so the theory locator must produce non-terminal graph evidence before synthesis.";
+  if (family === "repo_code") return "The prompt asks for repo/code evidence, so current-turn repo observations must be collected before synthesis.";
   if (status === "planned") return "The capability is visible and should be selected by the agent step before observing tool output.";
   return "The family is admitted by the current tool policy and may produce evidence before terminal synthesis.";
 };
@@ -149,6 +167,8 @@ const stepForFamily = (input: {
   step_id:
     input.family === "theory_locator"
       ? "locate_theory_context"
+      : input.family === "repo_code"
+        ? "collect_repo_code_evidence"
       : input.family === "scholarly_research"
         ? "collect_scholarly_evidence"
         : input.family === "internet_search"
@@ -159,6 +179,8 @@ const stepForFamily = (input: {
   purpose:
     input.family === "theory_locator"
       ? "Locate the prompt on the theory badge graph and expose scale/chunk/uncertainty evidence."
+      : input.family === "repo_code"
+        ? "Collect current-turn repo/code evidence requested by the prompt."
       : input.family === "scholarly_research"
         ? "Collect paper/citation evidence requested by the prompt."
         : input.family === "internet_search"
@@ -184,10 +206,11 @@ export function buildHelixCapabilityItinerary(input: {
     ? admission.forbidden_tool_families
     : []) as string[];
   const researchFamilies = requestedResearchFamilies(input.promptText);
+  const repoFamilies = requestedRepoFamilies(input.promptText);
   const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
     ? ["theory_locator"]
     : [];
-  const relevantFamilies = unique([...researchFamilies, ...locatorFamilies]);
+  const relevantFamilies = unique([...researchFamilies, ...repoFamilies, ...locatorFamilies]);
   const plannedSteps = relevantFamilies.map((family) => {
     const status = statusForFamily({
       family,
@@ -229,11 +252,18 @@ export function buildHelixCapabilityItinerary(input: {
     missing_tool_families: unique(missingItineraryFamilies),
     planned_steps: plannedSteps,
     reasoning_criteria: [
-      ...(researchFamilies.length > 0
+    ...(researchFamilies.length > 0
         ? [{
             criterion_id: "research_evidence_grounding",
             description: "Research claims must be grounded in current-turn research observations, not classifier or route hints.",
             required_observation_families: researchFamilies,
+          }]
+        : []),
+      ...(repoFamilies.length > 0
+        ? [{
+            criterion_id: "repo_code_evidence_grounding",
+            description: "Repo/code claims must be grounded in current-turn repo observations, not route or classifier hints.",
+            required_observation_families: repoFamilies,
           }]
         : []),
       ...(locatorFamilies.length > 0

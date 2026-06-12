@@ -111,6 +111,13 @@ const explicitTheoryIdeologyBridgeSourcePatterns: RegExp[] = [
   /\b(?:zen\s*(?:badge\s*)?graph|zengraph|fruition)\b[\s\S]{0,180}\b(?:theory\s+(?:badge\s*)?graph|physics\s+(?:badge\s*)?graph|entropy|conservation|self[-\s]?organization|observable\s+physics)\b/i,
 ];
 
+const explicitExternalEvidenceSourcePatterns: RegExp[] = [
+  /\b(?:scholarly\s+research|scholarly\s+sources?|research\s+papers?|peer[-\s]?reviewed|citations?|references?|bibliograph(?:y|ies)|arxiv|crossref|openalex|semantic\s+scholar|pubmed|doi)\b/i,
+  /\b(?:repo\/code|repo\s+code|repo\s+evidence|code\s+evidence|repository\s+evidence|file-backed|file\s+backed)\b/i,
+  /\b(?:web\s+search|internet\s+search|browse|check\s+online|verify\s+online|latest|current|recent)\b/i,
+  /\b(?:theory\s+badge\s+graph|theory\s+locator|theory\s+graph|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode)\b/i,
+];
+
 const figurativePicturePatterns: RegExp[] = [
   /\b(?:popular|standard|usual|common|classical|physical|conceptual|mental|intuitive|big)\s+picture\b/i,
   /\b(?:vacuum[-\s]?fluctuation|field|quantum|geometric|statistical|historical|economic|philosophical|biological)\s+picture\b/i,
@@ -128,6 +135,12 @@ export function isExplicitProjectSourceRequest(promptText: string): boolean {
   const prompt = normalizePrompt(promptText);
   return explicitProjectSourceRequestPatterns.some((pattern) => pattern.test(prompt)) ||
     explicitTheoryIdeologyBridgeSourcePatterns.some((pattern) => pattern.test(prompt));
+}
+
+export function isExplicitEvidenceSourceRequest(promptText: string): boolean {
+  const prompt = normalizePrompt(promptText);
+  return isExplicitProjectSourceRequest(prompt) ||
+    explicitExternalEvidenceSourcePatterns.some((pattern) => pattern.test(prompt));
 }
 
 export function hasExplicitModelOnlyConceptScope(promptText: string): boolean {
@@ -160,11 +173,12 @@ export function detectModelOnlyConceptSourceSignal(promptText: string): HelixMod
     /\b(?:and|also|since|because|but|while|instead|then|both|versus|vs\.?)\b/i.test(prompt);
   const explicitModelOnlyScope = hasExplicitModelOnlyConceptScope(prompt);
   const explicitProjectSourceRequest = !explicitModelOnlyScope && isExplicitProjectSourceRequest(prompt);
+  const explicitEvidenceSourceRequest = !explicitModelOnlyScope && isExplicitEvidenceSourceRequest(prompt);
   const explicitVisualInputRequest = isExplicitVisualInputRequest(prompt);
   const applies =
     hasConceptQuestion &&
     (hasMultipleConceptTerms || isLongish || hasCompoundShape || explicitModelOnlyScope) &&
-    !explicitProjectSourceRequest &&
+    !explicitEvidenceSourceRequest &&
     !explicitVisualInputRequest;
   const reasonCodes: string[] = [];
   if (hasConceptQuestion) reasonCodes.push("concept_explanation_prompt");
@@ -173,6 +187,7 @@ export function detectModelOnlyConceptSourceSignal(promptText: string): HelixMod
   if (explicitModelOnlyScope) reasonCodes.push("explicit_model_only_concept_scope");
   if (isFigurativePicturePrompt(prompt)) reasonCodes.push("figurative_picture_reference");
   if (explicitProjectSourceRequest) reasonCodes.push("explicit_project_source_request");
+  if (explicitEvidenceSourceRequest && !explicitProjectSourceRequest) reasonCodes.push("explicit_evidence_source_request");
   if (explicitVisualInputRequest) reasonCodes.push("explicit_visual_input_request");
   if (applies) reasonCodes.push("prefer_model_only_concept");
   if (reasonCodes.length === 0) reasonCodes.push("not_model_only_concept_source_signal");

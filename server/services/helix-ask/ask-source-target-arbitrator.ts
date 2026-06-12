@@ -24,7 +24,10 @@ import {
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
-import { detectModelOnlyConceptSourceSignal } from "./model-only-concept-source-guard";
+import {
+  detectModelOnlyConceptSourceSignal,
+  isExplicitEvidenceSourceRequest,
+} from "./model-only-concept-source-guard";
 import { buildAskEvidenceTargetArbitration } from "./evidence-target-arbitration";
 import {
   isStagePlayCheckpointRequestPrompt,
@@ -60,12 +63,18 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
     .filter((cue: CueRule["cues"][number]) => cue.pattern.test(prompt))
     .map((cue: CueRule["cues"][number]) => cue.label);
 
-const isExplicitModelOnlyPrompt = (prompt: string): boolean =>
-  Boolean(detectContextualToolAdmissionSuppression(prompt)) ||
-  /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
-  /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
-  /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||
-  /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(prompt);
+const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const mutatingWriteOnlySuppression = contextualSuppression?.verb_or_cue === "workstation.write_file";
+  return (
+    Boolean(contextualSuppression) &&
+    !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt))
+  ) ||
+    /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+    /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
+    /\bno\s+(?:workspace|docs?|source|screen|visual)\s+(?:lookup|use|search|context)\b/i.test(prompt) ||
+    /\b(?:background\s+only|background\s+mode|general\s+(?:knowledge|reasoning)|just\s+answer\s+from\s+general\s+reasoning)\b/i.test(prompt);
+};
 
 const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
   const docsViewerCue =
@@ -502,6 +511,10 @@ export function arbitrateAskSourceTarget(input: {
     (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
   );
   if (selectedEvidenceCandidate?.target_source === "repo_code") {
+    const repoPrecedenceReason =
+      selectedEvidenceCandidate.strength === "hard"
+        ? "explicit_repo_code_source_target"
+        : "project_local_entity_source_target";
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,
@@ -510,7 +523,7 @@ export function arbitrateAskSourceTarget(input: {
       strength: selectedEvidenceCandidate.strength,
       explicitCues: selectedEvidenceCandidate.reason_codes,
       reasons: [
-        "evidence_target_arbitration_selected_repo_code",
+        repoPrecedenceReason,
         ...selectedEvidenceCandidate.reason_codes,
       ],
       requestedOutputs: selectedEvidenceCandidate.requested_outputs.length > 0
@@ -526,7 +539,7 @@ export function arbitrateAskSourceTarget(input: {
         "doc_open_best",
         "live_environment_review",
       ],
-      precedenceReason: "evidence_target_arbitration_selected_repo_code",
+      precedenceReason: repoPrecedenceReason,
       confidence: selectedEvidenceCandidate.score,
       allowClientShortcut: false,
       allowNoToolDirect: false,
