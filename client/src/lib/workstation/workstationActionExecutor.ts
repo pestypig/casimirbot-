@@ -119,7 +119,7 @@ export async function executeWorkstationActionWithLedger(
     const handler = input.handler ?? (
       panelId === "mission-ethos"
         ? (await import("@/lib/workstation/ideologyPanelActions")).executeIdeologyPanelAction
-        : (await import("@/lib/workstation/panelActionAdapters")).executeHelixPanelAction
+        : (await import("@/lib/workstation/panelActionAdapters")).executeHelixPanelActionAsync
     );
     const result = await handler(input.request, input.context);
     if (!result.ok) {

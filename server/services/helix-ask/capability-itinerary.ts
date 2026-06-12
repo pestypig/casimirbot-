@@ -88,6 +88,14 @@ const requestedRepoFamilies = (promptText: string): HelixCapabilityItineraryFami
     : [];
 };
 
+const requestedDocsFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
+  const suppression = detectContextualToolAdmissionSuppression(promptText);
+  if (contextualToolSuppressionBlocksFamily(suppression, "docs_viewer")) return [];
+  return buildToolUseRestatement(promptText).requiredToolFamilies.includes("docs_viewer")
+    ? ["docs_viewer"]
+    : [];
+};
+
 const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText: string): string[] => {
   if (family === "scholarly_research") {
     return detectScholarlyResearchIntent(promptText).fullTextRequested
@@ -95,6 +103,7 @@ const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText:
       : ["scholarly_research_observation"];
   }
   if (family === "internet_search") return ["internet_search_observation"];
+  if (family === "docs_viewer") return ["doc_search_results", "doc_candidate_validation", "doc_open_receipt"];
   if (family === "theory_locator") return ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"];
   if (family === "repo_code") return ["repo_code_evidence_observation"];
   return [`${family}_observation`];
@@ -107,6 +116,7 @@ const capabilityHintFor = (family: HelixCapabilityItineraryFamily, promptText: s
       : HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY;
   }
   if (family === "internet_search") return HELIX_INTERNET_SEARCH_CAPABILITY;
+  if (family === "docs_viewer") return "docs-viewer.search_docs";
   if (family === "theory_locator") return THEORY_CONTEXT_REFLECTION_CAPABILITY;
   if (family === "repo_code") return "repo-code.search_concept";
   return null;
@@ -116,6 +126,7 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
   const kinds: string[] = ["final_answer_draft"];
   if (families.includes("scholarly_research")) kinds.push("scholarly_research_answer");
   if (families.includes("internet_search")) kinds.push("internet_search_answer");
+  if (families.includes("docs_viewer")) kinds.push("doc_open_receipt", "doc_summary", "doc_location_result");
   if (families.includes("repo_code")) kinds.push("repo_code_evidence_answer");
   if (families.includes("theory_locator")) kinds.push("theory_context_reflection_answer", "workstation_tool_evaluation");
   return unique(kinds);
@@ -154,6 +165,7 @@ const reasonForStep = (family: HelixCapabilityItineraryFamily, status: HelixCapa
   if (status === "forbidden") return "The route/tool-admission policy forbids this family for the current turn.";
   if (status === "missing") return "The prompt appears to require this family, but it is not admitted or visible as an available capability.";
   if (family === "theory_locator") return "The prompt asks for badge-graph placement, so the theory locator must produce non-terminal graph evidence before synthesis.";
+  if (family === "docs_viewer") return "The prompt asks to search local docs, so the docs viewer must produce document evidence before synthesis.";
   if (family === "repo_code") return "The prompt asks for repo/code evidence, so current-turn repo observations must be collected before synthesis.";
   if (status === "planned") return "The capability is visible and should be selected by the agent step before observing tool output.";
   return "The family is admitted by the current tool policy and may produce evidence before terminal synthesis.";
@@ -207,10 +219,11 @@ export function buildHelixCapabilityItinerary(input: {
     : []) as string[];
   const researchFamilies = requestedResearchFamilies(input.promptText);
   const repoFamilies = requestedRepoFamilies(input.promptText);
+  const docsFamilies = requestedDocsFamilies(input.promptText);
   const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
     ? ["theory_locator"]
     : [];
-  const relevantFamilies = unique([...researchFamilies, ...repoFamilies, ...locatorFamilies]);
+  const relevantFamilies = unique([...researchFamilies, ...repoFamilies, ...docsFamilies, ...locatorFamilies]);
   const plannedSteps = relevantFamilies.map((family) => {
     const status = statusForFamily({
       family,
@@ -237,6 +250,7 @@ export function buildHelixCapabilityItinerary(input: {
         : "model_only";
   const typedFailures = [
     ...(researchFamilies.length > 0 ? ["research_observation_missing"] : []),
+    ...(docsFamilies.length > 0 ? ["docs_viewer_observation_missing"] : []),
     ...(locatorFamilies.length > 0 ? ["locator_observation_missing"] : []),
     ...(promptShape === "compound_tool" ? ["compound_evidence_not_reentered"] : []),
     ...(missingItineraryFamilies.length > 0 ? ["capability_family_not_admitted_or_visible"] : []),
@@ -264,6 +278,13 @@ export function buildHelixCapabilityItinerary(input: {
             criterion_id: "repo_code_evidence_grounding",
             description: "Repo/code claims must be grounded in current-turn repo observations, not route or classifier hints.",
             required_observation_families: repoFamilies,
+          }]
+        : []),
+      ...(docsFamilies.length > 0
+        ? [{
+            criterion_id: "docs_viewer_evidence_grounding",
+            description: "Document path claims must be grounded in current-turn docs viewer observations, not route or classifier hints.",
+            required_observation_families: docsFamilies,
           }]
         : []),
       ...(locatorFamilies.length > 0

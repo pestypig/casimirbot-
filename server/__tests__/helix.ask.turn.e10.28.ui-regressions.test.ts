@@ -175,6 +175,27 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(finalPacket?.client_server_terminal_match).toBe(true);
     expect(finalPacket?.debug?.stream_error_terminalized).toBe(true);
     expect(String(finalPacket?.selected_final_answer ?? "")).toContain("Terminal: final_failure");
+    const debugEndpoint = finalPacket?.debug_export_ref?.endpoint;
+    expect(debugEndpoint).toBe(`/api/agi/ask/turn/${encodeURIComponent(String(finalPacket.turn_id))}/debug-export`);
+    expect(finalPacket?.debug_export_payload_hash).toEqual(expect.any(String));
+    expect(finalPacket?.debug?.debug_export_ref?.endpoint).toBe(debugEndpoint);
+
+    const debugExport = await request(app)
+      .get(debugEndpoint)
+      .expect(200);
+
+    expect(debugExport.body?.ok).toBe(true);
+    expect(debugExport.body?.payload?.active_turn_id).toBe(finalPacket.turn_id);
+    expect(debugExport.body?.payload?.resolved_turn_summary?.terminal_error_code).toBe("ask_turn_stream_failed");
+    expect(debugExport.body?.payload?.model_turn_fidelity_audit).toMatchObject({
+      artifact_id: "model_turn_fidelity_audit",
+      schema: "helix.model_turn_fidelity_audit.v1",
+      turn_id: finalPacket.turn_id,
+      authority: {
+        decision_source: "typed_failure",
+      },
+      parity_status: expect.any(String),
+    });
   });
 
   it("maps conversational notes navigation variants to the notes panel", async () => {

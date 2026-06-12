@@ -274,6 +274,40 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_clipboard", required_args: [], optional_args: ["receipt_id"], returns_artifact: true },
   { panel_id: "workstation-clipboard-history", action_id: "copy_receipt_to_note", required_args: [], optional_args: ["receipt_id", "note_id", "note_title"], returns_artifact: true },
   { panel_id: "workstation-clipboard-history", action_id: "copy_selection_to_note", required_args: [], optional_args: ["note_id", "note_title"], returns_artifact: true },
+  { panel_id: "image-lens", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "image-lens",
+    action_id: "image_lens.focus_regions",
+    title: "Run Image Lens Focus Regions",
+    description: "Submit one or more Image Lens crop regions into Live Answer visual evidence. Observation only.",
+    aliases: ["focus image lens regions", "inspect cropped regions", "crop areas of interest", "send focus regions to visual capture"],
+    required_args: ["sourceId", "regions"],
+    optional_args: ["mode", "maxRegions"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  { panel_id: "document-image-lens", action_id: "open", required_args: [], optional_args: [] },
+  {
+    panel_id: "document-image-lens",
+    action_id: "image_lens.focus_regions",
+    title: "Run Image Lens Focus Regions",
+    description: "Submit one or more legacy Image Lens crop regions into Live Answer visual evidence. Observation only.",
+    required_args: ["sourceId", "regions"],
+    optional_args: ["mode", "maxRegions"],
+    risk: "medium",
+    returns_artifact: true,
+  },
+  {
+    panel_id: "live-answer-environment",
+    action_id: "image_lens.focus_regions",
+    title: "Run Image Lens Focus Regions",
+    description: "Use Image Lens to crop source regions and submit them as Live Answer visual evidence. Observation only.",
+    aliases: ["route image lens focus to live answer", "send crop focus to live answer"],
+    required_args: ["sourceId", "regions"],
+    optional_args: ["mode", "maxRegions"],
+    risk: "medium",
+    returns_artifact: true,
+  },
   { panel_id: "situation-room-sources", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "situation-room-sources", action_id: "attach_display_audio_source", required_args: [], optional_args: ["room_id", "label"], risk: "medium", returns_artifact: true },
   { panel_id: "situation-room-sources", action_id: "attach_mic_audio_source", required_args: [], optional_args: ["room_id", "label"], risk: "medium", returns_artifact: true },
@@ -1305,6 +1339,32 @@ function normalizeIdentifier(value: string): string {
 function argSchema(arg: string): Record<string, unknown> {
   if (arg.endsWith("_ids") || arg === "source_ids") return { type: "array", items: { type: "string" } };
   if (arg === "active_pressures" || arg === "event_filter") return { type: "array", items: { type: "string" } };
+  if (arg === "regions") {
+    return {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          regionId: { type: "string" },
+          bboxPct: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              x: { type: "number" },
+              y: { type: "number" },
+              width: { type: "number" },
+              height: { type: "number" },
+            },
+            required: ["x", "y", "width", "height"],
+          },
+          reason: { type: "string" },
+          priority: { type: "number" },
+        },
+        required: ["bboxPct", "reason"],
+      },
+    };
+  }
   if (arg === "chunk_ranges") {
     return {
       type: "array",
@@ -1322,7 +1382,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "confirmed" || arg === "derived_outputs_auto_attach" || arg === "command_lane_enabled") {
     return { type: "boolean" };
   }
-  if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline" || arg === "max_chars") return { type: "number" };
+  if (arg === "limit" || arg === "max_nodes" || arg === "max_artifacts" || arg === "max_timeline" || arg === "max_chars" || arg === "maxRegions") return { type: "number" };
   if (arg === "recipe_id") {
     return {
       enum: [
@@ -1350,6 +1410,7 @@ function argSchema(arg: string): Record<string, unknown> {
   if (arg === "source_family") return { enum: ["minecraft_world", "calculator_stream", "physics_simulation", "browser_audio", "screen_summary", "manual_debug"] };
   if (arg === "modality") return { enum: ["visual_frame", "audio_transcript", "world_event", "environment_state", "environment_affordance", "procedure_graph", "calculator_stream", "simulation_stream"] };
   if (arg === "capture_mode") return { enum: ["interval", "manual", "salience_triggered", "push", "on_change"] };
+  if (arg === "mode") return { enum: ["regions_only", "broad_then_regions"] };
   if (arg === "cadence") return { enum: ["off", "milestones_only", "anomalies_and_milestones", "windowed_companion", "active_dialogue", "continuous_debug"] };
   if (arg === "commentary_cadence") return { enum: ["milestones_only", "salience_only", "manual"] };
   if (arg === "status") return { enum: ["active", "paused", "stopped", "planned", "blocked", "detached", "receipt_only", "stale", "completed"] };
@@ -1463,6 +1524,7 @@ export function buildWorkstationToolInputSchema(action: WorkstationDynamicToolAc
 
 export function resolveWorkstationToolTerminalArtifactKind(panelId: string, actionId: string): string | null {
   if (actionId === "open") return "workspace_action_receipt";
+  if (actionId === "image_lens.focus_regions") return "image_lens_focus_run_result";
   if (panelId === "docs-viewer" && actionId === "open_directory") return "workspace_action_receipt";
   if (panelId === "account-session" && actionId === "set_interface_language") return "workspace_action_receipt";
   if (panelId === "situation-room-pipelines" && actionId === "setup_from_prompt") return "situation_room_setup_execution_receipt";

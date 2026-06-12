@@ -176,7 +176,9 @@ export function buildToolCallAdmissionDecision(input: {
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
   const effectiveSourceTarget =
-    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
+    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
+      ? "docs_viewer"
+      : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
       : sourceTarget;
   const contextualSuppressionBlocksSelectedTarget =
@@ -463,6 +465,9 @@ export function buildToolCallAdmissionDecision(input: {
   }
   if (detectRepoCodeEvidenceIntent(promptText).repoEvidenceRequested && familyAllowed("repo_code")) {
     compoundPromptFamilies.push("repo_code");
+  }
+  if (toolUseRestatement.requiredToolFamilies.includes("docs_viewer") && familyAllowed("docs_viewer")) {
+    compoundPromptFamilies.push("docs_viewer");
   }
   if (theoryLocatorRequested(promptText) && familyAllowed("theory_locator")) {
     compoundPromptFamilies.push("theory_locator");

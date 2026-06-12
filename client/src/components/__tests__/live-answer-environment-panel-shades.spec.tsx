@@ -124,14 +124,21 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('window.addEventListener("helix:image-lens:visual-frame-sent"');
   });
 
-  it("offers an Image Lens-first screen share route without starting direct frame summarization", () => {
+  it("offers multi-route screen sharing with Image Lens and audio transcript lanes", () => {
     const source = panelSource();
 
     expect(source).toContain('aria-label="Visual capture route"');
-    expect(source).toContain("Live Answer first");
-    expect(source).toContain("Image Lens first");
-    expect(source).toContain("Share to Image Lens");
-    expect(source).toContain("routeVisualCaptureToImageLens");
+    expect(source).toContain("Live Answer visual");
+    expect(source).toContain("Image Lens");
+    expect(source).toContain("Audio transcript");
+    expect(source).toContain("Start selected live sources");
+    expect(source).toContain("visualCaptureRoutes");
+    expect(source).toContain("toggleVisualCaptureRoute");
+    expect(source).toContain("routeVisualCaptureToImageLensWithStream");
+    expect(source).toContain("startAudioTranscriptRoute");
+    expect(source).toContain("/api/agi/situation/audio-source/permission-granted");
+    expect(source).toContain("/api/agi/situation/audio-source/transcript-chunk");
+    expect(source).toContain("postAudioTranscriptLiveSourceDescriptor");
     expect(source).toContain("setImageLensLiveSource");
     expect(source).toContain("Raw frames will not be summarized until a crop is sent");
     expect(source).toContain('window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "image-lens" } }))');

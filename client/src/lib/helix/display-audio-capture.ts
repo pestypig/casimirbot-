@@ -5,15 +5,33 @@ export type DisplayAudioTranscribe = typeof transcribeVoice;
 
 export type DisplayAudioSituationSessionOptions = {
   roomId: string;
+  sourceId?: string;
+  environmentId?: string | null;
   missionId?: string;
   threadId?: string;
   captureSessionId?: string;
   chunkMs?: number;
+  stream?: MediaStream | null;
+  stopStreamOnStop?: boolean;
   onEvent: (event: HelixSituationEvent) => void;
+  onTranscriptChunk?: (chunk: DisplayAudioTranscriptChunk) => void | Promise<void>;
   onError?: (error: Error) => void;
   onStop?: (reason: "manual" | "track_ended") => void;
   isDottiePlaybackActive?: () => boolean;
   transcribe?: DisplayAudioTranscribe;
+};
+
+export type DisplayAudioTranscriptChunk = {
+  event: HelixSituationEvent;
+  result: VoiceTranscribeResponse;
+  sourceId?: string;
+  environmentId?: string | null;
+  source: HelixSituationSource;
+  captureSessionId: string;
+  chunkIndex: number;
+  durationMs: number;
+  fromTs: string;
+  toTs: string;
 };
 
 export type DisplayAudioSituationSession = {
@@ -117,14 +135,15 @@ const buildTranscriptEvent = (args: {
 export async function startDisplayAudioSituationSession(
   options: DisplayAudioSituationSessionOptions,
 ): Promise<DisplayAudioSituationSession> {
-  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
+  if (!options.stream && (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia)) {
     throw new Error("Display audio capture unavailable.");
   }
   if (typeof MediaRecorder === "undefined") {
     throw new Error("Browser recording unsupported.");
   }
 
-  const stream = await navigator.mediaDevices.getDisplayMedia({
+  const ownsStream = !options.stream;
+  const stream = options.stream ?? await navigator.mediaDevices.getDisplayMedia({
     video: true,
     audio: {
       echoCancellation: false,
@@ -135,7 +154,7 @@ export async function startDisplayAudioSituationSession(
 
   const audioTracks = stream.getAudioTracks();
   if (audioTracks.length === 0) {
-    stopStreamTracks(stream);
+    if (ownsStream) stopStreamTracks(stream);
     throw new Error("Selected source did not provide an audio track.");
   }
 
@@ -193,6 +212,8 @@ export async function startDisplayAudioSituationSession(
       const audio = new Blob(uploadChunks, { type: uploadMimeType });
       if (audio.size <= 0) return;
       const now = Date.now();
+      const fromTs = new Date(segmentStartedAt).toISOString();
+      const toTs = new Date(now).toISOString();
       const durationMs = Math.max(0, now - segmentStartedAt);
       segmentStartedAt = now;
       const currentChunkIndex = chunkIndex;
@@ -223,6 +244,22 @@ export async function startDisplayAudioSituationSession(
           });
           if (situationEvent) {
             options.onEvent(situationEvent);
+            if (options.onTranscriptChunk) {
+              void Promise.resolve(options.onTranscriptChunk({
+                event: situationEvent,
+                result,
+                sourceId: options.sourceId,
+                environmentId: options.environmentId ?? null,
+                source,
+                captureSessionId,
+                chunkIndex: currentChunkIndex,
+                durationMs,
+                fromTs,
+                toTs,
+              })).catch((error: unknown) => {
+                options.onError?.(error instanceof Error ? error : new Error(String(error)));
+              });
+            }
           }
         })
         .catch((error: unknown) => {
@@ -263,7 +300,9 @@ export async function startDisplayAudioSituationSession(
     } catch {
       // Recorder may already be stopped by the browser.
     }
-    stopStreamTracks(stream);
+    if (options.stopStreamOnStop ?? ownsStream) {
+      stopStreamTracks(stream);
+    }
     options.onStop?.(reason);
   };
 

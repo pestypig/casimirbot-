@@ -13,6 +13,7 @@ import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { runTheoryBadgePlaybackNow } from "@/lib/theory/theoryBadgePlaybackRunner";
 import { runTheoryCompoundRunNow, type TheoryCompoundRunSolveScope } from "@/lib/theory/runTheoryCompoundRunNow";
 import { solveTheoryCalculatorLoadoutNow } from "@/lib/theory/theoryCalculatorLoadoutRunner";
+import { runImageLensFocusRun } from "@/lib/helix/imageLensFocusRun";
 import { buildTheoryBadgeLocatorArtifact } from "@/lib/theory/theoryMapOverlay";
 import { runClientTheoryContextReflectionTool } from "@/lib/workstation/theoryContextReflectionToolAdapter";
 import { runStarSimRuntimeBadge } from "@shared/theory/starsim-runtime-adapter";
@@ -6286,4 +6287,41 @@ export function executeHelixPanelAction(
     action_id: actionId,
     message: `Action not supported for panel: ${panelId}.${actionId}`,
   };
+}
+
+export async function executeHelixPanelActionAsync(
+  request: HelixPanelActionRequest,
+  context: HelixPanelActionExecutionContext,
+): Promise<HelixPanelActionExecutionResult> {
+  const panelId = request.panel_id?.trim();
+  const actionId = request.action_id?.trim().toLowerCase();
+  if (
+    (panelId === "image-lens" || panelId === "live-answer-environment" || panelId === "document-image-lens") &&
+    actionId === "image_lens.focus_regions"
+  ) {
+    const result = await runImageLensFocusRun({
+      request: request.args ?? {},
+    });
+    context.openPanel("image-lens", undefined);
+    context.focusPanel("image-lens", undefined);
+    const blocked = result.blockers.length > 0;
+    return {
+      ok: true,
+      panel_id: panelId,
+      action_id: actionId,
+      artifact: {
+        kind: "image_lens_focus_run_result",
+        status: blocked ? "blocked" : "submitted",
+        ...result,
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "receipt_not_assistant_answer",
+      },
+      message: !blocked
+        ? `Image Lens focus run submitted ${result.submittedRegions.length} crop region${result.submittedRegions.length === 1 ? "" : "s"}.`
+        : `Image Lens focus run blocked: ${result.blockers.join("; ")}`,
+    };
+  }
+
+  return executeHelixPanelAction(request, context);
 }

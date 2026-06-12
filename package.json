@@ -206,6 +206,7 @@
     "nhm2:freeze-reference-run": "tsx tools/nhm2/freeze-reference-run.ts",
     "nhm2:validate-reference-run": "tsx tools/nhm2/validate-reference-run.ts",
     "nhm2:publish-regional-source-closure-evidence": "tsx tools/nhm2/publish-regional-source-closure-evidence.ts",
+    "nhm2:publish-metric-required-regional-tensor-receipt": "tsx tools/nhm2/publish-metric-required-regional-tensor-receipt.ts",
     "nhm2:report-source-to-geometry-divergence": "tsx tools/nhm2/report-source-to-geometry-divergence.ts",
     "nhm2:publish-tile-effective-counterpart": "tsx tools/nhm2/publish-tile-effective-counterpart.ts",
     "nhm2:audit-tile-effective-counterpart-provenance": "tsx tools/nhm2/audit-tile-effective-counterpart-provenance.ts",

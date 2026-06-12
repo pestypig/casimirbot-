@@ -59,8 +59,15 @@ import {
   type VisualSourceCaptureState,
 } from "@/store/useVisualSourceCaptureStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
+import {
+  startDisplayAudioSituationSession,
+  type DisplayAudioSituationSession,
+  type DisplayAudioTranscriptChunk,
+} from "@/lib/helix/display-audio-capture";
+import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
+type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
 type ClientCapabilityActionRead = {
   action_request_id: string;
   capability: string;
@@ -609,8 +616,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
   const [visualFrameReplayRunning, setVisualFrameReplayRunning] = useState(false);
   const [visualFrameReplayResult, setVisualFrameReplayResult] = useState<VisualFrameReplayResult | null>(null);
-  const [visualCaptureRoute, setVisualCaptureRoute] = useState<"live_answer" | "image_lens">("live_answer");
+  const [visualCaptureRoutes, setVisualCaptureRoutes] = useState<VisualCaptureRoute[]>(["live_answer"]);
   const visualReplayJobsInFlightRef = React.useRef<Set<string>>(new Set());
+  const audioTranscriptSessionRef = React.useRef<DisplayAudioSituationSession | null>(null);
+  const audioTranscriptSourceIdRef = React.useRef<string | null>(null);
   const setImageLensLiveSource = useImageLensLiveSourceStore((state) => state.setLiveSource);
   const clearImageLensLiveSource = useImageLensLiveSourceStore((state) => state.clearLiveSource);
   const imageLensLiveSource = useImageLensLiveSourceStore((state) => state.liveSource);
@@ -831,6 +840,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       .at(0) ?? null;
   });
   const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? visualProducerState?.source_id ?? null;
+  const routeLiveAnswerVisual = visualCaptureRoutes.includes("live_answer");
+  const routeImageLens = visualCaptureRoutes.includes("image_lens");
+  const routeAudioTranscript = visualCaptureRoutes.includes("audio_transcript");
+  const selectedRouteCount = visualCaptureRoutes.length;
   const visualCaptureStatus =
     visualEvidenceHealth?.status ??
     visualLatest?.active_source?.status ??
@@ -1277,13 +1290,29 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
   };
 
-  const requestDisplayStream = async (): Promise<MediaStream> => {
+  const toggleVisualCaptureRoute = (route: VisualCaptureRoute): void => {
+    setVisualCaptureRoutes((current: VisualCaptureRoute[]) => {
+      const selected = current.includes(route);
+      const next = selected
+        ? current.filter((entry: VisualCaptureRoute) => entry !== route)
+        : [...current, route];
+      return next;
+    });
+  };
+
+  const requestDisplayStream = async (input: { includeAudio?: boolean } = {}): Promise<MediaStream> => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       throw new Error("screen_capture_not_available_in_this_browser");
     }
     return navigator.mediaDevices.getDisplayMedia({
       video: true,
-      audio: false,
+      audio: input.includeAudio
+        ? {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          } as MediaTrackConstraints
+        : false,
     });
   };
 
@@ -1396,61 +1425,65 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
   };
 
+  const routeVisualCaptureToImageLensWithStream = async (source: VisualSourceRead, stream: MediaStream): Promise<void> => {
+    await postJson("/api/agi/situation/visual-source/permission-granted", {
+      source_id: source.source_id,
+      client_stream_confirmed: true,
+    });
+    await postJson("/api/agi/situation/source/heartbeat", {
+      source_id: source.source_id,
+      thread_id: threadId,
+      room_id: environment?.room_id ?? null,
+      modality: "visual_frame",
+      status: "active",
+      ts: new Date().toISOString(),
+    }).catch(() => null);
+    useVisualSourceCaptureStore.getState().upsertProducer({
+      source_id: source.source_id,
+      thread_id: threadId,
+      environment_id: environment?.environment_id ?? null,
+      pipeline_id: null,
+      stream_active: true,
+      interval_active: false,
+      track_ready_state: "live",
+      capture_mode: "manual",
+      cadence_ms: null,
+      last_heartbeat_at: new Date().toISOString(),
+      last_error: null,
+    });
+    const firstTrack = stream.getVideoTracks()[0] ?? stream.getTracks()[0] ?? null;
+    firstTrack?.addEventListener("ended", () => {
+      useVisualSourceCaptureStore.getState().patchProducer(source.source_id, {
+        stream_active: false,
+        interval_active: false,
+        track_ready_state: "ended",
+        last_heartbeat_at: new Date().toISOString(),
+      });
+      clearImageLensLiveSource(source.source_id);
+    }, { once: true });
+    setImageLensLiveSource({
+      sourceId: source.source_id,
+      threadId,
+      environmentId: environment?.environment_id ?? null,
+      pipelineId: null,
+      roomId: environment?.room_id ?? null,
+      stream,
+      streamActive: true,
+      captureMode: "screen_share_lens",
+      latestFrameDataUrl: null,
+      lastFrameAt: null,
+      createdAt: new Date().toISOString(),
+    });
+    openImageLensPanel();
+  };
+
   const routeVisualCaptureToImageLens = async () => {
     let stream: MediaStream | null = null;
     try {
       const source = await ensureVisualSourceRegistered();
       stream = getActiveVisualFrameStream(source.source_id) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
       if (!stream) stream = await requestDisplayStream();
-      await postJson("/api/agi/situation/visual-source/permission-granted", {
-        source_id: source.source_id,
-        client_stream_confirmed: true,
-      });
-      await postJson("/api/agi/situation/source/heartbeat", {
-        source_id: source.source_id,
-        thread_id: threadId,
-        room_id: environment?.room_id ?? null,
-        modality: "visual_frame",
-        status: "active",
-        ts: new Date().toISOString(),
-      }).catch(() => null);
-      useVisualSourceCaptureStore.getState().upsertProducer({
-        source_id: source.source_id,
-        thread_id: threadId,
-        environment_id: environment?.environment_id ?? null,
-        pipeline_id: null,
-        stream_active: true,
-        interval_active: false,
-        track_ready_state: "live",
-        capture_mode: "manual",
-        cadence_ms: null,
-        last_heartbeat_at: new Date().toISOString(),
-        last_error: null,
-      });
-      const firstTrack = stream.getVideoTracks()[0] ?? stream.getTracks()[0] ?? null;
-      firstTrack?.addEventListener("ended", () => {
-        useVisualSourceCaptureStore.getState().patchProducer(source.source_id, {
-          stream_active: false,
-          interval_active: false,
-          track_ready_state: "ended",
-          last_heartbeat_at: new Date().toISOString(),
-        });
-        clearImageLensLiveSource(source.source_id);
-      }, { once: true });
-      setImageLensLiveSource({
-        sourceId: source.source_id,
-        threadId,
-        environmentId: environment?.environment_id ?? null,
-        pipelineId: null,
-        roomId: environment?.room_id ?? null,
-        stream,
-        streamActive: true,
-        captureMode: "screen_share_lens",
-        latestFrameDataUrl: null,
-        lastFrameAt: null,
-        createdAt: new Date().toISOString(),
-      });
-      openImageLensPanel();
+      await routeVisualCaptureToImageLensWithStream(source, stream);
       setLastActionStatus(`Screen share routed to Image Lens. Raw frames will not be summarized until a crop is sent for ${source.source_id}.`);
       await refresh();
     } catch (error) {
@@ -1459,12 +1492,176 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
   };
 
+  const startAudioTranscriptRoute = async (input: {
+    stream: MediaStream;
+    chunkMs: number;
+    stopStreamOnStop: boolean;
+  }): Promise<string> => {
+    const sourceId = audioTranscriptSourceIdRef.current ?? `audio_transcript:${threadId}`;
+    audioTranscriptSessionRef.current?.stop();
+    audioTranscriptSessionRef.current = null;
+    audioTranscriptSourceIdRef.current = sourceId;
+    await postJson("/api/agi/situation/audio-source/permission-granted", {
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: environment?.room_id ?? null,
+      ts: new Date().toISOString(),
+    });
+    await postAudioTranscriptLiveSourceDescriptor({
+      postJson,
+      sourceId,
+      threadId,
+      environmentId: environment?.environment_id ?? null,
+      currentState: "active_interval",
+      cadenceMs: input.chunkMs,
+      stream: input.stream,
+    });
+    let sessionCaptureId: string | null = null;
+    const session = await startDisplayAudioSituationSession({
+      roomId: environment?.room_id ?? "room:live-answer",
+      sourceId,
+      environmentId: environment?.environment_id ?? null,
+      threadId,
+      stream: input.stream,
+      stopStreamOnStop: input.stopStreamOnStop,
+      chunkMs: input.chunkMs,
+      onEvent: () => undefined,
+      onTranscriptChunk: async (chunk: DisplayAudioTranscriptChunk) => {
+        const transcript = chunk.event.text?.trim() ?? "";
+        if (!transcript) return;
+        const response = await postJson("/api/agi/situation/audio-source/transcript-chunk", {
+          source_id: sourceId,
+          thread_id: threadId,
+          room_id: environment?.room_id ?? null,
+          environment_id: environment?.environment_id ?? null,
+          transcript,
+          transcript_is_final: true,
+          direct_address_classification: "unclassified",
+          evidence_refs: chunk.event.evidence_refs,
+          chunk_index: chunk.chunkIndex,
+          capture_session_id: chunk.captureSessionId,
+          capture_source: chunk.source,
+          duration_ms: chunk.durationMs,
+          from_ts: chunk.fromTs,
+          to_ts: chunk.toTs,
+          ts: chunk.toTs,
+        });
+        const latestObservationRefs = [
+          response?.live_source_event?.event_id,
+          response?.live_source_chunk?.chunk_id,
+          response?.live_source_analysis_job?.job_id,
+        ].filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0);
+        await postAudioTranscriptLiveSourceDescriptor({
+          postJson,
+          sourceId,
+          threadId,
+          environmentId: environment?.environment_id ?? null,
+          currentState: "active_interval",
+          cadenceMs: input.chunkMs,
+          stream: input.stream,
+          latestObservationRefs,
+        });
+      },
+      onError: (error: Error) => {
+        setLastActionStatus(error.message || "audio_transcript_capture_failed");
+      },
+      onStop: () => {
+        if (!sessionCaptureId || audioTranscriptSessionRef.current?.captureSessionId === sessionCaptureId) {
+          audioTranscriptSessionRef.current = null;
+        }
+        void postJson("/api/agi/situation/audio-source/stop", {
+          source_id: sourceId,
+          thread_id: threadId,
+          room_id: environment?.room_id ?? null,
+          ts: new Date().toISOString(),
+        }).catch(() => null);
+        void postAudioTranscriptLiveSourceDescriptor({
+          postJson,
+          sourceId,
+          threadId,
+          environmentId: environment?.environment_id ?? null,
+          currentState: "stopped",
+          cadenceMs: input.chunkMs,
+          stream: input.stream,
+        });
+      },
+    });
+    sessionCaptureId = session.captureSessionId;
+    audioTranscriptSessionRef.current = session;
+    return sourceId;
+  };
+
   const startVisualCaptureByRoute = async () => {
-    if (visualCaptureRoute === "image_lens") {
-      await routeVisualCaptureToImageLens();
+    if (selectedRouteCount === 0) {
+      setLastActionStatus("Select at least one screen-share route.");
       return;
     }
-    await grantVisualCapture();
+    let stream: MediaStream | null = null;
+    let ownsStream = false;
+    try {
+      const needsVisualSource = routeLiveAnswerVisual || routeImageLens;
+      const source = needsVisualSource ? await ensureVisualSourceRegistered() : null;
+      const existingStream = source
+        ? getActiveVisualFrameStream(source.source_id) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null
+        : null;
+      stream = existingStream && (!routeAudioTranscript || existingStream.getAudioTracks().length > 0)
+        ? existingStream
+        : await requestDisplayStream({ includeAudio: routeAudioTranscript });
+      ownsStream = stream !== existingStream;
+      const scheduledCadenceMs = source ? await readScheduledVisualCadenceMs(source.source_id) : null;
+      const sharedCadenceMs = scheduledCadenceMs ?? visualProducerState?.cadence_ms ?? 10_000;
+      const statusParts: string[] = [];
+
+      if (routeAudioTranscript) {
+        const audioSourceId = await startAudioTranscriptRoute({
+          stream,
+          chunkMs: sharedCadenceMs,
+          stopStreamOnStop: !routeLiveAnswerVisual && !routeImageLens,
+        });
+        statusParts.push(`audio transcript chunks every ${Math.round(sharedCadenceMs / 1000)}s from ${audioSourceId}`);
+      }
+
+      if (routeLiveAnswerVisual && source) {
+        if (scheduledCadenceMs) {
+          const result = await startVisualFrameProducerInterval({
+            sourceId: source.source_id,
+            threadId,
+            roomId: environment?.room_id ?? null,
+            environmentId: environment?.environment_id ?? null,
+            cadenceMs: scheduledCadenceMs,
+            stream,
+            postJson,
+            preserveExistingStream: routeAudioTranscript,
+          });
+          statusParts.push(`visual interval every ${Math.round(scheduledCadenceMs / 1000)}s. ${result.summary}`);
+        } else {
+          const result = await runVisualFrameProducerOnce({
+            sourceId: source.source_id,
+            threadId,
+            roomId: environment?.room_id ?? null,
+            environmentId: environment?.environment_id ?? null,
+            stream,
+            postJson,
+          });
+          statusParts.push(`visual first frame analyzed. ${result.summary}`);
+        }
+      }
+
+      if (routeImageLens && source) {
+        await routeVisualCaptureToImageLensWithStream(source, stream);
+        statusParts.push(`Image Lens is using ${source.source_id}; raw frames wait for crop submission`);
+      }
+
+      if (ownsStream && !routeAudioTranscript && !routeImageLens && !scheduledCadenceMs) {
+        stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      }
+      stream = null;
+      setLastActionStatus(`Screen share routed: ${statusParts.join(" | ")}`);
+      await refresh();
+    } catch (error) {
+      if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "screen_share_route_failed");
+    }
   };
 
   const applyVisualObserverProfile = async (profile: StagePlayVisualObserverProfileV1 | null) => {
@@ -1572,8 +1769,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
 
   const stopVisualSharing = async () => {
     const sourceId = activeVisualSourceId;
+    const audioSourceId = audioTranscriptSourceIdRef.current;
+    if (!sourceId && !audioSourceId) {
+      setLastActionStatus("No visual or audio transcript source is registered.");
+      return;
+    }
+    audioTranscriptSessionRef.current?.stop();
+    audioTranscriptSessionRef.current = null;
+    if (audioSourceId) {
+      await postJson("/api/agi/situation/audio-source/stop", {
+        source_id: audioSourceId,
+        thread_id: threadId,
+        room_id: environment?.room_id ?? null,
+        ts: new Date().toISOString(),
+      }).catch(() => null);
+      audioTranscriptSourceIdRef.current = null;
+    }
     if (!sourceId) {
-      setLastActionStatus("No visual source is registered.");
+      setLastActionStatus("Stopped audio transcript sharing.");
+      await refresh();
       return;
     }
     stopVisualFrameProducerInterval(sourceId, { stopStream: true });
@@ -1590,7 +1804,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }).catch(() => null);
     await setSourceStatus(sourceId, "stop").catch(() => null);
     clearImageLensLiveSource(sourceId);
-    setLastActionStatus("Stopped visual sharing and interval capture. Restart visual capture to resume frames.");
+    setLastActionStatus(audioSourceId
+      ? "Stopped visual sharing, interval capture, and audio transcript chunks. Restart screen share to resume sources."
+      : "Stopped visual sharing and interval capture. Restart visual capture to resume frames.");
     await refresh();
   };
 
@@ -2307,25 +2523,36 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           )}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <label className="inline-flex items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
-            Route screen share to
-            <select
-              value={visualCaptureRoute}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setVisualCaptureRoute(event.target.value as "live_answer" | "image_lens")}
-              className="rounded border border-white/10 bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-100"
-              aria-label="Visual capture route"
-            >
-              <option value="live_answer">Live Answer first</option>
-              <option value="image_lens">Image Lens first</option>
-            </select>
-          </label>
+          <fieldset
+            aria-label="Visual capture route"
+            className="inline-flex flex-wrap items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300"
+          >
+            <span className="mr-1 text-slate-400">Route screen share to</span>
+            {([
+              ["live_answer", "Live Answer visual"],
+              ["image_lens", "Image Lens"],
+              ["audio_transcript", "Audio transcript"],
+            ] as const).map(([route, label]) => (
+              <label key={route} className="inline-flex items-center gap-1 rounded border border-white/10 bg-slate-950/70 px-1.5 py-0.5 text-slate-100">
+                <input
+                  type="checkbox"
+                  checked={visualCaptureRoutes.includes(route)}
+                  onChange={() => toggleVisualCaptureRoute(route)}
+                  aria-label={`Route screen share to ${label}`}
+                  className="h-3 w-3 accent-cyan-300"
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
           <button
             type="button"
             onClick={() => void startVisualCaptureByRoute()}
+            disabled={selectedRouteCount === 0}
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {visualCaptureRoute === "image_lens"
-              ? "Share to Image Lens"
+            {routeAudioTranscript || routeImageLens
+              ? "Start selected live sources"
               : visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
           </button>
           <button
@@ -2360,7 +2587,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button
             type="button"
             onClick={() => void stopVisualSharing()}
-            disabled={!visualProducerState?.stream_active}
+            disabled={!visualProducerState?.stream_active && !audioTranscriptSourceIdRef.current}
             className="rounded border border-rose-300/30 px-2 py-1 text-[11px] text-rose-100 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             Stop sharing

@@ -17,6 +17,10 @@ import {
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
+  isNhm2MetricRequiredRegionalTensorReceipt,
+  type Nhm2MetricRequiredRegionalTensorReceiptRegionV1,
+} from "../../shared/contracts/nhm2-metric-required-regional-tensor-receipt.v1";
+import {
   isNhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartRegion,
@@ -192,6 +196,21 @@ const normalizeComparisonRole = (
     ? value
     : "unknown";
 
+const metricMetaFromReceipt = (
+  region: Nhm2MetricRequiredRegionalTensorReceiptRegionV1,
+) => ({
+  tensorRef:
+    region.tensorRef ??
+    `nhm2_metric_required_regional_tensor_receipt:${region.regionId}`,
+  chartRef: region.chartRef,
+  unitsRef: region.unitsRef,
+  aggregationMode: region.aggregationMode,
+  normalizationBasis: region.normalizationBasis,
+  sampleCount: region.sampleCount,
+  comparisonRole: null,
+  evidenceText: JSON.stringify(region),
+});
+
 const residualForComponents = (
   residuals: unknown,
 ): Nhm2RegionalSourceClosureEvidenceRegion["residuals"]["componentResiduals"] => {
@@ -293,6 +312,7 @@ const basisStatusFor = (
 
 const makeGlobalRegion = (
   sourceClosure: Record<string, unknown>,
+  metricReceiptRegion?: Nhm2MetricRequiredRegionalTensorReceiptRegionV1 | null,
   tileCounterpartRegion?: Nhm2TileEffectiveCounterpartRegion | null,
 ): Nhm2RegionalSourceClosureEvidenceRegion => {
   const tensors = asRecord(sourceClosure.tensors);
@@ -302,9 +322,10 @@ const makeGlobalRegion = (
     asRecord(sourceClosure.metricAccounting) ?? asRecord(globalAccounting?.metric);
   const tileAccounting =
     asRecord(sourceClosure.tileAccounting) ?? asRecord(globalAccounting?.tile);
-  const metric = normalizeTensor(asRecord(tensors?.metricRequired));
+  const metric =
+    metricReceiptRegion?.tensor ?? normalizeTensor(asRecord(tensors?.metricRequired));
   const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(asRecord(tensors?.tileEffective));
-  const metricMeta = {
+  const legacyMetricMeta = {
     tensorRef: asString(tensorRefs?.metricRequired),
     chartRef: asString(metricAccounting?.chartRef) ?? "comoving_cartesian",
     unitsRef: asString(metricAccounting?.unitsRef) ?? "J/m^3",
@@ -314,6 +335,10 @@ const makeGlobalRegion = (
     comparisonRole: null,
     evidenceText: JSON.stringify({ metricAccounting, tensorRef: tensorRefs?.metricRequired }),
   };
+  const metricMeta =
+    metricReceiptRegion == null
+      ? legacyMetricMeta
+      : metricMetaFromReceipt(metricReceiptRegion);
   const legacyTileMeta = {
     tensorRef: asString(tensorRefs?.tileEffective),
     chartRef: asString(tileAccounting?.chartRef) ?? "comoving_cartesian",
@@ -363,14 +388,18 @@ const makeGlobalRegion = (
           ? sourceClosure.status
           : "review",
     comparisonBasisStatus: basisStatusFor(
-      asString(sourceClosure.comparisonBasisStatus),
+      metricReceiptRegion != null && tileCounterpartRegion != null
+        ? null
+        : asString(sourceClosure.comparisonBasisStatus),
       metricMeta,
       tileMeta,
       comparisonRole,
     ),
     metricRequired: {
-      tensorRef: asString(tensorRefs?.metricRequired),
-      tensorAuthorityMode: inferAuthorityMode(metric, JSON.stringify(tensors?.metricRequired)),
+      tensorRef: metricMeta.tensorRef,
+      tensorAuthorityMode:
+        metricReceiptRegion?.tensorAuthorityMode ??
+        inferAuthorityMode(metric, JSON.stringify(tensors?.metricRequired)),
       tensor: metric,
       chartRef: metricMeta.chartRef,
       unitsRef: metricMeta.unitsRef,
@@ -395,16 +424,20 @@ const makeGlobalRegion = (
       comparisonRole,
     },
     residuals,
-    blockers: tileCounterpartRegion?.blockers ?? [],
+    blockers: [
+      ...(metricReceiptRegion?.blockers ?? []),
+      ...(tileCounterpartRegion?.blockers ?? []),
+    ],
   };
 };
 
 const makeRegionalRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   sourceRegion: Record<string, unknown> | null,
+  metricReceiptRegion?: Nhm2MetricRequiredRegionalTensorReceiptRegionV1 | null,
   tileCounterpartRegion?: Nhm2TileEffectiveCounterpartRegion | null,
 ): Nhm2RegionalSourceClosureEvidenceRegion => {
-  if (sourceRegion == null) {
+  if (sourceRegion == null && metricReceiptRegion == null) {
     return {
       regionId,
       status: "missing",
@@ -441,9 +474,14 @@ const makeRegionalRegion = (
     };
   }
 
-  const metric = normalizeTensor(sourceRegion.metricRequiredTensor);
-  const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(sourceRegion.tileEffectiveTensor);
-  const metricMeta = extractSideMeta(sourceRegion, "metric");
+  const metric =
+    metricReceiptRegion?.tensor ?? normalizeTensor(sourceRegion?.metricRequiredTensor);
+  const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(sourceRegion?.tileEffectiveTensor);
+  const legacyMetricMeta = extractSideMeta(sourceRegion, "metric");
+  const metricMeta =
+    metricReceiptRegion == null
+      ? legacyMetricMeta
+      : metricMetaFromReceipt(metricReceiptRegion);
   const legacyTileMeta = extractSideMeta(sourceRegion, "tile");
   const tileMeta =
     tileCounterpartRegion == null
@@ -460,33 +498,38 @@ const makeRegionalRegion = (
         };
   const role = tileCounterpartRegion?.comparisonRole ?? normalizeComparisonRole(tileMeta.comparisonRole);
   const comparisonBasisStatus = basisStatusFor(
-    asString(sourceRegion.comparisonBasisStatus),
+    metricReceiptRegion != null && tileCounterpartRegion != null
+      ? null
+      : asString(sourceRegion?.comparisonBasisStatus),
     metricMeta,
     tileMeta,
     role,
   );
   const residualNorms =
     tileCounterpartRegion == null
-      ? asRecord(sourceRegion.residualNorms)
+      ? asRecord(sourceRegion?.residualNorms)
       : {
-          toleranceRelLInf: asNumber(asRecord(sourceRegion.residualNorms)?.toleranceRelLInf),
+          toleranceRelLInf: asNumber(asRecord(sourceRegion?.residualNorms)?.toleranceRelLInf),
         };
   const residuals = computeResiduals(
     metric,
     tile,
-    tileCounterpartRegion == null ? sourceRegion.residualComponents : null,
+    tileCounterpartRegion == null ? sourceRegion?.residualComponents : null,
     residualNorms,
   );
   const blockers = [
-    ...((tileCounterpartRegion == null && Array.isArray(sourceRegion.reasonCodes)
-      ? sourceRegion.reasonCodes
+    ...((tileCounterpartRegion == null && Array.isArray(sourceRegion?.reasonCodes)
+      ? sourceRegion?.reasonCodes
       : []) as unknown[]).filter((entry): entry is string => typeof entry === "string"),
   ];
-  const authorityReason = asString(sourceRegion.comparisonBasisAuthorityStatus);
+  const authorityReason = asString(sourceRegion?.comparisonBasisAuthorityStatus);
   if (tileCounterpartRegion == null && authorityReason === "counterpart_missing") {
     blockers.push("counterpart_missing");
   }
-  if (tileCounterpartRegion == null && sourceRegion.counterpartResolutionStatus === "missing") {
+  if (
+    tileCounterpartRegion == null &&
+    sourceRegion?.counterpartResolutionStatus === "missing"
+  ) {
     blockers.push("counterpart_missing");
   }
 
@@ -495,15 +538,17 @@ const makeRegionalRegion = (
     status:
       tileCounterpartRegion != null
         ? "review"
-        : sourceRegion.status === "pass" ||
-            sourceRegion.status === "review" ||
-            sourceRegion.status === "fail"
+        : sourceRegion?.status === "pass" ||
+            sourceRegion?.status === "review" ||
+            sourceRegion?.status === "fail"
           ? sourceRegion.status
           : "review",
     comparisonBasisStatus,
     metricRequired: {
       tensorRef: metricMeta.tensorRef,
-      tensorAuthorityMode: inferAuthorityMode(metric, metricMeta.evidenceText),
+      tensorAuthorityMode:
+        metricReceiptRegion?.tensorAuthorityMode ??
+        inferAuthorityMode(metric, metricMeta.evidenceText),
       tensor: metric,
       chartRef: metricMeta.chartRef,
       unitsRef: metricMeta.unitsRef,
@@ -529,7 +574,11 @@ const makeRegionalRegion = (
       comparisonRole: role,
     },
     residuals,
-    blockers: [...blockers, ...(tileCounterpartRegion?.blockers ?? [])],
+    blockers: [
+      ...blockers,
+      ...(metricReceiptRegion?.blockers ?? []),
+      ...(tileCounterpartRegion?.blockers ?? []),
+    ],
   };
 };
 
@@ -539,13 +588,15 @@ export const publishRegionalSourceClosureEvidence = (args: {
   sourceClosurePath: string;
   outPath: string;
   tileEffectiveCounterpartPath?: string | null;
+  metricRequiredRegionalTensorReceiptPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2RegionalSourceClosureEvidenceArtifact => {
   if (
     !args.auditOnly &&
     (pathUsesLatestAlias(args.referenceRunPath) ||
       pathUsesLatestAlias(args.sourceClosurePath) ||
-      pathUsesLatestAlias(args.tileEffectiveCounterpartPath ?? ""))
+      pathUsesLatestAlias(args.tileEffectiveCounterpartPath ?? "") ||
+      pathUsesLatestAlias(args.metricRequiredRegionalTensorReceiptPath ?? ""))
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -576,6 +627,29 @@ export const publishRegionalSourceClosureEvidence = (args: {
       tileRegionMap.set(region.regionId, region);
     }
   }
+  const metricReceipt =
+    args.metricRequiredRegionalTensorReceiptPath == null
+      ? null
+      : readJson(
+          resolvePath(args.repoRoot, args.metricRequiredRegionalTensorReceiptPath),
+        );
+  if (
+    metricReceipt != null &&
+    !isNhm2MetricRequiredRegionalTensorReceipt(metricReceipt)
+  ) {
+    throw new Error(
+      "metric-required regional tensor receipt must be nhm2_metric_required_regional_tensor_receipt/v1",
+    );
+  }
+  const metricReceiptRegionMap = new Map<
+    string,
+    Nhm2MetricRequiredRegionalTensorReceiptRegionV1
+  >();
+  if (isNhm2MetricRequiredRegionalTensorReceipt(metricReceipt)) {
+    for (const region of metricReceipt.regions) {
+      metricReceiptRegionMap.set(region.regionId, region);
+    }
+  }
 
   const sourceRegions = new Map<string, Record<string, unknown>>();
   const regionList = getNested(sourceClosure, ["regionComparisons", "regions"]);
@@ -589,10 +663,15 @@ export const publishRegionalSourceClosureEvidence = (args: {
 
   const regions = REQUIRED_REGIONS.map((regionId: Nhm2RegionalSourceClosureRegionId) =>
     regionId === "global"
-      ? makeGlobalRegion(sourceClosure, tileRegionMap.get(regionId) ?? null)
+      ? makeGlobalRegion(
+          sourceClosure,
+          metricReceiptRegionMap.get(regionId) ?? null,
+          tileRegionMap.get(regionId) ?? null,
+        )
       : makeRegionalRegion(
           regionId,
           sourceRegions.get(regionId) ?? null,
+          metricReceiptRegionMap.get(regionId) ?? null,
           tileRegionMap.get(regionId) ?? null,
         ),
   );
@@ -629,6 +708,9 @@ const main = (): void => {
     referenceRunPath,
     sourceClosurePath,
     tileEffectiveCounterpartPath: asString(args["tile-effective-counterpart"]),
+    metricRequiredRegionalTensorReceiptPath: asString(
+      args["metric-required-regional-tensor-receipt"],
+    ),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

@@ -336,6 +336,27 @@ export const deriveNhm2RegionalSourceClosureRegionBlockers = (
   }
   if (
     metric.tensorAuthorityMode === "proxy" ||
+    metric.tensorAuthorityMode === "unknown" ||
+    metric.tensorAuthorityMode === "diagonal_reduced_order"
+  ) {
+    blockers.add("metric_tensor_authority_insufficient");
+  }
+  if (
+    tile.tensorAuthorityMode === "proxy" ||
+    tile.tensorAuthorityMode === "unknown" ||
+    tile.tensorAuthorityMode === "diagonal_reduced_order"
+  ) {
+    blockers.add("tile_tensor_authority_insufficient");
+  }
+  if (
+    metric.aggregationMode === "unknown" ||
+    metric.normalizationBasis === "unknown"
+  ) {
+    blockers.add("metric_aggregation_metadata_unknown");
+  }
+  if (metric.sampleCount == null) blockers.add("metric_sample_count_missing");
+  if (
+    metric.tensorAuthorityMode === "proxy" ||
     tile.tensorAuthorityMode === "proxy"
   ) {
     blockers.add("proxy_tensor_authority");

@@ -52,6 +52,7 @@ export type Nhm2TileEffectiveCounterpartRegion = {
     sourceModelId: string | null;
     sourceModelVersion: string | null;
     derivationMode:
+      | "explicit_global_source_row"
       | "tile_model_direct_full_tensor"
       | "tile_model_reconstituted_full_tensor"
       | "diagonal_proxy"
@@ -193,6 +194,7 @@ const isQeiApplicability = (
 const isDerivationMode = (
   value: unknown,
 ): value is Nhm2TileEffectiveCounterpartRegion["provenance"]["derivationMode"] =>
+  value === "explicit_global_source_row" ||
   value === "tile_model_direct_full_tensor" ||
   value === "tile_model_reconstituted_full_tensor" ||
   value === "diagonal_proxy" ||
@@ -266,6 +268,16 @@ const aggregateSourceAuthority = (
   }
   if (regions.every((region) => region.provenance.derivationMode === "tile_model_reconstituted_full_tensor")) {
     return "reconstituted_full_tensor_from_tile_model";
+  }
+  if (
+    regions.every(
+      (region) =>
+        region.provenance.derivationMode === "tile_model_direct_full_tensor" ||
+        region.provenance.derivationMode === "tile_model_reconstituted_full_tensor" ||
+        region.provenance.derivationMode === "explicit_global_source_row",
+    )
+  ) {
+    return "cycle_averaged_tile_model";
   }
   return "unknown";
 };

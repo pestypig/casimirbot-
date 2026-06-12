@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { buildCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
@@ -14,6 +16,7 @@ import { buildLayeredWallSourceCandidate } from "../tools/nhm2/build-layered-wal
 import { buildTileLocalSourceElementsFromCavityContract } from "../tools/nhm2/build-tile-local-source-elements";
 import { buildWallMaterialSourceTensorModel } from "../tools/nhm2/build-wall-material-source-tensor-model";
 import { buildWallSourceLayeringSweep } from "../tools/nhm2/build-wall-source-layering-sweep";
+import { buildRegionalMaterialSourceTensorModel } from "../tools/nhm2/build-regional-material-source-tensor-model";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
 const generatedAt = "2026-06-12T00:00:00.000Z";
@@ -311,6 +314,48 @@ describe("NHM2 tile-local source elements", () => {
     expect(wall?.blockers).toEqual([]);
     expect(authority.summary.hasWallAuthority).toBe(true);
     expect(authority.summary.allRequiredRegionsAuthoritative).toBe(true);
+  });
+
+  it("preserves an explicit regional global source row instead of averaging representative regions", () => {
+    const componentModel = JSON.parse(
+      readFileSync("fixtures/nhm2/regional-source-components.tuned-v1.json", "utf8"),
+    );
+    const receipt = materialReceipt();
+    const regionalModel = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      componentModel,
+      materialReceipt: receipt,
+      materialReceiptRef: "receipt.json",
+      sourceModelRef: "fixtures/nhm2/regional-source-components.tuned-v1.json",
+    });
+    const artifact = buildTileLocalSourceElementsFromCavityContract({
+      runId: "tile-local-run",
+      selectedProfileId: profile,
+      expectedProfileId: profile,
+      materialReceipt: receipt,
+      regionalMaterialSourceTensorModel: regionalModel,
+      regionalMaterialSourceTensorModelRef: "regional-source-model.json",
+    });
+    const globalElement = artifact.elements.find(
+      (entry) => entry.tileElementId === "nhm2_tile_local_source:global:representative_sector_bin",
+    );
+    const hullElement = artifact.elements.find(
+      (entry) => entry.tileElementId === "nhm2_tile_local_source:hull:representative_sector_bin",
+    );
+    const counterpart = aggregateTileLocalSourceToRegionalCounterpart({
+      referenceRun: referenceRun(),
+      tileLocalSourceElements: artifact,
+      tileLocalSourceElementsRef: "tile-local.json",
+    });
+    const global = counterpart.regions.find((region) => region.regionId === "global");
+
+    expect(globalElement?.sectorId).toBe("explicit_global_source_row");
+    expect(globalElement?.regionWeights).toEqual({ global: 1 });
+    expect(hullElement?.regionWeights.global).toBeUndefined();
+    expect(global?.tensor.T00).toBe(-58267451);
+    expect(global?.sampleCount).toBe(1);
+    expect(global?.provenance.derivationMode).toBe("explicit_global_source_row");
+    expect(global?.provenance.notDerivedFromMetricRequiredTensor).toBe(true);
   });
 
   it("keeps diagonal-only local tensors non-authoritative because T0i and off-diagonal Tij are missing", () => {

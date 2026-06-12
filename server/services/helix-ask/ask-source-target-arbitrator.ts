@@ -22,7 +22,11 @@ import {
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
 import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
-import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
+import {
+  buildToolUseRestatement,
+  detectInternetSearchIntent,
+  hasAffirmativeDocsViewerSearchCue,
+} from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   detectModelOnlyConceptSourceSignal,
@@ -135,6 +139,9 @@ const isDocsTopicSummaryPrompt = (prompt: string): boolean =>
     /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
     /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt)
   );
+
+const isAffirmativeDocsSearchPrompt = (prompt: string): boolean =>
+  hasAffirmativeDocsViewerSearchCue(prompt);
 
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
@@ -890,6 +897,23 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
       precedenceReason: "docs_topic_summary_source_target",
       confidence: 0.94,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isAffirmativeDocsSearchPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["docs_search"],
+      reasons: ["explicit_docs_search_source_target", "local_docs_scope_suppresses_freshness_search"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_search_source_target",
+      confidence: 0.96,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

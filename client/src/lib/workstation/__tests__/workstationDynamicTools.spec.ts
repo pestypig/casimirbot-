@@ -353,6 +353,47 @@ describe("workstation dynamic tools", () => {
     });
   });
 
+  it("exposes Image Lens focus runs as observation-only visual evidence tools", () => {
+    const tools = getWorkstationDynamicTools();
+    const imageLensFocus = tools.find((tool) => tool.name === "image_lens.image_lens_focus_regions");
+    const liveAnswerFocus = tools.find((tool) => tool.name === "live_answer_environment.image_lens_focus_regions");
+
+    expect(imageLensFocus).toMatchObject({
+      namespace: "workstation",
+      panel_id: "image-lens",
+      action_id: "image_lens.focus_regions",
+      risk: "medium",
+      returns_artifact: true,
+      terminal_artifact_kind: "image_lens_focus_run_result",
+    });
+    expect(imageLensFocus?.inputSchema).toMatchObject({
+      required: ["sourceId", "regions"],
+      properties: {
+        regions: {
+          type: "array",
+          items: {
+            properties: {
+              bboxPct: {
+                properties: {
+                  x: { type: "number" },
+                  y: { type: "number" },
+                  width: { type: "number" },
+                  height: { type: "number" },
+                },
+              },
+              reason: { type: "string" },
+            },
+          },
+        },
+      },
+    });
+    expect(liveAnswerFocus).toMatchObject({
+      panel_id: "live-answer-environment",
+      action_id: "image_lens.focus_regions",
+      terminal_artifact_kind: "image_lens_focus_run_result",
+    });
+  });
+
   it("keeps agent continuation Situation Room actions present in both tool registries", () => {
     const panelActions = new Set(
       WORKSTATION_V1_PANEL_CAPABILITIES["situation-room-pipelines"].actions.map((action) => action.id),

@@ -109,15 +109,19 @@ describe("display audio situation session", () => {
       engine: "openai_transcribe",
     });
     const events: unknown[] = [];
+    const transcriptChunks: unknown[] = [];
 
     const session = await startDisplayAudioSituationSession({
       roomId: "room-1",
+      sourceId: "audio_transcript:thread-1",
+      environmentId: "env-1",
       missionId: "mission-1",
       threadId: "thread-1",
       captureSessionId: "capture-1",
       chunkMs: 5000,
       transcribe,
       onEvent: (event: HelixSituationEvent) => events.push(event),
+      onTranscriptChunk: (chunk) => transcriptChunks.push(chunk),
       isDottiePlaybackActive: () => true,
     });
 
@@ -136,6 +140,7 @@ describe("display audio situation session", () => {
     await vi.advanceTimersByTimeAsync(5090);
 
     await vi.waitFor(() => expect(events).toHaveLength(1));
+    await vi.waitFor(() => expect(transcriptChunks).toHaveLength(1));
     expect(transcribe).toHaveBeenCalledWith(
       expect.objectContaining({
         room_id: "room-1",
@@ -163,10 +168,59 @@ describe("display audio situation session", () => {
         possible_tts_echo: true,
       },
     });
+    expect(transcriptChunks[0]).toMatchObject({
+      sourceId: "audio_transcript:thread-1",
+      environmentId: "env-1",
+      captureSessionId: "capture-1",
+      chunkIndex: 0,
+      durationMs: expect.any(Number),
+      fromTs: expect.any(String),
+      toTs: expect.any(String),
+    });
 
     session.stop();
     expect(audioTrack.stop).toHaveBeenCalledTimes(1);
     expect(videoTrack.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("can record from a provided display stream without stopping shared tracks", async () => {
+    vi.useFakeTimers();
+    const audioTrack: FakeTrack = { kind: "audio", stop: vi.fn(), addEventListener: vi.fn() };
+    const videoTrack: FakeTrack = {
+      kind: "video",
+      stop: vi.fn(),
+      addEventListener: vi.fn(),
+      getSettings: () => ({ displaySurface: "browser" }),
+    };
+    const stream = new FakeMediaStream([audioTrack, videoTrack]);
+    const getDisplayMedia = installMediaGlobals(new FakeMediaStream([]));
+    const transcribe = vi.fn().mockResolvedValue({
+      ok: true,
+      text: "Shared stream audio.",
+      language: "en",
+      confidence: 0.85,
+      engine: "openai_transcribe",
+    });
+    const events: unknown[] = [];
+
+    const session = await startDisplayAudioSituationSession({
+      roomId: "room-1",
+      captureSessionId: "capture-shared",
+      chunkMs: 1000,
+      stream: stream as unknown as MediaStream,
+      stopStreamOnStop: false,
+      transcribe,
+      onEvent: (event: HelixSituationEvent) => events.push(event),
+    });
+
+    expect(getDisplayMedia).not.toHaveBeenCalled();
+    FakeMediaRecorder.instances[0]?.emit(new Blob(["audio"], { type: "audio/webm" }));
+    await vi.advanceTimersByTimeAsync(1090);
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+
+    session.stop();
+    expect(audioTrack.stop).not.toHaveBeenCalled();
+    expect(videoTrack.stop).not.toHaveBeenCalled();
   });
 
   it("fails clearly and stops tracks when the selected source has no audio track", async () => {

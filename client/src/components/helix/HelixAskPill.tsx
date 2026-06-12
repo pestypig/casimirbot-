@@ -32222,6 +32222,7 @@ export function HelixAskPill({
             const askTurnPayload = {
               sessionId: sessionId ?? undefined,
               traceId,
+              turnId: runAskTurnId,
               maxTokens: HELIX_ASK_OUTPUT_TOKENS,
               question: trimmed,
               contextFiles: docsViewerAnchorPath ? [docsViewerAnchorPath] : undefined,

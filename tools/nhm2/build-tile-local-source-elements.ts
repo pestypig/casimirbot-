@@ -182,7 +182,14 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
       : [args.regionalMaterialSourceTensorModelRef]),
   ];
 
-  const elements: Nhm2TileLocalSourceElementV1[] = representativeRegionIds.map(
+  const explicitGlobalRegion = regionalSourceRegion(regionalTensorModel, "global");
+  const hasExplicitGlobalRegion =
+    explicitGlobalRegion != null && explicitGlobalRegion.status !== "missing";
+  const elementRegionIds: Nhm2RegionalSourceClosureRegionId[] = hasExplicitGlobalRegion
+    ? ["global", ...representativeRegionIds]
+    : [...representativeRegionIds];
+
+  const elements: Nhm2TileLocalSourceElementV1[] = elementRegionIds.map(
     (regionId, index) => {
       const regionalRegion = regionalSourceRegion(regionalTensorModel, regionId);
       const localTensor =
@@ -225,7 +232,10 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
       return {
         tileElementId: `nhm2_tile_local_source:${regionId}:representative_sector_bin`,
         tileBatchId: "nhm2_cavity_geometry_freeze_v1",
-        sectorId: `representative_sector_${index}`,
+        sectorId:
+          regionId === "global" && usingRegionalModel
+            ? "explicit_global_source_row"
+            : `representative_sector_${index}`,
         chartId: "comoving_cartesian",
         positionChartMeters: null,
         normalChart: null,
@@ -259,10 +269,12 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
         componentStatus: componentStatusFromTensor(localTensor),
         tensorAuthorityMode,
         missingComponentIds,
-        regionWeights: {
-          global: 1,
-          [regionId]: 1,
-        },
+        regionWeights:
+          regionId === "global"
+            ? { global: 1 }
+            : hasExplicitGlobalRegion
+            ? { [regionId]: 1 }
+            : { global: 1, [regionId]: 1 },
         provenance: {
           producerModule: "tools/nhm2/build-tile-local-source-elements.ts",
           producerFunction: "buildTileLocalSourceElementsFromCavityContract",
@@ -281,6 +293,7 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
         warnings: usingRegionalModel
           ? [
               `local_tensor_from_regional_material_source_tensor_model:${regionId}`,
+              ...(regionId === "global" ? ["explicit_global_source_row"] : []),
               ...regionalRegion.warnings,
             ]
           : usingWallModel

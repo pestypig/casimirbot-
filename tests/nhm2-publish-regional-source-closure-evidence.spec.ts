@@ -12,6 +12,7 @@ import {
   buildNhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartRegion,
 } from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import { buildMetricRequiredRegionalTensorReceiptFromSourceClosure } from "../tools/nhm2/publish-metric-required-regional-tensor-receipt";
 import { publishRegionalSourceClosureEvidence } from "../tools/nhm2/publish-regional-source-closure-evidence";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -354,6 +355,71 @@ describe("publish regional source-closure evidence", () => {
 
       expect(global?.comparisonBasisStatus).toBe("aggregation_mismatch");
       expect(artifact.reasonCodes).toContain("global:aggregation_mismatch");
+      expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
+    }));
+
+  it("uses metric-required receipt metadata before stale regional metric accounting", () =>
+    withTemp((root) => {
+      const closure = sourceClosure("tile_effective_counterpart");
+      for (const region of closure.regionComparisons.regions) {
+        region.comparisonBasisStatus = "diagnostic_only";
+        region.metricAccounting = {
+          sampleCount: null,
+          aggregationMode: "unknown",
+          normalizationBasis: null,
+        };
+        region.metricRequiredTensor = {
+          T00: -10,
+          T11: 10,
+          T22: 10,
+          T33: 10,
+        };
+        region.metricT00Diagnostics.trace = {
+          ...region.metricT00Diagnostics.trace,
+          tensorRef: `metric.${region.regionId}`,
+          regionMaskRef: `metric.mask.${region.regionId}`,
+          aggregationMode: "mean",
+          normalizationBasis: "sample_count",
+          sampleCount: 1,
+          pathFacts: {
+            chartRef: "comoving_cartesian",
+            unitsRef: "J/m^3",
+            comparisonRole: "metric_required_reference",
+          },
+        };
+      }
+      writeArtifacts(root, closure);
+      writeFileSync(
+        join(root, "counterpart.json"),
+        JSON.stringify(tileCounterpart()),
+        "utf8",
+      );
+      const receipt = buildMetricRequiredRegionalTensorReceiptFromSourceClosure({
+        generatedAt: "2026-05-05T00:00:00.000Z",
+        referenceRun: referenceRun(),
+        sourceClosure: closure,
+        sourceClosureRef: "source.json",
+      });
+      writeFileSync(join(root, "metric-receipt.json"), JSON.stringify(receipt), "utf8");
+
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        tileEffectiveCounterpartPath: "counterpart.json",
+        metricRequiredRegionalTensorReceiptPath: "metric-receipt.json",
+        outPath: "evidence.json",
+      });
+      const hull = artifact.regions.find((region) => region.regionId === "hull");
+
+      expect(hull?.comparisonBasisStatus).toBe("same_basis");
+      expect(hull?.metricRequired.aggregationMode).toBe("mean");
+      expect(hull?.metricRequired.normalizationBasis).toBe("sample_count");
+      expect(hull?.metricRequired.sampleCount).toBe(1);
+      expect(hull?.metricRequired.tensorAuthorityMode).toBe("diagonal_reduced_order");
+      expect(hull?.blockers).toContain("metric_required_full_tensor_authority_missing");
+      expect(hull?.blockers).toContain("metric_tensor_authority_insufficient");
+      expect(artifact.reasonCodes).not.toContain("hull:aggregation_mismatch");
       expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
     }));
 

@@ -165,7 +165,7 @@ const requestedActionFor = (
       return "docs-viewer.search_docs";
     }
     if (/\b(?:open|pull up|bring up|show)\b/.test(prompt)) return "open_or_validate_document";
-    if (/\b(?:read|locate|find)\b/.test(prompt)) return "locate_or_read_document";
+    if (/\b(?:read|locate|find|search)\b/.test(prompt)) return "docs-viewer.search_docs";
     return "retrieve_document_evidence";
   }
   if (family === "workstation_action") {
@@ -443,9 +443,16 @@ export const buildCapabilityPlan = (input: {
     !contextualSuppression &&
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
+  const requiresDocsViewerEvidence =
+    !hardLiveSourceMailboxRoute &&
+    !contextualSuppression &&
+    !requiresRepoConceptEvidence &&
+    !requiresInternetEvidence &&
+    toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const sourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (contextualSuppression ? "model_only" : "") ||
+    (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     routeMetadataSourceTarget(routeMetadata) ||
@@ -464,6 +471,8 @@ export const buildCapabilityPlan = (input: {
   });
   const family: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
+    : requiresDocsViewerEvidence
+    ? "docs"
     : requiresRepoConceptEvidence
     ? "repo_evidence"
     : requiresInternetEvidence
@@ -535,6 +544,8 @@ export const buildCapabilityPlan = (input: {
     source_target: sourceTarget,
     goal_kind: requiresRepoConceptEvidence
       ? "repo_concept_explanation"
+      : requiresDocsViewerEvidence
+        ? "doc_open_best"
       : requiresInternetEvidence
         ? "internet_search_lookup"
         : canonicalGoalKind || "unknown",

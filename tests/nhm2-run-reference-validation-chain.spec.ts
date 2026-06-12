@@ -127,6 +127,9 @@ describe("NHM2 reference validation chain planner", () => {
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-source-tensor-targets"),
     );
+    expect(
+      scripts.indexOf("nhm2:publish-metric-required-regional-tensor-receipt"),
+    ).toBeLessThan(scripts.indexOf("nhm2:publish-regional-source-closure-evidence"));
     expect(scripts.indexOf("nhm2:build-regional-source-tensor-targets")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-source-tensor-candidate"),
     );
@@ -142,6 +145,27 @@ describe("NHM2 reference validation chain planner", () => {
     );
     expect(targets.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-targets.json",
+    );
+
+    const metricReceipt = findCommand(
+      plan,
+      "nhm2:publish-metric-required-regional-tensor-receipt",
+    );
+    expect(metricReceipt.args).toContain("--reference-run");
+    expect(metricReceipt.args).toContain("artifacts/reference/nhm2-reference-run.json");
+    expect(metricReceipt.args).toContain("--source-closure");
+    expect(metricReceipt.args).toContain("artifacts/reference/nhm2-source-closure.json");
+    expect(metricReceipt.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-tensor-receipt.json",
+    );
+
+    const regionalEvidence = findCommand(
+      plan,
+      "nhm2:publish-regional-source-closure-evidence",
+    );
+    expect(regionalEvidence.args).toContain("--metric-required-regional-tensor-receipt");
+    expect(regionalEvidence.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-tensor-receipt.json",
     );
 
     const candidate = findCommand(plan, "nhm2:build-regional-source-tensor-candidate");

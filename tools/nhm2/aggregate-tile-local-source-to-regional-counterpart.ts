@@ -120,6 +120,13 @@ const sourceBlockersFor = (
   return Array.from(blockers);
 };
 
+const isExplicitGlobalSourceElement = (
+  element: Nhm2TileLocalSourceElementV1,
+): boolean =>
+  element.regionWeights.global === 1 &&
+  element.sectorId === "explicit_global_source_row" &&
+  element.tileElementId.includes(":global:");
+
 const makeMissingRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
 ): Nhm2TileEffectiveCounterpartRegion => ({
@@ -165,6 +172,10 @@ export const aggregateTileLocalSourceToRegionalCounterpart = (args: {
     const tensor = aggregateTensor(contributing, regionId);
     const tensorAuthorityMode = inferCounterpartTensorAuthority(tensor);
     const blockers = sourceBlockersFor(contributing, tensorAuthorityMode);
+    const usesExplicitGlobalSourceRow =
+      regionId === "global" &&
+      contributing.length === 1 &&
+      isExplicitGlobalSourceElement(contributing[0]);
     return {
       regionId,
       status: blockers.length > 0 ? "review" : "pass",
@@ -174,7 +185,9 @@ export const aggregateTileLocalSourceToRegionalCounterpart = (args: {
       chartRef: "comoving_cartesian",
       unitsRef: "J/m^3",
       regionMaskRef:
-        regionId === "global"
+        usesExplicitGlobalSourceRow
+          ? "tile_local_source.explicit_global_source_row"
+          : regionId === "global"
           ? "tile_local_source.region_weight.global"
           : `tile_local_source.region_weight.${regionId}`,
       aggregationMode: "mean",
@@ -190,7 +203,9 @@ export const aggregateTileLocalSourceToRegionalCounterpart = (args: {
         sourceModelId: args.tileLocalSourceElements.sourceModel.sourceModelId,
         sourceModelVersion: args.tileLocalSourceElements.sourceModel.sourceModelVersion,
         derivationMode:
-          tensorAuthorityMode === "full_tensor" || tensorAuthorityMode === "symmetric_full_tensor"
+          usesExplicitGlobalSourceRow
+            ? "explicit_global_source_row"
+            : tensorAuthorityMode === "full_tensor" || tensorAuthorityMode === "symmetric_full_tensor"
             ? "tile_model_reconstituted_full_tensor"
             : tensorAuthorityMode === "diagonal_reduced_order" || tensorAuthorityMode === "proxy"
               ? "diagonal_proxy"

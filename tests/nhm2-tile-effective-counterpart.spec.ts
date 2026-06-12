@@ -178,4 +178,25 @@ describe("nhm2 tile-effective counterpart contract", () => {
     expect(value.physicalMechanismClaimAllowed).toBe(false);
     expect(isNhm2TileEffectiveCounterpartArtifact(value)).toBe(true);
   });
+
+  it("accepts explicit global source row provenance without promoting physical claims", () => {
+    const value = artifact([
+      region("global", {
+        provenance: {
+          ...region("global").provenance,
+          derivationMode: "explicit_global_source_row",
+        },
+      }),
+      region("hull"),
+      region("wall"),
+      region("exterior_shell"),
+    ]);
+
+    expect(value.regions.find((entry) => entry.regionId === "global")?.provenance.derivationMode).toBe(
+      "explicit_global_source_row",
+    );
+    expect(value.sourceAuthorityMode).toBe("cycle_averaged_tile_model");
+    expect(value.physicalMechanismClaimAllowed).toBe(false);
+    expect(isNhm2TileEffectiveCounterpartArtifact(value)).toBe(true);
+  });
 });

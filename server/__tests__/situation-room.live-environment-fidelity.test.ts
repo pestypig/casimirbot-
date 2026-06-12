@@ -468,9 +468,11 @@ describe("live environment source fidelity", () => {
       .send({
         thread_id: threadId,
         source_id: "source:tab-audio",
+        environment_id: "env:audio-test",
         transcript: "Helix, I am decorating the farm boundary.",
         transcript_is_final: true,
         direct_address_classification: "direct_address",
+        duration_ms: 10_000,
       })
       .expect(200);
 
@@ -486,5 +488,12 @@ describe("live environment source fidelity", () => {
       },
     });
     expect(chunk.body.live_source_event.kind).toBe("browser_audio_transcript");
-  }, 15000);
+    expect(chunk.body.live_source_chunk).toMatchObject({
+      source_id: "source:tab-audio",
+      thread_id: threadId,
+      environment_id: "env:audio-test",
+      modality: "audio_transcript",
+      duration_ms: 10_000,
+    });
+  }, 30000);
 });

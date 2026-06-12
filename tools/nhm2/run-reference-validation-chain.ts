@@ -133,6 +133,8 @@ export const planReferenceValidationChain = (
   const conservation = inputConservation ?? (sourceInput == null ? null : generatedConservation);
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
+  const metricRequiredRegionalTensorReceipt =
+    `${outRoot}/nhm2-metric-required-regional-tensor-receipt.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
   const regionalSourceTensorTargets =
     `${outRoot}/nhm2-regional-source-tensor-targets.json`;
@@ -369,6 +371,15 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     ...auditOnly,
   ]));
+  commands.push(command("nhm2:publish-metric-required-regional-tensor-receipt", [
+    "--reference-run",
+    referenceRun,
+    "--source-closure",
+    sourceClosure,
+    "--out",
+    metricRequiredRegionalTensorReceipt,
+    ...auditOnly,
+  ]));
   commands.push(command("nhm2:publish-regional-source-closure-evidence", [
     "--reference-run",
     referenceRun,
@@ -376,6 +387,8 @@ export const planReferenceValidationChain = (
     sourceClosure,
     "--tile-effective-counterpart",
     tileCounterpart,
+    "--metric-required-regional-tensor-receipt",
+    metricRequiredRegionalTensorReceipt,
     "--out",
     regionalEvidence,
     ...auditOnly,

@@ -1873,6 +1873,7 @@ export async function runAskTurnStream(
   const decoder = new TextDecoder();
   let buffer = "";
   let finalPayload: unknown = null;
+  let lastErrorPayload: unknown = null;
   const flushBlock = (block: string): void => {
     const lines = block.split(/\r?\n/);
     const eventLine = lines.find((line) => line.startsWith("event:"));
@@ -1889,7 +1890,7 @@ export async function runAskTurnStream(
     const packet: HelixAskTurnStreamEvent = { event, data };
     onEvent?.(packet);
     if (event === "turn_final") finalPayload = data;
-    if (event === "turn_error" && finalPayload === null) finalPayload = data;
+    if (event === "turn_error") lastErrorPayload = data;
   };
   while (true) {
     const { done, value } = await reader.read();
@@ -1906,7 +1907,10 @@ export async function runAskTurnStream(
     if (done) break;
   }
   if (buffer.trim()) flushBlock(buffer.trim());
-  if (!finalPayload) throw new Error("ask_turn_stream_missing_final");
+  if (!finalPayload) {
+    const errorCode = readAskTurnStreamText(readAskTurnStreamRecord(lastErrorPayload)?.error);
+    throw new Error(errorCode ? `ask_turn_stream_missing_final:${errorCode}` : "ask_turn_stream_missing_final");
+  }
   const normalized = normalizeLocalAskResponse(finalPayload);
   normalized.debug = {
     ...(normalized.debug ?? {}),

@@ -3,7 +3,10 @@ import type {
   HelixAskSourceTargetStrength,
 } from "@shared/helix-ask-source-target-intent";
 import type { ToolFamily } from "./tool-family-contract";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 
 export type HelixInternetSearchIntent = {
   searchRequested: boolean;
@@ -49,6 +52,34 @@ const hasScholarlyScopeCue = (promptText: string): boolean =>
 
 const hasSearchActionCue = (promptText: string): boolean =>
   /\b(?:search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify|source|sources)\b/i.test(promptText);
+
+export const hasAffirmativeDocsViewerSearchCue = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  if (contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer")) return false;
+  if (
+    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
+    /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:search|find|locate|look\s+for|look\s+at|use|consult|open|show|view)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  if (
+    /\b(?:earlier|previously|last\s+turn|before|already)\b[\s\S]{0,120}\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(prompt) ||
+    /\b(?:searched|found|located|looked\s+for|retrieved)\b[\s\S]{0,120}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,120}\b(?:earlier|previously|last\s+turn|before|already)\b/i.test(prompt)
+  ) {
+    return false;
+  }
+  const withoutQuotedDocsSearch = prompt.replace(/["'`][^"'`]*(?:search|find|locate|look\s+for)[^"'`]*(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)[^"'`]*["'`]/gi, " ");
+  if (
+    /\b(?:search|find|locate|look\s+for|retrieve)\b[\s\S]{0,100}\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b/i.test(withoutQuotedDocsSearch) ||
+    /\b(?:docs?|documents?|papers?|docs?\s+viewer|documents?\s+viewer)\b[\s\S]{0,100}\b(?:search|find|locate|look\s+for|retrieve)\b/i.test(withoutQuotedDocsSearch)
+  ) {
+    return true;
+  }
+  return /\b(?:which|what)\s+(?:doc(?:ument)?|paper)\s+path\b/i.test(prompt) &&
+    /\b(?:from|in)\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt);
+};
 
 const hasCurrentWebCue = (promptText: string): boolean =>
   /\b(?:latest|current|today|yesterday|recent|newest|news|breaking|updated|right\s+now|this\s+week|this\s+month|online|internet|web\s+(?:results?|sources?|pages?)|google(?:\s+custom\s+search)?|search\s+engine)\b/i.test(promptText);
@@ -160,6 +191,7 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
   const negativeConstraints = extractNegativeConstraints(prompt);
   const quotedOrContextualMentions = extractQuotedOrContextualMentions(prompt);
   const suppressed = compactLiveSourceMailboxHandoff || negativeConstraints.length > 0 || isSuppliedTextOnlyTask(prompt);
+  const requiresDocsViewer = !suppressed && hasAffirmativeDocsViewerSearchCue(prompt);
   const freshnessRequired = !suppressed && (explicitProviderCue || currentWebCue || timeSensitiveCue || currentAffairsCue);
   const currentAffairsRequired = !suppressed && currentAffairsCue;
   const localSourceScope = hasLocalWorkspaceScopeCue(prompt) || hasLocalObservationScopeCue(prompt);
@@ -184,7 +216,10 @@ export const buildToolUseRestatement = (promptText: string): ToolUseRestatementV
     userGoal: prompt,
     freshnessRequired,
     currentAffairsRequired,
-    requiredToolFamilies: requiresInternet ? ["internet_search"] : [],
+    requiredToolFamilies: [
+      ...(requiresDocsViewer ? ["docs_viewer" as const] : []),
+      ...(requiresInternet ? ["internet_search" as const] : []),
+    ],
     ...(minimumEvidencePlan ? { minimumEvidencePlan } : {}),
     negativeConstraints,
     quotedOrContextualMentions,
