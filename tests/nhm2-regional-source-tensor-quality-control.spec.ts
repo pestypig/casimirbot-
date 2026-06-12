@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import type { CasimirMaterialReceiptV1 } from "../shared/contracts/casimir-material-receipt.v1";
+import {
+  isCasimirMaterialReceipt,
+  type CasimirMaterialReceiptV1,
+} from "../shared/contracts/casimir-material-receipt.v1";
 import { buildNhm2RegionalSourceTensorCandidate } from "../shared/contracts/nhm2-regional-source-tensor-candidate.v1";
 import {
   buildNhm2RegionalSourceTensorQualityControl,
@@ -191,23 +196,35 @@ describe("nhm2_regional_source_tensor_quality_control/v1", () => {
     expect(artifact.summary.candidateIsTargetFit).toBe(true);
     expect(artifact.summary.materialModelAvailable).toBe(false);
     expect(artifact.summary.sourceModelEligibleForHarness).toBe(false);
+    expect(artifact.summary.regionalNumericalClosurePass).toBe(false);
     expect(wall?.status).toBe("missing");
-    expect(wall?.blockers).toContain("regional_material_source_tensor_model_missing");
+    expect(wall?.sourceEligibilityBlockers).toContain(
+      "regional_material_source_tensor_model_missing",
+    );
     expect(artifact.claimBoundary.targetFitCandidateIsNotSourceEvidence).toBe(true);
     expect(isNhm2RegionalSourceTensorQualityControlArtifact(artifact)).toBe(true);
   });
 
-  it("fails quality control when the material tensor is authoritative but regionally off target", () => {
+  it("keeps source-model eligibility separate when the material tensor is authoritative but regionally off target", () => {
     const artifact = buildQc(materialModel(sourceByRegion));
     const hull = artifact.regions.find((region) => region.regionId === "hull");
 
     expect(artifact.summary.allRegionsIndependentMaterialTensor).toBe(true);
     expect(artifact.summary.allRegionsFullTensor).toBe(true);
     expect(artifact.summary.allRegionsMaterialReceipted).toBe(true);
+    expect(artifact.summary.sourceModelEligibleForHarness).toBe(true);
+    expect(artifact.summary.allDirectionalTargetsImproved).toBe(false);
     expect(artifact.summary.allMaterialT00WithinTolerance).toBe(false);
-    expect(artifact.summary.sourceModelEligibleForHarness).toBe(false);
+    expect(artifact.summary.regionalNumericalClosurePass).toBe(false);
+    expect(artifact.summary.firstNumericalBlocker).toBe(
+      "hull:material_model_wrong_direction",
+    );
     expect(hull?.status).toBe("fail");
-    expect(hull?.blockers).toContain("material_model_T00_outside_target_tolerance");
+    expect(hull?.sourceEligibilityBlockers).toEqual([]);
+    expect(hull?.numericalBlockers).toContain("material_model_wrong_direction");
+    expect(hull?.numericalBlockers).toContain(
+      "material_model_T00_outside_target_tolerance",
+    );
   });
 
   it("marks the source model harness-eligible only when all regional material tensors hit tolerance", () => {
@@ -217,11 +234,110 @@ describe("nhm2_regional_source_tensor_quality_control/v1", () => {
     expect(artifact.summary.allRegionsIndependentMaterialTensor).toBe(true);
     expect(artifact.summary.allRegionsFullTensor).toBe(true);
     expect(artifact.summary.allRegionsMaterialReceipted).toBe(true);
+    expect(artifact.summary.allDirectionalTargetsImproved).toBe(true);
     expect(artifact.summary.allMaterialT00WithinTolerance).toBe(true);
     expect(artifact.summary.sourceModelEligibleForHarness).toBe(true);
+    expect(artifact.summary.regionalNumericalClosurePass).toBe(true);
+    expect(artifact.summary.firstNumericalBlocker).toBe("none");
     expect(wall?.status).toBe("pass");
+    expect(wall?.directionalImprovement).toBe(true);
     expect(wall?.materialModelRelativeErrorToTarget).toBe(0);
     expect(artifact.claimBoundary.physicalClaimAllowed).toBe(false);
     expect(artifact.claimBoundary.requiresDownstreamHarness).toBe(true);
+  });
+
+  it("moves the declared fixture from missing-source-model to a numerical residual blocker", () => {
+    const fixtureReceipt = JSON.parse(
+      readFileSync(
+        "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+        "utf8",
+      ),
+    ) as unknown;
+    const fixtureComponentModel = JSON.parse(
+      readFileSync("fixtures/nhm2/regional-source-components.directional-v1.json", "utf8"),
+    ) as unknown;
+    if (!isCasimirMaterialReceipt(fixtureReceipt)) {
+      throw new Error("declared Lifshitz fixture must be casimir_material_receipt/v1");
+    }
+    const model = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      materialReceipt: fixtureReceipt,
+      materialReceiptRef: "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+      sourceModelRef: "fixtures/nhm2/regional-source-components.directional-v1.json",
+      componentModel: fixtureComponentModel,
+    });
+    const artifact = buildNhm2RegionalSourceTensorQualityControl({
+      generatedAt,
+      artifactRefs: {
+        regionalSourceTensorTargets: "targets.json",
+        regionalSourceTensorCandidate: "candidate.json",
+        regionalMaterialSourceTensorModel: "regional-model.json",
+        materialReceipt: "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+      },
+      targets: targets(),
+      candidate: candidate(),
+      regionalMaterialSourceTensorModel: model,
+      materialReceipt: fixtureReceipt,
+    });
+
+    expect(artifact.summary.materialModelAvailable).toBe(true);
+    expect(artifact.summary.allSourceEligibilityBlockersClear).toBe(true);
+    expect(artifact.summary.sourceModelEligibleForHarness).toBe(true);
+    expect(artifact.summary.allDirectionalTargetsImproved).toBe(true);
+    expect(artifact.summary.regionalNumericalClosurePass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe(
+      "hull:material_model_T00_outside_target_tolerance",
+    );
+    expect(artifact.summary.firstNumericalBlocker).toBe(
+      "hull:material_model_T00_outside_target_tolerance",
+    );
+    expect(artifact.claimBoundary.physicalClaimAllowed).toBe(false);
+  });
+
+  it("allows the tuned declared fixture to pass regional numerical QC without changing claim boundaries", () => {
+    const fixtureReceipt = JSON.parse(
+      readFileSync(
+        "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+        "utf8",
+      ),
+    ) as unknown;
+    const fixtureComponentModel = JSON.parse(
+      readFileSync("fixtures/nhm2/regional-source-components.tuned-v1.json", "utf8"),
+    ) as unknown;
+    if (!isCasimirMaterialReceipt(fixtureReceipt)) {
+      throw new Error("declared Lifshitz fixture must be casimir_material_receipt/v1");
+    }
+    const model = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      materialReceipt: fixtureReceipt,
+      materialReceiptRef: "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+      sourceModelRef: "fixtures/nhm2/regional-source-components.tuned-v1.json",
+      componentModel: fixtureComponentModel,
+    });
+    const artifact = buildNhm2RegionalSourceTensorQualityControl({
+      generatedAt,
+      artifactRefs: {
+        regionalSourceTensorTargets: "targets.json",
+        regionalSourceTensorCandidate: "candidate.json",
+        regionalMaterialSourceTensorModel: "regional-model.tuned-v1.json",
+        materialReceipt: "fixtures/nhm2/casimir-material-receipt.declared-lifshitz-v1.json",
+      },
+      targets: targets(),
+      candidate: candidate(),
+      regionalMaterialSourceTensorModel: model,
+      materialReceipt: fixtureReceipt,
+    });
+
+    expect(artifact.summary.candidateScalarAligned).toBe(true);
+    expect(artifact.summary.materialModelAvailable).toBe(true);
+    expect(artifact.summary.sourceModelEligibleForHarness).toBe(true);
+    expect(artifact.summary.allDirectionalTargetsImproved).toBe(true);
+    expect(artifact.summary.allMaterialT00WithinTolerance).toBe(true);
+    expect(artifact.summary.regionalNumericalClosurePass).toBe(true);
+    expect(artifact.summary.firstNumericalBlocker).toBe("none");
+    expect(artifact.summary.firstBlocker).toBe("none");
+    expect(artifact.regions.every((region) => region.status === "pass")).toBe(true);
+    expect(artifact.claimBoundary.physicalClaimAllowed).toBe(false);
+    expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
   });
 });

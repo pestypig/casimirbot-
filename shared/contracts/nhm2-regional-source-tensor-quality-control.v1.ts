@@ -26,12 +26,17 @@ export type Nhm2RegionalSourceTensorQualityStatus =
 
 export type Nhm2RegionalSourceTensorQualityRegionV1 = {
   regionId: Nhm2RegionalSourceClosureRegionId;
+  currentSourceT00_SI: number | null;
   targetT00_SI: number | null;
   candidateT00_SI: number | null;
   materialModelT00_SI: number | null;
+  requiredMultiplier: number | null;
+  currentRelativeResidual: number | null;
   candidateRelativeErrorToTarget: number | null;
   materialModelRelativeErrorToTarget: number | null;
   toleranceRelLInf: number | null;
+  directionalTarget: "increase_source_magnitude" | "decrease_source_magnitude" | "preserve_alignment" | "missing";
+  directionalImprovement: boolean | null;
   candidateKind: string | null;
   candidateTensorAuthorityMode: string | null;
   materialTensorAuthorityMode: string | null;
@@ -41,6 +46,8 @@ export type Nhm2RegionalSourceTensorQualityRegionV1 = {
   materialReceipted: boolean;
   residualWithinTolerance: boolean | null;
   status: Nhm2RegionalSourceTensorQualityStatus;
+  sourceEligibilityBlockers: string[];
+  numericalBlockers: string[];
   blockers: string[];
   warnings: string[];
 };
@@ -65,8 +72,12 @@ export type Nhm2RegionalSourceTensorQualityControlArtifactV1 = {
     allRegionsIndependentMaterialTensor: boolean;
     allRegionsFullTensor: boolean;
     allRegionsMaterialReceipted: boolean;
+    allSourceEligibilityBlockersClear: boolean;
+    allDirectionalTargetsImproved: boolean;
     allMaterialT00WithinTolerance: boolean;
     sourceModelEligibleForHarness: boolean;
+    regionalNumericalClosurePass: boolean;
+    firstNumericalBlocker: string;
     firstBlocker: string;
     blockerCount: number;
   };
@@ -102,6 +113,9 @@ const safeRelativeError = (value: number | null, target: number | null): number 
   return Math.abs(value - target) / Math.abs(target);
 };
 
+const abs = (value: number | null): number | null =>
+  value == null ? null : Math.abs(value);
+
 const unique = (values: Array<string | null | undefined>): string[] =>
   Array.from(
     new Set(
@@ -120,6 +134,42 @@ const targetFor = (
 ): Nhm2RegionalSourceTensorTargetRegionV1 | null =>
   targets.regions.find((region) => region.regionId === regionId) ?? null;
 
+const directionalTarget = (
+  target: Nhm2RegionalSourceTensorTargetRegionV1 | null,
+): Nhm2RegionalSourceTensorQualityRegionV1["directionalTarget"] => {
+  if (target == null) return "missing";
+  if (target.tuningDirection === "increase_magnitude") return "increase_source_magnitude";
+  if (target.tuningDirection === "decrease_magnitude") return "decrease_source_magnitude";
+  if (target.tuningDirection === "hold") return "preserve_alignment";
+  return "missing";
+};
+
+const directionalImprovement = (args: {
+  target: Nhm2RegionalSourceTensorQualityRegionV1["directionalTarget"];
+  currentSourceT00: number | null;
+  materialModelT00: number | null;
+  currentRelativeResidual: number | null;
+  materialRelativeError: number | null;
+}): boolean | null => {
+  if (args.materialModelT00 == null || args.currentSourceT00 == null) return null;
+  if (args.target === "increase_source_magnitude") {
+    const material = abs(args.materialModelT00);
+    const current = abs(args.currentSourceT00);
+    return material == null || current == null ? null : material > current;
+  }
+  if (args.target === "decrease_source_magnitude") {
+    const material = abs(args.materialModelT00);
+    const current = abs(args.currentSourceT00);
+    return material == null || current == null ? null : material < current;
+  }
+  if (args.target === "preserve_alignment") {
+    return args.currentRelativeResidual == null || args.materialRelativeError == null
+      ? null
+      : args.materialRelativeError <= Math.max(args.currentRelativeResidual, 0.1);
+  }
+  return null;
+};
+
 const qualityRegion = (args: {
   regionId: Nhm2RegionalSourceClosureRegionId;
   target: Nhm2RegionalSourceTensorTargetRegionV1 | null;
@@ -127,12 +177,23 @@ const qualityRegion = (args: {
   model: Nhm2RegionalMaterialSourceTensorModelV1["regions"][number] | null;
   materialReceipt: CasimirMaterialReceiptV1 | null | undefined;
 }): Nhm2RegionalSourceTensorQualityRegionV1 => {
+  const currentSourceT00 = finite(args.target?.currentSourceT00_SI);
   const targetT00 = finite(args.target?.targetSourceT00_SI);
   const candidateT00 = finite(args.candidate?.proposedT00_SI);
   const materialModelT00 = finite(args.model?.tensor.T00);
+  const requiredMultiplier = finite(args.target?.requiredOverCurrentSource);
+  const currentRelativeResidual = finite(args.target?.currentRelativeResidual);
   const tolerance = finite(args.target?.toleranceRelLInf);
   const candidateRelativeError = safeRelativeError(candidateT00, targetT00);
   const materialRelativeError = safeRelativeError(materialModelT00, targetT00);
+  const direction = directionalTarget(args.target);
+  const directionImproved = directionalImprovement({
+    target: direction,
+    currentSourceT00,
+    materialModelT00,
+    currentRelativeResidual,
+    materialRelativeError,
+  });
   const candidateIsTargetFit =
     args.candidate?.candidateKind === "target_fit_T00_only" ||
     args.candidate?.provenance.notDerivedFromMetricRequiredTensor === false;
@@ -153,7 +214,7 @@ const qualityRegion = (args: {
     materialRelativeError == null || tolerance == null
       ? null
       : materialRelativeError <= tolerance;
-  const blockers = unique([
+  const sourceEligibilityBlockers = unique([
     args.target == null ? "regional_source_tensor_target_missing" : null,
     args.candidate == null ? "regional_source_tensor_candidate_missing" : null,
     args.model == null ? "regional_material_source_tensor_model_missing" : null,
@@ -167,10 +228,14 @@ const qualityRegion = (args: {
       ? "material_model_tensor_components_missing"
       : null,
     args.model != null && !materialReceipted ? "material_receipt_not_material_receipted" : null,
-    materialModelT00 == null ? "material_model_T00_missing" : null,
-    residualWithinTolerance === false ? "material_model_T00_outside_target_tolerance" : null,
     ...(args.model?.blockers ?? []).map((blocker) => `material_model:${blocker}`),
   ]);
+  const numericalBlockers = unique([
+    materialModelT00 == null ? "material_model_T00_missing" : null,
+    directionImproved === false ? "material_model_wrong_direction" : null,
+    residualWithinTolerance === false ? "material_model_T00_outside_target_tolerance" : null,
+  ]);
+  const blockers = unique([...sourceEligibilityBlockers, ...numericalBlockers]);
   const status: Nhm2RegionalSourceTensorQualityStatus =
     args.target == null || args.candidate == null || args.model == null
       ? "missing"
@@ -183,15 +248,20 @@ const qualityRegion = (args: {
           ? "fail"
           : residualWithinTolerance === null
             ? "review"
-            : "pass";
+          : "pass";
   return {
     regionId: args.regionId,
+    currentSourceT00_SI: currentSourceT00,
     targetT00_SI: targetT00,
     candidateT00_SI: candidateT00,
     materialModelT00_SI: materialModelT00,
+    requiredMultiplier,
+    currentRelativeResidual,
     candidateRelativeErrorToTarget: candidateRelativeError,
     materialModelRelativeErrorToTarget: materialRelativeError,
     toleranceRelLInf: tolerance,
+    directionalTarget: direction,
+    directionalImprovement: directionImproved,
     candidateKind: args.candidate?.candidateKind ?? null,
     candidateTensorAuthorityMode: args.candidate?.tensorAuthorityMode ?? null,
     materialTensorAuthorityMode,
@@ -201,6 +271,8 @@ const qualityRegion = (args: {
     materialReceipted,
     residualWithinTolerance,
     status,
+    sourceEligibilityBlockers,
+    numericalBlockers,
     blockers,
     warnings: unique([
       candidateIsTargetFit
@@ -215,6 +287,14 @@ const firstBlocker = (regions: Nhm2RegionalSourceTensorQualityRegionV1[]): strin
   const blocked = regions.find((region) => region.status !== "pass");
   if (blocked == null) return "none";
   return `${blocked.regionId}:${blocked.blockers[0] ?? "quality_control_non_pass"}`;
+};
+
+const firstNumericalBlocker = (
+  regions: Nhm2RegionalSourceTensorQualityRegionV1[],
+): string => {
+  const blocked = regions.find((region) => region.numericalBlockers.length > 0);
+  if (blocked == null) return "none";
+  return `${blocked.regionId}:${blocked.numericalBlockers[0]}`;
 };
 
 export const buildNhm2RegionalSourceTensorQualityControl = (
@@ -244,9 +324,20 @@ export const buildNhm2RegionalSourceTensorQualityControl = (
   );
   const allRegionsFullTensor = regions.every((region) => region.fullTensorAvailable);
   const allRegionsMaterialReceipted = regions.every((region) => region.materialReceipted);
+  const allSourceEligibilityBlockersClear = regions.every(
+    (region) => region.sourceEligibilityBlockers.length === 0,
+  );
+  const allDirectionalTargetsImproved = regions.every(
+    (region) => region.directionalImprovement === true,
+  );
   const allMaterialT00WithinTolerance = regions.every(
     (region) => region.residualWithinTolerance === true,
   );
+  const sourceModelEligibleForHarness =
+    allRegionsIndependentMaterialTensor &&
+    allRegionsFullTensor &&
+    allRegionsMaterialReceipted &&
+    allSourceEligibilityBlockersClear;
   return {
     contractVersion: NHM2_REGIONAL_SOURCE_TENSOR_QUALITY_CONTROL_CONTRACT_VERSION,
     generatedAt: input.generatedAt ?? new Date().toISOString(),
@@ -272,13 +363,13 @@ export const buildNhm2RegionalSourceTensorQualityControl = (
       allRegionsIndependentMaterialTensor,
       allRegionsFullTensor,
       allRegionsMaterialReceipted,
+      allSourceEligibilityBlockersClear,
+      allDirectionalTargetsImproved,
       allMaterialT00WithinTolerance,
-      sourceModelEligibleForHarness:
-        allRegionsIndependentMaterialTensor &&
-        allRegionsFullTensor &&
-        allRegionsMaterialReceipted &&
-        allMaterialT00WithinTolerance &&
-        blockerCount === 0,
+      sourceModelEligibleForHarness,
+      regionalNumericalClosurePass:
+        sourceModelEligibleForHarness && allMaterialT00WithinTolerance,
+      firstNumericalBlocker: firstNumericalBlocker(regions),
       firstBlocker: firstBlocker(regions),
       blockerCount,
     },
@@ -325,12 +416,21 @@ const isRegion = (
   return (
     record != null &&
     isRegionId(record.regionId) &&
+    isNullableNumber(record.currentSourceT00_SI) &&
     isNullableNumber(record.targetT00_SI) &&
     isNullableNumber(record.candidateT00_SI) &&
     isNullableNumber(record.materialModelT00_SI) &&
+    isNullableNumber(record.requiredMultiplier) &&
+    isNullableNumber(record.currentRelativeResidual) &&
     isNullableNumber(record.candidateRelativeErrorToTarget) &&
     isNullableNumber(record.materialModelRelativeErrorToTarget) &&
     isNullableNumber(record.toleranceRelLInf) &&
+    (record.directionalTarget === "increase_source_magnitude" ||
+      record.directionalTarget === "decrease_source_magnitude" ||
+      record.directionalTarget === "preserve_alignment" ||
+      record.directionalTarget === "missing") &&
+    (record.directionalImprovement === null ||
+      typeof record.directionalImprovement === "boolean") &&
     isNullableText(record.candidateKind) &&
     isNullableText(record.candidateTensorAuthorityMode) &&
     isNullableText(record.materialTensorAuthorityMode) &&
@@ -341,6 +441,8 @@ const isRegion = (
     (record.residualWithinTolerance === null ||
       typeof record.residualWithinTolerance === "boolean") &&
     isStatus(record.status) &&
+    isStringArray(record.sourceEligibilityBlockers) &&
+    isStringArray(record.numericalBlockers) &&
     isStringArray(record.blockers) &&
     isStringArray(record.warnings)
   );
@@ -375,8 +477,12 @@ export const isNhm2RegionalSourceTensorQualityControlArtifact = (
     typeof summary.allRegionsIndependentMaterialTensor !== "boolean" ||
     typeof summary.allRegionsFullTensor !== "boolean" ||
     typeof summary.allRegionsMaterialReceipted !== "boolean" ||
+    typeof summary.allSourceEligibilityBlockersClear !== "boolean" ||
+    typeof summary.allDirectionalTargetsImproved !== "boolean" ||
     typeof summary.allMaterialT00WithinTolerance !== "boolean" ||
     typeof summary.sourceModelEligibleForHarness !== "boolean" ||
+    typeof summary.regionalNumericalClosurePass !== "boolean" ||
+    !isText(summary.firstNumericalBlocker) ||
     !isText(summary.firstBlocker) ||
     typeof summary.blockerCount !== "number" ||
     !Number.isFinite(summary.blockerCount) ||

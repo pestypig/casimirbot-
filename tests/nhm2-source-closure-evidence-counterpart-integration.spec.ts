@@ -153,6 +153,45 @@ describe("regional source-closure evidence counterpart integration", () => {
       expect(classifySourceToGeometryDivergence(evidence.regions.find((region) => region.regionId === "hull")!)).toBe("residual_exceeded");
     }));
 
+  it("retires stale legacy counterpart blockers when the explicit counterpart supplies matching tensors", () =>
+    withTemp((root) => {
+      const staleClosure = sourceClosure("gr_matter_channel_observation", 12) as any;
+      staleClosure.status = "fail";
+      for (const region of staleClosure.regionComparisons.regions) {
+        region.status = "fail";
+        region.reasonCodes = ["counterpart_missing", "legacy_residual_exceeded"];
+        region.comparisonBasisAuthorityStatus = "counterpart_missing";
+        region.counterpartResolutionStatus = "missing";
+      }
+      writeFileSync(join(root, "source.json"), JSON.stringify(staleClosure), "utf8");
+
+      writeFileSync(
+        join(root, "source-counterpart.json"),
+        JSON.stringify(sourceClosure("tile_effective_counterpart", 10)),
+        "utf8",
+      );
+      publishTileEffectiveCounterpart({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source-counterpart.json",
+        outPath: "tile.json",
+      });
+      const evidence = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        outPath: "evidence.json",
+      });
+      const hull = evidence.regions.find((region) => region.regionId === "hull");
+
+      expect(hull?.blockers).not.toContain("counterpart_missing");
+      expect(hull?.blockers).not.toContain("legacy_residual_exceeded");
+      expect(hull?.residuals.pass).toBe(true);
+      expect(hull?.status).toBe("pass");
+      expect(evidence.overallState).not.toBe("fail");
+    }));
+
   it("reference-run validation fails if regional evidence ignores the explicit counterpart artifact", () =>
     withTemp((root) => {
       writeFileSync(join(root, "source.json"), JSON.stringify(sourceClosure()), "utf8");

@@ -6,6 +6,10 @@ export type DocManifestEntry = {
   relativePath: string;
   folderChain: string[];
   folderLabel: string;
+  subjectLabel: string;
+  catalogDate: string | null;
+  catalogDateSource: "path" | "title" | null;
+  isLatest: boolean;
   title: string;
   searchText: string;
   loader: DocModuleLoader;
@@ -48,6 +52,7 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
   const folderLabel = folderChain.length ? folderChain.join(" / ") : "root";
   const fileName = segments.at(-1) ?? relative;
   const title = formatDocTitle(fileName);
+  const catalogDate = inferDocCatalogDate(title, relative);
   const searchText = `${title} ${relative}`.toLowerCase();
 
   return {
@@ -56,13 +61,17 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
     relativePath: relative,
     folderChain,
     folderLabel,
+    subjectLabel: inferDocSubjectLabel(title, relative, folderChain),
+    catalogDate: catalogDate?.date ?? null,
+    catalogDateSource: catalogDate?.source ?? null,
+    isLatest: /\blatest\b/i.test(`${title} ${relative}`),
     title,
     searchText,
     loader,
   };
 });
 
-export const DOC_MANIFEST = manifest.sort((a, b) => a.title.localeCompare(b.title));
+export const DOC_MANIFEST = manifest.sort(compareDocCatalogEntries);
 
 const ROUTE_INDEX = new Map(DOC_MANIFEST.map((entry) => [entry.route, entry]));
 
@@ -113,7 +122,7 @@ function ensureLeadingSlash(path: string) {
 }
 
 function buildDocSearchHaystack(entry: DocManifestEntry): string {
-  const normalized = normalizeDocSearchText(`${entry.searchText} ${entry.folderLabel}`);
+  const normalized = normalizeDocSearchText(`${entry.searchText} ${entry.folderLabel} ${entry.subjectLabel}`);
   const aliases: string[] = [];
   if (/\bnhm2\b/.test(normalized)) {
     aliases.push("needle hull mark2", "needle hull mark 2");
@@ -122,6 +131,81 @@ function buildDocSearchHaystack(entry: DocManifestEntry): string {
     aliases.push("nhm2");
   }
   return normalizeDocSearchText(`${normalized} ${aliases.join(" ")}`);
+}
+
+export function compareDocCatalogEntries(a: DocManifestEntry, b: DocManifestEntry): number {
+  const latestDelta = Number(b.isLatest) - Number(a.isLatest);
+  if (latestDelta !== 0) return latestDelta;
+  const dateDelta = docCatalogTimestamp(b) - docCatalogTimestamp(a);
+  if (dateDelta !== 0) return dateDelta;
+  return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+}
+
+export function docCatalogTimestamp(entry: Pick<DocManifestEntry, "catalogDate">): number {
+  if (!entry.catalogDate) return 0;
+  const parsed = Date.parse(`${entry.catalogDate}T00:00:00.000Z`);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function inferDocCatalogDate(
+  title: string,
+  relativePath: string,
+): { date: string; source: "path" | "title" } | null {
+  const pathDate = readLastIsoDate(relativePath);
+  if (pathDate) return { date: pathDate, source: "path" };
+  const titleDate = readLastIsoDate(title);
+  if (titleDate) return { date: titleDate, source: "title" };
+  return null;
+}
+
+function readLastIsoDate(value: string): string | null {
+  const matches = Array.from(value.matchAll(/\b(20\d{2})[-_](0[1-9]|1[0-2])[-_](0[1-9]|[12]\d|3[01])\b/g));
+  const last = matches.at(-1);
+  if (!last) return null;
+  return `${last[1]}-${last[2]}-${last[3]}`;
+}
+
+function inferDocSubjectLabel(title: string, relativePath: string, folderChain: string[]): string {
+  const text = normalizeDocSearchText(`${relativePath} ${title}`);
+  if (text.includes("helix ask") || text.includes("helix-ask") || text.includes("dottie") || text.includes("voice")) {
+    return "Helix Ask and Voice";
+  }
+  if (text.includes("warp") || text.includes("alcubierre") || text.includes("natario") || text.includes("vdb")) {
+    return "Warp Mechanics";
+  }
+  if (text.includes("casimir") || text.includes("qi ") || text.includes("quantum inequality") || text.includes("negative energy")) {
+    return "Casimir and Quantum Bounds";
+  }
+  if (text.includes("stellar") || text.includes("solar") || text.includes("sunquake") || text.includes("star ")) {
+    return "Stellar and Solar";
+  }
+  if (text.includes("ethos") || text.includes("ideology") || text.includes("citizens arc") || text.includes("zen")) {
+    return "Ethos and Ideology";
+  }
+  if (text.includes("knowledge") || text.includes("tree") || text.includes("ingestion")) {
+    return "Knowledge System";
+  }
+  if (text.includes("audit") || text.includes("research") || text.includes("prompt") || text.includes("codex")) {
+    return "Research and Development Logs";
+  }
+  if (text.includes("panel") || text.includes("ui") || text.includes("console") || text.includes("frontend")) {
+    return "Panels and UI";
+  }
+  if (text.includes("physics") || folderChain.includes("physics")) {
+    return "Physics Reference";
+  }
+  if (folderChain.length > 0) {
+    return titleCaseSubject(folderChain[0]);
+  }
+  return "General Reference";
+}
+
+function titleCaseSubject(value: string): string {
+  return value
+    .split(/[-_\s/]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function scoreDocSearchEntry(

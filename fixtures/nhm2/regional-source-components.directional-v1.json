@@ -1,0 +1,129 @@
+{
+  "modelKind": "declared_research_tensor",
+  "selectedProfileId": "stage1_centerline_alpha_0p995_v1",
+  "chartId": "comoving_cartesian",
+  "sourceModelRef": "declared:nhm2.directional_regional_source_tensor_v1",
+  "materialReceiptStatus": "material_receipted",
+  "regions": {
+    "global": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:global:nhm2_directional_regional_source_v1",
+      "provenanceRef": "declared-source:global:preserve-current-alignment-v1",
+      "tensor": {
+        "T00": -58267451,
+        "T01": 58.267451,
+        "T02": -29.1337255,
+        "T03": 11.6534902,
+        "T10": 58.267451,
+        "T11": 1165349.02,
+        "T12": -58267.451,
+        "T13": 29133.7255,
+        "T20": -29.1337255,
+        "T21": -58267.451,
+        "T22": 1165349.02,
+        "T23": -17480.2353,
+        "T30": 11.6534902,
+        "T31": 29133.7255,
+        "T32": -17480.2353,
+        "T33": 1165349.02
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation"
+      ]
+    },
+    "hull": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:hull:nhm2_directional_regional_source_v1",
+      "provenanceRef": "declared-source:hull:increase-source-magnitude-v1",
+      "tensor": {
+        "T00": -367000000,
+        "T01": 367,
+        "T02": -183.5,
+        "T03": 73.4,
+        "T10": 367,
+        "T11": 7340000,
+        "T12": -367000,
+        "T13": 183500,
+        "T20": -183.5,
+        "T21": -367000,
+        "T22": 7340000,
+        "T23": -110100,
+        "T30": 73.4,
+        "T31": 183500,
+        "T32": -110100,
+        "T33": 7340000
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation"
+      ]
+    },
+    "wall": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:wall:nhm2_directional_regional_source_v1",
+      "provenanceRef": "declared-source:wall:decrease-source-magnitude-v1",
+      "tensor": {
+        "T00": -8500000000,
+        "T01": 8500,
+        "T02": -4250,
+        "T03": 1700,
+        "T10": 8500,
+        "T11": 170000000,
+        "T12": -8500000,
+        "T13": 4250000,
+        "T20": -4250,
+        "T21": -8500000,
+        "T22": 170000000,
+        "T23": -2550000,
+        "T30": 1700,
+        "T31": 4250000,
+        "T32": -2550000,
+        "T33": 170000000
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation"
+      ]
+    },
+    "exterior_shell": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:exterior_shell:nhm2_directional_regional_source_v1",
+      "provenanceRef": "declared-source:exterior-shell:decrease-source-magnitude-v1",
+      "tensor": {
+        "T00": -2500000000,
+        "T01": 2500,
+        "T02": -1250,
+        "T03": 500,
+        "T10": 2500,
+        "T11": 50000000,
+        "T12": -2500000,
+        "T13": 1250000,
+        "T20": -1250,
+        "T21": -2500000,
+        "T22": 50000000,
+        "T23": -750000,
+        "T30": 500,
+        "T31": 1250000,
+        "T32": -750000,
+        "T33": 50000000
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation"
+      ]
+    }
+  }
+}

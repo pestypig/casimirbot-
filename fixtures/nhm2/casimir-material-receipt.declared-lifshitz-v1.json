@@ -1,0 +1,37 @@
+{
+  "contractVersion": "casimir_material_receipt/v1",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "tileBatchId": "nhm2_declared_directional_regional_source_v1",
+  "geometry": {
+    "gapMeters": 8e-9,
+    "gapMetrologyStatus": "measured",
+    "roughnessRmsMeters": 1e-10,
+    "beyondPfaValidity": "pass"
+  },
+  "material": {
+    "modelKind": "lifshitz",
+    "dielectricResponseRef": "declared:nhm2.directional_lifshitz_response_v1",
+    "finiteConductivityIncluded": true,
+    "finiteTemperatureIncluded": true,
+    "roughnessCorrectionIncluded": true
+  },
+  "environment": {
+    "vacuumSealEvidence": "present",
+    "temperatureK": 4
+  },
+  "correctionFactors": {
+    "conductivity": 1,
+    "temperature": 1,
+    "roughness": 1,
+    "geometry": 1
+  },
+  "status": "material_receipted",
+  "literatureRefs": [
+    "reid_white_johnson_2010_arbitrary_geometry_casimir",
+    "klimchitskaya_mohideen_mostepanenko_2009_lifshitz_review"
+  ],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "idealCasimirDoesNotValidateTileSource": true
+  }
+}

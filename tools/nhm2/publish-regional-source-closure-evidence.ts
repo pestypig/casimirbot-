@@ -355,11 +355,13 @@ const makeGlobalRegion = (
   return {
     regionId: "global",
     status:
-      sourceClosure.status === "pass" ||
-      sourceClosure.status === "review" ||
-      sourceClosure.status === "fail"
-      ? sourceClosure.status
-      : "review",
+      tileCounterpartRegion != null
+        ? "review"
+        : sourceClosure.status === "pass" ||
+            sourceClosure.status === "review" ||
+            sourceClosure.status === "fail"
+          ? sourceClosure.status
+          : "review",
     comparisonBasisStatus: basisStatusFor(
       asString(sourceClosure.comparisonBasisStatus),
       metricMeta,
@@ -476,24 +478,28 @@ const makeRegionalRegion = (
     residualNorms,
   );
   const blockers = [
-    ...((Array.isArray(sourceRegion.reasonCodes)
+    ...((tileCounterpartRegion == null && Array.isArray(sourceRegion.reasonCodes)
       ? sourceRegion.reasonCodes
       : []) as unknown[]).filter((entry): entry is string => typeof entry === "string"),
   ];
   const authorityReason = asString(sourceRegion.comparisonBasisAuthorityStatus);
-  if (authorityReason === "counterpart_missing") blockers.push("counterpart_missing");
-  if (sourceRegion.counterpartResolutionStatus === "missing") {
+  if (tileCounterpartRegion == null && authorityReason === "counterpart_missing") {
+    blockers.push("counterpart_missing");
+  }
+  if (tileCounterpartRegion == null && sourceRegion.counterpartResolutionStatus === "missing") {
     blockers.push("counterpart_missing");
   }
 
   return {
     regionId,
     status:
-      sourceRegion.status === "pass" ||
-      sourceRegion.status === "review" ||
-      sourceRegion.status === "fail"
-        ? sourceRegion.status
-        : "review",
+      tileCounterpartRegion != null
+        ? "review"
+        : sourceRegion.status === "pass" ||
+            sourceRegion.status === "review" ||
+            sourceRegion.status === "fail"
+          ? sourceRegion.status
+          : "review",
     comparisonBasisStatus,
     metricRequired: {
       tensorRef: metricMeta.tensorRef,

@@ -94,6 +94,59 @@ describe("helix ask turn e10.28 ui regressions", () => {
     expect(finalPacket?.turn_transcript_reconstructed_fallback_count).toEqual(expect.any(Number));
   });
 
+  it("advertises a backend debug export ref for stream-final docs search failures", async () => {
+    const app = createApp();
+    const sessionId = `e1028-stream-debug-ref-${Date.now()}`;
+    const question = "Search docs for Helix Ask console debug and tell me which document path you found.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question,
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+    const debugEndpoint = finalPacket?.debug_export_ref?.endpoint;
+
+    expect(finalPacket?.turn_id).toBeTruthy();
+    expect(debugEndpoint).toBe(`/api/agi/ask/turn/${encodeURIComponent(String(finalPacket.turn_id))}/debug-export`);
+    expect(finalPacket?.debug_export_payload_hash).toEqual(expect.any(String));
+    expect(finalPacket?.debug?.debug_export_ref?.endpoint).toBe(debugEndpoint);
+
+    const debugExport = await request(app)
+      .get(debugEndpoint)
+      .expect(200);
+
+    expect(debugExport.body?.ok).toBe(true);
+    expect(debugExport.body?.payload?.active_turn_id).toBe(finalPacket.turn_id);
+    expect(debugExport.body?.payload?.active_prompt).toBe(question);
+    expect(debugExport.body?.payload?.selected_final_answer).toBe(finalPacket.selected_final_answer);
+    expect(debugExport.body?.payload?.agent_runtime_loop ?? null).not.toBeUndefined();
+    expect(debugExport.body?.payload?.model_turn_fidelity_audit).toMatchObject({
+      artifact_id: "model_turn_fidelity_audit",
+      schema: "helix.model_turn_fidelity_audit.v1",
+      turn_id: finalPacket.turn_id,
+      llm_used: expect.any(Boolean),
+      sampling_attempted: expect.any(Boolean),
+      parity_status: expect.any(String),
+      authority: {
+        decision_source: expect.any(String),
+        policy_override_used: expect.any(Boolean),
+      },
+      terminal: {
+        terminal_blocked_before_reentry: expect.any(Boolean),
+        final_used_observed_artifact: expect.any(Boolean),
+        stale_fallback_rejected: expect.any(Boolean),
+      },
+    });
+    expect(Array.isArray(debugExport.body?.payload?.model_turn_fidelity_audit?.model_visible_capabilities)).toBe(true);
+  }, 60_000);
+
   it("terminalizes stream errors as a final typed-failure turn payload", async () => {
     const app = createApp();
     const sessionId = `e1028-stream-error-${Date.now()}`;

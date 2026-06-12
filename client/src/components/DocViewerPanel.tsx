@@ -16,8 +16,10 @@ import { cn } from "@/lib/utils";
 import { speakVoice } from "@/lib/agi/api";
 import {
   DOC_MANIFEST,
+  compareDocCatalogEntries,
   filterDocManifestEntries,
   findDocEntry,
+  docCatalogTimestamp,
   type DocManifestEntry,
 } from "@/lib/docs/docManifest";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
@@ -571,7 +573,7 @@ export function DocViewerPanel() {
   const filteredEntries = React.useMemo(() => {
     return filterDocManifestEntries(queryValue);
   }, [queryValue]);
-  const grouped = React.useMemo(() => groupByFolder(filteredEntries), [filteredEntries]);
+  const grouped = React.useMemo(() => groupBySubject(filteredEntries), [filteredEntries]);
   const handleDocMathClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
@@ -784,6 +786,7 @@ function DirectoryRail({
             <ul className="space-y-1.5">
               {group.entries.map((entry) => {
                 const selected = entry.route === currentRoute;
+                const catalogDate = formatDocCatalogDate(entry);
                 return (
                   <li key={entry.id}>
                     <button
@@ -799,6 +802,9 @@ function DirectoryRail({
                       onClick={() => onSelect(entry.route)}
                     >
                       <p className="break-words text-sm font-medium leading-tight">{entry.title}</p>
+                      {catalogDate ? (
+                        <p className="mt-0.5 text-[10px] uppercase tracking-wide text-cyan-300/75">{catalogDate}</p>
+                      ) : null}
                       <p className="break-all text-[11px] text-slate-400">{entry.relativePath}</p>
                     </button>
                   </li>
@@ -940,10 +946,10 @@ function PanelHeader({
   );
 }
 
-function groupByFolder(entries: DocManifestEntry[]): GroupedDocs[] {
+function groupBySubject(entries: DocManifestEntry[]): GroupedDocs[] {
   const map = new Map<string, DocManifestEntry[]>();
   entries.forEach((entry) => {
-    const label = entry.folderChain.length ? entry.folderChain.join(" / ") : "root";
+    const label = entry.subjectLabel || "General Reference";
     const bucket = map.get(label);
     if (bucket) {
       bucket.push(entry);
@@ -952,11 +958,23 @@ function groupByFolder(entries: DocManifestEntry[]): GroupedDocs[] {
     }
   });
   return Array.from(map.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
+    .sort((a, b) => groupRecencyScore(b[1]) - groupRecencyScore(a[1]) || a[0].localeCompare(b[0]))
     .map(([label, bucket]) => ({
       label,
-      entries: bucket.sort((a, b) => a.title.localeCompare(b.title)),
+      entries: bucket.sort(compareDocCatalogEntries),
     }));
+}
+
+function groupRecencyScore(entries: DocManifestEntry[]): number {
+  return entries.reduce((score, entry) => {
+    const latestBoost = entry.isLatest ? 9_000_000_000_000_000 : 0;
+    return Math.max(score, latestBoost + docCatalogTimestamp(entry));
+  }, 0);
+}
+
+function formatDocCatalogDate(entry: DocManifestEntry): string | null {
+  if (entry.isLatest) return entry.catalogDate ? `Latest / ${entry.catalogDate}` : "Latest";
+  return entry.catalogDate;
 }
 
 function markdownToSpeechText(markdown: string): string {
