@@ -386,6 +386,28 @@ nhm2_tile_local_source_elements/v1
 
 does not replace missing tensor components with zero. If the tile-local source only has scalar `T00`, the regional counterpart remains proxy-limited. If it has diagonal components but lacks `T0i` or off-diagonal `Tij`, it remains diagonal reduced-order. If wall region weights are missing, wall authority remains missing. This is the intended pass-path behavior: the patch makes per-tile-to-wall tensor construction inspectable before any attempt to tune tile count, duty, shell geometry, or source magnitude.
 
+The wall-source layering sweep is now the diagnostic instrument for that tuning lead:
+
+```text
+nhm2_wall_source_layering_sweep/v1
+```
+
+It starts from the current wall scalar gap rather than from a new physics claim. The metric-required wall magnitude is about `1.6995e9 J/m^3`, while the admitted tile-local wall source from the frozen ideal cavity replay is about `3.809e6 J/m^3`, giving a scalar multiplier of about `446.19`. One ideal mirror-gap-mirror layer has thickness
+
+```text
+1.5 um + 8 nm + 1.5 um = 3.008 um.
+```
+
+So `447` ideal fixed-control-volume layers correspond to about `1.345 mm` of stack thickness and can mark a scalar wall-`T00` row as inside a 1% arithmetic residual. That is only a margin lead. The sweep separately reports an expanded-wall-volume mode, which does not inherit the fixed-volume pass; it also sweeps packing, orientation projection, material correction, duty/`Q` multipliers, and metric-relief parameters:
+
+```text
+sourceMultiplier = N_layer f_pack f_orient C_material q_mult d_mult
+closureProduct = sourceMultiplier * metricRelief
+residual = |requiredMultiplier - closureProduct| / requiredMultiplier
+```
+
+Every row keeps `physicalPassAllowed = false`. A scalar layering row cannot substitute for a non-proxy same-basis wall tensor, material receipts, conservation, observer-robust energy-condition checks, or a QEI worldline dossier.
+
 This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
 
 ```text
@@ -940,6 +962,7 @@ npm run nhm2:publish-tile-counterpart-conservation
 npm run nhm2:audit-tile-counterpart-source-independence
 npm run nhm2:build-tile-local-source-elements
 npm run nhm2:aggregate-tile-local-source-counterpart
+npm run nhm2:build-wall-source-layering-sweep
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
 ```
@@ -952,6 +975,7 @@ publish source-side tile-effective full-tensor candidate
 publish conservation diagnostics
 build tile-local source elements from the frozen cavity contract
 aggregate tile-local source elements into regional tile-effective counterpart
+build diagnostic wall-source layering sweep
 publish tile-effective counterpart
 publish source-side same-basis authority receipt
 publish regional source-closure evidence
@@ -990,6 +1014,7 @@ This command does not recompute physics and does not produce a full-solve pass. 
 | `G_mu_nu=8piT_mu_nu` | Einstein tensor route | geometry-first stress-energy evaluation | repo-internal evaluator, not experimental validation |
 | `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
 | `R_wall_T00 = T00_wall_required - T00_wall_available` | wall-region source residual | front-door wall closure badge / audit row | global residual cannot override wall failure |
+| `sourceMultiplier = N_layer f_pack f_orient C_material q_mult d_mult` | wall-source layering scalar sweep | explores whether layer count / packing / orientation / material / duty / metric relief can approach wall `T00` arithmetic margins | scalar lead only; no physical pass without tensor, material, conservation, observer, and QEI gates |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |

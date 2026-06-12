@@ -101,6 +101,7 @@ let filterHelixAskActiveTurnStreamRows: typeof import("@/components/helix/HelixA
 let buildAskLiveAgenticEventRows: typeof import("@/components/helix/HelixAskPill").buildAskLiveAgenticEventRows;
 let buildHelixActiveTurnStreamRows: typeof import("@/components/helix/HelixAskPill").buildHelixActiveTurnStreamRows;
 let createHelixAskConsoleStreamIngressDebug: typeof import("@/components/helix/HelixAskPill").createHelixAskConsoleStreamIngressDebug;
+let attachHelixAskClientTraceToLiveEvent: typeof import("@/components/helix/HelixAskPill").attachHelixAskClientTraceToLiveEvent;
 let isDurableHelixAskMailTranscriptGroup: typeof import("@/components/helix/HelixAskPill").isDurableHelixAskMailTranscriptGroup;
 let shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata: typeof import("@/components/helix/HelixAskPill").shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata;
 let HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG: typeof import("@/components/helix/HelixAskPill").HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG;
@@ -208,6 +209,7 @@ beforeAll(async () => {
     buildAskLiveAgenticEventRows,
     buildHelixActiveTurnStreamRows,
     createHelixAskConsoleStreamIngressDebug,
+    attachHelixAskClientTraceToLiveEvent,
     isDurableHelixAskMailTranscriptGroup,
     shouldBlockStagePlayMailboxWakePromptWithoutRouteMetadata,
     HELIX_E6_ASK_TURN_VOICE_PARITY_FLAG,
@@ -503,6 +505,32 @@ describe("HelixAskPill mic-first surface contract", () => {
       replayedTranscriptEventCount: 0,
       droppedEventCount: 0,
       droppedReasons: {},
+    });
+  });
+
+  it("tags backend transcript events with the active client trace for console admission", () => {
+    const traced = attachHelixAskClientTraceToLiveEvent(
+      {
+        id: "stream:backend",
+        text: "Runtime selected terminal synthesis from current observations.",
+        meta: {
+          turn_id: "ask:backend-runtime-turn",
+          source_event_type: "model_decision_completed",
+        },
+      } as any,
+      {
+        traceId: "ask:client-active-turn",
+        turnId: "ask:client-active-turn",
+      },
+    );
+
+    expect(traced.meta).toMatchObject({
+      turn_id: "ask:backend-runtime-turn",
+      backend_turn_id: "ask:backend-runtime-turn",
+      active_turn_id: "ask:client-active-turn",
+      client_active_turn_id: "ask:client-active-turn",
+      trace_id: "ask:client-active-turn",
+      ask_trace_id: "ask:client-active-turn",
     });
   });
 
@@ -1367,6 +1395,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("chronologicalAskRepliesForTranscript");
     expect(source).toContain("const latestAskReply = chronologicalAskRepliesForTranscript.at(-1) ?? null");
     expect(source).toContain("chronologicalAskReplies.map");
+    expect(source).toContain("const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0");
+    expect(source).toContain("renderPlacement: \"after_completed_replies\"");
+    expect(source.indexOf("chronologicalAskReplies.map")).toBeLessThan(source.indexOf("{activeTurnStreamPanel}"));
+    expect(source.indexOf("{activeTurnStreamPanel}")).toBeLessThan(source.indexOf("data-testid=\"helix-ask-reply-list-bottom\""));
     expect(source).toContain('aria-label="Turn stream"');
     expect(source).not.toContain(">Turn stream<");
     expect(source).toContain("data-turn-stream-lines");
@@ -1426,7 +1458,7 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("buildAskLiveEventFromTurnTranscriptRecord");
     expect(source).toContain('source_event_type === "public_commentary"');
     expect(source).toContain('stream_event: "turn_transcript_event"');
-    expect(source).toContain("appendSyntheticLiveEvent(liveEvent)");
+    expect(source).toContain("appendSyntheticLiveEvent(tracedLiveEvent)");
     expect(source).toContain("console_stream_ingress_debug");
     expect(source).toContain("rawStreamPacketCount");
     expect(source).toContain("acceptedLiveEventCount");
@@ -1434,6 +1466,8 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("includeLowSignalRows");
     expect(source).toContain("includeTerminalRows");
     expect(source).toContain("replayHelixAskTurnTranscriptEventsToConsole");
+    expect(source).toContain("attachHelixAskClientTraceToLiveEvent");
+    expect(source).toContain("backend_turn_id");
     expect(source).toContain("record.turn_id ?? record.turnId ?? record.active_turn_id");
     expect(source).toContain("targetTurnId");
     expect(source).toContain("resolveHelixAskReplyCanonicalKey(reply) !== targetTurnId");

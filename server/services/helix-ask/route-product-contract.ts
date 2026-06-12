@@ -60,6 +60,7 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "model_only_concept",
   "client_projection",
   "panel_generated_answer",
+  "ask_debug_history_summary",
 ] as const;
 
 export const ALL_ROUTE_TERMINAL_PRODUCTS = [
@@ -245,6 +246,12 @@ export function buildRouteProductContract(input: {
           : normalizeSourceTarget((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source);
   const targetKind = normalizeSourceTarget(sourceTargetRecord?.target_kind);
   const procedureRecallRule = matchProcedureRecallPrompt(promptText);
+  const explicitAskDebugHistorySummary =
+    (
+      /\b(?:last|latest|previous|prior)\s+(?:helix\s+ask\s+)?turn\b/i.test(promptText) ||
+      /\b(?:inspect|summari[sz]e|summary)\b[\s\S]{0,80}\b(?:helix\s+ask|ask)\s+turn\b/i.test(promptText)
+    ) &&
+    /\b(?:debug|trace|route|tool|receipt|final\s+source|source|artifact|work\s*log)\b/i.test(promptText);
   const strictProcedureEpochReplay =
     (sourceTarget === "procedure_memory" || sourceTarget === "situation_epoch") &&
     targetKind === "situation_epoch" &&
@@ -286,6 +293,26 @@ export function buildRouteProductContract(input: {
         "helix_recommended_action_admission/v1",
       ],
       precedenceReason: "zen_graph_reflection_requires_evidence_reentry_before_terminal_synthesis",
+    });
+  }
+
+  if (explicitAskDebugHistorySummary) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "runtime_evidence",
+      allowedCore: [],
+      allowedExtra: ["ask_debug_history_summary"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "model_synthesized_answer",
+        "client_projection",
+        "panel_generated_answer",
+      ],
+      precedenceReason: "explicit_prior_ask_debug_summary_allows_read_only_debug_history_product",
+      sideArtifactKindsAllowed: ["ask_debug_history_summary"],
     });
   }
 
@@ -532,10 +559,11 @@ export function buildRouteProductContract(input: {
       threadId: input.threadId,
       sourceTarget,
       allowedCore: ["repo_code_evidence_answer"],
-      allowedExtra: ["repo_entity_definition", "tool_evaluation", "workstation_tool_evaluation"],
+      allowedExtra: ["repo_entity_definition", "tool_evaluation", "workstation_tool_evaluation", "ask_debug_history_summary"],
       forbiddenExtra: ["direct_answer_text", "no_tool_direct", "model_only_concept", "process_graph_overview", "situation_context_pack", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "active_doc_identity", "doc_summary", "doc_location_matches", "doc_evidence_location"],
       precedenceReason: "runtime_evidence_source_target_allows_repo_and_runtime_evidence_products",
       sideArtifactKindsAllowed: [
+        "ask_debug_history_summary",
         "repo_code_evidence_observation",
         "repo_evidence_synthesis_attempt",
         "repo_evidence_synthesis_repair_observation",

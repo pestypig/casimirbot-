@@ -275,6 +275,37 @@ describe("helix ask public commentary stream", () => {
     expect(turnResponse.body?.text).not.toMatch(/Mission interface blocked|preflight gate|runtime authority checks failed/i);
     expect(turnResponse.body?.final_answer_source).toBe("ask_debug_history_summary");
     expect(turnResponse.body?.terminal_artifact_kind).toBe("ask_debug_history_summary");
+    expect(turnResponse.body?.resolved_turn_summary).toMatchObject({
+      terminal_artifact_kind: "ask_debug_history_summary",
+    });
+    expect(turnResponse.body?.terminal_answer_authority).toMatchObject({
+      final_answer_source: "ask_debug_history_summary",
+      terminal_artifact_kind: "ask_debug_history_summary",
+      server_authoritative: true,
+    });
+    expect(turnResponse.body?.route_authority_audit).toMatchObject({
+      route_authority_ok: true,
+    });
+    expect(turnResponse.body?.solver_controller_decision).toMatchObject({
+      decision: "allow_terminal",
+      selected_terminal_artifact_kind: "ask_debug_history_summary",
+    });
+
+    const turnDebugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(turnResponse.body?.turn_id))}/debug-export`)
+      .expect(200);
+    expect(turnDebugExport.body?.payload?.resolved_turn_summary).toMatchObject({
+      terminal_artifact_kind: "ask_debug_history_summary",
+    });
+    expect(turnDebugExport.body?.payload?.terminal_answer_authority).toMatchObject({
+      final_answer_source: "ask_debug_history_summary",
+      terminal_artifact_kind: "ask_debug_history_summary",
+      server_authoritative: true,
+    });
+    expect(turnDebugExport.body?.payload?.solver_controller_summary).toMatchObject({
+      route_authority_ok: true,
+      selected_terminal_artifact_kind: "ask_debug_history_summary",
+    });
 
     const response = await request(app)
       .post("/api/agi/ask")
@@ -298,7 +329,10 @@ describe("helix ask public commentary stream", () => {
     expect(response.body?.text).not.toMatch(/Mission interface blocked|preflight gate/i);
     expect(response.body?.final_answer_source).toBe("ask_debug_history_summary");
     expect(response.body?.terminal_artifact_kind).toBe("ask_debug_history_summary");
-    expect(response.body?.debug?.ask_debug_history_summary).toMatchObject({
+    const legacySummaryArtifact = Array.isArray(response.body?.current_turn_artifact_ledger)
+      ? response.body.current_turn_artifact_ledger.find((artifact: any) => artifact?.kind === "ask_debug_history_summary")
+      : null;
+    expect(legacySummaryArtifact?.payload).toMatchObject({
       schema: "helix.ask_debug_history_summary.v1",
       inspected_turn_id: priorResponse.body?.turn_id,
       assistant_answer: false,

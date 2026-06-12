@@ -215,6 +215,7 @@
     "nhm2:publish-source-side-same-basis-authority": "tsx tools/nhm2/publish-source-side-same-basis-authority.ts",
     "nhm2:build-tile-local-source-elements": "tsx tools/nhm2/build-tile-local-source-elements.ts",
     "nhm2:aggregate-tile-local-source-counterpart": "tsx tools/nhm2/aggregate-tile-local-source-to-regional-counterpart.ts",
+    "nhm2:build-wall-source-layering-sweep": "tsx tools/nhm2/build-wall-source-layering-sweep.ts",
     "nhm2:source-closure-pass-readiness": "tsx tools/nhm2/source-closure-pass-readiness.ts",
     "nhm2:build-reference-run-blocker-ledger": "tsx tools/nhm2/build-reference-run-blocker-ledger.ts",
     "nhm2:render-reference-run-blocker-ledger": "tsx tools/nhm2/render-reference-run-blocker-ledger.ts",
