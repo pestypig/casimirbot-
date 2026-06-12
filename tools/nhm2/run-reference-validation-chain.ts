@@ -93,6 +93,14 @@ export const planReferenceValidationChain = (
     "wall-material-source-tensor-model",
   );
   const wallSourceComponentModel = asOptionalString(args, "wall-source-component-model");
+  const regionalMaterialSourceTensorModelInput = asOptionalString(
+    args,
+    "regional-material-source-tensor-model",
+  );
+  const regionalSourceComponentModel = asOptionalString(
+    args,
+    "regional-source-component-model",
+  );
   const layeredWallSourceCandidateRowId = asOptionalString(
     args,
     "layered-wall-source-candidate-row-id",
@@ -133,11 +141,26 @@ export const planReferenceValidationChain = (
   const wallMaterialSourceTensorModel =
     wallMaterialSourceTensorModelInput ??
     (wallSourceComponentModel == null ? null : generatedWallMaterialSourceTensorModel);
+  const generatedRegionalMaterialSourceTensorModel =
+    `${outRoot}/nhm2-regional-material-source-tensor-model.json`;
+  const regionalMaterialSourceTensorModel =
+    regionalMaterialSourceTensorModelInput ??
+    (regionalSourceComponentModel == null ? null : generatedRegionalMaterialSourceTensorModel);
   const layeredWallFullTensorAudit =
     `${outRoot}/nhm2-layered-wall-full-tensor-source-audit.json`;
   const layeredWallSourceTensorCandidate =
     `${outRoot}/nhm2-layered-wall-source-tensor-candidate.json`;
 
+  if (regionalMaterialSourceTensorModelInput != null && regionalSourceComponentModel != null) {
+    throw new Error(
+      "--regional-material-source-tensor-model and --regional-source-component-model are mutually exclusive",
+    );
+  }
+  if (regionalMaterialSourceTensorModel != null && wallMaterialSourceTensorModel != null) {
+    throw new Error(
+      "regional and wall material source tensor models are mutually exclusive; use the regional model to cover wall/hull/exterior together",
+    );
+  }
   if (wallMaterialSourceTensorModelInput != null && wallSourceComponentModel != null) {
     throw new Error(
       "--wall-material-source-tensor-model and --wall-source-component-model are mutually exclusive",
@@ -148,9 +171,19 @@ export const planReferenceValidationChain = (
       "--wall-material-source-tensor-model cannot be combined with prebuilt --tile-local-source-elements; rebuild tile-local elements so wall tensor provenance is explicit",
     );
   }
+  if (regionalMaterialSourceTensorModel != null && inputTileLocalSourceElements != null) {
+    throw new Error(
+      "--regional-material-source-tensor-model cannot be combined with prebuilt --tile-local-source-elements; rebuild tile-local elements so regional tensor provenance is explicit",
+    );
+  }
   if (wallMaterialSourceTensorModel != null && !buildTileLocalSourceElements) {
     throw new Error(
       "--wall-material-source-tensor-model or --wall-source-component-model requires --build-tile-local-source-elements so the source tensor model is consumed",
+    );
+  }
+  if (regionalMaterialSourceTensorModel != null && !buildTileLocalSourceElements) {
+    throw new Error(
+      "--regional-material-source-tensor-model or --regional-source-component-model requires --build-tile-local-source-elements so the source tensor model is consumed",
     );
   }
 
@@ -179,6 +212,18 @@ export const planReferenceValidationChain = (
       sourceTensor,
       "--out",
       sourceIndependenceAudit,
+    ]));
+  }
+
+  if (regionalSourceComponentModel != null) {
+    commands.push(command("nhm2:build-regional-material-source-tensor-model", [
+      "--component-model",
+      regionalSourceComponentModel,
+      ...(casimirMaterialReceipt == null
+        ? []
+        : ["--material-receipt", casimirMaterialReceipt]),
+      "--out",
+      generatedRegionalMaterialSourceTensorModel,
     ]));
   }
 
@@ -254,6 +299,9 @@ export const planReferenceValidationChain = (
       ...(wallMaterialSourceTensorModel == null
         ? []
         : ["--wall-material-source-tensor-model", wallMaterialSourceTensorModel]),
+      ...(regionalMaterialSourceTensorModel == null
+        ? []
+        : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
       "--out",
       generatedTileLocalSourceElements,
       ...auditOnly,

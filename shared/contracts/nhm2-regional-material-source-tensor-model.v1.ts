@@ -1,0 +1,382 @@
+import type { CasimirMaterialReceiptStatus } from "./casimir-material-receipt.v1";
+import {
+  NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
+  NHM2_TENSOR_COMPONENTS,
+  type Nhm2RegionalSourceClosureRegionId,
+  type Nhm2RegionalTensor,
+  type Nhm2TensorAuthorityMode,
+  type Nhm2TensorComponent,
+} from "./nhm2-regional-source-closure-evidence.v1";
+
+export const NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION =
+  "nhm2_regional_material_source_tensor_model/v1";
+
+export type Nhm2RegionalMaterialSourceTensorModelKind =
+  | "lifshitz_regional_tensor"
+  | "measured_material_tensor"
+  | "declared_research_tensor"
+  | "missing";
+
+export type Nhm2RegionalMaterialSourceTensorComponentStatus =
+  | "computed"
+  | "material_receipted"
+  | "proxy"
+  | "missing"
+  | "blocked";
+
+export type Nhm2RegionalMaterialSourceTensorRegionV1 = {
+  regionId: Nhm2RegionalSourceClosureRegionId;
+  status: "material_receipted" | "computed" | "proxy" | "missing" | "blocked";
+  tensor: Nhm2RegionalTensor;
+  componentStatus: Partial<
+    Record<Nhm2TensorComponent, Nhm2RegionalMaterialSourceTensorComponentStatus>
+  >;
+  tensorAuthorityMode: Nhm2TensorAuthorityMode;
+  missingComponentIds: Nhm2TensorComponent[];
+  chartId: "comoving_cartesian" | string;
+  basisRef: "same_basis" | "local_material_basis" | "unknown" | string;
+  units: "J/m^3" | string;
+  regionMaskRef: string | null;
+  aggregationMode: "direct_region_model" | "aggregate_from_regions" | "representative_sector_bin" | "unknown";
+  normalizationBasis: "sample_count" | "volume" | "area" | "unknown";
+  sampleCount: number | null;
+  materialReceiptRef: string | null;
+  materialReceiptStatus: CasimirMaterialReceiptStatus | "missing";
+  provenanceRef: string;
+  notDerivedFromMetricRequiredTensor: true;
+  blockers: string[];
+  warnings: string[];
+};
+
+export type Nhm2RegionalMaterialSourceTensorModelV1 = {
+  contractVersion: typeof NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION;
+  generatedAt: string;
+  laneId: "nhm2_shift_lapse";
+  selectedProfileId: string;
+  chartId: "comoving_cartesian" | string;
+  modelKind: Nhm2RegionalMaterialSourceTensorModelKind;
+  materialReceiptRef: string | null;
+  sourceModelRef: string | null;
+  notDerivedFromMetricRequiredTensor: true;
+  regions: Nhm2RegionalMaterialSourceTensorRegionV1[];
+  summary: {
+    hasWallAuthority: boolean;
+    allRequiredRegionsPresent: boolean;
+    allRequiredRegionsFullTensor: boolean;
+    allRequiredRegionsMaterialReceipted: boolean;
+    missingRegionIds: Nhm2RegionalSourceClosureRegionId[];
+    proxyRegionIds: Nhm2RegionalSourceClosureRegionId[];
+    blockerCount: number;
+  };
+  claimBoundary: {
+    diagnosticOnly: true;
+    sourceTensorModelDoesNotValidatePhysicalSource: true;
+    globalCannotBeCopiedFromWallWithoutAggregationReceipt: true;
+    metricEchoForbidden: true;
+    missingRegionsAreBlockers: true;
+  };
+};
+
+export type BuildNhm2RegionalMaterialSourceTensorModelInput = Omit<
+  Nhm2RegionalMaterialSourceTensorModelV1,
+  "contractVersion" | "summary" | "claimBoundary"
+>;
+
+const SYMMETRIC_TENSOR_COMPONENTS = [
+  "T00",
+  "T01",
+  "T02",
+  "T03",
+  "T11",
+  "T12",
+  "T13",
+  "T22",
+  "T23",
+  "T33",
+] as const satisfies readonly Nhm2TensorComponent[];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value != null && typeof value === "object" && !Array.isArray(value);
+
+const isText = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const isNullableText = (value: unknown): value is string | null =>
+  value === null || isText(value);
+
+const isNullableNumber = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
+
+const isRegionId = (value: unknown): value is Nhm2RegionalSourceClosureRegionId =>
+  NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.includes(
+    value as Nhm2RegionalSourceClosureRegionId,
+  );
+
+const isTensorComponent = (value: string): value is Nhm2TensorComponent =>
+  NHM2_TENSOR_COMPONENTS.includes(value as Nhm2TensorComponent);
+
+const isModelKind = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceTensorModelKind =>
+  value === "lifshitz_regional_tensor" ||
+  value === "measured_material_tensor" ||
+  value === "declared_research_tensor" ||
+  value === "missing";
+
+const isComponentStatus = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceTensorComponentStatus =>
+  value === "computed" ||
+  value === "material_receipted" ||
+  value === "proxy" ||
+  value === "missing" ||
+  value === "blocked";
+
+const isRegionStatus = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceTensorRegionV1["status"] =>
+  value === "material_receipted" ||
+  value === "computed" ||
+  value === "proxy" ||
+  value === "missing" ||
+  value === "blocked";
+
+const isTensorAuthorityMode = (value: unknown): value is Nhm2TensorAuthorityMode =>
+  value === "full_tensor" ||
+  value === "symmetric_full_tensor" ||
+  value === "diagonal_reduced_order" ||
+  value === "proxy" ||
+  value === "unknown";
+
+const isMaterialReceiptStatus = (
+  value: unknown,
+): value is CasimirMaterialReceiptStatus | "missing" =>
+  value === "material_receipted" ||
+  value === "ideal_scalar_only" ||
+  value === "blocked" ||
+  value === "missing";
+
+export const inferNhm2RegionalMaterialSourceTensorAuthorityMode = (
+  tensor: Nhm2RegionalTensor,
+): Nhm2TensorAuthorityMode => {
+  const available = new Set(
+    NHM2_TENSOR_COMPONENTS.filter((component) => tensor[component] != null),
+  );
+  if (NHM2_TENSOR_COMPONENTS.every((component) => available.has(component))) {
+    return "full_tensor";
+  }
+  if (SYMMETRIC_TENSOR_COMPONENTS.every((component) => available.has(component))) {
+    return "symmetric_full_tensor";
+  }
+  if (["T00", "T11", "T22", "T33"].every((component) => available.has(component as Nhm2TensorComponent))) {
+    return "diagonal_reduced_order";
+  }
+  return available.size > 0 ? "proxy" : "unknown";
+};
+
+export const missingNhm2RegionalMaterialSourceTensorComponents = (
+  tensor: Nhm2RegionalTensor,
+): Nhm2TensorComponent[] => {
+  const authority = inferNhm2RegionalMaterialSourceTensorAuthorityMode(tensor);
+  const required =
+    authority === "symmetric_full_tensor"
+      ? SYMMETRIC_TENSOR_COMPONENTS
+      : NHM2_TENSOR_COMPONENTS;
+  return required.filter((component) => tensor[component] == null);
+};
+
+const missingRegion = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): Nhm2RegionalMaterialSourceTensorRegionV1 => ({
+  regionId,
+  status: "missing",
+  tensor: {},
+  componentStatus: {},
+  tensorAuthorityMode: "unknown",
+  missingComponentIds: [...NHM2_TENSOR_COMPONENTS],
+  chartId: "comoving_cartesian",
+  basisRef: "unknown",
+  units: "J/m^3",
+  regionMaskRef: null,
+  aggregationMode: "unknown",
+  normalizationBasis: "unknown",
+  sampleCount: null,
+  materialReceiptRef: null,
+  materialReceiptStatus: "missing",
+  provenanceRef: `missing:${regionId}`,
+  notDerivedFromMetricRequiredTensor: true,
+  blockers: ["regional_source_tensor_missing"],
+  warnings: [],
+});
+
+const normalizeRegion = (
+  region: Nhm2RegionalMaterialSourceTensorRegionV1,
+): Nhm2RegionalMaterialSourceTensorRegionV1 => {
+  const tensorAuthorityMode =
+    region.tensorAuthorityMode === "unknown"
+      ? inferNhm2RegionalMaterialSourceTensorAuthorityMode(region.tensor)
+      : region.tensorAuthorityMode;
+  const missingComponentIds =
+    region.missingComponentIds.length > 0
+      ? region.missingComponentIds
+      : missingNhm2RegionalMaterialSourceTensorComponents(region.tensor);
+  const blockers = new Set(region.blockers);
+  if (tensorAuthorityMode !== "full_tensor" && tensorAuthorityMode !== "symmetric_full_tensor") {
+    blockers.add("regional_full_tensor_authority_missing");
+  }
+  if (missingComponentIds.length > 0) {
+    blockers.add("regional_full_tensor_components_missing");
+  }
+  if (region.regionMaskRef == null) blockers.add("region_mask_ref_missing");
+  if (region.materialReceiptStatus !== "material_receipted") {
+    blockers.add("material_receipt_missing_or_not_receipted");
+  }
+  return {
+    ...region,
+    tensorAuthorityMode,
+    missingComponentIds,
+    blockers: Array.from(blockers),
+  };
+};
+
+export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
+  input: BuildNhm2RegionalMaterialSourceTensorModelInput,
+): Nhm2RegionalMaterialSourceTensorModelV1 => {
+  const byRegion = new Map<Nhm2RegionalSourceClosureRegionId, Nhm2RegionalMaterialSourceTensorRegionV1>();
+  for (const region of input.regions) {
+    byRegion.set(region.regionId, normalizeRegion(region));
+  }
+  for (const regionId of NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS) {
+    if (!byRegion.has(regionId)) byRegion.set(regionId, missingRegion(regionId));
+  }
+  const regions = [...NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS].map(
+    (regionId) => byRegion.get(regionId) as Nhm2RegionalMaterialSourceTensorRegionV1,
+  );
+  const missingRegionIds = regions
+    .filter((region) => region.status === "missing")
+    .map((region) => region.regionId);
+  const proxyRegionIds = regions
+    .filter(
+      (region) =>
+        region.tensorAuthorityMode !== "full_tensor" &&
+        region.tensorAuthorityMode !== "symmetric_full_tensor",
+    )
+    .map((region) => region.regionId);
+  const authorityRegion = (region: Nhm2RegionalMaterialSourceTensorRegionV1): boolean =>
+    (region.tensorAuthorityMode === "full_tensor" ||
+      region.tensorAuthorityMode === "symmetric_full_tensor") &&
+    region.blockers.length === 0 &&
+    region.status !== "missing" &&
+    region.status !== "blocked";
+  return {
+    contractVersion: NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION,
+    ...input,
+    regions,
+    summary: {
+      hasWallAuthority: authorityRegion(byRegion.get("wall") ?? missingRegion("wall")),
+      allRequiredRegionsPresent: missingRegionIds.length === 0,
+      allRequiredRegionsFullTensor: regions.every(authorityRegion),
+      allRequiredRegionsMaterialReceipted: regions.every(
+        (region) => region.materialReceiptStatus === "material_receipted",
+      ),
+      missingRegionIds,
+      proxyRegionIds,
+      blockerCount: regions.reduce((sum, region) => sum + region.blockers.length, 0),
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      sourceTensorModelDoesNotValidatePhysicalSource: true,
+      globalCannotBeCopiedFromWallWithoutAggregationReceipt: true,
+      metricEchoForbidden: true,
+      missingRegionsAreBlockers: true,
+    },
+  };
+};
+
+const isTensor = (value: unknown): value is Nhm2RegionalTensor => {
+  const record = isRecord(value) ? value : null;
+  return (
+    record != null &&
+    Object.entries(record).every(
+      ([key, entry]) => isTensorComponent(key) && isNullableNumber(entry),
+    )
+  );
+};
+
+const isRegion = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceTensorRegionV1 => {
+  const record = isRecord(value) ? value : null;
+  const componentStatus = isRecord(record?.componentStatus)
+    ? record?.componentStatus
+    : null;
+  return (
+    record != null &&
+    isRegionId(record.regionId) &&
+    isRegionStatus(record.status) &&
+    isTensor(record.tensor) &&
+    componentStatus != null &&
+    Object.entries(componentStatus).every(
+      ([key, entry]) => isTensorComponent(key) && isComponentStatus(entry),
+    ) &&
+    isTensorAuthorityMode(record.tensorAuthorityMode) &&
+    Array.isArray(record.missingComponentIds) &&
+    record.missingComponentIds.every(isTensorComponent) &&
+    isText(record.chartId) &&
+    isText(record.basisRef) &&
+    isText(record.units) &&
+    isNullableText(record.regionMaskRef) &&
+    isText(record.aggregationMode) &&
+    isText(record.normalizationBasis) &&
+    isNullableNumber(record.sampleCount) &&
+    isNullableText(record.materialReceiptRef) &&
+    isMaterialReceiptStatus(record.materialReceiptStatus) &&
+    isText(record.provenanceRef) &&
+    record.notDerivedFromMetricRequiredTensor === true &&
+    Array.isArray(record.blockers) &&
+    record.blockers.every(isText) &&
+    Array.isArray(record.warnings) &&
+    record.warnings.every(isText)
+  );
+};
+
+export const isNhm2RegionalMaterialSourceTensorModelArtifact = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceTensorModelV1 => {
+  const record = isRecord(value) ? value : null;
+  const summary = isRecord(record?.summary) ? record?.summary : null;
+  const claimBoundary = isRecord(record?.claimBoundary)
+    ? record?.claimBoundary
+    : null;
+  return (
+    record != null &&
+    record.contractVersion ===
+      NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION &&
+    isText(record.generatedAt) &&
+    record.laneId === "nhm2_shift_lapse" &&
+    isText(record.selectedProfileId) &&
+    isText(record.chartId) &&
+    isModelKind(record.modelKind) &&
+    isNullableText(record.materialReceiptRef) &&
+    isNullableText(record.sourceModelRef) &&
+    record.notDerivedFromMetricRequiredTensor === true &&
+    Array.isArray(record.regions) &&
+    record.regions.every(isRegion) &&
+    summary != null &&
+    typeof summary.hasWallAuthority === "boolean" &&
+    typeof summary.allRequiredRegionsPresent === "boolean" &&
+    typeof summary.allRequiredRegionsFullTensor === "boolean" &&
+    typeof summary.allRequiredRegionsMaterialReceipted === "boolean" &&
+    Array.isArray(summary.missingRegionIds) &&
+    summary.missingRegionIds.every(isRegionId) &&
+    Array.isArray(summary.proxyRegionIds) &&
+    summary.proxyRegionIds.every(isRegionId) &&
+    typeof summary.blockerCount === "number" &&
+    Number.isFinite(summary.blockerCount) &&
+    claimBoundary?.diagnosticOnly === true &&
+    claimBoundary?.sourceTensorModelDoesNotValidatePhysicalSource === true &&
+    claimBoundary?.globalCannotBeCopiedFromWallWithoutAggregationReceipt === true &&
+    claimBoundary?.metricEchoForbidden === true &&
+    claimBoundary?.missingRegionsAreBlockers === true
+  );
+};

@@ -248,6 +248,8 @@ const runChain = async (args: CliArgs): Promise<number> => {
     ...forwardStringArg("casimir-material-receipt"),
     ...forwardStringArg("wall-material-source-tensor-model"),
     ...forwardStringArg("wall-source-component-model"),
+    ...forwardStringArg("regional-material-source-tensor-model"),
+    ...forwardStringArg("regional-source-component-model"),
     ...forwardStringArg("layered-wall-source-candidate"),
     ...forwardStringArg("layered-wall-source-candidate-row-id"),
     ...forwardStringArg("layered-wall-volume-mode"),

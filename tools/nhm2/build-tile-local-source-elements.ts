@@ -23,7 +23,13 @@ import {
   isNhm2WallMaterialSourceTensorModelArtifact,
   type Nhm2WallMaterialSourceTensorModelV1,
 } from "../../shared/contracts/nhm2-wall-material-source-tensor-model.v1";
+import {
+  isNhm2RegionalMaterialSourceTensorModelArtifact,
+  type Nhm2RegionalMaterialSourceTensorModelV1,
+  type Nhm2RegionalMaterialSourceTensorRegionV1,
+} from "../../shared/contracts/nhm2-regional-material-source-tensor-model.v1";
 import type {
+  Nhm2RegionalSourceClosureRegionId,
   Nhm2RegionalTensor,
   Nhm2TensorComponent,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
@@ -100,6 +106,24 @@ const localTensorFromWallModel = (
   return tensor;
 };
 
+const regionalSourceRegion = (
+  model: Nhm2RegionalMaterialSourceTensorModelV1 | null,
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): Nhm2RegionalMaterialSourceTensorRegionV1 | null =>
+  model?.regions.find((region) => region.regionId === regionId) ?? null;
+
+const localTensorFromRegionalRegion = (
+  region: Nhm2RegionalMaterialSourceTensorRegionV1,
+): Nhm2RegionalTensor => {
+  const tensor: Nhm2RegionalTensor = {};
+  for (const [component, value] of Object.entries(region.tensor)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      tensor[component as Nhm2TensorComponent] = value;
+    }
+  }
+  return tensor;
+};
+
 const componentStatusFromTensor = (
   tensor: Nhm2RegionalTensor,
 ): Nhm2TileLocalSourceElementV1["componentStatus"] =>
@@ -116,8 +140,15 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
   materialReceipt?: CasimirMaterialReceiptV1 | null;
   wallMaterialSourceTensorModel?: Nhm2WallMaterialSourceTensorModelV1 | null;
   wallMaterialSourceTensorModelRef?: string | null;
+  regionalMaterialSourceTensorModel?: Nhm2RegionalMaterialSourceTensorModelV1 | null;
+  regionalMaterialSourceTensorModelRef?: string | null;
 } = {}): Nhm2TileLocalSourceElementsArtifactV1 => {
   const contract = args.contract ?? NHM2_CAVITY_CONTRACT;
+  const regionalTensorModel = isNhm2RegionalMaterialSourceTensorModelArtifact(
+    args.regionalMaterialSourceTensorModel,
+  )
+    ? args.regionalMaterialSourceTensorModel
+    : null;
   const wallTensorModel = isNhm2WallMaterialSourceTensorModelArtifact(
     args.wallMaterialSourceTensorModel,
   )
@@ -146,20 +177,38 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
     ...(args.wallMaterialSourceTensorModelRef == null
       ? []
       : [args.wallMaterialSourceTensorModelRef]),
+    ...(args.regionalMaterialSourceTensorModelRef == null
+      ? []
+      : [args.regionalMaterialSourceTensorModelRef]),
   ];
 
   const elements: Nhm2TileLocalSourceElementV1[] = representativeRegionIds.map(
     (regionId, index) => {
+      const regionalRegion = regionalSourceRegion(regionalTensorModel, regionId);
       const localTensor =
-        regionId === "wall" && wallTensorModel != null
+        regionalRegion != null && regionalRegion.status !== "missing"
+          ? localTensorFromRegionalRegion(regionalRegion)
+          : regionId === "wall" && wallTensorModel != null
           ? localTensorFromWallModel(wallTensorModel)
           : { T00: cycleAveragedT00 };
       const tensorAuthorityMode =
         inferNhm2TileLocalSourceTensorAuthorityMode(localTensor);
       const missingComponentIds =
         missingNhm2TileLocalSourceTensorComponents(localTensor);
+      const usingRegionalModel =
+        regionalRegion != null && regionalRegion.status !== "missing";
       const usingWallModel = regionId === "wall" && wallTensorModel != null;
-      const blockers = usingWallModel
+      const blockers = usingRegionalModel
+        ? [
+            ...regionalRegion.blockers,
+            ...(regionalRegion.chartId === "comoving_cartesian"
+              ? []
+              : ["chart_mismatch_or_unknown"]),
+            ...(regionalRegion.basisRef === "same_basis"
+              ? []
+              : ["same_basis_projection_missing_or_failed"]),
+          ]
+        : usingWallModel
         ? [
             ...(wallTensorModel.projection.sameChartProjectionStatus === "pass"
               ? []
@@ -191,8 +240,13 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
         qFactor: contract.loss.qCavity,
         material: {
           materialStack: contract.boundary.material,
-          materialReceiptRef: receiptRef ?? wallTensorModel?.materialReceiptRef ?? null,
-          materialReceiptStatus: receiptStatus,
+          materialReceiptRef:
+            regionalRegion?.materialReceiptRef ??
+            receiptRef ??
+            wallTensorModel?.materialReceiptRef ??
+            null,
+          materialReceiptStatus:
+            regionalRegion?.materialReceiptStatus ?? receiptStatus,
         },
         scalarBudget: {
           idealCasimirEnergyPerAreaSI: energyPerArea,
@@ -212,7 +266,9 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
         provenance: {
           producerModule: "tools/nhm2/build-tile-local-source-elements.ts",
           producerFunction: "buildTileLocalSourceElementsFromCavityContract",
-          sourceModelId: usingWallModel
+          sourceModelId: usingRegionalModel
+            ? "nhm2_regional_material_source_tensor_model"
+            : usingWallModel
             ? "nhm2_wall_material_source_tensor_model"
             : "nhm2_casimir_tile_local_source_placeholder",
           sourceModelVersion: "v1",
@@ -222,7 +278,12 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
           approximationMode: "representative_sector_bin",
         },
         blockers,
-        warnings: usingWallModel
+        warnings: usingRegionalModel
+          ? [
+              `local_tensor_from_regional_material_source_tensor_model:${regionId}`,
+              ...regionalRegion.warnings,
+            ]
+          : usingWallModel
           ? ["local_tensor_from_wall_material_source_tensor_model"]
           : [
               "representative_sector_bin_not_full_tile_lattice",
@@ -240,7 +301,9 @@ export const buildTileLocalSourceElementsFromCavityContract = (args: {
     laneId: "nhm2_shift_lapse",
     sourceModel: {
       sourceModelId:
-        wallTensorModel == null
+        regionalTensorModel != null
+          ? "nhm2_regional_material_source_tensor_model"
+          : wallTensorModel == null
           ? "nhm2_casimir_tile_local_source_placeholder"
           : "nhm2_wall_material_source_tensor_model",
       sourceModelVersion: "v1",
@@ -276,13 +339,15 @@ export const publishNhm2TileLocalSourceElements = (args: {
   referenceRunPath?: string | null;
   casimirMaterialReceiptPath?: string | null;
   wallMaterialSourceTensorModelPath?: string | null;
+  regionalMaterialSourceTensorModelPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2TileLocalSourceElementsArtifactV1 => {
   if (
     !args.auditOnly &&
     (pathUsesLatestAlias(args.referenceRunPath) ||
       pathUsesLatestAlias(args.casimirMaterialReceiptPath) ||
-      pathUsesLatestAlias(args.wallMaterialSourceTensorModelPath))
+      pathUsesLatestAlias(args.wallMaterialSourceTensorModelPath) ||
+      pathUsesLatestAlias(args.regionalMaterialSourceTensorModelPath))
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -312,6 +377,18 @@ export const publishNhm2TileLocalSourceElements = (args: {
       "wall material source tensor model must be nhm2_wall_material_source_tensor_model/v1",
     );
   }
+  const regionalTensorModel =
+    args.regionalMaterialSourceTensorModelPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.regionalMaterialSourceTensorModelPath));
+  if (
+    regionalTensorModel != null &&
+    !isNhm2RegionalMaterialSourceTensorModelArtifact(regionalTensorModel)
+  ) {
+    throw new Error(
+      "regional material source tensor model must be nhm2_regional_material_source_tensor_model/v1",
+    );
+  }
   const reference = isNhm2ReferenceRunArtifact(referenceRun) ? referenceRun : null;
   const artifact = buildTileLocalSourceElementsFromCavityContract({
     runId: reference?.runId,
@@ -322,6 +399,10 @@ export const publishNhm2TileLocalSourceElements = (args: {
       wallTensorModel == null ? null : wallTensorModel,
     wallMaterialSourceTensorModelRef:
       args.wallMaterialSourceTensorModelPath ?? null,
+    regionalMaterialSourceTensorModel:
+      regionalTensorModel == null ? null : regionalTensorModel,
+    regionalMaterialSourceTensorModelRef:
+      args.regionalMaterialSourceTensorModelPath ?? null,
   });
   if (!isNhm2TileLocalSourceElementsArtifact(artifact)) {
     throw new Error("internal error: produced invalid tile-local source elements artifact");
@@ -341,6 +422,9 @@ const main = (): void => {
     referenceRunPath: asString(args["reference-run"]),
     casimirMaterialReceiptPath: asString(args["casimir-material-receipt"]),
     wallMaterialSourceTensorModelPath: asString(args["wall-material-source-tensor-model"]),
+    regionalMaterialSourceTensorModelPath: asString(
+      args["regional-material-source-tensor-model"],
+    ),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

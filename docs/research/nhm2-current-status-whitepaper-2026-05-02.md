@@ -991,6 +991,7 @@ npm run nhm2:aggregate-tile-local-source-counterpart
 npm run nhm2:build-wall-source-layering-sweep
 npm run nhm2:build-layered-wall-source-candidate
 npm run nhm2:build-wall-material-source-tensor-model
+npm run nhm2:build-regional-material-source-tensor-model
 npm run nhm2:build-layered-wall-full-tensor-source-audit
 npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
@@ -1008,6 +1009,7 @@ aggregate tile-local source elements into regional tile-effective counterpart
 build diagnostic wall-source layering sweep
 select layered wall-source candidate
 emit wall material/source tensor model when non-proxy component evidence exists
+emit regional material/source tensor model for hull, wall, and exterior-shell when non-proxy component evidence exists
 audit layered wall-source full tensor components
 emit honest wall T00-only tensor candidate when no full tensor source exists
 publish tile-effective counterpart
@@ -1037,6 +1039,8 @@ npm run nhm2:run-reference-validation-chain -- \
 ```
 
 The `latest` wrapper forwards the same wall-source flags when they are supplied by the operator, while still resolving the frozen reference-run inputs from the latest ledger/atlas context. This path is intentionally strict: a wall tensor model cannot be supplied alongside prebuilt tile-local elements, because the chain must be able to prove the model was consumed. It also does not infer global, hull, or exterior-shell authority from a wall-local tensor. Those regional rows must either receive their own non-proxy same-basis source tensors or remain explicit blockers in `nhm2_source_side_same_basis_tensor_authority/v1`.
+
+The next pass-path branch is regional rather than wall-only. A regional component model can be supplied through `--regional-source-component-model` or as a prebuilt `--regional-material-source-tensor-model`. The chain then feeds `nhm2_regional_material_source_tensor_model/v1` into tile-local source generation before regional aggregation and source-side authority are recomputed. This is the preferred path when hull, wall, and exterior-shell source tensors are available. A wall-only tensor may make the wall row authoritative, but it must not become global authority by copy; global authority can only come from a legitimate aggregate of non-proxy regional elements or an explicitly receipted global row with its own provenance.
 
 The representation-space navigation patch adds no run-free validation command. It is a static claim-boundary map. The relevant review action is to verify that code paths using `QST_PROXY`, tile-effective source tensors, and bounded contracts expose the correct boundary id and do not treat the boundary id as a promotion token.
 

@@ -74,6 +74,30 @@ describe("NHM2 reference validation chain planner", () => {
     );
   });
 
+  it("generates and consumes a regional material source tensor model from component evidence", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "build-tile-local-source-elements": true,
+      "casimir-material-receipt": "artifacts/reference/casimir-material-receipt.json",
+      "regional-source-component-model": "fixtures/nhm2/regional-source-components.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const regionalModel = findCommand(
+      plan,
+      "nhm2:build-regional-material-source-tensor-model",
+    );
+    const tileLocal = findCommand(plan, "nhm2:build-tile-local-source-elements");
+
+    expect(scripts.indexOf("nhm2:build-regional-material-source-tensor-model")).toBeLessThan(
+      scripts.indexOf("nhm2:build-tile-local-source-elements"),
+    );
+    expect(regionalModel.args).toContain("fixtures/nhm2/regional-source-components.json");
+    expect(tileLocal.args).toContain("--regional-material-source-tensor-model");
+    expect(tileLocal.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-material-source-tensor-model.json",
+    );
+  });
+
   it("builds a layered full-tensor audit when both a candidate and source tensor model are available", () => {
     const plan = planReferenceValidationChain({
       ...baseArgs(),
@@ -118,6 +142,19 @@ describe("NHM2 reference validation chain planner", () => {
     ).toThrow(/mutually exclusive/);
   });
 
+  it("rejects mixed wall and regional tensor model inputs", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "build-tile-local-source-elements": true,
+        "wall-material-source-tensor-model":
+          "artifacts/reference/nhm2-wall-material-source-tensor-model.json",
+        "regional-source-component-model":
+          "fixtures/nhm2/regional-source-components.json",
+      }),
+    ).toThrow(/regional and wall material source tensor models are mutually exclusive/);
+  });
+
   it("rejects prebuilt tile-local inputs when a wall tensor model still needs provenance", () => {
     expect(() =>
       planReferenceValidationChain({
@@ -127,6 +164,19 @@ describe("NHM2 reference validation chain planner", () => {
           "artifacts/reference/nhm2-tile-local-source-elements.json",
         "wall-material-source-tensor-model":
           "artifacts/reference/nhm2-wall-material-source-tensor-model.json",
+      }),
+    ).toThrow(/prebuilt --tile-local-source-elements/);
+  });
+
+  it("rejects prebuilt tile-local inputs when a regional tensor model still needs provenance", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "build-tile-local-source-elements": true,
+        "tile-local-source-elements":
+          "artifacts/reference/nhm2-tile-local-source-elements.json",
+        "regional-material-source-tensor-model":
+          "artifacts/reference/nhm2-regional-material-source-tensor-model.json",
       }),
     ).toThrow(/prebuilt --tile-local-source-elements/);
   });
