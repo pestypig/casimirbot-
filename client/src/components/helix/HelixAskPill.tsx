@@ -23399,6 +23399,54 @@ export function HelixAskPill({
     [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, updateReasoningAttempt],
   );
 
+  const updateHelixAskConsoleStreamIngressDebug = useCallback(
+    (updater: (current: HelixAskConsoleStreamIngressDebug) => HelixAskConsoleStreamIngressDebug) => {
+      helixAskConsoleStreamIngressDebugRef.current = updater(helixAskConsoleStreamIngressDebugRef.current);
+      setHelixAskConsoleStreamIngressDebugVersion((version) => version + 1);
+    },
+    [],
+  );
+
+  const resetHelixAskConsoleStreamIngressDebug = useCallback(
+    (input: { turnId?: string | null; traceId?: string | null; startedAtMs?: number | null }) => {
+      helixAskConsoleStreamIngressDebugRef.current = createHelixAskConsoleStreamIngressDebug(input);
+      setHelixAskConsoleStreamIngressDebugVersion((version) => version + 1);
+    },
+    [],
+  );
+
+  const replayHelixAskTurnTranscriptEventsToConsole = useCallback(
+    (events: unknown[], traceId: string, reason: string) => {
+      const existingIds = new Set(askLiveEventsRef.current.map((event) => event.id));
+      let replayed = 0;
+      events.forEach((event, index) => {
+        const record = readAgentLoopAuditRecord(event);
+        if (!record) return;
+        const sourceEventType =
+          coerceText(record.source_event_type).trim() ||
+          coerceText(record.type).trim() ||
+          "turn_transcript_event";
+        const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
+          { ...record, reconstructed: record.reconstructed === true || reason === "final_response_replay" },
+          `replay:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || index}`,
+        );
+        if (!liveEvent || existingIds.has(liveEvent.id)) return;
+        existingIds.add(liveEvent.id);
+        replayed += 1;
+        appendSyntheticLiveEvent(liveEvent);
+      });
+      if (replayed > 0) {
+        updateHelixAskConsoleStreamIngressDebug((current) => ({
+          ...current,
+          replayedTranscriptEventCount: current.replayedTranscriptEventCount + replayed,
+          lastUpdatedAtMs: Date.now(),
+        }));
+      }
+      return replayed;
+    },
+    [appendSyntheticLiveEvent, updateHelixAskConsoleStreamIngressDebug],
+  );
+
   const stopDisplayAudioCapture = useCallback(() => {
     const sourceId = displayAudioSourceIdRef.current;
     if (sourceId) {
@@ -30484,8 +30532,8 @@ export function HelixAskPill({
     [askLiveEvents, askLiveTraceId],
   );
   const askLiveAgenticEventRows = useMemo(
-    () => buildAskLiveAgenticEventRows(activeAskLiveEvents),
-    [activeAskLiveEvents],
+    () => buildAskLiveAgenticEventRows(activeAskLiveEvents, { includeLowSignalRows: userSettings.showHelixAskConsoleDebug }),
+    [activeAskLiveEvents, userSettings.showHelixAskConsoleDebug],
   );
   const activeTurnStreamRows = useMemo(
     () =>
@@ -30504,7 +30552,9 @@ export function HelixAskPill({
     activeStartedAtMs: activeAskStartedAtMsRef.current,
     latestReply: latestAskReply,
   })
-    ? filterHelixAskActiveTurnStreamRows(activeTurnStreamRows)
+    ? filterHelixAskActiveTurnStreamRows(activeTurnStreamRows, {
+        includeTerminalRows: userSettings.showHelixAskConsoleDebug,
+      })
     : [];
   const helixAskConsoleDebugSnapshot = useMemo(() => {
     if (!userSettings.showHelixAskConsoleDebug) return null;
@@ -30522,6 +30572,7 @@ export function HelixAskPill({
       activeRowCount: visibleActiveTurnStreamRows.length,
       replyCount: chronologicalAskRepliesForTranscript.length,
       latestReplyId: latestAskReply?.id ?? latestAskReplyId,
+      streamIngress: helixAskConsoleStreamIngressDebugRef.current,
       renderOrder: [
         ...(visibleActiveTurnStreamRows.length > 0
           ? [
@@ -30558,6 +30609,7 @@ export function HelixAskPill({
     askLiveEvents,
     askLiveTraceId,
     chronologicalAskRepliesForTranscript,
+    helixAskConsoleStreamIngressDebugVersion,
     latestAskReply,
     latestAskReplyId,
     userSettings.showHelixAskConsoleDebug,
@@ -31848,6 +31900,7 @@ export function HelixAskPill({
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = runAskTurnId;
+      resetHelixAskConsoleStreamIngressDebug({ turnId: runAskTurnId, traceId, startedAtMs });
       const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
         ? createReasoningAttempt({
@@ -32066,6 +32119,12 @@ export function HelixAskPill({
             try {
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
                 const record = readAgentLoopAuditRecord(event.data);
+                updateHelixAskConsoleStreamIngressDebug((current) => ({
+                  ...current,
+                  rawStreamPacketCount: current.rawStreamPacketCount + 1,
+                  lastEventName: event.event,
+                  lastUpdatedAtMs: Date.now(),
+                }));
                 if (event.event === "interim_voice_callout_handoff" && record) {
                   const artifacts = [
                     readAgentLoopAuditRecord(record.artifact),
@@ -32076,28 +32135,73 @@ export function HelixAskPill({
                   if (artifacts.length > 0) {
                     enqueueInterimVoiceCalloutsFromAskArtifacts(artifacts);
                   }
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    nonTranscriptPacketCount: current.nonTranscriptPacketCount + 1,
+                    lastUpdatedAtMs: Date.now(),
+                  }));
                   return;
                 }
-                if (event.event === "turn_transcript_event" && record) {
-                  const sourceEventType =
-                    coerceText(record.source_event_type).trim() ||
-                    coerceText(record.type).trim() ||
-                    "turn_transcript_event";
-                  const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
-                    record,
-                    `stream:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || Date.now()}`,
-                  );
-                  if (liveEvent) {
-                    const isFinalAnswerEvent =
-                      sourceEventType === "terminal_answer" ||
-                      sourceEventType === "final_answer" ||
-                      coerceText(record.type).trim() === "final_answer";
-                    setAskStatus(isFinalAnswerEvent ? "Final answer ready." : liveEvent.text);
-                    if (!isFinalAnswerEvent) {
-                      appendSyntheticLiveEvent(liveEvent);
-                    }
-                  }
+                if (event.event !== "turn_transcript_event") {
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    nonTranscriptPacketCount: current.nonTranscriptPacketCount + 1,
+                    lastUpdatedAtMs: Date.now(),
+                  }));
+                  return;
                 }
+                updateHelixAskConsoleStreamIngressDebug((current) => ({
+                  ...current,
+                  transcriptPacketCount: current.transcriptPacketCount + 1,
+                  lastUpdatedAtMs: Date.now(),
+                }));
+                if (!record) {
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    droppedEventCount: current.droppedEventCount + 1,
+                    droppedReasons: incrementHelixAskConsoleDropReason(current.droppedReasons, "invalid_transcript_record"),
+                    lastDropReason: "invalid_transcript_record",
+                    lastUpdatedAtMs: Date.now(),
+                  }));
+                  return;
+                }
+                const sourceEventType =
+                  coerceText(record.source_event_type).trim() ||
+                  coerceText(record.type).trim() ||
+                  "turn_transcript_event";
+                updateHelixAskConsoleStreamIngressDebug((current) => ({
+                  ...current,
+                  lastTranscriptType: sourceEventType,
+                  lastUpdatedAtMs: Date.now(),
+                }));
+                const liveEvent = buildAskLiveEventFromTurnTranscriptRecord(
+                  record,
+                  `stream:${traceId}:${sourceEventType}:${coerceText(record.seq).trim() || coerceText(record.at_ms).trim() || Date.now()}`,
+                );
+                if (!liveEvent) {
+                  updateHelixAskConsoleStreamIngressDebug((current) => ({
+                    ...current,
+                    droppedEventCount: current.droppedEventCount + 1,
+                    droppedReasons: incrementHelixAskConsoleDropReason(current.droppedReasons, "empty_transcript_text"),
+                    lastDropReason: "empty_transcript_text",
+                    lastUpdatedAtMs: Date.now(),
+                  }));
+                  return;
+                }
+                const isFinalAnswerEvent =
+                  sourceEventType === "terminal_answer" ||
+                  sourceEventType === "final_answer" ||
+                  coerceText(record.type).trim() === "final_answer";
+                setAskStatus(isFinalAnswerEvent ? "Final answer ready." : liveEvent.text);
+                appendSyntheticLiveEvent(liveEvent);
+                updateHelixAskConsoleStreamIngressDebug((current) => ({
+                  ...current,
+                  acceptedLiveEventCount: current.acceptedLiveEventCount + 1,
+                  terminalTranscriptEventCount: current.terminalTranscriptEventCount + (isFinalAnswerEvent ? 1 : 0),
+                  lastAcceptedEventId: liveEvent.id,
+                  lastAcceptedText: clipText(liveEvent.text, 180),
+                  lastUpdatedAtMs: Date.now(),
+                }));
               });
             } catch (streamError) {
               localResponse = await runAskTurn(askTurnPayload);
@@ -32130,6 +32234,16 @@ export function HelixAskPill({
             downgradedFromMode = askResult.downgradedFromMode;
           }
           localResponseForTerminal = localResponse;
+          const responseTranscriptEvents = Array.isArray(localResponse.turn_transcript_events)
+            ? localResponse.turn_transcript_events
+            : [];
+          if (
+            HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
+            responseTranscriptEvents.length > 0 &&
+            helixAskConsoleStreamIngressDebugRef.current.acceptedLiveEventCount === 0
+          ) {
+            replayHelixAskTurnTranscriptEventsToConsole(responseTranscriptEvents, traceId, "final_response_replay");
+          }
           responseEnvelope = localResponse.envelope;
           const terminalResolution = resolveHelixAskVisibleTerminal(localResponse);
           const envelopeAnswer = coerceText(responseEnvelope?.assistant_answer ?? responseEnvelope?.answer).trim();
@@ -33060,6 +33174,7 @@ export function HelixAskPill({
       launchAtomicViewer,
       patchHelixTimelineEntry,
       resetReasoningTheaterEventClock,
+      resetHelixAskConsoleStreamIngressDebug,
       resolveWorkstationActionFromPendingInput,
       resolveSelectedContextCapsuleIds,
       resolveWorkstationUserInputGate,
@@ -33070,8 +33185,10 @@ export function HelixAskPill({
       resizeTextarea,
       runWorkstationAction,
       setActive,
+      replayHelixAskTurnTranscriptEventsToConsole,
       upsertContextCapsuleSessionLedger,
       updateReasoningAttempt,
+      updateHelixAskConsoleStreamIngressDebug,
       updateMoodFromText,
       unresolvedPendingRequestCountForTurn,
       missionContextControls.voiceMode,
