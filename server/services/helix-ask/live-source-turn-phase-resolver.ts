@@ -68,6 +68,21 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
     next: "terminal_checkpoint",
     terminalAllowed: false,
   },
+  query_micro_reasoner_deck: {
+    allowedTools: ["live_env.query_micro_reasoner_presets"],
+    fallbackTools: [],
+    forbiddenTools: [
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.read_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ],
+    requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+    completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+    next: "terminal_checkpoint",
+    terminalAllowed: false,
+  },
   read_processed_mail: {
     allowedTools: ["live_env.read_processed_live_source_mail"],
     fallbackTools: ["live_env.process_live_source_mail"],
@@ -421,6 +436,22 @@ const hasVisualObserverProfileCue = (prompt: string): boolean =>
   /\b(?:put|use|apply|configure|set\s+up|setup|create|make|test|compare)\b[\s\S]{0,120}\b(?:minecraft\s+shades|minecraft\s+gameplay\s+observer|visual\s+observer\s+profile|observer\s+shades|visual\s+shades|shades\s+prompt|capture\s+prompt)\b/i.test(prompt) ||
   /\b(?:make|have)\b[\s\S]{0,120}\b(?:visual\s+capture|observer|vision|image\s+model)\b[\s\S]{0,120}\b(?:focus|look\s+for|watch)\b[\s\S]{0,120}\b(?:hud|hotbar|mobs?|health|hunger|fire|damage|minecraft|ui)\b/i.test(prompt);
 
+const hasContextualMicroReasonerDeckCue = (prompt: string): boolean =>
+  /["'`][^"'`]*(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(prompt) ||
+  /\b(?:in\s+the\s+future|future|later|eventually|hypothetically|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt);
+
+const hasMicroReasonerDeckQueryCue = (prompt: string): boolean => {
+  if (hasContextualMicroReasonerDeckCue(prompt)) return false;
+  return (
+    /\blive_env\.query_micro_reasoner_presets\b/i.test(prompt) ||
+    /\b(?:query|view|inspect|show|list|get|check|read)\b[\s\S]{0,120}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|active\s+(?:micro[-\s]?deck|preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|source\s+deck\s+assembly)\b[\s\S]{0,120}\b(?:query|view|inspect|show|list|get|check|read|active|assembled|enabled|using)\b/i.test(prompt)
+  );
+};
+
 const hasExplicitReadCue = (prompt: string): boolean =>
   /\blive_env\.(?:read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|check_live_source_mail)\b/i.test(prompt) ||
   /\b(?:read|check|process|review)\b[\s\S]{0,110}\b(?:latest|current|active|unread|new)?[\s\S]{0,40}\b(?:mailbox|live\s+source\s+mail|source\s+mail|new\s+source\s+mail|visual\s+mail|visual\s+summary\s+mail|latest\s+visual\s+update|visual\s+update|source\s+update|latest\s+unread|unread\s+(?:mail|updates?))\b/i.test(prompt);
@@ -508,6 +539,7 @@ export const resolveLiveSourceTurnPhase = (
   const packets = collectProcessedPackets(input, receipts);
   const latestPacket = packets.at(-1) ?? null;
   const selectedCapability = readString(input.selectedCapability);
+  const contextualMicroReasonerDeckCue = hasContextualMicroReasonerDeckCue(prompt);
   const routeMetadata = readRecord(input.routeMetadata);
   const routeMetadataTargetsMailbox =
     readString(routeMetadata?.invocationKind) === "stage_play_mail_wake" &&
@@ -733,6 +765,32 @@ export const resolveLiveSourceTurnPhase = (
       nextPhase: "terminal_checkpoint",
       locked: true,
       lockReason: "Observer-shades setup is a source-configuration phase.",
+      evidenceRefs,
+    });
+  }
+
+  if (
+    !contextualMicroReasonerDeckCue &&
+    (hasMicroReasonerDeckQueryCue(prompt) || selectedCapability === "live_env.query_micro_reasoner_presets")
+  ) {
+    return makeResolution({
+      phase: "query_micro_reasoner_deck",
+      reason: "Prompt asks to query the MicroDeck preset/prompt assembly; read MicroDeck evidence without entering the processed-mail flow.",
+      canonicalGoal: "live_source_status",
+      allowedTools: ["live_env.query_micro_reasoner_presets"],
+      fallbackTools: [],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+      ],
+      requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      nextPhase: "terminal_checkpoint",
+      locked: true,
+      lockReason: "MicroDeck inspection is a read-only source-prompt query, not mailbox processing.",
       evidenceRefs,
     });
   }

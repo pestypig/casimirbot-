@@ -205,6 +205,17 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
 export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   ...Object.values(TOOL_FAMILY_DEFAULT_CONTRACTS),
   contract({
+    toolName: "live_env.query_micro_reasoner_presets",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["microdeck", "micro_reasoner_presets", "stage_play_micro_reasoner_prompt_preset_query_result/v1"],
+  }),
+  contract({
     toolName: "live_env.read_processed_live_source_mail",
     toolFamily: "live_source_mail",
     authority: "evidence_only",

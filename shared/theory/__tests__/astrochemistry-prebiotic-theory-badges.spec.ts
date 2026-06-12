@@ -19,11 +19,17 @@ describe("astrochemistry/prebiotic theory badges", () => {
     expect(branchBadgeIds).toContain("astrochemistry.aromatic_carbon.interstellar_context");
     expect(branchBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
     expect(branchBadgeIds).toContain("astrochemistry.pah.spectral_family_context");
+    expect(branchBadgeIds).toContain("astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation");
+    expect(branchBadgeIds).toContain("astrochemistry.prebiotic.small_organic_dense_cloud_inventory");
+    expect(branchBadgeIds).toContain("astrochemistry.fullerene.c60_c70_carbon_cage_context");
+    expect(branchBadgeIds).toContain("astrochemistry.phosphorus.po_pn_molecular_cloud_context");
     expect(branchBadgeIds).toContain("astrochemistry.complex_organics.dense_source_inventory_context");
     expect(branchBadgeIds).toContain("astrochemistry.gas_grain.ice_mantle_formation_context");
     expect(branchBadgeIds).toContain("astrochemistry.source_class.chemical_differentiation_context");
     expect(branchBadgeIds).toContain("astrochemistry.claim_boundary.spectral_model_inference_only");
     expect(branchBadgeIds).toContain("prebiotic.inventory.meteoritic_organics_context");
+    expect(branchBadgeIds).toContain("astrochemistry.planetary_delivery.meteorite_comet_link_context");
+    expect(branchBadgeIds).toContain("astrochemistry.claim_boundary.protoplanetary_processing_uncertain");
     expect(branchBadgeIds).toContain("prebiotic.photochemistry.radiation_processing_context");
     expect(branchBadgeIds).toContain("prebiotic.surface_catalysis.mineral_aqueous_context");
     expect(branchBadgeIds).toContain("prebiotic.aromatic_ring.coupled_oscillator_context");
@@ -35,8 +41,11 @@ describe("astrochemistry/prebiotic theory badges", () => {
 
     expect(graphBadgeIds).toContain("stellar.nucleosynthesis.reaction_network_context");
     expect(graphBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
+    expect(graphBadgeIds).toContain("astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation");
+    expect(graphBadgeIds).toContain("astrochemistry.phosphorus.po_pn_molecular_cloud_context");
     expect(graphBadgeIds).toContain("astrochemistry.complex_organics.dense_source_inventory_context");
     expect(graphBadgeIds).toContain("astrochemistry.claim_boundary.spectral_model_inference_only");
+    expect(graphBadgeIds).toContain("astrochemistry.claim_boundary.protoplanetary_processing_uncertain");
     expect(graphBadgeIds).toContain("prebiotic.inventory.meteoritic_organics_context");
     expect(graphBadgeIds).toContain("prebiotic.claim_boundary.dopamine_not_pah_shortcut");
     expect(graphBadgeIds).toContain("orch_or.claim_boundary.prebiotic_consciousness_exploratory_only");
@@ -50,6 +59,10 @@ describe("astrochemistry/prebiotic theory badges", () => {
       badgeIds: [
         "astrochemistry.fullerene.c60_stellar_context",
         "astrochemistry.pah.spectral_family_context",
+        "astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation",
+        "astrochemistry.prebiotic.small_organic_dense_cloud_inventory",
+        "astrochemistry.fullerene.c60_c70_carbon_cage_context",
+        "astrochemistry.phosphorus.po_pn_molecular_cloud_context",
         "prebiotic.photochemistry.radiation_processing_context",
         "astrochemistry.complex_organics.dense_source_inventory_context",
         "astrochemistry.gas_grain.ice_mantle_formation_context",
@@ -67,6 +80,11 @@ describe("astrochemistry/prebiotic theory badges", () => {
     expect(solveExpressions).toContain("f_C60_Hz = c/lambda_C60_m");
     expect(solveExpressions).toContain("E_C60_J = h*f_C60_Hz");
     expect(solveExpressions).toContain("E_PAH_J = h*c/lambda_PAH_m");
+    expect(solveExpressions).toContain("E_transition_J = h*nu_Hz");
+    expect(solveExpressions).toContain("X_org = N_org_cm2/N_H2_cm2");
+    expect(solveExpressions).toContain("E_fullerene_J = h*c/lambda_fullerene_m");
+    expect(solveExpressions).toContain("R_PO_PN = N_PO_cm2/N_PN_cm2");
+    expect(solveExpressions).toContain("X_P_bearing = (N_PO_cm2 + N_PN_cm2)/N_H2_cm2");
     expect(solveExpressions).toContain("X_mol = N_mol_cm2/N_H2_cm2");
     expect(solveExpressions).toContain("R_CH3OH_H2O = X_CH3OH_ice/X_H2O_ice");
     expect(solveExpressions).toContain("photon_fluence_m2 = photon_flux_m2_s*t_exposure_s");
@@ -112,6 +130,41 @@ describe("astrochemistry/prebiotic theory badges", () => {
     expect(boundary?.assumptions.join(" ")).toMatch(/model-conditioned evidence/i);
   });
 
+  it("represents Ziurys as prebiotic astrochemistry foundation evidence without promoting life claims", () => {
+    const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
+    const byId = new Map(branch.badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+    const ziurysBadgeIds = [
+      "astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation",
+      "astrochemistry.prebiotic.small_organic_dense_cloud_inventory",
+      "astrochemistry.fullerene.c60_c70_carbon_cage_context",
+      "astrochemistry.phosphorus.po_pn_molecular_cloud_context",
+      "astrochemistry.planetary_delivery.meteorite_comet_link_context",
+      "astrochemistry.claim_boundary.protoplanetary_processing_uncertain",
+    ];
+
+    for (const badgeId of ziurysBadgeIds) {
+      expect(byId.get(badgeId)?.sourceRefs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: "literature_ref", id: "doi:10.1146/annurev-physchem-090722-010849" }),
+        ]),
+      );
+    }
+
+    expect(byId.get("astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation")?.level).toBe(
+      "diagnostic_gate",
+    );
+    expect(byId.get("astrochemistry.claim_boundary.protoplanetary_processing_uncertain")?.level).toBe(
+      "claim_boundary",
+    );
+    expect(byId.get("astrochemistry.claim_boundary.protoplanetary_processing_uncertain")?.status).toBe("blocked");
+    expect(byId.get("astrochemistry.fullerene.c60_c70_carbon_cage_context")?.assumptions.join(" ")).toMatch(
+      /do not validate biology/i,
+    );
+    expect(byId.get("astrochemistry.phosphorus.po_pn_molecular_cloud_context")?.assumptions.join(" ")).toMatch(
+      /does not prove bioavailable phosphate/i,
+    );
+  });
+
   it("wires complex organic evidence through source-class and spectral inference boundaries", () => {
     const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
 
@@ -141,6 +194,75 @@ describe("astrochemistry/prebiotic theory badges", () => {
           from: "astrochemistry.source_class.chemical_differentiation_context",
           to: "astrochemistry.claim_boundary.spectral_model_inference_only",
           relation: "blocks",
+        }),
+      ]),
+    );
+  });
+
+  it("wires Ziurys foundation rows through lab, inventory, delivery, and boundary contracts", () => {
+    const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
+
+    expect(branch.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "astrochemistry.aromatic_carbon.interstellar_context",
+          to: "astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation",
+          to: "astrochemistry.prebiotic.small_organic_dense_cloud_inventory",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.prebiotic.small_organic_dense_cloud_inventory",
+          to: "astrochemistry.claim_boundary.spectral_model_inference_only",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.prebiotic.small_organic_dense_cloud_inventory",
+          to: "astrochemistry.phosphorus.po_pn_molecular_cloud_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.aromatic_carbon.interstellar_context",
+          to: "astrochemistry.fullerene.c60_c70_carbon_cage_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.fullerene.c60_stellar_context",
+          to: "astrochemistry.fullerene.c60_c70_carbon_cage_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.fullerene.c60_c70_carbon_cage_context",
+          to: "astrochemistry.claim_boundary.spectral_model_inference_only",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.phosphorus.po_pn_molecular_cloud_context",
+          to: "astrochemistry.planetary_delivery.meteorite_comet_link_context",
+          relation: "bounds",
+        }),
+        expect.objectContaining({
+          from: "prebiotic.inventory.meteoritic_organics_context",
+          to: "astrochemistry.planetary_delivery.meteorite_comet_link_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.planetary_delivery.meteorite_comet_link_context",
+          to: "astrochemistry.claim_boundary.protoplanetary_processing_uncertain",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.claim_boundary.protoplanetary_processing_uncertain",
+          to: "orch_or.claim_boundary.prebiotic_consciousness_exploratory_only",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "astrochemistry.claim_boundary.protoplanetary_processing_uncertain",
+          to: "prebiotic.surface_catalysis.mineral_aqueous_context",
+          relation: "bounds",
         }),
       ]),
     );
@@ -199,6 +321,24 @@ describe("astrochemistry/prebiotic theory badges", () => {
       expect.arrayContaining([
         expect.objectContaining({ symbol: "N_mol_cm2", dimensionSignature: "L^-2" }),
         expect.objectContaining({ symbol: "X_mol", dimensionSignature: "1" }),
+      ]),
+    );
+    expect(byId.get("astrochemistry.lab_spectroscopy.molecular_fingerprint_foundation")?.units).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "nu_Hz", dimensionSignature: "T^-1" }),
+        expect.objectContaining({ symbol: "E_transition_J", dimensionSignature: "M L^2 T^-2" }),
+      ]),
+    );
+    expect(byId.get("astrochemistry.fullerene.c60_c70_carbon_cage_context")?.units).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "lambda_fullerene_m", dimensionSignature: "L" }),
+        expect.objectContaining({ symbol: "E_fullerene_J", dimensionSignature: "M L^2 T^-2" }),
+      ]),
+    );
+    expect(byId.get("astrochemistry.phosphorus.po_pn_molecular_cloud_context")?.units).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "R_PO_PN", dimensionSignature: "1" }),
+        expect.objectContaining({ symbol: "X_P_bearing", dimensionSignature: "1" }),
       ]),
     );
     expect(byId.get("astrochemistry.gas_grain.ice_mantle_formation_context")?.units).toEqual(
@@ -261,7 +401,7 @@ describe("astrochemistry/prebiotic theory badges", () => {
     const branch = buildAstrochemistryPrebioticTheoryBadgesV1();
 
     expect(JSON.stringify(branch)).not.toMatch(
-      /buckyballs caused life|complex organics prove life|ice mantles prove abiogenesis|spectra prove consciousness|pleasure optimization is a law|OR validated|consciousness validated|wavefunction-collapse biology validated|PAHs become dopamine|PAH chemistry proves reward/i,
+      /buckyballs caused life|complex organics prove life|ice mantles prove abiogenesis|spectra prove consciousness|phosphorus proves life|fullerenes prove life|meteorites prove abiogenesis|interstellar organics prove consciousness|spectroscopy proves formation pathway|pleasure optimization is a law|OR validated|consciousness validated|wavefunction-collapse biology validated|PAHs become dopamine|PAH chemistry proves reward/i,
     );
   });
 });

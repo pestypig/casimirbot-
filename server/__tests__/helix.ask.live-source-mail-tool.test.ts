@@ -171,6 +171,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.query_micro_reasoner_presets",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.update_micro_reasoner_prompt",
         family: "live_env",
         creates_assistant_answer: false,
@@ -262,6 +269,46 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
     ]));
+  });
+
+  it("queries MicroDeck presets as evidence-only preset query observations", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_micro_reasoner_presets",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        include_presets: true,
+        limit: 10,
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_micro_reasoner_presets",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.summary).toMatch(/Found \d+ MicroDeck preset\(s\) and \d+ prompt\(s\)\./);
+    expect(observation.observation).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+      sourceId,
+      source_id: sourceId,
+      sourceIds: [sourceId],
+      source_ids: [sourceId],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect((observation.observation as any).presets.length).toBeGreaterThan(0);
+    expect((observation.observation as any).prompts.length).toBeGreaterThan(0);
+    expect(observation.evidenceRefs).toEqual(
+      expect.arrayContaining([sourceId]),
+    );
   });
 
   it("configures an interpreter profile without reading mail or answering", () => {

@@ -67,6 +67,20 @@ export const ALL_ROUTE_TERMINAL_PRODUCTS = [
   ...AUXILIARY_TERMINAL_PRODUCTS,
 ] as const;
 
+const isMicroDeckQueryPrompt = (promptText: string): boolean =>
+  !(
+    /["'`][^"'`]*(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(promptText) ||
+    /\b(?:in\s+the\s+future|future|later|eventually|hypothetically|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(promptText) ||
+    /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(promptText) ||
+    /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(promptText) ||
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(promptText)
+  ) &&
+  (
+    /\blive_env\.query_micro_reasoner_presets\b/i.test(promptText) ||
+    /\b(?:query|view|inspect|show|list|get|check|read)\b[\s\S]{0,120}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)s?|active\s+(?:micro[-\s]?deck|preset|deck)|source\s+deck\s+assembly)\b/i.test(promptText) ||
+    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)s?|source\s+deck\s+assembly)\b[\s\S]{0,120}\b(?:query|view|inspect|show|list|get|check|read|active|assembled|enabled|using)\b/i.test(promptText)
+  );
+
 type CoreTerminalProduct = (typeof CORE_TERMINAL_PRODUCTS)[number];
 
 function completeContract(
@@ -595,6 +609,38 @@ export function buildRouteProductContract(input: {
   }
 
   if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") {
+    if (isMicroDeckQueryPrompt(promptText)) {
+      return makeContract({
+        turnId: input.turnId,
+        threadId: input.threadId,
+        sourceTarget,
+        allowedCore: [],
+        allowedExtra: ["model_synthesized_answer"],
+        forbiddenExtra: [
+          "live_environment_tool_observation",
+          "direct_answer_text",
+          "turn_final_text",
+          "tool_receipt",
+          "live_pipeline_receipt",
+          "visual_producer_cadence_receipt",
+          "workspace_action_receipt",
+          "visual_context_pack",
+          "situation_context_pack",
+          "doc_summary",
+          "active_doc_identity",
+          "doc_location_matches",
+          "doc_evidence_location",
+          "process_graph_overview",
+          "no_tool_direct",
+          "model_only_concept",
+          "panel_generated_answer",
+        ],
+        sideArtifactKindsAllowed: [
+          "stage_play_micro_reasoner_prompt_preset_query_result",
+        ],
+        precedenceReason: "microdeck_query_requires_tool_observation_then_model_synthesis",
+      });
+    }
     return makeContract({
       turnId: input.turnId,
       threadId: input.threadId,

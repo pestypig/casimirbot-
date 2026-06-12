@@ -256,7 +256,8 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isFileListOnly(text)) violations.push("file_list_only");
   if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
-  if (collectSupportRefs(input.payload).length === 0) violations.push("missing_support_refs");
+  const supportRefs = collectSupportRefs(input.payload);
+  if (supportRefs.length === 0) violations.push("missing_support_refs");
   violations.push(...exactSectionTermCoverage({ text, payload: input.payload }));
   const synthesisPacket = readRecord(input.payload.repo_docs_synthesis_packet);
   const depthContract = readRecord(synthesisPacket?.answer_depth_contract);
@@ -270,9 +271,15 @@ export function evaluateRepoAnswerTextQualityGate(input: {
     const missingCoverage = readArray(depthContract?.required_coverage_points)
       .map(readString)
       .filter((point) => point && !coveragePointPresent(point, text, concept));
-    if (wordCount(text) < minWords) violations.push("shallow_broad_concept_answer");
+    const conciseSourceCitedDefinition =
+      hasSubstantiveProse(text) &&
+      conceptMentioned(text, concept) &&
+      /\bSources?\s*:/i.test(text) &&
+      supportRefs.length >= 2 &&
+      roles.length >= minRoles;
+    if (wordCount(text) < minWords && !conciseSourceCitedDefinition) violations.push("shallow_broad_concept_answer");
     if (roles.length < minRoles) violations.push("insufficient_evidence_role_coverage");
-    if (missingCoverage.length > 0) violations.push("missing_broad_concept_coverage");
+    if (missingCoverage.length > 0 && !conciseSourceCitedDefinition) violations.push("missing_broad_concept_coverage");
   }
   const relevanceGate = readRecord(input.payload.repo_evidence_relevance_gate);
   const repoConceptDetection = readRecord(input.payload.repo_concept_detection);

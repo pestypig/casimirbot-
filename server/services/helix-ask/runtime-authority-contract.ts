@@ -11,6 +11,8 @@ export type HelixRuntimeAuthorityBoundaryReport = {
   checks: {
     agent_runtime_loop: boolean;
     agent_step_decision: boolean;
+    runtime_tool_call: boolean;
+    microdeck_selected_capability: boolean;
     selected_capability_observation: boolean;
     post_observation_model_decision: boolean;
     goal_satisfaction_allows_terminal: boolean;
@@ -83,6 +85,9 @@ const LIVE_PIPELINE_RECEIPT_GOAL_KINDS = new Set([
   "live_runtime_repair",
 ]);
 
+const MICRODECK_QUERY_CAPABILITY = "live_env.query_micro_reasoner_presets";
+const MICRODECK_QUERY_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_preset_query_result/v1";
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -111,13 +116,46 @@ const artifactKindMatchesCapability = (
 ): boolean => {
   const kind = readString(artifact?.kind);
   const payload = readRecord(artifact?.payload);
+  const topSchema = readString(artifact?.schema);
+  const topToolName = readString(artifact?.tool_name) ?? readString(artifact?.toolName);
+  const topObservation = readRecord(artifact?.observation);
   const payloadKind = readString(payload?.kind);
   const schema = readString(payload?.schema);
+  const payloadToolName = readString(payload?.tool_name) ?? readString(payload?.toolName);
+  const payloadObservation = readRecord(payload?.observation);
+  const observationSchema =
+    readString(topObservation?.schema) ??
+    readString(topObservation?.schemaVersion) ??
+    readString(payloadObservation?.schema) ??
+    readString(payloadObservation?.schemaVersion);
   const actionId = readString(payload?.action_id) ?? readString(readRecord(payload?.action)?.action_id);
   const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
   const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
-  const joined = [kind, payloadKind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
+  const topObservationText = topObservation ? JSON.stringify(topObservation).slice(0, 4000) : "";
+  const joined = [
+    kind,
+    topSchema,
+    topToolName,
+    payloadKind,
+    schema,
+    payloadToolName,
+    observationSchema,
+    actionId,
+    panelId,
+    payloadText,
+    topObservationText,
+  ].filter(Boolean).join(" ");
+  const microDeckPresetQueryObservation =
+    observationSchema === MICRODECK_QUERY_OBSERVATION_SCHEMA ||
+    /stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined);
 
+  if (capability === MICRODECK_QUERY_CAPABILITY) {
+    return (
+      microDeckPresetQueryObservation &&
+      /live_env\.query_micro_reasoner_presets|stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined)
+    );
+  }
+  if (microDeckPresetQueryObservation && capability.startsWith("live_env.")) return false;
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
@@ -197,11 +235,36 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (!artifact) return null;
   const kind = readString(artifact.kind);
   const payload = readRecord(artifact.payload);
+  const topSchema = readString(artifact.schema);
+  const topToolName = readString(artifact.tool_name) ?? readString(artifact.toolName);
+  const topObservation = readRecord(artifact.observation);
   const schema = readString(payload?.schema);
+  const payloadToolName = readString(payload?.tool_name) ?? readString(payload?.toolName);
+  const payloadObservation = readRecord(payload?.observation);
+  const observationSchema =
+    readString(topObservation?.schema) ??
+    readString(topObservation?.schemaVersion) ??
+    readString(payloadObservation?.schema) ??
+    readString(payloadObservation?.schemaVersion);
   const actionId = readString(payload?.action_id) ?? readString(readRecord(payload?.action)?.action_id);
   const panelId = readString(payload?.panel_id) ?? readString(readRecord(payload?.action)?.panel_id);
   const payloadText = payload ? JSON.stringify(payload).slice(0, 4000) : "";
-  const joined = [kind, schema, actionId, panelId, payloadText].filter(Boolean).join(" ");
+  const topObservationText = topObservation ? JSON.stringify(topObservation).slice(0, 4000) : "";
+  const joined = [
+    kind,
+    topSchema,
+    topToolName,
+    schema,
+    payloadToolName,
+    observationSchema,
+    actionId,
+    panelId,
+    payloadText,
+    topObservationText,
+  ].filter(Boolean).join(" ");
+  if (/stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined)) {
+    return MICRODECK_QUERY_CAPABILITY;
+  }
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";
   }
@@ -329,8 +392,84 @@ const observedArtifactRefsForIteration = (iteration: Record<string, unknown>): s
     ...readStringArray(toolObservation?.artifact_refs),
     ...readStringArray(toolObservation?.observed_artifact_refs),
     ...(readString(toolObservation?.artifact_id) ? [readString(toolObservation?.artifact_id) as string] : []),
+    ...(readString(toolObservation?.observation_id) ? [readString(toolObservation?.observation_id) as string] : []),
   ]));
 };
+
+const capabilityFromRecord = (record: Record<string, unknown> | null): string | null =>
+  readString(record?.capability_key) ??
+  readString(record?.tool_name) ??
+  readString(record?.toolName) ??
+  readString(record?.chosen_capability) ??
+  readString(record?.executed_action_key);
+
+const artifactCapability = (artifact: Record<string, unknown> | null): string | null => {
+  const payload = readRecord(artifact?.payload);
+  return capabilityFromRecord(payload) ?? capabilityFromRecord(artifact);
+};
+
+const selectedCapabilityMatches = (payload: Record<string, unknown>, capability: string): boolean => {
+  const topLevelDecision = readRecord(payload.agent_step_decision);
+  const topLevelModelDecision = readRecord(topLevelDecision?.model_decision);
+  if (
+    readString(payload.selected_capability) === capability ||
+    readString(topLevelDecision?.chosen_capability) === capability ||
+    readString(topLevelModelDecision?.chosen_capability) === capability ||
+    readString(readRecord(payload.runtime_tool_call)?.capability_key) === capability
+  ) {
+    return true;
+  }
+  const loop = readRecord(payload.agent_runtime_loop);
+  return readArray(loop?.iterations).some((iteration) => {
+    const record = readRecord(iteration);
+    return Boolean(
+      record &&
+        (
+          readString(record.chosen_capability) === capability ||
+          readString(record.executed_action_key) === capability ||
+          capabilityFromRecord(readRecord(record.runtime_tool_call)) === capability
+        ),
+    );
+  });
+};
+
+export function hasRuntimeToolCallForSelectedCapability(payload: Record<string, unknown>, capability: string): boolean {
+  if (readString(readRecord(payload.runtime_tool_call)?.capability_key) === capability) return true;
+  const loop = readRecord(payload.agent_runtime_loop);
+  if (readArray(loop?.iterations).some((iteration) => {
+    const record = readRecord(iteration);
+    if (!record) return false;
+    return (
+      capabilityFromRecord(readRecord(record.runtime_tool_call)) === capability ||
+      readString(record.executed_action_key) === capability
+    );
+  })) {
+    return true;
+  }
+  return readArray(payload.current_turn_artifact_ledger).some((artifact) => {
+    const record = readRecord(artifact);
+    if (!record) return false;
+    return readString(record.kind) === "runtime_tool_call" && artifactCapability(record) === capability;
+  });
+}
+
+const hasMicroDeckQueryObservation = (payload: Record<string, unknown>): boolean => {
+  const loop = readRecord(payload.agent_runtime_loop);
+  if (readArray(loop?.iterations).some((iteration) => {
+    const record = readRecord(iteration);
+    const toolObservation = readRecord(record?.tool_observation);
+    return Boolean(toolObservation && artifactKindMatchesCapability(MICRODECK_QUERY_CAPABILITY, toolObservation));
+  })) {
+    return true;
+  }
+  return readArray(payload.current_turn_artifact_ledger).some((artifact) =>
+    artifactKindMatchesCapability(MICRODECK_QUERY_CAPABILITY, readRecord(artifact)),
+  );
+};
+
+const isMicroDeckObservationBackedRoute = (payload: Record<string, unknown>): boolean =>
+  selectedCapabilityMatches(payload, MICRODECK_QUERY_CAPABILITY) ||
+  hasMicroDeckQueryObservation(payload);
 
 const artifactLinkedToIteration = (
   artifact: Record<string, unknown> | null,
@@ -431,7 +570,8 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     const toolObservation = readRecord(record.tool_observation);
     if (!toolObservation) return false;
     const status = readString(toolObservation.status);
-    return /completed|observed|ok|success/i.test(status ?? "") && artifactKindMatchesCapability(capability, toolObservation);
+    const ok = readBoolean(toolObservation.ok);
+    return (/completed|observed|ok|success/i.test(status ?? "") || ok === true) && artifactKindMatchesCapability(capability, toolObservation);
   });
   if (runtimeLoopHasObservation) return true;
 
@@ -774,9 +914,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const livePipelineReceiptAllowed = livePipelineReceiptTerminalAllowed(payload);
   const liveEnvironmentBindingDiagnosisAllowed = liveEnvironmentBindingDiagnosisTerminalAllowed(payload);
   const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
+  const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
   const checks = {
     agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
     agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
+    runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, MICRODECK_QUERY_CAPABILITY),
+    microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, MICRODECK_QUERY_CAPABILITY),
     selected_capability_observation: hasSelectedCapabilityObservation(payload),
     post_observation_model_decision: hasPostObservationModelDecision(payload),
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
@@ -797,6 +940,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
       // Control/status Live Pipeline receipts and binding diagnostics are terminal only by route-product contract.
       // The receipt/diagnosis and disclosure remain observations, not assistant answers or raw logs.
     } else {
+      if (microDeckObservationBackedRoute && !checks.microdeck_selected_capability) {
+        blockingReasons.push("microdeck_selected_capability_missing");
+      }
+      if (microDeckObservationBackedRoute && !checks.runtime_tool_call) {
+        blockingReasons.push("runtime_tool_call_missing");
+      }
       if (!checks.agent_runtime_loop) blockingReasons.push("agent_runtime_loop_missing");
       if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
       if (!checks.selected_capability_observation) {
@@ -809,7 +958,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const severity: HelixRuntimeAuthoritySeverity =
     eligible
       ? "pass"
-      : blockingReasons.some((reason) => /agent_runtime_loop_missing|agent_step_decision_missing|selected_capability_observation_missing/.test(reason))
+      : blockingReasons.some((reason) => /agent_runtime_loop_missing|agent_step_decision_missing|runtime_tool_call_missing|microdeck_selected_capability_missing|selected_capability_observation_missing/.test(reason))
         ? "p0"
         : blockingReasons.some((reason) => /goal_satisfaction|post_observation|typed_failure/.test(reason))
           ? "p1"

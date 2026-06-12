@@ -46,6 +46,8 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_CONCURRENT;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
       hostMemoryReader: hostReader(),
@@ -76,6 +78,8 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_MAX_CONCURRENT;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_LIMIT;
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   });
 
@@ -468,6 +472,86 @@ describe("runtime memory governor", () => {
     expect(decision.limits.maxHeapUsedMiB).toBe(1000);
     expect(decision.limits.maxRssMiB).toBe(1500);
     decision.lease?.release("completed");
+  });
+
+  it("uses explicit active user turn memory headroom instead of generic fallback limits", () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.reason).toBe("ok");
+    expect(decision.pressureLevel).toBe("normal");
+    expect(decision.limits.maxHeapUsedMiB).toBe(2048);
+    expect(decision.limits.maxRssMiB).toBe(3200);
+    decision.lease?.release("completed");
+  });
+
+  it("keeps active user turn memory headroom configurable through task env limits", () => {
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "600";
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB = "1000";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.reason).toBe("ok");
+    expect(decision.pressureLevel).toBe("hard_pressure");
+    expect(decision.limits.maxHeapUsedMiB).toBe(600);
+    expect(decision.limits.maxRssMiB).toBe(1000);
+    decision.lease?.release("completed");
+  });
+
+  it("labels runtime memory headline pressure with the active user turn basis", () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const snapshot = runtimeMemoryGovernor.getRuntimeMemorySnapshot();
+
+    expect(snapshot.pressureLevel).toBe("normal");
+    expect(snapshot.pressureReason).toBe("ok");
+    expect(snapshot.pressureBasis).toEqual({
+      taskClass: "active_user_turn",
+      reason: "headline_pressure_uses_active_user_turn_budget",
+    });
+    expect(snapshot.limits.maxHeapUsedMiB).toBe(2048);
+    expect(snapshot.limits.maxRssMiB).toBe(3200);
+  });
+
+  it("reports per-task-class pressure when headline pressure is normal", () => {
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const snapshot = runtimeMemoryGovernor.getRuntimeMemorySnapshot();
+    const activeUserTurn = snapshot.taskClassPressure.find((entry) => entry.taskClass === "active_user_turn");
+    const voiceStt = snapshot.taskClassPressure.find((entry) => entry.taskClass === "voice_stt");
+    const stagePlayRefresh = snapshot.taskClassPressure.find((entry) => entry.taskClass === "stage_play_refresh");
+
+    expect(activeUserTurn).toMatchObject({
+      taskClass: "active_user_turn",
+      pressureLevel: "normal",
+      pressureReason: "ok",
+    });
+    expect(voiceStt).toMatchObject({
+      taskClass: "voice_stt",
+      pressureLevel: "hard_pressure",
+      pressureReason: "heap_used_limit",
+    });
+    expect(stagePlayRefresh).toMatchObject({
+      taskClass: "stage_play_refresh",
+      pressureLevel: "hard_pressure",
+      pressureReason: "heap_used_limit",
+    });
   });
 
   it("reports registered pausable tasks and recent completions in the task snapshot", () => {

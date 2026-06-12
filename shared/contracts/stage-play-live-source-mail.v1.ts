@@ -78,6 +78,7 @@ export type LiveSourceTurnPhaseV1 =
   | "configure_interpreter_profile"
   | "configure_watch_job"
   | "apply_visual_observer_profile"
+  | "query_micro_reasoner_deck"
   | "read_processed_mail"
   | "process_mail_fallback"
   | "record_decision"

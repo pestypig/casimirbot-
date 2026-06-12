@@ -1595,6 +1595,25 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       },
     ],
   }),
+  "document-image-lens": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Document Image Lens",
+        description: "Open and focus the document image crop and candidate receipt panel.",
+        risk: "low",
+        aliases: [
+          "open document image lens",
+          "show image lens",
+          "open pdf image lens",
+          "open image crop panel",
+        ],
+      },
+    ],
+  }),
   "workstation-clipboard-history": makeCapabilities({
     can_read_state: true,
     can_run_action: true,

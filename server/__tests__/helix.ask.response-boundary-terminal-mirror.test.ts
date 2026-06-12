@@ -212,4 +212,118 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
     });
     expect(JSON.stringify(envelope)).not.toContain("terminal_consistency_violation");
   });
+
+  it("normalizes superseded compound coverage from authoritative terminal answers", () => {
+    const answerText = [
+      "Evidence packet includes six source-backed article references for the photosynthetic coherence question.",
+      "The second observation maps the topic near photosynthetic light-harvesting and coherence-window context.",
+      "The final synthesis keeps the boundary diagnostic and cites the collected source records.",
+    ].join("\n");
+    const staleGate = {
+      schema: "helix.compound_prompt_coverage_gate.v1",
+      applies: true,
+      passed: true,
+      decision: "PASS",
+      reason: "all required compound prompt items were answered, visibly blocked, or failed closed",
+      required_count: 3,
+      answered_count: 0,
+      blocked_count: 0,
+      failed_closed_count: 3,
+      unresolved_requirement_ids: [],
+      non_visible_blocked_requirement_ids: [],
+      resolutions: ["R1", "R2", "R3"].map((id) => ({
+        requirement_id: id,
+        status: "failed_closed",
+        reason: "terminal failed closed before a partial success answer could be authoritative",
+        evidence_refs: [],
+        terminal_visible: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      })),
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload = {
+      turn_id: "ask:test-superseded-compound-coverage",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      terminal_artifact_kind: "scholarly_research_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer: answerText,
+      answer: answerText,
+      text: answerText,
+      compound_prompt_coverage_gate: staleGate,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test-superseded-compound-coverage:compound_prompt_coverage_gate",
+          kind: "compound_prompt_coverage_gate",
+          payload: staleGate,
+        },
+      ],
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_text_preview: answerText,
+        server_authoritative: true,
+      },
+      solver_controller_decision: {
+        schema: "helix.solver_controller_decision.v1",
+        decision: "allow_terminal",
+        compound_prompt_coverage_gate_superseded_by_answer_artifact: true,
+        compound_prompt_coverage_superseded_ref: "ask:test-superseded-compound-coverage:scholarly_research_answer",
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        compound_prompt_contract: {
+          schema: "helix.compound_prompt_contract.v1",
+          requirements: [
+            { id: "R1", text: "Use scholarly research to find papers about quantum coherence in photosynthesis.", required: true },
+            { id: "R2", text: "Use the Theory Badge Graph locator to place the claim.", required: true },
+            { id: "R3", text: "Synthesize uncertainty with citations.", required: true },
+          ],
+        },
+      },
+      debug: {
+        compound_prompt_coverage_gate: staleGate,
+      },
+    };
+
+    const normalized = __testHelixAskOutputContract.prepareHelixAskLiveResponsePayload(payload, { mode: "deep" }) as Record<string, any>;
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "Use scholarly research, then the Theory Badge Graph locator, then synthesize uncertainty with citations.",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect(normalized.compound_prompt_coverage_gate).toMatchObject({
+      passed: true,
+      decision: "PASS",
+      answered_count: 3,
+      failed_closed_count: 0,
+      unresolved_requirement_ids: [],
+    });
+    expect(normalized.compound_prompt_coverage_gate.resolutions.map((entry: any) => entry.status)).toEqual([
+      "answered",
+      "answered",
+      "answered",
+    ]);
+    expect(normalized.debug.compound_prompt_coverage_gate).toMatchObject({
+      answered_count: 3,
+      failed_closed_count: 0,
+    });
+    expect(normalized.current_turn_artifact_ledger[0].payload).toMatchObject({
+      answered_count: 3,
+      failed_closed_count: 0,
+    });
+    expect(envelope.compound_prompt_coverage_gate).toMatchObject({
+      answered_count: 3,
+      failed_closed_count: 0,
+      reason: "terminal authority superseded an earlier fail-closed coverage gate after the compound solver path allowed the answer",
+    });
+    expect(envelope.compound_prompt_coverage_gate.resolutions.map((entry: any) => entry.status)).not.toContain("failed_closed");
+  });
 });

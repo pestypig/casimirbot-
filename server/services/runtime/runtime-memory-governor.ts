@@ -22,6 +22,13 @@ export type RuntimeAdmissionAction =
 
 export type RuntimePressureLevel = "normal" | "soft_pressure" | "hard_pressure";
 
+export type RuntimeTaskClassPressureSnapshot = {
+  taskClass: RuntimeTaskClass;
+  pressureLevel: RuntimePressureLevel;
+  pressureReason: RuntimeAdmissionDecision["reason"];
+  limits: RuntimeAdmissionDecision["limits"];
+};
+
 export type RuntimeTaskLease = {
   id: string;
   taskClass: RuntimeTaskClass;
@@ -144,6 +151,8 @@ const BYTES_PER_MIB = 1024 * 1024;
 const RECENT_DECISION_LIMIT = 50;
 const RECENT_COMPLETION_LIMIT = 50;
 const DEFAULT_BURST_WINDOW_MS = 60_000;
+const DEFAULT_ACTIVE_USER_TURN_MAX_HEAP_USED_MIB = 2048;
+const DEFAULT_ACTIVE_USER_TURN_MAX_RSS_MIB = 3200;
 const DEV_VOICE_STT_MAX_HEAP_USED_MIB = 2048;
 const DEV_VOICE_STT_MAX_RSS_MIB = 3200;
 const DEV_VOICE_TTS_MAX_HEAP_USED_MIB = 2048;
@@ -151,7 +160,15 @@ const DEV_VOICE_TTS_MAX_RSS_MIB = 3200;
 
 const DEFAULT_TASK_BUDGETS: Record<RuntimeTaskClass, RuntimeTaskBudget> = {
   critical_resident: { priority: 100, deferrable: false, pausable: false, maxConcurrent: 16 },
-  active_user_turn: { priority: 90, deferrable: false, pausable: false, maxConcurrent: 4, burstLimit: 24 },
+  active_user_turn: {
+    priority: 90,
+    deferrable: false,
+    pausable: false,
+    maxHeapUsedMiB: DEFAULT_ACTIVE_USER_TURN_MAX_HEAP_USED_MIB,
+    maxRssMiB: DEFAULT_ACTIVE_USER_TURN_MAX_RSS_MIB,
+    maxConcurrent: 4,
+    burstLimit: 24,
+  },
   voice_capture: { priority: 75, deferrable: false, pausable: false, maxConcurrent: 2, burstLimit: 30 },
   voice_stt: {
     priority: 70,
@@ -522,11 +539,30 @@ const makeDecision = (
   return decision;
 };
 
+const taskClasses = (): RuntimeTaskClass[] => Object.keys(DEFAULT_TASK_BUDGETS) as RuntimeTaskClass[];
+
+const buildTaskClassPressureSnapshots = (
+  memory: RuntimeAdmissionDecision["memory"],
+  host: RuntimeAdmissionDecision["host"],
+): RuntimeTaskClassPressureSnapshot[] =>
+  taskClasses().map((taskClass) => {
+    const limits = readLimits(taskClass);
+    const pressure = classifyPressure(memory, host, limits);
+    return {
+      taskClass,
+      pressureLevel: pressure.level,
+      pressureReason: pressure.reason,
+      limits,
+    };
+  });
+
 export const getRuntimeMemorySnapshot = () => {
   const memory = toMemorySnapshot(memoryReader());
   const host = hostMemoryReader();
-  const limits = readLimits("voice_stt");
+  const headlineTaskClass: RuntimeTaskClass = "active_user_turn";
+  const limits = readLimits(headlineTaskClass);
   const pressure = classifyPressure(memory, host, limits);
+  const taskClassPressure = buildTaskClassPressureSnapshots(memory, host);
   return {
     schema: "casimir.runtime_memory.v1",
     pid: process.pid,
@@ -537,6 +573,12 @@ export const getRuntimeMemorySnapshot = () => {
       freeRatio: Math.round(host.freeRatio * 1000) / 1000,
     },
     pressureLevel: pressure.level,
+    pressureReason: pressure.reason,
+    pressureBasis: {
+      taskClass: headlineTaskClass,
+      reason: "headline_pressure_uses_active_user_turn_budget",
+    },
+    taskClassPressure,
     activeTasks: Array.from(activeTasks.values()).map((task) => ({
       id: task.id,
       taskClass: task.taskClass,
@@ -558,8 +600,7 @@ export const getRuntimeMemorySnapshot = () => {
 export const getRuntimeTaskSnapshot = () => {
   const memorySnapshot = getRuntimeMemorySnapshot();
   const nowMs = Date.now();
-  const taskClasses = Object.keys(DEFAULT_TASK_BUDGETS) as RuntimeTaskClass[];
-  const classes = taskClasses.map((taskClass) => {
+  const classes = taskClasses().map((taskClass) => {
     const budget = resolveDefaultTaskBudget(taskClass);
     const burst = readClassBurstBudget(taskClass);
     const starts = pruneBurstStarts(taskClass, nowMs, burst.windowMs);

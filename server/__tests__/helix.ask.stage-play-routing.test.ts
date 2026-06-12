@@ -395,6 +395,75 @@ describe("Helix Ask Stage Play routing", () => {
     expect(executedCapabilities, routeDebug).toContain("live_env.read_processed_live_source_mail");
   }, 60_000);
 
+  it("executes MicroDeck preset queries without processed-mail tools and projects the selected tool", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Query the MicroDeck preset assembly for the active visual source.",
+        sessionId: `${threadId}:microdeck-query`,
+        debug: true,
+      })
+      .expect(200);
+
+    const iterations = Array.isArray(response.body?.agent_runtime_loop?.iterations)
+      ? response.body.agent_runtime_loop.iterations
+      : [];
+    const executedCapabilities = iterations.flatMap((iteration: any) => [
+      iteration?.chosen_capability,
+      iteration?.executed_action_key,
+      iteration?.tool_observation?.tool_name,
+    ]).filter(Boolean);
+    const routeDebug = JSON.stringify({
+      selectedTool: response.body?.selected_tool,
+      selectedCapability: response.body?.selected_capability,
+      lifecycle: response.body?.tool_lifecycle_trace,
+      phase: response.body?.live_source_turn_phase_resolution,
+      mandatory: response.body?.mandatory_next_tool,
+      loop: response.body?.agent_runtime_loop,
+      artifacts: response.body?.current_turn_artifact_ledger,
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.live_source_turn_phase_resolution, routeDebug).toMatchObject({
+      phase: "query_micro_reasoner_deck",
+      allowedTools: ["live_env.query_micro_reasoner_presets"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+    });
+    expect(response.body?.mandatory_next_tool, routeDebug).toMatchObject({
+      tool_name: "live_env.query_micro_reasoner_presets",
+      allowed_tools: ["live_env.query_micro_reasoner_presets"],
+      terminal_forbidden: true,
+    });
+    expect(executedCapabilities, routeDebug).toContain("live_env.query_micro_reasoner_presets");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.read_processed_live_source_mail");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.process_live_source_mail");
+    expect(JSON.stringify(response.body?.agent_runtime_loop ?? {}), routeDebug)
+      .toContain("stage_play_micro_reasoner_prompt_preset_query_result/v1");
+    expect(response.body?.selected_tool, routeDebug).toBe("live_env.query_micro_reasoner_presets");
+    expect(response.body?.selected_tool, routeDebug).toBe(response.body?.selected_capability);
+    expect(response.body?.tool_lifecycle_trace, routeDebug).toMatchObject({
+      selected_tool: "live_env.query_micro_reasoner_presets",
+      selected_capability: "live_env.query_micro_reasoner_presets",
+      executed_capability: "live_env.query_micro_reasoner_presets",
+    });
+    expect(response.body?.stage_play_live_source_mailbox_debug?.executed_capabilities_seen ?? [], routeDebug)
+      .not.toEqual(expect.arrayContaining([
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+      ]));
+  }, 60_000);
+
   it("keeps interpreter profile setup on configure_interpreter_profile without reading mail", async () => {
     startVisualSnapshotSource({
       source_id: sourceId,

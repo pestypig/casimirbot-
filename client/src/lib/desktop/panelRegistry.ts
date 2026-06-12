@@ -23,6 +23,7 @@ export type PanelId =
   | "situation-room-sources"
   | "situation-room-pipelines"
   | "live-answer-environment"
+  | "document-image-lens"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -289,6 +290,14 @@ const BASE_PANELS: PanelDefinition[] = [
     keywords: ["live", "answer", "cortana", "minecraft", "game source", "plugin signal", "present state", "line checks", "interpreted log"],
   },
   {
+    id: "document-image-lens",
+    title: "Document Image Lens",
+    loader: load(() => import("@/components/workstation/DocumentImageLensPanel")),
+    defaultSize: { w: 1180, h: 760 },
+    defaultPosition: { x: 260, y: 150 },
+    keywords: ["image", "pdf", "crop", "document", "equation", "ocr", "visual source", "attachment"],
+  },
+  {
     id: "workstation-clipboard-history",
     title: "Clipboard History",
     loader: load(() => import("@/components/workstation/WorkstationClipboardHistoryPanel")),
@@ -348,8 +357,8 @@ const BASE_PANELS: PanelDefinition[] = [
 ];
 
 // Merge HELIX_PANELS without duplicating ids that already exist in BASE_PANELS.
-const existingIds = new Set(BASE_PANELS.map((p) => p.id));
-const mergedHelix = HELIX_PANELS.filter((p) => !existingIds.has(p.id));
+const existingIds = new Set(BASE_PANELS.map((p: PanelDefinition) => p.id));
+const mergedHelix = HELIX_PANELS.filter((p: HelixPanelRef) => !existingIds.has(p.id));
 
 export const panelRegistry: PanelDefinition[] = ([...BASE_PANELS, ...mergedHelix] as PanelDefinition[]).map((panel) => ({
   ...panel,

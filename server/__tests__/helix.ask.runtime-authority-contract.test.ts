@@ -7,10 +7,13 @@ import {
   hasAgentRuntimeLoopDecisionChain,
   hasDirectAnswerDraft,
   hasPostObservationModelDecision,
+  hasRuntimeToolCallForSelectedCapability,
   hasSelectedCapabilityObservation,
   isSourceCapabilityDiagnosticTurn,
 } from "../services/helix-ask/runtime-authority-contract";
 import { buildPostToolAuthorityBridge } from "../services/helix-ask/post-tool-authority-bridge";
+import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
+import { resolveToolFamilyContract } from "../services/helix-ask/tool-family-contract";
 
 describe("helix ask runtime authority contract", () => {
   it("requires model-only direct answers to include a model answer step and answer draft", () => {
@@ -229,6 +232,336 @@ describe("helix ask runtime authority contract", () => {
     const report = evaluateTerminalBoundaryEligibility(payload);
     expect(report.eligible).toBe(true);
     expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
+  it("treats MicroDeck preset query results as the selected live_env query observation", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-query",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.query_micro_reasoner_presets",
+            executed_action_key: "live_env.query_micro_reasoner_presets",
+            tool_observation: {
+              schema: "helix.live_environment_tool_observation.v1",
+              observation_id: "live_env_tool_observation:microdeck-query",
+              tool_name: "live_env.query_micro_reasoner_presets",
+              ok: true,
+              summary: "Found 4 MicroDeck preset(s) and 13 prompt(s).",
+              observation: {
+                schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+                presets: [],
+                prompts: [],
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+                context_role: "tool_evidence",
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime-tool-call-microdeck-query",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            call_id: "runtime-call-microdeck-query",
+            capability_key: "live_env.query_micro_reasoner_presets",
+            args: {},
+          },
+        },
+      ],
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+    };
+
+    expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
+    expect(hasRuntimeToolCallForSelectedCapability(payload, "live_env.query_micro_reasoner_presets")).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.checks).toMatchObject({
+      runtime_tool_call: true,
+      microdeck_selected_capability: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+    expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
+  });
+
+  it("blocks MicroDeck summaries when an observation appears without a runtime tool call", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-query",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.query_micro_reasoner_presets",
+            tool_observation: {
+              schema: "helix.live_environment_tool_observation.v1",
+              observation_id: "live_env_tool_observation:microdeck-query",
+              tool_name: "live_env.query_micro_reasoner_presets",
+              ok: true,
+              observation: {
+                schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+    expect(hasRuntimeToolCallForSelectedCapability(payload, "live_env.query_micro_reasoner_presets")).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(false);
+    expect(report.checks.runtime_tool_call).toBe(false);
+    expect(report.blocking_reasons).toContain("runtime_tool_call_missing");
+  });
+
+  it("fails closed for MicroDeck terminal summaries when the query observation is missing", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-query",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.query_micro_reasoner_presets",
+            executed_action_key: "live_env.query_micro_reasoner_presets",
+            observed_artifact_refs: [],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime-tool-call-microdeck-query",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            call_id: "runtime-call-microdeck-query",
+            capability_key: "live_env.query_micro_reasoner_presets",
+            args: {},
+          },
+        },
+      ],
+    };
+
+    expect(hasRuntimeToolCallForSelectedCapability(payload, "live_env.query_micro_reasoner_presets")).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(false);
+    expect(report.checks.runtime_tool_call).toBe(true);
+    expect(report.checks.microdeck_selected_capability).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(false);
+    expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
+  });
+
+  it("blocks MicroDeck summaries until a post-observation answer decision exists", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-query",
+            decision_authority: "llm",
+            decision_timing: "pre_observation",
+            next_step: "next_action",
+            chosen_capability: "live_env.query_micro_reasoner_presets",
+            executed_action_key: "live_env.query_micro_reasoner_presets",
+            tool_observation: {
+              schema: "helix.live_environment_tool_observation.v1",
+              observation_id: "live_env_tool_observation:microdeck-query",
+              tool_name: "live_env.query_micro_reasoner_presets",
+              ok: true,
+              observation: {
+                schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime-tool-call-microdeck-query",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            call_id: "runtime-call-microdeck-query",
+            capability_key: "live_env.query_micro_reasoner_presets",
+            args: {},
+          },
+        },
+      ],
+    };
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.checks.runtime_tool_call).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(true);
+    expect(report.checks.post_observation_model_decision).toBe(false);
+    expect(report.eligible).toBe(false);
+    expect(report.blocking_reasons).toContain("post_observation_model_decision_missing");
+  });
+
+  it("contracts MicroDeck query prompts as observation-backed model summaries", () => {
+    const contract = buildRouteProductContract({
+      turnId: "turn-microdeck-contract",
+      promptText: "Inspect the active MicroDeck prompts for the visual live source.",
+      sourceTargetIntent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+    });
+    const toolContract = resolveToolFamilyContract({
+      toolName: "live_env.query_micro_reasoner_presets",
+    });
+
+    expect(contract).toMatchObject({
+      schema: "helix.route_product_contract.v1",
+      source_target: "live_source_mailbox",
+      precedence_reason: "microdeck_query_requires_tool_observation_then_model_synthesis",
+    });
+    expect(contract.allowed_terminal_artifact_kinds).toContain("model_synthesized_answer");
+    expect(contract.allowed_terminal_artifact_kinds).not.toContain("live_environment_tool_observation");
+    expect(contract.allowed_terminal_artifact_kinds).not.toContain("direct_answer_text");
+    expect(contract.side_artifact_kinds_allowed).toContain("stage_play_micro_reasoner_prompt_preset_query_result");
+    expect(toolContract).toMatchObject({
+      toolName: "live_env.query_micro_reasoner_presets",
+      authority: "evidence_only",
+      mutating: false,
+      requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      allowedTerminalKinds: ["model_synthesized_answer"],
+      requiredReentry: true,
+      requiresGoalSatisfaction: true,
+    });
+  });
+
+  it("does not let a MicroDeck preset query result satisfy a different live_env selected capability", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-stale-mail-read",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.read_processed_live_source_mail",
+            tool_observation: {
+              schema: "helix.live_environment_tool_observation.v1",
+              observation_id: "live_env_tool_observation:microdeck-query",
+              tool_name: "live_env.query_micro_reasoner_presets",
+              ok: true,
+              summary: "Found 4 MicroDeck preset(s) and 13 prompt(s).",
+              observation: {
+                schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
+                presets: [],
+                prompts: [],
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+                context_role: "tool_evidence",
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    expect(hasSelectedCapabilityObservation(payload)).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
   });
 
   it("accepts agent step loop capability observations recorded after the selected action step", () => {

@@ -25,6 +25,17 @@ describe("resolveLiveSourceTurnPhase", () => {
       completionEvidence: ["stage_play_processed_mail_packet"],
       next: "record_decision",
     });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_micro_reasoner_deck).toMatchObject({
+      allowedTools: ["live_env.query_micro_reasoner_presets"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_micro_reasoner_deck.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+    ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.record_decision).toMatchObject({
       allowedTools: ["live_env.record_live_source_mail_decision"],
       completionEvidence: ["stage_play_live_source_mail_decision"],
@@ -368,6 +379,74 @@ describe("resolveLiveSourceTurnPhase", () => {
     ]));
     expect(phase.completionEvidence).toEqual(["stage_play_live_source_watch_job_policy"]);
     expect(phase.phaseLock.locked).toBe(true);
+  });
+
+  it("locks MicroDeck inspection to the read-only preset query without processed-mail fallback", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Query the MicroDeck preset assembly for the active visual source.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.read_processed_live_source_mail",
+    });
+
+    expect(phase.phase).toBe("query_micro_reasoner_deck");
+    expect(phase.canonicalGoal).toBe("live_source_status");
+    expect(phase.allowedTools).toEqual(["live_env.query_micro_reasoner_presets"]);
+    expect(phase.fallbackTools).toEqual([]);
+    expect(phase.requiredEvidence).toEqual(["stage_play_micro_reasoner_prompt_preset_query_result"]);
+    expect(phase.completionEvidence).toEqual(["stage_play_micro_reasoner_prompt_preset_query_result"]);
+    expect(phase.nextPhase).toBe("terminal_checkpoint");
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "MicroDeck inspection is a read-only source-prompt query, not mailbox processing.",
+    });
+    expect(isLockedExecutableLiveSourcePhase(phase)).toBe(true);
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_micro_reasoner_presets");
+  });
+
+  it("recognizes MicroDeck prompt and active deck inspection wording", () => {
+    for (const prompt of [
+      "Show the active MicroDeck prompts for this source.",
+      "Inspect the micro-reasoner deck that is assembled for the live source.",
+      "List the prompt presets in the source deck assembly.",
+    ]) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt,
+        selectedTargetSource: "live_source_mailbox",
+      });
+
+      expect(phase.phase).toBe("query_micro_reasoner_deck");
+      expect(phase.allowedTools).toEqual(["live_env.query_micro_reasoner_presets"]);
+      expect(phase.fallbackTools).toEqual([]);
+      expect(phase.requiredEvidence).toEqual(["stage_play_micro_reasoner_prompt_preset_query_result"]);
+    }
+  });
+
+  it("does not execute MicroDeck query from quoted, negated, future, historical, or screen-visible mentions", () => {
+    for (const prompt of [
+      "Do not query the MicroDeck right now; explain what it is for.",
+      "Later we might inspect the micro-reasoner deck.",
+      "If we inspect the MicroDeck presets tomorrow, what should we watch for?",
+      "Earlier we queried the MicroDeck preset assembly during the smoke test.",
+      "The UI button says MicroDeck presets.",
+      "The current screen-visible label reads Query MicroDeck presets.",
+      "The operator said \"query the MicroDeck presets\" in the old transcript.",
+      "The phrase `live_env.query_micro_reasoner_presets` is shown in the docs.",
+    ]) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt,
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: "live_env.query_micro_reasoner_presets",
+      });
+
+      expect(phase.phase).not.toBe("query_micro_reasoner_deck");
+      expect(phase.allowedTools).not.toContain("live_env.query_micro_reasoner_presets");
+      expect(phase.allowedTools).not.toContain("live_env.read_processed_live_source_mail");
+      expect(phase.allowedTools).not.toContain("live_env.process_live_source_mail");
+    }
   });
 
   it("requires a recorded decision before voice for processed voice candidates", () => {
