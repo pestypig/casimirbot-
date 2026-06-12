@@ -8,6 +8,7 @@ export type HelixSolverControllerBlockingReason =
   | "solver_path_incomplete"
   | "retrieval_not_answerable"
   | "capability_lifecycle_incomplete"
+  | "capability_admitted_not_dispatched"
   | "turn_id_integrity_failed"
   | "visual_evidence_missing"
   | "workspace_context_missing"

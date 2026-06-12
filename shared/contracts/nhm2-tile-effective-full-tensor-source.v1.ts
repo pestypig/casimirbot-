@@ -261,7 +261,7 @@ export const buildNhm2TileEffectiveFullTensorSourceArtifact = (
     !input.sourceModel.sourceSideOnly ||
     !input.sourceModel.notDerivedFromMetricRequiredTensor ||
     input.sourceModel.metricRequiredInputRefs.length > 0 ||
-    regions.some((region) => region.status === "fail");
+    regions.some((region) => region.status === "fail" || region.status === "missing");
   const hasReview = regions.some((region) => region.status === "review");
   const overallState = hasFail ? "fail" : hasReview ? "review" : "pass";
   return {

@@ -170,6 +170,26 @@ const hasSatisfiedLivePipelineReceipt = (payload: RecordLike, terminalArtifactKi
   });
 };
 
+const hasSatisfiedDocOpenReceipt = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (terminalArtifactKind !== "doc_open_receipt") return false;
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes("doc_open_receipt")) return false;
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "doc_open_receipt") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    return readString(artifactPayload?.status) === "opened";
+  });
+};
+
 const hasMaterializedScholarlyResearchAnswer = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (terminalArtifactKind !== "scholarly_research_answer") return false;
   if (readString(payload.final_answer_source) !== "final_answer_draft") return false;
@@ -436,6 +456,7 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (hasMaterializedScholarlyResearchAnswer(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedDocOpenReceipt(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);
@@ -450,6 +471,11 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
     if (readBoolean(result.reentered_solver) !== true) return false;
   }
   return true;
+};
+
+const hasAdmittedCapabilityWithoutDispatch = (payload: RecordLike): boolean => {
+  const ledger = readRecord(payload.capability_lifecycle_ledger);
+  return readStringArray(ledger?.failure_codes).includes("capability_admitted_not_dispatched");
 };
 
 export function buildTurnIdIntegrityAudit(input: {
@@ -755,6 +781,9 @@ export function buildSolverControllerDecision(input: {
       pushUnique(blockingReasons, "terminal_equivalence_failed");
     }
     if (capabilityGuardRequired && !isCapabilityLifecycleComplete(payload, terminalArtifactKind)) {
+      if (hasAdmittedCapabilityWithoutDispatch(payload)) {
+        pushUnique(blockingReasons, "capability_admitted_not_dispatched");
+      }
       pushUnique(blockingReasons, "capability_lifecycle_incomplete");
     }
     if (disciplineGuardRequired) {
@@ -948,6 +977,7 @@ export function buildSolverControllerDecision(input: {
       reason === "terminal_kind_not_required" ||
       reason === "terminal_equivalence_missing" ||
       reason === "terminal_equivalence_failed" ||
+      reason === "capability_admitted_not_dispatched" ||
       reason === "capability_lifecycle_incomplete" ||
       reason === "agent_runtime_loop_missing" ||
       reason === "agent_step_decision_missing" ||
@@ -978,6 +1008,7 @@ export function buildSolverControllerDecision(input: {
     effectiveBlockingReasons.every((reason) =>
       reason === "selected_capability_observation_missing" ||
       reason === "post_observation_model_decision_missing" ||
+      reason === "capability_admitted_not_dispatched" ||
       reason === "capability_lifecycle_incomplete" ||
       reason === "solver_path_incomplete",
     );

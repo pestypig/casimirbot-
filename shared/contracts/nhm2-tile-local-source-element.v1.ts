@@ -175,6 +175,19 @@ const isTensorComponent = (value: string): value is Nhm2TensorComponent =>
 const componentSet = (tensor: Nhm2RegionalTensor): Set<Nhm2TensorComponent> =>
   new Set(NHM2_TENSOR_COMPONENTS.filter((component) => tensor[component] != null));
 
+const NHM2_TILE_LOCAL_SOURCE_SYMMETRIC_TENSOR_COMPONENTS = [
+  "T00",
+  "T01",
+  "T02",
+  "T03",
+  "T11",
+  "T12",
+  "T13",
+  "T22",
+  "T23",
+  "T33",
+] as const satisfies readonly Nhm2TensorComponent[];
+
 export const inferNhm2TileLocalSourceTensorAuthorityMode = (
   tensor: Nhm2RegionalTensor,
 ): Nhm2TileLocalSourceElementV1["tensorAuthorityMode"] => {
@@ -182,19 +195,7 @@ export const inferNhm2TileLocalSourceTensorAuthorityMode = (
   if (NHM2_TENSOR_COMPONENTS.every((component) => components.has(component))) {
     return "full_tensor";
   }
-  const symmetric: readonly Nhm2TensorComponent[] = [
-    "T00",
-    "T01",
-    "T02",
-    "T03",
-    "T11",
-    "T12",
-    "T13",
-    "T22",
-    "T23",
-    "T33",
-  ];
-  if (symmetric.every((component) => components.has(component))) {
+  if (NHM2_TILE_LOCAL_SOURCE_SYMMETRIC_TENSOR_COMPONENTS.every((component) => components.has(component))) {
     return "symmetric_full_tensor";
   }
   if (["T00", "T11", "T22", "T33"].every((component) => components.has(component as Nhm2TensorComponent))) {
@@ -205,8 +206,14 @@ export const inferNhm2TileLocalSourceTensorAuthorityMode = (
 
 export const missingNhm2TileLocalSourceTensorComponents = (
   tensor: Nhm2RegionalTensor,
-): Nhm2TensorComponent[] =>
-  NHM2_TENSOR_COMPONENTS.filter((component) => tensor[component] == null);
+): Nhm2TensorComponent[] => {
+  const authority = inferNhm2TileLocalSourceTensorAuthorityMode(tensor);
+  const required =
+    authority === "symmetric_full_tensor"
+      ? NHM2_TILE_LOCAL_SOURCE_SYMMETRIC_TENSOR_COMPONENTS
+      : NHM2_TENSOR_COMPONENTS;
+  return required.filter((component) => tensor[component] == null);
+};
 
 const deriveElementBlockers = (
   element: Nhm2TileLocalSourceElementV1,

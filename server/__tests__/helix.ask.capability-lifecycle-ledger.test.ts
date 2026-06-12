@@ -78,7 +78,7 @@ describe("Helix capability lifecycle ledger", () => {
     });
   });
 
-  it("requires every capability plan to have a result or explicit not-run reason", () => {
+  it("requires every admitted capability plan to dispatch before a result can be missing", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:missing-result",
       promptText: "Click Start.",
@@ -94,7 +94,14 @@ describe("Helix capability lifecycle ledger", () => {
       },
     });
 
-    expect(ledger.failure_codes).toEqual(expect.arrayContaining(["capability_result_missing"]));
+    expect(ledger.failure_codes).toEqual(expect.arrayContaining([
+      "capability_admitted_not_dispatched",
+      "capability_result_missing",
+    ]));
+    expect(ledger.stages.find((stage) => stage.stage === "dispatched")).toMatchObject({
+      status: "failed",
+      reason: "capability_admitted_not_dispatched",
+    });
     expect(ledger.stages.find((stage) => stage.stage === "result_observed")).toMatchObject({
       status: "failed",
     });
@@ -126,6 +133,7 @@ describe("Helix capability lifecycle ledger", () => {
     });
 
     expect(ledger.failure_codes).not.toContain("capability_result_missing");
+    expect(ledger.failure_codes).not.toContain("capability_admitted_not_dispatched");
     expect(ledger.failure_codes).toEqual(expect.arrayContaining(["mutating_capability_without_operator_command"]));
     expect(ledger.stages.find((stage) => stage.stage === "result_observed")).toMatchObject({
       status: "succeeded",

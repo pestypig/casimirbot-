@@ -1433,4 +1433,85 @@ describe("helix ask solver controller decision", () => {
     expect(decision.decision).toBe("continue");
     expect(decision.blocking_reasons).toContain("receipt_not_terminal_eligible");
   });
+
+  it("surfaces admitted capability plans that never dispatch", () => {
+    const payload = {
+      active_prompt: "Search docs for Helix Ask console debug.",
+      canonical_goal_frame: {
+        turn_id: "ask:admitted-not-dispatched",
+        goal_kind: "doc_lookup",
+        required_terminal_kind: "doc_search_result",
+      },
+      route_reason_code: "doc_lookup",
+      terminal_artifact_kind: "doc_search_result",
+      final_answer_source: "doc_search_result",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: "ask:admitted-not-dispatched",
+        route: "doc_lookup",
+        terminal_artifact_kind: "doc_search_result",
+        final_answer_source: "doc_search_result",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: "ask:admitted-not-dispatched",
+        completed_solver_path: false,
+      },
+      goal_satisfaction_evaluation: satisfiedGoal("doc_lookup", "doc_search_result"),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:admitted-not-dispatched",
+        capability_family: "docs",
+        requested_action: "search_docs",
+        mutating: false,
+        operator_command_required: false,
+        operator_command_present: false,
+        source_target: "docs_viewer",
+        goal_kind: "doc_lookup",
+        required_terminal_kind: "doc_search_result",
+        admission_status: "needs_evidence",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_lifecycle_ledger: {
+        schema: "helix.capability_lifecycle_ledger.v1",
+        turn_id: "ask:admitted-not-dispatched",
+        capability_plan_id: "capability_plan:ask:admitted-not-dispatched:docs:search_docs",
+        capability_result_id: null,
+        stages: [
+          {
+            stage: "dispatched",
+            status: "failed",
+            refs: [],
+            reason: "capability_admitted_not_dispatched",
+          },
+        ],
+        failure_codes: ["capability_admitted_not_dispatched", "capability_result_missing"],
+        ok: false,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId: "ask:admitted-not-dispatched",
+      finalRoute: "doc_lookup",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId: "ask:admitted-not-dispatched", payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId: "ask:admitted-not-dispatched",
+        finalRoute: "doc_lookup",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("fail_closed");
+    expect(decision.blocking_reasons).toContain("capability_admitted_not_dispatched");
+    expect(decision.blocking_reasons).toContain("capability_lifecycle_incomplete");
+    expect(decision.typed_failure_code).toBe("capability_admitted_not_dispatched");
+  });
 });

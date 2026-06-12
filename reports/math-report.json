@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-12T06:50:47.698Z",
+  "generatedAt": "2026-06-12T15:48:50.432Z",
   "registryCount": 129,
   "coverage": {
     "exploratory": {
@@ -251,8 +251,8 @@
     "modules": []
   },
   "autoGraph": {
-    "nodeCount": 1961,
-    "edgeCount": 4570
+    "nodeCount": 1966,
+    "edgeCount": 4571
   },
   "evidenceProfiles": [
     {

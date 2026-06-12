@@ -14,6 +14,7 @@ export type HelixCapabilityLifecycleStageStatus = "succeeded" | "failed" | "skip
 
 export type HelixCapabilityLifecycleFailureCode =
   | "capability_dispatched_without_admission"
+  | "capability_admitted_not_dispatched"
   | "capability_result_missing"
   | "capability_result_unvalidated"
   | "capability_result_not_reentered"

@@ -22,6 +22,11 @@ const findAction = (body: Record<string, any>, panelId: string, actionId = "open
     : null;
 };
 
+const actionsOf = (body: Record<string, any>) => {
+  const actions = body?.action_envelope?.workstation_actions ?? [];
+  return Array.isArray(actions) ? actions : [];
+};
+
 const readGoalSatisfaction = (body: Record<string, any>) => body?.goal_satisfaction_evaluation ?? null;
 
 const readStreamFinal = (text: string): Record<string, any> => {
@@ -1076,6 +1081,93 @@ describe("helix ask E52 panel control terminal contract", () => {
         iteration.missing_requirement_ids?.length > 0
       )).toBe(true);
       expect(response.body?.agent_runtime_loop?.iterations?.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+      if (previousObservationReview === undefined) delete process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE;
+      else process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE = previousObservationReview;
+      if (previousObservationReviewIndex === undefined) delete process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE_INDEX = previousObservationReviewIndex;
+    }
+  }, 60000);
+
+  it("advances docs open workflow when the model repeats a completed docs search", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    const previousObservationReview = process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE;
+    const previousObservationReviewIndex = process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    delete process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE;
+    delete process.env.HELIX_OBSERVATION_REVIEW_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Search docs for the requested console debug document path.",
+        args: { query: "Helix Ask console debug", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.92,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Incorrectly repeat the same search after results already exist.",
+        args: { query: "Helix Ask console debug", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.7,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.open_doc_by_path",
+        reason: "Open the selected Helix Ask console debug document path.",
+        args: { path: "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md" },
+        expected_artifacts: ["doc_open_receipt"],
+        confidence: 0.94,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The doc_open_receipt satisfies the document path request.",
+        args: {},
+        expected_artifacts: ["doc_open_receipt"],
+        confidence: 0.97,
+      },
+    ]);
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Search docs for Helix Ask console debug and tell me which document path you found.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-doc-search-repeat-${Date.now()}`,
+        })
+        .expect(200);
+
+      const actions = actionsOf(response.body);
+      expect(actions.filter((action) => action?.panel_id === "docs-viewer" && action?.action_id === "search_docs")).toHaveLength(1);
+      expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "validate_doc_candidates")).toBe(true);
+      expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_by_path")).toBe(true);
+      expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      expect(response.body?.goal_satisfaction_evaluation?.required_actions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ action_key: "docs-viewer.search_docs", satisfied: true }),
+          expect.objectContaining({ action_key: "docs-viewer.validate_doc_candidates", satisfied: true }),
+          expect.objectContaining({ action_key: "docs-viewer.open_doc_by_path", satisfied: true }),
+        ]),
+      );
+      expect((response.body?.agent_runtime_loop?.iterations ?? []).some((iteration: any) =>
+        iteration.chosen_capability === "docs-viewer.validate_doc_candidates" &&
+        iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
     } finally {
       if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
       else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;

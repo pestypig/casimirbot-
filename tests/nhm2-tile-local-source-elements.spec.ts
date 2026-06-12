@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
 import {
   buildNhm2TileLocalSourceElementsArtifact,
@@ -9,13 +10,17 @@ import {
 import type { Nhm2RegionalTensor } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import { aggregateTileLocalSourceToRegionalCounterpart } from "../tools/nhm2/aggregate-tile-local-source-to-regional-counterpart";
+import { buildLayeredWallSourceCandidate } from "../tools/nhm2/build-layered-wall-source-candidate";
 import { buildTileLocalSourceElementsFromCavityContract } from "../tools/nhm2/build-tile-local-source-elements";
+import { buildWallMaterialSourceTensorModel } from "../tools/nhm2/build-wall-material-source-tensor-model";
+import { buildWallSourceLayeringSweep } from "../tools/nhm2/build-wall-source-layering-sweep";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
+const generatedAt = "2026-06-12T00:00:00.000Z";
 
 const referenceRun = () =>
   buildNhm2ReferenceRunArtifact({
-    generatedAt: "2026-06-12T00:00:00.000Z",
+    generatedAt,
     runId: "tile-local-run",
     repo: {
       repositoryFullName: "local/casimirbot",
@@ -53,6 +58,77 @@ const referenceRun = () =>
       reproducibilityStatus: "missing",
     },
   });
+
+const materialReceipt = () =>
+  buildCasimirMaterialReceipt({
+    generatedAt,
+    tileBatchId: "nhm2_cavity_geometry_freeze_v1",
+    geometry: {
+      gapMeters: 8e-9,
+      gapMetrologyStatus: "measured",
+      roughnessRmsMeters: 1e-12,
+      beyondPfaValidity: "pass",
+    },
+    material: {
+      modelKind: "lifshitz",
+      dielectricResponseRef: "fixture:lifshitz-response",
+      finiteConductivityIncluded: true,
+      finiteTemperatureIncluded: true,
+      roughnessCorrectionIncluded: true,
+    },
+    environment: {
+      vacuumSealEvidence: "present",
+      temperatureK: 4,
+    },
+    correctionFactors: {
+      conductivity: 1,
+      temperature: 1,
+      roughness: 1,
+      geometry: 1,
+    },
+  });
+
+const wallSourceTensorModel = () => {
+  const selected = buildLayeredWallSourceCandidate({
+    generatedAt,
+    sourceSweep: buildWallSourceLayeringSweep({
+      generatedAt,
+      layerCounts: [447],
+      packingFractions: [1],
+      orientationProjections: [1],
+      materialCorrections: [1],
+      metricReliefFactors: [1],
+    }),
+    sourceSweepRef: "sweep.json",
+  });
+  return buildWallMaterialSourceTensorModel({
+    generatedAt,
+    candidate: selected,
+    candidateRef: "candidate.json",
+    materialReceipt: materialReceipt(),
+    materialReceiptRef: "receipt.json",
+    componentModel: {
+      modelKind: "lifshitz_wall_tensor",
+      basis: "local_wall_orthonormal",
+      projection: {
+        wallNormalRef: "fixture:wall-normal",
+        sameChartProjectionStatus: "pass",
+      },
+      components: {
+        T00: { valueSI: -1.6995e9, status: "material_receipted", provenanceRef: "fixture:T00" },
+        T0x: { valueSI: 0, status: "computed", provenanceRef: "fixture:T0x" },
+        T0y: { valueSI: 0, status: "computed", provenanceRef: "fixture:T0y" },
+        T0z: { valueSI: 0, status: "computed", provenanceRef: "fixture:T0z" },
+        Txx: { valueSI: 4.1e7, status: "computed", provenanceRef: "fixture:Txx" },
+        Txy: { valueSI: 0, status: "computed", provenanceRef: "fixture:Txy" },
+        Txz: { valueSI: 0, status: "computed", provenanceRef: "fixture:Txz" },
+        Tyy: { valueSI: 4.1e7, status: "computed", provenanceRef: "fixture:Tyy" },
+        Tyz: { valueSI: 0, status: "computed", provenanceRef: "fixture:Tyz" },
+        Tzz: { valueSI: 4.1e7, status: "computed", provenanceRef: "fixture:Tzz" },
+      },
+    },
+  });
+};
 
 const fullTensor = (value: number): Nhm2RegionalTensor => ({
   T00: -value,
@@ -199,6 +275,42 @@ describe("NHM2 tile-local source elements", () => {
     expect(wall?.tensor.T01).toBeUndefined();
     expect(wall?.tensorAuthorityMode).toBe("proxy");
     expect(wall?.blockers).toContain("full_tensor_authority_missing");
+  });
+
+  it("uses a wall material source tensor model to produce non-proxy wall counterpart authority", () => {
+    const artifact = buildTileLocalSourceElementsFromCavityContract({
+      runId: "tile-local-run",
+      selectedProfileId: profile,
+      expectedProfileId: profile,
+      materialReceipt: materialReceipt(),
+      wallMaterialSourceTensorModel: wallSourceTensorModel(),
+      wallMaterialSourceTensorModelRef: "wall-source-tensor-model.json",
+    });
+    const counterpart = aggregateTileLocalSourceToRegionalCounterpart({
+      referenceRun: referenceRun(),
+      tileLocalSourceElements: artifact,
+      tileLocalSourceElementsRef: "tile-local.json",
+    });
+    const authority = buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+      generatedAt,
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId: profile,
+      chartId: "comoving_cartesian",
+      sourceModelId: "nhm2_wall_material_source_tensor_model",
+      counterpartArtifactRef: "tile-counterpart.json",
+      counterpartArtifact: counterpart,
+      casimirMaterialReceipt: materialReceipt(),
+      requiredRegionIds: ["wall"],
+    });
+    const wall = counterpart.regions.find((region) => region.regionId === "wall");
+
+    expect(wall?.comparisonRole).toBe("tile_effective_counterpart");
+    expect(wall?.tensorAuthorityMode).toBe("symmetric_full_tensor");
+    expect(wall?.tensor.T01).toBe(0);
+    expect(wall?.tensor.T12).toBe(0);
+    expect(wall?.blockers).toEqual([]);
+    expect(authority.summary.hasWallAuthority).toBe(true);
+    expect(authority.summary.allRequiredRegionsAuthoritative).toBe(true);
   });
 
   it("keeps diagonal-only local tensors non-authoritative because T0i and off-diagonal Tij are missing", () => {

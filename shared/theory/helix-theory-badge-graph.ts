@@ -63,6 +63,9 @@ import {
 import {
   buildPeriodicElementOriginTheoryBadgesV1,
 } from "./periodic-element-origin-theory-badges";
+import {
+  buildPhaseOfMatterTheoryBadgesV1,
+} from "./phase-of-matter-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -927,6 +930,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
   const nucleosynthesisOrigins = buildNucleosynthesisOriginTheoryBadgesV1();
   const periodicElements = buildPeriodicElementOriginTheoryBadgesV1();
+  const phasesOfMatter = buildPhaseOfMatterTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
@@ -953,6 +957,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...orchOr.badges,
       ...nucleosynthesisOrigins.badges,
       ...periodicElements.badges,
+      ...phasesOfMatter.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -974,6 +979,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...orchOr.edges,
       ...nucleosynthesisOrigins.edges,
       ...periodicElements.edges,
+      ...phasesOfMatter.edges,
     ],
   });
 }

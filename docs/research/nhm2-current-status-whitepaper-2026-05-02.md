@@ -418,6 +418,22 @@ The first selected row is the `447`-layer fixed-control-volume case. It can reco
 
 The companion tensor adapter is also deliberately narrow. It can emit the selected candidate into the existing `nhm2_tile_effective_full_tensor_source/v1` surface, but only as a wall `T00` proxy when that is all the source model supplies. Missing `T0i`, off-diagonal `Tij`, regional masks, and other required regions remain explicit blockers. This makes the next failure mode inspectable: either the 447-layer lead grows into a material-receipted same-basis full tensor, or it stops at scalar wall magnitude.
 
+The non-proxy wall source tensor model is the new source-side insertion point:
+
+```text
+nhm2_wall_material_source_tensor_model/v1
+```
+
+This artifact is intentionally not a solver. It is a typed receipt for an independently supplied wall source tensor model: `T00`, `T0i`, diagonal stresses, and off-diagonal stresses, with provenance, assumptions, material receipt reference, chart/basis metadata, and same-chart projection status. Explicit zeros are allowed only when the model computes or receipts them; absent components remain `missing`. The builder rejects metric-required tensor provenance so the wall source cannot become a metric echo. When supplied to tile-local source elements, the wall model can become a non-proxy `symmetric_full_tensor` regional counterpart for the wall while hull and exterior evidence remain separately audited.
+
+The layered wall full-tensor source audit is the next gate in that chain:
+
+```text
+nhm2_layered_wall_full_tensor_source_audit/v1
+```
+
+It asks whether the selected layered source candidate can supply `T00`, `T0i`, diagonal spatial stresses, and off-diagonal spatial stresses on the same chart without copying the metric-required tensor. With no wall source tensor model, the implementation carries wall `T00` from the layered scalar candidate and marks momentum density and stress components missing. With an explicit non-metric source tensor model, it maps only the supplied components into the audit; missing components are still blockers. A material receipt may remove the material-evidence blocker, but it does not by itself create a material tensor model. Until a real source-side stress model fills those components, the full tensor path remains proxy/incomplete and the same-basis authority receipt should continue to fail.
+
 This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
 
 ```text
@@ -974,6 +990,8 @@ npm run nhm2:build-tile-local-source-elements
 npm run nhm2:aggregate-tile-local-source-counterpart
 npm run nhm2:build-wall-source-layering-sweep
 npm run nhm2:build-layered-wall-source-candidate
+npm run nhm2:build-wall-material-source-tensor-model
+npm run nhm2:build-layered-wall-full-tensor-source-audit
 npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
@@ -989,6 +1007,8 @@ build tile-local source elements from the frozen cavity contract
 aggregate tile-local source elements into regional tile-effective counterpart
 build diagnostic wall-source layering sweep
 select layered wall-source candidate
+emit wall material/source tensor model when non-proxy component evidence exists
+audit layered wall-source full tensor components
 emit honest wall T00-only tensor candidate when no full tensor source exists
 publish tile-effective counterpart
 publish source-side same-basis authority receipt
@@ -1030,6 +1050,8 @@ This command does not recompute physics and does not produce a full-solve pass. 
 | `R_wall_T00 = T00_wall_required - T00_wall_available` | wall-region source residual | front-door wall closure badge / audit row | global residual cannot override wall failure |
 | `sourceMultiplier = N_layer f_pack f_orient C_material q_mult d_mult` | wall-source layering scalar sweep | explores whether layer count / packing / orientation / material / duty / metric relief can approach wall `T00` arithmetic margins | scalar lead only; no physical pass without tensor, material, conservation, observer, and QEI gates |
 | `nhm2_layered_wall_source_candidate/v1` | selected source-stack pass-path audit | records whether a sweep row survives scalar, tensor, material, conservation, QEI, and observer gates | `fullSolvePassEligible=false`; selected row is not a physical source proof |
+| `nhm2_wall_material_source_tensor_model/v1` | source-side wall tensor model receipt | supplies independently declared wall `T00`, `T0i`, diagonal stress, and off-diagonal stress components when available | explicit zeros require computed provenance; metric-required tensor echoes are forbidden |
+| `nhm2_layered_wall_full_tensor_source_audit/v1` | layered source tensor component audit | checks whether selected stack supplies `T00`, `T0i`, diagonal stresses, and off-diagonal stresses | missing components remain missing; material receipt alone does not create tensor authority |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
