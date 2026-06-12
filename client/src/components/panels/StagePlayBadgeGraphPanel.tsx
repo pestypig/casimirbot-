@@ -515,6 +515,13 @@ type StagePlayPacketTrafficReasonerRun = {
   refs: string[];
 };
 
+type StagePlayPacketTrafficDeckSnapshot = {
+  presetId?: string | null;
+  title?: string | null;
+  runPlan?: string | null;
+  promptedRoles: StagePlayMicroReasonerRoleV1[];
+};
+
 type StagePlayPacketTrafficViewV1 = {
   packetKey: string;
   colorKey: string;
@@ -527,6 +534,17 @@ type StagePlayPacketTrafficViewV1 = {
   sourceId?: string | null;
   observerProfileId?: string | null;
   observerProfileTitle?: string | null;
+  deck?: StagePlayPacketTrafficDeckSnapshot | null;
+  deckVerdict?: {
+    recommendedNext?: string | null;
+    wakeAsk?: boolean | null;
+    voiceCandidate?: boolean | null;
+    reason?: string | null;
+  };
+  coalescing?: {
+    supersededWakeIds: string[];
+    label: string | null;
+  };
   status:
     | "mail_received"
     | "packet_ready"
@@ -2304,6 +2322,28 @@ const stagePlayTrafficStatusGlyph = (status: StagePlayPacketTrafficStationStatus
   return "--";
 };
 
+const stagePlayPacketDeckTitle = (deck?: StagePlayPacketTrafficDeckSnapshot | null): string =>
+  compactStagePlayText(deck?.title, "Deck pending.", 64);
+
+const stagePlayPacketDeckRunPlan = (deck?: StagePlayPacketTrafficDeckSnapshot | null): string =>
+  compactStagePlayText(deck?.runPlan, "plan pending", 64);
+
+function stagePlayDeckRolesForPacket(packet: StagePlayProcessedMailPacketV1 | null): StagePlayMicroReasonerRoleV1[] {
+  const promptedRoles = packet?.microReasonerDeck?.promptedRoles ?? [];
+  if (promptedRoles.length > 0) return promptedRoles;
+  return STAGE_PLAY_DECK_ROLES;
+}
+
+function stagePlayDeckSnapshotForPacket(packet: StagePlayProcessedMailPacketV1): StagePlayPacketTrafficDeckSnapshot | null {
+  if (!packet.microReasonerDeck) return null;
+  return {
+    presetId: packet.microReasonerDeck.presetId,
+    title: packet.microReasonerDeck.presetTitle,
+    runPlan: packet.microReasonerDeck.deckRunPlan,
+    promptedRoles: packet.microReasonerDeck.promptedRoles ?? [],
+  };
+}
+
 const activeStagePlayJourneyIndex = (stations: StagePlayMailJourneyStation[]): number => {
   const blocked = stations.findIndex((station) => station.state === "blocked");
   if (blocked >= 0) return blocked;
@@ -2586,9 +2626,27 @@ function StagePlayReasonerDots({
 }) {
   const color = packetTrailColor(traffic.colorKey);
   const runByRole = new Map(traffic.microReasonerRuns.map((run) => [run.role, run]));
+  const visibleRoles = traffic.microReasonerRuns.map((run) => run.role);
+  if (visibleRoles.length === 1 && visibleRoles[0] === "hypothesis_arbiter") {
+    const run = runByRole.get("hypothesis_arbiter");
+    const recommendation = traffic.deckVerdict?.recommendedNext ?? "arbiter";
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(traffic.packetKey)}
+        className="inline-flex max-w-full items-center gap-1.5 rounded border border-emerald-700 bg-emerald-950/35 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+        style={{ borderColor: color.border }}
+        title={`Hypothesis Arbiter: ${run?.status ?? "missing"}${run?.latencyMs != null ? ` (${run.latencyMs}ms)` : ""}`}
+        data-testid="stage-play-packet-reasoner-dot"
+      >
+        <span className="h-2 w-2 rounded-full bg-emerald-300" aria-hidden="true" />
+        <span className="truncate">Arbiter OK {labelize(recommendation)}</span>
+      </button>
+    );
+  }
   return (
     <div className="flex flex-wrap gap-1" data-testid="stage-play-packet-reasoner-dots">
-      {STAGE_PLAY_DECK_ROLES.map((role) => {
+      {visibleRoles.map((role) => {
         const run = runByRole.get(role);
         const status = run?.status ?? "missing";
         const statusClass = status === "completed"
@@ -2715,6 +2773,16 @@ function StagePlayPacketTrafficBoard({
                     <span className="truncate text-[11px] font-semibold text-slate-100">{row.packetId?.split(":").at(-1)?.slice(0, 10) ?? row.packetKey.split(":").at(-1)?.slice(0, 10)}</span>
                   </div>
                   <div className="mt-1 truncate font-mono text-[9px] text-slate-500">{labelize(row.status)}</div>
+                  <div className="mt-2 rounded border border-slate-800 bg-slate-950/70 px-1.5 py-1">
+                    <div className="text-[8px] font-semibold uppercase tracking-wide text-slate-500">Deck</div>
+                    <div className="mt-0.5 truncate text-[10px] font-semibold text-cyan-100">{stagePlayPacketDeckTitle(row.deck)}</div>
+                    <div className="truncate font-mono text-[8px] text-slate-500">{stagePlayPacketDeckRunPlan(row.deck)}</div>
+                  </div>
+                  {row.coalescing?.label ? (
+                    <div className="mt-1 line-clamp-2 rounded border border-amber-800 bg-amber-950/25 px-1.5 py-1 text-[9px] leading-snug text-amber-100">
+                      {row.coalescing.label}
+                    </div>
+                  ) : null}
                 </button>
                 {STAGE_PLAY_PACKET_TRAFFIC_STATIONS.map((station) => {
                   const state = row.stationStates.find((entry) => entry.station === station.key);
@@ -2740,6 +2808,17 @@ function StagePlayPacketTrafficBoard({
                         <div className="mt-2">
                           <StagePlayReasonerDots traffic={row} onSelect={onSelectPacket} />
                         </div>
+                        <div className="mt-2 line-clamp-2 text-[10px] leading-snug opacity-85">
+                          {stagePlayPacketDeckTitle(row.deck)}
+                        </div>
+                        <div className="mt-1 truncate font-mono text-[9px] opacity-70">
+                          {stagePlayPacketDeckRunPlan(row.deck)}
+                        </div>
+                        {row.coalescing?.label ? (
+                          <div className="mt-1 line-clamp-2 text-[9px] leading-snug text-amber-100">
+                            {row.coalescing.label}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   }
@@ -2784,7 +2863,7 @@ function StagePlayPacketTrafficBoard({
             <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(selected.metrics.packetChars ?? 0)} />
             <StagePlayMetricPill label="compact chars" value={formatStagePlayCount(selected.metrics.compactChars ?? 0)} />
             <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(selected.metrics.deckMs ?? null)} />
-            <StagePlayMetricPill label="reasoners" value={`${selected.microReasonerRuns.filter((run) => run.status === "completed").length}/${STAGE_PLAY_DECK_ROLES.length}`} />
+            <StagePlayMetricPill label="reasoners" value={`${selected.microReasonerRuns.filter((run) => run.status === "completed").length}/${selected.microReasonerRuns.length}`} />
             <StagePlayMetricPill
               label="workload"
               value={formatStagePlayBudgetRatio(selected.metrics.activePacketLoad)}
@@ -2800,6 +2879,33 @@ function StagePlayPacketTrafficBoard({
               value={typeof selected.metrics.estimatedDeckCallsPerMinute === "number" ? formatStagePlayCount(selected.metrics.estimatedDeckCallsPerMinute) : "n/a"}
               tone={stagePlayBudgetTone(null, selected.metrics.estimatedReasonerLoad)}
             />
+          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
+            <div className="rounded border border-cyan-900/60 bg-cyan-950/15 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Selected deck</div>
+              <div className="mt-1 text-sm font-semibold text-cyan-50" data-testid="stage-play-packet-inspector-deck-title">
+                {stagePlayPacketDeckTitle(selected.deck)}
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-cyan-100/70" data-testid="stage-play-packet-inspector-deck-plan">
+                {stagePlayPacketDeckRunPlan(selected.deck)}
+              </div>
+              <div className="mt-2 text-xs leading-relaxed text-cyan-100/80">
+                Roles shown here are the roles used by this packet deck: {selected.microReasonerRuns.map((run) => labelize(run.role)).join(", ") || "none"}.
+              </div>
+            </div>
+            <div className={`rounded border p-3 ${
+              selected.coalescing?.label
+                ? "border-amber-800 bg-amber-950/25"
+                : "border-slate-800 bg-slate-950/60"
+            }`}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Wake coalescing</div>
+              <div className="mt-1 text-sm font-semibold text-slate-100" data-testid="stage-play-packet-inspector-coalescing">
+                {selected.coalescing?.label ?? "no superseded wakes"}
+              </div>
+              <div className="mt-1 font-mono text-[10px] text-slate-500">
+                {(selected.coalescing?.supersededWakeIds ?? []).slice(0, 3).join(" | ") || "latest packet has no coalesced predecessors"}
+              </div>
+            </div>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {selected.microReasonerRuns.map((run) => (
@@ -5242,11 +5348,12 @@ function StagePlayMailLoopLiveOverview({
     packet: StagePlayProcessedMailPacketV1 | null,
     mailIds: string[],
   ): StagePlayPacketTrafficReasonerRun[] => {
+    const rolesForPacket = stagePlayDeckRolesForPacket(packet);
     const scopedRuns = runs.filter((run) => {
       if (packet?.microReasonerRunRefs.includes(run.runId)) return true;
       return run.mailIds.some((mailId) => mailIds.includes(mailId));
     });
-    return STAGE_PLAY_DECK_ROLES.map((role) => {
+    return rolesForPacket.map((role) => {
       const run =
         (packet ? latestStagePlayRunForPacket(scopedRuns, role, packet) : null) ??
         scopedRuns.filter((entry) => entry.role === role).at(-1) ??
@@ -5273,6 +5380,7 @@ function StagePlayMailLoopLiveOverview({
     const mailIds = packet.mailIds;
     const primaryMail = mailIds.map((mailId) => mailById.get(mailId)).find(Boolean) ?? null;
     const reasonerRuns = buildReasonerTrafficRuns(packet, mailIds);
+    const deck = stagePlayDeckSnapshotForPacket(packet);
     const deckStatus = stationStatusForDeck(reasonerRuns);
     const wake = wakeRequests
       .filter((candidate) => candidate.mailIds.some((mailId) => mailIds.includes(mailId)))
@@ -5284,6 +5392,10 @@ function StagePlayMailLoopLiveOverview({
     const decisionIds = new Set([...(wake?.decisionIds ?? []), ...(wakeResult?.decisionIds ?? [])]);
     const decision = decisions.filter((entry) => decisionIds.has(entry.decisionId)).at(-1) ?? null;
     const voiceRefs = wakeResult?.voiceCheckpointRefs ?? [];
+    const supersededWakeIds = uniqueSorted([
+      ...(wake?.supersededWakeIds ?? []),
+      ...(wakeResult?.supersededWakeIds ?? []),
+    ]);
     const wakeFailure = wakeResult?.failedReason ?? wakeResult?.skippedReason ?? wake?.failureReason ?? null;
     const packetVoiceRequested =
       packet.recommendedNext === "request_voice_callout" ||
@@ -5396,7 +5508,7 @@ function StagePlayMailLoopLiveOverview({
       {
         station: "micro_reasoner_deck",
         status: deckStatus,
-        preview: `${reasonerRuns.filter((run) => run.status === "completed").length}/${STAGE_PLAY_DECK_ROLES.length} complete`,
+        preview: `${stagePlayPacketDeckTitle(deck)} | ${stagePlayPacketDeckRunPlan(deck)} | ${reasonerRuns.filter((run) => run.status === "completed").length}/${reasonerRuns.length} complete`,
         refs: reasonerRuns.flatMap((run) => run.refs),
         durationMs: packetDeckMs,
       },
@@ -5459,6 +5571,19 @@ function StagePlayMailLoopLiveOverview({
       sourceId: primaryMail?.sourceId ?? visualSource?.sourceId ?? null,
       observerProfileId: latestPolicy?.observerProfileId ?? null,
       observerProfileTitle: latestPolicy?.observerProfileTitle ?? null,
+      deck,
+      deckVerdict: {
+        recommendedNext: packet.arbiter?.recommendedNext ?? packet.recommendedNext,
+        wakeAsk: packet.arbiter?.wakeAsk ?? false,
+        voiceCandidate: packet.arbiter?.voiceCandidate ?? packet.salience.voiceCandidate ?? false,
+        reason: packet.arbiter?.reason ?? null,
+      },
+      coalescing: {
+        supersededWakeIds,
+        label: supersededWakeIds.length > 0
+          ? `superseded ${supersededWakeIds.length} older wake${supersededWakeIds.length === 1 ? "" : "s"}; latest same-source packet wins`
+          : null,
+      },
       status: trafficStatus,
       stationStates,
       microReasonerRuns: reasonerRuns,
@@ -5495,6 +5620,17 @@ function StagePlayMailLoopLiveOverview({
     sourceId: mail.sourceId,
     observerProfileId: latestPolicy?.observerProfileId ?? null,
     observerProfileTitle: latestPolicy?.observerProfileTitle ?? null,
+    deck: null,
+    deckVerdict: {
+      recommendedNext: null,
+      wakeAsk: false,
+      voiceCandidate: false,
+      reason: null,
+    },
+    coalescing: {
+      supersededWakeIds: [],
+      label: null,
+    },
     status: "mail_received",
     stationStates: [
       {

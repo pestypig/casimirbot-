@@ -369,6 +369,23 @@ nhm2_source_side_same_basis_tensor_authority/v1
 
 It is a gate over the source-side tensor candidate rather than a second tensor producer. Its job is to state whether the source-side artifact has enough basis, chart, region, provenance, material-receipt, and full-component evidence to be compared against the metric-required tensor. A tensor-shaped source artifact can still fail this receipt if it is diagonal-only, proxy-derived, material-unreceipted where material authority is claimed, missing wall authority, or dependent on metric-required references. This distinction keeps the paper from treating "a tile tensor exists" as equivalent to "source-side same-basis authority exists."
 
+The tile-local source-element bridge adds the missing intermediate surface between the scalar Casimir tile budget and the regional counterpart tensor. The new artifact:
+
+```text
+nhm2_tile_local_source_elements/v1
+```
+
+records representative or explicit tile source elements with tile batch, sector, chart, area, gap, duty, `Q`, material receipt status, scalar budget, local tensor components, region weights, provenance, and blockers. Its first builder reads the frozen cavity contract values: `10 mm x 10 mm` tile area, `8 nm` gap, `80` sectors, `2` concurrent sectors, `Q = 100000`, `dutyCycle = 0.12`, `dutyShip = 0.12`, `15 GHz`, and the `Au-SiN-AlN engineering-freeze stack`. The resulting ideal scalar one-tile baseline remains diagnostic: `E_tile` is about `-8.46e-8 J` for the ideal `8 nm` parallel-plate replay before source-authority gates.
+
+The aggregation adapter:
+
+```text
+nhm2_tile_local_source_elements/v1
+-> nhm2_tile_effective_counterpart/v1
+```
+
+does not replace missing tensor components with zero. If the tile-local source only has scalar `T00`, the regional counterpart remains proxy-limited. If it has diagonal components but lacks `T0i` or off-diagonal `Tij`, it remains diagonal reduced-order. If wall region weights are missing, wall authority remains missing. This is the intended pass-path behavior: the patch makes per-tile-to-wall tensor construction inspectable before any attempt to tune tile count, duty, shell geometry, or source magnitude.
+
 This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
 
 ```text
@@ -392,6 +409,7 @@ With the authority receipt in place, the canonical source-side progression is no
 
 ```text
 source tensor candidate
+-> tile-local source elements and regional aggregation
 -> source-side same-basis tensor authority receipt
 -> wall-region T00 closure
 -> conservation / QEI / observer / policy gates
@@ -920,6 +938,8 @@ The May 8 source-side full-tensor update adds the following validation-hardening
 npm run nhm2:publish-tile-effective-full-tensor-source
 npm run nhm2:publish-tile-counterpart-conservation
 npm run nhm2:audit-tile-counterpart-source-independence
+npm run nhm2:build-tile-local-source-elements
+npm run nhm2:aggregate-tile-local-source-counterpart
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
 ```
@@ -930,6 +950,8 @@ The intended chain is:
 freeze reference run
 publish source-side tile-effective full-tensor candidate
 publish conservation diagnostics
+build tile-local source elements from the frozen cavity contract
+aggregate tile-local source elements into regional tile-effective counterpart
 publish tile-effective counterpart
 publish source-side same-basis authority receipt
 publish regional source-closure evidence

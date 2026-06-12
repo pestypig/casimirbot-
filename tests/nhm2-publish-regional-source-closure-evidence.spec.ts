@@ -8,6 +8,10 @@ import {
   isNhm2RegionalSourceClosureEvidenceArtifact,
   type Nhm2RegionalTensor,
 } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import {
+  buildNhm2TileEffectiveCounterpartArtifact,
+  type Nhm2TileEffectiveCounterpartRegion,
+} from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
 import { publishRegionalSourceClosureEvidence } from "../tools/nhm2/publish-regional-source-closure-evidence";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -192,6 +196,67 @@ const writeArtifacts = (root: string, closure: unknown, sourceName = "source.jso
   writeFileSync(join(root, sourceName), JSON.stringify(closure), "utf8");
 };
 
+const counterpartRegion = (
+  regionId: Nhm2TileEffectiveCounterpartRegion["regionId"],
+): Nhm2TileEffectiveCounterpartRegion => ({
+  regionId,
+  status: "review",
+  comparisonRole: "tile_effective_counterpart",
+  tensorAuthorityMode: "proxy",
+  tensor: { T00: -10 },
+  chartRef: "comoving_cartesian",
+  unitsRef: "J/m^3",
+  regionMaskRef: `tile.region.${regionId}`,
+  aggregationMode: "mean",
+  normalizationBasis: "sample_count",
+  sampleCount: 1,
+  provenance: {
+    producerModule: "fixture",
+    producerFunction: "counterpartRegion",
+    inputRefs: ["fixture"],
+    sourceModelId: "fixture",
+    sourceModelVersion: "v1",
+    derivationMode: "diagonal_proxy",
+    notDerivedFromMetricRequiredTensor: true,
+  },
+  blockers: ["proxy_tensor_authority"],
+});
+
+const tileCounterpart = () =>
+  buildNhm2TileEffectiveCounterpartArtifact({
+    generatedAt: "2026-05-04T00:00:00.000Z",
+    runId: "run-1",
+    selectedProfileId: profile,
+    expectedProfileId: profile,
+    laneId: "nhm2_shift_lapse",
+    sourceAuthorityMode: "proxy",
+    sourceTensorArtifactRef: "tile-local.json",
+    sourceTensorAuthorityMode: "proxy",
+    conservationRef: null,
+    conservationStatus: "unknown",
+    qeiDossierRef: null,
+    qeiApplicabilityStatus: "UNKNOWN",
+    quantumStateAssumptions: [],
+    renormalizationConvention: null,
+    cavityBoundaryModel: "ideal_parallel_plate_scalar_placeholder",
+    cycleAverageClosureStatus: "review",
+    dutyCycleStatus: "review",
+    lightCrossingConsistencyStatus: "unknown",
+    conservationDiagnostics: {
+      divTStatus: "unknown",
+      divTResidualLInf: null,
+      continuityResidualLInf: null,
+      momentumResidualLInf: null,
+    },
+    regions: [
+      counterpartRegion("global"),
+      counterpartRegion("hull"),
+      counterpartRegion("wall"),
+      counterpartRegion("exterior_shell"),
+    ],
+    literatureRefs: ["fixture"],
+  });
+
 describe("publish regional source-closure evidence", () => {
   it("current diagnostic-only source closure produces review or fail", () =>
     withTemp((root) => {
@@ -254,6 +319,42 @@ describe("publish regional source-closure evidence", () => {
           auditOnly: true,
         }).artifactId,
       ).toBe("nhm2_regional_source_closure_evidence");
+    }));
+
+  it("does not force global same-basis status when supplied counterpart metadata mismatches legacy metric metadata", () =>
+    withTemp((root) => {
+      const closure = {
+        ...sourceClosure("tile_effective_counterpart"),
+        globalAccounting: {
+          metric: {
+            sampleCount: 10,
+          },
+          tile: {
+            sampleCount: 10,
+            aggregationMode: "mean",
+            normalizationBasis: "sample_count",
+          },
+        },
+      };
+      writeArtifacts(root, closure);
+      writeFileSync(
+        join(root, "counterpart.json"),
+        JSON.stringify(tileCounterpart()),
+        "utf8",
+      );
+
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        tileEffectiveCounterpartPath: "counterpart.json",
+        outPath: "evidence.json",
+      });
+      const global = artifact.regions.find((region) => region.regionId === "global");
+
+      expect(global?.comparisonBasisStatus).toBe("aggregation_mismatch");
+      expect(artifact.reasonCodes).toContain("global:aggregation_mismatch");
+      expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
     }));
 
   it("artifact includes literatureRefs", () =>

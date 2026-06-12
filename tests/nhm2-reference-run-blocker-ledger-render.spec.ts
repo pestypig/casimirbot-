@@ -26,6 +26,7 @@ const ledger = () =>
       sourceToGeometryDivergenceReport: "divergence.md",
       tileCounterpartProvenanceAudit: "provenance.md",
       sourceTensorArtifact: "source-tensor.json",
+      tileLocalSourceElements: "tile-local-source-elements.json",
       conservationArtifact: null,
       sourceSideSameBasisTensorAuthority: "source-authority.json",
       sourceClosurePassReadiness: "readiness.json",
@@ -34,6 +35,11 @@ const ledger = () =>
     tileCounterpartSource: {
       sourceTensorArtifactRef: "source-tensor.json",
       sourceTensorAuthorityMode: "reconstituted_from_source_channels",
+      tileLocalSourceElementsRef: "tile-local-source-elements.json",
+      tileLocalSourceElementCount: 3,
+      tileLocalSourceWallCoverage: true,
+      tileLocalSourceMaterialReceiptStatus: "ideal_scalar_only",
+      tileLocalSourceFirstBlocker: "material_receipt_missing_or_not_receipted",
       conservationStatus: "unknown",
       qeiLinkageStatus: "UNKNOWN",
       sourceSideAuthorityRef: "source-authority.json",
@@ -111,6 +117,7 @@ describe("render reference-run blocker ledger", () => {
   it("renders source-side authority and pass-readiness preflight", () => {
     const report = renderReferenceRunBlockerLedger(ledger());
     expect(report).toMatch(/Source-Side Same-Basis Authority/);
+    expect(report).toMatch(/Tile-local source elements ref/);
     expect(report).toMatch(/wall_source_side_authority_incomplete/);
   });
 

@@ -98,6 +98,24 @@ describe("Helix Ask prompt interpretation", () => {
     expect(interpretation.executable_operator_commands).toEqual([]);
   });
 
+  it("does not treat casual debug check wording as a debug diagnosis request", () => {
+    const interpretation = interpretHelixAskPrompt(
+      "Helix console debug check: answer in one short sentence and include whether this is a new Helix Ask turn.",
+    );
+
+    expect(interpretation.debug_or_history_question_detected).toBe(false);
+    expect(interpretation.control_command_detected).toBe(false);
+    expect(interpretation.executable_operator_commands).toEqual([]);
+  });
+
+  it("still treats explicit debug export inspection as debug diagnosis", () => {
+    const interpretation = interpretHelixAskPrompt("Inspect the debug export for the previous turn and explain why it failed.");
+
+    expect(interpretation.debug_or_history_question_detected).toBe(true);
+    expect(interpretation.control_command_detected).toBe(false);
+    expect(interpretation.executable_operator_commands).toEqual([]);
+  });
+
   it("treats screen-visible Start text as content context", () => {
     const interpretation = interpretHelixAskPrompt("The screen shows a Start button.");
 

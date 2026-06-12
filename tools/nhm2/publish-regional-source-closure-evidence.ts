@@ -244,12 +244,17 @@ const computeResiduals = (
         .filter((entry): entry is number => entry != null),
     );
   const toleranceRelLInf = asNumber(residualNorms?.toleranceRelLInf);
+  const pass =
+    asBoolean(residualNorms?.pass) ??
+    (toleranceRelLInf != null && Number.isFinite(relLInf)
+      ? relLInf <= toleranceRelLInf
+      : null);
   return {
     componentResiduals,
     relLInf: Number.isFinite(relLInf) ? relLInf : null,
     absLInf: Number.isFinite(absLInf) ? absLInf : null,
     toleranceRelLInf,
-    pass: asBoolean(residualNorms?.pass),
+    pass,
   };
 };
 
@@ -291,11 +296,51 @@ const makeGlobalRegion = (
     asRecord(sourceClosure.tileAccounting) ?? asRecord(globalAccounting?.tile);
   const metric = normalizeTensor(asRecord(tensors?.metricRequired));
   const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(asRecord(tensors?.tileEffective));
+  const metricMeta = {
+    chartRef: asString(metricAccounting?.chartRef) ?? "comoving_cartesian",
+    unitsRef: asString(metricAccounting?.unitsRef) ?? "J/m^3",
+    aggregationMode: normalizeAggregationMode(metricAccounting?.aggregationMode),
+    normalizationBasis: normalizeNormalizationBasis(metricAccounting?.normalizationBasis),
+    sampleCount: asNumber(metricAccounting?.sampleCount),
+    comparisonRole: null,
+    evidenceText: JSON.stringify({ metricAccounting, tensorRef: tensorRefs?.metricRequired }),
+  };
+  const legacyTileMeta = {
+    chartRef: asString(tileAccounting?.chartRef) ?? "comoving_cartesian",
+    unitsRef: asString(tileAccounting?.unitsRef) ?? "J/m^3",
+    aggregationMode: normalizeAggregationMode(tileAccounting?.aggregationMode),
+    normalizationBasis: normalizeNormalizationBasis(tileAccounting?.normalizationBasis),
+    sampleCount: asNumber(tileAccounting?.sampleCount),
+    comparisonRole: "tile_effective_counterpart",
+    evidenceText: JSON.stringify({ tileAccounting, tensorRef: tensorRefs?.tileEffective }),
+  };
+  const tileMeta =
+    tileCounterpartRegion == null
+      ? legacyTileMeta
+      : {
+          ...legacyTileMeta,
+          chartRef: tileCounterpartRegion.chartRef,
+          unitsRef: tileCounterpartRegion.unitsRef,
+          aggregationMode: tileCounterpartRegion.aggregationMode,
+          normalizationBasis: tileCounterpartRegion.normalizationBasis,
+          sampleCount: tileCounterpartRegion.sampleCount,
+          comparisonRole: tileCounterpartRegion.comparisonRole,
+          evidenceText: JSON.stringify(tileCounterpartRegion),
+        };
+  const comparisonRole =
+    tileCounterpartRegion?.comparisonRole ??
+    normalizeComparisonRole(tileMeta.comparisonRole);
+  const residualNorms =
+    tileCounterpartRegion == null
+      ? asRecord(sourceClosure.residualNorms)
+      : {
+          toleranceRelLInf: asNumber(asRecord(sourceClosure.residualNorms)?.toleranceRelLInf),
+        };
   const residuals = computeResiduals(
     metric,
     tile,
-    sourceClosure.residualComponents,
-    asRecord(sourceClosure.residualNorms),
+    tileCounterpartRegion == null ? sourceClosure.residualComponents : null,
+    residualNorms,
   );
   return {
     regionId: "global",
@@ -303,23 +348,23 @@ const makeGlobalRegion = (
       sourceClosure.status === "pass" ||
       sourceClosure.status === "review" ||
       sourceClosure.status === "fail"
-        ? sourceClosure.status
-        : "review",
-    comparisonBasisStatus:
-      tileCounterpartRegion != null
-        ? "same_basis"
-        : sourceClosure.comparisonBasisStatus === "same_basis"
-          ? "same_basis"
-          : "unknown",
+      ? sourceClosure.status
+      : "review",
+    comparisonBasisStatus: basisStatusFor(
+      asString(sourceClosure.comparisonBasisStatus),
+      metricMeta,
+      tileMeta,
+      comparisonRole,
+    ),
     metricRequired: {
       tensorRef: asString(tensorRefs?.metricRequired),
       tensorAuthorityMode: inferAuthorityMode(metric, JSON.stringify(tensors?.metricRequired)),
       tensor: metric,
-      chartRef: asString(metricAccounting?.chartRef) ?? "comoving_cartesian",
-      unitsRef: asString(metricAccounting?.unitsRef) ?? "J/m^3",
-      aggregationMode: normalizeAggregationMode(metricAccounting?.aggregationMode),
-      normalizationBasis: normalizeNormalizationBasis(metricAccounting?.normalizationBasis),
-      sampleCount: asNumber(metricAccounting?.sampleCount),
+      chartRef: metricMeta.chartRef,
+      unitsRef: metricMeta.unitsRef,
+      aggregationMode: metricMeta.aggregationMode,
+      normalizationBasis: metricMeta.normalizationBasis,
+      sampleCount: metricMeta.sampleCount,
     },
     tileEffectiveCounterpart: {
       tensorRef:
@@ -330,20 +375,12 @@ const makeGlobalRegion = (
         tileCounterpartRegion?.tensorAuthorityMode ??
         inferAuthorityMode(tile, JSON.stringify(tensors?.tileEffective)),
       tensor: tile,
-      chartRef:
-        tileCounterpartRegion?.chartRef ??
-        asString(tileAccounting?.chartRef) ??
-        "comoving_cartesian",
-      unitsRef: tileCounterpartRegion?.unitsRef ?? asString(tileAccounting?.unitsRef) ?? "J/m^3",
-      aggregationMode:
-        tileCounterpartRegion?.aggregationMode ??
-        normalizeAggregationMode(tileAccounting?.aggregationMode),
-      normalizationBasis:
-        tileCounterpartRegion?.normalizationBasis ??
-        normalizeNormalizationBasis(tileAccounting?.normalizationBasis),
-      sampleCount: tileCounterpartRegion?.sampleCount ?? asNumber(tileAccounting?.sampleCount),
-      comparisonRole:
-        tileCounterpartRegion?.comparisonRole ?? "tile_effective_counterpart",
+      chartRef: tileMeta.chartRef,
+      unitsRef: tileMeta.unitsRef,
+      aggregationMode: tileMeta.aggregationMode,
+      normalizationBasis: tileMeta.normalizationBasis,
+      sampleCount: tileMeta.sampleCount,
+      comparisonRole,
     },
     residuals,
     blockers: tileCounterpartRegion?.blockers ?? [],
@@ -416,11 +453,17 @@ const makeRegionalRegion = (
     tileMeta,
     role,
   );
+  const residualNorms =
+    tileCounterpartRegion == null
+      ? asRecord(sourceRegion.residualNorms)
+      : {
+          toleranceRelLInf: asNumber(asRecord(sourceRegion.residualNorms)?.toleranceRelLInf),
+        };
   const residuals = computeResiduals(
     metric,
     tile,
-    sourceRegion.residualComponents,
-    asRecord(sourceRegion.residualNorms),
+    tileCounterpartRegion == null ? sourceRegion.residualComponents : null,
+    residualNorms,
   );
   const blockers = [
     ...((Array.isArray(sourceRegion.reasonCodes)

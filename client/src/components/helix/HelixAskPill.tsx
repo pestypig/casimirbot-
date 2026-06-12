@@ -6754,6 +6754,68 @@ type AskLiveEventEntry = {
   meta?: Record<string, unknown>;
 };
 
+type HelixAskConsoleStreamIngressDebug = {
+  schema: "helix.ask.console_stream_ingress_debug.v1";
+  turnId: string | null;
+  traceId: string | null;
+  startedAtMs: number | null;
+  rawStreamPacketCount: number;
+  transcriptPacketCount: number;
+  acceptedLiveEventCount: number;
+  replayedTranscriptEventCount: number;
+  droppedEventCount: number;
+  droppedReasons: Record<string, number>;
+  terminalTranscriptEventCount: number;
+  nonTranscriptPacketCount: number;
+  lastEventName: string | null;
+  lastTranscriptType: string | null;
+  lastAcceptedEventId: string | null;
+  lastAcceptedText: string | null;
+  lastDropReason: string | null;
+  lastUpdatedAtMs: number | null;
+};
+
+export function createHelixAskConsoleStreamIngressDebug(input?: {
+  turnId?: string | null;
+  traceId?: string | null;
+  startedAtMs?: number | null;
+}): HelixAskConsoleStreamIngressDebug {
+  return {
+    schema: "helix.ask.console_stream_ingress_debug.v1",
+    turnId: coerceText(input?.turnId).trim() || null,
+    traceId: coerceText(input?.traceId).trim() || null,
+    startedAtMs:
+      typeof input?.startedAtMs === "number" && Number.isFinite(input.startedAtMs)
+        ? Math.trunc(input.startedAtMs)
+        : null,
+    rawStreamPacketCount: 0,
+    transcriptPacketCount: 0,
+    acceptedLiveEventCount: 0,
+    replayedTranscriptEventCount: 0,
+    droppedEventCount: 0,
+    droppedReasons: {},
+    terminalTranscriptEventCount: 0,
+    nonTranscriptPacketCount: 0,
+    lastEventName: null,
+    lastTranscriptType: null,
+    lastAcceptedEventId: null,
+    lastAcceptedText: null,
+    lastDropReason: null,
+    lastUpdatedAtMs: null,
+  };
+}
+
+function incrementHelixAskConsoleDropReason(
+  droppedReasons: Record<string, number>,
+  reason: string,
+): Record<string, number> {
+  const key = reason.trim() || "unknown";
+  return {
+    ...droppedReasons,
+    [key]: (droppedReasons[key] ?? 0) + 1,
+  };
+}
+
 type HelixAskObjectiveUnknownBlockTrace = {
   unknown: string;
   why: string;
@@ -9566,7 +9628,7 @@ function buildHelixContinuousTurnStreamRows(args: {
   return rows;
 }
 
-function buildHelixActiveTurnStreamRows(args: {
+export function buildHelixActiveTurnStreamRows(args: {
   question?: string | null;
   eventRows: AskLiveAgenticEventRow[];
   draftText?: string | null;
@@ -9826,8 +9888,12 @@ export function shouldAdmitHelixAskExternalLiveEventToActiveStream(input: {
 
 export function filterHelixAskActiveTurnStreamRows(
   rows: HelixContinuousTurnStreamRow[],
+  options?: {
+    includeTerminalRows?: boolean;
+  },
 ): HelixContinuousTurnStreamRow[] {
   if (!rows.length) return rows;
+  if (options?.includeTerminalRows) return rows;
   const hasTerminalRow = rows.some((row) => row.tone === "final" || row.source === "final" || row.status === "final");
   return hasTerminalRow ? [] : rows;
 }
@@ -12288,7 +12354,12 @@ function shouldShowAskLiveAgenticEventRow(row: AskLiveAgenticEventRow): boolean 
   return !LOW_SIGNAL_ASK_LIVE_TRANSCRIPT_PATTERNS.some((pattern) => pattern.test(normalizedText));
 }
 
-function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgenticEventRow[] {
+export function buildAskLiveAgenticEventRows(
+  events: AskLiveEventEntry[],
+  options?: {
+    includeLowSignalRows?: boolean;
+  },
+): AskLiveAgenticEventRow[] {
   return events
     .filter((event) => !isAskLiveEventSuperseded(event))
     .map((event, index) => {
@@ -12313,7 +12384,7 @@ function buildAskLiveAgenticEventRows(events: AskLiveEventEntry[]): AskLiveAgent
         meta: [timestamp, duration].filter(Boolean).join(" / "),
       };
     })
-    .filter(shouldShowAskLiveAgenticEventRow)
+    .filter((row) => options?.includeLowSignalRows || shouldShowAskLiveAgenticEventRow(row))
     .slice(-18);
 }
 
@@ -13309,6 +13380,7 @@ function buildReplyMasterEventClockExport(args: {
   voiceDiagnostics: VoiceCaptureDiagnosticsSnapshot | null;
   docViewerState: Record<string, unknown>;
   workstationLayoutState: Record<string, unknown>;
+  consoleAssemblyDebug?: Record<string, unknown> | null;
 }): string {
   const traceIds = new Set<string>();
   const turnKeys = new Set<string>();
@@ -13832,6 +13904,7 @@ function buildReplyMasterEventClockExport(args: {
       attemptIds: [...attemptIds],
     },
     debugContext: args.debugContext,
+    console_assembly_debug: args.consoleAssemblyDebug ?? null,
     workstationLayout: workstationLayoutDebugSnapshot,
     workspace_action_client_ack: workspaceActionClientAck,
     helix_ask_client_bypass_audit: helixAskClientBypassAudit,
@@ -17599,6 +17672,10 @@ export function HelixAskPill({
   );
   const [askLiveEvents, setAskLiveEvents] = useState<AskLiveEventEntry[]>([]);
   const askLiveEventsRef = useRef<AskLiveEventEntry[]>([]);
+  const [helixAskConsoleStreamIngressDebugVersion, setHelixAskConsoleStreamIngressDebugVersion] = useState(0);
+  const helixAskConsoleStreamIngressDebugRef = useRef<HelixAskConsoleStreamIngressDebug>(
+    createHelixAskConsoleStreamIngressDebug(),
+  );
   const mirekReasoningArtifactRef = useRef<MirekReasoningArtifactV1 | null>(null);
   const mirekObjectiveFingerprintRef = useRef<string | null>(null);
   const situationRoomId = useMemo(() => contextId?.trim() || "helix-room", [contextId]);
@@ -30443,8 +30520,8 @@ export function HelixAskPill({
       totalLiveEventCount: askLiveEvents.length,
       activeLiveEventCount: activeAskLiveEvents.length,
       activeRowCount: visibleActiveTurnStreamRows.length,
-      replyCount: chronologicalAskReplies.length,
-      latestReplyId: transcriptLatestAskReplyId,
+      replyCount: chronologicalAskRepliesForTranscript.length,
+      latestReplyId: latestAskReply?.id ?? latestAskReplyId,
       renderOrder: [
         ...(visibleActiveTurnStreamRows.length > 0
           ? [
@@ -30455,13 +30532,13 @@ export function HelixAskPill({
               },
             ]
           : []),
-        ...chronologicalAskReplies.map((reply, index) => ({
+        ...chronologicalAskRepliesForTranscript.map((reply, index) => ({
           kind: "completed_reply",
           index,
           replyId: reply.id,
           canonicalKey: resolveHelixAskReplyCanonicalKey(reply),
           createdAtMs: resolveHelixAskReplyOrderMs(reply),
-          isLatest: reply.id === transcriptLatestAskReplyId,
+          isLatest: reply.id === (latestAskReply?.id ?? latestAskReplyId),
         })),
       ],
       filteredLiveEvents: askLiveEvents.length - activeAskLiveEvents.length,
@@ -30480,8 +30557,9 @@ export function HelixAskPill({
     askBusy,
     askLiveEvents,
     askLiveTraceId,
-    chronologicalAskReplies,
-    transcriptLatestAskReplyId,
+    chronologicalAskRepliesForTranscript,
+    latestAskReply,
+    latestAskReplyId,
     userSettings.showHelixAskConsoleDebug,
     visibleActiveTurnStreamRows,
   ]);
@@ -35342,6 +35420,7 @@ export function HelixAskPill({
               voiceDiagnostics: buildCurrentVoiceDiagnosticsSnapshot(),
               docViewerState: docViewerDebugSnapshot,
               workstationLayoutState: workstationLayoutDebugSnapshot,
+              consoleAssemblyDebug: helixAskConsoleDebugSnapshot,
             });
             const replyDebugRecord = readAgentLoopAuditRecord(reply.debug);
             const agentLoopAudit = readAgentLoopAuditRecord(replyDebugRecord?.agent_loop_audit);

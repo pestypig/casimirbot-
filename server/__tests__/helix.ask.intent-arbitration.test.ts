@@ -124,6 +124,38 @@ describe("Helix Ask intent arbitration", () => {
     );
   });
 
+  it("does not promote casual debug check wording to debug diagnosis", () => {
+    const { arbitration, promptInterpretation, hypotheses } = runArbitration({
+      prompt: "Helix console debug check: answer in one short sentence and include whether this is a new Helix Ask turn.",
+      selectedRoute: "conversation:simple",
+      sourceTarget: "model_only",
+      routeCandidates: [
+        { route: "conversation:simple", confidence: 0.82 },
+        { route: "runtime_debug_diagnosis", confidence: 0.45 },
+      ],
+    });
+
+    expect(promptInterpretation.debug_or_history_question_detected).toBe(false);
+    expect(hypotheses.map((entry) => entry.kind)).not.toContain("debug_diagnosis");
+    expect(arbitration.selected_primary_intent_kind).not.toBe("debug_diagnosis");
+  });
+
+  it("keeps explicit debug export inspection on the debug diagnosis path", () => {
+    const { arbitration, promptInterpretation, hypotheses } = runArbitration({
+      prompt: "Inspect the debug export for the previous turn and explain why it failed.",
+      selectedRoute: "runtime_debug_diagnosis",
+      sourceTarget: "runtime_evidence",
+      routeCandidates: [
+        { route: "runtime_debug_diagnosis", confidence: 0.82 },
+        { route: "conversation:simple", confidence: 0.45 },
+      ],
+    });
+
+    expect(promptInterpretation.debug_or_history_question_detected).toBe(true);
+    expect(hypotheses.map((entry) => entry.kind)).toContain("debug_diagnosis");
+    expect(arbitration.selected_primary_intent_kind).toBe("debug_diagnosis");
+  });
+
   it("uses debug/general reasoning with negative constraints to suppress mutating routes", () => {
     const { arbitration, promptInterpretation } = runArbitration({
       prompt: "Open nothing and run nothing; just reason from these debug facts.",

@@ -19,6 +19,10 @@ import {
 } from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import { isNhm2TileEffectiveCounterpartArtifact } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
 import { isNhm2TileEffectiveFullTensorSourceArtifact } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
+import {
+  isNhm2TileLocalSourceElementsArtifact,
+  type Nhm2TileLocalSourceElementsArtifactV1,
+} from "../../shared/contracts/nhm2-tile-local-source-element.v1";
 import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import {
   classifySourceToGeometryDivergence,
@@ -331,6 +335,16 @@ const sourceClosureReadinessGate = (
   };
 };
 
+const tileLocalMaterialStatus = (
+  artifact: Nhm2TileLocalSourceElementsArtifactV1 | null,
+): string | null => {
+  if (artifact == null || artifact.elements.length === 0) return null;
+  const statuses = Array.from(
+    new Set(artifact.elements.map((element) => element.material.materialReceiptStatus)),
+  );
+  return statuses.length === 1 ? statuses[0] : "mixed";
+};
+
 const primaryBlockerClass = (
   gates: Nhm2BlockerLedgerArtifact["gateSummary"],
 ): string | null => {
@@ -387,6 +401,7 @@ export const buildReferenceRunBlockerLedger = (args: {
   tileProvenanceAuditPath?: string | null;
   qeiDossierPath?: string | null;
   sourceTensorArtifactPath?: string | null;
+  tileLocalSourceElementsPath?: string | null;
   conservationArtifactPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   sourceClosurePassReadinessPath?: string | null;
@@ -402,6 +417,7 @@ export const buildReferenceRunBlockerLedger = (args: {
     args.tileProvenanceAuditPath,
     args.qeiDossierPath,
     args.sourceTensorArtifactPath,
+    args.tileLocalSourceElementsPath,
     args.conservationArtifactPath,
     args.sourceSideAuthorityPath,
     args.sourceClosurePassReadinessPath,
@@ -458,6 +474,16 @@ export const buildReferenceRunBlockerLedger = (args: {
   if (conservation != null && !isNhm2TileCounterpartConservationArtifact(conservation)) {
     throw new Error("conservation artifact must be nhm2_tile_counterpart_conservation/v1");
   }
+  const tileLocalSourceElements =
+    args.tileLocalSourceElementsPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.tileLocalSourceElementsPath));
+  if (
+    tileLocalSourceElements != null &&
+    !isNhm2TileLocalSourceElementsArtifact(tileLocalSourceElements)
+  ) {
+    throw new Error("tile local source elements must be nhm2_tile_local_source_elements/v1");
+  }
   const sourceAuthority =
     args.sourceSideAuthorityPath == null
       ? null
@@ -488,6 +514,11 @@ export const buildReferenceRunBlockerLedger = (args: {
     : null;
   const passReadinessArtifact = isNhm2SourceClosurePassReadinessArtifact(passReadiness)
     ? passReadiness
+    : null;
+  const tileLocalSourceElementsArtifact = isNhm2TileLocalSourceElementsArtifact(
+    tileLocalSourceElements,
+  )
+    ? tileLocalSourceElements
     : null;
   const gateSummary = [
     ...validation.gates.map((entry: Nhm2ReferenceRunValidationGate) => ({
@@ -551,6 +582,7 @@ export const buildReferenceRunBlockerLedger = (args: {
       sourceToGeometryDivergenceReport: args.sourceDivergenceReportPath ?? null,
       tileCounterpartProvenanceAudit: args.tileProvenanceAuditPath ?? null,
       sourceTensorArtifact: args.sourceTensorArtifactPath ?? null,
+      tileLocalSourceElements: args.tileLocalSourceElementsPath ?? null,
       conservationArtifact: args.conservationArtifactPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
       sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
@@ -562,6 +594,16 @@ export const buildReferenceRunBlockerLedger = (args: {
         (isNhm2TileEffectiveFullTensorSourceArtifact(sourceTensor)
           ? sourceTensor.sourceModel.sourceModelClass
           : tile.sourceTensorAuthorityMode) ?? null,
+      tileLocalSourceElementsRef: args.tileLocalSourceElementsPath ?? null,
+      tileLocalSourceElementCount:
+        tileLocalSourceElementsArtifact?.summary.elementCount ?? null,
+      tileLocalSourceWallCoverage:
+        tileLocalSourceElementsArtifact?.summary.hasWallCoverage ?? null,
+      tileLocalSourceMaterialReceiptStatus: tileLocalMaterialStatus(
+        tileLocalSourceElementsArtifact,
+      ),
+      tileLocalSourceFirstBlocker:
+        tileLocalSourceElementsArtifact?.summary.firstBlocker ?? null,
       conservationStatus:
         (isNhm2TileCounterpartConservationArtifact(conservation)
           ? conservation.overallState
@@ -634,6 +676,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     tileProvenanceAuditPath: asString(args["tile-provenance-audit"]),
     qeiDossierPath: asString(args["qei-dossier"]),
     sourceTensorArtifactPath: asString(args["source-tensor-artifact"]),
+    tileLocalSourceElementsPath: asString(args["tile-local-source-elements"]),
     conservationArtifactPath: asString(args.conservation),
     sourceSideAuthorityPath: asString(args["source-side-authority"]),
     sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),

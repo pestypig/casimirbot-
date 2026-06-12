@@ -52,6 +52,15 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = typeof args["qei-dossier"] === "string" ? args["qei-dossier"] : null;
   const sourceInput = typeof args["source-input"] === "string" ? args["source-input"] : null;
+  const inputTileLocalSourceElements =
+    typeof args["tile-local-source-elements"] === "string"
+      ? args["tile-local-source-elements"]
+      : null;
+  const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
+  const casimirMaterialReceipt =
+    typeof args["casimir-material-receipt"] === "string"
+      ? args["casimir-material-receipt"]
+      : null;
   const literatureMap =
     typeof args["literature-map"] === "string"
       ? args["literature-map"]
@@ -60,6 +69,10 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const runId = required(args, "run-id");
   const auditOnly = args["audit-only"] === true ? ["--audit-only"] : [];
   const tileCounterpart = `${outRoot}/nhm2-tile-effective-counterpart.json`;
+  const generatedTileLocalSourceElements = `${outRoot}/nhm2-tile-local-source-elements.json`;
+  const tileLocalSourceElements =
+    inputTileLocalSourceElements ??
+    (buildTileLocalSourceElements ? generatedTileLocalSourceElements : null);
   const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
   const conservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
@@ -101,17 +114,42 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     ]);
   }
 
-  run("nhm2:publish-tile-effective-counterpart", [
-    "--reference-run",
-    referenceRun,
-    "--source-closure",
-    sourceClosure,
-    ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
-    ...(sourceInput == null ? [] : ["--tile-full-tensor-source", sourceTensor, "--conservation", conservation]),
-    "--out",
-    tileCounterpart,
-    ...auditOnly,
-  ]);
+  if (buildTileLocalSourceElements) {
+    run("nhm2:build-tile-local-source-elements", [
+      "--reference-run",
+      referenceRun,
+      ...(casimirMaterialReceipt == null
+        ? []
+        : ["--casimir-material-receipt", casimirMaterialReceipt]),
+      "--out",
+      generatedTileLocalSourceElements,
+      ...auditOnly,
+    ]);
+  }
+
+  if (tileLocalSourceElements != null) {
+    run("nhm2:aggregate-tile-local-source-counterpart", [
+      "--reference-run",
+      referenceRun,
+      "--tile-local-source-elements",
+      tileLocalSourceElements,
+      "--out",
+      tileCounterpart,
+      ...auditOnly,
+    ]);
+  } else {
+    run("nhm2:publish-tile-effective-counterpart", [
+      "--reference-run",
+      referenceRun,
+      "--source-closure",
+      sourceClosure,
+      ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+      ...(sourceInput == null ? [] : ["--tile-full-tensor-source", sourceTensor, "--conservation", conservation]),
+      "--out",
+      tileCounterpart,
+      ...auditOnly,
+    ]);
+  }
   run("nhm2:publish-source-side-same-basis-authority", [
     "--reference-run",
     referenceRun,
@@ -191,6 +229,9 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     ...(sourceInput == null
       ? []
       : ["--source-tensor-artifact", sourceTensor, "--conservation", conservation]),
+    ...(tileLocalSourceElements == null
+      ? []
+      : ["--tile-local-source-elements", tileLocalSourceElements]),
     "--source-side-authority",
     sourceAuthority,
     "--source-closure-pass-readiness",

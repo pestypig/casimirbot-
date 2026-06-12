@@ -62,6 +62,7 @@ export type Nhm2BlockerLedgerArtifact = {
     sourceToGeometryDivergenceReport: string | null;
     tileCounterpartProvenanceAudit: string | null;
     sourceTensorArtifact: string | null;
+    tileLocalSourceElements: string | null;
     conservationArtifact: string | null;
     sourceSideSameBasisTensorAuthority: string | null;
     sourceClosurePassReadiness: string | null;
@@ -70,6 +71,11 @@ export type Nhm2BlockerLedgerArtifact = {
   tileCounterpartSource: {
     sourceTensorArtifactRef: string | null;
     sourceTensorAuthorityMode: string | null;
+    tileLocalSourceElementsRef: string | null;
+    tileLocalSourceElementCount: number | null;
+    tileLocalSourceWallCoverage: boolean | null;
+    tileLocalSourceMaterialReceiptStatus: string | null;
+    tileLocalSourceFirstBlocker: string | null;
     conservationStatus: string | null;
     qeiLinkageStatus: string | null;
     sourceSideAuthorityRef: string | null;
@@ -335,6 +341,7 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(refs.sourceToGeometryDivergenceReport) ||
     !isNullableText(refs.tileCounterpartProvenanceAudit) ||
     !isNullableText(refs.sourceTensorArtifact) ||
+    !isNullableText(refs.tileLocalSourceElements) ||
     !isNullableText(refs.conservationArtifact) ||
     !isNullableText(refs.sourceSideSameBasisTensorAuthority) ||
     !isNullableText(refs.sourceClosurePassReadiness) ||
@@ -342,6 +349,13 @@ export const isNhm2BlockerLedgerArtifact = (
     tileCounterpartSource == null ||
     !isNullableText(tileCounterpartSource.sourceTensorArtifactRef) ||
     !isNullableText(tileCounterpartSource.sourceTensorAuthorityMode) ||
+    !isNullableText(tileCounterpartSource.tileLocalSourceElementsRef) ||
+    (tileCounterpartSource.tileLocalSourceElementCount !== null &&
+      (typeof tileCounterpartSource.tileLocalSourceElementCount !== "number" ||
+        !Number.isFinite(tileCounterpartSource.tileLocalSourceElementCount))) ||
+    !isNullableBoolean(tileCounterpartSource.tileLocalSourceWallCoverage) ||
+    !isNullableText(tileCounterpartSource.tileLocalSourceMaterialReceiptStatus) ||
+    !isNullableText(tileCounterpartSource.tileLocalSourceFirstBlocker) ||
     !isNullableText(tileCounterpartSource.conservationStatus) ||
     !isNullableText(tileCounterpartSource.qeiLinkageStatus) ||
     !isNullableText(tileCounterpartSource.sourceSideAuthorityRef) ||

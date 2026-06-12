@@ -126,7 +126,9 @@ const statusQuestionPatterns = [
 ];
 
 const debugOrHistoryPatterns = [
-  /\b(?:why\s+did|why\s+was|what\s+called|last\s+turn|previous\s+(?:turn|answer)|histor(?:y|ical)|debug|trace|tool\s+call|set_rate)\b/i,
+  /\b(?:why\s+did|why\s+was|what\s+called|last\s+turn|previous\s+(?:turn|answer)|histor(?:y|ical)|set_rate)\b/i,
+  /\b(?:debug\s+(?:export|trace|facts?|payload|copy|evidence|log)|tool\s+calls?|runtime\s+evidence)\b/i,
+  /\b(?:inspect|show|open|copy|review|analy[sz]e|diagnos(?:e|is)|explain|summari[sz]e|reason\s+from|given)\b[\s\S]{0,100}\b(?:debug\s+(?:export|trace|facts?|payload|copy|evidence|log)|trace|tool\s+calls?|runtime\s+evidence|failure|error)\b/i,
 ];
 
 const implementationPatterns = [
