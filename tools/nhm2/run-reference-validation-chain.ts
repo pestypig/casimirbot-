@@ -46,28 +46,65 @@ const run = (
   }
 };
 
-export const runReferenceValidationChain = (args: Record<string, string | boolean>): void => {
+export type Nhm2ReferenceValidationChainCommand = {
+  script: string;
+  args: string[];
+  allowNonZeroWithOutput?: string;
+};
+
+const asOptionalString = (
+  args: Record<string, string | boolean>,
+  key: string,
+): string | null => {
+  const value = args[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+};
+
+const command = (
+  script: string,
+  args: string[],
+  options: { allowNonZeroWithOutput?: string } = {},
+): Nhm2ReferenceValidationChainCommand =>
+  options.allowNonZeroWithOutput == null
+    ? { script, args }
+    : { script, args, allowNonZeroWithOutput: options.allowNonZeroWithOutput };
+
+export const planReferenceValidationChain = (
+  args: Record<string, string | boolean>,
+): Nhm2ReferenceValidationChainCommand[] => {
   const referenceRun = required(args, "reference-run");
   const sourceClosure = required(args, "source-closure");
   const fullLoopAudit = required(args, "full-loop-audit");
-  const qeiDossier = typeof args["qei-dossier"] === "string" ? args["qei-dossier"] : null;
-  const sourceInput = typeof args["source-input"] === "string" ? args["source-input"] : null;
-  const inputTileLocalSourceElements =
-    typeof args["tile-local-source-elements"] === "string"
-      ? args["tile-local-source-elements"]
-      : null;
+  const qeiDossier = asOptionalString(args, "qei-dossier");
+  const sourceInput = asOptionalString(args, "source-input");
+  const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
-  const casimirMaterialReceipt =
-    typeof args["casimir-material-receipt"] === "string"
-      ? args["casimir-material-receipt"]
-      : null;
+  const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
+  const regionalSourceClosureEvidence = asOptionalString(
+    args,
+    "regional-source-closure-evidence",
+  );
+  const inputLayeredWallSourceCandidate = asOptionalString(
+    args,
+    "layered-wall-source-candidate",
+  );
+  const wallMaterialSourceTensorModelInput = asOptionalString(
+    args,
+    "wall-material-source-tensor-model",
+  );
+  const wallSourceComponentModel = asOptionalString(args, "wall-source-component-model");
+  const layeredWallSourceCandidateRowId = asOptionalString(
+    args,
+    "layered-wall-source-candidate-row-id",
+  );
+  const layeredWallVolumeMode = asOptionalString(args, "layered-wall-volume-mode");
   const literatureMap =
-    typeof args["literature-map"] === "string"
-      ? args["literature-map"]
-      : "docs/research/nhm2-literature-claim-map.v1.json";
+    asOptionalString(args, "literature-map") ??
+    "docs/research/nhm2-literature-claim-map.v1.json";
   const outRoot = required(args, "out-root");
   const runId = required(args, "run-id");
   const auditOnly = args["audit-only"] === true ? ["--audit-only"] : [];
+  const commands: Nhm2ReferenceValidationChainCommand[] = [];
   const tileCounterpart = `${outRoot}/nhm2-tile-effective-counterpart.json`;
   const generatedTileLocalSourceElements = `${outRoot}/nhm2-tile-local-source-elements.json`;
   const tileLocalSourceElements =
@@ -85,9 +122,40 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const validation = `${outRoot}/nhm2-reference-run-validation.json`;
   const ledger = `${outRoot}/nhm2-blocker-ledger-${runId}.json`;
   const ledgerReport = `${outRoot}/nhm2-blocker-ledger-${runId}.md`;
+  const wallSourceLayeringSweep = `${outRoot}/nhm2-wall-source-layering-sweep.json`;
+  const generatedLayeredWallSourceCandidate =
+    `${outRoot}/nhm2-layered-wall-source-candidate.json`;
+  const layeredWallSourceCandidate =
+    inputLayeredWallSourceCandidate ??
+    (wallSourceComponentModel == null ? null : generatedLayeredWallSourceCandidate);
+  const generatedWallMaterialSourceTensorModel =
+    `${outRoot}/nhm2-wall-material-source-tensor-model.json`;
+  const wallMaterialSourceTensorModel =
+    wallMaterialSourceTensorModelInput ??
+    (wallSourceComponentModel == null ? null : generatedWallMaterialSourceTensorModel);
+  const layeredWallFullTensorAudit =
+    `${outRoot}/nhm2-layered-wall-full-tensor-source-audit.json`;
+  const layeredWallSourceTensorCandidate =
+    `${outRoot}/nhm2-layered-wall-source-tensor-candidate.json`;
+
+  if (wallMaterialSourceTensorModelInput != null && wallSourceComponentModel != null) {
+    throw new Error(
+      "--wall-material-source-tensor-model and --wall-source-component-model are mutually exclusive",
+    );
+  }
+  if (wallMaterialSourceTensorModel != null && inputTileLocalSourceElements != null) {
+    throw new Error(
+      "--wall-material-source-tensor-model cannot be combined with prebuilt --tile-local-source-elements; rebuild tile-local elements so wall tensor provenance is explicit",
+    );
+  }
+  if (wallMaterialSourceTensorModel != null && !buildTileLocalSourceElements) {
+    throw new Error(
+      "--wall-material-source-tensor-model or --wall-source-component-model requires --build-tile-local-source-elements so the source tensor model is consumed",
+    );
+  }
 
   if (sourceInput != null) {
-    run("nhm2:publish-tile-effective-full-tensor-source", [
+    commands.push(command("nhm2:publish-tile-effective-full-tensor-source", [
       "--reference-run",
       referenceRun,
       "--source-input",
@@ -96,8 +164,8 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       "--out",
       sourceTensor,
       ...auditOnly,
-    ]);
-    run("nhm2:publish-tile-counterpart-conservation", [
+    ]));
+    commands.push(command("nhm2:publish-tile-counterpart-conservation", [
       "--reference-run",
       referenceRun,
       "--tile-full-tensor-source",
@@ -105,30 +173,95 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       "--out",
       conservation,
       ...auditOnly,
-    ]);
-    run("nhm2:audit-tile-counterpart-source-independence", [
+    ]));
+    commands.push(command("nhm2:audit-tile-counterpart-source-independence", [
       "--tile-full-tensor-source",
       sourceTensor,
       "--out",
       sourceIndependenceAudit,
-    ]);
+    ]));
+  }
+
+  if (wallSourceComponentModel != null) {
+    if (inputLayeredWallSourceCandidate == null) {
+      commands.push(command("nhm2:build-wall-source-layering-sweep", [
+        ...(regionalSourceClosureEvidence == null
+          ? []
+          : ["--regional-source-closure-evidence", regionalSourceClosureEvidence]),
+        "--out",
+        wallSourceLayeringSweep,
+      ]));
+      commands.push(command("nhm2:build-layered-wall-source-candidate", [
+        "--sweep",
+        wallSourceLayeringSweep,
+        ...(layeredWallSourceCandidateRowId == null
+          ? []
+          : ["--row-id", layeredWallSourceCandidateRowId]),
+        ...(layeredWallVolumeMode == null
+          ? []
+          : ["--volume-mode", layeredWallVolumeMode]),
+        ...(casimirMaterialReceipt == null
+          ? []
+          : ["--material-receipt", casimirMaterialReceipt]),
+        ...(sourceInput == null ? [] : ["--conservation", conservation]),
+        ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+        "--out",
+        generatedLayeredWallSourceCandidate,
+      ]));
+    }
+    commands.push(command("nhm2:build-wall-material-source-tensor-model", [
+      "--candidate",
+      layeredWallSourceCandidate as string,
+      "--component-model",
+      wallSourceComponentModel,
+      ...(casimirMaterialReceipt == null
+        ? []
+        : ["--material-receipt", casimirMaterialReceipt]),
+      "--out",
+      generatedWallMaterialSourceTensorModel,
+    ]));
+  }
+
+  if (layeredWallSourceCandidate != null && wallMaterialSourceTensorModel != null) {
+    commands.push(command("nhm2:build-layered-wall-full-tensor-source-audit", [
+      "--candidate",
+      layeredWallSourceCandidate,
+      "--source-tensor-model",
+      wallMaterialSourceTensorModel,
+      ...(casimirMaterialReceipt == null
+        ? []
+        : ["--material-receipt", casimirMaterialReceipt]),
+      "--out",
+      layeredWallFullTensorAudit,
+    ]));
+    commands.push(command("nhm2:build-layered-wall-source-tensor-candidate", [
+      "--candidate",
+      layeredWallSourceCandidate,
+      "--full-tensor-audit",
+      layeredWallFullTensorAudit,
+      "--out",
+      layeredWallSourceTensorCandidate,
+    ]));
   }
 
   if (buildTileLocalSourceElements) {
-    run("nhm2:build-tile-local-source-elements", [
+    commands.push(command("nhm2:build-tile-local-source-elements", [
       "--reference-run",
       referenceRun,
       ...(casimirMaterialReceipt == null
         ? []
         : ["--casimir-material-receipt", casimirMaterialReceipt]),
+      ...(wallMaterialSourceTensorModel == null
+        ? []
+        : ["--wall-material-source-tensor-model", wallMaterialSourceTensorModel]),
       "--out",
       generatedTileLocalSourceElements,
       ...auditOnly,
-    ]);
+    ]));
   }
 
   if (tileLocalSourceElements != null) {
-    run("nhm2:aggregate-tile-local-source-counterpart", [
+    commands.push(command("nhm2:aggregate-tile-local-source-counterpart", [
       "--reference-run",
       referenceRun,
       "--tile-local-source-elements",
@@ -136,9 +269,9 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       "--out",
       tileCounterpart,
       ...auditOnly,
-    ]);
+    ]));
   } else {
-    run("nhm2:publish-tile-effective-counterpart", [
+    commands.push(command("nhm2:publish-tile-effective-counterpart", [
       "--reference-run",
       referenceRun,
       "--source-closure",
@@ -148,9 +281,9 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       "--out",
       tileCounterpart,
       ...auditOnly,
-    ]);
+    ]));
   }
-  run("nhm2:publish-source-side-same-basis-authority", [
+  commands.push(command("nhm2:publish-source-side-same-basis-authority", [
     "--reference-run",
     referenceRun,
     "--tile-effective-counterpart",
@@ -160,8 +293,8 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     "--out",
     sourceAuthority,
     ...auditOnly,
-  ]);
-  run("nhm2:publish-regional-source-closure-evidence", [
+  ]));
+  commands.push(command("nhm2:publish-regional-source-closure-evidence", [
     "--reference-run",
     referenceRun,
     "--source-closure",
@@ -171,8 +304,8 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     "--out",
     regionalEvidence,
     ...auditOnly,
-  ]);
-  run("nhm2:source-closure-pass-readiness", [
+  ]));
+  commands.push(command("nhm2:source-closure-pass-readiness", [
     "--regional-evidence",
     regionalEvidence,
     "--source-authority",
@@ -181,20 +314,20 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     sourceClosurePassReadiness,
     "--out-md",
     sourceClosurePassReadinessReport,
-  ]);
-  run("nhm2:report-source-to-geometry-divergence", [
+  ]));
+  commands.push(command("nhm2:report-source-to-geometry-divergence", [
     "--regional-evidence",
     regionalEvidence,
     "--out",
     divergenceReport,
-  ]);
-  run("nhm2:audit-tile-effective-counterpart-provenance", [
+  ]));
+  commands.push(command("nhm2:audit-tile-effective-counterpart-provenance", [
     "--counterpart",
     tileCounterpart,
     "--out",
     provenanceAudit,
-  ]);
-  run(
+  ]));
+  commands.push(command(
     "nhm2:validate-reference-run",
     [
       "--reference-run",
@@ -210,8 +343,8 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
       validation,
     ],
     { allowNonZeroWithOutput: validation },
-  );
-  run("nhm2:build-reference-run-blocker-ledger", [
+  ));
+  commands.push(command("nhm2:build-reference-run-blocker-ledger", [
     "--reference-run",
     referenceRun,
     "--full-loop-audit",
@@ -242,13 +375,26 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     "--out",
     ledger,
     ...auditOnly,
-  ]);
-  run("nhm2:render-reference-run-blocker-ledger", [
+  ]));
+  commands.push(command("nhm2:render-reference-run-blocker-ledger", [
     "--ledger",
     ledger,
     "--out",
     ledgerReport,
-  ]);
+  ]));
+  return commands;
+};
+
+export const runReferenceValidationChain = (args: Record<string, string | boolean>): void => {
+  for (const plannedCommand of planReferenceValidationChain(args)) {
+    run(
+      plannedCommand.script,
+      plannedCommand.args,
+      plannedCommand.allowNonZeroWithOutput == null
+        ? {}
+        : { allowNonZeroWithOutput: plannedCommand.allowNonZeroWithOutput },
+    );
+  }
 };
 
 if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url))) {

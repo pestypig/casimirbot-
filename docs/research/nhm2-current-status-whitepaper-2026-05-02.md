@@ -1021,6 +1021,23 @@ build and render blocker ledger
 
 This chain may end in `fail` or `review`. That is acceptable when the ledger identifies the first remaining blocker precisely.
 
+The production-chain pass path now has a first-class wall material/source tensor branch. When a non-proxy source-side component model exists, the reference validation chain can generate the wall layering sweep, select the layered wall candidate, build `nhm2_wall_material_source_tensor_model/v1`, audit it through `nhm2_layered_wall_full_tensor_source_audit/v1`, feed that model into tile-local source elements, aggregate the regional counterpart, and then rerun source-side authority, regional closure evidence, source-closure readiness, validation, and the blocker ledger. A representative invocation is:
+
+```text
+npm run nhm2:run-reference-validation-chain -- \
+  --reference-run <reference-run.json> \
+  --source-closure <source-closure.json> \
+  --full-loop-audit <full-loop-audit.json> \
+  --regional-source-closure-evidence <regional-source-closure-evidence.json> \
+  --casimir-material-receipt <casimir-material-receipt.json> \
+  --wall-source-component-model <wall-source-components.json> \
+  --build-tile-local-source-elements \
+  --out-root <frozen-run-output-dir> \
+  --run-id <frozen-run-id>
+```
+
+The `latest` wrapper forwards the same wall-source flags when they are supplied by the operator, while still resolving the frozen reference-run inputs from the latest ledger/atlas context. This path is intentionally strict: a wall tensor model cannot be supplied alongside prebuilt tile-local elements, because the chain must be able to prove the model was consumed. It also does not infer global, hull, or exterior-shell authority from a wall-local tensor. Those regional rows must either receive their own non-proxy same-basis source tensors or remain explicit blockers in `nhm2_source_side_same_basis_tensor_authority/v1`.
+
 The representation-space navigation patch adds no run-free validation command. It is a static claim-boundary map. The relevant review action is to verify that code paths using `QST_PROXY`, tile-effective source tensors, and bounded contracts expose the correct boundary id and do not treat the boundary id as a promotion token.
 
 The June closure-stack contracts add placeholder-safe runtime artifacts rather than a new numerical relativity solver. Their builders are allowed to emit `missing`, `blocked`, `not_run`, `proxy`, or `ideal_scalar_only` when the current runtime lacks a component. That behavior is part of the reproducibility boundary: an incomplete artifact is still useful because it preserves the blocker instead of omitting it.

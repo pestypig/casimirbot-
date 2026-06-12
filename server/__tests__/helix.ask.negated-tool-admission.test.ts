@@ -56,6 +56,7 @@ describe("Helix Ask negated/contextual tool admission", () => {
       "Explain what would happen if I opened the docs viewer.",
       '"Open the docs viewer" is the command I typed; explain what it means.',
       "I opened the docs viewer earlier; what is it for?",
+      "Earlier I saw the docs-viewer.search_docs tool mentioned in debug. Do not run it; just explain whether mentioning a tool name should execute it.",
     ];
 
     for (const promptText of prompts) {

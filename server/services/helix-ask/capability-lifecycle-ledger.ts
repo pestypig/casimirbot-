@@ -134,6 +134,23 @@ const terminalReceiptAllowed = (input: {
   const terminalKind = readString(input.terminalArtifactKind ?? input.payload.terminal_artifact_kind);
   if (!isReceiptKind(terminalKind)) return true;
   const goal = readRecord(input.payload.canonical_goal_frame);
+  const goalKind = readString(goal?.goal_kind);
+  const requiredTerminalKind = readString(goal?.required_terminal_kind);
+  if (
+    terminalKind === "doc_open_receipt" &&
+    (goalKind === "doc_open_best" || goalKind === "doc_open") &&
+    requiredTerminalKind === "doc_open_receipt" &&
+    goalSatisfied(input.payload) === true
+  ) {
+    input.payload.tool_family_terminal_policy = {
+      schema: "helix.tool_family_terminal_policy.v1",
+      allowed: true,
+      reason: "doc_open_receipt_matches_doc_open_goal",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return true;
+  }
   const policy = evaluateToolFamilyTerminalPolicy({
     toolName: input.plan?.requested_action,
     toolFamily: input.plan?.capability_family,

@@ -1156,6 +1156,19 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "validate_doc_candidates")).toBe(true);
       expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_by_path")).toBe(true);
       expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
+      expect(response.body?.final_answer_source).toBe("doc_open_receipt");
+      expect(response.body?.line_tool_request_count).toBe(3);
+      expect(response.body?.line_tool_evaluation_count).toBe(3);
+      expect(response.body?.debug?.line_tool_request_count).toBe(3);
+      expect(response.body?.debug?.line_tool_evaluation_count).toBe(3);
+      expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).toContain(
+        "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md",
+      );
+      expect(String(response.body?.terminal_presentation?.concise_text ?? "")).toContain(
+        "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md",
+      );
+      expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).not.toMatch(/workspace_step_failed|Failed to execute/i);
+      expect(response.body?.capability_lifecycle_ledger?.failure_codes ?? []).not.toContain("capability_receipt_terminal_without_goal");
       expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
       expect(response.body?.goal_satisfaction_evaluation?.required_actions).toEqual(
         expect.arrayContaining([

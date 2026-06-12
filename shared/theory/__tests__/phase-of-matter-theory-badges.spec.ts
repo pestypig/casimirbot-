@@ -16,6 +16,16 @@ describe("phase of matter theory badges", () => {
       "matter.phase.thermodynamic_state_context",
       "matter.phase.equation_of_state_density_context",
       "matter.phase.structural_order_context",
+      "matter.phase.dynamical_order_context",
+      "matter.phase.time_translation_symmetry_context",
+      "matter.phase.equilibrium_time_crystal_claim_context",
+      "matter.phase.equilibrium_time_crystal_no_go_boundary",
+      "matter.phase.floquet_discrete_time_crystal_context",
+      "matter.phase.prethermal_discrete_time_crystal_context",
+      "matter.phase.driven_dissipative_continuous_time_crystal_context",
+      "matter.phase.time_crystal_observable_signature_context",
+      "matter.phase.time_crystal_platform_parameter_context",
+      "matter.phase.time_crystal_claim_boundary",
       "matter.phase.quantized_mode_frequency_context",
       "matter.phase.water_conditioned_state_context",
     ]);
@@ -44,6 +54,41 @@ describe("phase of matter theory badges", () => {
           expression: "deltaE = h * nu",
         }),
       ]),
+    );
+  });
+
+  it("places time crystals under dynamical order with grounded no-go and non-equilibrium route references", () => {
+    const badgesById = new Map(PHASE_OF_MATTER_THEORY_BADGES.map((badge) => [badge.id, badge]));
+    const sourceIdsFor = (id: string) => badgesById.get(id)?.sourceRefs.map((ref) => ref.id) ?? [];
+
+    expect(sourceIdsFor("matter.phase.time_translation_symmetry_context")).toEqual(
+      expect.arrayContaining([
+        "doi:10.1103/PhysRevLett.109.160401",
+        "doi:10.1103/PhysRevLett.114.251603",
+        "doi:10.1103/PhysRevLett.117.090402",
+      ]),
+    );
+    expect(sourceIdsFor("matter.phase.floquet_discrete_time_crystal_context")).toEqual(
+      expect.arrayContaining([
+        "doi:10.1103/PhysRevLett.117.090402",
+        "doi:10.1103/PhysRevLett.116.250401",
+        "doi:10.1103/PhysRevLett.118.030401",
+      ]),
+    );
+    expect(sourceIdsFor("matter.phase.time_crystal_observable_signature_context")).toEqual(
+      expect.arrayContaining(["doi:10.1038/nature21413", "doi:10.1038/nature21426"]),
+    );
+    expect(sourceIdsFor("matter.phase.prethermal_discrete_time_crystal_context")).toContain(
+      "doi:10.1126/science.abg8102",
+    );
+    expect(sourceIdsFor("matter.phase.driven_dissipative_continuous_time_crystal_context")).toContain(
+      "doi:10.1126/science.abo3382",
+    );
+
+    expect(badgesById.get("matter.phase.equilibrium_time_crystal_claim_context")?.status).toBe("blocked");
+    expect(badgesById.get("matter.phase.time_crystal_observable_signature_context")?.level).toBe("diagnostic_gate");
+    expect(badgesById.get("matter.phase.time_crystal_platform_parameter_context")?.assumptions.join(" ")).toMatch(
+      /not time-crystal order parameters/i,
     );
   });
 
@@ -82,6 +127,68 @@ describe("phase of matter theory badges", () => {
       (edge) => edge.id === "quantum_energy_frequency_specializes_phase_mode_frequency",
     );
     expect(frequencyBridge?.claimBoundaryNote).toMatch(/not a bulk-density equation of state/i);
+  });
+
+  it("connects time crystals as dynamical phases with a blocked equilibrium route and diagnostic signatures", () => {
+    expect(PHASE_OF_MATTER_THEORY_EDGES).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "matter.phase.structural_order_context",
+          to: "matter.phase.dynamical_order_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.dynamical_order_context",
+          to: "matter.phase.time_translation_symmetry_context",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.equilibrium_time_crystal_no_go_boundary",
+          to: "matter.phase.equilibrium_time_crystal_claim_context",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.time_translation_symmetry_context",
+          to: "matter.phase.floquet_discrete_time_crystal_context",
+          relation: "specializes",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.time_translation_symmetry_context",
+          to: "matter.phase.prethermal_discrete_time_crystal_context",
+          relation: "specializes",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.time_translation_symmetry_context",
+          to: "matter.phase.driven_dissipative_continuous_time_crystal_context",
+          relation: "specializes",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.floquet_discrete_time_crystal_context",
+          to: "matter.phase.time_crystal_observable_signature_context",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.time_crystal_observable_signature_context",
+          to: "matter.phase.quantized_mode_frequency_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.equation_of_state_density_context",
+          to: "matter.phase.time_crystal_platform_parameter_context",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "matter.phase.time_crystal_observable_signature_context",
+          to: "matter.phase.time_crystal_claim_boundary",
+          relation: "documents",
+        }),
+      ]),
+    );
+
+    const densityEdge = PHASE_OF_MATTER_THEORY_EDGES.find(
+      (edge) => edge.id === "phase_eos_density_documents_time_crystal_platform_parameters",
+    );
+    expect(densityEdge?.claimBoundaryNote).toMatch(/not the defining time-crystal order parameter/i);
   });
 
   it("extends water context into condition-qualified phase behavior without overclaiming origin or habitability", () => {
@@ -126,9 +233,14 @@ describe("phase of matter theory badges", () => {
     expect(issues).toEqual([]);
     expect(graphBadgeIds).toContain("matter.phase.composition_identity_context");
     expect(graphBadgeIds).toContain("matter.phase.equation_of_state_density_context");
+    expect(graphBadgeIds).toContain("matter.phase.floquet_discrete_time_crystal_context");
+    expect(graphBadgeIds).toContain("matter.phase.equilibrium_time_crystal_no_go_boundary");
+    expect(graphBadgeIds).toContain("matter.phase.time_crystal_observable_signature_context");
     expect(graphBadgeIds).toContain("matter.phase.quantized_mode_frequency_context");
     expect(graphBadgeIds).toContain("matter.phase.water_conditioned_state_context");
     expect(graphEdgeIds).toContain("water_binding_requires_conditioned_phase_state");
+    expect(graphEdgeIds).toContain("equilibrium_no_go_blocks_equilibrium_time_crystal_claim");
+    expect(graphEdgeIds).toContain("phase_eos_density_documents_time_crystal_platform_parameters");
     expect(graphEdgeIds).toContain("quantum_energy_frequency_specializes_phase_mode_frequency");
   });
 
@@ -144,5 +256,11 @@ describe("phase of matter theory badges", () => {
     expect(serialized).not.toMatch(/hydrogen and oxygen determine water density/i);
     expect(serialized).not.toMatch(/phase proves habitability/i);
     expect(serialized).not.toMatch(/frequency proves molecular structure/i);
+    expect(serialized).not.toMatch(/time crystals are perpetual motion/i);
+    expect(serialized).not.toMatch(/time crystals violate energy conservation/i);
+    expect(serialized).not.toMatch(/any repeating oscillation is a time crystal/i);
+    expect(serialized).not.toMatch(/frequency alone proves time-crystalline order/i);
+    expect(serialized).not.toMatch(/density determines time-crystal behavior/i);
+    expect(serialized).not.toMatch(/equilibrium ground-state time crystals are accepted ordinary matter phases/i);
   });
 });

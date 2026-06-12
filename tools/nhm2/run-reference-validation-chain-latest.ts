@@ -1,12 +1,17 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalize } from "node:path";
 
 type CliArgs = Record<string, string | boolean>;
 type InputRefs = Record<string, string | null>;
+type AtlasManifestCandidate = {
+  path: string;
+  generatedAt: string;
+  mtimeMs: number;
+};
 
 const CLAIM_BOUNDARY = {
   validationClaimAllowed: false,
@@ -61,10 +66,10 @@ const newestAtlasManifest = (): string | null => {
   if (!fs.existsSync(root)) return null;
   const candidates = fs
     .readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(root, entry.name, "manifest.json"))
-    .filter((candidate) => fs.existsSync(candidate))
-    .map((candidate) => {
+    .filter((entry: fs.Dirent) => entry.isDirectory())
+    .map((entry: fs.Dirent) => path.join(root, entry.name, "manifest.json"))
+    .filter((candidate: string) => fs.existsSync(candidate))
+    .map((candidate: string): AtlasManifestCandidate => {
       let generatedAt = "";
       try {
         generatedAt = String(readJson(candidate)?.generatedAt ?? "");
@@ -74,7 +79,7 @@ const newestAtlasManifest = (): string | null => {
       return { path: candidate, generatedAt, mtimeMs: fs.statSync(candidate).mtimeMs };
     });
   if (candidates.length === 0) return null;
-  candidates.sort((a, b) => {
+  candidates.sort((a: AtlasManifestCandidate, b: AtlasManifestCandidate) => {
     const byGenerated = b.generatedAt.localeCompare(a.generatedAt);
     if (byGenerated !== 0) return byGenerated;
     const byMtime = b.mtimeMs - a.mtimeMs;
@@ -114,7 +119,11 @@ const latestReferenceLedger = (): string | null => {
     }
   }
   if (candidates.length === 0) return null;
-  candidates.sort((a, b) => {
+  candidates.sort(
+    (
+      a: { path: string; generatedAt: string; runId: string; mtimeMs: number },
+      b: { path: string; generatedAt: string; runId: string; mtimeMs: number },
+    ) => {
     const byGenerated = b.generatedAt.localeCompare(a.generatedAt);
     if (byGenerated !== 0) return byGenerated;
     const byRun = b.runId.localeCompare(a.runId);
@@ -122,7 +131,8 @@ const latestReferenceLedger = (): string | null => {
     const byMtime = b.mtimeMs - a.mtimeMs;
     if (byMtime !== 0) return byMtime;
     return b.path.localeCompare(a.path);
-  });
+    },
+  );
   if (
     candidates.length > 1 &&
     candidates[0].generatedAt === candidates[1].generatedAt &&
@@ -147,6 +157,7 @@ const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRe
   const explicitOutRoot = asString(args, "out-root");
   const explicitRunId = asString(args, "run-id");
   const explicitLedger = asString(args, "ledger");
+  const explicitRegionalSourceClosure = asString(args, "regional-source-closure-evidence");
 
   const manifestPath = newestAtlasManifest();
   const manifest = manifestPath == null ? null : readJson(manifestPath);
@@ -173,7 +184,9 @@ const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRe
   );
   const regionalSourceClosure = ensureFile(
     "regional_source_closure_evidence",
-    ledger?.artifactRefs?.regionalSourceClosureEvidence ?? manifestRegional,
+    explicitRegionalSourceClosure ??
+      ledger?.artifactRefs?.regionalSourceClosureEvidence ??
+      manifestRegional,
   );
   const runId = explicitRunId ?? ledgerRunId;
   if (runId.length === 0) throw new Error("missing_run_id");
@@ -206,6 +219,10 @@ const runChain = async (args: CliArgs): Promise<number> => {
   const stderr = fs.createWriteStream(stderrPath, { flags: "w" });
   const startedAt = new Date().toISOString();
   const command = "npm";
+  const forwardStringArg = (key: string): string[] => {
+    const value = asString(args, key);
+    return value == null ? [] : [`--${key}`, value];
+  };
   const commandArgs = [
     "run",
     "nhm2:run-reference-validation-chain",
@@ -220,6 +237,21 @@ const runChain = async (args: CliArgs): Promise<number> => {
     resolved.outRoot,
     "--run-id",
     resolved.runId,
+    "--regional-source-closure-evidence",
+    resolved.inputRefs.regionalSourceClosure!,
+    ...forwardStringArg("qei-dossier"),
+    ...forwardStringArg("source-input"),
+    ...forwardStringArg("tile-local-source-elements"),
+    ...(args["build-tile-local-source-elements"] === true
+      ? ["--build-tile-local-source-elements"]
+      : []),
+    ...forwardStringArg("casimir-material-receipt"),
+    ...forwardStringArg("wall-material-source-tensor-model"),
+    ...forwardStringArg("wall-source-component-model"),
+    ...forwardStringArg("layered-wall-source-candidate"),
+    ...forwardStringArg("layered-wall-source-candidate-row-id"),
+    ...forwardStringArg("layered-wall-volume-mode"),
+    ...forwardStringArg("literature-map"),
     ...(args["audit-only"] === true ? ["--audit-only"] : []),
   ];
 
@@ -239,19 +271,22 @@ const runChain = async (args: CliArgs): Promise<number> => {
     stderr.write(chunk);
   });
 
-  await new Promise<void>((resolve) => {
-    child.on("close", (code) => {
+  await new Promise<void>((resolve: () => void) => {
+    child.on("close", (code: number | null) => {
       exitCode = code;
       resolve();
     });
   });
 
-  await new Promise<void>((resolve) => stdout.end(resolve));
-  await new Promise<void>((resolve) => stderr.end(resolve));
+  await new Promise<void>((resolve: () => void) => stdout.end(resolve));
+  await new Promise<void>((resolve: () => void) => stderr.end(resolve));
 
   const finishedAt = new Date().toISOString();
   const inputHashes = Object.fromEntries(
-    Object.entries(resolved.inputRefs).map(([key, value]) => [key, value == null ? null : sha256File(value)]),
+    Object.entries(resolved.inputRefs).map(([key, value]: [string, string | null]) => [
+      key,
+      value == null ? null : sha256File(value),
+    ]),
   );
   const invocation = {
     command,
@@ -271,10 +306,10 @@ const runChain = async (args: CliArgs): Promise<number> => {
 
 if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url))) {
   runChain(parseArgs(process.argv.slice(2)))
-    .then((code) => {
+    .then((code: number) => {
       process.exitCode = code;
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       process.stderr.write(`${JSON.stringify({ ok: false, error: message, claimBoundary: CLAIM_BOUNDARY }, null, 2)}\n`);
       process.exitCode = 1;

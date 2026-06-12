@@ -70,6 +70,40 @@ const readFinalAnswerDraftText = (payload: Record<string, unknown>): string | nu
   return readString(draft?.text) ?? readString(draft?.answer_text);
 };
 
+const readDocOpenReceiptTerminalText = (payload: Record<string, unknown>): string | null => {
+  const terminalArtifactId = readString(payload.terminal_artifact_id);
+  const ledger = readArray(payload.current_turn_artifact_ledger);
+  const directReceipt = readRecord(payload.doc_open_receipt);
+  const candidates = [
+    ...ledger
+      .map((entry) => readRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .filter((entry) => readString(entry.kind) === "doc_open_receipt")
+      .sort((left, right) => {
+        const leftId = readString(left.artifact_id);
+        const rightId = readString(right.artifact_id);
+        if (terminalArtifactId && leftId === terminalArtifactId) return -1;
+        if (terminalArtifactId && rightId === terminalArtifactId) return 1;
+        return 0;
+      })
+      .map((entry) => readRecord(entry.payload)),
+    directReceipt,
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+  for (const receipt of candidates) {
+    const status = readString(receipt.status)?.toLowerCase();
+    if (status && !/^(?:opened|completed|succeeded|success|ok)$/.test(status)) continue;
+    const path =
+      readString(receipt.path) ??
+      readString(receipt.doc_path) ??
+      readString(receipt.active_doc_path) ??
+      readString(receipt.source_path) ??
+      readString(receipt.opened_path);
+    if (path) return `Opened document: ${path}`;
+  }
+  return null;
+};
+
 const readTurnId = (payload: Record<string, unknown>, fallback?: string | null): string =>
   readString(payload.turn_id) ?? readString(fallback) ?? "unknown-turn";
 
@@ -369,6 +403,10 @@ export function resolveTerminalAnswerEnvelope(
     authorityOrigin = terminalText === readValidRepoEvidenceAnswerText(payload)
       ? "repo_code_evidence_answer"
       : "terminal_presentation";
+  } else if (terminalArtifactKind === "doc_open_receipt") {
+    terminalText = readDocOpenReceiptTerminalText(payload) ?? readTerminalPresentationText(payload);
+    finalAnswerSource = "doc_open_receipt";
+    authorityOrigin = "terminal_presentation";
   } else if (terminalArtifactKind === "live_environment_tool_observation") {
     terminalText = readFinalAnswerDraftText(payload) ?? readString(payload.selected_final_answer) ?? readTerminalPresentationText(payload);
     authorityOrigin = terminalText === readFinalAnswerDraftText(payload) || terminalText === readString(payload.selected_final_answer)

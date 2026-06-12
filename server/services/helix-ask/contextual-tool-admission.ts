@@ -24,8 +24,8 @@ export type HelixContextualToolSuppressionFamily =
   | "repo_code"
   | "live_environment";
 
-const DOCS_VIEWER_CUE_RE = /\bdocs?\s+viewer\b|\bdocuments?\s+viewer\b|\bdocs?\s+panel\b|\bdocuments?\s+panel\b/i;
-const DOCS_VIEWER_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load)\b[\s\S]{0,100}(?:the\s+|a\s+)?(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)\b/i;
+const DOCS_VIEWER_CUE_RE = /\bdocs?\s+viewer\b|\bdocuments?\s+viewer\b|\bdocs?\s+panel\b|\bdocuments?\s+panel\b|\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b/i;
+const DOCS_VIEWER_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|run|call|execute|use)\b[\s\S]{0,100}(?:the\s+|a\s+)?(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?|docs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?)\b/i;
 const DOCS_VIEWER_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
 const SCIENTIFIC_CALCULATOR_CUE_RE = /\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate|equation|expression)\b/i;
 const SCIENTIFIC_CALCULATOR_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:\d|[=+\-*/^()]|\\frac|\\sqrt)/i;
@@ -88,6 +88,20 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     )
   ) return null;
   MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
+
+  const contextualDocsIdentifier = prompt.match(
+    /\b(?:earlier|previously|last\s+turn|before|debug|screen|visible|mentioned|saw|quoted?)\b[\s\S]{0,160}\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b|\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b/i,
+  )?.[0];
+  if (contextualDocsIdentifier) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(contextualDocsIdentifier)
+        ? "negated_tool_instruction"
+        : "explanatory_only",
+      verb_or_cue: "docs_viewer.search_docs",
+      text: contextualDocsIdentifier,
+    };
+  }
 
   const quoted = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
   if (quoted) {
